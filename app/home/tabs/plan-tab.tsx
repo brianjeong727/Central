@@ -6597,6 +6597,13 @@ export function EventPlanWorkspace({
   const [notes, setNotes] = useState<EventNote[]>([])
   const [members, setMembers] = useState<{ id: string; name: string }[]>([])
 
+  // Assignee pool = team members ∪ anyone assigned to a role on this event, deduped by id
+  const assigneePool = useMemo(() => {
+    const map = new Map<string, string>(members.map(m => [m.id, m.name]))
+    for (const r of roles) if (r.assigned_to && r.assigned_name) map.set(r.assigned_to, r.assigned_name)
+    return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [members, roles])
+
   // Planning chat state
   const [planningGroupId, setPlanningGroupId] = useState<string | null>(null)
   const [creatingPlanChat, setCreatingPlanChat] = useState(false)
@@ -6631,6 +6638,13 @@ export function EventPlanWorkspace({
   const [addingTask, setAddingTask] = useState(false)
   const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
   const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null)
+
+  // Task inline edit state
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [editTaskTitle, setEditTaskTitle] = useState("")
+  const [editTaskAssignee, setEditTaskAssignee] = useState("")
+  const [editTaskDue, setEditTaskDue] = useState("")
+  const [savingTaskEdit, setSavingTaskEdit] = useState(false)
 
   // Role add state
   const [newRoleName, setNewRoleName] = useState("")
@@ -6732,21 +6746,12 @@ export function EventPlanWorkspace({
         created_at: n.created_at as string,
       })))
 
-      // Fetch assignee list: team roster if teamId given, else all ministry members
-      if (teamId) {
-        const { data: rosterData } = await supabase
-          .from("team_members")
-          .select("user_id, profiles(id, name)")
-          .eq("team_id", teamId)
-        setMembers((rosterData ?? []).map((r: Record<string, unknown>) => {
-          const p = r.profiles as { id?: string; name?: string } | null
-          return { id: p?.id ?? r.user_id as string, name: p?.name ?? "Unknown" }
-        }).filter(m => m.name !== "Unknown"))
-      } else {
-        const { data: membersData } = await supabase
-          .from("profiles").select("id, name").eq("ministry_id", ministryId).order("name")
-        setMembers(membersData ?? [])
-      }
+      // Assignee list = the entire ministry (student org) member list — the team
+      // roster is often unpopulated, and tasks should be assignable to anyone in
+      // the org. assigneePool (memo) additionally unions in this event's role-assignees.
+      const { data: membersData } = await supabase
+        .from("profiles").select("id, name").eq("ministry_id", ministryId).order("name")
+      setMembers(membersData ?? [])
 
       // Fetch RSVP count if linked to an announcement
       if ((calendarEvent as { linked_announcement_id?: string | null }).linked_announcement_id) {
@@ -6838,6 +6843,31 @@ export function EventPlanWorkspace({
   async function handleDeleteTask(id: string) {
     setTasks((prev) => prev.filter((t) => t.id !== id))
     await supabase.from("event_tasks").delete().eq("id", id)
+  }
+
+  function startEditTask(task: EventTask) {
+    setConfirmDeleteTaskId(null)
+    setEditingTaskId(task.id)
+    setEditTaskTitle(task.title)
+    setEditTaskAssignee(task.assigned_to ?? "")
+    setEditTaskDue(task.due_date ?? "")
+  }
+
+  async function handleUpdateTask() {
+    if (!editingTaskId || !editTaskTitle.trim()) return
+    setSavingTaskEdit(true)
+    const id = editingTaskId
+    const newTitle = editTaskTitle.trim()
+    const newAssignee = editTaskAssignee || null
+    const newDue = editTaskDue || null
+    await supabase
+      .from("event_tasks")
+      .update({ title: newTitle, assigned_to: newAssignee, due_date: newDue })
+      .eq("id", id)
+    const assignedName = newAssignee ? assigneePool.find(a => a.id === newAssignee)?.name : undefined
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, title: newTitle, assigned_to: newAssignee, due_date: newDue, assigned_name: assignedName } : t))
+    setEditingTaskId(null)
+    setSavingTaskEdit(false)
   }
 
   async function handleAddRole() {
@@ -7310,6 +7340,50 @@ export function EventPlanWorkspace({
                             <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "14px 4px 6px" }}>No tasks yet for this phase.</p>
                           )}
                           {phaseTasks.map((task, i) => (
+                            canEdit && editingTaskId === task.id ? (
+                              <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: i === phaseTasks.length - 1 ? "none" : "1px solid #F0EBE0" }}>
+                                <button
+                                  onClick={() => handleToggleTask(task)}
+                                  style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "var(--plum)" : "#C4C0B0"), background: task.completed ? "var(--plum)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
+                                >
+                                  {task.completed && <Check className="w-2.5 h-2.5 text-white" />}
+                                </button>
+                                <input
+                                  autoFocus
+                                  value={editTaskTitle}
+                                  onChange={(e) => setEditTaskTitle(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === "Enter" && editTaskTitle.trim()) handleUpdateTask(); if (e.key === "Escape") setEditingTaskId(null) }}
+                                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
+                                />
+                                <select
+                                  value={editTaskAssignee}
+                                  onChange={(e) => setEditTaskAssignee(e.target.value)}
+                                  style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                                >
+                                  <option value="">Unassigned</option>
+                                  {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                </select>
+                                <input
+                                  type="date"
+                                  value={editTaskDue}
+                                  onChange={(e) => setEditTaskDue(e.target.value)}
+                                  style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                                />
+                                <CentralButton
+                                  variant="primary" size="sm"
+                                  onClick={handleUpdateTask}
+                                  disabled={savingTaskEdit || !editTaskTitle.trim()}
+                                >
+                                  Save
+                                </CentralButton>
+                                <button
+                                  onClick={() => setEditingTaskId(null)}
+                                  style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
                             <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: i === phaseTasks.length - 1 && !canEdit ? "none" : "1px solid #F0EBE0" }}>
                               <button
                                 onClick={() => handleToggleTask(task)}
@@ -7343,12 +7417,18 @@ export function EventPlanWorkspace({
                                     </button>
                                   </div>
                                 ) : (
-                                  <button onClick={() => setConfirmDeleteTaskId(task.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
+                                  <>
+                                    <button onClick={() => startEditTask(task)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--muted-text)" }}>
+                                      <Pencil style={{ width: 14, height: 14 }} />
+                                    </button>
+                                    <button onClick={() => { setEditingTaskId(null); setConfirmDeleteTaskId(task.id) }} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
                                 )
                               )}
                             </div>
+                            )
                           ))}
 
                           {/* Inline add row per phase */}
@@ -7371,7 +7451,7 @@ export function EventPlanWorkspace({
                                     style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
                                   >
                                     <option value="">Unassigned</option>
-                                    {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                    {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                                   </select>
                                   <input
                                     type="date"
