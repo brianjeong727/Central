@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } fro
 import { createPortal } from "react-dom"
 import useSWR from "swr"
 import {
-  ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2,
+  ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2, MapPin,
   Edit3, ArrowLeft, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, ListOrdered,
   Indent, Outdent, AlignLeft, AlignCenter, AlignRight, ClipboardList, Pencil,
@@ -1155,6 +1155,386 @@ async function fetchCalendarEventsAndPlans([, ministryId, teamScope]: readonly [
   return { events, plannedIds, tableReady }
 }
 
+// ── Events agenda helpers ──────────────────────────────────────────────────────
+// Whole-day difference between two dates (calendar days, sign-preserving).
+function daysUntil(start: Date, now: Date): number {
+  const s = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  const n = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((s.getTime() - n.getTime()) / 86400000)
+}
+// Humanised countdown for a future event; null for past events (caller shows no pill).
+function countdownLabel(start: Date, now: Date): { label: string; soon: boolean } | null {
+  const days = daysUntil(start, now)
+  if (days < 0) return null
+  let label: string
+  if (days === 0) label = "Today"
+  else if (days === 1) label = "Tomorrow"
+  else if (days < 30) label = `in ${days} days`
+  else { const m = Math.round(days / 30); label = `in ${m} month${m === 1 ? "" : "s"}` }
+  return { label, soon: days <= 7 }
+}
+// Humanised "Ended · …" label for a past event (day/week/month granularity).
+function endedAgoLabel(start: Date, now: Date): string {
+  const days = -daysUntil(start, now) // positive = days in the past
+  if (days <= 0) return "Ended · today"
+  if (days === 1) return "Ended · yesterday"
+  if (days < 7) return `Ended · ${days} days ago`
+  if (days < 14) return "Ended · last week"
+  if (days < 30) { const w = Math.round(days / 7); return `Ended · ${w} weeks ago` }
+  if (days < 60) return "Ended · last month"
+  const m = Math.round(days / 30)
+  return `Ended · ${m} months ago`
+}
+
+// ── EventsAgendaList ───────────────────────────────────────────────────────────
+// Agenda/timeline view for a team's Events section (redesign per cdesign handoff).
+// Groups top-level events by month with a spine + node rail; the earliest upcoming
+// event is emphasised as an "up next" callout with an optional sub-events disclosure.
+function EventsAgendaList({
+  events, allEvents, onOpenEvent, canEdit, onDelete, deleteConfirmId, setDeleteConfirmId, deleting, plannedIds,
+}: {
+  events: CalendarEvent[]
+  allEvents: CalendarEvent[]
+  onOpenEvent: (ev: CalendarEvent) => void
+  canEdit: boolean
+  onDelete: (id: string) => void
+  deleteConfirmId: string | null
+  setDeleteConfirmId: (id: string | null) => void
+  deleting: boolean
+  plannedIds: Set<string>
+}) {
+  const now = useMemo(() => new Date(), [])
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  // null = user hasn't toggled anything → fall back to the derived default (up-next open).
+  const [openSubs, setOpenSubs] = useState<Set<string> | null>(null)
+  // null = user hasn't toggled → derived default (collapsed unless there are no upcoming events).
+  const [showPastOverride, setShowPastOverride] = useState<boolean | null>(null)
+  const [pastBarHover, setPastBarHover] = useState(false)
+
+  const sorted = useMemo(
+    () => [...events].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()),
+    [events],
+  )
+  // Split by the same "today" cutoff countdownLabel uses: on/after today = upcoming.
+  const upcoming = useMemo(() => sorted.filter(e => daysUntil(new Date(e.start_date), now) >= 0), [sorted, now])
+  const past = useMemo(() => sorted.filter(e => daysUntil(new Date(e.start_date), now) < 0), [sorted, now])
+  const upNextId = upcoming[0]?.id ?? null
+  const showPast = showPastOverride ?? (upcoming.length === 0)
+  const childrenByParent = useMemo(() => {
+    const m = new Map<string, CalendarEvent[]>()
+    for (const e of allEvents) {
+      if (!e.parent_event_id) continue
+      const arr = m.get(e.parent_event_id) ?? []
+      arr.push(e); m.set(e.parent_event_id, arr)
+    }
+    for (const arr of m.values()) arr.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
+    return m
+  }, [allEvents])
+
+  // Derived open set: until the user toggles, the up-next event's panel defaults open.
+  const effectiveOpenSubs = openSubs ?? new Set<string>(upNextId ? [upNextId] : [])
+
+  function toggleSubs(id: string) {
+    setOpenSubs(prev => {
+      const base = prev ?? new Set<string>(upNextId ? [upNextId] : [])
+      const next = new Set(base)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  if (events.length === 0) {
+    return (
+      <div style={{ borderLeft: "2px solid var(--line)", paddingLeft: 20 }}>
+        <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>
+          No events yet. Click &ldquo;New Event&rdquo; to get started.
+        </p>
+      </div>
+    )
+  }
+
+  const monoBase: React.CSSProperties = { fontFamily: "var(--mono)", textTransform: "uppercase" }
+  const dot = <span style={{ width: 3, height: 3, borderRadius: "50%", background: "var(--faint)", flexShrink: 0 }} />
+
+  // Shared bits reused by both the upcoming and past lists.
+  const renderPlannedCheck = (isPlanned: boolean) => isPlanned ? (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--faint)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ) : null
+  const renderDeleteBtn = (evId: string, isHovered: boolean) => canEdit ? (
+    <button
+      onClick={e => { e.stopPropagation(); setDeleteConfirmId(evId) }}
+      style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: "var(--muted-text)", flexShrink: 0, display: "flex", alignItems: "center", opacity: isHovered ? 1 : 0, transition: "opacity 120ms" }}
+      title="Delete event"
+    >
+      <Trash2 className="w-4 h-4" />
+    </button>
+  ) : null
+  const renderConfirmBody = (ev: CalendarEvent) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "17px 20px", borderRadius: "var(--r-card)", background: "color-mix(in srgb, var(--danger) 5%, var(--cream))", border: "1px solid color-mix(in srgb, var(--danger) 28%, var(--line-2))" }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--danger)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+        <p style={{ fontSize: 13, color: "color-mix(in srgb, var(--danger) 60%, var(--body))", margin: "4px 0 0", fontFamily: "var(--sans)" }}>Delete this event and all its planning data?</p>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        <button onClick={e => { e.stopPropagation(); setDeleteConfirmId(null) }} style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", fontSize: 13, fontWeight: 500, cursor: "pointer", color: "var(--body)", fontFamily: "var(--sans)" }}>Cancel</button>
+        <button onClick={e => { e.stopPropagation(); onDelete(ev.id) }} disabled={deleting} style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--danger)", background: "transparent", color: "var(--danger)", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1, fontFamily: "var(--sans)" }}>{deleting ? "Deleting…" : "Delete"}</button>
+      </div>
+    </div>
+  )
+
+  // ── Upcoming list (month-grouped; first entry is the emphasised Up-Next) ──────
+  const upcomingNodes: ReactNode[] = []
+  let lastMonthKey = ""
+  upcoming.forEach((ev, i) => {
+    const d = new Date(ev.start_date)
+    const end = new Date(ev.end_date)
+    const monthKey = `${d.getFullYear()}-${d.getMonth()}`
+    if (monthKey !== lastMonthKey) {
+      lastMonthKey = monthKey
+      upcomingNodes.push(
+        <div key={`m-${monthKey}`} style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", margin: "var(--space-9) 0 var(--space-6)" }}>
+          <span style={{ ...monoBase, fontSize: 11, letterSpacing: "0.16em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
+            {d.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+          </span>
+          <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+        </div>,
+      )
+    }
+
+    const isFirst = i === 0
+    const isLast = i === upcoming.length - 1
+    const isUpNext = ev.id === upNextId
+    const isConfirmDelete = deleteConfirmId === ev.id
+    const isHovered = hoveredId === ev.id
+    const isPlanned = plannedIds.has(ev.id)
+    const cd = countdownLabel(d, now)
+    const kids = childrenByParent.get(ev.id) ?? []
+    const hasKids = kids.length > 0
+    const subsOpen = effectiveOpenSubs.has(ev.id)
+
+    const metaDate = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+    const timeStr = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    const dtStr = ev.all_day ? metaDate : `${metaDate} · ${timeStr}`
+    const multiDay = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime() !== new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() && !isNaN(end.getTime())
+    const rangeStr = multiDay
+      ? `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+      : dtStr
+
+    const dayNum = daysUntil(d, now)
+    const bigNum = dayNum >= 30 ? String(Math.round(dayNum / 30)) : String(Math.max(dayNum, 0))
+    const bigUnit = dayNum <= 0 ? "today" : dayNum < 30 ? (dayNum === 1 ? "day away" : "days away") : (Math.round(dayNum / 30) === 1 ? "month away" : "months away")
+
+    // Body: confirm-delete swap, up-next callout, or standard card.
+    let body: ReactNode
+    if (isConfirmDelete) {
+      body = renderConfirmBody(ev)
+    } else if (isUpNext) {
+      body = (
+        <div
+          onClick={() => onOpenEvent(ev)}
+          onMouseEnter={() => setHoveredId(ev.id)}
+          onMouseLeave={() => setHoveredId(null)}
+          style={{ background: "var(--cream-3)", border: "1px solid var(--line-2)", borderLeft: "3px solid var(--plum)", borderRadius: "var(--r-callout)", padding: "18px 22px", cursor: "pointer" }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)", flexShrink: 0 }} />
+            <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.15em", color: "var(--plum)" }}>Up next · Starts {(cd?.label ?? "soon").toLowerCase()}</span>
+            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+              {renderPlannedCheck(isPlanned)}
+              {renderDeleteBtn(ev.id, isHovered)}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginTop: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h3 style={{ fontFamily: "var(--serif)", fontSize: 23, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</h3>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, fontSize: 13, color: "var(--body)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {rangeStr}</span>
+                {ev.location && <>{dot}<span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {ev.location}</span></>}
+              </div>
+            </div>
+            <div style={{ marginLeft: "auto", textAlign: "right", flexShrink: 0 }}>
+              <div style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, color: "var(--plum)", lineHeight: 1, letterSpacing: "-0.02em" }}>{bigNum}</div>
+              <div style={{ ...monoBase, fontSize: 10, color: "var(--muted-text)", marginTop: 3 }}>{bigUnit}</div>
+            </div>
+          </div>
+        </div>
+      )
+    } else {
+      const isPast = cd === null
+      body = (
+        <div
+          onClick={() => onOpenEvent(ev)}
+          onMouseEnter={() => setHoveredId(ev.id)}
+          onMouseLeave={() => setHoveredId(null)}
+          style={{ display: "flex", alignItems: "center", gap: "var(--space-5)", padding: "17px 20px", borderRadius: "var(--r-card)", background: "var(--cream)", border: `1px solid ${isHovered ? "var(--dashed)" : "var(--line-2)"}`, cursor: "pointer", transition: "border-color 120ms ease" }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 13, color: "var(--body)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {dtStr}</span>
+              {ev.location && <>{dot}<span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {ev.location}</span></>}
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            {!isPast && cd && (
+              <span style={{ fontFamily: "var(--sans)", fontSize: 12.5, borderRadius: 999, padding: "5px 12px", whiteSpace: "nowrap", border: "1px solid var(--line-2)", background: cd.soon ? "var(--ivory)" : "var(--cream-2)", color: cd.soon ? "var(--plum)" : "var(--body)", fontWeight: cd.soon ? 500 : 400 }}>{cd.label}</span>
+            )}
+            {renderPlannedCheck(isPlanned)}
+            {renderDeleteBtn(ev.id, isHovered)}
+          </div>
+        </div>
+      )
+    }
+
+    // Sub-events disclosure (only when the event has children).
+    const subsBlock = hasKids ? (
+      <div style={{ marginTop: 10 }}>
+        <button
+          onClick={() => toggleSubs(ev.id)}
+          style={{ display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", cursor: "pointer", color: "var(--plum)", fontFamily: "var(--sans)", fontSize: 12.5, padding: 0 }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: subsOpen ? "rotate(90deg)" : "none", transition: "transform 160ms ease" }}>
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+          <span>Sub-events</span>
+          <span style={{ ...monoBase, fontSize: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "1px 7px", color: "var(--plum)" }}>{kids.length}</span>
+        </button>
+        <div style={{ overflow: "hidden", maxHeight: subsOpen ? 2000 : 0, transition: "max-height 260ms ease" }}>
+          <div style={{ paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+            {kids.map(c => {
+              const cd2 = new Date(c.start_date)
+              const cTime = c.all_day ? "All day" : cd2.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              return (
+                <div key={c.id} onClick={e => { e.stopPropagation(); onOpenEvent(c) }} style={{ display: "grid", gridTemplateColumns: "52px 20px 1fr", cursor: "pointer" }}>
+                  <div style={{ textAlign: "center", paddingTop: 4 }}>
+                    <div style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", lineHeight: 1, letterSpacing: "-0.02em" }}>{cd2.getDate()}</div>
+                    <div style={{ ...monoBase, fontSize: 9, color: "var(--muted-text)", marginTop: 2 }}>{cd2.toLocaleDateString("en-US", { month: "short" })}</div>
+                  </div>
+                  <div style={{ position: "relative" }}>
+                    <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 2, background: "var(--line-2)", transform: "translateX(-50%)" }} />
+                    <div style={{ position: "absolute", left: "50%", top: "50%", width: 7, height: 7, borderRadius: "50%", background: "var(--cream)", border: "2px solid var(--dashed)", transform: "translate(-50%,-50%)", boxSizing: "border-box" }} />
+                  </div>
+                  <div style={{ background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "11px 15px", display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", margin: 0, fontFamily: "var(--sans)" }}>{c.title}</p>
+                      {c.description && <p style={{ fontSize: 12, color: "var(--body)", margin: "2px 0 0", fontFamily: "var(--sans)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.description}</p>}
+                    </div>
+                    <span style={{ ...monoBase, fontSize: 11, color: "var(--muted-text)", marginLeft: "auto", flexShrink: 0 }}>{cTime}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    ) : null
+
+    upcomingNodes.push(
+      <div key={ev.id} style={{ display: "grid", gridTemplateColumns: "76px 26px 1fr" }}>
+        {/* Date block */}
+        <div style={{ textAlign: "center", paddingTop: 20 }}>
+          <div style={{ ...monoBase, fontSize: 11, letterSpacing: "0.12em", color: "var(--muted-text)" }}>{d.toLocaleDateString("en-US", { weekday: "short" })}</div>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 38, fontWeight: 600, letterSpacing: "-0.02em", color: isUpNext ? "var(--plum)" : "var(--ink)", lineHeight: 1 }}>{d.getDate()}</div>
+          <div style={{ ...monoBase, fontSize: 11, color: "var(--muted-text)" }}>{d.toLocaleDateString("en-US", { month: "short" })}</div>
+        </div>
+        {/* Spine */}
+        <div style={{ position: "relative" }}>
+          <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", width: 2, background: "var(--line)", top: isFirst ? 28 : 0, bottom: isLast ? "auto" : 0, height: isLast ? 28 : "auto" }} />
+          <div className={isUpNext ? "event-upnext-node" : undefined} style={{ position: "absolute", top: 28, left: "50%", transform: "translate(-50%,-50%)", width: 11, height: 11, borderRadius: "50%", background: isUpNext ? "var(--plum)" : "var(--cream)", border: `2px solid ${isUpNext ? "var(--plum)" : "var(--dashed)"}`, boxSizing: "border-box" }} />
+        </div>
+        {/* Body */}
+        <div style={{ paddingTop: 14, minWidth: 0 }}>
+          {body}
+          {subsBlock}
+        </div>
+      </div>,
+    )
+  })
+
+  // ── Past list (reverse-chronological, de-emphasised; no month grouping, no subs) ──
+  const pastDesc = [...past].reverse()
+  const pastNodes: ReactNode[] = pastDesc.map((ev, i) => {
+    const d = new Date(ev.start_date)
+    const isFirst = i === 0
+    const isLast = i === pastDesc.length - 1
+    const isConfirmDelete = deleteConfirmId === ev.id
+    const isHovered = hoveredId === ev.id
+    const isPlanned = plannedIds.has(ev.id)
+    const metaDate = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+    const timeStr = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    const dtStr = ev.all_day ? metaDate : `${metaDate} · ${timeStr}`
+
+    const body = isConfirmDelete ? renderConfirmBody(ev) : (
+      <div
+        onClick={() => onOpenEvent(ev)}
+        onMouseEnter={() => setHoveredId(ev.id)}
+        onMouseLeave={() => setHoveredId(null)}
+        style={{ display: "flex", alignItems: "center", gap: "var(--space-5)", padding: "17px 20px", borderRadius: "var(--r-card)", background: "var(--cream-2)", border: `1px solid ${isHovered ? "var(--line-2)" : "var(--line)"}`, opacity: isHovered ? 1 : 0.82, cursor: "pointer", transition: "opacity 120ms ease, border-color 120ms ease" }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--body)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 13, color: "var(--faint)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {dtStr}</span>
+            {ev.location && <>{dot}<span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {ev.location}</span></>}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.08em", color: "var(--faint)", whiteSpace: "nowrap" }}>{endedAgoLabel(d, now)}</span>
+          {renderPlannedCheck(isPlanned)}
+          {renderDeleteBtn(ev.id, isHovered)}
+        </div>
+      </div>
+    )
+
+    return (
+      <div key={ev.id} style={{ display: "grid", gridTemplateColumns: "76px 26px 1fr" }}>
+        {/* Date block — de-emphasised */}
+        <div style={{ textAlign: "center", paddingTop: 20 }}>
+          <div style={{ ...monoBase, fontSize: 11, letterSpacing: "0.12em", color: "var(--faint)" }}>{d.toLocaleDateString("en-US", { weekday: "short" })}</div>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 38, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--muted-text)", lineHeight: 1 }}>{d.getDate()}</div>
+          <div style={{ ...monoBase, fontSize: 11, color: "var(--faint)" }}>{d.toLocaleDateString("en-US", { month: "short" })}</div>
+        </div>
+        {/* Spine — done node */}
+        <div style={{ position: "relative" }}>
+          <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", width: 2, background: "var(--line)", top: isFirst ? 28 : 0, bottom: isLast ? "auto" : 0, height: isLast ? 28 : "auto" }} />
+          <div style={{ position: "absolute", top: 28, left: "50%", transform: "translate(-50%,-50%)", width: 11, height: 11, borderRadius: "50%", background: "var(--line-2)", border: "2px solid var(--line-2)", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Check style={{ width: 8, height: 8, color: "var(--cream)" }} strokeWidth={3} />
+          </div>
+        </div>
+        {/* Body */}
+        <div style={{ paddingTop: 14, minWidth: 0 }}>{body}</div>
+      </div>
+    )
+  })
+
+  return (
+    <div>
+      {upcomingNodes}
+      {past.length > 0 && (
+        <>
+          <button
+            onClick={() => setShowPastOverride(v => !(v ?? (upcoming.length === 0)))}
+            onMouseEnter={() => setPastBarHover(true)}
+            onMouseLeave={() => setPastBarHover(false)}
+            style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: "var(--space-10)" }}
+          >
+            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <ChevronDown className="w-3.5 h-3.5" style={{ color: "var(--muted-text)", transform: showPast ? "rotate(180deg)" : "none", transition: "transform 200ms ease" }} />
+              <span style={{ ...monoBase, fontSize: 11, letterSpacing: "0.14em", color: pastBarHover ? "var(--body)" : "var(--muted-text)", transition: "color 120ms ease" }}>Past events</span>
+              <span style={{ ...monoBase, fontSize: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "1px 7px", color: "var(--muted-text)" }}>{past.length}</span>
+            </span>
+            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </button>
+          {showPast && <div style={{ paddingTop: "var(--space-6)" }}>{pastNodes}</div>}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── StudentOrgTeamHome ─────────────────────────────────────────────────────────
 // Full redesign per design spec: plum hero → General/Plan/Roster/Resources tabs →
 // General = month calendar (click → EventPlanWorkspace directly) + UP NEXT + QUICK ADD + notes timeline
@@ -1214,7 +1594,6 @@ export function StudentOrgTeamHome({
   const [showAddModal, setShowAddModal] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [hoveredEventId, setHoveredEventId] = useState<string | null>(null)
 
   // Sub-event body-swap: when a sub-event is opened from EventPlanWorkspace's
   // Sub-events tab, it reuses the SAME parent SubpageShell (body + extended
@@ -1514,77 +1893,17 @@ export function StudentOrgTeamHome({
                 )}
               </div>
             )}
-            {calEvents.length === 0 ? (
-              <div style={{ borderLeft: "2px solid var(--line)", paddingLeft: 20 }}>
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No events yet. Click &ldquo;New Event&rdquo; to get started.</p>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {calEvents.map(ev => {
-                  const isPlanned = plannedIds.has(ev.id)
-                  const dateStr = new Date(ev.start_date).toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric" })
-                  const isConfirmDelete = deleteConfirmId === ev.id
-                  const isHovered = hoveredEventId === ev.id
-                  return (
-                    <div
-                      key={ev.id}
-                      onClick={() => !isConfirmDelete && onPlanningEventChange(ev)}
-                      onMouseEnter={() => !isConfirmDelete && setHoveredEventId(ev.id)}
-                      onMouseLeave={() => setHoveredEventId(null)}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 16,
-                        padding: "16px 20px", borderRadius: 12,
-                        border: `1px solid ${isConfirmDelete ? "#F0C8C8" : "var(--line)"}`,
-                        background: isConfirmDelete ? "#FEF7F7" : isHovered ? "var(--ivory)" : "var(--body-bg)",
-                        cursor: isConfirmDelete ? "default" : "pointer",
-                        transition: "background 120ms ease, border-color 120ms ease",
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: isConfirmDelete ? "#9F3030" : "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
-                        <p style={{ fontSize: 12, color: isConfirmDelete ? "#C08080" : "var(--muted-text)", margin: "3px 0 0", fontFamily: "var(--sans)" }}>
-                          {isConfirmDelete ? "Delete this event and all its planning data?" : `${dateStr}${ev.location ? ` · ${ev.location}` : ""}`}
-                        </p>
-                      </div>
-                      {isConfirmDelete ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                          <button
-                            onClick={e => { e.stopPropagation(); setDeleteConfirmId(null) }}
-                            style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", fontSize: 13, fontWeight: 500, cursor: "pointer", color: "var(--body)", fontFamily: "var(--sans)" }}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={e => { e.stopPropagation(); handleDeleteEvent(ev.id) }}
-                            disabled={deleting}
-                            style={{ padding: "7px 14px", borderRadius: 9, border: "none", background: "#9F3030", color: "var(--cream-panel)", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1, fontFamily: "var(--sans)" }}
-                          >
-                            {deleting ? "Deleting…" : "Delete"}
-                          </button>
-                        </div>
-                      ) : (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                          {isPlanned && (
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted-text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          )}
-                          {canEdit && (
-                            <button
-                              onClick={e => { e.stopPropagation(); setDeleteConfirmId(ev.id) }}
-                              style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", color: "var(--muted-text)", flexShrink: 0, display: "flex", alignItems: "center", opacity: isHovered ? 1 : 0, transition: "opacity 120ms" }}
-                              title="Delete event"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            <EventsAgendaList
+              events={calEvents}
+              allEvents={calData?.events ?? []}
+              onOpenEvent={onPlanningEventChange}
+              canEdit={canEdit}
+              onDelete={handleDeleteEvent}
+              deleteConfirmId={deleteConfirmId}
+              setDeleteConfirmId={setDeleteConfirmId}
+              deleting={deleting}
+              plannedIds={plannedIds}
+            />
           </div>
         )}
 
