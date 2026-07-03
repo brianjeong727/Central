@@ -1,16 +1,16 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo, Fragment, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 import { createPortal } from "react-dom"
 import useSWR from "swr"
 import {
   ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2, MapPin,
-  Edit3, ArrowLeft, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
+  Edit3, ArrowLeft, ArrowRight, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
   ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle,
   FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle, Eye,
-  UserPlus, Sparkles, Layers, Bus, Clock, AlertTriangle,
+  Sparkles, Layers, Bus, Clock, Star, CornerUpLeft, AlertTriangle,
 } from "lucide-react"
 import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
@@ -38,7 +38,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, Header
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, CentralButton } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, IconButton } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -47,7 +47,7 @@ import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
   WorshipWeek, WorshipRoleRow, PraiseTeamMember, WorshipSong, WorshipInvite, WorshipChart, AnnotationObj, Category,
-  EventType, EventExtraTab, EventNewFolk, TransitionNote,
+  EventType, EventExtraTab, TransitionNote,
 } from "../types"
 import { teamAccessLevel, type TeamAccess } from "../governance"
 
@@ -905,8 +905,11 @@ function EventsAgendaList({
     const monthKey = `${d.getFullYear()}-${d.getMonth()}`
     if (monthKey !== lastMonthKey) {
       lastMonthKey = monthKey
+      // First month sits flush under the section header — the padded wrapper already
+      // supplies the top gap; only later months get the full separating top margin.
+      const firstMonth = upcomingNodes.length === 0
       upcomingNodes.push(
-        <div key={`m-${monthKey}`} style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", margin: "var(--space-9) 0 var(--space-6)" }}>
+        <div key={`m-${monthKey}`} style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", margin: `${firstMonth ? "0" : "var(--space-9)"} 0 var(--space-6)` }}>
           <span style={{ ...monoBase, fontSize: 11, letterSpacing: "0.16em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
             {d.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
           </span>
@@ -5067,7 +5070,7 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
       { name: "DGL Liaison", notes: "Coordinates with DGL team for dinner cooking rotations" },
       { name: "Praise Team Liaison", notes: "Coordinates Praise Night worship with Praise Team" },
     ],
-    extraTabs: ["sub_events", "new_folks"],
+    extraTabs: ["sub_events"],
   },
   coffeehouse: {
     label: "Coffeehouse", icon: "☕", dot: "#9D7B4F", bg: "#FDF6EC", text: "#6B4C1E",
@@ -6174,6 +6177,32 @@ function LaunchpadRow({ icon: Icon, title, subtitle, right, onClick }: {
   )
 }
 
+// Small hover-aware icon button for the checklist row actions (grip, pin, add
+// subtask, promote, edit, delete). Inline styles across this file preclude CSS
+// :hover, so hover is tracked in local state.
+function ChecklistIconBtn({ onClick, title, baseColor = "var(--faint)", hoverColor = "var(--body)", children, style }: {
+  onClick: () => void
+  title: string
+  baseColor?: string
+  hoverColor?: string
+  children: ReactNode
+  style?: React.CSSProperties
+}) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+      title={title}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "grid", placeItems: "center", color: hov ? hoverColor : baseColor, transition: "color .12s ease", ...style }}
+    >
+      {children}
+    </button>
+  )
+}
+
 export function EventPlanWorkspace({
   calendarEvent,
   ministryId,
@@ -6230,6 +6259,26 @@ export function EventPlanWorkspace({
     return [...map.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
   }, [members, roles])
 
+  // Map a raw event_tasks row (with joined assignee profile) to an EventTask.
+  // Shared by the initial load, task add, and subtask add so the hierarchy /
+  // pin / priority columns are mapped consistently in one place.
+  function mapTask(t: Record<string, unknown>): EventTask {
+    return {
+      id: t.id as string,
+      event_plan_id: t.event_plan_id as string,
+      title: t.title as string,
+      assigned_to: t.assigned_to as string | null,
+      assigned_name: (t.profiles as { name?: string } | null)?.name,
+      due_date: t.due_date as string | null,
+      completed: t.completed as boolean,
+      phase: (t.phase as string ?? "pre_event") as EventTask["phase"],
+      sort_order: (t.sort_order as number) ?? 0,
+      parent_id: (t.parent_id as string | null) ?? null,
+      pinned: (t.pinned as boolean) ?? false,
+      priority: (t.priority as EventTask["priority"]) ?? "none",
+    }
+  }
+
   // Planning chat state
   const [planningGroupId, setPlanningGroupId] = useState<string | null>(null)
   const [creatingPlanChat, setCreatingPlanChat] = useState(false)
@@ -6264,7 +6313,6 @@ export function EventPlanWorkspace({
   const [newTaskSection, setNewTaskSection] = useState<string>("")
   const [addingTask, setAddingTask] = useState(false)
   const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
-  const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null)
 
   // Plan/crunch date state — drives the checklist section windows.
   const [planStartDate, setPlanStartDate] = useState("")
@@ -6277,7 +6325,24 @@ export function EventPlanWorkspace({
   const [editTaskTitle, setEditTaskTitle] = useState("")
   const [editTaskAssignee, setEditTaskAssignee] = useState("")
   const [editTaskDue, setEditTaskDue] = useState("")
+  const [editTaskPriority, setEditTaskPriority] = useState<EventTask["priority"]>("none")
+  const [editTaskPinned, setEditTaskPinned] = useState(false)
   const [savingTaskEdit, setSavingTaskEdit] = useState(false)
+
+  // Checklist hierarchy / interaction state
+  const [childTitle, setChildTitle] = useState("")               // inline subtask input text
+  const [addingChildFor, setAddingChildFor] = useState<string | null>(null) // parent id whose subtask input is open
+  const [collapsedTasks, setCollapsedTasks] = useState<Set<string>>(new Set()) // parents whose children are collapsed
+  const [hoveredTaskId, setHoveredTaskId] = useState<string | null>(null)
+  const [dragTaskId, setDragTaskId] = useState<string | null>(null)
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null)
+  const [dragOverSection, setDragOverSection] = useState<string | null>(null)
+  const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null) // row in two-step delete confirm
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)           // delete in flight
+  // A dated task dropped onto a different date-window section — pending until the
+  // user confirms the date change (see §14 / date-reseed warning).
+  const [pendingSectionMove, setPendingSectionMove] = useState<{ taskId: string; sectionKey: string } | null>(null)
+  const [sectionMoveBusy, setSectionMoveBusy] = useState(false)
 
   // Role add state
   const [newRoleName, setNewRoleName] = useState("")
@@ -6290,6 +6355,10 @@ export function EventPlanWorkspace({
   const [editRoleName, setEditRoleName] = useState("")
   const [editRoleAssignee, setEditRoleAssignee] = useState("")
   const [editRoleNotes, setEditRoleNotes] = useState("")
+
+  // Role presentation state (inline add-role form + inline assignee select)
+  const [showAddRole, setShowAddRole] = useState(false)
+  const [assigningRoleId, setAssigningRoleId] = useState<string | null>(null)
 
   // Transition Notes (cross-year institutional memory of pain points)
   const CURRENT_CLASS_YEAR = currentFiscalYear()
@@ -6389,17 +6458,7 @@ export function EventPlanWorkspace({
         .eq("event_plan_id", planId)
         .order("sort_order", { ascending: true })
 
-      setTasks((tasksData ?? []).map((t: Record<string, unknown>) => ({
-        id: t.id as string,
-        event_plan_id: t.event_plan_id as string,
-        title: t.title as string,
-        assigned_to: t.assigned_to as string | null,
-        assigned_name: (t.profiles as { name?: string } | null)?.name,
-        due_date: t.due_date as string | null,
-        completed: t.completed as boolean,
-        phase: (t.phase as string ?? "pre_event") as EventTask["phase"],
-        sort_order: (t.sort_order as number) ?? 0,
-      })))
+      setTasks((tasksData ?? []).map(mapTask))
 
       // Fetch roles with assignee name
       const { data: rolesData } = await supabase
@@ -6512,20 +6571,7 @@ export function EventPlanWorkspace({
       })
       .select("*, profiles!event_tasks_assigned_to_fkey(name)")
       .single()
-    if (data) {
-      const d = data as Record<string, unknown>
-      setTasks((prev) => [...prev, {
-        id: d.id as string,
-        event_plan_id: d.event_plan_id as string,
-        title: d.title as string,
-        assigned_to: d.assigned_to as string | null,
-        assigned_name: (d.profiles as { name?: string } | null)?.name,
-        due_date: d.due_date as string | null,
-        completed: d.completed as boolean,
-        phase: (d.phase as string ?? phase) as EventTask["phase"],
-        sort_order: (d.sort_order as number) ?? 0,
-      }])
-    }
+    if (data) setTasks((prev) => [...prev, mapTask(data as Record<string, unknown>)])
     setNewTaskTitle("")
     setNewTaskAssignee("")
     setNewTaskDue("")
@@ -6534,33 +6580,147 @@ export function EventPlanWorkspace({
   }
 
   async function handleDeleteTask(id: string) {
-    setTasks((prev) => prev.filter((t) => t.id !== id))
+    // Children cascade in the DB (parent_id ON DELETE CASCADE); drop them from
+    // local state too so the UI doesn't strand orphaned child rows.
+    setDeletingTaskId(id)
     await supabase.from("event_tasks").delete().eq("id", id)
+    setTasks((prev) => prev.filter((t) => t.id !== id && t.parent_id !== id))
+    setDeletingTaskId(null)
+    setConfirmDeleteTaskId(null)
   }
 
   function startEditTask(task: EventTask) {
-    setConfirmDeleteTaskId(null)
     setEditingTaskId(task.id)
     setEditTaskTitle(task.title)
     setEditTaskAssignee(task.assigned_to ?? "")
     setEditTaskDue(task.due_date ?? "")
+    setEditTaskPriority(task.priority)
+    setEditTaskPinned(task.pinned)
   }
 
   async function handleUpdateTask() {
     if (!editingTaskId || !editTaskTitle.trim()) return
     setSavingTaskEdit(true)
     const id = editingTaskId
+    const editing = tasks.find((t) => t.id === id)
     const newTitle = editTaskTitle.trim()
     const newAssignee = editTaskAssignee || null
     const newDue = editTaskDue || null
+    // Pin is top-level only — never persist pinned=true for a child.
+    const newPinned = editing && editing.parent_id === null ? editTaskPinned : false
     await supabase
       .from("event_tasks")
-      .update({ title: newTitle, assigned_to: newAssignee, due_date: newDue })
+      .update({ title: newTitle, assigned_to: newAssignee, due_date: newDue, priority: editTaskPriority, pinned: newPinned })
       .eq("id", id)
     const assignedName = newAssignee ? assigneePool.find(a => a.id === newAssignee)?.name : undefined
-    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, title: newTitle, assigned_to: newAssignee, due_date: newDue, assigned_name: assignedName } : t))
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, title: newTitle, assigned_to: newAssignee, due_date: newDue, priority: editTaskPriority, pinned: newPinned, assigned_name: assignedName } : t))
     setEditingTaskId(null)
     setSavingTaskEdit(false)
+  }
+
+  // ── Hierarchy / pin / priority / drag handlers ─────────────────────────────
+  async function togglePin(task: EventTask) {
+    if (!canEdit || task.parent_id !== null) return
+    const np = !task.pinned
+    setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, pinned: np } : t))
+    await supabase.from("event_tasks").update({ pinned: np }).eq("id", task.id)
+  }
+
+  async function addChild(parent: EventTask) {
+    if (!plan || !canEdit || !childTitle.trim()) return
+    const maxSort = tasks.reduce((m, t) => Math.max(m, t.sort_order), -1)
+    const { data } = await supabase
+      .from("event_tasks")
+      .insert({
+        event_plan_id: plan.id,
+        title: childTitle.trim(),
+        assigned_to: null,
+        due_date: null,
+        completed: false,
+        phase: parent.phase,
+        sort_order: maxSort + 1,
+        created_by: userId,
+        parent_id: parent.id,
+        priority: "none",
+        pinned: false,
+      })
+      .select("*, profiles!event_tasks_assigned_to_fkey(name)")
+      .single()
+    if (data) setTasks((prev) => [...prev, mapTask(data as Record<string, unknown>)])
+    setChildTitle("") // keep the input open so several subtasks can be added in a row
+  }
+
+  async function promoteTask(task: EventTask) {
+    if (!canEdit || task.parent_id === null) return
+    setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, parent_id: null } : t))
+    await supabase.from("event_tasks").update({ parent_id: null }).eq("id", task.id)
+  }
+
+  // Make dragId a child of targetId's parent (or targetId itself). One level
+  // deep: a task that already HAS children can't be nested. Inherits the new
+  // parent's phase and clears pinned.
+  async function nest(dragId: string, targetId: string) {
+    if (!canEdit || dragId === targetId) return
+    const drag = tasks.find((t) => t.id === dragId)
+    const target = tasks.find((t) => t.id === targetId)
+    if (!drag || !target) return
+    if (tasks.some((t) => t.parent_id === dragId)) return // dragId is a parent → refuse
+    const newParent = target.parent_id ?? target.id
+    if (newParent === dragId) return
+    const parentTask = tasks.find((t) => t.id === newParent)
+    const phase = parentTask?.phase ?? drag.phase
+    setTasks((prev) => prev.map((t) => t.id === dragId ? { ...t, parent_id: newParent, phase, pinned: false } : t))
+    await supabase.from("event_tasks").update({ parent_id: newParent, phase, pinned: false }).eq("id", dragId)
+  }
+
+  // Drop onto a section → promote to a standalone (top-level) task in that
+  // section, reseeding its due_date to the section's default so it actually
+  // lands in that date window (sections are date-driven). Children inherit the
+  // new phase. Callers gate the date-change warning via requestMoveToSection.
+  async function moveToSection(dragId: string, sectionKey: ChecklistSection) {
+    if (!canEdit) return
+    const def = sectionDefs.find((s) => s.key === sectionKey)
+    const drag = tasks.find((t) => t.id === dragId)
+    if (!def || !drag) return
+    const phase = def.phase
+    const newDue = def.defaultDue || null
+    const kidIds = tasks.filter((t) => t.parent_id === dragId).map((t) => t.id)
+    setTasks((prev) => prev.map((t) => {
+      if (t.id === dragId) return { ...t, parent_id: null, phase, due_date: newDue }
+      if (kidIds.includes(t.id)) return { ...t, phase }
+      return t
+    }))
+    await supabase.from("event_tasks").update({ parent_id: null, phase, due_date: newDue }).eq("id", dragId)
+    if (kidIds.length) await supabase.from("event_tasks").update({ phase }).in("id", kidIds)
+  }
+
+  // Section-drop entry point. A DATED task moving to a DIFFERENT date-window
+  // section would have its due_date overwritten — warn first (pending state). A
+  // dateless task (e.g. a promoted subtask) has nothing to overwrite, so move
+  // immediately.
+  function requestMoveToSection(dragId: string, sectionKey: ChecklistSection) {
+    if (!canEdit) return
+    const drag = tasks.find((t) => t.id === dragId)
+    if (!drag) return
+    if (drag.due_date && sectionOf(drag) !== sectionKey) {
+      setPendingSectionMove({ taskId: dragId, sectionKey })
+    } else {
+      moveToSection(dragId, sectionKey)
+    }
+  }
+
+  async function confirmSectionMove() {
+    if (!pendingSectionMove) return
+    setSectionMoveBusy(true)
+    await moveToSection(pendingSectionMove.taskId, pendingSectionMove.sectionKey as ChecklistSection)
+    setSectionMoveBusy(false)
+    setPendingSectionMove(null)
+  }
+
+  function clearDrag() {
+    setDragTaskId(null)
+    setDragOverTaskId(null)
+    setDragOverSection(null)
   }
 
   async function handleAddRole() {
@@ -6592,11 +6752,24 @@ export function EventPlanWorkspace({
     setNewRoleAssignee("")
     setNewRoleNotes("")
     setAddingRole(false)
+    setShowAddRole(false)
   }
 
   async function handleDeleteRole(id: string) {
     setRoles((prev) => prev.filter((r) => r.id !== id))
     await supabase.from("event_roles").delete().eq("id", id)
+  }
+
+  async function handleAssignRole(roleId: string, userId: string) {
+    const name = members.find((m) => m.id === userId)?.name
+    setRoles((prev) => prev.map((r) => r.id === roleId ? { ...r, assigned_to: userId || null, assigned_name: name } : r))
+    setAssigningRoleId(null)
+    await supabase.from("event_roles").update({ assigned_to: userId || null }).eq("id", roleId)
+  }
+
+  async function handleUnassignRole(roleId: string) {
+    setRoles((prev) => prev.map((r) => r.id === roleId ? { ...r, assigned_to: null, assigned_name: undefined } : r))
+    await supabase.from("event_roles").update({ assigned_to: null }).eq("id", roleId)
   }
 
   async function handleSaveRoleEdit(roleId: string) {
@@ -6664,7 +6837,7 @@ export function EventPlanWorkspace({
   const incompleteTasks = tasks.filter((t) => !t.completed)
 
   const EXTRA_TAB_LABELS: Record<EventExtraTab, string> = {
-    sub_events: "Sub-events", new_folks: "New Folks", acts: "Acts",
+    sub_events: "Sub-events", acts: "Acts",
     teams: "Teams", transport: "Transport", program: "Program",
   }
 
@@ -6672,7 +6845,6 @@ export function EventPlanWorkspace({
   // a one-line subtitle per planning tab this event actually carries.
   const EXTRA_TAB_META: Record<EventExtraTab, { icon: typeof Users; subtitle: string }> = {
     sub_events: { icon: Calendar, subtitle: "Nights & activities inside the week" },
-    new_folks: { icon: UserPlus, subtitle: "Track first-timers and follow-up" },
     acts: { icon: Sparkles, subtitle: "Performances & skits for the night" },
     teams: { icon: Layers, subtitle: "Split attendees into teams" },
     transport: { icon: Bus, subtitle: "Rides & carpools to the venue" },
@@ -6722,6 +6894,217 @@ export function EventPlanWorkspace({
     { key: "day_of", label: "Day of", defaultDue: eventYMD, phase: "day_of" },
     { key: "post", label: "Post week", defaultDue: eventPlusOneYMD, phase: "post_event" },
   ]
+
+  // ── Checklist hierarchy helpers ────────────────────────────────────────────
+  const childrenOf = (id: string) => tasks.filter((t) => t.parent_id === id).sort((a, b) => a.sort_order - b.sort_order)
+  const pinnedTop = tasks.filter((t) => t.parent_id === null && t.pinned)
+  const pinnedIds = new Set(pinnedTop.map((t) => t.id))
+  // A task lives in the top Pinned band if it's a pinned top-level task or a
+  // child of one — those never appear in the date-driven sections below.
+  const inBand = (t: EventTask) => (t.parent_id === null ? t.pinned : pinnedIds.has(t.parent_id ?? ""))
+
+  // The roomy inline editor card that replaces a row while it's being edited.
+  function renderTaskEditor(task: EventTask) {
+    const isTop = task.parent_id === null
+    const isHighPriority = editTaskPriority === "high"
+    return (
+      <div key={task.id} style={{ border: "1px solid var(--plum)", borderRadius: 14, padding: "16px 18px", background: "var(--cream)", marginBottom: 2 }}>
+        <input
+          autoFocus
+          value={editTaskTitle}
+          onChange={(e) => setEditTaskTitle(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && editTaskTitle.trim()) handleUpdateTask(); if (e.key === "Escape") setEditingTaskId(null) }}
+          placeholder="Task title"
+          style={{ width: "100%", background: "none", border: "none", borderBottom: "1px solid var(--line)", outline: "none", fontSize: 16, fontFamily: "var(--font-inter)", color: "var(--ink)", padding: "2px 0 8px" }}
+        />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginTop: 16 }}>
+          <label style={{ display: "block" }}>
+            <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Assignee</span>
+            <select value={editTaskAssignee} onChange={(e) => setEditTaskAssignee(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
+              <option value="">Unassigned</option>
+              {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </label>
+          <label style={{ display: "block" }}>
+            <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Due date</span>
+            <input type="date" value={editTaskDue} min={planStartDate || undefined} max={eventPlusTwoMonthsYMD} onChange={(e) => setEditTaskDue(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }} />
+          </label>
+          <div>
+            <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Priority</span>
+            <button type="button" onClick={() => setEditTaskPriority((p) => (p === "high" ? "none" : "high"))}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+                background: isHighPriority ? "var(--cream-3)" : "var(--cream-2)", border: "1px solid " + (isHighPriority ? "var(--plum)" : "var(--line-2)"), color: isHighPriority ? "var(--plum)" : "var(--body)", fontFamily: "var(--font-inter)" }}>
+              <AlertCircle style={{ width: 12, height: 12 }} />
+              High priority
+            </button>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <CentralButton variant="primary" size="sm" onClick={handleUpdateTask} disabled={savingTaskEdit || !editTaskTitle.trim()}>Save</CentralButton>
+            <button onClick={() => setEditingTaskId(null)} style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}>Cancel</button>
+          </div>
+          {isTop && (
+            <button type="button" onClick={() => setEditTaskPinned((p) => !p)}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+                background: editTaskPinned ? "var(--plum)" : "var(--cream-2)", border: "1px solid " + (editTaskPinned ? "var(--plum)" : "var(--line-2)"), color: editTaskPinned ? "var(--cream-3)" : "var(--body)" }}>
+              <Star style={{ width: 12, height: 12, fill: editTaskPinned ? "currentColor" : "none" }} />
+              {editTaskPinned ? "Pinned" : "Pin to top"}
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // A single checklist row (top-level or child). isChild → tighter, promote
+  // action instead of pin/add-subtask, no disclosure/subcount.
+  function renderTaskRow(task: EventTask, isChild: boolean) {
+    if (canEdit && editingTaskId === task.id) return renderTaskEditor(task)
+    const kids = childrenOf(task.id)
+    const hasKids = kids.length > 0
+    const doneKids = kids.filter((k) => k.completed).length
+    const collapsed = collapsedTasks.has(task.id)
+    const isHigh = task.priority === "high"
+    const hovered = hoveredTaskId === task.id
+    const isDragOver = dragOverTaskId === task.id
+    const inDeleteConfirm = confirmDeleteTaskId === task.id
+    const isDeleting = deletingTaskId === task.id
+    const kidCount = kids.length
+    return (
+      <div
+        key={task.id}
+        draggable={canEdit}
+        onDragStart={canEdit ? (e) => { setDragTaskId(task.id); e.dataTransfer.effectAllowed = "move" } : undefined}
+        onDragOver={canEdit ? (e) => { e.preventDefault(); e.stopPropagation(); setDragOverTaskId(task.id); setDragOverSection(null) } : undefined}
+        onDrop={canEdit ? (e) => { e.preventDefault(); e.stopPropagation(); if (dragTaskId) nest(dragTaskId, task.id); clearDrag() } : undefined}
+        onDragEnd={canEdit ? clearDrag : undefined}
+        onMouseEnter={() => setHoveredTaskId(task.id)}
+        onMouseLeave={() => setHoveredTaskId((cur) => (cur === task.id ? null : cur))}
+        style={{
+          position: "relative",
+          display: "flex", alignItems: "center", gap: "var(--space-4)",
+          padding: isChild ? "11px 12px" : "13px 12px",
+          borderBottom: "1px solid var(--line-3)",
+          background: isDragOver ? "var(--cream-3)" : hovered ? "var(--cream-2)" : isHigh ? "color-mix(in srgb, var(--plum) 7%, transparent)" : "transparent",
+          boxShadow: isDragOver ? "inset 0 0 0 2px var(--plum)" : "none",
+          borderRadius: isDragOver ? 8 : 0,
+        }}
+      >
+        {/* grip */}
+        <span style={{ display: "grid", placeItems: "center", cursor: "grab", color: "var(--dashed)", opacity: canEdit && hovered ? 1 : 0, flexShrink: 0, width: 14 }}>
+          <GripVertical style={{ width: 14, height: 14 }} />
+        </span>
+        {/* disclosure or spacer */}
+        {!isChild && hasKids ? (
+          <button type="button" onClick={(e) => { e.stopPropagation(); setCollapsedTasks((prev) => { const n = new Set(prev); if (n.has(task.id)) n.delete(task.id); else n.add(task.id); return n }) }}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "grid", placeItems: "center", color: "var(--faint)", flexShrink: 0, width: 14 }}>
+            <ChevronRight style={{ width: 14, height: 14, transform: collapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform .15s ease" }} />
+          </button>
+        ) : (
+          <span style={{ width: 14, flexShrink: 0 }} />
+        )}
+        {/* checkbox */}
+        <button
+          onClick={(e) => { e.stopPropagation(); if (canEdit) handleToggleTask(task) }}
+          disabled={!canEdit}
+          style={{ width: 20, height: 20, borderRadius: 6, border: "1.6px solid " + (task.completed ? "var(--plum-2)" : "var(--dashed)"), background: task.completed ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: canEdit ? "pointer" : "default", flexShrink: 0 }}
+        >
+          {task.completed && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
+        </button>
+        {/* title */}
+        <span style={{ flex: 1, minWidth: 0, fontSize: isChild ? 14.5 : 15.5, color: task.completed ? "var(--faint)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
+        {/* subcount */}
+        {!isChild && hasKids && (
+          <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap", flexShrink: 0 }}>✓ {doneKids}/{kids.length}</span>
+        )}
+        {/* assignee */}
+        {task.assigned_name && (
+          <span style={{ padding: "3px 10px", borderRadius: 999, background: "var(--ivory)", fontSize: 12, color: "var(--body)", whiteSpace: "nowrap", flexShrink: 0 }}>{task.assigned_name}</span>
+        )}
+        {/* due */}
+        {task.due_date && (
+          <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{fmtMD(task.due_date)}</span>
+        )}
+        {/* hover actions — two-step delete confirm (§14) takes over the cluster */}
+        {canEdit && (
+          inDeleteConfirm ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, opacity: 1, flexShrink: 0 }} onMouseDown={(e) => e.stopPropagation()}>
+              {kidCount > 0 && (
+                <span style={{ fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap" }}>and {kidCount} subtask{kidCount > 1 ? "s" : ""}</span>
+              )}
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }}
+                disabled={isDeleting}
+                style={{ fontSize: 11, fontWeight: 600, color: "var(--danger)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 30%, transparent)", borderRadius: 6, padding: "3px 10px", cursor: isDeleting ? "default" : "pointer", whiteSpace: "nowrap" }}
+              >
+                {isDeleting ? "Deleting…" : kidCount > 0 ? `Delete +${kidCount}` : "Delete"}
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setConfirmDeleteTaskId(null) }}
+                disabled={isDeleting}
+                style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none", cursor: isDeleting ? "default" : "pointer", padding: "2px 4px" }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, opacity: hovered ? 1 : 0, transition: "opacity .12s ease", flexShrink: 0 }}>
+              {isChild ? (
+                <ChecklistIconBtn onClick={() => promoteTask(task)} title="Promote to standalone task"><CornerUpLeft style={{ width: 14, height: 14 }} /></ChecklistIconBtn>
+              ) : (
+                <>
+                  <ChecklistIconBtn onClick={() => togglePin(task)} title={task.pinned ? "Unpin" : "Pin to top"} baseColor={task.pinned ? "var(--plum)" : "var(--faint)"} hoverColor={task.pinned ? "var(--plum)" : "var(--body)"}>
+                    <Star style={{ width: 14, height: 14, fill: task.pinned ? "currentColor" : "none" }} />
+                  </ChecklistIconBtn>
+                  <ChecklistIconBtn onClick={() => { setCollapsedTasks((prev) => { const n = new Set(prev); n.delete(task.id); return n }); setChildTitle(""); setAddingChildFor(task.id) }} title="Add subtask"><Plus style={{ width: 15, height: 15 }} /></ChecklistIconBtn>
+                </>
+              )}
+              <ChecklistIconBtn onClick={() => startEditTask(task)} title="Edit"><Pencil style={{ width: 14, height: 14 }} /></ChecklistIconBtn>
+              <ChecklistIconBtn onClick={() => { setEditingTaskId(null); setConfirmDeleteTaskId(task.id) }} title="Delete"><X style={{ width: 14, height: 14 }} /></ChecklistIconBtn>
+            </div>
+          )
+        )}
+      </div>
+    )
+  }
+
+  // A top-level task plus (when expanded) its indented children block and the
+  // "Add subtask" affordance / inline input.
+  function renderTaskTree(task: EventTask) {
+    const kids = childrenOf(task.id)
+    const hasKids = kids.length > 0
+    const collapsed = collapsedTasks.has(task.id)
+    const showChildren = hasKids && !collapsed
+    const inputOpen = addingChildFor === task.id
+    return (
+      <Fragment key={task.id}>
+        {renderTaskRow(task, false)}
+        {(showChildren || inputOpen) && (
+          <div style={{ marginLeft: 30, paddingLeft: 16, borderLeft: "1px solid var(--line-2)" }}>
+            {showChildren && kids.map((k) => renderTaskRow(k, true))}
+            {canEdit && inputOpen && (
+              <input
+                autoFocus
+                value={childTitle}
+                onChange={(e) => setChildTitle(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { if (childTitle.trim()) addChild(task); else setAddingChildFor(null) } if (e.key === "Escape") { setChildTitle(""); setAddingChildFor(null) } }}
+                onBlur={() => { if (!childTitle.trim()) setAddingChildFor(null) }}
+                placeholder="New subtask, press Enter…"
+                style={{ width: "100%", boxSizing: "border-box", background: "var(--cream)", border: "1px solid var(--plum)", borderRadius: 8, outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", padding: "9px 12px", margin: "8px 0" }}
+              />
+            )}
+            {canEdit && showChildren && !inputOpen && (
+              <button type="button" onClick={() => { setChildTitle(""); setAddingChildFor(task.id) }} onMouseEnter={(e) => { e.currentTarget.style.color = "var(--plum)" }} onMouseLeave={(e) => { e.currentTarget.style.color = "var(--muted-text)" }}
+                style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", color: "var(--muted-text)", fontSize: 13, fontFamily: "var(--font-inter)", padding: "8px 0" }}>
+                <Plus style={{ width: 14, height: 14 }} /> Add subtask
+              </button>
+            )}
+          </div>
+        )}
+      </Fragment>
+    )
+  }
 
   const inputStyle: React.CSSProperties = {
     background: "var(--cream-panel)",
@@ -7092,13 +7475,32 @@ export function EventPlanWorkspace({
                   <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{incompleteTasks.length} of {tasks.length} remaining</span>
                 </div>
 
-                {/* Phase-grouped task list */}
+                {/* Pinned band — top-level pinned tasks (+ their children) */}
+                {pinnedTop.length > 0 && (
+                  <div style={{ background: "var(--cream-3)", border: "1px solid var(--line-2)", borderRadius: 14, padding: "6px 14px 8px", marginBottom: 24 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0 6px" }}>
+                      <Star style={{ width: 12, height: 12, color: "var(--plum)", fill: "currentColor" }} />
+                      <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 600 }}>Pinned</span>
+                    </div>
+                    {pinnedTop.map((task) => renderTaskTree(task))}
+                  </div>
+                )}
+
+                {/* Date-driven sections — top-level, non-pinned tasks grouped by window */}
                 {sectionDefs.map((section) => {
-                  const sectionTasks = tasks.filter(t => sectionOf(t) === section.key)
-                  const sectionIncomplete = sectionTasks.filter(t => !t.completed).length
+                  const sectionTop = tasks
+                    .filter((t) => t.parent_id === null && !t.pinned && sectionOf(t) === section.key)
+                    .sort((a, b) => (Number(b.priority === "high") - Number(a.priority === "high")) || (a.sort_order - b.sort_order))
+                  const remaining = tasks.filter((t) => !inBand(t) && sectionOf(t) === section.key && !t.completed).length
                   const isCollapsed = collapsedPhases.has(section.key)
+                  const isDropZone = dragOverSection === section.key
                   return (
-                    <div key={section.key} style={{ marginBottom: 28 }}>
+                    <div
+                      key={section.key}
+                      style={{ marginBottom: 28 }}
+                      onDragOver={canEdit ? (e) => { e.preventDefault(); setDragOverSection(section.key); setDragOverTaskId(null) } : undefined}
+                      onDrop={canEdit ? (e) => { e.preventDefault(); if (dragTaskId) requestMoveToSection(dragTaskId, section.key); clearDrag() } : undefined}
+                    >
                       {/* Section header */}
                       <button
                         onClick={() => setCollapsedPhases(prev => {
@@ -7110,118 +7512,28 @@ export function EventPlanWorkspace({
                         style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "0 0 10px", width: "100%", textAlign: "left" }}
                       >
                         <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{section.label}</span>
-                        {sectionTasks.length > 0 && (
-                          <span style={{ fontSize: 11, color: sectionIncomplete > 0 ? "var(--body)" : "#7FA67F", background: sectionIncomplete > 0 ? "#EFEAE0" : "#EEF4F1", borderRadius: 999, padding: "1px 7px" }}>
-                            {sectionIncomplete > 0 ? `${sectionIncomplete} remaining` : "All done"}
-                          </span>
-                        )}
-                        <span style={{ marginLeft: "auto", color: "#A09A8C", fontSize: 12 }}>{isCollapsed ? "▸" : "▾"}</span>
+                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10.5, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px" }}>{remaining} remaining</span>
+                        <ChevronRight style={{ marginLeft: "auto", width: 14, height: 14, color: "var(--faint)", transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform .15s ease" }} />
                       </button>
                       <div style={{ borderTop: "1px solid var(--line)" }} />
 
+                      {isDropZone && (
+                        <div style={{ margin: "10px 0", padding: "12px", border: "1.5px dashed var(--plum)", borderRadius: 10, textAlign: "center" }}>
+                          <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--plum)" }}>Drop here to make it a standalone task</span>
+                        </div>
+                      )}
+
                       {!isCollapsed && (
                         <>
-                          {sectionTasks.length === 0 && (
-                            <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "14px 4px 6px" }}>No tasks yet for this section.</p>
+                          {sectionTop.length === 0 && !isDropZone && (
+                            <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--faint)", padding: "14px 4px 6px" }}>No tasks yet for this section.</p>
                           )}
-                          {sectionTasks.map((task, i) => (
-                            canEdit && editingTaskId === task.id ? (
-                              <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: i === sectionTasks.length - 1 ? "none" : "1px solid #F0EBE0" }}>
-                                <button
-                                  onClick={() => handleToggleTask(task)}
-                                  style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "var(--plum)" : "#C4C0B0"), background: task.completed ? "var(--plum)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
-                                >
-                                  {task.completed && <Check className="w-2.5 h-2.5 text-white" />}
-                                </button>
-                                <input
-                                  autoFocus
-                                  value={editTaskTitle}
-                                  onChange={(e) => setEditTaskTitle(e.target.value)}
-                                  onKeyDown={(e) => { if (e.key === "Enter" && editTaskTitle.trim()) handleUpdateTask(); if (e.key === "Escape") setEditingTaskId(null) }}
-                                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
-                                />
-                                <select
-                                  value={editTaskAssignee}
-                                  onChange={(e) => setEditTaskAssignee(e.target.value)}
-                                  style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
-                                >
-                                  <option value="">Unassigned</option>
-                                  {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                                </select>
-                                <input
-                                  type="date"
-                                  value={editTaskDue}
-                                  min={planStartDate || undefined}
-                                  max={eventPlusTwoMonthsYMD}
-                                  onChange={(e) => setEditTaskDue(e.target.value)}
-                                  style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
-                                />
-                                <CentralButton
-                                  variant="primary" size="sm"
-                                  onClick={handleUpdateTask}
-                                  disabled={savingTaskEdit || !editTaskTitle.trim()}
-                                >
-                                  Save
-                                </CentralButton>
-                                <button
-                                  onClick={() => setEditingTaskId(null)}
-                                  style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                            <div key={task.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 4px", borderBottom: i === sectionTasks.length - 1 && !canEdit ? "none" : "1px solid #F0EBE0" }}>
-                              <button
-                                onClick={() => handleToggleTask(task)}
-                                style={{ width: 18, height: 18, borderRadius: 5, border: "1.5px solid " + (task.completed ? "var(--plum)" : "#C4C0B0"), background: task.completed ? "var(--plum)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}
-                              >
-                                {task.completed && <Check className="w-2.5 h-2.5 text-white" />}
-                              </button>
-                              <span style={{ flex: 1, fontSize: 14, color: task.completed ? "#A09A8C" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
-                              {task.assigned_name && (
-                                <span style={{ padding: "4px 10px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line)", fontSize: 12, color: "var(--plum-2)", whiteSpace: "nowrap" }}>{task.assigned_name}</span>
-                              )}
-                              {task.due_date && (
-                                <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-                                  {new Date(task.due_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                                </span>
-                              )}
-                              {canEdit && (
-                                confirmDeleteTaskId === task.id ? (
-                                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                    <button
-                                      onClick={() => { handleDeleteTask(task.id); setConfirmDeleteTaskId(null) }}
-                                      style={{ fontSize: 11, fontWeight: 600, color: "#9F3030", background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 6, padding: "2px 8px", cursor: "pointer", whiteSpace: "nowrap" }}
-                                    >
-                                      Delete
-                                    </button>
-                                    <button
-                                      onClick={() => setConfirmDeleteTaskId(null)}
-                                      style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
-                                    >
-                                      Cancel
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <>
-                                    <button onClick={() => startEditTask(task)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--muted-text)" }}>
-                                      <Pencil style={{ width: 14, height: 14 }} />
-                                    </button>
-                                    <button onClick={() => { setEditingTaskId(null); setConfirmDeleteTaskId(task.id) }} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "#C4C4C4" }}>
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  </>
-                                )
-                              )}
-                            </div>
-                            )
-                          ))}
+                          {sectionTop.map((task) => renderTaskTree(task))}
 
                           {/* Inline add row per section — prefills due to the section window */}
                           {canEdit && (
-                            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 4px", borderBottom: "1px dashed #D8D2C0" }}>
-                              <span style={{ color: "#B0A898", fontSize: 13 }}>+</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 12px", borderBottom: "1px dashed var(--dashed)" }}>
+                              <Plus style={{ width: 14, height: 14, color: "var(--faint)", flexShrink: 0 }} />
                               <input
                                 value={section.key === newTaskSection ? newTaskTitle : ""}
                                 onChange={(e) => {
@@ -7230,7 +7542,7 @@ export function EventPlanWorkspace({
                                 }}
                                 onFocus={() => { if (section.key !== newTaskSection) { setNewTaskSection(section.key); setNewTaskDue(section.defaultDue) } }}
                                 placeholder={`Add to ${section.label}…`}
-                                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
+                                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
                                 onKeyDown={(e) => { if (e.key === "Enter" && newTaskTitle.trim() && newTaskSection === section.key) handleAddTask(section) }}
                               />
                               {section.key === newTaskSection && newTaskTitle.trim() && (
@@ -7267,139 +7579,234 @@ export function EventPlanWorkspace({
                     </div>
                   )
                 })}
+
+                {/* Section-move date-change confirmation (dated task → different window) */}
+                {pendingSectionMove && (
+                  <div
+                    style={{ position: "fixed", inset: 0, zIndex: 210, background: "color-mix(in srgb, var(--ink) 35%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+                    onClick={() => { if (!sectionMoveBusy) setPendingSectionMove(null) }}
+                  >
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: "22px 24px", maxWidth: 380, width: "100%", boxShadow: "0 8px 40px color-mix(in srgb, var(--ink) 16%, transparent)" }}
+                    >
+                      <p style={{ fontSize: 15, lineHeight: 1.5, color: "var(--ink)", margin: 0 }}>
+                        This will change this task&rsquo;s date to fit the {sectionDefs.find((s) => s.key === pendingSectionMove.sectionKey)?.label ?? "section"} window. Continue?
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12, marginTop: 20 }}>
+                        <button
+                          onClick={() => setPendingSectionMove(null)}
+                          disabled={sectionMoveBusy}
+                          style={{ fontSize: 13, color: "var(--muted-text)", background: "none", border: "none", cursor: sectionMoveBusy ? "default" : "pointer", padding: "6px 8px" }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={confirmSectionMove}
+                          disabled={sectionMoveBusy}
+                          style={{ fontSize: 13, fontWeight: 600, color: "var(--cream)", background: "var(--plum-2)", border: "none", borderRadius: 8, padding: "8px 16px", cursor: sectionMoveBusy ? "default" : "pointer" }}
+                        >
+                          {sectionMoveBusy ? "Moving…" : "Continue"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* ── Roles & Leads ── */}
-            {activeSection === 'roles' && (
-              <div>
+            {activeSection === 'roles' && (() => {
+              const needs = roles.filter(r => !r.assigned_to)
+              const covered = roles.filter(r => r.assigned_to)
+              const iconBtnBase: React.CSSProperties = { background: "none", border: "none", padding: 3, borderRadius: 6, cursor: "pointer", display: "grid", placeItems: "center", color: "var(--faint)" }
+              const editInput: React.CSSProperties = { ...inputStyle, borderRadius: 10, fontSize: 15, fontFamily: "var(--font-inter)", border: "1px solid var(--line-2)" }
+              const editSelect: React.CSSProperties = { ...selectStyle, width: "100%", borderRadius: 10, fontSize: 15, fontFamily: "var(--font-inter)", border: "1px solid var(--line-2)" }
+
+              const GroupHeader = ({ label, count, allSet }: { label: string; count?: number; allSet?: boolean }) => (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "28px 0 4px" }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{label}</span>
+                  {allSet ? (
+                    <span style={{ fontStyle: "italic", fontSize: 13, color: "var(--faint)", fontFamily: "var(--font-inter)" }}>All roles covered</span>
+                  ) : (
+                    <span style={{ background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", fontSize: 11, color: "var(--body)", fontFamily: "var(--font-inter)" }}>{count}</span>
+                  )}
+                  <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+                </div>
+              )
+
+              const renderRow = (role: EventRole, isLast: boolean) => {
+                if (editingRoleId === role.id) {
+                  return (
+                    <div key={role.id} style={{ borderBottom: isLast ? "none" : "1px solid var(--line-3)" }}>
+                      <div style={{ padding: "14px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          <input value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} placeholder="Role name" className="roleinput" style={editInput} />
+                          <select value={editRoleAssignee} onChange={(e) => setEditRoleAssignee(e.target.value)} className="roleinput" style={editSelect}>
+                            <option value="">Unassigned</option>
+                            {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                          </select>
+                        </div>
+                        <input value={editRoleNotes} onChange={(e) => setEditRoleNotes(e.target.value)} placeholder="Notes (optional)" className="roleinput" style={editInput} />
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <CentralButton variant="primary" size="sm" onClick={() => handleSaveRoleEdit(role.id)}>Save</CentralButton>
+                          <button onClick={() => setEditingRoleId(null)} style={{ padding: "6px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", cursor: "pointer" }}>Cancel</button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                }
+                const isCovered = !!role.assigned_to
+                const initials = role.assigned_name?.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase() ?? ""
+                return (
+                  <div key={role.id} className="rrow" style={{ display: "grid", gridTemplateColumns: "38px 1fr auto", gap: 16, alignItems: "center", padding: "14px 8px", borderRadius: 8, borderBottom: isLast ? "none" : "1px solid var(--line-3)" }}>
+                    {isCovered ? (
+                      <MonogramChip initials={initials} style={{ width: 38, height: 38, fontSize: 13, fontWeight: 600 }} />
+                    ) : (
+                      <div style={{ width: 38, height: 38, border: "1px dashed var(--dashed)", borderRadius: 999, display: "grid", placeItems: "center" }}>
+                        <Plus style={{ width: 16, height: 16, color: "var(--dashed)" }} />
+                      </div>
+                    )}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontFamily: "var(--font-inter)", fontSize: 15, fontWeight: 500, color: "var(--ink)", letterSpacing: "-0.01em" }}>{role.role_name}</div>
+                      {role.notes ? (
+                        <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.4, marginTop: 3 }}>{role.notes}</div>
+                      ) : canEdit ? (
+                        <div style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", lineHeight: 1.4, marginTop: 3, fontFamily: "var(--font-inter)" }}>Add a note for whoever takes this on</div>
+                      ) : null}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      {isCovered ? (
+                        <>
+                          <span style={{ fontSize: 14, color: "var(--ink)", whiteSpace: "nowrap", fontFamily: "var(--font-inter)" }}>{role.assigned_name}</span>
+                          {canEdit && (
+                            <button className="role-icon danger" title="Unassign" onClick={() => handleUnassignRole(role.id)} style={iconBtnBase}>
+                              <X style={{ width: 16, height: 16 }} />
+                            </button>
+                          )}
+                        </>
+                      ) : canEdit ? (
+                        assigningRoleId === role.id ? (
+                          <select autoFocus defaultValue="" onChange={(e) => handleAssignRole(role.id, e.target.value)} onBlur={() => setAssigningRoleId(null)} style={{ border: "1px solid var(--plum)", borderRadius: 10, padding: "8px 11px", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)", background: "var(--cream)", outline: "none" }}>
+                            <option value="">Choose someone…</option>
+                            {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                          </select>
+                        ) : (
+                          <button className="assignbtn" onClick={() => setAssigningRoleId(role.id)} style={{ border: "1px dashed var(--dashed)", borderRadius: 10, padding: "8px 14px", color: "var(--plum)", background: "transparent", fontSize: 13, fontFamily: "var(--font-inter)", whiteSpace: "nowrap", cursor: "pointer" }}>+ Assign someone</button>
+                        )
+                      ) : null}
+                      {canEdit && (
+                        <>
+                          <button className="role-icon" title="Edit role" onClick={() => { setShowAddRole(false); setEditingRoleId(role.id); setEditRoleName(role.role_name); setEditRoleAssignee(role.assigned_to ?? ""); setEditRoleNotes(role.notes ?? "") }} style={iconBtnBase}>
+                            <Pencil style={{ width: 16, height: 16 }} />
+                          </button>
+                          <button className="role-icon danger" title="Delete role" onClick={() => handleDeleteRole(role.id)} style={iconBtnBase}>
+                            <Trash2 style={{ width: 16, height: 16 }} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              }
+
+              return (
+              <div className="rolesui">
+                <style>{`
+                  .rolesui .rrow{transition:background .12s}
+                  .rolesui .rrow:hover{background:var(--cream-2)}
+                  .rolesui .rrow:hover .role-icon{opacity:1}
+                  .rolesui .role-icon{opacity:0;transition:opacity .12s}
+                  .rolesui .role-icon:hover{color:var(--body)}
+                  .rolesui .role-icon.danger:hover{color:var(--danger)}
+                  .rolesui .assignbtn:hover{border-color:var(--plum)}
+                  .rolesui .roleinput:focus{border-color:var(--plum)}
+                `}</style>
                 <ContentHeader
                   eyebrow="Who's Responsible"
                   label="Roles"
                   action={canEdit ? (
                     <>
                       {planningGroupId ? (
-                        <CentralButton
-                          variant="primary" size="sm"
+                        <ContentActionButton
+                          variant="ghost"
+                          icon={<MessageCircle style={{ width: 14, height: 14 }} />}
+                          label="Open planning chat"
                           onClick={() => onOpenChat?.(planningGroupId, `${calendarEvent.title} Planning`)}
-                        >
-                          <MessageCircle style={{ width: 13, height: 13 }} /> Open planning chat
-                        </CentralButton>
+                        />
                       ) : (
-                        <button
+                        <ContentActionButton
+                          variant="ghost"
+                          icon={<MessageCircle style={{ width: 14, height: 14 }} />}
+                          label={creatingPlanChat ? "Creating…" : "Create planning chat"}
                           onClick={handleCreatePlanningChat}
-                          disabled={creatingPlanChat || roles.filter(r => r.assigned_to).length === 0}
-                          title={roles.filter(r => r.assigned_to).length === 0 ? "Assign roles first" : "Create a group chat with all role holders"}
-                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: creatingPlanChat ? "not-allowed" : "pointer", fontWeight: 500, opacity: roles.filter(r => r.assigned_to).length === 0 ? 0.4 : 1 }}
-                        >
-                          <MessageCircle style={{ width: 13, height: 13 }} />
-                          {creatingPlanChat ? "Creating…" : "Create planning chat"}
-                        </button>
+                          disabled={creatingPlanChat || covered.length === 0}
+                          title={covered.length === 0 ? "Assign roles first" : "Create a group chat with all role holders"}
+                        />
                       )}
-                      <ContentActionButton
-                        variant="primary"
-                        icon={<Plus style={{ width: 13, height: 13 }} />}
-                        label="Add role"
-                        onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setAddingRole(false) }}
-                      />
+                      {!showAddRole && !editingRoleId && (
+                        <ContentActionButton
+                          variant="primary"
+                          icon={<Plus style={{ width: 14, height: 14 }} />}
+                          label="Add role"
+                          onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setEditingRoleId(null); setShowAddRole(true) }}
+                        />
+                      )}
                     </>
                   ) : undefined}
                 />
-                {planChatError && <p style={{ fontSize: 12, color: "#C44B4B", marginTop: 8 }}>{planChatError}</p>}
+                {planChatError && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{planChatError}</p>}
 
-                {/* Roles rows */}
-                <div style={{ marginTop: 28 }}>
-                  {roles.length === 0 && !canEdit && (
-                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C", padding: "8px 0" }}>No roles defined yet.</p>
-                  )}
-                  {roles.map((role, i) => (
-                    <div key={role.id} style={{ borderBottom: i === roles.length - 1 ? "none" : "1px solid var(--line)" }}>
-                      {editingRoleId === role.id ? (
-                        <div style={{ padding: "18px 4px", display: "flex", flexDirection: "column", gap: 8 }}>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                            <input value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} placeholder="Role name" style={inputStyle} />
-                            <select value={editRoleAssignee} onChange={(e) => setEditRoleAssignee(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
-                              <option value="">Unassigned</option>
-                              {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                            </select>
-                          </div>
-                          <input value={editRoleNotes} onChange={(e) => setEditRoleNotes(e.target.value)} placeholder="Notes (optional)" style={inputStyle} />
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <CentralButton variant="primary" size="sm" onClick={() => handleSaveRoleEdit(role.id)}>Save</CentralButton>
-                            <button onClick={() => setEditingRoleId(null)} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "none", fontSize: 12, color: "var(--body)", cursor: "pointer" }}>Cancel</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: "grid", gridTemplateColumns: "200px 1fr 220px", alignItems: "center", gap: 18, padding: "18px 4px" }}>
-                          <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", letterSpacing: -0.2 }}>{role.role_name}</div>
-                          <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
-                            {role.notes || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>Add a note for whoever takes this on</span>}
-                          </div>
-                          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                            {role.assigned_name ? (
-                              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px 6px 6px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line-2)" }}>
-                                <span style={{ width: 24, height: 24, borderRadius: 999, background: "var(--plum)", color: "var(--cream-panel)", fontSize: 11, display: "grid", placeItems: "center", fontWeight: 600 }}>
-                                  {role.assigned_name.split(" ").map((s: string) => s[0]).join("")}
-                                </span>
-                                <span style={{ fontSize: 13 }}>{role.assigned_name}</span>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => canEdit ? (setEditingRoleId(role.id), setEditRoleName(role.role_name), setEditRoleAssignee(""), setEditRoleNotes(role.notes ?? "")) : undefined}
-                                style={{ padding: "8px 14px", borderRadius: 999, border: "1px dashed #C4C0B0", background: "transparent", color: "var(--muted-text)", fontSize: 13, fontFamily: "var(--font-inter)", cursor: canEdit ? "pointer" : "default" }}
-                              >+ Assign someone</button>
-                            )}
-                            {canEdit && role.assigned_name && (
-                              <button onClick={() => { setEditingRoleId(role.id); setEditRoleName(role.role_name); setEditRoleAssignee(role.assigned_to ?? ""); setEditRoleNotes(role.notes ?? "") }} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "var(--muted-text)" }}>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                              </button>
-                            )}
-                            {canEdit && (
-                              <button onClick={() => handleDeleteRole(role.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "#C4C4C4" }}>
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                {/* Inline add-role form */}
+                {canEdit && showAddRole && (
+                  <div style={{ display: "grid", gridTemplateColumns: "230px 1fr 180px auto auto", gap: 14, alignItems: "center", border: "1px dashed var(--dashed)", borderRadius: 14, padding: "14px 18px", marginTop: 20, background: "var(--cream-2)" }}>
+                    <input
+                      value={newRoleName}
+                      onChange={(e) => setNewRoleName(e.target.value)}
+                      placeholder="Role name…"
+                      className="roleinput"
+                      style={{ border: "1px solid var(--line-2)", borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: "var(--font-inter)", fontWeight: 600, color: "var(--ink)", background: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box" }}
+                    />
+                    <input
+                      value={newRoleNotes}
+                      onChange={(e) => setNewRoleNotes(e.target.value)}
+                      placeholder="What they're responsible for…"
+                      className="roleinput"
+                      style={{ border: "1px solid var(--line-2)", borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)", background: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box" }}
+                    />
+                    <select
+                      value={newRoleAssignee}
+                      onChange={(e) => setNewRoleAssignee(e.target.value)}
+                      className="roleinput"
+                      style={{ border: "1px solid var(--line-2)", borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)", background: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box", cursor: "pointer" }}
+                    >
+                      <option value="">Unassigned</option>
+                      {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                    <CentralButton variant="primary" size="sm" onClick={handleAddRole} disabled={addingRole || !newRoleName.trim()}>Add</CentralButton>
+                    <button onClick={() => setShowAddRole(false)} style={{ padding: "8px 14px", borderRadius: 10, border: "none", background: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", cursor: "pointer" }}>Cancel</button>
+                  </div>
+                )}
 
-                  {/* Inline add role row */}
-                  {canEdit && (
-                    <div style={{ border: "1px dashed #C4C0B0", borderRadius: 12, padding: "14px 16px", marginTop: 16, display: "flex", gap: 12, alignItems: "center", background: "#F8F4EA" }}>
-                      <input
-                        value={newRoleName}
-                        onChange={(e) => setNewRoleName(e.target.value)}
-                        placeholder="Role name…"
-                        style={{ flex: "0 0 160px", background: "none", border: "none", outline: "none", fontSize: 15, color: "var(--ink)", fontFamily: "var(--font-inter)", fontWeight: 500 }}
-                      />
-                      <input
-                        value={newRoleNotes}
-                        onChange={(e) => setNewRoleNotes(e.target.value)}
-                        placeholder="Add a note…"
-                        style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--body)", fontFamily: "var(--font-inter)" }}
-                      />
-                      <select
-                        value={newRoleAssignee}
-                        onChange={(e) => setNewRoleAssignee(e.target.value)}
-                        style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-inter)" }}
-                      >
-                        <option value="">Unassigned</option>
-                        {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                      </select>
-                      <CentralButton
-                        variant="primary" size="sm"
-                        onClick={handleAddRole}
-                        disabled={addingRole || !newRoleName.trim()}
-                      >
-                        Add
-                      </CentralButton>
-                    </div>
-                  )}
-                </div>
+                {roles.length === 0 ? (
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)", padding: "24px 0 8px" }}>
+                    {canEdit ? "No roles yet — add the first one." : "No roles defined yet."}
+                  </p>
+                ) : (
+                  <>
+                    <GroupHeader label="Needs someone" count={needs.length} allSet={needs.length === 0} />
+                    {needs.map((role, i) => renderRow(role, i === needs.length - 1))}
+                    {covered.length > 0 && (
+                      <>
+                        <GroupHeader label="Covered" count={covered.length} />
+                        {covered.map((role, i) => renderRow(role, i === covered.length - 1))}
+                      </>
+                    )}
+                  </>
+                )}
               </div>
-            )}
+              )
+            })()}
 
             {/* ── Transition Notes (cross-year institutional memory) ── */}
             {activeSection === 'notes' && (
@@ -7646,15 +8053,6 @@ export function EventPlanWorkspace({
               />
             )}
 
-            {/* ── New Folks (Welcome Week) ── */}
-            {activeSection === 'new_folks' && plan && (
-              <NewFolksTab
-                planId={plan.id}
-                ministryId={ministryId}
-                canEdit={canEdit}
-              />
-            )}
-
             {/* ── Acts Lineup (Coffeehouse) ── */}
             {activeSection === 'acts' && plan && (
               <ActsTab
@@ -7705,6 +8103,18 @@ export function EventPlanWorkspace({
 
 // ── SubEventsTab ──────────────────────────────────────────────────────────────
 
+// Readiness status → dot color. Kept as a small LOCAL map so it's swappable when
+// the amber ramp decision lands. Deliberately compliant/neutral for now: only
+// "Ready" earns --success; everything in-flight stays neutral --muted-text
+// (no --gold / --warm-tan, which are documented off-label here).
+function subEventStatus(done: number, total: number): { label: string; color: string; empty?: boolean } {
+  if (total === 0) return { label: "No checklist", color: "var(--muted-text)", empty: true }
+  const pct = Math.round((done / total) * 100)
+  if (done === total) return { label: "Ready", color: "var(--success)" }
+  if (pct >= 50) return { label: "In progress", color: "var(--muted-text)" }
+  return { label: "Needs attention", color: "var(--muted-text)" }
+}
+
 function SubEventsTab({
   parentEvent,
   ministryId,
@@ -7723,8 +8133,11 @@ function SubEventsTab({
 }) {
   const supabase = createClient()
   const [subEvents, setSubEvents] = useState<CalendarEvent[]>([])
+  // childId → checklist progress, batched (never N+1).
+  const [readiness, setReadiness] = useState<Record<string, { done: number; total: number }>>({})
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -7733,18 +8146,53 @@ function SubEventsTab({
         .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
         .eq("parent_event_id", parentEvent.id)
         .order("start_date", { ascending: true })
-      setSubEvents((data ?? []) as CalendarEvent[])
+      const rows = (data ?? []) as CalendarEvent[]
+      setSubEvents(rows)
+
+      // Batch readiness: child events → their event_plans → event_tasks
+      // done/total, aggregated client-side. Two queries total (no per-row).
+      // Scope the plan lookup by ministry_id (event_tasks has no ministry_id
+      // column, so it's scoped transitively through these plan ids).
+      const childIds = rows.map((e) => e.id)
+      if (childIds.length) {
+        const { data: plans } = await supabase
+          .from("event_plans")
+          .select("id, calendar_event_id")
+          .in("calendar_event_id", childIds)
+          .eq("ministry_id", ministryId)
+        const planRows = (plans ?? []) as { id: string; calendar_event_id: string }[]
+        const planToChild = new Map(planRows.map((p) => [p.id, p.calendar_event_id]))
+        const map: Record<string, { done: number; total: number }> = {}
+        childIds.forEach((id) => { map[id] = { done: 0, total: 0 } })
+        if (planRows.length) {
+          const { data: taskRows } = await supabase
+            .from("event_tasks")
+            .select("event_plan_id, completed")
+            .in("event_plan_id", planRows.map((p) => p.id))
+          ;((taskRows ?? []) as { event_plan_id: string; completed: boolean }[]).forEach((t) => {
+            const childId = planToChild.get(t.event_plan_id)
+            if (!childId) return
+            map[childId].total++
+            if (t.completed) map[childId].done++
+          })
+        }
+        setReadiness(map)
+      }
       setLoading(false)
     }
     load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentEvent.id])
 
+  // Day-grouped, sorted-ascending rows (query already orders by start_date).
+  let lastDayKey: string | null = null
+  let firstHeaderRendered = false
+
   return (
     <div>
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 20 }}>
         <ContentHeader
-          eyebrow="Welcome Week"
+          eyebrow={parentEvent.title}
           label="Sub-events"
           action={canEdit ? (
             <ContentActionButton variant="primary" label="Add sub-event" onClick={() => setShowAdd(true)} />
@@ -7754,31 +8202,100 @@ function SubEventsTab({
 
       {loading && <p style={{ color: "var(--muted-text)", fontSize: 13 }}>Loading…</p>}
       {!loading && subEvents.length === 0 && (
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No sub-events yet. Add the individual events that make up Welcome Week.</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>No sub-events yet. Add the individual events that make up {parentEvent.title}.</p>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {subEvents.map(ev => {
+      <div>
+        {subEvents.map((ev) => {
           const evCfg = getEventConfig(ev)
-          const d = new Date(ev.start_date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+          const dt = new Date(ev.start_date)
+          const dayKey = dt.toDateString()
+          const showHeader = dayKey !== lastDayKey
+          const isFirstHeader = showHeader && !firstHeaderRendered
+          if (showHeader) { lastDayKey = dayKey; firstHeaderRendered = true }
+          const dayLabel = `${dt.toLocaleDateString("en-US", { weekday: "short" })} · ${dt.toLocaleDateString("en-US", { month: "short" })} ${dt.getDate()}`.toUpperCase()
+
+          const r = readiness[ev.id] ?? { done: 0, total: 0 }
+          const st = subEventStatus(r.done, r.total)
+          const filled = r.total > 0 ? Math.round((r.done / r.total) * 6) : 0
           const drillable = !!onOpenChild
+
           return (
-            <button
-              key={ev.id}
-              onClick={drillable ? () => onOpenChild(ev) : undefined}
-              disabled={!drillable}
-              style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 20px", border: "1px solid var(--line)", borderRadius: 12, background: "var(--ivory)", cursor: drillable ? "pointer" : "default", textAlign: "left", width: "100%" }}
-            >
-              <span style={{ fontSize: 22 }}>{evCfg.icon ?? "📅"}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{ev.title}</p>
-                <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "3px 0 0" }}>{d}{ev.location ? ` · ${ev.location}` : ""}</p>
+            <Fragment key={ev.id}>
+              {showHeader && (
+                <div style={{ display: "flex", alignItems: "center", gap: 12, margin: isFirstHeader ? "0 0 12px" : "26px 0 12px" }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)", flexShrink: 0 }}>{dayLabel}</span>
+                  <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+                </div>
+              )}
+
+              <div
+                onMouseEnter={() => setHoveredId(ev.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 16,
+                  padding: "15px 16px",
+                  border: `1px solid ${hoveredId === ev.id ? "var(--dashed)" : "var(--line)"}`,
+                  borderRadius: "var(--r-card)",
+                  background: "var(--cream)",
+                  marginBottom: 10,
+                  transition: "border-color .15s",
+                }}
+              >
+                {/* emoji badge — derived from event_type via getEventConfig */}
+                <span style={{ width: 36, height: 36, display: "grid", placeItems: "center", background: "var(--ivory)", borderRadius: "var(--r-input)", fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{evCfg.icon ?? "📅"}</span>
+
+                {/* info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 16, fontWeight: 500, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+                  <p style={{ fontSize: 13, margin: "3px 0 0" }}>
+                    {ev.location
+                      ? <span style={{ color: "var(--body)" }}>{ev.location}</span>
+                      : <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Location TBD</span>}
+                  </p>
+                  {/* mobile-only compact readiness (segmented bar hidden < sm) */}
+                  <div className="sm:hidden" style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 8 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: st.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: "var(--body)" }}>{st.label}</span>
+                    {!st.empty && <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--muted-text)", marginLeft: "auto" }}>{r.done}/{r.total}</span>}
+                  </div>
+                </div>
+
+                {/* desktop readiness widget */}
+                <div className="hidden sm:block" style={{ width: 190, flexShrink: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--body)" }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: st.color, flexShrink: 0 }} />
+                      {st.label}
+                    </span>
+                    {!st.empty && <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.4px", color: "var(--muted-text)" }}>{r.done}/{r.total}</span>}
+                  </div>
+                  {st.empty ? (
+                    <div style={{ height: 6, borderRadius: 999, background: "var(--line-2)" }} />
+                  ) : (
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <span key={i} style={{ flex: 1, height: 6, borderRadius: 999, background: i < filled ? "var(--plum)" : "var(--line-2)" }} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* drill affordance — omitted when nesting-capped (non-drillable) */}
+                {drillable && (
+                  <IconButton
+                    dim={34}
+                    onClick={() => onOpenChild!(ev)}
+                    title="Open planning"
+                    style={{ borderRadius: "var(--r-input)", border: "1px solid var(--line)", color: "var(--body)" }}
+                  >
+                    <ArrowRight style={{ width: 16, height: 16 }} />
+                  </IconButton>
+                )}
               </div>
-              <span style={{ fontSize: 12, padding: "3px 10px", borderRadius: 999, background: ev.status === "complete" ? "#EDE5F0" : ev.status === "active" ? "#EEF4F1" : "#F4F1E8", color: ev.status === "complete" ? "var(--plum)" : ev.status === "active" ? "#2D5445" : "var(--body)" }}>
-                {ev.status.charAt(0).toUpperCase() + ev.status.slice(1)}
-              </span>
-              {drillable && <span style={{ color: "#A09A8C", fontSize: 14 }}>→</span>}
-            </button>
+            </Fragment>
           )
         })}
       </div>
@@ -7801,135 +8318,6 @@ function SubEventsTab({
   )
 }
 
-// ── NewFolksTab ───────────────────────────────────────────────────────────────
-
-function NewFolksTab({
-  planId,
-  ministryId,
-  canEdit,
-}: {
-  planId: string
-  ministryId: string
-  canEdit: boolean
-}) {
-  const supabase = createClient()
-  const [folks, setFolks] = useState<EventNewFolk[]>([])
-  const [dgls, setDgls] = useState<{ id: string; name: string }[]>([])
-  const [loading, setLoading] = useState(true)
-  const [newName, setNewName] = useState("")
-  const [newContact, setNewContact] = useState("")
-  const [newNotes, setNewNotes] = useState("")
-  const [adding, setAdding] = useState(false)
-
-  useEffect(() => {
-    async function load() {
-      const [{ data: folkData }, { data: dglData }] = await Promise.all([
-        supabase.from("event_new_folks").select("*, profiles!event_new_folks_assigned_dgl_id_fkey(name)").eq("event_plan_id", planId).order("created_at", { ascending: true }),
-        supabase.from("profiles").select("id, name").eq("ministry_id", ministryId).order("name"),
-      ])
-      setFolks((folkData ?? []).map((f: Record<string, unknown>) => ({
-        id: f.id as string, event_plan_id: f.event_plan_id as string,
-        ministry_id: f.ministry_id as string, name: f.name as string,
-        contact: f.contact as string | null, notes: f.notes as string | null,
-        assigned_dgl_id: f.assigned_dgl_id as string | null,
-        assigned_dgl_name: (f.profiles as { name?: string } | null)?.name,
-        created_at: f.created_at as string,
-      })))
-      setDgls((dglData ?? []) as { id: string; name: string }[])
-      setLoading(false)
-    }
-    load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planId])
-
-  async function handleAdd() {
-    if (!newName.trim()) return
-    setAdding(true)
-    const { data } = await supabase.from("event_new_folks").insert({
-      event_plan_id: planId, ministry_id: ministryId,
-      name: newName.trim(), contact: newContact.trim() || null, notes: newNotes.trim() || null,
-    }).select("*, profiles!event_new_folks_assigned_dgl_id_fkey(name)").single()
-    if (data) {
-      const d = data as Record<string, unknown>
-      setFolks(prev => [...prev, {
-        id: d.id as string, event_plan_id: planId, ministry_id: ministryId,
-        name: d.name as string, contact: d.contact as string | null,
-        notes: d.notes as string | null, assigned_dgl_id: null, created_at: d.created_at as string,
-      }])
-    }
-    setNewName(""); setNewContact(""); setNewNotes("")
-    setAdding(false)
-  }
-
-  async function handleAssignDGL(folkId: string, dglId: string) {
-    const dgl = dgls.find(d => d.id === dglId)
-    setFolks(prev => prev.map(f => f.id === folkId ? { ...f, assigned_dgl_id: dglId || null, assigned_dgl_name: dgl?.name } : f))
-    await supabase.from("event_new_folks").update({ assigned_dgl_id: dglId || null }).eq("id", folkId)
-  }
-
-  async function handleDelete(id: string) {
-    setFolks(prev => prev.filter(f => f.id !== id))
-    await supabase.from("event_new_folks").delete().eq("id", id)
-  }
-
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
-        <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Follow Up</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>New Folks</h2>
-        </div>
-        <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{folks.length} people tracked</span>
-      </div>
-
-      {loading && <p style={{ color: "var(--muted-text)", fontSize: 13 }}>Loading…</p>}
-
-      {/* Table header */}
-      {folks.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 130px 1fr 160px 28px", gap: 12, padding: "0 4px 8px", borderBottom: "1px solid var(--line)" }}>
-          {["Name", "Contact", "Notes", "Assigned DGL", ""].map(h => (
-            <span key={h} style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#A09A8C" }}>{h}</span>
-          ))}
-        </div>
-      )}
-
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        {!loading && folks.length === 0 && (
-          <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C", padding: "16px 0" }}>No new folks tracked yet. Add people you met during Welcome Week.</p>
-        )}
-        {folks.map(folk => (
-          <div key={folk.id} style={{ display: "grid", gridTemplateColumns: "1fr 130px 1fr 160px 28px", gap: 12, padding: "12px 4px", borderBottom: "1px solid #F0EBE0", alignItems: "center" }}>
-            <span style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{folk.name}</span>
-            <span style={{ fontSize: 13, color: "var(--body)" }}>{folk.contact ?? <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
-            <span style={{ fontSize: 13, color: "var(--body)" }}>{folk.notes ?? <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
-            <select
-              value={folk.assigned_dgl_id ?? ""}
-              onChange={(e) => canEdit && handleAssignDGL(folk.id, e.target.value)}
-              disabled={!canEdit}
-              style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: folk.assigned_dgl_id ? "var(--plum-2)" : "#A09A8C", fontSize: 12, cursor: canEdit ? "pointer" : "default" }}
-            >
-              <option value="">Unassigned</option>
-              {dgls.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-            {canEdit ? (
-              <button onClick={() => handleDelete(folk.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#C4C4C4", padding: 0 }}><X className="w-3.5 h-3.5" /></button>
-            ) : <span />}
-          </div>
-        ))}
-      </div>
-
-      {/* Add row */}
-      {canEdit && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16, padding: "12px 16px", border: "1px dashed #C4C0B0", borderRadius: 12, background: "#F8F4EA" }}>
-          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Name…" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)" }} />
-          <input value={newContact} onChange={e => setNewContact(e.target.value)} placeholder="Contact (optional)" style={{ flex: "0 0 140px", background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)" }} />
-          <input value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="Notes (optional)" style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)" }} />
-          <CentralButton variant="primary" size="sm" onClick={handleAdd} disabled={adding || !newName.trim()}>Add</CentralButton>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ── ActsTab ───────────────────────────────────────────────────────────────────
 

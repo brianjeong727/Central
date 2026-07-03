@@ -483,7 +483,7 @@ export interface GovernanceSettings {
 
 export type EventType = 'welcome_week' | 'coffeehouse' | 'turkey_bowl' | 'retreat' | 'appreciation_night' | 'social' | 'ministry'
 export type EventStatus = 'planning' | 'active' | 'complete'
-export type EventExtraTab = 'sub_events' | 'new_folks' | 'acts' | 'teams' | 'transport' | 'program'
+export type EventExtraTab = 'sub_events' | 'acts' | 'teams' | 'transport' | 'program'
 
 export interface CalendarEvent {
   id: string
@@ -523,19 +523,11 @@ export interface EventTask {
   completed: boolean
   phase: 'pre_event' | 'day_of' | 'post_event' | 'followup'
   sort_order: number
+  parent_id: string | null
+  pinned: boolean
+  priority: 'none' | 'med' | 'high'
 }
 
-export interface EventNewFolk {
-  id: string
-  event_plan_id: string
-  ministry_id: string
-  name: string
-  contact: string | null
-  notes: string | null
-  assigned_dgl_id: string | null
-  assigned_dgl_name?: string
-  created_at: string
-}
 
 export interface EventRole {
   id: string
