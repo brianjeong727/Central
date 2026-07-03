@@ -49,3 +49,16 @@ export function audienceLabel(audience: string | null): string {
 export function previewBody(body: string): string {
   return body.replace(/\s*\n+\s*/g, " ").trim()
 }
+
+// Preview label for a replied-to / pinned / forwarded message. Text wins; falls
+// back to "Photo" for images or the attachment name / "File" otherwise.
+export function replyPreviewLabel(
+  content?: string | null,
+  attachmentType?: string | null,
+  attachmentName?: string | null,
+): string {
+  if (content && content.trim()) return content
+  if (attachmentType?.startsWith("image/")) return "Photo"
+  if (attachmentType) return attachmentName || "File"
+  return ""
+}
