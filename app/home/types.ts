@@ -660,6 +660,12 @@ export interface PlanTabProps {
   // Receipts workspace: team selected WITHIN receipts (synced to ?rteam)
   activeReceiptsTeamId?: string | null
   onReceiptsTeamChange?: (id: string) => void
+  // Bumped by home-app whenever the user clicks a workspace section-nav item
+  // (finance/student-org/DGL section, or a receipts team). PlanTab closes any open
+  // team-settings subpage on each bump — the subpage state is local to PlanTab, so
+  // the section handlers in home-app can't clear it directly. Fires on EVERY click
+  // (not just value changes) so clicking the already-selected section also exits.
+  closeSubpageSignal?: number
 }
 
 export interface WorshipWeek {

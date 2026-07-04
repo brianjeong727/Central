@@ -1005,7 +1005,7 @@ export function SettingsTab({
                       {peopleChangingRole === m.id ? <span style={{ fontSize: 11, color: "var(--muted-text)" }}>Saving…</span> : roleBadge(m.role)}
                       {isAdmin && !isMe && (
                         <div style={{ position: "relative" }}>
-                          {menuOpen && <div style={{ position: "fixed", inset: 0, zIndex: 5 }} onClick={() => setPeopleRoleMenuOpen(null)} />}
+                          {menuOpen && <div className="fixed inset-0 z-[5] md:left-[var(--shell-offset)]" onClick={() => setPeopleRoleMenuOpen(null)} />}
                           <button onClick={() => setPeopleRoleMenuOpen(menuOpen ? null : m.id)} style={{ width: 28, height: 28, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer" }}>
                             <MoreHorizontal style={{ width: 16, height: 16, color: "var(--faint)" }} />
                           </button>
