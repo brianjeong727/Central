@@ -1742,17 +1742,26 @@ function shortDow(dateStr: string): string {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" })
 }
 
-// Small circular initials avatar. `mine` → plum fill; else neutral ivory.
+// Small circular initials avatar. `mine` → plum fill (canonical MonogramChip);
+// else neutral ivory (outside MonogramChip's plum-only contract, kept custom).
 function RotationAvatar({ name, mine }: { name: string; mine: boolean }) {
+  if (mine) {
+    return (
+      <MonogramChip
+        initials={getInitials(name)}
+        style={{ width: 22, height: 22, fontSize: 9.5, fontWeight: 600, letterSpacing: "0.02em" }}
+      />
+    )
+  }
   return (
     <span
       style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center",
         width: 22, height: 22, borderRadius: 999, flexShrink: 0,
         fontFamily: "var(--sans)", fontSize: 9.5, fontWeight: 600, letterSpacing: "0.02em",
-        background: mine ? "var(--plum)" : "var(--ivory)",
-        color: mine ? "var(--cream-on-dark)" : "var(--body)",
-        border: mine ? "1px solid transparent" : "1px solid var(--line-2)",
+        background: "var(--ivory)",
+        color: "var(--body)",
+        border: "1px solid var(--line-2)",
       }}
     >
       {getInitials(name)}
@@ -10191,11 +10200,10 @@ function GroupGeneratorWizard({
                             }}
                           >
                             <GripVertical style={{ width: 12, height: 12, color: "var(--dashed)", flexShrink: 0 }} />
-                            <div style={{ width: 24, height: 24, borderRadius: 6, background: "var(--plum)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <span style={{ fontSize: 9, fontWeight: 700, color: "var(--cream-panel)" }}>
-                                {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
-                              </span>
-                            </div>
+                            <MonogramChip
+                              initials={m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                              style={{ width: 24, height: 24, fontSize: 10, fontWeight: 700 }}
+                            />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <p style={{ fontSize: 12, fontWeight: 500, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
                               <p style={{ fontSize: 10, color: "var(--muted-text)", margin: 0 }}>
@@ -10249,11 +10257,10 @@ function GroupGeneratorWizard({
                             }}
                           >
                             <GripVertical style={{ width: 12, height: 12, color: "var(--dashed)", flexShrink: 0 }} />
-                            <div style={{ width: 24, height: 24, borderRadius: 6, background: "var(--plum)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <span style={{ fontSize: 9, fontWeight: 700, color: "var(--cream-panel)" }}>
-                                {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
-                              </span>
-                            </div>
+                            <MonogramChip
+                              initials={m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                              style={{ width: 24, height: 24, fontSize: 10, fontWeight: 700 }}
+                            />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <p style={{ fontSize: 12, fontWeight: 500, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
                               <p style={{ fontSize: 10, color: "var(--muted-text)", margin: 0 }}>

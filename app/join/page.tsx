@@ -7,6 +7,7 @@ import { joinMinistryByCode, getPublicMinistries, joinMinistryById, getUserMinis
 import { Spinner } from "@/app/home/components/shared"
 import { createClient } from "@/lib/supabase"
 import { MonogramChip } from "@/components/central/MonogramChip"
+import { PlanSubTabStrip } from "@/components/central/plan-sub-tab-strip"
 import { getInitials } from "@/app/home/utils"
 
 // ─── design tokens ──────────────────────────────────────────────
@@ -441,23 +442,14 @@ function JoinContent() {
         </div>
 
         {/* ── Tab bar ── */}
-        <div style={{ borderBottom: "1px solid var(--line)", flexShrink: 0, background: "var(--cream-panel)" }}>
-          <div style={{ maxWidth: 520, margin: "0 auto", display: "flex", padding: "0 24px" }}>
-            {(["browse", "code"] as Tab[]).map((t) => (
-              <button key={t} onClick={() => setTab(t)} style={{
-                paddingTop: 14, paddingBottom: 14, marginRight: 32,
-                fontSize: 14, fontFamily: SANS, background: "none",
-                color: tab === t ? "var(--plum-2)" : "var(--muted-text)",
-                fontWeight: tab === t ? 600 : 400,
-                borderBottom: tab === t ? "2px solid var(--plum-2)" : "2px solid transparent",
-                border: "none", borderBottomWidth: 2,
-                borderBottomStyle: "solid",
-                borderBottomColor: tab === t ? "var(--plum-2)" : "transparent",
-                marginBottom: -1, cursor: "pointer", transition: "color .15s",
-              }}>
-                {t === "browse" ? "Find ministry" : "I have a code"}
-              </button>
-            ))}
+        <div style={{ flexShrink: 0, background: "var(--cream-panel)" }}>
+          <div style={{ maxWidth: 520, margin: "0 auto", padding: "0 24px" }}>
+            <PlanSubTabStrip
+              flush
+              tabs={[{ key: "browse", label: "Find ministry" }, { key: "code", label: "I have a code" }]}
+              active={tab}
+              onChange={(k) => setTab(k as Tab)}
+            />
           </div>
         </div>
 

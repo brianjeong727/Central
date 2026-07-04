@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase"
 import { getUserMinistries, getPublicMinistries, joinMinistryById, joinMinistryByCode, setCurrentMinistry } from "@/app/actions/ministry"
 import { Spinner, RingCrossLogo } from "@/app/home/components/shared"
 import { MonogramChip } from "@/components/central/MonogramChip"
+import { PlanSubTabStrip } from "@/components/central/plan-sub-tab-strip"
 
 const SANS  = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
@@ -190,19 +191,13 @@ function MinistriesContent() {
         </p>
 
         {/* Underline tabs */}
-        <div style={{ display: "flex", gap: 32, borderBottom: "1px solid var(--line)", marginTop: 32 }}>
-          {(["browse", "code"] as const).map(t => (
-            <button key={t} type="button" onClick={() => changeTab(t)} style={{
-              padding: "12px 0 14px", fontSize: 15,
-              color: tab === t ? "var(--plum-2)" : "var(--muted-text)",
-              fontWeight: tab === t ? 600 : 400, fontFamily: SANS,
-              background: "none", border: "none",
-              borderBottom: `2px solid ${tab === t ? "var(--plum)" : "transparent"}`,
-              marginBottom: -1, cursor: "pointer", transition: "color .12s ease",
-            }}>
-              {t === "browse" ? "Browse" : "Invite code"}
-            </button>
-          ))}
+        <div style={{ marginTop: 32 }}>
+          <PlanSubTabStrip
+            flush
+            tabs={[{ key: "browse", label: "Browse" }, { key: "code", label: "Invite code" }]}
+            active={tab}
+            onChange={(k) => changeTab(k as Tab)}
+          />
         </div>
 
         {/* ── Browse panel ── */}
