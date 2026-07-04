@@ -1,3 +1,4 @@
+export { EYEBROW_STYLE, MONO_STYLE } from "./typography"
 export { CentralCard } from "./card"
 export { ListRow } from "./list-row"
 export { SectionHeader } from "./section-header"

@@ -1,5 +1,5 @@
 import { ReactNode, CSSProperties } from "react"
-import { EYEBROW_STYLE } from "@/app/home/components/shared"
+import { EYEBROW_STYLE } from "./typography"
 
 interface PageTitleProps {
   // Omit to suppress the eyebrow entirely — title top-spacing tightens automatically.

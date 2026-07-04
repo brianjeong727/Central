@@ -7,17 +7,7 @@ import {
   ReactNode,
   forwardRef,
 } from "react"
-
-// Local copy of the canonical eyebrow micro-label (mirrors EYEBROW_STYLE in
-// app/home/components/shared.tsx) so components/central stays a leaf and does
-// not depend on the app layer.
-const FIELD_LABEL_STYLE: React.CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: "11px",
-  letterSpacing: "1.4px",
-  textTransform: "uppercase",
-  color: "var(--muted-text)",
-}
+import { EYEBROW_STYLE } from "./typography"
 
 // ── Central form-control system (DESIGN_SYSTEM §4.4) ───────────────────────────
 // Shared input / select / textarea primitives. Every control forwards `style`
@@ -181,7 +171,7 @@ interface FormFieldProps {
 export function FormField({ label, children, helper, error }: FormFieldProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      {label != null && <span style={FIELD_LABEL_STYLE}>{label}</span>}
+      {label != null && <span style={EYEBROW_STYLE}>{label}</span>}
       {children}
       {error != null ? (
         <span style={{ fontSize: 12, color: "var(--danger)" }}>{error}</span>

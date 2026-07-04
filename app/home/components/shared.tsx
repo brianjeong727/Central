@@ -5,24 +5,9 @@ import { Plus } from "lucide-react"
 import { CentralButton } from "@/components/central"
 
 // ── Shared design tokens ──────────────────────────────────────────────────────
-
-export const MONO_STYLE: React.CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: "10px",
-  letterSpacing: "0.06em",
-  textTransform: "uppercase",
-  color: "var(--muted-text)",
-}
-
-// Canonical "eyebrow" micro-label: 11px / 1.4px tracking / uppercase mono.
-// Distinct from MONO_STYLE (10px / 0.06em) — do not flatten the two together.
-export const EYEBROW_STYLE: React.CSSProperties = {
-  fontFamily: "var(--mono)",
-  fontSize: "11px",
-  letterSpacing: "1.4px",
-  textTransform: "uppercase",
-  color: "var(--muted-text)",
-}
+// EYEBROW_STYLE / MONO_STYLE are canonically defined in components/central/typography.ts
+// (the leaf layer) and re-exported here so existing app-layer importers keep working.
+export { EYEBROW_STYLE, MONO_STYLE } from "@/components/central/typography"
 
 // ── Shared brand mark ─────────────────────────────────────────────────────────
 
