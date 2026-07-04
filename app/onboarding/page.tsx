@@ -17,7 +17,7 @@ const mono: React.CSSProperties = {
 // ─── Rail stepper ────────────────────────────────────────────────
 const STEPS = [
   { label: "Basic info",  sub: "Name, campus, size"  },
-  { label: "Structure",   sub: "Visibility & access" },
+  { label: "Structure",   sub: "Public or private"   },
   { label: "Workspaces",  sub: "What you need"       },
   { label: "Review",      sub: "Confirm & submit"    },
 ]
@@ -260,9 +260,7 @@ export default function OnboardingPage() {
   const [step1Touched, setStep1Touched] = useState(false)
 
   // Step 2
-  const [isPublic, setIsPublic]         = useState(true)
-  const [allowInviteCode, setAllowInviteCode] = useState(true)
-  const [requireApproval, setRequireApproval] = useState(false)
+  const [isPublic, setIsPublic]         = useState(false)
 
   // Step 3 — workspaces (preset ids). Default: none selected.
   const [selectedWorkspaces, setSelectedWorkspaces] = useState<string[]>([])
@@ -310,9 +308,7 @@ export default function OnboardingPage() {
   }
 
   const sizeLabel = SIZE_OPTIONS.find(o => o.value === size)?.label ?? ""
-  const discoveryLabel = isPublic
-    ? `Public${allowInviteCode ? " · invite code" : ""}`
-    : "Private"
+  const discoveryLabel = isPublic ? "Public" : "Private"
 
   return (
     <div style={{ display: "flex", height: "100svh", overflow: "hidden", fontFamily: SANS, color: "var(--ink)" }}>
@@ -485,38 +481,19 @@ export default function OnboardingPage() {
             <>
               <StepHeader
                 eyebrow="Step 2 of 4 · Structure"
-                title="Visibility & access."
-                sub="Decide how new members find and enter your ministry. You can change this anytime in settings."
+                title="Visibility."
+                sub="Decide whether your ministry is listed publicly or joinable only by invite code. You can change this anytime in settings."
               />
 
               <div>
                 <div style={mono}>Discovery</div>
                 <ToggleRow
                   title="List in the public directory"
-                  desc="Students can find your ministry by name or university on the Ministries page."
+                  desc="On: students find your ministry on the Ministries page and join instantly. Off: your ministry stays private and only people with your invite code can enter."
                   on={isPublic} onClick={() => setIsPublic(v => !v)}
                 />
-                <ToggleRow
-                  title="Allow joining by invite code"
-                  desc="Leaders share a code for direct entry without browsing."
-                  on={allowInviteCode} onClick={() => setAllowInviteCode(v => !v)}
-                />
-                <ToggleRow
-                  title="Require admin approval to join"
-                  desc="New requests wait for a leader to approve before they're in."
-                  on={requireApproval} onClick={() => setRequireApproval(v => !v)}
-                />
-              </div>
-
-              <div style={{ marginTop: 26 }}>
-                <Field
-                  label="Member invite code"
-                  value={name.trim().replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 5) || "CODE"}
-                  readOnly
-                  mono
-                />
-                <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 8 }}>
-                  Auto-generated — edit it to something memorable for your campus.
+                <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 12, lineHeight: 1.5 }}>
+                  You&apos;ll get your invite codes to share once your ministry is approved.
                 </div>
               </div>
 

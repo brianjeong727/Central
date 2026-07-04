@@ -3,9 +3,13 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
+import { getMinistryCodes } from "@/app/actions/ministry"
 
 export default function PendingPage() {
   const [ministryName, setMinistryName] = useState<string | null>(null)
+  const [inviteCode, setInviteCode] = useState<string | null>(null)
+  const [staffCode, setStaffCode] = useState<string | null>(null)
+  const [copied, setCopied] = useState<"member" | "staff" | null>(null)
   const [checking, setChecking] = useState(false)
 
   useEffect(() => {
@@ -29,9 +33,29 @@ export default function PendingPage() {
         .maybeSingle()
 
       if (ministry?.name) setMinistryName(ministry.name)
+
+      // Fetch the REAL invite codes so the founder can prepare to share them.
+      // Fails silently — if codes can't load, the section simply doesn't render.
+      try {
+        const { inviteCode: mCode, staffInviteCode: sCode } = await getMinistryCodes(profile.ministry_id)
+        if (mCode) setInviteCode(mCode)
+        if (sCode) setStaffCode(sCode)
+      } catch {
+        // ignore — don't break the page
+      }
     }
     load()
   }, [])
+
+  async function copyCode(code: string, which: "member" | "staff") {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopied(which)
+      setTimeout(() => setCopied(c => (c === which ? null : c)), 1600)
+    } catch {
+      // clipboard unavailable — no-op
+    }
+  }
 
   async function checkStatus() {
     setChecking(true)
@@ -80,6 +104,96 @@ export default function PendingPage() {
         <p className="text-[14px] text-[var(--body)] leading-relaxed mb-8 max-w-[300px]">
           We&apos;ve received your ministry application and will review it within 24–48 hours. You&apos;ll gain full access once approved.
         </p>
+
+        {/* Real invite codes — founder can prepare to share them ahead of approval.
+            Renders only when at least the member code loaded (fails silently). */}
+        {inviteCode && (
+          <div
+            style={{
+              width: "100%",
+              border: "1px solid var(--line)",
+              borderRadius: 14,
+              background: "var(--cream)",
+              padding: 18,
+              marginBottom: 32,
+              textAlign: "left",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 11,
+                letterSpacing: "0.13em",
+                textTransform: "uppercase",
+                color: "var(--muted-text)",
+                marginBottom: 14,
+              }}
+            >
+              Your invite codes
+            </div>
+
+            {/* Member code — prominent */}
+            <button
+              type="button"
+              onClick={() => copyCode(inviteCode, "member")}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                padding: "13px 15px",
+                border: "1px solid var(--line)",
+                borderRadius: 10,
+                background: "var(--cream)",
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              <span>
+                <span style={{ display: "block", fontSize: 11, color: "var(--muted-text)", marginBottom: 3 }}>Member code</span>
+                <span style={{ fontFamily: "var(--mono)", fontSize: 20, letterSpacing: "2px", color: "var(--ink)" }}>{inviteCode}</span>
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "var(--plum)", flexShrink: 0 }}>
+                {copied === "member" ? "Copied" : "Copy"}
+              </span>
+            </button>
+
+            {/* Staff code — secondary */}
+            {staffCode && (
+              <button
+                type="button"
+                onClick={() => copyCode(staffCode, "staff")}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  padding: "11px 15px",
+                  marginTop: 10,
+                  border: "1px solid var(--line)",
+                  borderRadius: 10,
+                  background: "var(--cream)",
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+              >
+                <span>
+                  <span style={{ display: "block", fontSize: 11, color: "var(--muted-text)", marginBottom: 3 }}>Staff code</span>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 15, letterSpacing: "2px", color: "var(--muted-text)" }}>{staffCode}</span>
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 500, color: "var(--plum)", flexShrink: 0 }}>
+                  {copied === "staff" ? "Copied" : "Copy"}
+                </span>
+              </button>
+            )}
+
+            <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 14, lineHeight: 1.5 }}>
+              Share these once you&apos;re approved — codes work as soon as your ministry is active.
+            </div>
+          </div>
+        )}
 
         <div className="w-full flex flex-col gap-3">
           <button
