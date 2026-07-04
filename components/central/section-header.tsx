@@ -1,5 +1,5 @@
 import { ReactNode, CSSProperties } from "react"
-import { EYEBROW_STYLE } from "@/app/home/components/shared"
+import { EYEBROW_STYLE } from "./typography"
 
 interface SectionHeaderProps {
   eyebrow?: string

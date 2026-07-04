@@ -2,7 +2,7 @@
 
 import { CSSProperties } from "react"
 import type { ChatPreview } from "@/components/ui/chats-section"
-import { EYEBROW_STYLE } from "@/app/home/components/shared"
+import { EYEBROW_STYLE } from "./typography"
 import { MonogramChip } from "./MonogramChip"
 
 interface ChatStripProps {
