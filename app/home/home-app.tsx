@@ -11,7 +11,7 @@ import type { ChatPreview } from "@/components/ui/chats-section"
 
 // Types
 import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings, ChatGroup, Crumb } from "./types"
-import { formatRelativeTime, getInitials } from "./utils"
+import { formatRelativeTime, getInitials, chatPreviewLabel } from "./utils"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 import { classifyTeam } from "./team-type"
 import { useNavState, ALL_FOLDED_PARAMS } from "./nav-state"
@@ -449,6 +449,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     last_read_at: string | null; last_msg_content: string | null
     last_msg_sender_name: string | null; last_msg_at: string | null
     last_msg_type: string | null; unread_count: number
+    last_msg_attachment_type: string | null; last_msg_has_poll: boolean | null
   }
 
   // Single DB round-trip via get_chat_previews function (replaces unbounded messages fetch)
@@ -464,7 +465,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         id: row.group_id,
         groupName: row.group_name,
         type: row.group_type,
-        lastMessage: row.last_msg_content ?? "",
+        lastMessage: chatPreviewLabel(row.last_msg_content, row.last_msg_attachment_type, row.last_msg_has_poll),
         lastMessageSender: row.last_msg_sender_name ?? "",
         unreadCount: Number(row.unread_count),
         initials: getInitials(row.group_name),
@@ -701,7 +702,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "messages", filter: `group_id=in.(${memberGroupKey})` },
         (payload) => {
-          const msg = payload.new as { group_id: string; content: string; created_at: string; sender_id: string }
+          const msg = payload.new as { group_id: string; content: string; created_at: string; sender_id: string; attachment_type: string | null; poll_id: string | null }
           // Drive the Messages sidebar live (order, preview, unread badges). This
           // throttled refetch ALSO refreshes the plain-fetch fallback (chatListData)
           // from the same RPC result — no separate loadChatList() needed here.
@@ -715,7 +716,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 c.id === msg.group_id
                   ? {
                       ...c,
-                      lastMessage: msg.content,
+                      lastMessage: chatPreviewLabel(msg.content, msg.attachment_type, !!msg.poll_id),
                       lastMessageSender: senderName,
                       time: formatRelativeTime(msg.created_at),
                       _ts: msg.created_at,

@@ -50,6 +50,15 @@ export function previewBody(body: string): string {
   return body.replace(/\s*\n+\s*/g, " ").trim()
 }
 
+// Display text for a chat-list preview: text wins, else a media/poll label, else "".
+export function chatPreviewLabel(content?: string | null, attachmentType?: string | null, hasPoll?: boolean | null): string {
+  if (content && content.trim()) return previewBody(content)
+  if (attachmentType?.startsWith("image/")) return "Photo"
+  if (attachmentType) return "File"
+  if (hasPoll) return "Poll"
+  return ""
+}
+
 // Preview label for a replied-to / pinned / forwarded message. Text wins; falls
 // back to "Photo" for images or the attachment name / "File" otherwise.
 export function replyPreviewLabel(
