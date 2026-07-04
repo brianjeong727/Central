@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase"
+import { chatPreviewLabel } from "./utils"
 import type { ChatGroup } from "./types"
 
 // ── Shared chat-list SWR fetcher ─────────────────────────────────────────────
@@ -14,6 +15,7 @@ export type ChatListRow = {
   last_msg_content: string | null; last_msg_sender_id: string | null
   last_msg_sender_name: string | null; last_msg_at: string | null
   last_msg_type: string | null; unread_count: number
+  last_msg_attachment_type: string | null; last_msg_has_poll: boolean | null
 }
 
 export async function fetchChatList([, userId, ministryId]: [string, string, string]): Promise<ChatGroup[]> {
@@ -32,7 +34,7 @@ export async function fetchChatList([, userId, ministryId]: [string, string, str
     name: row.group_name,
     type: row.group_type,
     archived: row.group_archived ?? false,
-    last_message: row.last_msg_content ?? null,
+    last_message: chatPreviewLabel(row.last_msg_content, row.last_msg_attachment_type, row.last_msg_has_poll) || null,
     last_sender: row.last_msg_sender_name ?? null,
     last_message_time: row.last_msg_at ?? null,
     unread_count: Number(row.unread_count),

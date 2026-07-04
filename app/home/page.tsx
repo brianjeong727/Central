@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase-server"
 import { HomeApp } from "./home-app"
-import { formatRelativeTime, getInitials } from "./utils"
+import { formatRelativeTime, getInitials, chatPreviewLabel } from "./utils"
 import type { UserTeam, CongregationQuestion, GovernanceSettings } from "./types"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
@@ -12,6 +12,7 @@ type PreviewRow = {
   last_read_at: string | null; last_msg_content: string | null
   last_msg_sender_name: string | null; last_msg_at: string | null
   last_msg_type: string | null; unread_count: number
+  last_msg_attachment_type: string | null; last_msg_has_poll: boolean | null
 }
 
 type RawTeamRef = { id: string; name: string; icon: string | null; description: string | null; team_type: string; allow_co_presidency: boolean | null; allow_admin_members: boolean | null }
@@ -61,7 +62,7 @@ export default async function HomePage() {
   const rawPreviews = ((chatResult.data ?? []) as PreviewRow[]).map((row) => ({
     id: row.group_id,
     groupName: row.group_name,
-    lastMessage: row.last_msg_content ?? "",
+    lastMessage: chatPreviewLabel(row.last_msg_content, row.last_msg_attachment_type, row.last_msg_has_poll),
     lastMessageSender: row.last_msg_sender_name ?? "",
     unreadCount: Number(row.unread_count),
     initials: getInitials(row.group_name),
