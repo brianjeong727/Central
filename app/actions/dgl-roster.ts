@@ -1,6 +1,7 @@
 "use server"
 
 import { createAdminClient } from "@/lib/supabase-admin"
+import { requireTeamMemberOrAdmin } from "@/app/actions/authz"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,10 @@ export async function getDGLRosterAction(
   teamId: string,
   semester: string,
 ): Promise<{ status: RosterStatus | null; members: RosterMember[] }> {
+  // Caller must be admin-tier or a member of this team, in this ministry.
+  const authz = await requireTeamMemberOrAdmin(teamId)
+  if (authz.error !== null) return { status: null, members: [] }
+
   const admin = createAdminClient()
 
   const { data: statusRow } = await admin
@@ -74,6 +79,11 @@ export async function confirmDGLRosterAction(
   presidentId: string,
 ): Promise<{ error?: string }> {
   if (userIds.length === 0) return { error: "Select at least one DGL." }
+
+  // Caller must be admin-tier or a member of this team, in this ministry.
+  const authz = await requireTeamMemberOrAdmin(teamId)
+  if (authz.error !== null) return { error: authz.error }
+  if (authz.ministryId !== ministryId) return { error: "Not authorized." }
 
   try {
     const admin = createAdminClient()
@@ -131,6 +141,11 @@ export async function handleRosterRenewalAction(
   action: "keep" | "fresh",
   presidentId: string,
 ): Promise<{ error?: string }> {
+  // Caller must be admin-tier or a member of this team, in this ministry.
+  const authz = await requireTeamMemberOrAdmin(teamId)
+  if (authz.error !== null) return { error: authz.error }
+  if (authz.ministryId !== ministryId) return { error: "Not authorized." }
+
   const admin = createAdminClient()
 
   // currentSemester at June 1 is "summer_YEAR"

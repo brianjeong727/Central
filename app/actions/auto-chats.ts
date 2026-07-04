@@ -2,6 +2,13 @@
 
 import { createAdminClient } from "@/lib/supabase-admin"
 import { getSemesterLabel } from "@/app/actions/dgl-utils"
+import {
+  requireMinistryMember,
+  requireSameMinistry,
+  requireMinistryAdmin,
+  requireTeamMemberOrAdmin,
+  isAdminTier,
+} from "@/app/actions/authz"
 
 // ── ensureMinistryChats ───────────────────────────────────────────────────────
 // Creates only the central church chat (e.g. "Central Chat").
@@ -12,6 +19,12 @@ export async function ensureMinistryChats(
   ministryName: string,
   createdBy: string,
 ): Promise<Map<string, string>> {
+  // Internal helper reached via ministry join/registration flows, but exported
+  // from a "use server" file → also a public endpoint. Caller must belong to
+  // the ministry (the join flows set profiles.ministry_id before calling this).
+  const authz = await requireSameMinistry(ministryId)
+  if (authz.error !== null) return new Map()
+
   const admin = createAdminClient()
   const centralName = `${ministryName} Chat`
 
@@ -50,6 +63,12 @@ export async function autoAddUserToChats(
   graduationYear: number | null,
   userRole?: string | null,
 ): Promise<void> {
+  // Caller must belong to the ministry, and may only auto-add THEMSELVES
+  // unless admin-tier (the join flows always pass the caller's own id).
+  const authz = await requireSameMinistry(ministryId)
+  if (authz.error !== null) return
+  if (userId !== authz.userId && !isAdminTier(authz.role)) return
+
   const admin = createAdminClient()
 
   const { data: ministry } = await admin
@@ -132,6 +151,10 @@ export async function retroactivelyApplyToggle(
   ministryId: string,
   toggleKey: string,
 ): Promise<{ added: number; error?: string }> {
+  // Admin-tier ministry configuration.
+  const authz = await requireMinistryAdmin(ministryId)
+  if (authz.error !== null) return { added: 0, error: authz.error }
+
   const admin = createAdminClient()
 
   const { data: ministry } = await admin
@@ -234,6 +257,10 @@ export async function runAnnualClassMaintenance(ministryId: string): Promise<{
   graduated: string | null
   error?: string
 }> {
+  // Admin-tier ministry configuration.
+  const authz = await requireMinistryAdmin(ministryId)
+  if (authz.error !== null) return { created: null, graduated: null, error: authz.error }
+
   const admin = createAdminClient()
   const now = new Date()
   const currentYear = now.getFullYear()
@@ -285,6 +312,10 @@ export async function createPraiseTeamChatAction(
   weekId: string,
   ministryId: string,
 ): Promise<{ groupId: string | null; skipped?: boolean; error?: string }> {
+  // Caller must belong to the ministry.
+  const authz = await requireSameMinistry(ministryId)
+  if (authz.error !== null) return { groupId: null, error: authz.error }
+
   const admin = createAdminClient()
 
   // Check automation setting
@@ -297,14 +328,27 @@ export async function createPraiseTeamChatAction(
   const settings = ((ministry?.automation_settings ?? {}) as Record<string, boolean>)
   if (settings.auto_praise_chat === false) return { groupId: null, skipped: true }
 
-  // Fetch the worship week
+  // Fetch the worship week — scoped to this ministry (a cross-ministry weekId
+  // must not be reachable).
   const { data: week } = await admin
     .from("worship_weeks")
-    .select("week_date, leader_id, chat_group_id")
+    .select("week_date, leader_id, chat_group_id, team_id")
     .eq("id", weekId)
+    .eq("ministry_id", ministryId)
     .single()
 
   if (!week) return { groupId: null, error: "Week not found." }
+
+  // Non-admin callers must be members of the praise team that owns this week.
+  if (!isAdminTier(authz.role) && week.team_id) {
+    const { data: member } = await admin
+      .from("team_members")
+      .select("id")
+      .eq("team_id", week.team_id)
+      .eq("user_id", authz.userId)
+      .maybeSingle()
+    if (!member) return { groupId: null, error: "Not authorized." }
+  }
   if (week.chat_group_id) return { groupId: week.chat_group_id, skipped: true }
 
   // Fetch assigned roles
@@ -372,6 +416,11 @@ export async function confirmSmallGroupChatsAction(
   teamId: string,
   ministryId: string,
 ): Promise<{ created: number; updated: number; error?: string }> {
+  // Caller must be admin-tier or a member of this team, in this ministry.
+  const authz = await requireTeamMemberOrAdmin(teamId)
+  if (authz.error !== null) return { created: 0, updated: 0, error: authz.error }
+  if (authz.ministryId !== ministryId) return { created: 0, updated: 0, error: "Not authorized." }
+
   try {
   const admin = createAdminClient()
 
@@ -534,7 +583,22 @@ export async function respondToGradCheck(
   userId: string,
   graduated: boolean,
 ): Promise<{ error?: string }> {
+  // A user may only respond for THEMSELVES; admins may respond for a member of
+  // their own ministry. Nobody can flip another user's grad status otherwise.
+  const authz = await requireMinistryMember()
+  if (authz.error !== null) return { error: authz.error }
+
   const admin = createAdminClient()
+
+  if (userId !== authz.userId) {
+    if (!isAdminTier(authz.role)) return { error: "Not authorized." }
+    const { data: target } = await admin
+      .from("profiles")
+      .select("ministry_id")
+      .eq("id", userId)
+      .maybeSingle()
+    if (!target || target.ministry_id !== authz.ministryId) return { error: "Not authorized." }
+  }
 
   if (graduated) {
     // Fetch user's ministry_id
@@ -594,17 +658,44 @@ export async function updateSmallGroupMembersAction(params: {
   addUserIds: string[]
   removeUserIds: string[]
 }): Promise<{ error?: string }> {
+  const authz = await requireMinistryMember()
+  if (authz.error !== null) return { error: authz.error }
+
   const admin = createAdminClient()
   const semester = getSemesterLabel()
 
-  // Fetch the small group to get chat_group_id
+  // Fetch the small group to get chat_group_id — and its ministry/team so the
+  // caller can be verified against it.
   const { data: sg, error: sgErr } = await admin
     .from("small_groups")
-    .select("id, chat_group_id")
+    .select("id, chat_group_id, ministry_id, team_id")
     .eq("id", params.smallGroupId)
     .single()
 
   if (sgErr || !sg) return { error: "Small group not found." }
+  if (sg.ministry_id !== authz.ministryId) return { error: "Not authorized." }
+
+  // Non-admin callers must be members of the team that owns this small group.
+  if (!isAdminTier(authz.role)) {
+    const { data: member } = await admin
+      .from("team_members")
+      .select("id")
+      .eq("team_id", sg.team_id)
+      .eq("user_id", authz.userId)
+      .maybeSingle()
+    if (!member) return { error: "Not authorized." }
+  }
+
+  // Only users who belong to this ministry may be added.
+  if (params.addUserIds.length > 0) {
+    const { data: validProfiles } = await admin
+      .from("profiles")
+      .select("id")
+      .in("id", params.addUserIds)
+      .eq("ministry_id", authz.ministryId)
+    const validIds = new Set((validProfiles ?? []).map((p: { id: string }) => p.id))
+    params = { ...params, addUserIds: params.addUserIds.filter(id => validIds.has(id)) }
+  }
 
   // Remove members from small_group_members
   if (params.removeUserIds.length > 0) {
@@ -666,17 +757,35 @@ export async function syncSmallGroupFromChatAction(params: {
 }): Promise<{ skipped?: boolean; error?: string }> {
   if (params.addUserIds.length === 0 && params.removeUserIds.length === 0) return { skipped: true }
 
+  // Caller must belong to the linked small group's ministry. (Chat managers may
+  // not be members of the owning team — the finer chat-management gate lives in
+  // ChatSettings; this blocks cross-ministry callers.)
+  const authz = await requireMinistryMember()
+  if (authz.error !== null) return { error: authz.error }
+
   const admin = createAdminClient()
   const semester = getSemesterLabel()
 
   // Find a small group linked to this chat
   const { data: sg } = await admin
     .from("small_groups")
-    .select("id")
+    .select("id, ministry_id")
     .eq("chat_group_id", params.chatGroupId)
     .maybeSingle()
 
   if (!sg) return { skipped: true }
+  if (sg.ministry_id !== authz.ministryId) return { error: "Not authorized." }
+
+  // Only users who belong to this ministry may be added.
+  if (params.addUserIds.length > 0) {
+    const { data: validProfiles } = await admin
+      .from("profiles")
+      .select("id")
+      .in("id", params.addUserIds)
+      .eq("ministry_id", authz.ministryId)
+    const validIds = new Set((validProfiles ?? []).map((p: { id: string }) => p.id))
+    params = { ...params, addUserIds: params.addUserIds.filter(id => validIds.has(id)) }
+  }
 
   if (params.removeUserIds.length > 0) {
     await admin
@@ -709,6 +818,10 @@ export async function updateAutomationSettings(
   ministryId: string,
   settings: Record<string, boolean>,
 ): Promise<{ error?: string }> {
+  // Admin-tier ministry configuration.
+  const authz = await requireMinistryAdmin(ministryId)
+  if (authz.error !== null) return { error: authz.error }
+
   const admin = createAdminClient()
   const { error } = await admin
     .from("ministries")
@@ -727,6 +840,10 @@ export async function archiveToggleChats(
   ministryId: string,
   key: string,
 ): Promise<{ archived: number; error?: string }> {
+  // Admin-tier ministry configuration.
+  const authz = await requireMinistryAdmin(ministryId)
+  if (authz.error !== null) return { archived: 0, error: authz.error }
+
   const admin = createAdminClient()
 
   const { data: ministry } = await admin
@@ -783,6 +900,11 @@ export async function createTeamChatAction(
   ministryId: string,
   createdBy: string,
 ): Promise<{ groupId: string | null; error?: string }> {
+  // Caller must be admin-tier or a member of this team, in this ministry.
+  const authz = await requireTeamMemberOrAdmin(teamId)
+  if (authz.error !== null) return { groupId: null, error: authz.error }
+  if (authz.ministryId !== ministryId) return { groupId: null, error: "Not authorized." }
+
   const admin = createAdminClient()
 
   const { data: memberRows } = await admin
@@ -839,13 +961,28 @@ export async function createEventPlanningChatAction(
   createdBy: string,
   ministryId: string,
 ): Promise<{ groupId: string | null; created: boolean; error?: string }> {
-  const admin = createAdminClient()
-  const memberIds = [...new Set([...assignedUserIds, createdBy])]
+  // Caller must belong to the ministry; the chat creator is always the caller.
+  const authz = await requireSameMinistry(ministryId)
+  if (authz.error !== null) return { groupId: null, created: false, error: authz.error }
 
+  const admin = createAdminClient()
+
+  // Only users who belong to this ministry may be added to the planning chat.
+  const candidateIds = [...new Set([...assignedUserIds, authz.userId])]
+  const { data: validProfiles } = await admin
+    .from("profiles")
+    .select("id")
+    .in("id", candidateIds)
+    .eq("ministry_id", ministryId)
+  const validIds = new Set((validProfiles ?? []).map((p: { id: string }) => p.id))
+  const memberIds = candidateIds.filter(id => validIds.has(id))
+
+  // Event plan lookup scoped to this ministry — a cross-ministry planId is unreachable.
   const { data: planRow } = await admin
     .from("event_plans")
     .select("planning_group_id")
     .eq("id", eventPlanId)
+    .eq("ministry_id", ministryId)
     .single()
 
   const now = new Date().toISOString()
@@ -861,7 +998,8 @@ export async function createEventPlanningChatAction(
   const chatName = `${eventTitle} Planning`
   const { data: group, error: gErr } = await admin
     .from("groups")
-    .insert({ name: chatName, type: "church", ministry_id: ministryId, created_by: createdBy })
+    // created_by comes from the verified session, never the caller-supplied param.
+    .insert({ name: chatName, type: "church", ministry_id: ministryId, created_by: authz.userId })
     .select("id")
     .single()
   if (gErr || !group) return { groupId: null, created: false, error: "Failed to create group chat." }
@@ -870,7 +1008,7 @@ export async function createEventPlanningChatAction(
     memberIds.map(uid => ({ group_id: group.id, user_id: uid, last_read_at: now })),
     { onConflict: "group_id,user_id" },
   )
-  await admin.from("event_plans").update({ planning_group_id: group.id }).eq("id", eventPlanId)
+  await admin.from("event_plans").update({ planning_group_id: group.id }).eq("id", eventPlanId).eq("ministry_id", ministryId)
 
   return { groupId: group.id as string, created: true }
 }

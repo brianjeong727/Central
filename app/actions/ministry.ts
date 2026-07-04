@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
+import { requireSameMinistry, requireMinistryAdmin, isAdminTier } from "./authz"
 import { autoAddUserToChats, ensureMinistryChats } from "./auto-chats"
 import { presetById } from "@/app/home/workspace-presets"
 
@@ -78,7 +79,14 @@ export async function joinMinistryByCode(
     return { ministryName: ministry.name, error: null, isStaffCode: true }
   }
 
-  const role = isStaff ? (adminRole as string) : "member"
+  // Validated allowlist — the staff code may only grant pastor/deacon/elder
+  // (permissions.md § Join Codes). Never pass the caller-supplied role through.
+  const ALLOWED_STAFF_ROLES = ["pastor", "deacon", "elder"]
+  if (isStaff && !ALLOWED_STAFF_ROLES.includes((adminRole ?? "").toLowerCase())) {
+    return { ministryName: null, error: "Invalid staff role" }
+  }
+
+  const role = isStaff ? (adminRole as string).toLowerCase() : "member"
 
   const { data: updatedRows, error: updateErr } = await admin
     .from("profiles")
@@ -308,6 +316,11 @@ async function createOnboardingWorkspaces(
         description: preset.description,
         team_type: preset.teamType,
         created_by: createdBy,
+        // Gov-WRITE by default so admins can manage onboarding-created teams
+        // without first being members (consistent with AddWorkspaceModal). This
+        // insert is service-role so it isn't RLS-blocked, but the column keeps
+        // the resulting teams admin-manageable under Full-gov RLS.
+        admin_access: "write",
       })
       .select("id")
       .single()
@@ -549,17 +562,62 @@ export async function regenerateStaffCode(): Promise<{ code: string | null; erro
   return { code: newCode, error: null }
 }
 
+// ─── Last-admin hard block ───────────────────────────────────────────────────
+// A ministry must never reach zero admin-tier members. Returns an error string
+// if the target is currently admin-tier AND is the last admin-tier member of
+// the ministry (so demoting/removing them would lock the ministry out).
+// Returns null when the action is safe to proceed.
+const ADMIN_TIER_ROLES = ["admin", "deacon", "elder", "pastor"]
+const LAST_ADMIN_ERROR = "This is the last admin — a ministry must keep at least one admin. Promote someone else first."
+
+async function lastAdminBlockError(
+  admin: ReturnType<typeof createAdminClient>,
+  ministryId: string,
+  targetUserId: string,
+): Promise<string | null> {
+  const { data: target } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", targetUserId)
+    .eq("ministry_id", ministryId)
+    .maybeSingle()
+
+  // Target isn't admin-tier (or isn't in this ministry) — no last-admin risk.
+  if (!target || !ADMIN_TIER_ROLES.includes((target.role ?? "").toLowerCase())) return null
+
+  // Count remaining admin-tier members (case-insensitive role match).
+  const { count } = await admin
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("ministry_id", ministryId)
+    .or(ADMIN_TIER_ROLES.map((r) => `role.ilike.${r}`).join(","))
+
+  return (count ?? 0) <= 1 ? LAST_ADMIN_ERROR : null
+}
+
 // ─── Admin: change a member's role ──────────────────────────────────────────
 export async function updateMemberRole(targetUserId: string, newRole: "visitor" | "member" | "leader" | "admin" | "deacon" | "elder" | "pastor"): Promise<{ error: string | null }> {
   const supabase = await createClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return { error: "Not authenticated." }
 
+  // Self-target guard (mirrors removeMember/excommunicateMember) — a lone admin
+  // must not be able to self-demote and lock the ministry out.
+  if (targetUserId === user.id) return { error: "You cannot change your own role." }
+
   const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
   if (!profile?.ministry_id) return { error: "No ministry found." }
   if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { error: "Only admins can change member roles." }
 
   const admin = createAdminClient()
+
+  // Hard-block last admin: if the new role drops the target out of admin-tier,
+  // the target must not be the ministry's last admin-tier member.
+  if (!ADMIN_TIER_ROLES.includes(newRole.toLowerCase())) {
+    const blockErr = await lastAdminBlockError(admin, profile.ministry_id, targetUserId)
+    if (blockErr) return { error: blockErr }
+  }
+
   const { error } = await admin.from("profiles").update({ role: newRole }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
   return { error: error?.message ?? null }
 }
@@ -577,23 +635,101 @@ export async function removeMember(targetUserId: string): Promise<{ error: strin
   if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { error: "Only admins can remove members." }
 
   const admin = createAdminClient()
+
+  // Hard-block last admin: removal drops the target out of admin-tier, so the
+  // target must not be the ministry's last admin-tier member.
+  const blockErr = await lastAdminBlockError(admin, profile.ministry_id, targetUserId)
+  if (blockErr) return { error: blockErr }
+
   const { error } = await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
+  if (error) return { error: error.message }
+
+  // Revoke the membership record too (mirrors excommunicateMember/selfLeaveMinistry) —
+  // otherwise the removed member can re-enter via setCurrentMinistry, which restores
+  // their stale role from user_ministries.
+  await admin.from("user_ministries").delete().eq("user_id", targetUserId).eq("ministry_id", profile.ministry_id)
+
+  return { error: null }
+}
+
+// ─── Admin: archive ministry (two-step, second-admin confirmation) ───────────
+// Q4: archiving requires TWO distinct admins. The first admin's call records a
+// request (archive_requested_by/_at, status stays active); a DIFFERENT admin's
+// call completes it (status → archived). The requester can never self-confirm.
+export async function archiveMinistry(): Promise<{ state: "requested" | "archived" | null; error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: authErr } = await supabase.auth.getUser()
+  if (authErr || !user) return { state: null, error: "Not authenticated." }
+
+  const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
+  if (!profile?.ministry_id) return { state: null, error: "No ministry found." }
+  if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { state: null, error: "Only admins can archive the ministry." }
+
+  const admin = createAdminClient()
+  const { data: ministry } = await admin
+    .from("ministries")
+    .select("archive_requested_by")
+    .eq("id", profile.ministry_id)
+    .maybeSingle()
+  if (!ministry) return { state: null, error: "Ministry not found." }
+
+  // Step 1 — no pending request: record this admin's request. Status stays active.
+  if (!ministry.archive_requested_by) {
+    const { error } = await admin
+      .from("ministries")
+      .update({ archive_requested_by: user.id, archive_requested_at: new Date().toISOString() })
+      .eq("id", profile.ministry_id)
+    if (error) return { state: null, error: error.message }
+    return { state: "requested", error: null }
+  }
+
+  // The requester cannot confirm their own request.
+  if (ministry.archive_requested_by === user.id) {
+    return { state: null, error: "You've already requested archiving — a different admin must confirm." }
+  }
+
+  // Step 2 — a SECOND admin confirms: flip to archived and clear the request.
+  const { error } = await admin
+    .from("ministries")
+    .update({ status: "archived", archive_requested_by: null, archive_requested_at: null })
+    .eq("id", profile.ministry_id)
+  if (error) return { state: null, error: error.message }
+  return { state: "archived", error: null }
+}
+
+// ─── Admin: cancel a pending archive request ─────────────────────────────────
+export async function cancelArchiveRequest(ministryId: string): Promise<{ error: string | null }> {
+  const authz = await requireMinistryAdmin(ministryId)
+  if (authz.error !== null) return { error: authz.error }
+
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from("ministries")
+    .update({ archive_requested_by: null, archive_requested_at: null })
+    .eq("id", ministryId)
   return { error: error?.message ?? null }
 }
 
-// ─── Admin: archive ministry ─────────────────────────────────────────────────
-export async function archiveMinistry(): Promise<{ error: string | null }> {
-  const supabase = await createClient()
-  const { data: { user }, error: authErr } = await supabase.auth.getUser()
-  if (authErr || !user) return { error: "Not authenticated." }
-
-  const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
-  if (!profile?.ministry_id) return { error: "No ministry found." }
-  if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { error: "Only admins can archive the ministry." }
+// ─── Admin: read invite codes (scoped server action) ─────────────────────────
+// The invite_code/staff_invite_code columns are revoked from `authenticated`
+// (Q2 SELECT-narrow migration) — clients can no longer read them directly.
+// Admins of the ministry read them via this service-role action instead.
+export async function getMinistryCodes(ministryId: string): Promise<{
+  inviteCode: string | null
+  staffInviteCode: string | null
+  error: string | null
+}> {
+  const authz = await requireMinistryAdmin(ministryId)
+  if (authz.error !== null) return { inviteCode: null, staffInviteCode: null, error: authz.error }
 
   const admin = createAdminClient()
-  const { error } = await admin.from("ministries").update({ status: "archived" }).eq("id", profile.ministry_id)
-  return { error: error?.message ?? null }
+  const { data, error } = await admin
+    .from("ministries")
+    .select("invite_code, staff_invite_code")
+    .eq("id", ministryId)
+    .maybeSingle()
+  if (error || !data) return { inviteCode: null, staffInviteCode: null, error: error?.message ?? "Ministry not found." }
+  return { inviteCode: data.invite_code ?? null, staffInviteCode: data.staff_invite_code ?? null, error: null }
 }
 
 // ─── Admin: excommunicate a member (permanent ban — can never rejoin) ───────────
@@ -611,6 +747,12 @@ export async function excommunicateMember(targetUserId: string): Promise<{ error
   const admin = createAdminClient()
 
   const targetMinistryId = profile.ministry_id
+
+  // Hard-block last admin: excommunication drops the target out of admin-tier,
+  // so the target must not be the ministry's last admin-tier member. Runs
+  // before the ban insert so a blocked action mutates nothing.
+  const blockErr = await lastAdminBlockError(admin, targetMinistryId, targetUserId)
+  if (blockErr) return { error: blockErr }
 
   // Insert the ban record first
   const { error: banErr } = await admin.from("ministry_bans").upsert(
@@ -769,8 +911,26 @@ export async function runDepartedMemberCleanup(ministryId: string): Promise<{ cl
 // Never downgrades admins or existing leaders.
 export async function elevateToLeader(userIds: string[], ministryId: string): Promise<{ error: string | null }> {
   if (userIds.length === 0) return { error: null }
+
+  // Caller must belong to this ministry AND be admin-tier or a team manager
+  // (president / can_manage_team) — the only people who can add team members,
+  // which is the sole legitimate trigger for this elevation.
+  const authz = await requireSameMinistry(ministryId)
+  if (authz.error !== null) return { error: authz.error }
+
   try {
     const admin = createAdminClient()
+
+    if (!isAdminTier(authz.role)) {
+      const { data: managerRows } = await admin
+        .from("team_members")
+        .select("team_id, teams!inner(ministry_id), team_roles!role_id(is_president, permissions)")
+        .eq("user_id", authz.userId)
+        .eq("teams.ministry_id", ministryId)
+      const isTeamManager = ((managerRows ?? []) as { team_roles: { is_president?: boolean; permissions?: string[] } | null }[])
+        .some(r => r.team_roles?.is_president || (r.team_roles?.permissions ?? []).includes("can_manage_team"))
+      if (!isTeamManager) return { error: "Not authorized." }
+    }
     const { error } = await admin
       .from("profiles")
       .update({ role: "leader" })

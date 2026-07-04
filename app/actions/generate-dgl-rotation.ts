@@ -1,6 +1,7 @@
 "use server"
 
 import { createAdminClient } from "@/lib/supabase-admin"
+import { requireTeamMemberOrAdmin } from "@/app/actions/authz"
 import { SLOTS } from "./dgl-constants"
 import type { DGLSlot, ProposedAssignment } from "./dgl-constants"
 
@@ -38,6 +39,11 @@ function dateForSlot(sundayStr: string, slot: DGLSlot): string {
 export async function generateDGLRotationAction(
   params: GenerateRotationParams,
 ): Promise<GenerateRotationResult> {
+  // Caller must be admin-tier or a member of this team, in this ministry.
+  const authz = await requireTeamMemberOrAdmin(params.teamId)
+  if (authz.error !== null) return { assignments: [], flaggedWeeks: [], error: authz.error }
+  if (authz.ministryId !== params.ministryId) return { assignments: [], flaggedWeeks: [], error: "Not authorized." }
+
   try {
     const admin = createAdminClient()
 
@@ -236,6 +242,11 @@ export async function saveDGLRotationAction(params: {
   semester: string
   assignments: Omit<ProposedAssignment, "user_name" | "needs_review">[]
 }): Promise<{ error?: string }> {
+  // Caller must be admin-tier or a member of this team, in this ministry.
+  const authz = await requireTeamMemberOrAdmin(params.teamId)
+  if (authz.error !== null) return { error: authz.error }
+  if (authz.ministryId !== params.ministryId) return { error: "Not authorized." }
+
   const admin = createAdminClient()
 
   // Delete existing unpublished assignments for this team+semester before saving
@@ -269,6 +280,11 @@ export async function publishDGLRotationAction(params: {
   semester: string
   publish: boolean
 }): Promise<{ error?: string }> {
+  // Caller must be admin-tier or a member of this team, in this ministry.
+  const authz = await requireTeamMemberOrAdmin(params.teamId)
+  if (authz.error !== null) return { error: authz.error }
+  if (authz.ministryId !== params.ministryId) return { error: "Not authorized." }
+
   const admin = createAdminClient()
   const { error } = await admin
     .from("dgl_assignments")

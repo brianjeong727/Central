@@ -155,6 +155,17 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse
   }
 
+  // Fail closed: 'archived' and ANY other non-active status must never reach
+  // /home — treat exactly like 'rejected' (only pending/rejected have their own
+  // branches above; everything else that isn't 'active' lands here).
+  if (status !== 'active') {
+    const allowedForInactive = pathname.startsWith('/landing') || pathname.startsWith('/join') || pathname.startsWith('/onboarding') || pathname === '/'
+    if (!allowedForInactive) {
+      return NextResponse.redirect(new URL('/landing', request.url))
+    }
+    return supabaseResponse
+  }
+
   // Active ministry — block pending page only; /join and /onboarding stay open for multi-ministry users
   if (pathname.startsWith('/pending')) {
     return NextResponse.redirect(new URL('/home', request.url))

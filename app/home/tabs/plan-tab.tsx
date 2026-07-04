@@ -2361,18 +2361,24 @@ export function PlanTab({
     }
   }
 
-  // Clicking a workspace card: admins on a presidentless workspace are routed to
-  // settings to assign one; everyone else enters the workspace normally.
+  // Clicking a workspace card: a governance admin on a presidentless workspace is
+  // routed to settings to assign one; everyone else enters the workspace normally.
+  // Gated on isGovernanceAdmin (not bare isAdmin) so a non-roster admin isn't sent
+  // to a settings page they can't configure under Full-gov RLS.
   function handleWorkspaceCardClick(team: Team) {
-    if (isAdmin && team.hasPresident === false) { openSettings(team); return }
+    if (isGovernanceAdmin && team.hasPresident === false) { openSettings(team); return }
     onTeamSelect?.(team.id)
   }
 
   // Receipts is a team like any other (unifying formality): its settings page is
-  // the active Receipts team's TeamDetailOverlay (members + president). Only the
-  // team's president or a governance admin may open it.
+  // the active Receipts team's TeamDetailOverlay (members + president). Manage
+  // parity with auth_can_manage_team: the receipts team's president, OR a
+  // governance admin the team's matrix grants WRITE (gov-view is not enough — the
+  // overlay would open read-only, so we don't surface the affordance for it).
   const activeReceiptsUserTeam = userTeams.find(t => t.teamId === activeReceiptsTeamId)
-  const canManageReceiptsTeam = !!activeReceiptsTeamId && ((activeReceiptsUserTeam?.isPresident ?? false) || isGovernanceAdmin)
+  const activeReceiptsTeamFull = allTeams.find(t => t.id === activeReceiptsTeamId)
+  const receiptsGovWrite = isGovernanceAdmin && activeReceiptsTeamFull?.admin_access === "write"
+  const canManageReceiptsTeam = !!activeReceiptsTeamId && ((activeReceiptsUserTeam?.isPresident ?? false) || receiptsGovWrite)
   function openActiveReceiptsTeamSettings() {
     if (!activeReceiptsTeamId) return
     const full = allTeams.find(t => t.id === activeReceiptsTeamId)
@@ -2413,6 +2419,11 @@ export function PlanTab({
   })
   const govWrite = activeTeamAccess === "gov-write"
   const govView = activeTeamAccess === "gov-view"
+  // Deep-link gate: a team workspace only renders when the caller has SOME
+  // access to it (member, gov-write, or gov-view) — `?team=<id>` alone must not
+  // mount a workspace the user can't see. Mirrors the finance branch's
+  // financeCanAccess gate.
+  const activeTeamAllowed = activeTeamAccess !== "none"
 
   // Single classifier — team_type + name only, no permission probes. See
   // app/home/team-type.ts for precedence and rationale. This is the only thing
@@ -2468,7 +2479,9 @@ export function PlanTab({
       userId={userId}
       ministryId={ministryId}
       isAdmin={isAdmin}
-      isGovernanceAdmin={isGovernanceAdmin}
+      // Gov-WRITE to THIS team (matrix = 'write'), mirroring the RLS
+      // auth_can_manage_team: gov-view admins get a read-only settings view.
+      govWrite={isGovernanceAdmin && openTeam.admin_access === "write"}
       onClose={closeSettings}
       onChanged={() => { closeSettings(); onTeamsChange() }}
       onOpenChat={onOpenChat}
@@ -2489,7 +2502,9 @@ export function PlanTab({
         setShowCreateTeam(false)
         onTeamsChange()
         // Open the new (empty) workspace's settings so the admin assigns a president.
-        openSettings({ id: team.id, name: team.name, icon: team.icon, description: "", created_by: "", member_count: 0, team_type: team.team_type as Team["team_type"], allow_co_presidency: false, admin_access: "view", allow_admin_members: false, hasPresident: false })
+        // admin_access matches the 'write' the team was just inserted with, so the
+        // overlay computes govWrite=true and opens in manageable (not read-only) mode.
+        openSettings({ id: team.id, name: team.name, icon: team.icon, description: "", created_by: "", member_count: 0, team_type: team.team_type as Team["team_type"], allow_co_presidency: false, admin_access: "write", allow_admin_members: false, hasPresident: false })
       }}
     />
   )
@@ -2505,7 +2520,7 @@ export function PlanTab({
           </svg>
           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
-        {isAdmin && (
+        {isGovernanceAdmin && (
           <button onClick={() => setShowCreateTeam(true)} className="size-9 bg-[var(--plum)] rounded-xl flex items-center justify-center hover:bg-[var(--plum-2)] transition-colors">
             <Plus className="w-4 h-4 text-[var(--cream-on-dark)]" />
           </button>
@@ -2637,7 +2652,7 @@ export function PlanTab({
                           sub={`${receiptsTeams.length} team${receiptsTeams.length === 1 ? "" : "s"}`}
                           onClick={() => onTeamSelect?.("receipts")}
                         />
-                        {isAdmin && <WsAddTile onClick={() => setShowCreateTeam(true)} />}
+                        {isGovernanceAdmin && <WsAddTile onClick={() => setShowCreateTeam(true)} />}
                       </div>
                     </>
                   )
@@ -2690,7 +2705,7 @@ export function PlanTab({
                     ? "Workspaces keep your ministry organized — Small Group Leaders, Student Org Board, Finance, and more."
                     : "Ask a leader to add you to a team."}
                 </p>
-                {isAdmin && (
+                {isGovernanceAdmin && (
                   <CentralButton
                     variant="primary" size="md"
                     onClick={() => setShowCreateTeam(true)}
@@ -2726,7 +2741,7 @@ export function PlanTab({
             canAccessReimbursements={financeCanEdit}
             readOnly={govView}
           />
-        ) : teamKind === "dgPraise" && activeTeamId ? (
+        ) : teamKind === "dgPraise" && activeTeamId && activeTeamAllowed ? (
           <div className="px-14 py-7">
             <DgPraiseTeamTab
               teamId={activeTeamId}
@@ -2735,7 +2750,7 @@ export function PlanTab({
               canManage={canManageWorship}
             />
           </div>
-        ) : teamKind === "oneTime" && activeTeamId ? (
+        ) : teamKind === "oneTime" && activeTeamId && activeTeamAllowed ? (
           <div className="px-14 py-7">
             <OneTimeTeamTab
               teamId={activeTeamId}
@@ -2744,11 +2759,11 @@ export function PlanTab({
               canManage={canManageWorship}
             />
           </div>
-        ) : teamKind === "tech" ? (
+        ) : teamKind === "tech" && activeTeamAllowed ? (
           <div className="px-14 py-7">
             <TechTeamTab ministryId={ministryId} userId={userId} canManage={canManageWorship} />
           </div>
-        ) : teamKind === "praise" && activeTeamId ? (
+        ) : teamKind === "praise" && activeTeamId && activeTeamAllowed ? (
           <PraiseTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
@@ -2756,7 +2771,7 @@ export function PlanTab({
             canManage={canManageWorship}
             canManageSchedule={canManageSchedule}
           />
-        ) : teamKind === "studentOrg" ? (
+        ) : teamKind === "studentOrg" && activeTeamAllowed ? (
           <StudentOrgTeamHome
               teamId={activeTeamId}
               teamName={activeTeamName}
@@ -2777,7 +2792,7 @@ export function PlanTab({
               onCalEventsChange={evs => onStudentOrgCalEventsChange?.(evs)}
               onEditEvent={() => setShowEditEvent(true)}
             />
-        ) : teamKind === "dgl" && activeTeamId ? (
+        ) : teamKind === "dgl" && activeTeamId && activeTeamAllowed ? (
           <SmallGroupLeadersTab
               teamId={activeTeamId}
               ministryId={ministryId}
@@ -2883,23 +2898,23 @@ export function PlanTab({
             </span>
           </div>
         )}
-        {teamKind === "dgPraise" && activeTeamId ? (
+        {teamKind === "dgPraise" && activeTeamId && activeTeamAllowed ? (
           <DgPraiseTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
             userId={userId}
             canManage={canManageWorship}
           />
-        ) : teamKind === "oneTime" && activeTeamId ? (
+        ) : teamKind === "oneTime" && activeTeamId && activeTeamAllowed ? (
           <OneTimeTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
             userId={userId}
             canManage={canManageWorship}
           />
-        ) : teamKind === "tech" ? (
+        ) : teamKind === "tech" && activeTeamAllowed ? (
           <TechTeamTab ministryId={ministryId} userId={userId} canManage={canManageWorship} />
-        ) : teamKind === "praise" && activeTeamId ? (
+        ) : teamKind === "praise" && activeTeamId && activeTeamAllowed ? (
           <PraiseTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
@@ -2907,7 +2922,7 @@ export function PlanTab({
             canManage={canManageWorship}
             canManageSchedule={canManageSchedule}
           />
-        ) : teamKind === "studentOrg" ? (
+        ) : teamKind === "studentOrg" && activeTeamAllowed ? (
           <StudentOrgTeamHome
             teamId={activeTeamId}
             teamName={activeTeamName}
@@ -2923,7 +2938,7 @@ export function PlanTab({
             onPlanningEventChange={ev => onStudentOrgPlanningEventChange?.(ev)}
             onOpenChat={onOpenChat}
           />
-        ) : teamKind === "dgl" && activeTeamId ? (
+        ) : teamKind === "dgl" && activeTeamId && activeTeamAllowed ? (
           <SmallGroupLeadersTab
             teamId={activeTeamId}
             ministryId={ministryId}
@@ -10415,6 +10430,11 @@ export function AddWorkspaceModal({ ministryId, userId, ownedKeys, onClose, onCr
           description: preset.description,
           team_type: preset.teamType,
           created_by: userId,
+          // New teams default to gov-WRITE so the creating governance admin
+          // satisfies auth_can_manage_team (gov-write arm) and can seed roles +
+          // add members via this client flow before a president exists. The
+          // admin can dial it back to 'view'/'none' in the governance matrix.
+          admin_access: "write",
         })
         .select("id")
         .single()
@@ -10550,14 +10570,15 @@ async function fetchTeamSettings([, teamId]: readonly [string, string]) {
   return { roles, members }
 }
 
-export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGovernanceAdmin, onClose, onChanged, onOpenChat }: {
+export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite, onClose, onChanged, onOpenChat }: {
   team: Team
   userId: string
   ministryId: string
   isAdmin: boolean
-  // Governance-narrowed admin power — gates the structural team-admin actions
-  // (delete, manage). isAdmin is retained for non-structural member-row UI.
-  isGovernanceAdmin: boolean
+  // Governance-WRITE to this specific team: the caller is a governance admin AND
+  // the team's admin_access matrix grants 'write'. Mirrors the RLS
+  // auth_can_manage_team — gov-view (or a non-governing admin) is read-only here.
+  govWrite: boolean
   onClose: () => void
   onChanged: () => void
   onOpenChat?: (id: string, name: string, type?: string) => void
@@ -10603,9 +10624,15 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
 
   const myRoleId = members.find(m => m.user_id === userId)?.role_id
   const isPresident = roles.some(r => r.id === myRoleId && r.is_president)
-  const canDelete = isGovernanceAdmin || isPresident
   const myRolePerms = roles.find(r => r.id === members.find(m => m.user_id === userId)?.role_id)?.permissions ?? []
-  const canManageTeam = isGovernanceAdmin || myRolePerms.includes("can_manage_team")
+  // Matches the RLS auth_can_manage_team exactly: this team's president, OR a
+  // member whose role grants can_manage_team, OR a governance admin the matrix
+  // grants WRITE on this team. Gov-view opens settings but sees it read-only.
+  const canManageTeam = isPresident || myRolePerms.includes("can_manage_team") || govWrite
+  // Delete parity with auth_can_manage_team (same three arms as canManageTeam):
+  // president, can_manage_team member, or gov-write. UI previously omitted the
+  // can_manage arm, hiding the delete button from a member RLS would authorize.
+  const canDelete = canManageTeam
   const isTechTeam = /\btech\b/i.test(team.name)
   const canCreateGroupChat = isTechTeam || isAdmin || isPresident
 
@@ -11153,7 +11180,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em" }}>Members</span>
                         <div className="flex-1 h-px bg-[var(--line)]" />
                       </div>
-                      {(isAdmin || isPresident) && (
+                      {canManageTeam && (
                         <button onClick={() => setShowAddMember(true)} className="text-[12px] font-semibold text-[var(--plum)] hover:opacity-70 flex-shrink-0">
                           + Add
                         </button>
@@ -11167,12 +11194,12 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         return (
                           <div key={m.user_id} className="flex items-center gap-3 rounded-xl border border-[var(--line)] p-3"
                             style={{ background: isConfirming ? "#FDF0F0" : "var(--cream)", transition: "background 0.1s" }}
-                            onClick={() => { if ((isAdmin || isPresident) && m.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === m.user_id ? null : m.user_id) }}
+                            onClick={() => { if (canManageTeam && m.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === m.user_id ? null : m.user_id) }}
                           >
                             <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-semibold" />
                             <div className="flex-1 min-w-0">
                               <p className="text-[14px] font-medium text-[var(--ink)] truncate">{m.name}</p>
-                              {(isAdmin || isPresident) && roles.length > 1 && m.user_id !== userId ? (
+                              {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
                                 <select
                                   value={m.role_id}
                                   onChange={e => { e.stopPropagation(); handleChangeRole(m.user_id, e.target.value) }}
@@ -11185,7 +11212,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                                 <p className="text-[12px] text-[var(--muted-text)]">{m.role_name}</p>
                               )}
                             </div>
-                            {(isAdmin || isPresident) && m.user_id !== userId && (
+                            {canManageTeam && m.user_id !== userId && (
                               isConfirming ? (
                                 <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
                                   <button onClick={e => { e.stopPropagation(); handleRemoveMember(m.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--danger)" }}><Check className="w-4 h-4" /></button>
@@ -11437,7 +11464,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         ) : (
                           <ContentActionButton variant="ghost" icon={<MessageCircle style={{ width: 14, height: 14 }} />} label={creatingChat ? "Creating…" : "Group chat"} onClick={handleCreateGroupChat} disabled={creatingChat} />
                         ))}
-                        {(isAdmin || isPresident) && (
+                        {canManageTeam && (
                           <ContentActionButton variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} label="Add member" onClick={() => setShowAddMember(true)} />
                         )}
                       </>
@@ -11472,7 +11499,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                       >
                         <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-semibold" />
                         <span style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>{m.name}</span>
-                        {(isAdmin || isPresident) && roles.length > 1 && m.user_id !== userId ? (
+                        {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
                           <select
                             value={m.role_id}
                             onChange={e => handleChangeRole(m.user_id, e.target.value)}
@@ -11484,7 +11511,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                           <span style={{ fontSize: 13, color: "var(--body)" }}>{m.role_name}</span>
                         )}
                         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
-                          {(isAdmin || isPresident) && m.user_id !== userId && (
+                          {canManageTeam && m.user_id !== userId && (
                             isConfirming ? (
                               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                                 <button onClick={() => handleRemoveMember(m.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--danger)" }}><Check className="w-4 h-4" /></button>

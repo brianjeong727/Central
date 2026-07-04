@@ -3,17 +3,56 @@
 import { createAdminClient } from "@/lib/supabase-admin"
 import { runAlgorithm } from "@/lib/group-algorithm"
 import { confirmSmallGroupChatsAction } from "@/app/actions/auto-chats"
+import { requireSameMinistry, requireTeamMemberOrAdmin, isAdminTier } from "@/app/actions/authz"
 export type { PoolPerson, GeneratedGroup, PrevPairing, GenerateGroupsParams, DGLLeader, SGGeneratedGroup } from "@/lib/group-algorithm"
 import type { PoolPerson, GenerateGroupsParams, SGGeneratedGroup } from "@/lib/group-algorithm"
 
 export async function generateGroupsAction(
   params: GenerateGroupsParams,
 ): Promise<{ groups: ReturnType<typeof runAlgorithm>; error?: string }> {
+  // Caller must belong to the target ministry.
+  const authz = await requireSameMinistry(params.ministryId)
+  if (authz.error !== null) return { groups: [], error: authz.error }
+
   let admin: ReturnType<typeof createAdminClient>
   try {
     admin = createAdminClient()
   } catch {
     return { groups: [], error: "Server configuration error." }
+  }
+
+  // Group generation reads ministry-wide profile data — restrict to admin-tier
+  // or members of at least one team in the ministry (every legitimate generator
+  // — Student Org board, DGL president — is a team member).
+  if (!isAdminTier(authz.role)) {
+    const { data: ministryTeams } = await admin
+      .from("teams")
+      .select("id")
+      .eq("ministry_id", params.ministryId)
+    const teamIds = (ministryTeams ?? []).map((t: { id: string }) => t.id)
+    let onATeam = false
+    if (teamIds.length > 0) {
+      const { data: membership } = await admin
+        .from("team_members")
+        .select("id")
+        .in("team_id", teamIds)
+        .eq("user_id", authz.userId)
+        .limit(1)
+      onATeam = !!membership && membership.length > 0
+    }
+    if (!onATeam) return { groups: [], error: "Not authorized." }
+  }
+
+  // The announcement pool path joins profiles without a ministry filter —
+  // verify the source announcement belongs to this ministry first.
+  if (params.sourceType === "announcement" && params.sourceId) {
+    const { data: ann } = await admin
+      .from("announcements")
+      .select("id")
+      .eq("id", params.sourceId)
+      .eq("ministry_id", params.ministryId)
+      .maybeSingle()
+    if (!ann) return { groups: [], error: "Announcement not found." }
   }
 
   // ── 1. Fetch pool ────────────────────────────────────────────────────────────
@@ -87,6 +126,11 @@ export async function confirmSmallGroupsAction(params: {
     members: Array<{ id: string }>
   }>
 }): Promise<{ error?: string; chatResult?: { created: number; updated: number } }> {
+  // Caller must be admin-tier or a member of this team, in this ministry.
+  const authz = await requireTeamMemberOrAdmin(params.teamId)
+  if (authz.error !== null) return { error: authz.error }
+  if (authz.ministryId !== params.ministryId) return { error: "Not authorized." }
+
   try {
     const admin = createAdminClient()
 
@@ -157,6 +201,10 @@ export async function confirmSmallGroupsAction(params: {
 // Deletes all small_groups rows for a team, cascading to small_group_members.
 // Called when the president deletes a confirmed SG-mode session.
 export async function deleteSmallGroupAssignmentsAction(teamId: string): Promise<{ error?: string }> {
+  // Caller must be admin-tier or a member of this team, in this ministry.
+  const authz = await requireTeamMemberOrAdmin(teamId)
+  if (authz.error !== null) return { error: authz.error }
+
   try {
     const admin = createAdminClient()
     const { error } = await admin.from("small_groups").delete().eq("team_id", teamId)
