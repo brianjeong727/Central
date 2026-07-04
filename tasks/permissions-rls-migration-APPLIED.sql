@@ -3,16 +3,16 @@
 -- Decisions (Brian, 2026-07-04): Q1 Full governance · Q2 Scoped action + narrow
 --   SELECT · Q3 Hard-block last admin (shipped, app-layer) · Q4 Second-admin archive.
 --
--- STATUS:
---   ✅ SAFE SUBSET — ALREADY APPLIED to prod 2026-07-04 (migration
---      `permissions_hardening_safe_subset`): auth_is_admin / auth_is_governance_admin
---      / auth_can_manage_team helpers (defined, inert until policies use them),
---      ministry_giving edit → admin-only, is_team_president → is_president flag,
---      ministries.archive_requested_by/_at columns. Non-breaking on current main.
---
---   ⏳ BREAKING PART — BELOW, NOT YET APPLIED. Apply AT MERGE of
---      feat/permissions-hardening → main (paired UI must be live first, or admins
---      hit RLS rejections on team management). Needs Brian's prod-deploy approval.
+-- STATUS: ✅ FULLY APPLIED to prod 2026-07-04 (coordinated with #102 merged to main).
+--   Applied via Supabase MCP migrations, in order:
+--     1. permissions_hardening_safe_subset  — helpers, giving→admin, is_team_president→flag, archive columns
+--     2. permissions_full_governance_and_codes — team-management policies, admin_access default→'write',
+--          max-president trigger, ministries SELECT narrow, code-column column-grant setup
+--     3. ministries_hide_code_columns — converted table SELECT → column grant so invite_code/staff_invite_code
+--          are unreadable by authenticated/anon (service_role keeps them for getMinistryCodes)
+--   Verified: 4 team managers still pass auth_can_manage_team; plain leaders don't; codes hidden from
+--   authenticated/anon; /ministries, /join, /pick-ministry, /home all load. This file is kept as the
+--   canonical record of what shipped (historical — do not re-run).
 -- ============================================================================
 
 begin;
