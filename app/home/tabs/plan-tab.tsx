@@ -1007,8 +1007,8 @@ function EventsAgendaList({
         <p style={{ fontSize: 13, color: "color-mix(in srgb, var(--danger) 60%, var(--body))", margin: "4px 0 0", fontFamily: "var(--sans)" }}>Delete this event and all its planning data?</p>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        <button onClick={e => { e.stopPropagation(); setDeleteConfirmId(null) }} style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", fontSize: 13, fontWeight: 500, cursor: "pointer", color: "var(--body)", fontFamily: "var(--sans)" }}>Cancel</button>
-        <button onClick={e => { e.stopPropagation(); onDelete(ev.id) }} disabled={deleting} style={{ padding: "7px 14px", borderRadius: 9, border: "1px solid var(--danger)", background: "transparent", color: "var(--danger)", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1, fontFamily: "var(--sans)" }}>{deleting ? "Deleting…" : "Delete"}</button>
+        <CentralButton variant="secondary" size="sm" onClick={e => { e.stopPropagation(); setDeleteConfirmId(null) }}>Cancel</CentralButton>
+        <CentralButton variant="danger-solid" size="sm" onClick={e => { e.stopPropagation(); onDelete(ev.id) }} disabled={deleting}>{deleting ? "Deleting…" : "Delete"}</CentralButton>
       </div>
     </div>
   )
@@ -1123,16 +1123,18 @@ function EventsAgendaList({
     // Sub-events disclosure (only when the event has children).
     const subsBlock = hasKids ? (
       <div style={{ marginTop: 10 }}>
-        <button
+        <CentralButton
+          variant="quiet"
+          size="sm"
           onClick={() => toggleSubs(ev.id)}
-          style={{ display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", cursor: "pointer", color: "var(--plum)", fontFamily: "var(--sans)", fontSize: 12.5, padding: 0 }}
+          style={{ fontSize: 12.5, gap: 7 }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: subsOpen ? "rotate(90deg)" : "none", transition: "transform 160ms ease" }}>
             <path d="M9 6l6 6-6 6" />
           </svg>
           <span>Sub-events</span>
           <span style={{ ...monoBase, fontSize: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "1px 7px", color: "var(--plum)" }}>{kids.length}</span>
-        </button>
+        </CentralButton>
         <div style={{ overflow: "hidden", maxHeight: subsOpen ? 2000 : 0, transition: "max-height 260ms ease" }}>
           <div style={{ paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
             {kids.map(c => {
@@ -1246,11 +1248,12 @@ function EventsAgendaList({
       {upcomingNodes}
       {past.length > 0 && (
         <>
-          <button
+          <CentralButton
+            variant="quiet"
             onClick={() => setShowPastOverride(v => !(v ?? (upcoming.length === 0)))}
             onMouseEnter={() => setPastBarHover(true)}
             onMouseLeave={() => setPastBarHover(false)}
-            style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: "var(--space-10)" }}
+            style={{ width: "100%", gap: "var(--space-6)", marginTop: "var(--space-10)" }}
           >
             <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1259,7 +1262,7 @@ function EventsAgendaList({
               <span style={{ ...monoBase, fontSize: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "1px 7px", color: "var(--muted-text)" }}>{past.length}</span>
             </span>
             <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-          </button>
+          </CentralButton>
           {showPast && <div style={{ paddingTop: "var(--space-6)" }}>{pastNodes}</div>}
         </>
       )}
@@ -1538,13 +1541,9 @@ export function StudentOrgTeamHome({
             />
           </div>
           {onTeamSettings && (
-            <button
-              onClick={onTeamSettings}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[var(--cream-panel)] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
-              title="Team settings"
-            >
-              <Settings className="w-4 h-4 text-[var(--body)]" />
-            </button>
+            <IconButton dim={32} onClick={onTeamSettings} title="Team settings" className="ml-auto">
+              <Settings className="w-4 h-4" />
+            </IconButton>
           )}
         </div>
       )}
@@ -1574,13 +1573,9 @@ export function StudentOrgTeamHome({
               <HeaderActionButton label="Generate groups" onClick={() => setGroupGenerateTrigger(t => t + 1)} />
             )}
             {onTeamSettings && (
-              <button
-                onClick={onTeamSettings}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[var(--cream-panel)] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
-                title="Team settings"
-              >
-                <Settings className="w-4 h-4 text-[var(--body)]" />
-              </button>
+              <IconButton dim={32} onClick={onTeamSettings} title="Team settings" className="ml-auto">
+                <Settings className="w-4 h-4" />
+              </IconButton>
             )}
           </TabPageHeader>
         )
@@ -1941,12 +1936,9 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
             })}
           </div>
           {canEdit && (
-            <button
-              onClick={() => setShowNewSemester(true)}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 15px", borderRadius: 10, background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", cursor: "pointer", fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, flexShrink: 0 }}
-            >
+            <CentralButton variant="primary" size="sm" onClick={() => setShowNewSemester(true)} style={{ flexShrink: 0 }}>
               <Plus className="w-4 h-4" /> New semester
-            </button>
+            </CentralButton>
           )}
         </div>
       )}
@@ -1960,12 +1952,9 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
             subtitle={canEdit ? "Create a semester to open up sign-up slots." : "Ask a leader to set up a semester."}
           />
           {canEdit && (
-            <button
-              onClick={() => setShowNewSemester(true)}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 15px", borderRadius: 10, background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", cursor: "pointer", fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500 }}
-            >
+            <CentralButton variant="primary" size="sm" onClick={() => setShowNewSemester(true)}>
               <Plus className="w-4 h-4" /> New semester
-            </button>
+            </CentralButton>
           )}
         </div>
       ) : slotsLoading ? (
@@ -2038,29 +2027,17 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-                <button
-                  onClick={() => setConfirmSlot(null)}
-                  disabled={confirmBusy}
-                  style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: confirmBusy ? "default" : "pointer", padding: "8px 10px" }}
-                >
+                <CentralButton variant="quiet" size="sm" onClick={() => setConfirmSlot(null)} disabled={confirmBusy}>
                   {isMine ? "Keep it" : "Cancel"}
-                </button>
+                </CentralButton>
                 {isMine ? (
-                  <button
-                    onClick={confirmClaimOrDrop}
-                    disabled={confirmBusy}
-                    style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--danger)", background: "transparent", border: "1px solid var(--danger)", borderRadius: 9, padding: "8px 16px", cursor: confirmBusy ? "default" : "pointer" }}
-                  >
+                  <CentralButton variant="danger-solid" size="sm" onClick={confirmClaimOrDrop} disabled={confirmBusy}>
                     {confirmBusy ? "Dropping…" : "Drop it"}
-                  </button>
+                  </CentralButton>
                 ) : (
-                  <button
-                    onClick={confirmClaimOrDrop}
-                    disabled={confirmBusy}
-                    style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--cream-on-dark)", background: "var(--plum-2)", border: "none", borderRadius: 9, padding: "8px 16px", cursor: confirmBusy ? "default" : "pointer" }}
-                  >
+                  <CentralButton variant="primary" size="sm" onClick={confirmClaimOrDrop} disabled={confirmBusy}>
                     {confirmBusy ? "Signing up…" : "Yes, sign me up"}
-                  </button>
+                  </CentralButton>
                 )}
               </div>
             </div>
@@ -2234,10 +2211,10 @@ function NewSemesterModal({ onClose, onCreate }: {
         </div>
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 24 }}>
-          <button onClick={() => { if (!busy) onClose() }} disabled={busy} style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: busy ? "default" : "pointer", padding: "9px 12px" }}>Cancel</button>
-          <button onClick={submit} disabled={!canCreate} style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--cream-on-dark)", background: "var(--plum-2)", border: "none", borderRadius: 9, padding: "9px 18px", cursor: canCreate ? "pointer" : "default", opacity: canCreate ? 1 : 0.5 }}>
+          <CentralButton variant="quiet" size="sm" onClick={() => { if (!busy) onClose() }} disabled={busy}>Cancel</CentralButton>
+          <CentralButton variant="primary" size="sm" onClick={submit} disabled={!canCreate}>
             {busy ? "Creating…" : "Create"}
-          </button>
+          </CentralButton>
         </div>
       </div>
     </div>
@@ -2624,13 +2601,9 @@ export function PlanTab({
               compact
             />
             {activeTeamFull && canOpenTeamSettings && (
-              <button
-                onClick={() => openSettings(activeTeamFull)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[var(--cream-panel)] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
-                title="Team settings"
-              >
-                <Settings className="w-4 h-4 text-[var(--body)]" />
-              </button>
+              <IconButton dim={32} onClick={() => openSettings(activeTeamFull)} title="Team settings" className="ml-auto">
+                <Settings className="w-4 h-4" />
+              </IconButton>
             )}
           </TabPageHeader>
         )}
@@ -3790,15 +3763,15 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                     })}
                   </div>
                   {addWeekError && (
-                    <p style={{ fontSize: 12, color: "#DC2626", marginTop: 5 }}>{addWeekError}</p>
+                    <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 5 }}>{addWeekError}</p>
                   )}
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: newLeaderError ? "#DC2626" : "var(--body)", marginBottom: 4 }}>
-                    Leader <span style={{ color: newLeaderError ? "#DC2626" : "var(--muted-text)", fontWeight: 400 }}>{newLeaderError ? "— required" : "(required)"}</span>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: newLeaderError ? "var(--danger)" : "var(--body)", marginBottom: 4 }}>
+                    Leader <span style={{ color: newLeaderError ? "var(--danger)" : "var(--muted-text)", fontWeight: 400 }}>{newLeaderError ? "— required" : "(required)"}</span>
                   </label>
                   <select value={newLeaderId} onChange={e => { setNewLeaderId(e.target.value); setNewLeaderError(false) }}
-                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${newLeaderError ? "#DC2626" : "var(--line)"}`, background: "var(--cream-panel)", fontSize: 14, color: newLeaderId ? "var(--ink)" : "var(--muted-text)", outline: "none" }}>
+                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${newLeaderError ? "var(--danger)" : "var(--line)"}`, background: "var(--cream-panel)", fontSize: 14, color: newLeaderId ? "var(--ink)" : "var(--muted-text)", outline: "none" }}>
                     <option value="">Select Worship Leader…</option>
                     {worshipLeaders.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
                   </select>
@@ -3847,11 +3820,9 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                         <WorshipStatusBadge status={week.status} onChange={canChangeStatus ? s => handleStatusChange(week.id, s) : undefined} />
                         {canManage && (
-                          <button
-                            onClick={() => setConfirmDeleteWeekId(confirmDeleteWeekId === week.id ? null : week.id)}
-                            style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4", display: "flex", alignItems: "center", borderRadius: 6 }}>
+                          <IconButton dim={26} onClick={() => setConfirmDeleteWeekId(confirmDeleteWeekId === week.id ? null : week.id)} title="Delete week">
                             <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          </IconButton>
                         )}
                       </div>
                     </div>
@@ -3879,22 +3850,22 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                         <span style={{ fontSize: 13, color: "var(--body)" }}>Delete this week?</span>
                         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                           <button onClick={() => setConfirmDeleteWeekId(null)} style={{ fontSize: 13, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
-                          <button onClick={() => handleDeleteWeek(week.id)} style={{ fontSize: 13, fontWeight: 600, color: "#DC2626", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Delete</button>
+                          <button onClick={() => handleDeleteWeek(week.id)} style={{ fontSize: 13, fontWeight: 600, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Delete</button>
                         </div>
                       </div>
                     )}
 
                     {/* ── Leader row ── */}
                     <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 52 }}>
-                      <span style={{ ...monoStyle, color: !week.leader_id ? "#DC2626" : undefined, flexShrink: 0, width: 80 }}>Leader</span>
+                      <span style={{ ...monoStyle, color: !week.leader_id ? "var(--danger)" : undefined, flexShrink: 0, width: 80 }}>Leader</span>
                       {canManageSchedule ? (
                         <select value={week.leader_id ?? ""} onChange={e => handleLeaderChange(week.id, e.target.value)}
-                          style={{ flex: 1, fontSize: 14, color: week.leader_id ? "var(--ink)" : "#DC2626", border: "none", outline: "none", background: "transparent", cursor: "pointer" }}>
+                          style={{ flex: 1, fontSize: 14, color: week.leader_id ? "var(--ink)" : "var(--danger)", border: "none", outline: "none", background: "transparent", cursor: "pointer" }}>
                           <option value="">— required —</option>
                           {worshipLeaders.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
                         </select>
                       ) : (
-                        <span style={{ fontSize: 14, color: week.leader_name ? "var(--ink)" : "#DC2626", flex: 1 }}>
+                        <span style={{ fontSize: 14, color: week.leader_name ? "var(--ink)" : "var(--danger)", flex: 1 }}>
                           {week.leader_name ?? "Not assigned"}
                         </span>
                       )}
@@ -3911,10 +3882,9 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                         <span style={{ ...monoStyle, flexShrink: 0, width: 80 }}>{role.role_name}</span>
                         <span style={{ fontSize: 14, color: "var(--ink)", flex: 1 }}>{role.user_name}</span>
                         {(canManageSchedule || isLeader) && (
-                          <button onClick={() => handleRemoveMember(role.id)}
-                            style={{ padding: "2px 6px", fontSize: 13, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer", lineHeight: 1, flexShrink: 0 }}>
-                            ✕
-                          </button>
+                          <IconButton dim={24} onClick={() => handleRemoveMember(role.id)} title="Remove">
+                            <X style={{ width: 13, height: 13 }} />
+                          </IconButton>
                         )}
                       </div>
                     ))}
@@ -4086,10 +4056,9 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                                     style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#E5E0D2" : "var(--muted-text)", fontSize: 13, lineHeight: 1 }}>↑</button>
                                   <button onClick={() => handleReorderSong(week.id, song.id, "down")} disabled={idx === songs.length - 1}
                                     style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === songs.length - 1 ? "default" : "pointer", color: idx === songs.length - 1 ? "#E5E0D2" : "var(--muted-text)", fontSize: 13, lineHeight: 1 }}>↓</button>
-                                  <button onClick={() => handleDeleteSong(week.id, song.id)}
-                                    style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4", display: "flex", alignItems: "center" }}>
+                                  <IconButton dim={24} onClick={() => handleDeleteSong(week.id, song.id)} title="Delete song">
                                     <Trash2 className="w-3 h-3" />
-                                  </button>
+                                  </IconButton>
                                 </div>
                               )}
                             </div>
@@ -4445,7 +4414,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
             <div key={m.user_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #EFE9DA" }}>
               <span style={{ fontSize: 14, color: "var(--ink)" }}>{m.name}</span>
               {canManage && m.user_id !== userId && (
-                <button onClick={() => handleRemoveTeamMember(m.user_id)} style={{ fontSize: 12, color: "#C4C4C4", background: "none", border: "none", cursor: "pointer" }}>✕</button>
+                <IconButton dim={22} onClick={() => handleRemoveTeamMember(m.user_id)} title="Remove"><X style={{ width: 12, height: 12 }} /></IconButton>
               )}
             </div>
           ))}
@@ -4522,9 +4491,9 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                     {new Date(event.week_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                   </p>
                   {canManage && (
-                    <button onClick={() => handleDeleteEvent(event.id)} style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4" }}>
+                    <IconButton dim={26} onClick={() => handleDeleteEvent(event.id)} title="Delete event">
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </IconButton>
                   )}
                 </div>
 
@@ -4533,7 +4502,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                   <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 48, borderBottom: "1px solid #EFE9DA" }}>
                     <span style={{ ...monoStyle, flexShrink: 0, width: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{role.role_name}</span>
                     <span style={{ fontSize: 14, color: "var(--ink)", flex: 1 }}>{role.user_name}</span>
-                    {canManage && <button onClick={() => handleRemoveRole(role.id)} style={{ padding: "2px 6px", fontSize: 13, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer" }}>✕</button>}
+                    {canManage && <IconButton dim={24} onClick={() => handleRemoveRole(role.id)} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>}
                   </div>
                 ))}
 
@@ -4640,9 +4609,9 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                               </div>
                             )}
                             {canManage && (
-                              <button onClick={() => handleDeleteSong(event.id, song.id)} style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4" }}>
+                              <IconButton dim={24} onClick={() => handleDeleteSong(event.id, song.id)} title="Delete song">
                                 <Trash2 className="w-3 h-3" />
-                              </button>
+                              </IconButton>
                             )}
                           </div>
                         )
@@ -4885,9 +4854,9 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                     </p>
                   </div>
                   {canManage && (
-                    <button onClick={() => handleDeleteEvent(event.id)} style={{ padding: 4, background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4" }}>
+                    <IconButton dim={26} onClick={() => handleDeleteEvent(event.id)} title="Delete event">
                       <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    </IconButton>
                   )}
                 </div>
 
@@ -4895,7 +4864,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                   <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 48, borderBottom: "1px solid #EFE9DA" }}>
                     <span style={{ ...monoStyle, flexShrink: 0, width: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{role.role_name}</span>
                     <span style={{ fontSize: 14, color: "var(--ink)", flex: 1 }}>{role.user_name}</span>
-                    {canManage && <button onClick={() => handleRemoveRole(role.id)} style={{ padding: "2px 6px", fontSize: 13, color: "#C4C4C4", background: "transparent", border: "none", cursor: "pointer" }}>✕</button>}
+                    {canManage && <IconButton dim={24} onClick={() => handleRemoveRole(role.id)} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>}
                   </div>
                 ))}
 
@@ -5000,9 +4969,9 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                               </div>
                             )}
                             {canManage && (
-                              <button onClick={() => handleDeleteSong(event.id, song.id)} style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: "pointer", color: "#C4C4C4" }}>
+                              <IconButton dim={24} onClick={() => handleDeleteSong(event.id, song.id)} title="Delete song">
                                 <Trash2 className="w-3 h-3" />
-                              </button>
+                              </IconButton>
                             )}
                           </div>
                         )
@@ -6044,7 +6013,7 @@ export function EventDetailPopover({
         {(canEdit || event.created_by === userId) && (
           <button
             onClick={() => onDelete(event.id)}
-            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--line)", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, color: "#C0392B" }}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--line)", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, color: "var(--danger)" }}
           >
             <Trash2 className="w-3.5 h-3.5" />
             Delete event
@@ -6413,23 +6382,23 @@ export function AddEventModal({
             </div>
           )}
 
-          {error && <p style={{ fontSize: 13, color: "#C0392B" }}>{error}</p>}
+          {error && <p style={{ fontSize: 13, color: "var(--danger)" }}>{error}</p>}
 
           {/* Actions */}
           {isEditing && onDelete && (
             <div style={{ borderTop: "1px solid var(--line)", paddingTop: 18, marginTop: 8 }}>
               {deleteConfirm ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 13, color: "#9F3030", flex: 1 }}>This will permanently delete the event and all its planning data.</span>
-                  <button onClick={() => setDeleteConfirm(false)} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid #E5E0D2", background: "transparent", fontSize: 13, cursor: "pointer", color: "var(--body)" }}>Cancel</button>
-                  <button onClick={handleDelete} disabled={deleting} style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "#9F3030", color: "var(--cream-panel)", fontSize: 13, fontWeight: 500, cursor: deleting ? "not-allowed" : "pointer", opacity: deleting ? 0.6 : 1 }}>
+                  <span style={{ fontSize: 13, color: "var(--danger)", flex: 1 }}>This will permanently delete the event and all its planning data.</span>
+                  <CentralButton variant="secondary" size="sm" onClick={() => setDeleteConfirm(false)}>Cancel</CentralButton>
+                  <CentralButton variant="danger-solid" size="sm" onClick={handleDelete} disabled={deleting}>
                     {deleting ? "Deleting…" : "Delete forever"}
-                  </button>
+                  </CentralButton>
                 </div>
               ) : (
                 <button
                   onClick={() => setDeleteConfirm(true)}
-                  style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#C0392B", padding: 0 }}
+                  style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--danger)", padding: 0 }}
                 >
                   <Trash2 className="w-3.5 h-3.5" /> Delete event
                 </button>
@@ -6746,29 +6715,6 @@ function LaunchpadRow({ icon: Icon, title, subtitle, right, onClick }: {
 // Small hover-aware icon button for the checklist row actions (grip, pin, add
 // subtask, promote, edit, delete). Inline styles across this file preclude CSS
 // :hover, so hover is tracked in local state.
-function ChecklistIconBtn({ onClick, title, baseColor = "var(--faint)", hoverColor = "var(--body)", children, style }: {
-  onClick: () => void
-  title: string
-  baseColor?: string
-  hoverColor?: string
-  children: ReactNode
-  style?: React.CSSProperties
-}) {
-  const [hov, setHov] = useState(false)
-  return (
-    <button
-      type="button"
-      onClick={(e) => { e.stopPropagation(); onClick() }}
-      title={title}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "grid", placeItems: "center", color: hov ? hoverColor : baseColor, transition: "color .12s ease", ...style }}
-    >
-      {children}
-    </button>
-  )
-}
-
 export function EventPlanWorkspace({
   calendarEvent,
   ministryId,
@@ -7633,17 +7579,17 @@ export function EventPlanWorkspace({
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 10, opacity: hovered ? 1 : 0, transition: "opacity .12s ease", flexShrink: 0 }}>
               {isChild ? (
-                <ChecklistIconBtn onClick={() => promoteTask(task)} title="Promote to standalone task"><CornerUpLeft style={{ width: 14, height: 14 }} /></ChecklistIconBtn>
+                <IconButton dim={24} onClick={(e) => { e.stopPropagation(); promoteTask(task) }} title="Promote to standalone task"><CornerUpLeft style={{ width: 14, height: 14 }} /></IconButton>
               ) : (
                 <>
-                  <ChecklistIconBtn onClick={() => togglePin(task)} title={task.pinned ? "Unpin" : "Pin to top"} baseColor={task.pinned ? "var(--plum)" : "var(--faint)"} hoverColor={task.pinned ? "var(--plum)" : "var(--body)"}>
+                  <IconButton dim={24} onClick={(e) => { e.stopPropagation(); togglePin(task) }} title={task.pinned ? "Unpin" : "Pin to top"} style={task.pinned ? { color: "var(--plum)" } : undefined}>
                     <Star style={{ width: 14, height: 14, fill: task.pinned ? "currentColor" : "none" }} />
-                  </ChecklistIconBtn>
-                  <ChecklistIconBtn onClick={() => { setCollapsedTasks((prev) => { const n = new Set(prev); n.delete(task.id); return n }); setChildTitle(""); setAddingChildFor(task.id) }} title="Add subtask"><Plus style={{ width: 15, height: 15 }} /></ChecklistIconBtn>
+                  </IconButton>
+                  <IconButton dim={24} onClick={(e) => { e.stopPropagation(); setCollapsedTasks((prev) => { const n = new Set(prev); n.delete(task.id); return n }); setChildTitle(""); setAddingChildFor(task.id) }} title="Add subtask"><Plus style={{ width: 15, height: 15 }} /></IconButton>
                 </>
               )}
-              <ChecklistIconBtn onClick={() => startEditTask(task)} title="Edit"><Pencil style={{ width: 14, height: 14 }} /></ChecklistIconBtn>
-              <ChecklistIconBtn onClick={() => { setEditingTaskId(null); setConfirmDeleteTaskId(task.id) }} title="Delete"><X style={{ width: 14, height: 14 }} /></ChecklistIconBtn>
+              <IconButton dim={24} onClick={(e) => { e.stopPropagation(); startEditTask(task) }} title="Edit"><Pencil style={{ width: 14, height: 14 }} /></IconButton>
+              <IconButton dim={24} onClick={(e) => { e.stopPropagation(); setEditingTaskId(null); setConfirmDeleteTaskId(task.id) }} title="Delete"><Trash2 style={{ width: 14, height: 14 }} /></IconButton>
             </div>
           )
         )}
@@ -8134,7 +8080,7 @@ export function EventPlanWorkspace({
                         <button
                           onClick={confirmSectionMove}
                           disabled={sectionMoveBusy}
-                          style={{ fontSize: 13, fontWeight: 600, color: "var(--cream)", background: "var(--plum-2)", border: "none", borderRadius: 8, padding: "8px 16px", cursor: sectionMoveBusy ? "default" : "pointer" }}
+                          style={{ fontSize: 13, fontWeight: 600, color: "var(--cream)", background: "var(--plum)", border: "none", borderRadius: 8, padding: "8px 16px", cursor: sectionMoveBusy ? "default" : "pointer" }}
                         >
                           {sectionMoveBusy ? "Moving…" : "Continue"}
                         </button>
@@ -8346,7 +8292,7 @@ export function EventPlanWorkspace({
                   action={canEdit ? (
                     <button
                       onClick={() => setPpModalOpen(true)}
-                      style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--plum-2)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9999, padding: "9px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9999, padding: "9px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-inter)" }}
                     >
                       <Plus className="w-4 h-4" /> Log a pain point
                     </button>
@@ -8880,7 +8826,7 @@ function ActsTab({
       <EventSectionHeader
         title="Acts Lineup"
         action={canEdit ? (
-          <button onClick={addAct} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Add act</button>
+          <ContentActionButton variant="primary" icon={<Plus style={{ width: 14, height: 14 }} />} label="Add act" onClick={addAct} />
         ) : undefined}
       />
 
@@ -8917,7 +8863,7 @@ function ActsTab({
               <input value={act.sound_check} onChange={e => updateAct(act.id, "sound_check", e.target.value)} placeholder="5:30 PM" style={{ background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
             ) : <span style={{ fontSize: 12, color: "var(--body)" }}>{act.sound_check || "—"}</span>}
             {canEdit ? (
-              <button onClick={() => deleteAct(act.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#C4C4C4", padding: 0 }}><X className="w-3.5 h-3.5" /></button>
+              <IconButton dim={24} onClick={() => deleteAct(act.id)} title="Remove act"><X className="w-3.5 h-3.5" /></IconButton>
             ) : <span />}
           </div>
         ))}
@@ -8979,7 +8925,7 @@ function TeamsTab({
           return (
             <div key={uid} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 10px", background: "var(--ivory)", borderRadius: 8 }}>
               <span style={{ fontSize: 13, color: "var(--plum-2)" }}>{m?.name ?? uid}</span>
-              {canEdit && <button onClick={() => removeMember(teamKey, uid)} style={{ background: "none", border: "none", cursor: "pointer", color: "#C4C4C4", padding: 0 }}><X className="w-3 h-3" /></button>}
+              {canEdit && <IconButton dim={22} onClick={() => removeMember(teamKey, uid)} title="Remove"><X className="w-3 h-3" /></IconButton>}
             </div>
           )
         })}
@@ -9079,7 +9025,7 @@ function TransportTab({
       <EventSectionHeader
         title="Transport"
         action={canEdit ? (
-          <button onClick={addCar} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>+ Add car</button>
+          <ContentActionButton variant="primary" icon={<Plus style={{ width: 14, height: 14 }} />} label="Add car" onClick={addCar} />
         ) : undefined}
       />
 
@@ -9118,7 +9064,7 @@ function TransportTab({
                   <input type="number" value={car.seats} onChange={e => updateCar(car.id, { seats: parseInt(e.target.value) || 4 })} min={1} max={15} style={{ width: 60, background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, padding: "6px 8px", textAlign: "center" }} />
                 )}
                 <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{car.rider_ids.length}/{car.seats} seats</span>
-                {canEdit && <button onClick={() => save(cars.filter(c => c.id !== car.id))} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#C4C4C4" }}><X className="w-3.5 h-3.5" /></button>}
+                {canEdit && <IconButton dim={24} onClick={() => save(cars.filter(c => c.id !== car.id))} title="Remove car" style={{ marginLeft: "auto" }}><X className="w-3.5 h-3.5" /></IconButton>}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {car.rider_ids.map(rid => {
@@ -9126,7 +9072,7 @@ function TransportTab({
                   return (
                     <span key={rid} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", background: "var(--ivory)", borderRadius: 999, fontSize: 12, color: "var(--plum-2)" }}>
                       {m?.name ?? rid}
-                      {canEdit && <button onClick={() => removeRider(car.id, rid)} style={{ background: "none", border: "none", cursor: "pointer", color: "#A09A8C", padding: 0, lineHeight: 1 }}>×</button>}
+                      {canEdit && <IconButton dim={20} onClick={() => removeRider(car.id, rid)} title="Remove rider"><X style={{ width: 12, height: 12 }} /></IconButton>}
                     </span>
                   )
                 })}
@@ -9205,7 +9151,7 @@ function ProgramTab({
                 Day {dayIdx + 1} — {dayLabel}
               </p>
               {canEdit && (
-                <button onClick={() => addSession(dayIdx)} style={{ padding: "4px 10px", borderRadius: 8, border: "1px solid var(--plum)", color: "var(--plum)", background: "transparent", fontSize: 12, cursor: "pointer" }}>+ Add session</button>
+                <CentralButton variant="secondary" size="sm" onClick={() => addSession(dayIdx)}><Plus style={{ width: 14, height: 14 }} /> Add session</CentralButton>
               )}
             </div>
             <div style={{ borderTop: "1px solid var(--line)" }} />
@@ -9235,7 +9181,7 @@ function ProgramTab({
                   <span style={{ fontSize: 12, color: "var(--body)" }}>{members.find(m => m.id === session.leader_id)?.name ?? "—"}</span>
                 )}
                 {canEdit ? (
-                  <button onClick={() => deleteSession(session.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#C4C4C4", padding: 0 }}><X className="w-3.5 h-3.5" /></button>
+                  <IconButton dim={24} onClick={() => deleteSession(session.id)} title="Remove session"><X className="w-3.5 h-3.5" /></IconButton>
                 ) : <span />}
               </div>
             ))}
@@ -9381,7 +9327,7 @@ function GroupsTab({
           {sessions.map(session => (
             <div
               key={session.id}
-              style={{ background: "var(--cream-panel)", border: "1px solid " + (confirmDeleteId === session.id ? "#9F3030" : "var(--line)"), borderRadius: 14, padding: "18px 22px", transition: "border-color 0.15s" }}
+              style={{ background: "var(--cream-panel)", border: "1px solid " + (confirmDeleteId === session.id ? "var(--danger)" : "var(--line)"), borderRadius: 14, padding: "18px 22px", transition: "border-color 0.15s" }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -9404,7 +9350,7 @@ function GroupsTab({
                     <button
                       onClick={() => setConfirmDeleteId(session.id)}
                       disabled={deletingId === session.id}
-                      style={{ padding: "6px 14px", border: "1px solid var(--line-2)", borderRadius: 8, background: "transparent", color: "#9F3030", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: deletingId === session.id ? 0.5 : 1, fontFamily: "inherit" }}
+                      style={{ padding: "6px 14px", border: "1px solid var(--line-2)", borderRadius: 8, background: "transparent", color: "var(--danger)", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: deletingId === session.id ? 0.5 : 1, fontFamily: "inherit" }}
                     >
                       {deletingId === session.id ? "Deleting…" : "Delete"}
                     </button>
@@ -9416,7 +9362,7 @@ function GroupsTab({
               {confirmDeleteId === session.id && (
                 <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #F0EDE8", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "#9F3030", margin: 0 }}>Delete this grouping?</p>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "var(--danger)", margin: 0 }}>Delete this grouping?</p>
                     {session.config.smallGroupMode === true && (
                       <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "3px 0 0" }}>This will also clear all small group assignments. DGLs will see the empty state until groups are re-confirmed.</p>
                     )}
@@ -9430,7 +9376,7 @@ function GroupsTab({
                     </button>
                     <button
                       onClick={() => handleDelete(session)}
-                      style={{ padding: "6px 14px", border: "none", borderRadius: 8, background: "#9F3030", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                      style={{ padding: "6px 14px", border: "none", borderRadius: 8, background: "var(--danger)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
                     >
                       Delete
                     </button>
@@ -10286,8 +10232,8 @@ function GroupGeneratorWizard({
             )}
 
             {genError && (
-              <div style={{ marginTop: 18, padding: "12px 16px", background: "rgba(159,48,48,0.06)", border: "1px solid rgba(159,48,48,0.2)", borderRadius: 8 }}>
-                <p style={{ fontSize: 13, color: "#9F3030", margin: 0 }}>{genError}</p>
+              <div style={{ marginTop: 18, padding: "12px 16px", background: "color-mix(in srgb, var(--danger) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 20%, transparent)", borderRadius: 8 }}>
+                <p style={{ fontSize: 13, color: "var(--danger)", margin: 0 }}>{genError}</p>
               </div>
             )}
           </div>
@@ -10298,8 +10244,8 @@ function GroupGeneratorWizard({
           <div style={{ maxWidth: 1080, margin: "0 auto" }}>
             {/* Non-blocking notice carried over from generation (e.g. empty leader groups) */}
             {genError && (
-              <div style={{ marginBottom: 20, padding: "12px 16px", background: "rgba(159,48,48,0.06)", border: "1px solid rgba(159,48,48,0.2)", borderRadius: 10 }}>
-                <p style={{ fontSize: 13, color: "#9F3030", margin: 0 }}>{genError}</p>
+              <div style={{ marginBottom: 20, padding: "12px 16px", background: "color-mix(in srgb, var(--danger) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 20%, transparent)", borderRadius: 10 }}>
+                <p style={{ fontSize: 13, color: "var(--danger)", margin: 0 }}>{genError}</p>
               </div>
             )}
             {/* Session name */}
@@ -10324,8 +10270,8 @@ function GroupGeneratorWizard({
 
             {/* Cross-gender drag error */}
             {dragError && (
-              <div style={{ marginBottom: 16, padding: "10px 14px", background: "rgba(159,48,48,0.06)", border: "1px solid rgba(159,48,48,0.2)", borderRadius: 8 }}>
-                <p style={{ fontSize: 13, color: "#9F3030", margin: 0 }}>{dragError}</p>
+              <div style={{ marginBottom: 16, padding: "10px 14px", background: "color-mix(in srgb, var(--danger) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 20%, transparent)", borderRadius: 8 }}>
+                <p style={{ fontSize: 13, color: "var(--danger)", margin: 0 }}>{dragError}</p>
               </div>
             )}
 
@@ -11368,7 +11314,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                             {(isAdmin || isPresident) && m.user_id !== userId && (
                               isConfirming ? (
                                 <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
-                                  <button onClick={e => { e.stopPropagation(); handleRemoveMember(m.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check className="w-4 h-4" /></button>
+                                  <button onClick={e => { e.stopPropagation(); handleRemoveMember(m.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--danger)" }}><Check className="w-4 h-4" /></button>
                                   <button onClick={e => { e.stopPropagation(); setConfirmRemoveId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X className="w-4 h-4" /></button>
                                 </div>
                               ) : (
@@ -11467,7 +11413,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                                     isRoleConfirming ? (
                                       roleDeleteError ? (
                                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                          <span style={{ fontSize: 11, color: "#9F3030", maxWidth: 100 }}>{roleDeleteError}</span>
+                                          <span style={{ fontSize: 11, color: "var(--danger)", maxWidth: 100 }}>{roleDeleteError}</span>
                                           <button
                                             onClick={e => { e.stopPropagation(); setConfirmDeleteRoleId(null); setRoleDeleteError(null) }}
                                             style={{ width: 22, height: 22, borderRadius: 4, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)", flexShrink: 0 }}
@@ -11479,7 +11425,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                           <button
                                             onClick={e => { e.stopPropagation(); handleDeleteRole(role.id) }}
-                                            style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}
+                                            style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--danger)" }}
                                           >
                                             <Check className="w-4 h-4" />
                                           </button>
@@ -11667,7 +11613,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                           {(isAdmin || isPresident) && m.user_id !== userId && (
                             isConfirming ? (
                               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                                <button onClick={() => handleRemoveMember(m.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check className="w-4 h-4" /></button>
+                                <button onClick={() => handleRemoveMember(m.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--danger)" }}><Check className="w-4 h-4" /></button>
                                 <button onClick={() => setConfirmRemoveId(null)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X className="w-4 h-4" /></button>
                               </div>
                             ) : (
@@ -11748,8 +11694,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                 </p>
               </div>
               <div style={{ display: "flex", gap: 10, padding: "0 26px 24px", justifyContent: "flex-end" }}>
-                <button onClick={() => setConfirmDelete(false)} style={{ height: 38, padding: "0 16px", background: "transparent", border: "1px solid var(--line)", borderRadius: 10, color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Cancel</button>
-                <button onClick={handleDeleteTeam} style={{ height: 38, padding: "0 20px", background: "#9F3030", color: "var(--cream)", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}>Delete team</button>
+                <CentralButton variant="secondary" onClick={() => setConfirmDelete(false)}>Cancel</CentralButton>
+                <CentralButton variant="danger-solid" onClick={handleDeleteTeam}>Delete team</CentralButton>
               </div>
             </div>
           </div>
@@ -12438,13 +12384,9 @@ function SmallGroupLeadersTab({
         <TabPageHeader>
           <PageTitle title={effectiveSection === "bible_study" ? "Bible Study" : "Schedule"} compact />
           {onTeamSettings && (
-            <button
-              onClick={onTeamSettings}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[var(--cream-panel)] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
-              title="Team settings"
-            >
-              <Settings className="w-4 h-4 text-[var(--body)]" />
-            </button>
+            <IconButton dim={32} onClick={onTeamSettings} title="Team settings" className="ml-auto">
+              <Settings className="w-4 h-4" />
+            </IconButton>
           )}
         </TabPageHeader>
       )}
@@ -12463,13 +12405,9 @@ function SmallGroupLeadersTab({
             />
           </div>
           {onTeamSettings && (
-            <button
-              onClick={onTeamSettings}
-              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#E5E0D2] bg-[var(--cream-panel)] hover:bg-[#EFEAE0] transition-colors flex-shrink-0 ml-auto"
-              title="Team settings"
-            >
-              <Settings className="w-4 h-4 text-[var(--body)]" />
-            </button>
+            <IconButton dim={32} onClick={onTeamSettings} title="Team settings" className="ml-auto">
+              <Settings className="w-4 h-4" />
+            </IconButton>
           )}
         </div>
       )}
@@ -12733,17 +12671,17 @@ function SmallGroupLeadersTab({
                         return (
                           <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA", background: isPendingRemove || isConfirming ? "#FDF8F8" : "transparent" }}>
                             <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
-                            <p className={`flex-1 text-[14px] ${isPendingRemove ? "line-through text-[#9F3030]" : "text-[var(--ink)]"}`}>{m.name}</p>
+                            <p className={`flex-1 text-[14px] ${isPendingRemove ? "line-through text-[var(--danger)]" : "text-[var(--ink)]"}`}>{m.name}</p>
                             {isEditing ? (
                               isPendingRemove ? (
                                 <button onClick={() => setPendingRemoveMemberIds(prev => { const n = new Set(prev); n.delete(m.user_id); return n })} style={{ fontSize: 11, fontWeight: 600, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Undo</button>
                               ) : isConfirming ? (
                                 <div style={{ display: "flex", gap: 8 }}>
-                                  <button onClick={() => { setPendingRemoveMemberIds(prev => new Set([...prev, m.user_id])); setConfirmRemoveSgMemberId(null) }} style={{ fontSize: 11, fontWeight: 600, color: "#9F3030", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Remove</button>
+                                  <button onClick={() => { setPendingRemoveMemberIds(prev => new Set([...prev, m.user_id])); setConfirmRemoveSgMemberId(null) }} style={{ fontSize: 11, fontWeight: 600, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Remove</button>
                                   <button onClick={() => setConfirmRemoveSgMemberId(null)} style={{ fontSize: 11, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Keep</button>
                                 </div>
                               ) : (
-                                <button onClick={() => setConfirmRemoveSgMemberId(m.user_id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#C4C4C4" }}><X style={{ width: 13, height: 13 }} /></button>
+                                <IconButton dim={24} onClick={() => setConfirmRemoveSgMemberId(m.user_id)} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>
                               )
                             ) : (
                               <button onClick={() => toggleMeal(m)} style={{ padding: "4px 10px", borderRadius: 8, cursor: "pointer", border: mealDone ? "none" : "1px solid var(--line-2)", background: mealDone ? "#EDE5F0" : "transparent", fontSize: 11, fontWeight: 600, color: mealDone ? "var(--plum)" : "var(--muted-text)", letterSpacing: "0.03em", textTransform: "uppercase" as const }}>
@@ -12761,7 +12699,7 @@ function SmallGroupLeadersTab({
                             <MonogramChip initials={getInitials(person.name)} className="w-7 h-7 text-[11px] font-semibold" />
                             <p className="flex-1 text-[14px] text-[var(--ink)]">{person.name}</p>
                             <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "var(--plum)", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px", marginRight: 4 }}>ADDING</span>
-                            <button onClick={() => setPendingAddMemberIds(prev => { const n = new Set(prev); n.delete(uid); return n })} style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 4, color: "#C4C4C4" }}><X style={{ width: 13, height: 13 }} /></button>
+                            <IconButton dim={24} onClick={() => setPendingAddMemberIds(prev => { const n = new Set(prev); n.delete(uid); return n })} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>
                           </div>
                         )
                       })}
@@ -12960,7 +12898,7 @@ function SmallGroupLeadersTab({
                   {!isPresident && (
                     <div className="mt-4 flex items-center gap-3">
                       {scheduleReady ? (
-                        <span style={{ fontSize: 13, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 13, color: "var(--success)", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
                           <Check style={{ width: 14, height: 14 }} /> Marked as done — the president will be notified.
                         </span>
                       ) : (
@@ -13034,7 +12972,7 @@ function SmallGroupLeadersTab({
                     {scheduleRosterMembers.map(m => {
                       const ready = memberReadiness.get(m.user_id) ?? false
                       return (
-                        <span key={m.user_id} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, padding: "4px 10px", borderRadius: 999, background: ready ? "rgba(46,125,50,0.08)" : "#F4F1E8", border: `1px solid ${ready ? "rgba(46,125,50,0.2)" : "var(--line)"}`, color: ready ? "#2E7D32" : "var(--muted-text)", fontWeight: ready ? 500 : 400 }}>
+                        <span key={m.user_id} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, padding: "4px 10px", borderRadius: 999, background: ready ? "color-mix(in srgb, var(--success) 8%, transparent)" : "#F4F1E8", border: `1px solid ${ready ? "color-mix(in srgb, var(--success) 20%, transparent)" : "var(--line)"}`, color: ready ? "var(--success)" : "var(--muted-text)", fontWeight: ready ? 500 : 400 }}>
                           {ready && <Check style={{ width: 10, height: 10 }} />}
                           {m.name.split(" ")[0]}
                           {!ready && <span style={{ fontSize: 10, opacity: 0.6 }}>…</span>}
@@ -13617,7 +13555,7 @@ function BibleStudySubTab({
                     onKeyDown={e => { if (e.key === "Enter") void handleRename(s.id); if (e.key === "Escape") setRenamingId(null) }}
                     style={{ fontSize: 13, border: "none", outline: "none", background: "transparent", fontFamily: "inherit", color: "var(--ink)", width: 120 }}
                   />
-                  <button onClick={() => void handleRename(s.id)} disabled={savingRename} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#2E7D32", display: "flex" }}>
+                  <button onClick={() => void handleRename(s.id)} disabled={savingRename} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--success)", display: "flex" }}>
                     <Check style={{ width: 13, height: 13 }} />
                   </button>
                   <button onClick={() => setRenamingId(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)", display: "flex" }}>
@@ -13626,8 +13564,8 @@ function BibleStudySubTab({
                 </div>
               ) : isConfirmingDelete ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", border: "1.5px solid #E57373", borderRadius: 20, background: "#FFF5F5" }}>
-                  <span style={{ fontSize: 12, color: "#9F3030", whiteSpace: "nowrap" as const }}>Delete?</span>
-                  <button onClick={() => void handleDelete(s.id)} disabled={deletingId === s.id} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "#9F3030", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}>
+                  <span style={{ fontSize: 12, color: "var(--danger)", whiteSpace: "nowrap" as const }}>Delete?</span>
+                  <button onClick={() => void handleDelete(s.id)} disabled={deletingId === s.id} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--danger)", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}>
                     {deletingId === s.id ? "…" : "Yes"}
                   </button>
                   <button onClick={() => setConfirmingDeleteId(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)", display: "flex" }}>
@@ -13700,7 +13638,7 @@ function BibleStudySubTab({
             style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 8, fontFamily: "inherit", color: "var(--ink)", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
           />
           <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 10 }}>Make sure the doc is set to &ldquo;Anyone with the link can view&rdquo; before finalizing.</p>
-          {createError && <p style={{ fontSize: 12, color: "#9F3030", marginBottom: 8 }}>{createError}</p>}
+          {createError && <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>{createError}</p>}
           <div style={{ display: "flex", gap: 8 }}>
             <CentralButton variant="primary" size="sm" onClick={handleCreate} disabled={saving} style={{ flex: 1 }}>
               {saving ? "Saving…" : "Save"}
@@ -13736,7 +13674,7 @@ function BibleStudySubTab({
                 fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" as const,
                 padding: "3px 8px", borderRadius: 6,
                 background: sheet.status === "finalized" ? "#E8F5E9" : "#FFF8E7",
-                color: sheet.status === "finalized" ? "#2E7D32" : "#8A6200",
+                color: sheet.status === "finalized" ? "var(--success)" : "#8A6200",
               }}>
                 {sheet.status === "finalized" ? "Finalized" : "Draft"}
               </span>
@@ -13901,8 +13839,8 @@ function BibleStudySubTab({
                   </p>
                   {finalizeError && (
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 10 }}>
-                      <AlertCircle style={{ width: 13, height: 13, color: "#9F3030", flexShrink: 0, marginTop: 1 }} />
-                      <p style={{ fontSize: 12, color: "#9F3030" }}>{finalizeError}</p>
+                      <AlertCircle style={{ width: 13, height: 13, color: "var(--danger)", flexShrink: 0, marginTop: 1 }} />
+                      <p style={{ fontSize: 12, color: "var(--danger)" }}>{finalizeError}</p>
                     </div>
                   )}
                   <div style={{ display: "flex", gap: 8 }}>
@@ -13922,7 +13860,7 @@ function BibleStudySubTab({
           {sheet.status === "finalized" && (isPastor || isPresident) && onOpenChat && (
             <div>
               {shareSuccess ? (
-                <p style={{ fontSize: 13, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                <p style={{ fontSize: 13, color: "var(--success)", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
                   <CheckCircle2 style={{ width: 14, height: 14 }} />
                   Shared to group chat!
                 </p>
