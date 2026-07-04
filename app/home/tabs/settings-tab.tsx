@@ -25,7 +25,7 @@ import type { HomeVerse } from "@/app/actions/home-verses"
 import { updateGovernanceSettings, updateTeamAdminAccess } from "@/app/actions/governance"
 import type { GovernanceSettings } from "../types"
 import { getInitials } from "../utils"
-import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader } from "@/components/central"
+import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip } from "@/components/central"
 import { useNavState } from "../nav-state"
 
 interface MemberRow {
@@ -794,16 +794,16 @@ export function SettingsTab({
                               <input autoFocus value={verseRefDraft} onChange={e => setVerseRefDraft(e.target.value)} placeholder="Reference (e.g. John 3:16)" style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                               <textarea value={verseTextDraft} onChange={e => setVerseTextDraft(e.target.value)} placeholder="Verse text" rows={3} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
                               <div style={{ display: "flex", gap: 8 }}>
-                                <button onClick={() => setEditingVerseId(null)} style={{ flex: 1, padding: "6px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
-                                <button onClick={() => handleUpdateVerse(v.id)} disabled={savingVerse || !verseRefDraft.trim() || !verseTextDraft.trim()} style={{ flex: 1, padding: "6px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingVerse ? 0.6 : 1 }}>{savingVerse ? "Saving…" : "Save"}</button>
+                                <CentralButton variant="secondary" size="sm" onClick={() => setEditingVerseId(null)} style={{ flex: 1 }}>Cancel</CentralButton>
+                                <CentralButton variant="primary" size="sm" onClick={() => handleUpdateVerse(v.id)} disabled={savingVerse || !verseRefDraft.trim() || !verseTextDraft.trim()} style={{ flex: 1 }}>{savingVerse ? "Saving…" : "Save"}</CentralButton>
                               </div>
                             </div>
                           ) : confirmDeleteVerseId === v.id ? (
                             <div style={{ padding: "16px 22px" }}>
                               <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>Remove &ldquo;{v.reference}&rdquo;?</p>
                               <div style={{ display: "flex", gap: 8 }}>
-                                <button onClick={() => setConfirmDeleteVerseId(null)} style={{ flex: 1, padding: "5px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
-                                <button onClick={() => handleDeleteVerse(v.id)} disabled={deletingVerseId === v.id} style={{ flex: 1, padding: "5px 0", background: "var(--danger)", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "white", opacity: deletingVerseId === v.id ? 0.6 : 1 }}>{deletingVerseId === v.id ? "Removing…" : "Remove"}</button>
+                                <CentralButton variant="secondary" size="sm" onClick={() => setConfirmDeleteVerseId(null)} style={{ flex: 1 }}>Cancel</CentralButton>
+                                <CentralButton variant="danger-solid" size="sm" onClick={() => handleDeleteVerse(v.id)} disabled={deletingVerseId === v.id} style={{ flex: 1 }}>{deletingVerseId === v.id ? "Removing…" : "Remove"}</CentralButton>
                               </div>
                             </div>
                           ) : (
@@ -830,8 +830,8 @@ export function SettingsTab({
                         <input autoFocus value={newVerseRef} onChange={e => setNewVerseRef(e.target.value)} placeholder="Reference (e.g. John 3:16)" style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                         <textarea value={newVerseText} onChange={e => setNewVerseText(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddVerse() } }} placeholder="Verse text" rows={3} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
                         <div style={{ display: "flex", gap: 8 }}>
-                          <button onClick={() => { setAddingVerse(false); setNewVerseRef(""); setNewVerseText("") }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
-                          <button onClick={handleAddVerse} disabled={savingVerse || !newVerseRef.trim() || !newVerseText.trim()} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingVerse ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingVerse || !newVerseRef.trim() || !newVerseText.trim() ? 0.5 : 1 }}>{savingVerse ? "Adding…" : "Add verse"}</button>
+                          <CentralButton variant="secondary" size="sm" onClick={() => { setAddingVerse(false); setNewVerseRef(""); setNewVerseText("") }} style={{ flex: 1 }}>Cancel</CentralButton>
+                          <CentralButton variant="primary" size="sm" onClick={handleAddVerse} disabled={savingVerse || !newVerseRef.trim() || !newVerseText.trim()} style={{ flex: 1 }}>{savingVerse ? "Adding…" : "Add verse"}</CentralButton>
                         </div>
                       </div>
                     ) : (
@@ -857,14 +857,14 @@ export function SettingsTab({
                       <p style={{ fontSize: "13px", color: "var(--body)", lineHeight: 1.6, maxWidth: "560px" }}>Deactivates the ministry. Members lose access immediately. Data is preserved and can be restored by contacting support.</p>
                     </div>
                     {!showArchiveConfirm ? (
-                      <button onClick={() => setShowArchiveConfirm(true)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 10, border: "1px solid var(--danger)", color: "var(--danger)", background: "transparent", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Archive</button>
+                      <CentralButton variant="destructive" size="md" onClick={() => setShowArchiveConfirm(true)} style={{ flexShrink: 0 }}>Archive</CentralButton>
                     ) : (
                       <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
                         <p style={{ fontSize: "12px", color: "var(--muted-text)", textAlign: "right" }}>Type <strong style={{ color: "var(--ink)" }}>{ministryInfo?.name ?? ministryName}</strong> to confirm</p>
                         <input value={archiveConfirmText} onChange={e => setArchiveConfirmText(e.target.value)} placeholder="Ministry name…" style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid var(--danger)", fontSize: 13, color: "var(--ink)", outline: "none", background: "var(--cream-panel)", width: 192, fontFamily: "inherit" }} />
                         <div style={{ display: "flex", gap: 8 }}>
-                          <button onClick={() => { setShowArchiveConfirm(false); setArchiveConfirmText("") }} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                          <button onClick={handleArchive} disabled={archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName)} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid var(--danger)", fontSize: 12, fontWeight: 600, color: "var(--danger)", background: "transparent", cursor: "pointer", opacity: archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName) ? 0.5 : 1 }}>{archiving ? "Archiving…" : "Archive ministry"}</button>
+                          <CentralButton variant="secondary" size="sm" onClick={() => { setShowArchiveConfirm(false); setArchiveConfirmText("") }}>Cancel</CentralButton>
+                          <CentralButton variant="danger-solid" size="sm" onClick={handleArchive} disabled={archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName)}>{archiving ? "Archiving…" : "Archive ministry"}</CentralButton>
                         </div>
                       </div>
                     )}
@@ -906,9 +906,9 @@ export function SettingsTab({
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {(["all", "admin", "leader", "member", "visitor"] as const).map(f => (
-                    <button key={f} onClick={() => setPeopleFilter(f)} style={{ padding: "7px 12px", borderRadius: 999, border: `1px solid ${peopleFilter === f ? "var(--plum)" : "var(--line-2)"}`, background: peopleFilter === f ? "var(--plum-2)" : "var(--cream-panel)", color: peopleFilter === f ? "var(--cream-panel)" : "var(--body)", fontSize: 12, fontWeight: peopleFilter === f ? 500 : 400, cursor: "pointer", fontFamily: "var(--font-inter)" }}>
+                    <FilterChip key={f} selected={peopleFilter === f} onClick={() => setPeopleFilter(f)} tone="plum">
                       {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
-                    </button>
+                    </FilterChip>
                   ))}
                 </div>
               </div>

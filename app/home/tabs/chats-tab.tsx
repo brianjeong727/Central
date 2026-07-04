@@ -9,7 +9,7 @@ import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
 import { useNavState } from "../nav-state"
@@ -786,13 +786,14 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               </p>
             </div>
             <div style={{ display: "flex", gap: 10, padding: "0 26px 24px", justifyContent: "flex-end" }}>
-              <button onClick={() => setConfirmAction(null)} style={{ height: 38, padding: "0 16px", background: "transparent", border: "1px solid var(--line)", borderRadius: 10, color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Cancel</button>
-              <button
+              <CentralButton variant="secondary" size="md" onClick={() => setConfirmAction(null)}>Cancel</CentralButton>
+              <CentralButton
+                variant={confirmAction === "unarchive" ? "primary" : "danger-solid"}
+                size="md"
                 onClick={() => { const a = confirmAction; setConfirmAction(null); if (a === "archive") handleArchive(); else if (a === "unarchive") handleUnarchive(); else handleDelete() }}
-                style={{ height: 38, padding: "0 20px", background: confirmAction === "unarchive" ? "var(--plum-2)" : "var(--danger)", color: "var(--cream)", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}
               >
                 {confirmAction === "archive" ? "Archive" : confirmAction === "unarchive" ? "Unarchive" : "Delete"}
-              </button>
+              </CentralButton>
             </div>
           </div>
         </div>,
@@ -2429,12 +2430,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                               {optVoters.length > 0 && (
                                 <div className="flex items-center">
                                   {optVoters.map((v, vi) => (
-                                    <div key={v.user_id} className={`w-5 h-5 rounded-full border border-white overflow-hidden flex-shrink-0${vi > 0 ? " -ml-1.5" : ""}`} style={{ background: "var(--plum)" }}>
-                                      {v.avatar_url
-                                        ? <img src={v.avatar_url} alt={v.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                                        : <span className="font-bold flex items-center justify-center h-full" style={{ fontSize: 7, color: "var(--cream)" }}>{v.name.charAt(0).toUpperCase()}</span>
-                                      }
-                                    </div>
+                                    <MonogramChip
+                                      key={v.user_id}
+                                      initials={v.name.charAt(0).toUpperCase()}
+                                      avatarUrl={v.avatar_url}
+                                      className={`w-5 h-5 border border-white${vi > 0 ? " -ml-1.5" : ""}`}
+                                      style={{ fontSize: 7, fontWeight: 700 }}
+                                    />
                                   ))}
                                   {count > 3 && (
                                     <div className="-ml-1.5 w-5 h-5 rounded-full bg-[var(--line)] border border-white flex items-center justify-center flex-shrink-0">
@@ -2514,12 +2516,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                       <div className="flex flex-col gap-1.5">
                         {optVoters.map(v => (
                           <div key={v.user_id} className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center" style={{ background: "var(--plum)" }}>
-                              {v.avatar_url
-                                ? <img src={v.avatar_url} alt={v.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                                : <span className="font-bold" style={{ fontSize: 10, color: "var(--cream)" }}>{v.name.charAt(0).toUpperCase()}</span>
-                              }
-                            </div>
+                            <MonogramChip
+                              initials={v.name.charAt(0).toUpperCase()}
+                              avatarUrl={v.avatar_url}
+                              className="w-7 h-7"
+                              style={{ fontSize: 10, fontWeight: 700 }}
+                            />
                             <span className="text-[13px] text-[var(--ink)]">{v.name}</span>
                           </div>
                         ))}
