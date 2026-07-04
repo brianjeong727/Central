@@ -238,6 +238,9 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `lib/supabase-server.ts` | Server Supabase client |
 | `lib/supabase-admin.ts` | Admin Supabase client (service role) |
 | `lib/audit.ts` | Audit log helpers |
+| `lib/moderation.ts` | Chat profanity filter — tiered word list + `moderateText` (whole-word, leet-aware; scripture/theology terms excluded) + `MODERATION_DEFAULTS`. Pure TS, client+server. |
+| `app/actions/moderation.ts` | Chat-moderation server actions: `updateModerationSettings` (admin-gated, enum-validated) + `recordChatOffense` (fire-and-forget; atomic `increment_chat_offense` RPC; audits admins at every 5th offense). |
+| `app/actions/authz.ts` | Shared server-action auth guards: `requireMinistryMember` / `requireMinistryAdmin` / `requireSameMinistry` / `requireTeamMemberOrAdmin` — the pattern every service-role action must use. |
 | `lib/group-algorithm.ts` | Small group generation algorithm |
 | `components/ui/bottom-nav.tsx` | Bottom tab navigation (mobile only) |
 | `components/ui/chats-section.tsx` | Recent chats list used on Home tab |
@@ -351,7 +354,7 @@ HomeApp (root — owns all global state)
 
 | Table | Key Columns |
 |-------|-------------|
-| `ministries` | `id`, `name`, `university`, `universities` (jsonb), `invite_code`, `staff_invite_code`, `status` (`active`/`pending`/`rejected`), `is_public`, `location`, `automation_settings` (jsonb), `governance_settings` (jsonb `{all_admins, roster_ids}`), `created_by` |
+| `ministries` | `id`, `name`, `university`, `universities` (jsonb), `invite_code`, `staff_invite_code` (both **column-revoked** from `authenticated`/`anon` — read only via the admin-scoped `getMinistryCodes` action), `status` (`active`/`pending`/`rejected`/`archived`), `is_public`, `location`, `automation_settings` (jsonb), `governance_settings` (jsonb `{all_admins, roster_ids}`), `moderation_settings` (jsonb `{enabled, behavior, strictness, scope, photo_enabled}` — chat filter config), `archive_requested_by`/`archive_requested_at` (two-step archive), `created_by` |
 | `profiles` | `id`, `ministry_id`, `name`, `email`, `role`, `graduation_year`, `grade`, `needs_grad_check`, `gender`, `avatar_url`, `about_me`, `bible_verse`, `prayer_request`, `pray_for_me`, `phone`, `bio`, `testimony`, `favorite_worship_song`, `favorite_verse`, `favorite_book_of_bible`, `show_journal_entries`, `show_journal_streak`, `school_id`, `saved_signature`, `sidebar_note` |
 | `groups` | `id`, `ministry_id`, `name`, `type` (`church`/`my`/`dm`), `created_by`, `archived`, `pinned_message_id` |
 | `group_members` | `group_id`, `user_id`, `last_read_at` |
@@ -367,7 +370,7 @@ HomeApp (root — owns all global state)
 ### Feature-area index (names only — query MCP for columns)
 
 **Messaging**
-`polls`, `poll_votes`, `message_reactions`, `group_sessions`
+`polls`, `poll_votes`, `message_reactions`, `group_sessions`, `chat_offenses` (per-user profanity-filter offense counter; written only via the service-role `recordChatOffense` action + `increment_chat_offense` RPC; admins read)
 
 **Announcements & Forms**
 `announcement_forms`, `form_fields`, `form_responses`, `form_answers`
