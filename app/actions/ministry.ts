@@ -64,6 +64,8 @@ export async function joinMinistryByCode(
   if (!ministry) return { ministryName: null, error: "No ministry found with that invite code." }
   if (ministry.status === "pending") return { ministryName: null, error: "This ministry is not yet active." }
   if (ministry.status === "rejected") return { ministryName: null, error: "This ministry is not available." }
+  // Catch-all — any non-active status (archived etc.) is not joinable.
+  if (ministry.status !== "active") return { ministryName: null, error: "This ministry is not available." }
 
   // Check if user is banned from this ministry
   const { data: ban } = await admin
@@ -86,11 +88,44 @@ export async function joinMinistryByCode(
     return { ministryName: null, error: "Invalid staff role" }
   }
 
-  const role = isStaff ? (adminRole as string).toLowerCase() : "member"
+  // Fetch the caller's current profile before any write. A member-code join must
+  // never carry over a previous ministry's admin role into the new one (stale-role
+  // escalation) — so we resolve the role explicitly rather than leaving it untouched.
+  const { data: currentProfile } = await admin
+    .from("profiles")
+    .select("ministry_id, role, graduation_year")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  if (!currentProfile) {
+    return { ministryName: null, error: "Profile not found. Please sign out and sign back in, then try again." }
+  }
+
+  // Member-code join into a ministry they're already in (e.g. a pastor re-entering
+  // their own member code) — no-op, so we never demote them.
+  if (!isStaff && currentProfile.ministry_id === ministry.id) {
+    return { ministryName: ministry.name, error: null }
+  }
+
+  // Resolve the role to write. Staff joins use the validated adminRole above.
+  // Member joins default to "member", but a RETURN to a ministry the user still
+  // has a membership row in restores that row's role (never the stale profile role).
+  let role: string
+  if (isStaff) {
+    role = (adminRole as string).toLowerCase()
+  } else {
+    const { data: existingUm } = await admin
+      .from("user_ministries")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("ministry_id", ministry.id)
+      .maybeSingle()
+    role = existingUm ? (existingUm.role ?? "member") : "member"
+  }
 
   const { data: updatedRows, error: updateErr } = await admin
     .from("profiles")
-    .update({ ministry_id: ministry.id, ...(isStaff ? { role } : {}) })
+    .update({ ministry_id: ministry.id, role })
     .eq("id", user.id)
     .select("id")
 
@@ -104,8 +139,7 @@ export async function joinMinistryByCode(
     { onConflict: "user_id,ministry_id" }
   )
 
-  const { data: profile } = await admin.from("profiles").select("graduation_year").eq("id", user.id).single()
-  await autoAddUserToChats(user.id, ministry.id, profile?.graduation_year ?? null, role)
+  await autoAddUserToChats(user.id, ministry.id, currentProfile.graduation_year ?? null, role)
 
   return { ministryName: ministry.name, error: null }
 }
@@ -151,20 +185,46 @@ export async function joinMinistryById(ministryId: string): Promise<{ error: str
     .from("ministry_bans").select("id").eq("ministry_id", ministryId).eq("user_id", user.id).maybeSingle()
   if (ban) return { error: "You are not permitted to join this ministry." }
 
+  // Same stale-role escalation guard as joinMinistryByCode — a public join must
+  // never carry a previous ministry's admin role into this one.
+  const { data: currentProfile } = await admin
+    .from("profiles")
+    .select("ministry_id, role, graduation_year")
+    .eq("id", user.id)
+    .maybeSingle()
+
+  if (!currentProfile) {
+    return { error: "Profile not found. Please sign out and sign back in, then try again." }
+  }
+
+  // Already in this ministry — no-op so we never demote an existing role.
+  if (currentProfile.ministry_id === ministryId) {
+    return { error: null }
+  }
+
+  // Restore the role from an existing membership row if this is a return;
+  // otherwise it's a fresh join → "member".
+  const { data: existingUm } = await admin
+    .from("user_ministries")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("ministry_id", ministryId)
+    .maybeSingle()
+  const role = existingUm ? (existingUm.role ?? "member") : "member"
+
   const { error: updateErr } = await admin
     .from("profiles")
-    .update({ ministry_id: ministryId })
+    .update({ ministry_id: ministryId, role })
     .eq("id", user.id)
 
   if (updateErr) return { error: updateErr.message }
 
   await admin.from("user_ministries").upsert(
-    { user_id: user.id, ministry_id: ministryId, role: "member" },
+    { user_id: user.id, ministry_id: ministryId, role },
     { onConflict: "user_id,ministry_id" }
   )
 
-  const { data: profile } = await admin.from("profiles").select("graduation_year").eq("id", user.id).single()
-  await autoAddUserToChats(user.id, ministryId, profile?.graduation_year ?? null, "member")
+  await autoAddUserToChats(user.id, ministryId, currentProfile.graduation_year ?? null, role)
 
   return { error: null }
 }
@@ -215,19 +275,35 @@ export async function submitMinistryApplication(data: {
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return { error: "Not authenticated." }
 
+  // Registration gate — server actions are public HTTP endpoints, so the
+  // /register-ministry page gate isn't enough on its own. A user who already
+  // belongs to a ministry must be admin-tier to register another; users with
+  // no ministry (fresh registrants) always pass.
+  const { data: callerProfile } = await supabase
+    .from("profiles")
+    .select("ministry_id, role")
+    .eq("id", user.id)
+    .maybeSingle()
+  if (callerProfile?.ministry_id && !["admin", "deacon", "elder", "pastor"].includes((callerProfile.role ?? "").toLowerCase())) {
+    return { error: "Only ministry admins can register a new ministry." }
+  }
+
   const admin = createAdminClient()
   const inviteCode = await uniqueInviteCode(admin)
   const staffCode = await uniqueStaffCode(admin)
 
-  // Determine founder role. If the profile already carries an admin-level role
-  // (set during signup via metadata), use that. If it's a basic role like "member"
-  // (e.g. existing account, Google OAuth), fall back to the passed-in role or "pastor".
-  const { data: founderRoleRow } = await admin.from("profiles").select("role").eq("id", user.id).single()
-  const profileRole = founderRoleRow?.role?.toLowerCase()
-  const adminLevelRoles = ["admin", "pastor", "deacon", "elder", "leader"]
-  const founderRole = (profileRole && adminLevelRoles.includes(profileRole))
-    ? profileRole
-    : (data.founderRole ?? "pastor")
+  // Resolve the founder's role from validated sources only — never trust
+  // unvalidated input and never read profiles.role (the DB trigger now forces
+  // fresh signups to 'member', and the metadata role was previously forgeable).
+  // Prefer the role picked on the admin signup form (stored in auth metadata),
+  // then an explicit validated param, then default to "pastor".
+  const ALLOWED_FOUNDER_ROLES = ["pastor", "deacon", "elder"]
+  const picked = (user.user_metadata?.role as string | undefined)?.toLowerCase()
+  const founderRole = ALLOWED_FOUNDER_ROLES.includes(picked ?? "")
+    ? picked!
+    : (ALLOWED_FOUNDER_ROLES.includes((data.founderRole ?? "").toLowerCase())
+      ? (data.founderRole as string).toLowerCase()
+      : "pastor")
 
   const universitiesList = data.universities && data.universities.length > 0
     ? data.universities.map(u => u.trim()).filter(Boolean)
