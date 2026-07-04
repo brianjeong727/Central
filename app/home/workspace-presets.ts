@@ -159,6 +159,16 @@ export function presetIdForTeam(team: { team_type?: string | null; name?: string
   }
 }
 
+// The design-system line-icon key for a team = its preset's `iconKey`. ALWAYS
+// render team icons via `<PlanLineIcon iconKey={teamIconKey(team)} />` — NEVER the
+// raw `teams.icon` value, which is legacy emoji (and some rows even store an
+// iconKey string, e.g. "users"), and is inconsistent with the established
+// PlanLineIcon glyph system. Falls back to "clipboard".
+export function teamIconKey(team: { team_type?: string | null; name?: string | null }): string {
+  const id = presetIdForTeam(team)
+  return (id ? presetById(id)?.iconKey : undefined) ?? "clipboard"
+}
+
 // Which preset ids a ministry already has, given its current teams. Used by the
 // "Add workspace" flow to offer only the presets the ministry is missing.
 export function ownedPresetKeys(teams: Array<{ team_type?: string | null; name?: string | null }>): Set<string> {

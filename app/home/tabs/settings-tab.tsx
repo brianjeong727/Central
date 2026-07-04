@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
-import { EYEBROW_STYLE } from "../components/shared"
+import { EYEBROW_STYLE, PlanLineIcon } from "../components/shared"
+import { teamIconKey } from "../workspace-presets"
 import {
   updateMinistryPublic,
   updateMinistryInfo,
@@ -25,6 +26,9 @@ import type { ReceiptLimit } from "@/app/actions/receipts"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
 import type { HomeVerse } from "@/app/actions/home-verses"
 import { updateGovernanceSettings, updateTeamAdminAccess } from "@/app/actions/governance"
+import { updateModerationSettings } from "@/app/actions/moderation"
+import { MODERATION_DEFAULTS } from "@/lib/moderation"
+import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@/lib/moderation"
 import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
 import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip } from "@/components/central"
@@ -45,12 +49,12 @@ interface MinistryInfo {
 }
 
 type RoleFilter = "all" | "member" | "visitor" | "leader" | "admin" | "deacon" | "elder"
-type ActiveSettingsTab = "general" | "people" | "governance" | "automations" | "workspace" | "audit"
+type ActiveSettingsTab = "general" | "people" | "governance" | "automations" | "chat" | "workspace" | "audit"
 
 interface GovTeamRow {
   id: string
   name: string
-  icon: string | null
+  team_type: string | null
   admin_access: "none" | "view" | "write"
 }
 
@@ -104,7 +108,7 @@ export function SettingsTab({
   const [activeSettingsTab, setActiveSettingsTab] = useState<ActiveSettingsTab>(() => {
     if (typeof window === "undefined") return "general"
     const p = new URLSearchParams(window.location.search).get("stab")
-    return (["general", "people", "governance", "automations", "workspace", "audit"].includes(p ?? "") ? p as ActiveSettingsTab : "general")
+    return (["general", "people", "governance", "automations", "chat", "workspace", "audit"].includes(p ?? "") ? p as ActiveSettingsTab : "general")
   })
   function goToSettingsTab(t: ActiveSettingsTab) {
     setActiveSettingsTab(t)
@@ -193,6 +197,12 @@ export function SettingsTab({
   const [showArchiveWarning, setShowArchiveWarning] = useState(false)
   const [pendingArchiveLabels, setPendingArchiveLabels] = useState<string[]>([])
 
+  // Chat moderation
+  const [moderationSettings, setModerationSettings] = useState<ModerationSettings>(MODERATION_DEFAULTS)
+  const [pendingModerationSettings, setPendingModerationSettings] = useState<ModerationSettings>(MODERATION_DEFAULTS)
+  const [savingModeration, setSavingModeration] = useState(false)
+  const [moderationSaveMsg, setModerationSaveMsg] = useState<string | null>(null)
+
   // Danger Zone — archiving is two-step (Q4): one admin requests, a DIFFERENT
   // admin confirms. archiveRequest mirrors ministries.archive_requested_by/_at.
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
@@ -252,12 +262,12 @@ export function SettingsTab({
       const [{ data: min }, { data: profiles }, { data: schoolRows }, limitsRes, verses, { data: teamRows }, codesRes] = await Promise.all([
         // invite_code/staff_invite_code are column-revoked for browser clients
         // (Q2 migration) — they load via the admin-scoped getMinistryCodes action.
-        supabase.from("ministries").select("name, university, size, is_public, automation_settings, governance_settings, archive_requested_by, archive_requested_at").eq("id", ministryId).maybeSingle(),
+        supabase.from("ministries").select("name, university, size, is_public, automation_settings, governance_settings, moderation_settings, archive_requested_by, archive_requested_at").eq("id", ministryId).maybeSingle(),
         supabase.from("profiles").select("id, name, email, role, graduation_year").eq("ministry_id", ministryId).order("name"),
         supabase.from("ministry_schools").select("id, name, abbreviation, sort_order").eq("ministry_id", ministryId).order("sort_order"),
         getReceiptLimits(ministryId),
         getHomeVerses(ministryId),
-        supabase.from("teams").select("id, name, icon, admin_access").eq("ministry_id", ministryId).order("name"),
+        supabase.from("teams").select("id, name, team_type, admin_access").eq("ministry_id", ministryId).order("name"),
         getMinistryCodes(ministryId),
       ])
 
@@ -282,8 +292,11 @@ export function SettingsTab({
         if (gov && typeof gov.all_admins === "boolean") {
           setGovernanceSettings({ all_admins: gov.all_admins, roster_ids: Array.isArray(gov.roster_ids) ? gov.roster_ids : [] })
         }
+        const mergedMod = { ...MODERATION_DEFAULTS, ...((min.moderation_settings as Partial<ModerationSettings> | null) ?? {}) }
+        setModerationSettings(mergedMod)
+        setPendingModerationSettings(mergedMod)
       }
-      setGovTeams((teamRows ?? []).map((t) => ({ id: t.id, name: t.name, icon: t.icon, admin_access: (t.admin_access ?? "view") as "none" | "view" | "write" })))
+      setGovTeams((teamRows ?? []).map((t) => ({ id: t.id, name: t.name, team_type: t.team_type ?? null, admin_access: (t.admin_access ?? "view") as "none" | "view" | "write" })))
       setSchools((schoolRows ?? []) as { id: string; name: string; abbreviation: string; sort_order: number }[])
       setReceiptLimits(limitsRes.data)
       setMembers(profiles ?? [])
@@ -439,6 +452,20 @@ export function SettingsTab({
   }
 
   const hasAutomationChanges = JSON.stringify(pendingAutomationSettings) !== JSON.stringify(automationSettings)
+
+  const hasModerationChanges = JSON.stringify(pendingModerationSettings) !== JSON.stringify(moderationSettings)
+  function setModField<K extends keyof ModerationSettings>(key: K, val: ModerationSettings[K]) {
+    setPendingModerationSettings((prev) => ({ ...prev, [key]: val }))
+    setModerationSaveMsg(null)
+  }
+  async function handleSaveModeration() {
+    setSavingModeration(true)
+    const res = await updateModerationSettings(ministryId, pendingModerationSettings)
+    setSavingModeration(false)
+    if (res?.error) { setModerationSaveMsg(`Error: ${res.error}`); return }
+    setModerationSettings(pendingModerationSettings)
+    setModerationSaveMsg("Chat moderation settings saved.")
+  }
 
   async function commitSaveAutomations() {
     setSavingAutomations(true)
@@ -683,6 +710,7 @@ export function SettingsTab({
     { key: "people", label: "People" },
     ...(isAdmin ? [{ key: "governance" as ActiveSettingsTab, label: "Governance" }] : []),
     { key: "automations", label: "Automations" },
+    { key: "chat", label: "Chat" },
     { key: "workspace", label: "Workspace" },
     ...(isAdmin ? [{ key: "audit" as ActiveSettingsTab, label: "Audit Log" }] : []),
   ]
@@ -1147,7 +1175,9 @@ export function SettingsTab({
                     <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "20px 22px", textAlign: "center" }}>No teams yet.</p>
                   ) : govTeams.map((team, i) => (
                     <div key={team.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < govTeams.length - 1 ? "1px solid var(--line-3)" : "none" }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{team.icon ?? "•"}</div>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <PlanLineIcon iconKey={teamIconKey(team)} bg="transparent" fg="var(--plum)" size={20} radius={0} />
+                      </div>
                       <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{team.name}</div>
                       <div style={{ display: "inline-flex", border: "1px solid var(--line-2)", borderRadius: 999, padding: 2, background: "var(--ivory)", flexShrink: 0 }}>
                         {(["none", "view", "write"] as const).map(opt => {
@@ -1284,6 +1314,109 @@ export function SettingsTab({
                   <button onClick={handleRunDepartedCleanup} disabled={cleanupRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: cleanupRunning ? "var(--line-2)" : "var(--cream-panel)", color: cleanupRunning ? "var(--muted-text)" : "var(--ink)", fontSize: 13, fontWeight: 500, cursor: cleanupRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
                     {cleanupRunning ? "Running…" : "Run now"}
                   </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════ CHAT TAB ══════════════════ */}
+          {activeSettingsTab === "chat" && (
+            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
+              <div>
+                <SectionHeader eyebrow="Chat" title="Chat moderation" titleSize={20} />
+                <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", maxWidth: 640, lineHeight: 1.55 }}>Screen messages for profanity and slurs before they send. Choose how flagged language is handled, how strict the filter is, and which chats it covers.</p>
+              </div>
+
+              {/* Enable toggle */}
+              <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
+                <button onClick={() => setModField("enabled", !pendingModerationSettings.enabled)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.enabled ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                  <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(pendingModerationSettings.enabled ? { right: 2 } : { left: 2 }) }} />
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Filter message language</div>
+                  <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>When on, messages are screened using the rules below before they send.</div>
+                </div>
+              </div>
+
+              {/* Rule chips — only when enabled */}
+              {pendingModerationSettings.enabled && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                  {/* Behavior */}
+                  <div>
+                    <p style={{ ...SECTION_LABEL, marginBottom: 10 }}>Behavior</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {([{ v: "asterisk_first", l: "Soften (s***)" }, { v: "asterisk_all", l: "Censor (****)" }, { v: "block", l: "Block send" }] as { v: ModBehavior; l: string }[]).map((o) => (
+                        <FilterChip key={o.v} tone="ivory" selected={pendingModerationSettings.behavior === o.v} disabled={!isAdmin} onClick={() => setModField("behavior", o.v)}>{o.l}</FilterChip>
+                      ))}
+                    </div>
+                    <p style={{ marginTop: 8, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>How flagged words are handled. Block prevents the message from sending at all.</p>
+                  </div>
+
+                  {/* Strictness */}
+                  <div>
+                    <p style={{ ...SECTION_LABEL, marginBottom: 10 }}>Strictness</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {([{ v: "lenient", l: "Lenient" }, { v: "moderate", l: "Moderate" }, { v: "strict", l: "Strict" }] as { v: ModStrictness; l: string }[]).map((o) => (
+                        <FilterChip key={o.v} tone="ivory" selected={pendingModerationSettings.strictness === o.v} disabled={!isAdmin} onClick={() => setModField("strictness", o.v)}>{o.l}</FilterChip>
+                      ))}
+                    </div>
+                    <p style={{ marginTop: 8, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Lenient flags only slurs and hate terms; Moderate adds strong profanity; Strict adds crude and borderline words.</p>
+                  </div>
+
+                  {/* Scope */}
+                  <div>
+                    <p style={{ ...SECTION_LABEL, marginBottom: 10 }}>Scope</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {([{ v: "all", l: "All chats" }, { v: "church", l: "Church chats" }, { v: "personal", l: "Personal chats" }, { v: "ministry", l: "Ministry chat" }] as { v: ModScope; l: string }[]).map((o) => (
+                        <FilterChip key={o.v} tone="ivory" selected={pendingModerationSettings.scope === o.v} disabled={!isAdmin} onClick={() => setModField("scope", o.v)}>{o.l}</FilterChip>
+                      ))}
+                    </div>
+                    <p style={{ marginTop: 8, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Which conversations the filter covers. Ministry chat = the default chat everyone&apos;s in.</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Reverent capitalization — independent of the language filter */}
+              <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
+                <button onClick={() => setModField("reverent_caps", !pendingModerationSettings.reverent_caps)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.reverent_caps ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                  <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(pendingModerationSettings.reverent_caps ? { right: 2 } : { left: 2 }) }} />
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Reverent capitalization</div>
+                  <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Auto-capitalizes God, Jesus, and Holy Spirit in messages.</div>
+                </div>
+              </div>
+
+              {/* Coming soon — photo moderation */}
+              <div>
+                <p style={{ ...SECTION_LABEL, marginBottom: 12 }}>Coming soon</p>
+                <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "var(--cream-2)", opacity: 0.6, pointerEvents: "none" }}>
+                  <div style={{ width: 38, height: 22, borderRadius: 999, background: "#D6D0C0", position: "relative", flexShrink: 0 }}>
+                    <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, left: 2 }} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", display: "flex", alignItems: "center", gap: 8 }}>
+                      Inappropriate photo filter
+                      <span style={{ fontSize: 10, letterSpacing: "0.8px", padding: "2px 7px", borderRadius: 999, background: "#EFEAE0", textTransform: "uppercase", fontWeight: 500, color: "var(--muted-text)" }}>Coming soon</span>
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Automatically flags explicit images.</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Save / discard bar */}
+              {hasModerationChanges && (
+                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
+                  <button onClick={() => setPendingModerationSettings(moderationSettings)} disabled={!isAdmin} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: isAdmin ? "pointer" : "not-allowed", opacity: !isAdmin ? 0.5 : 1 }}>Discard</button>
+                  <button onClick={handleSaveModeration} disabled={savingModeration || !isAdmin} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 600, cursor: savingModeration || !isAdmin ? "not-allowed" : "pointer", opacity: savingModeration || !isAdmin ? 0.6 : 1 }}>
+                    {savingModeration ? "Saving…" : "Save changes"}
+                  </button>
+                </div>
+              )}
+
+              {moderationSaveMsg && (
+                <div style={{ padding: "10px 16px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontSize: 13, color: "var(--body)" }}>
+                  {moderationSaveMsg}
                 </div>
               )}
             </div>

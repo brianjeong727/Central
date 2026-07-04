@@ -104,6 +104,8 @@ Central is a daily-driver tool that an entire church community lives in for comm
 
 **Do not:** use emoji as iconography. Do not use Font Awesome / Heroicons mixed sets. Do not fill icons — strokes only.
 
+**Team / workspace icons — always the glyph, never the emoji.** A team's visual is the `PlanLineIcon` stroked glyph keyed by its preset — resolve it with `teamIconKey(team)` from `app/home/workspace-presets.ts` and render `<PlanLineIcon iconKey={teamIconKey(team)} …/>`. **Never render the raw `teams.icon` value** — that column holds legacy emoji (and some rows even store a stray iconKey string like `"users"`), so rendering it directly produces the exact emoji/garbled-text leak this rule exists to prevent. This holds everywhere a team is shown in a list/matrix/chip (governance access matrix, founder admin panel, settings, sidebar). (This supersedes the older "emoji are used for team icons" carve-out.)
+
 ---
 
 ## 2. Shell & navigation

@@ -261,3 +261,9 @@ Date: 2026-07-03
   6. Lazily `nice -n 19 rm -rf <dir>-broken-*` in the background (the stuck delete eventually clears once nothing contends).
 - **Don't** burn time reinstalling `node_modules` (identical to a working slot ⇒ never the cause) or chasing CPU/watchers. Byte-identical deps + 0%-CPU compile deadlock ⇒ the directory is the problem ⇒ recreate it.
 - Orthogonally useful find: an **app-translocated** editor (running from `/private/var/folders/.../AppTranslocation/...`, i.e. launched from quarantine) had two renderer procs pegged at ~280% CPU each (~5.6 cores), spiking system load to ~8. `ps aux | sort -nrk3 | head` finds runaway CPU fast; that translocated state is abnormal and worth killing on sight.
+
+## Team icons — never render the raw `teams.icon` value
+
+**Mistake:** the governance Team-Access matrix (settings-tab) and the founder admin panel rendered `{team.icon}` directly. `teams.icon` holds legacy emoji (💰/🏛️/🎵) and some rows even store a stray iconKey string ("users"), so the chip showed emoji or garbled literal text instead of the design-system glyph.
+
+**Rule:** a team's visual is the `PlanLineIcon` stroked glyph keyed by its preset. Resolve it with `teamIconKey(team)` (`app/home/workspace-presets.ts`, source of truth: `presetIdForTeam` → preset `iconKey`, fallback `"clipboard"`) and render `<PlanLineIcon iconKey={teamIconKey(team)} bg="transparent" fg="var(--plum)" size={…} radius={0} />`. **Never** render `team.icon`/`teams.icon` in any list, matrix, chip, or picker. This is DESIGN_SYSTEM §"Do not: emoji as iconography" made concrete. Add `team_type` to the query if the row doesn't carry it (teamIconKey classifies by team_type then name).
