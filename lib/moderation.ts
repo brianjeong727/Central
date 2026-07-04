@@ -12,6 +12,7 @@ export interface ModerationSettings {
   strictness: ModStrictness
   scope: ModScope
   photo_enabled: boolean
+  reverent_caps: boolean
 }
 
 export const MODERATION_DEFAULTS: ModerationSettings = {
@@ -20,6 +21,7 @@ export const MODERATION_DEFAULTS: ModerationSettings = {
   strictness: "moderate",
   scope: "all",
   photo_enabled: false,
+  reverent_caps: false,
 }
 
 // Curated built-in tiers (lowercase base forms + the most common inflections).
@@ -101,4 +103,23 @@ export function scopeApplies(
   if (scope === "church") return ctx.isChurch
   if (scope === "personal") return ctx.isPersonal
   return ctx.isMinistryDefault // "ministry"
+}
+
+// Reverent capitalization — a silent, helpful transform (SEPARATE from the
+// profanity filter). Case-insensitive, WHOLE-WORD only via \b boundaries, so it
+// never touches substrings. Pure and idempotent (already-correct forms no-op).
+//
+// Examples:
+//   "oh my god"      → "oh my God"       ("god" is a whole word; space is a boundary)
+//   "god's grace"    → "God's grace"     (apostrophe is a word boundary)
+//   "godzilla"       → "godzilla"        (no boundary after "god")
+//   "goddess"/"gods" → unchanged         (trailing letter is a word char → not \bgod\b)
+//   "jesuit"         → "jesuit"          (no boundary)
+//   "the holy spirit"→ "the Holy Spirit" (phrase handled first)
+export function reverentCapitalize(text: string): string {
+  return text
+    // Phrase first so "holy spirit" becomes "Holy Spirit" as a unit.
+    .replace(/\bholy spirit\b/gi, "Holy Spirit")
+    .replace(/\bgod\b/gi, "God")
+    .replace(/\bjesus\b/gi, "Jesus")
 }

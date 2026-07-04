@@ -1376,6 +1376,17 @@ export function SettingsTab({
                 </div>
               )}
 
+              {/* Reverent capitalization — independent of the language filter */}
+              <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
+                <button onClick={() => setModField("reverent_caps", !pendingModerationSettings.reverent_caps)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.reverent_caps ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                  <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(pendingModerationSettings.reverent_caps ? { right: 2 } : { left: 2 }) }} />
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Reverent capitalization</div>
+                  <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Auto-capitalizes God, Jesus, and Holy Spirit in messages.</div>
+                </div>
+              </div>
+
               {/* Coming soon — photo moderation */}
               <div>
                 <p style={{ ...SECTION_LABEL, marginBottom: 12 }}>Coming soon</p>

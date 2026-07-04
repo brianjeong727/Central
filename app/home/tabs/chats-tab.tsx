@@ -17,7 +17,7 @@ import { InsetHairline } from "@/components/central/hairline"
 import { fetchChatList } from "../chat-list"
 import { MessageRow } from "./message-row"
 import { Composer } from "./composer"
-import { MODERATION_DEFAULTS, moderateText, scopeApplies } from "@/lib/moderation"
+import { MODERATION_DEFAULTS, moderateText, scopeApplies, reverentCapitalize } from "@/lib/moderation"
 import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
 
@@ -1856,6 +1856,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     // Text-only + block mode → refuse to send outright.
     if (!attachment && contentMod.blocked) return
 
+    // Reverent capitalization — a SEPARATE, silent transform: auto-caps God /
+    // Jesus / Holy Spirit. Independent of the language filter (works even when
+    // it's off/out-of-scope); no warning, no offense recording. Applied to the
+    // outgoing text that feeds BOTH the optimistic bubble and the DB insert.
+    const applyReverent = (t: string): string => (modSettings?.reverent_caps ? reverentCapitalize(t) : t)
+
     // Clear own typing status
     if (myTypingTimeoutRef.current) clearTimeout(myTypingTimeoutRef.current)
     typingChannelRef.current?.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: false } })
@@ -1884,7 +1890,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           attachment_type: attachment.type, attachment_name: attachment.name, attachment_size: attachment.size,
         }
         // Block mode on a flagged caption → send the attachment with NO caption.
-        const captionText = contentMod.blocked ? "" : contentMod.text
+        const captionText = contentMod.blocked ? "" : applyReverent(contentMod.text)
         setMessages(prev => [...prev, optimisticMsg])
         bumpChatListForOwnSend(captionText || attachment.name)
         const { data } = await supabase.from("messages").insert({
@@ -1918,8 +1924,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     }
 
     // Text-only message — send the moderated text (softened/censored, or the
-    // original when nothing was flagged; block mode already returned above).
-    const sendText = contentMod.text
+    // original when nothing was flagged; block mode already returned above),
+    // then apply reverent capitalization on top.
+    const sendText = applyReverent(contentMod.text)
     const optimisticId = `optimistic-${Date.now()}`
     const optimisticMsg: Message = {
       id: optimisticId, group_id: groupId, sender_id: userId, content: sendText,

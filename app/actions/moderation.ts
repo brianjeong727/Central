@@ -28,6 +28,7 @@ export async function updateModerationSettings(
     strictness,
     scope,
     photo_enabled: Boolean(settings.photo_enabled),
+    reverent_caps: Boolean(settings.reverent_caps),
   }
 
   const admin = createAdminClient()
