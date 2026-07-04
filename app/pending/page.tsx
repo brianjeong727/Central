@@ -7,6 +7,10 @@ import { getMinistryCodes } from "@/app/actions/ministry"
 
 export default function PendingPage() {
   const [ministryName, setMinistryName] = useState<string | null>(null)
+  // Ministry status drives the page variant: 'pending' (default) shows the
+  // under-review copy + codes; 'rejected' and any other non-active status get
+  // their own explanation + CTAs (proxy routes those users here too).
+  const [status, setStatus] = useState<string>("pending")
   const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [staffCode, setStaffCode] = useState<string | null>(null)
   const [copied, setCopied] = useState<"member" | "staff" | null>(null)
@@ -28,20 +32,24 @@ export default function PendingPage() {
 
       const { data: ministry } = await supabase
         .from("ministries")
-        .select("name")
+        .select("name, status")
         .eq("id", profile.ministry_id)
         .maybeSingle()
 
       if (ministry?.name) setMinistryName(ministry.name)
+      if (ministry?.status) setStatus(ministry.status)
 
       // Fetch the REAL invite codes so the founder can prepare to share them.
+      // Pending only — rejected/archived ministries have nothing to share.
       // Fails silently — if codes can't load, the section simply doesn't render.
-      try {
-        const { inviteCode: mCode, staffInviteCode: sCode } = await getMinistryCodes(profile.ministry_id)
-        if (mCode) setInviteCode(mCode)
-        if (sCode) setStaffCode(sCode)
-      } catch {
-        // ignore — don't break the page
+      if ((ministry?.status ?? "pending") === "pending") {
+        try {
+          const { inviteCode: mCode, staffInviteCode: sCode } = await getMinistryCodes(profile.ministry_id)
+          if (mCode) setInviteCode(mCode)
+          if (sCode) setStaffCode(sCode)
+        } catch {
+          // ignore — don't break the page
+        }
       }
     }
     load()
@@ -94,7 +102,11 @@ export default function PendingPage() {
         </div>
 
         <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "var(--ink)", fontWeight: 400, marginBottom: 8 }}>
-          Application under review
+          {status === "rejected"
+            ? "Your registration wasn’t approved"
+            : status !== "pending"
+            ? "This ministry is no longer active"
+            : "Application under review"}
         </h1>
 
         {ministryName && (
@@ -102,7 +114,11 @@ export default function PendingPage() {
         )}
 
         <p className="text-[14px] text-[var(--body)] leading-relaxed mb-8 max-w-[300px]">
-          We&apos;ve received your ministry application and will review it within 24–48 hours. You&apos;ll gain full access once approved.
+          {status === "rejected"
+            ? "If you think this was a mistake, reach out below — or you can browse existing ministries, or register again."
+            : status !== "pending"
+            ? "You can browse existing ministries to find a new home, or reach out below with any questions."
+            : <>We&apos;ve received your ministry application and will review it within 24–48 hours. You&apos;ll gain full access once approved.</>}
         </p>
 
         {/* Real invite codes — founder can prepare to share them ahead of approval.
@@ -196,20 +212,42 @@ export default function PendingPage() {
         )}
 
         <div className="w-full flex flex-col gap-3">
-          <button
-            onClick={checkStatus}
-            disabled={checking}
-            className="w-full py-3.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-60 text-[var(--cream-on-dark)] font-bold text-[14px] transition-colors"
-          >
-            {checking ? "Checking…" : "Check status"}
-          </button>
+          {status === "pending" ? (
+            <>
+              <button
+                onClick={checkStatus}
+                disabled={checking}
+                className="w-full py-3.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-60 text-[var(--cream-on-dark)] font-bold text-[14px] transition-colors"
+              >
+                {checking ? "Checking…" : "Check status"}
+              </button>
 
-          <button
-            onClick={() => window.location.href = "/landing"}
-            className="w-full py-3.5 rounded-xl border border-[#E5E0D2] text-[14px] font-semibold text-[var(--body)] hover:border-[#3E1540]/40 hover:text-[var(--plum)] transition-colors"
-          >
-            Back to home
-          </button>
+              <button
+                onClick={() => window.location.href = "/landing"}
+                className="w-full py-3.5 rounded-xl border border-[#E5E0D2] text-[14px] font-semibold text-[var(--body)] hover:border-[#3E1540]/40 hover:text-[var(--plum)] transition-colors"
+              >
+                Back to home
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => window.location.href = "/ministries"}
+                className="w-full py-3.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] text-[var(--cream-on-dark)] font-bold text-[14px] transition-colors"
+              >
+                Browse ministries
+              </button>
+
+              {status === "rejected" && (
+                <button
+                  onClick={() => window.location.href = "/register-ministry"}
+                  className="w-full py-3.5 rounded-xl border border-[#E5E0D2] text-[14px] font-semibold text-[var(--body)] hover:border-[#3E1540]/40 hover:text-[var(--plum)] transition-colors"
+                >
+                  Register again
+                </button>
+              )}
+            </>
+          )}
 
           <button
             onClick={signOut}

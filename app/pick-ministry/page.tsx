@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase"
 import { getUserMinistries, setCurrentMinistry } from "@/app/actions/ministry"
 import { RingCrossLogo } from "@/app/home/components/shared"
 
@@ -11,6 +12,7 @@ const ROLE_LABEL: Record<string, string> = {
   admin: "Admin",
   leader: "Leader",
   member: "Member",
+  visitor: "Visitor",
 }
 
 export default function PickMinistryPage() {
@@ -32,6 +34,12 @@ export default function PickMinistryPage() {
     const { error: err } = await setCurrentMinistry(id)
     if (err) { setError(err); setSelecting(null); return }
     window.location.assign("/home")
+  }
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.assign("/login")
   }
 
   return (
@@ -100,6 +108,20 @@ export default function PickMinistryPage() {
             </button>
           ))}
         </div>
+
+        {/* Quiet exit — the logo is the only other way off this page. */}
+        <button
+          onClick={handleSignOut}
+          style={{
+            display: "block", margin: "28px auto 0", padding: "6px 10px",
+            background: "transparent", border: "none", cursor: "pointer",
+            fontSize: 13, color: "var(--muted-text)", fontFamily: "inherit",
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--plum)" }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--muted-text)" }}
+        >
+          Sign out
+        </button>
       </div>
     </div>
   )

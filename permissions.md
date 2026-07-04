@@ -132,7 +132,9 @@ The DG-dinner `reimbursement_forms` flow is **retired** — replaced by free-for
 | **Member invite code** | Anyone (private ministries only) | `member` |
 | **Staff invite code** | Pastors, deacons, elders | Chosen during join: `pastor` / `deacon` / `elder` |
 
-Public ministries have no member invite code (join via browse). If an admin-tier person joins via the member path, an existing admin can promote them in Settings → Members.
+Public ministries carry a member invite code too — codes work alongside browse-join (both assign `member`). If an admin-tier person joins via the member path, an existing admin can promote them in Settings → Members.
+
+**Member code visibility (2026-07-04):** any member of a ministry may READ its member invite code (`getMemberInviteCode`, member-gated) — surfaced on the My Ministries card so anyone can invite a friend. The **staff code stays admin-only** (`getMinistryCodes`, admin-gated). Regenerating either code remains admin-only.
 
 ---
 

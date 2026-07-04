@@ -822,6 +822,27 @@ export async function getMinistryCodes(ministryId: string): Promise<{
   return { inviteCode: data.invite_code ?? null, staffInviteCode: data.staff_invite_code ?? null, error: null }
 }
 
+// ─── Member: read the MEMBER invite code only ────────────────────────────────
+// Brian-approved rule change (2026-07-04): any member of a ministry may read its
+// member invite code to invite friends. The staff code stays admin-only — this
+// action NEVER selects it (getMinistryCodes above is the admin-gated path).
+export async function getMemberInviteCode(ministryId: string): Promise<{
+  inviteCode: string | null
+  error: string | null
+}> {
+  const authz = await requireSameMinistry(ministryId)
+  if (authz.error !== null) return { inviteCode: null, error: authz.error }
+
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from("ministries")
+    .select("invite_code")
+    .eq("id", ministryId)
+    .maybeSingle()
+  if (error || !data) return { inviteCode: null, error: error?.message ?? "Ministry not found." }
+  return { inviteCode: data.invite_code ?? null, error: null }
+}
+
 // ─── Admin: excommunicate a member (permanent ban — can never rejoin) ───────────
 export async function excommunicateMember(targetUserId: string): Promise<{ error: string | null }> {
   const supabase = await createClient()

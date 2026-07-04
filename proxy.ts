@@ -89,11 +89,13 @@ export async function proxy(request: NextRequest) {
     .eq('id', user.id)
     .maybeSingle()
 
-  // No ministry yet — allow join/onboarding/public paths, otherwise send to landing.
-  // Fresh registrants land on /onboarding straight from signup, so it stays open here.
+  // No ministry yet — allow join/onboarding/public paths; everything else goes to
+  // /join (the unified no-ministry destination: code entry + browse — actionable,
+  // unlike the marketing page). Fresh registrants land on /onboarding straight
+  // from signup, so it stays open here.
   if (!profile?.ministry_id) {
     if (!pathname.startsWith('/join') && !pathname.startsWith('/onboarding') && !isPublicPath) {
-      return NextResponse.redirect(new URL('/landing', request.url))
+      return NextResponse.redirect(new URL('/join', request.url))
     }
     return supabaseResponse
   }
@@ -149,16 +151,22 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/pick-ministry', request.url))
     }
 
-    if (!pathname.startsWith('/pending') && !pathname.startsWith('/landing') && pathname !== '/') {
+    // /join stays open — a pending registrant may want to join an existing
+    // ministry instead of waiting (previously they had to sign out first).
+    if (!pathname.startsWith('/pending') && !pathname.startsWith('/landing') && !pathname.startsWith('/join') && pathname !== '/') {
       return NextResponse.redirect(new URL('/pending', request.url))
     }
     return supabaseResponse
   }
 
+  // Rejected/inactive land on /pending (the ministry-status page renders a
+  // status-specific explanation + CTAs) — never a silent bounce to marketing.
   if (status === 'rejected') {
-    const allowedForRejected = pathname.startsWith('/landing') || pathname.startsWith('/join') || pathname.startsWith('/onboarding') || pathname === '/'
+    // /register-ministry must stay reachable — /pending's "Register again" CTA
+    // points there (its page then routes admin-tier founders to /onboarding).
+    const allowedForRejected = pathname.startsWith('/pending') || pathname.startsWith('/landing') || pathname.startsWith('/join') || pathname.startsWith('/onboarding') || pathname.startsWith('/register-ministry') || pathname === '/'
     if (!allowedForRejected) {
-      return NextResponse.redirect(new URL('/landing', request.url))
+      return NextResponse.redirect(new URL('/pending', request.url))
     }
     return supabaseResponse
   }
@@ -167,9 +175,9 @@ export async function proxy(request: NextRequest) {
   // /home — treat exactly like 'rejected' (only pending/rejected have their own
   // branches above; everything else that isn't 'active' lands here).
   if (status !== 'active') {
-    const allowedForInactive = pathname.startsWith('/landing') || pathname.startsWith('/join') || pathname.startsWith('/onboarding') || pathname === '/'
+    const allowedForInactive = pathname.startsWith('/pending') || pathname.startsWith('/landing') || pathname.startsWith('/join') || pathname.startsWith('/onboarding') || pathname.startsWith('/register-ministry') || pathname === '/'
     if (!allowedForInactive) {
-      return NextResponse.redirect(new URL('/landing', request.url))
+      return NextResponse.redirect(new URL('/pending', request.url))
     }
     return supabaseResponse
   }

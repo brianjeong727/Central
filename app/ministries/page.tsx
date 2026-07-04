@@ -4,10 +4,11 @@ import { Suspense, useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase"
-import { getUserMinistries, getPublicMinistries, joinMinistryById, joinMinistryByCode, setCurrentMinistry } from "@/app/actions/ministry"
+import { getUserMinistries, getPublicMinistries, joinMinistryById, joinMinistryByCode, setCurrentMinistry, getMemberInviteCode } from "@/app/actions/ministry"
 import { Spinner, RingCrossLogo } from "@/app/home/components/shared"
 import { MonogramChip } from "@/components/central/MonogramChip"
 import { PlanSubTabStrip } from "@/components/central/plan-sub-tab-strip"
+import { usePostJoinPickers, PostJoinPickerModals } from "@/app/join/post-join-pickers"
 
 const SANS  = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
@@ -76,6 +77,15 @@ function MinistriesContent() {
   const [joiningCode, setJoiningCode] = useState(false)
   const [codeError, setCodeError]     = useState<string | null>(null)
 
+  // Member invite codes per my-ministry (member-visible by rule change 2026-07-04),
+  // so members can share their ministry's code without asking an admin.
+  const [memberCodes, setMemberCodes] = useState<Record<string, string>>({})
+  const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null)
+
+  // Gender + school pickers — shared with /join so every join path enforces
+  // the same profile-completeness flow.
+  const pickers = usePostJoinPickers()
+
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -86,6 +96,13 @@ function MinistriesContent() {
           if (data && data.length > 0) {
             setMyMinistries(data)
             setMyIds(new Set(data.map((m) => m.id)))
+            // Fetch each ministry's member code (fails silently per-ministry).
+            data.forEach(async (m) => {
+              try {
+                const { inviteCode: code } = await getMemberInviteCode(m.id)
+                if (code) setMemberCodes(prev => ({ ...prev, [m.id]: code }))
+              } catch { /* ignore */ }
+            })
           }
           setLoadingMine(false)
         })
@@ -95,6 +112,14 @@ function MinistriesContent() {
     const urlTab = new URLSearchParams(window.location.search).get("tab") as Tab | null
     if (urlTab && ["browse", "code"].includes(urlTab)) setTab(urlTab)
   }, [])
+
+  async function copyMemberCode(id: string, code: string) {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopiedCodeId(id)
+      setTimeout(() => setCopiedCodeId(c => (c === id ? null : c)), 1600)
+    } catch { /* clipboard unavailable — no-op */ }
+  }
 
   function changeTab(t: Tab) {
     setTab(t)
@@ -124,33 +149,55 @@ function MinistriesContent() {
     window.location.assign("/home")
   }
 
-  async function handleJoin(ministry: PublicMinistry) {
-    if (!isLoggedIn) { window.location.assign("/signup"); return }
+  async function doJoin(ministry: PublicMinistry) {
     setJoiningId(ministry.id)
     setJoinError(null)
     const { error } = await joinMinistryById(ministry.id)
     if (error) { setJoinError(error); setJoiningId(null); return }
-    window.location.assign("/home")
+    const shown = await pickers.maybeShowSchoolPicker(() => window.location.assign("/home"))
+    if (shown) setJoiningId(null)
   }
 
-  async function handleCodeJoin(e: React.FormEvent) {
-    e.preventDefault()
-    if (!isLoggedIn) { window.location.assign("/login?intent=join"); return }
-    if (!inviteCode.trim()) return
+  async function handleJoin(ministry: PublicMinistry) {
+    if (!isLoggedIn) { window.location.assign("/signup"); return }
+    if (pickers.genderGate(() => doJoin(ministry))) return
+    doJoin(ministry)
+  }
+
+  async function doCodeJoin() {
     setJoiningCode(true)
     setCodeError(null)
     try {
-      const { error } = await joinMinistryByCode(inviteCode)
+      const { error, isStaffCode } = await joinMinistryByCode(inviteCode)
+      if (isStaffCode) {
+        // Staff codes need the staff-role picker, which lives on /join. Hand off
+        // WITHOUT the code in the URL — a staff code is a pastor-granting
+        // credential and must not land in browser history / server logs.
+        window.location.assign("/join?tab=code")
+        return
+      }
       if (error) { setCodeError(error); setJoiningCode(false); return }
-      window.location.assign("/home")
+      const shown = await pickers.maybeShowSchoolPicker(() => window.location.assign("/home"))
+      if (shown) setJoiningCode(false)
     } catch {
       setCodeError("Something went wrong. Please try again.")
       setJoiningCode(false)
     }
   }
 
+  async function handleCodeJoin(e: React.FormEvent) {
+    e.preventDefault()
+    if (!isLoggedIn) { window.location.assign("/login?intent=join"); return }
+    if (!inviteCode.trim()) return
+    if (pickers.genderGate(doCodeJoin)) return
+    doCodeJoin()
+  }
+
   return (
     <div style={{ minHeight: "100svh", background: "#FDFCF8", fontFamily: SANS, color: "var(--ink)" }}>
+
+      {/* ── Gender + school picker modals (shared with /join) ── */}
+      <PostJoinPickerModals pickers={pickers} />
 
       {/* ── Top bar ── */}
       <div style={{
@@ -245,6 +292,26 @@ function MinistriesContent() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 16, fontWeight: 500, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
                       <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 3 }}>{m.university}</div>
+                      {/* Member invite code — visible to every member so anyone can invite a friend. */}
+                      {memberCodes[m.id] && (
+                        <button
+                          type="button"
+                          onClick={() => copyMemberCode(m.id, memberCodes[m.id])}
+                          title="Copy invite code"
+                          style={{
+                            display: "inline-flex", alignItems: "center", gap: 8,
+                            marginTop: 6, padding: 0, background: "transparent", border: "none",
+                            cursor: "pointer", fontFamily: SANS,
+                          }}
+                        >
+                          <span style={{ ...mono, fontSize: 12, letterSpacing: "2px", color: "var(--ink)", textTransform: "none" }}>
+                            {memberCodes[m.id]}
+                          </span>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: "var(--plum)" }}>
+                            {copiedCodeId === m.id ? "Copied" : "Copy invite code"}
+                          </span>
+                        </button>
+                      )}
                     </div>
                     <div style={{ marginLeft: "auto", flexShrink: 0 }}>
                       <button onClick={() => handleGoToMinistry(m.id)} disabled={switchingId === m.id} style={{
