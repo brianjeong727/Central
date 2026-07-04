@@ -190,7 +190,8 @@ export default function LandingPage() {
   }
 
   function handleOpenApp() {
-    if (ministryCount === 0) router.push("/ministries")
+    // No ministry → /join (code entry + browse — the unified no-ministry destination)
+    if (ministryCount === 0) router.push("/join")
     else if (ministryCount !== null && ministryCount > 1) router.push("/pick-ministry")
     else router.push("/home")
   }
@@ -317,7 +318,7 @@ export default function LandingPage() {
               ) : (
                 <>
                   <button onClick={() => router.push("/register-ministry")} className="cl-btn-primary" style={{ height: 54, padding: "0 30px", borderRadius: 999, fontSize: 15, fontWeight: 500, background: PLUM2, color: CREAM, border: "none", cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}>
-                    Open app
+                    Register your ministry
                   </button>
                   <a href="/ministries" className="cl-ghost" style={{ fontSize: 15, fontWeight: 500, color: PLUM2, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 7 }}>
                     Find a ministry <span>→</span>

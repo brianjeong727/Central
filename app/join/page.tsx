@@ -5,10 +5,10 @@ import Link from "next/link"
 import { Search } from "lucide-react"
 import { joinMinistryByCode, getPublicMinistries, joinMinistryById, getUserMinistries, setCurrentMinistry } from "@/app/actions/ministry"
 import { Spinner } from "@/app/home/components/shared"
-import { createClient } from "@/lib/supabase"
 import { MonogramChip } from "@/components/central/MonogramChip"
 import { PlanSubTabStrip } from "@/components/central/plan-sub-tab-strip"
 import { getInitials } from "@/app/home/utils"
+import { usePostJoinPickers, PostJoinPickerModals, ModalAction } from "./post-join-pickers"
 
 // ─── design tokens ──────────────────────────────────────────────
 const SANS = "var(--font-inter), system-ui, sans-serif"
@@ -45,28 +45,7 @@ function Wordmark({ tone = "ink" }: { tone?: "ink" | "plum" }) {
   )
 }
 
-// ─── modal action button ─────────────────────────────────────────
-function ModalAction({ children, onClick, disabled }: {
-  children: React.ReactNode; onClick?: () => void; disabled?: boolean
-}) {
-  return (
-    <button type="button" onClick={disabled ? undefined : onClick} disabled={disabled} style={{
-      width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-      background: disabled ? "var(--line-2)" : "var(--plum-2)",
-      color: disabled ? "#A09A8C" : "var(--cream-panel)",
-      fontSize: 15, fontWeight: 500, fontFamily: SANS,
-      cursor: disabled ? "not-allowed" : "pointer",
-      transition: "background .15s ease",
-    }}>{children}</button>
-  )
-}
-
 // ─── data ────────────────────────────────────────────────────────
-const GENDERS = [
-  { value: "male",   label: "Male" },
-  { value: "female", label: "Female" },
-] as const
-
 const SIZE_LABELS: Record<string, string> = {
   small: "Under 50",
   medium: "50–100",
@@ -77,9 +56,18 @@ type Ministry = { id: string; name: string; university: string; size: string; lo
 type Tab = "browse" | "code"
 
 function JoinContent() {
-  const [tab, setTab] = useState<Tab>("browse")
+  // Lazy-init from URL (SSR-safe): /ministries hands staff codes off to
+  // /join?tab=code (code deliberately NOT in the URL — it's a credential).
+  // ?code= is still honored for future member-invite links.
+  const [tab, setTab] = useState<Tab>(() => {
+    if (typeof window === "undefined") return "browse"
+    return new URLSearchParams(window.location.search).get("tab") === "code" ? "code" : "browse"
+  })
 
-  const [inviteCode, setInviteCode] = useState("")
+  const [inviteCode, setInviteCode] = useState(() => {
+    if (typeof window === "undefined") return ""
+    return (new URLSearchParams(window.location.search).get("code") ?? "").toUpperCase()
+  })
   const [joining, setJoining] = useState(false)
   const [codeError, setCodeError] = useState<string | null>(null)
 
@@ -99,29 +87,12 @@ function JoinContent() {
   const [joiningStaff, setJoiningStaff] = useState(false)
   const [staffRoleError, setStaffRoleError] = useState<string | null>(null)
 
-  const [needsGender, setNeedsGender] = useState(false)
-  const [gender, setGender] = useState<string>("")
-  const [savingGender, setSavingGender] = useState(false)
-  const [genderError, setGenderError] = useState<string | null>(null)
-  const [pendingAction, setPendingAction] = useState<"code" | "browse" | null>(null)
-
-  const [needsSchool, setNeedsSchool] = useState(false)
-  const [schoolOptions, setSchoolOptions] = useState<{ id: string; name: string; abbreviation: string }[]>([])
-  const [selectedSchoolId, setSelectedSchoolId] = useState<string>("")
-  const [savingSchool, setSavingSchool] = useState(false)
-  const [schoolError, setSchoolError] = useState<string | null>(null)
-  const [pendingSchoolRedirect, setPendingSchoolRedirect] = useState<(() => void) | null>(null)
+  // Gender + school pickers — shared with /ministries (one implementation).
+  const pickers = usePostJoinPickers()
 
   useEffect(() => {
     getUserMinistries().then(({ data }) => {
       if (data) setMyMinistryIds(new Set(data.map((m) => m.id)))
-    })
-    const supabase = createClient()
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return
-      const { data: profile } = await supabase
-        .from("profiles").select("gender").eq("id", user.id).single()
-      if (profile && !profile.gender) setNeedsGender(true)
     })
   }, [])
 
@@ -140,21 +111,6 @@ function JoinContent() {
     return () => clearTimeout(t)
   }, [tab, search, fetchMinistries])
 
-  async function checkAndShowSchoolPicker(afterFn: () => void) {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { afterFn(); return }
-    const { data: profile } = await supabase.from("profiles").select("ministry_id, school_id").eq("id", user.id).maybeSingle()
-    if (!profile?.ministry_id || profile?.school_id) { afterFn(); return }
-    const { data: schools } = await supabase.from("ministry_schools").select("id, name, abbreviation").eq("ministry_id", profile.ministry_id).order("sort_order")
-    if (!schools || schools.length === 0) { afterFn(); return }
-    setSchoolOptions(schools)
-    setNeedsSchool(true)
-    setPendingSchoolRedirect(() => afterFn)
-    setJoining(false)
-    setConfirming(false)
-  }
-
   async function doCodeJoin() {
     setJoining(true)
     setCodeError(null)
@@ -167,7 +123,8 @@ function JoinContent() {
         return
       }
       if (error) { setCodeError(error); setJoining(false); return }
-      await checkAndShowSchoolPicker(() => window.location.assign("/home"))
+      const shown = await pickers.maybeShowSchoolPicker(() => window.location.assign("/home"))
+      if (shown) setJoining(false)
     } catch {
       setCodeError("Something went wrong. Please try again.")
       setJoining(false)
@@ -182,7 +139,8 @@ function JoinContent() {
       const { error } = await joinMinistryByCode(inviteCode, staffRole)
       if (error) { setStaffRoleError(error); setJoiningStaff(false); return }
       setNeedsStaffRole(false)
-      await checkAndShowSchoolPicker(() => window.location.assign("/home"))
+      const shown = await pickers.maybeShowSchoolPicker(() => window.location.assign("/home"))
+      if (shown) setJoiningStaff(false)
     } catch {
       setStaffRoleError("Something went wrong. Please try again.")
       setJoiningStaff(false)
@@ -192,7 +150,7 @@ function JoinContent() {
   async function handleCodeJoin(e: React.FormEvent) {
     e.preventDefault()
     if (!inviteCode.trim()) return
-    if (needsGender) { setPendingAction("code"); return }
+    if (pickers.genderGate(doCodeJoin)) return
     doCodeJoin()
   }
 
@@ -209,44 +167,14 @@ function JoinContent() {
     setConfirmError(null)
     const { error } = await joinMinistryById(selected.id)
     if (error) { setConfirmError(error); setConfirming(false); return }
-    await checkAndShowSchoolPicker(() => window.location.assign("/home"))
-  }
-
-  async function handleSaveSchool() {
-    if (!selectedSchoolId) return
-    setSavingSchool(true)
-    setSchoolError(null)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSchoolError("Not signed in."); setSavingSchool(false); return }
-    const schoolId = selectedSchoolId === "other" ? null : selectedSchoolId
-    const { error } = await supabase.from("profiles").update({ school_id: schoolId }).eq("id", user.id)
-    if (error) { setSchoolError("Failed to save. Try again."); setSavingSchool(false); return }
-    setSavingSchool(false)
-    setNeedsSchool(false)
-    if (pendingSchoolRedirect) pendingSchoolRedirect()
+    const shown = await pickers.maybeShowSchoolPicker(() => window.location.assign("/home"))
+    if (shown) setConfirming(false)
   }
 
   async function handleBrowseJoin() {
     if (!selected) return
-    if (needsGender) { setPendingAction("browse"); return }
+    if (pickers.genderGate(doBrowseJoin)) return
     doBrowseJoin()
-  }
-
-  async function handleSaveGender() {
-    if (!gender) return
-    setSavingGender(true)
-    setGenderError(null)
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setGenderError("Not signed in."); setSavingGender(false); return }
-    const { error } = await supabase.from("profiles").update({ gender }).eq("id", user.id)
-    if (error) { setGenderError("Failed to save. Try again."); setSavingGender(false); return }
-    setNeedsGender(false)
-    setSavingGender(false)
-    if (pendingAction === "code") { setPendingAction(null); doCodeJoin() }
-    else if (pendingAction === "browse") { setPendingAction(null); doBrowseJoin() }
-    else setPendingAction(null)
   }
 
   const joinLabel = switching ? "Switching…" : confirming ? "Joining…"
@@ -256,67 +184,8 @@ function JoinContent() {
 
   return (
     <>
-      {/* ── School picker modal ── */}
-      {needsSchool && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
-          background: "rgba(19,16,26,0.6)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px",
-        }}>
-          <div style={{ background: "var(--cream-panel)", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
-            <div style={mono}>One more thing</div>
-            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "var(--ink)", margin: "6px 0", fontWeight: 400 }}>
-              Which school?
-            </h2>
-            <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 20, lineHeight: 1.5 }}>
-              This helps us organize groups and events by campus.
-            </p>
-            {schoolError && (
-              <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "var(--plum)", marginBottom: 14 }}>
-                {schoolError}
-              </div>
-            )}
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
-              {schoolOptions.map(s => {
-                const active = selectedSchoolId === s.id
-                return (
-                  <button key={s.id} type="button" onClick={() => setSelectedSchoolId(s.id)} style={{
-                    padding: "12px 16px", borderRadius: 12, textAlign: "left", cursor: "pointer",
-                    border: `1px solid ${active ? "var(--plum-2)" : "var(--line-2)"}`,
-                    background: active ? "var(--plum-2)" : "var(--cream-panel)",
-                    transition: "all .12s ease",
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                  }}>
-                    <span style={{ fontFamily: SERIF, fontSize: 18, color: active ? "var(--cream-panel)" : "var(--ink)" }}>
-                      {s.name}
-                    </span>
-                    <span style={{ fontSize: 12, color: active ? "rgba(251,248,242,0.65)" : "var(--muted-text)" }}>
-                      {s.abbreviation}
-                    </span>
-                  </button>
-                )
-              })}
-              <button type="button" onClick={() => setSelectedSchoolId("other")} style={{
-                padding: "12px 16px", borderRadius: 12, textAlign: "left", cursor: "pointer",
-                border: `1px solid ${selectedSchoolId === "other" ? "var(--plum-2)" : "var(--line-2)"}`,
-                background: selectedSchoolId === "other" ? "var(--plum-2)" : "var(--cream-panel)",
-                transition: "all .12s ease",
-              }}>
-                <span style={{ fontFamily: SERIF, fontSize: 18, color: selectedSchoolId === "other" ? "var(--cream-panel)" : "var(--ink)" }}>
-                  Other / Not a student
-                </span>
-              </button>
-            </div>
-            <ModalAction onClick={handleSaveSchool} disabled={!selectedSchoolId || savingSchool}>
-              {savingSchool ? "Saving…" : "Continue"}
-            </ModalAction>
-            <button type="button" onClick={() => { setNeedsSchool(false); if (pendingSchoolRedirect) pendingSchoolRedirect() }}
-              style={{ width: "100%", background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
-              Skip for now
-            </button>
-          </div>
-        </div>
-      )}
+      {/* ── Gender + school picker modals (shared with /ministries) ── */}
+      <PostJoinPickerModals pickers={pickers} />
 
       {/* ── Staff role picker modal ── */}
       {needsStaffRole && (
@@ -362,54 +231,6 @@ function JoinContent() {
               {joiningStaff ? "Joining…" : `Join as ${staffRole || "…"}`}
             </ModalAction>
             <button type="button" onClick={() => { setNeedsStaffRole(false); setStaffRole(""); setStaffRoleError(null) }}
-              style={{ width: "100%", background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Gender picker modal ── */}
-      {needsGender && pendingAction !== null && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
-          background: "rgba(19,16,26,0.6)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px",
-        }}>
-          <div style={{ background: "var(--cream-panel)", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
-            <div style={mono}>One more thing</div>
-            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "var(--ink)", margin: "6px 0", fontWeight: 400 }}>
-              What&apos;s your gender?
-            </h2>
-            <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 20, lineHeight: 1.5 }}>
-              Helps us place you in the right small group.
-            </p>
-            {genderError && (
-              <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "var(--plum)", marginBottom: 14 }}>
-                {genderError}
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-              {GENDERS.map(({ value, label }) => {
-                const active = gender === value
-                return (
-                  <button key={value} type="button" onClick={() => setGender(value)} style={{
-                    flex: 1, padding: "10px 16px", borderRadius: 999,
-                    border: `1px solid ${active ? "var(--plum)" : "var(--line-2)"}`,
-                    background: active ? "var(--plum-2)" : "var(--cream-panel)",
-                    color: active ? "var(--cream-panel)" : "var(--body)",
-                    fontSize: 14, fontWeight: active ? 500 : 400, cursor: "pointer",
-                    transition: "all .12s ease", fontFamily: SANS,
-                  }}>
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
-            <ModalAction onClick={handleSaveGender} disabled={!gender || savingGender}>
-              {savingGender ? "Saving…" : "Continue"}
-            </ModalAction>
-            <button type="button" onClick={() => setPendingAction(null)}
               style={{ width: "100%", background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
               Cancel
             </button>
@@ -553,7 +374,7 @@ function JoinContent() {
               <div style={{ flexShrink: 0, paddingTop: 14, paddingBottom: 20, borderTop: "1px solid var(--line)" }}>
                 <p style={{ textAlign: "center", fontSize: 14, marginBottom: 12, color: "var(--body)" }}>
                   Starting a new ministry?{" "}
-                  <a href="/onboarding" style={{ fontWeight: 600, color: "var(--plum-2)", textDecoration: "none" }}>Register here</a>
+                  <a href="/register-ministry" style={{ fontWeight: 600, color: "var(--plum-2)", textDecoration: "none" }}>Register here</a>
                 </p>
                 <button onClick={handleBrowseJoin} disabled={!selected || confirming || !!switching} style={{
                   width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
@@ -625,7 +446,7 @@ function JoinContent() {
 
               <p style={{ fontSize: 13, color: "var(--muted-text)" }}>
                 Starting a new ministry?{" "}
-                <a href="/onboarding" style={{ fontWeight: 600, color: "var(--plum-2)", textDecoration: "none" }}>Register here</a>
+                <a href="/register-ministry" style={{ fontWeight: 600, color: "var(--plum-2)", textDecoration: "none" }}>Register here</a>
               </p>
             </form>
           )}
