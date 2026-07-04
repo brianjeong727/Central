@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { Check, X, Clock, Users, MapPin, Building2, LogOut } from "lucide-react"
 import { getPendingMinistries, approveMinistry, rejectMinistry } from "@/app/actions/ministry"
 import { createClient } from "@/lib/supabase"
+import { PlanLineIcon } from "@/app/home/components/shared"
+import { teamIconKey } from "@/app/home/workspace-presets"
 
 type Ministry = {
   id: string
@@ -168,7 +170,8 @@ export default function AdminPage() {
                   <div className="flex flex-wrap gap-2">
                     {m.teams.map((t, i) => (
                       <span key={i} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--body-bg)] border border-[var(--line-2)] text-[12px] text-[var(--ink)]">
-                        {t.icon} {t.name}
+                        <PlanLineIcon iconKey={teamIconKey({ name: t.name })} bg="transparent" fg="var(--plum)" size={14} radius={0} />
+                        {t.name}
                       </span>
                     ))}
                   </div>

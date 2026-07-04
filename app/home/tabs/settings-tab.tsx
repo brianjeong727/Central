@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
-import { EYEBROW_STYLE } from "../components/shared"
+import { EYEBROW_STYLE, PlanLineIcon } from "../components/shared"
+import { teamIconKey } from "../workspace-presets"
 import {
   updateMinistryPublic,
   updateMinistryInfo,
@@ -50,7 +51,7 @@ type ActiveSettingsTab = "general" | "people" | "governance" | "automations" | "
 interface GovTeamRow {
   id: string
   name: string
-  icon: string | null
+  team_type: string | null
   admin_access: "none" | "view" | "write"
 }
 
@@ -257,7 +258,7 @@ export function SettingsTab({
         supabase.from("ministry_schools").select("id, name, abbreviation, sort_order").eq("ministry_id", ministryId).order("sort_order"),
         getReceiptLimits(ministryId),
         getHomeVerses(ministryId),
-        supabase.from("teams").select("id, name, icon, admin_access").eq("ministry_id", ministryId).order("name"),
+        supabase.from("teams").select("id, name, team_type, admin_access").eq("ministry_id", ministryId).order("name"),
         getMinistryCodes(ministryId),
       ])
 
@@ -283,7 +284,7 @@ export function SettingsTab({
           setGovernanceSettings({ all_admins: gov.all_admins, roster_ids: Array.isArray(gov.roster_ids) ? gov.roster_ids : [] })
         }
       }
-      setGovTeams((teamRows ?? []).map((t) => ({ id: t.id, name: t.name, icon: t.icon, admin_access: (t.admin_access ?? "view") as "none" | "view" | "write" })))
+      setGovTeams((teamRows ?? []).map((t) => ({ id: t.id, name: t.name, team_type: t.team_type ?? null, admin_access: (t.admin_access ?? "view") as "none" | "view" | "write" })))
       setSchools((schoolRows ?? []) as { id: string; name: string; abbreviation: string; sort_order: number }[])
       setReceiptLimits(limitsRes.data)
       setMembers(profiles ?? [])
@@ -1147,7 +1148,9 @@ export function SettingsTab({
                     <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "20px 22px", textAlign: "center" }}>No teams yet.</p>
                   ) : govTeams.map((team, i) => (
                     <div key={team.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < govTeams.length - 1 ? "1px solid var(--line-3)" : "none" }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{team.icon ?? "•"}</div>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <PlanLineIcon iconKey={teamIconKey(team)} bg="transparent" fg="var(--plum)" size={20} radius={0} />
+                      </div>
                       <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{team.name}</div>
                       <div style={{ display: "inline-flex", border: "1px solid var(--line-2)", borderRadius: 999, padding: 2, background: "var(--ivory)", flexShrink: 0 }}>
                         {(["none", "view", "write"] as const).map(opt => {
