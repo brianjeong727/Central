@@ -2413,6 +2413,11 @@ export function PlanTab({
   })
   const govWrite = activeTeamAccess === "gov-write"
   const govView = activeTeamAccess === "gov-view"
+  // Deep-link gate: a team workspace only renders when the caller has SOME
+  // access to it (member, gov-write, or gov-view) — `?team=<id>` alone must not
+  // mount a workspace the user can't see. Mirrors the finance branch's
+  // financeCanAccess gate.
+  const activeTeamAllowed = activeTeamAccess !== "none"
 
   // Single classifier — team_type + name only, no permission probes. See
   // app/home/team-type.ts for precedence and rationale. This is the only thing
@@ -2726,7 +2731,7 @@ export function PlanTab({
             canAccessReimbursements={financeCanEdit}
             readOnly={govView}
           />
-        ) : teamKind === "dgPraise" && activeTeamId ? (
+        ) : teamKind === "dgPraise" && activeTeamId && activeTeamAllowed ? (
           <div className="px-14 py-7">
             <DgPraiseTeamTab
               teamId={activeTeamId}
@@ -2735,7 +2740,7 @@ export function PlanTab({
               canManage={canManageWorship}
             />
           </div>
-        ) : teamKind === "oneTime" && activeTeamId ? (
+        ) : teamKind === "oneTime" && activeTeamId && activeTeamAllowed ? (
           <div className="px-14 py-7">
             <OneTimeTeamTab
               teamId={activeTeamId}
@@ -2744,11 +2749,11 @@ export function PlanTab({
               canManage={canManageWorship}
             />
           </div>
-        ) : teamKind === "tech" ? (
+        ) : teamKind === "tech" && activeTeamAllowed ? (
           <div className="px-14 py-7">
             <TechTeamTab ministryId={ministryId} userId={userId} canManage={canManageWorship} />
           </div>
-        ) : teamKind === "praise" && activeTeamId ? (
+        ) : teamKind === "praise" && activeTeamId && activeTeamAllowed ? (
           <PraiseTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
@@ -2756,7 +2761,7 @@ export function PlanTab({
             canManage={canManageWorship}
             canManageSchedule={canManageSchedule}
           />
-        ) : teamKind === "studentOrg" ? (
+        ) : teamKind === "studentOrg" && activeTeamAllowed ? (
           <StudentOrgTeamHome
               teamId={activeTeamId}
               teamName={activeTeamName}
@@ -2777,7 +2782,7 @@ export function PlanTab({
               onCalEventsChange={evs => onStudentOrgCalEventsChange?.(evs)}
               onEditEvent={() => setShowEditEvent(true)}
             />
-        ) : teamKind === "dgl" && activeTeamId ? (
+        ) : teamKind === "dgl" && activeTeamId && activeTeamAllowed ? (
           <SmallGroupLeadersTab
               teamId={activeTeamId}
               ministryId={ministryId}
@@ -2883,23 +2888,23 @@ export function PlanTab({
             </span>
           </div>
         )}
-        {teamKind === "dgPraise" && activeTeamId ? (
+        {teamKind === "dgPraise" && activeTeamId && activeTeamAllowed ? (
           <DgPraiseTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
             userId={userId}
             canManage={canManageWorship}
           />
-        ) : teamKind === "oneTime" && activeTeamId ? (
+        ) : teamKind === "oneTime" && activeTeamId && activeTeamAllowed ? (
           <OneTimeTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
             userId={userId}
             canManage={canManageWorship}
           />
-        ) : teamKind === "tech" ? (
+        ) : teamKind === "tech" && activeTeamAllowed ? (
           <TechTeamTab ministryId={ministryId} userId={userId} canManage={canManageWorship} />
-        ) : teamKind === "praise" && activeTeamId ? (
+        ) : teamKind === "praise" && activeTeamId && activeTeamAllowed ? (
           <PraiseTeamTab
             teamId={activeTeamId}
             ministryId={ministryId}
@@ -2907,7 +2912,7 @@ export function PlanTab({
             canManage={canManageWorship}
             canManageSchedule={canManageSchedule}
           />
-        ) : teamKind === "studentOrg" ? (
+        ) : teamKind === "studentOrg" && activeTeamAllowed ? (
           <StudentOrgTeamHome
             teamId={activeTeamId}
             teamName={activeTeamName}
@@ -2923,7 +2928,7 @@ export function PlanTab({
             onPlanningEventChange={ev => onStudentOrgPlanningEventChange?.(ev)}
             onOpenChat={onOpenChat}
           />
-        ) : teamKind === "dgl" && activeTeamId ? (
+        ) : teamKind === "dgl" && activeTeamId && activeTeamAllowed ? (
           <SmallGroupLeadersTab
             teamId={activeTeamId}
             ministryId={ministryId}

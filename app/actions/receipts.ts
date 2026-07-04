@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
 import { computeFinanceCapability } from "./finance-auth"
+import { requireTeamMemberOrAdmin, requireSameMinistry } from "./authz"
 
 export interface ReceiptLimit {
   id: string
@@ -45,19 +46,44 @@ export async function submitReceipt(params: {
   receiptImageUrl: string | null
   notes: string
 }): Promise<{ data: Receipt | null; error: string | null }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { data: null, error: "Not authenticated" }
+  // Auth gate. permissions.md: "any team member of that team can submit". A
+  // receipt is normally filed under a team → require team membership (or
+  // admin-tier). When no team is attached (legacy/finance path), fall back to
+  // same-ministry. Both arms assert the team/caller belong to the ministry.
+  const authz = params.teamId
+    ? await requireTeamMemberOrAdmin(params.teamId)
+    : await requireSameMinistry(params.ministryId)
+  if (authz.error !== null) return { data: null, error: authz.error }
+  // Reject a mismatched client-supplied ministryId even on the team arm.
+  if (params.ministryId !== authz.ministryId) return { data: null, error: "Not authorized." }
 
-  const { data: profile } = await supabase.from("profiles").select("name").eq("id", user.id).single()
+  const supabase = await createClient()
+  const admin = createAdminClient()
+
+  // If a category is supplied it must belong to the target team (and thus this
+  // ministry) — blocks tagging a receipt with a foreign category.
+  if (params.categoryId) {
+    if (!params.teamId) return { data: null, error: "Not authorized." }
+    const { data: cat } = await admin
+      .from("receipt_categories")
+      .select("id")
+      .eq("id", params.categoryId)
+      .eq("team_id", params.teamId)
+      .eq("ministry_id", authz.ministryId)
+      .maybeSingle()
+    if (!cat) return { data: null, error: "Not authorized." }
+  }
+
+  const { data: profile } = await supabase.from("profiles").select("name").eq("id", authz.userId).single()
 
   const { data, error } = await supabase
     .from("receipts")
     .insert({
-      ministry_id: params.ministryId,
+      ministry_id: authz.ministryId,
       team_id: params.teamId ?? null,
       category_id: params.categoryId ?? null,
-      submitted_by: user.id,
+      // submitted_by comes from the verified session, never a client param.
+      submitted_by: authz.userId,
       submitted_by_name: (profile as { name?: string } | null)?.name ?? null,
       event_name: params.eventName || null,
       category: params.category,
@@ -73,22 +99,6 @@ export async function submitReceipt(params: {
 
   if (error) return { data: null, error: error.message }
   return { data: data as Receipt, error: null }
-}
-
-export async function updateReceiptStatus(params: {
-  receiptId: string
-  status: string
-}): Promise<{ error: string | null }> {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: "Not authenticated" }
-
-  const { error } = await supabase
-    .from("receipts")
-    .update({ status: params.status, reviewed_by: user.id, reviewed_at: new Date().toISOString() })
-    .eq("id", params.receiptId)
-
-  return { error: error?.message ?? null }
 }
 
 // ── Reimbursement approval inbox + two-step (treasurer → president) workflow ──────
@@ -390,6 +400,10 @@ export async function exportReceiptsCSV(ministryId: string): Promise<{ csv: stri
 }
 
 export async function getReceiptLimits(ministryId: string): Promise<{ data: ReceiptLimit[]; error: string | null }> {
+  // Read gate: caller must belong to this ministry. Empty array on deny.
+  const authz = await requireSameMinistry(ministryId)
+  if (authz.error !== null) return { data: [], error: null }
+
   const supabase = await createClient()
   const { data, error } = await supabase
     .from("receipt_limits")

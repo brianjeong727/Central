@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
+import { requireSameMinistry, isAdminTier } from "./authz"
 import { autoAddUserToChats, ensureMinistryChats } from "./auto-chats"
 import { presetById } from "@/app/home/workspace-presets"
 
@@ -78,7 +79,14 @@ export async function joinMinistryByCode(
     return { ministryName: ministry.name, error: null, isStaffCode: true }
   }
 
-  const role = isStaff ? (adminRole as string) : "member"
+  // Validated allowlist — the staff code may only grant pastor/deacon/elder
+  // (permissions.md § Join Codes). Never pass the caller-supplied role through.
+  const ALLOWED_STAFF_ROLES = ["pastor", "deacon", "elder"]
+  if (isStaff && !ALLOWED_STAFF_ROLES.includes((adminRole ?? "").toLowerCase())) {
+    return { ministryName: null, error: "Invalid staff role" }
+  }
+
+  const role = isStaff ? (adminRole as string).toLowerCase() : "member"
 
   const { data: updatedRows, error: updateErr } = await admin
     .from("profiles")
@@ -555,6 +563,10 @@ export async function updateMemberRole(targetUserId: string, newRole: "visitor" 
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return { error: "Not authenticated." }
 
+  // Self-target guard (mirrors removeMember/excommunicateMember) — a lone admin
+  // must not be able to self-demote and lock the ministry out.
+  if (targetUserId === user.id) return { error: "You cannot change your own role." }
+
   const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
   if (!profile?.ministry_id) return { error: "No ministry found." }
   if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { error: "Only admins can change member roles." }
@@ -578,7 +590,14 @@ export async function removeMember(targetUserId: string): Promise<{ error: strin
 
   const admin = createAdminClient()
   const { error } = await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
-  return { error: error?.message ?? null }
+  if (error) return { error: error.message }
+
+  // Revoke the membership record too (mirrors excommunicateMember/selfLeaveMinistry) —
+  // otherwise the removed member can re-enter via setCurrentMinistry, which restores
+  // their stale role from user_ministries.
+  await admin.from("user_ministries").delete().eq("user_id", targetUserId).eq("ministry_id", profile.ministry_id)
+
+  return { error: null }
 }
 
 // ─── Admin: archive ministry ─────────────────────────────────────────────────
@@ -769,8 +788,26 @@ export async function runDepartedMemberCleanup(ministryId: string): Promise<{ cl
 // Never downgrades admins or existing leaders.
 export async function elevateToLeader(userIds: string[], ministryId: string): Promise<{ error: string | null }> {
   if (userIds.length === 0) return { error: null }
+
+  // Caller must belong to this ministry AND be admin-tier or a team manager
+  // (president / can_manage_team) — the only people who can add team members,
+  // which is the sole legitimate trigger for this elevation.
+  const authz = await requireSameMinistry(ministryId)
+  if (authz.error !== null) return { error: authz.error }
+
   try {
     const admin = createAdminClient()
+
+    if (!isAdminTier(authz.role)) {
+      const { data: managerRows } = await admin
+        .from("team_members")
+        .select("team_id, teams!inner(ministry_id), team_roles!role_id(is_president, permissions)")
+        .eq("user_id", authz.userId)
+        .eq("teams.ministry_id", ministryId)
+      const isTeamManager = ((managerRows ?? []) as { team_roles: { is_president?: boolean; permissions?: string[] } | null }[])
+        .some(r => r.team_roles?.is_president || (r.team_roles?.permissions ?? []).includes("can_manage_team"))
+      if (!isTeamManager) return { error: "Not authorized." }
+    }
     const { error } = await admin
       .from("profiles")
       .update({ role: "leader" })
