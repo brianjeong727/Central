@@ -2,7 +2,7 @@ import { ReactNode, CSSProperties } from "react"
 import { EYEBROW_STYLE } from "@/app/home/components/shared"
 
 interface SectionHeaderProps {
-  eyebrow: string
+  eyebrow?: string
   title: string
   titleSize?: number
   action?: ReactNode
@@ -13,7 +13,7 @@ export function SectionHeader({ eyebrow, title, titleSize = 28, action, style }:
   return (
     <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", ...style }}>
       <div>
-        <div style={EYEBROW_STYLE}>{eyebrow}</div>
+        {eyebrow && <div style={EYEBROW_STYLE}>{eyebrow}</div>}
         <h2
           style={{
             fontFamily: "var(--serif)",

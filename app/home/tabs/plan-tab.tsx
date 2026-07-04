@@ -34,7 +34,7 @@ import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamCh
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
-import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, HeaderActionButton, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
+import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
@@ -1507,46 +1507,17 @@ export function StudentOrgTeamHome({
         </div>
       )}
 
-      {/* Desktop section header — shared TabPageHeader + PageTitle (suppressed when a note is open) */}
-      {isDesktopView && !meetingNoteOpen && (() => {
-        const sectionMeta: Record<string, string> = {
-          General: "General", "Meeting Notes": "Meeting Notes", Events: "Events",
-          Resources: "Resources", Groups: "Groups", Rotations: "Rotations",
-        }
-        const sectionTitle = sectionMeta[displaySection] ?? displaySection
-        return (
-          <TabPageHeader>
-            <PageTitle title={sectionTitle} compact />
-            {displaySection === "Events" && canEdit && (
-              <HeaderActionButton label="New Event" onClick={() => setShowAddModal(true)} />
-            )}
-            {displaySection === "Resources" && userRosterRole && (
-              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginLeft: "auto" }}>
-                {userRosterRole}
-              </span>
-            )}
-            {displaySection === "Meeting Notes" && canEdit && (
-              <HeaderActionButton label="New notes" onClick={() => setNotesTrigger(t => t + 1)} />
-            )}
-            {displaySection === "Groups" && canEdit && (
-              <HeaderActionButton label="Generate groups" onClick={() => setGroupGenerateTrigger(t => t + 1)} />
-            )}
-            {onTeamSettings && (
-              <IconButton dim={32} onClick={onTeamSettings} title="Team settings" className="ml-auto">
-                <Settings className="w-4 h-4" />
-              </IconButton>
-            )}
-          </TabPageHeader>
-        )
-      })()}
-
-      {/* Desktop Resources role sub-strip (replaces pill buttons) */}
-      {isDesktopView && displaySection === "Resources" && resourcesRoles.length > 0 && (
-        <PlanSubTabStrip
-          tabs={resourcesRoles.map(r => ({ key: r, label: r }))}
-          active={activeResourcesRole}
-          onChange={setResourcesRole}
-        />
+      {/* Desktop object header — workspace name + settings gear only.
+          Per-section titles + creates now live in each section body (Zone C). */}
+      {isDesktopView && !meetingNoteOpen && (
+        <TabPageHeader>
+          <PageTitle title={teamName} compact />
+          {onTeamSettings && (
+            <IconButton dim={32} onClick={onTeamSettings} title="Team settings" className="ml-auto">
+              <Settings className="w-4 h-4" />
+            </IconButton>
+          )}
+        </TabPageHeader>
       )}
 
       {/* ── Tab content ── */}
@@ -1559,6 +1530,7 @@ export function StudentOrgTeamHome({
         {/* GENERAL — calendar full-width + meeting notes */}
         {displaySection === "General" && (
           <div>
+            <SectionHeader title="General" titleSize={30} style={{ marginBottom: 28 }} />
             <section>
               {calLoading ? (
                 <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
@@ -1582,9 +1554,20 @@ export function StudentOrgTeamHome({
         {/* NOTES — meeting notes timeline */}
         {displaySection === "Meeting Notes" && (
           <div>
-            {!isDesktopView && (
-              <SectionHeader eyebrow="Meeting Notes" title="Meeting Notes" titleSize={30} style={{ marginBottom: 28 }} />
-            )}
+            <SectionHeader
+              title="Meeting Notes"
+              titleSize={30}
+              style={{ marginBottom: 28 }}
+              action={canEdit && (
+                <CentralButton
+                  variant="primary" size="sm"
+                  onClick={() => setNotesTrigger(t => t + 1)}
+                  style={{ flexShrink: 0, marginBottom: 4 }}
+                >
+                  <Plus className="w-3.5 h-3.5" /> New note
+                </CentralButton>
+              )}
+            />
             <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} openNoteId={openNoteId} onOpenNote={setOpenNoteAndUrl} />
           </div>
         )}
@@ -1592,24 +1575,21 @@ export function StudentOrgTeamHome({
         {/* PLAN — events list with Plan → links */}
         {displaySection === "Events" && (
           <div>
-            {/* Mobile header + New Event (desktop header is TabPageHeader above) */}
-            {!isDesktopView && (
-              <SectionHeader
-                eyebrow="Events & planning"
-                title="Events"
-                titleSize={30}
-                style={{ marginBottom: 28 }}
-                action={canEdit && (
-                  <CentralButton
-                    variant="primary" size="sm"
-                    onClick={() => setShowAddModal(true)}
-                    style={{ flexShrink: 0, marginBottom: 4 }}
-                  >
-                    <Plus className="w-3.5 h-3.5" /> New Event
-                  </CentralButton>
-                )}
-              />
-            )}
+            <SectionHeader
+              eyebrow="Events & planning"
+              title="Events"
+              titleSize={30}
+              style={{ marginBottom: 28 }}
+              action={canEdit && (
+                <CentralButton
+                  variant="primary" size="sm"
+                  onClick={() => setShowAddModal(true)}
+                  style={{ flexShrink: 0, marginBottom: 4 }}
+                >
+                  <Plus className="w-3.5 h-3.5" /> New Event
+                </CentralButton>
+              )}
+            />
             <EventsAgendaList
               events={calEvents}
               allEvents={calData?.events ?? []}
@@ -1627,30 +1607,26 @@ export function StudentOrgTeamHome({
         {/* RESOURCES — role links/docs */}
         {displaySection === "Resources" && (
           <div>
-            {/* Mobile header + role pills (desktop gets TabPageHeader + PlanSubTabStrip above) */}
-            {!isDesktopView && (
-              <>
-                <SectionHeader
-                  eyebrow="Team resources"
-                  title="Resources"
-                  titleSize={30}
-                  style={{ marginBottom: 20 }}
-                  action={userRosterRole && (
-                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginBottom: 4 }}>
-                      {userRosterRole}
-                    </span>
-                  )}
+            {/* Header + role sub-strip render once for both breakpoints. */}
+            <SectionHeader
+              eyebrow="Team resources"
+              title="Resources"
+              titleSize={30}
+              style={{ marginBottom: 20 }}
+              action={userRosterRole && (
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginBottom: 4 }}>
+                  {userRosterRole}
+                </span>
+              )}
+            />
+            {resourcesRoles.length > 0 && (
+              <div style={{ marginBottom: 22 }}>
+                <PlanSubTabStrip
+                  tabs={resourcesRoles.map(r => ({ key: r, label: r }))}
+                  active={activeResourcesRole}
+                  onChange={setResourcesRole}
                 />
-                {resourcesRoles.length > 0 && (
-                  <div style={{ marginBottom: 22 }}>
-                    <PlanSubTabStrip
-                      tabs={resourcesRoles.map(r => ({ key: r, label: r }))}
-                      active={activeResourcesRole}
-                      onChange={setResourcesRole}
-                    />
-                  </div>
-                )}
-              </>
+              </div>
             )}
             <StudentOrgRoleTabContent key={activeResourcesRole} teamId={teamId} roleName={activeResourcesRole} userId={userId} canWrite={canWriteActiveRole} />
           </div>
@@ -1658,22 +1634,41 @@ export function StudentOrgTeamHome({
 
         {/* GROUPS — group generator */}
         {displaySection === "Groups" && (
-          <GroupsTab
-            teamId={teamId}
-            ministryId={ministryId}
-            userId={userId}
-            canEdit={canEdit}
-            generateTrigger={groupGenerateTrigger}
-          />
+          <div>
+            <SectionHeader
+              title="Groups"
+              titleSize={30}
+              style={{ marginBottom: 28 }}
+              action={canEdit && (
+                <CentralButton
+                  variant="primary" size="sm"
+                  onClick={() => setGroupGenerateTrigger(t => t + 1)}
+                  style={{ flexShrink: 0, marginBottom: 4 }}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Generate groups
+                </CentralButton>
+              )}
+            />
+            <GroupsTab
+              teamId={teamId}
+              ministryId={ministryId}
+              userId={userId}
+              canEdit={canEdit}
+              generateTrigger={groupGenerateTrigger}
+            />
+          </div>
         )}
 
         {displaySection === "Rotations" && teamId && (
-          <RotationsTab
-            teamId={teamId}
-            ministryId={ministryId}
-            userId={userId}
-            canEdit={canEdit}
-          />
+          <div>
+            <SectionHeader title="Rotations" titleSize={30} style={{ marginBottom: 28 }} />
+            <RotationsTab
+              teamId={teamId}
+              ministryId={ministryId}
+              userId={userId}
+              canEdit={canEdit}
+            />
+          </div>
         )}
       </div>
       )}
