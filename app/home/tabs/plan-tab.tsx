@@ -38,7 +38,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sideba
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, SectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -1317,6 +1317,8 @@ export function StudentOrgTeamHome({
   const [groupGenerateTrigger, setGroupGenerateTrigger] = useState(0)
   // Notes tab — trigger createNote from header button
   const [notesTrigger, setNotesTrigger] = useState(0)
+  // Rotations tab — trigger New-semester modal from header button
+  const [rotationNewSemesterTrigger, setRotationNewSemesterTrigger] = useState(0)
   // Meeting Notes — which note is open (URL-synced via ?notetab); null = list view.
   const [openNoteId, setOpenNoteId] = useState<string | null>(() =>
     typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("notetab") : null,
@@ -1530,7 +1532,7 @@ export function StudentOrgTeamHome({
         {/* GENERAL — calendar full-width + meeting notes */}
         {displaySection === "General" && (
           <div>
-            <SectionHeader title="General" titleSize={30} style={{ marginBottom: 28 }} />
+            <ContentHeader label="General" style={{ marginBottom: 24 }} />
             <section>
               {calLoading ? (
                 <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
@@ -1554,18 +1556,16 @@ export function StudentOrgTeamHome({
         {/* NOTES — meeting notes timeline */}
         {displaySection === "Meeting Notes" && (
           <div>
-            <SectionHeader
-              title="Meeting Notes"
-              titleSize={30}
-              style={{ marginBottom: 28 }}
+            <ContentHeader
+              label="Meeting Notes"
+              style={{ marginBottom: 24 }}
               action={canEdit && (
-                <CentralButton
-                  variant="primary" size="sm"
+                <ContentActionButton
+                  variant="primary"
+                  icon={<Plus style={{ width: 13, height: 13 }} />}
+                  label="New note"
                   onClick={() => setNotesTrigger(t => t + 1)}
-                  style={{ flexShrink: 0, marginBottom: 4 }}
-                >
-                  <Plus className="w-3.5 h-3.5" /> New note
-                </CentralButton>
+                />
               )}
             />
             <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} openNoteId={openNoteId} onOpenNote={setOpenNoteAndUrl} />
@@ -1575,19 +1575,16 @@ export function StudentOrgTeamHome({
         {/* PLAN — events list with Plan → links */}
         {displaySection === "Events" && (
           <div>
-            <SectionHeader
-              eyebrow="Events & planning"
-              title="Events"
-              titleSize={30}
-              style={{ marginBottom: 28 }}
+            <ContentHeader
+              label="Events"
+              style={{ marginBottom: 24 }}
               action={canEdit && (
-                <CentralButton
-                  variant="primary" size="sm"
+                <ContentActionButton
+                  variant="primary"
+                  icon={<Plus style={{ width: 13, height: 13 }} />}
+                  label="New Event"
                   onClick={() => setShowAddModal(true)}
-                  style={{ flexShrink: 0, marginBottom: 4 }}
-                >
-                  <Plus className="w-3.5 h-3.5" /> New Event
-                </CentralButton>
+                />
               )}
             />
             <EventsAgendaList
@@ -1608,13 +1605,11 @@ export function StudentOrgTeamHome({
         {displaySection === "Resources" && (
           <div>
             {/* Header + role sub-strip render once for both breakpoints. */}
-            <SectionHeader
-              eyebrow="Team resources"
-              title="Resources"
-              titleSize={30}
-              style={{ marginBottom: 20 }}
+            <ContentHeader
+              label="Resources"
+              style={{ marginBottom: 24 }}
               action={userRosterRole && (
-                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginBottom: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}>
                   {userRosterRole}
                 </span>
               )}
@@ -1625,6 +1620,7 @@ export function StudentOrgTeamHome({
                   tabs={resourcesRoles.map(r => ({ key: r, label: r }))}
                   active={activeResourcesRole}
                   onChange={setResourcesRole}
+                  flush
                 />
               </div>
             )}
@@ -1635,18 +1631,16 @@ export function StudentOrgTeamHome({
         {/* GROUPS — group generator */}
         {displaySection === "Groups" && (
           <div>
-            <SectionHeader
-              title="Groups"
-              titleSize={30}
-              style={{ marginBottom: 28 }}
+            <ContentHeader
+              label="Groups"
+              style={{ marginBottom: 24 }}
               action={canEdit && (
-                <CentralButton
-                  variant="primary" size="sm"
+                <ContentActionButton
+                  variant="primary"
+                  icon={<Plus style={{ width: 13, height: 13 }} />}
+                  label="Generate groups"
                   onClick={() => setGroupGenerateTrigger(t => t + 1)}
-                  style={{ flexShrink: 0, marginBottom: 4 }}
-                >
-                  <Plus className="w-3.5 h-3.5" /> Generate groups
-                </CentralButton>
+                />
               )}
             />
             <GroupsTab
@@ -1661,12 +1655,24 @@ export function StudentOrgTeamHome({
 
         {displaySection === "Rotations" && teamId && (
           <div>
-            <SectionHeader title="Rotations" titleSize={30} style={{ marginBottom: 28 }} />
+            <ContentHeader
+              label="Rotations"
+              style={{ marginBottom: 24 }}
+              action={canEdit && (
+                <ContentActionButton
+                  variant="primary"
+                  icon={<Plus style={{ width: 13, height: 13 }} />}
+                  label="New semester"
+                  onClick={() => setRotationNewSemesterTrigger(t => t + 1)}
+                />
+              )}
+            />
             <RotationsTab
               teamId={teamId}
               ministryId={ministryId}
               userId={userId}
               canEdit={canEdit}
+              newSemesterTrigger={rotationNewSemesterTrigger}
             />
           </div>
         )}
@@ -1754,8 +1760,8 @@ function RotationAvatar({ name, mine }: { name: string; mine: boolean }) {
   )
 }
 
-function RotationsTab({ teamId, ministryId, userId, canEdit }: {
-  teamId: string; ministryId: string; userId: string; canEdit: boolean
+function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger }: {
+  teamId: string; ministryId: string; userId: string; canEdit: boolean; newSemesterTrigger?: number
 }) {
   const supabase = createClient()
   const [semesters, setSemesters] = useState<RotationSemester[]>([])
@@ -1767,6 +1773,9 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
   const [confirmSlot, setConfirmSlot] = useState<RotationSlot | null>(null)
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [showNewSemester, setShowNewSemester] = useState(false)
+
+  // Open the New-semester modal from the section ContentHeader create button.
+  useEffect(() => { if (newSemesterTrigger) setShowNewSemester(true) }, [newSemesterTrigger])
 
   const loadSemesters = useCallback(async () => {
     setLoading(true)
@@ -1885,11 +1894,6 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
               )
             })}
           </div>
-          {canEdit && (
-            <CentralButton variant="primary" size="sm" onClick={() => setShowNewSemester(true)} style={{ flexShrink: 0 }}>
-              <Plus className="w-4 h-4" /> New semester
-            </CentralButton>
-          )}
         </div>
       )}
 
@@ -1902,7 +1906,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
             subtitle={canEdit ? "Create a semester to open up sign-up slots." : "Ask a leader to set up a semester."}
           />
           {canEdit && (
-            <CentralButton variant="primary" size="sm" onClick={() => setShowNewSemester(true)}>
+            <CentralButton variant="secondary" size="sm" onClick={() => setShowNewSemester(true)}>
               <Plus className="w-4 h-4" /> New semester
             </CentralButton>
           )}
