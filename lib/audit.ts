@@ -14,6 +14,7 @@ export type AuditAction =
   | "team.member_add"
   | "team.member_remove"
   | "team.member_role_change"
+  | "moderation.flag_threshold"
 
 interface AuditPayload {
   ministryId: string

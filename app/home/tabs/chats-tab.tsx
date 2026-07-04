@@ -17,6 +17,9 @@ import { InsetHairline } from "@/components/central/hairline"
 import { fetchChatList } from "../chat-list"
 import { MessageRow } from "./message-row"
 import { Composer } from "./composer"
+import { MODERATION_DEFAULTS, moderateText, scopeApplies } from "@/lib/moderation"
+import type { ModerationSettings } from "@/lib/moderation"
+import { recordChatOffense } from "@/app/actions/moderation"
 
 export function CreateChatScreen({ userId, userName, ministryId, groupType, onClose, onCreated }: CreateChatScreenProps) {
   const supabase = createClient()
@@ -964,6 +967,27 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       return (data as { type: string; archived: boolean | null; pinned_message_id: string | null } | null) ?? null
     }
   )
+  // Chat moderation config — ministry-scoped, SWR-cached. Falls back to defaults
+  // (disabled) until loaded, so existing chat behavior is preserved.
+  const { data: modSettings } = useSWR(
+    ministryId ? ["moderation-settings", ministryId] : null,
+    async () => {
+      const { data } = await supabase.from("ministries").select("moderation_settings").eq("id", ministryId).maybeSingle()
+      return { ...MODERATION_DEFAULTS, ...(data?.moderation_settings ?? {}) } as ModerationSettings
+    }
+  )
+  // Room scope context (mirrors the settings' isCentralChat / group-type logic).
+  const modIsChurch = groupType === "church"
+  const modIsPersonal = groupType === "my" || groupType === "dm"
+  const modIsMinistryDefault = modIsChurch && groupName === `${ministryName} Chat`
+  // Transient "your message was filtered" banner; auto-dismisses.
+  const [moderationWarning, setModerationWarning] = useState<string | null>(null)
+  useEffect(() => {
+    if (!moderationWarning) return
+    const t = setTimeout(() => setModerationWarning(null), 4000)
+    return () => clearTimeout(t)
+  }, [moderationWarning])
+
   // Link previews
   const [linkPreviews, setLinkPreviews] = useState<Record<string, LinkPreviewData>>({})
 
@@ -1809,6 +1833,29 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const handleSend = useCallback(async ({ content, attachment, replyTo }: { content: string; attachment: File | null; replyTo: Message | null }) => {
     if (!content && !attachment) return
 
+    // Moderation gate — runs before anything is sent. When enabled AND in-scope
+    // for this room, flag words per the ministry's rules. On a flag: record an
+    // offense (fire-and-forget), surface the warning banner, and either block the
+    // send (block mode) or substitute the softened/censored text.
+    const applyModeration = (raw: string): { text: string; blocked: boolean } => {
+      if (
+        modSettings?.enabled && raw.trim() &&
+        scopeApplies(modSettings.scope, { isChurch: modIsChurch, isPersonal: modIsPersonal, isMinistryDefault: modIsMinistryDefault })
+      ) {
+        const { cleaned, flaggedCount } = moderateText(raw, { strictness: modSettings.strictness, behavior: modSettings.behavior })
+        if (flaggedCount > 0) {
+          void recordChatOffense(groupId, raw)
+          setModerationWarning("Your message was filtered for language against ministry guidelines. Repeated flags are reported to admins.")
+          if (modSettings.behavior === "block") return { text: raw, blocked: true }
+          return { text: cleaned, blocked: false }
+        }
+      }
+      return { text: raw, blocked: false }
+    }
+    const contentMod = content ? applyModeration(content) : { text: "", blocked: false }
+    // Text-only + block mode → refuse to send outright.
+    if (!attachment && contentMod.blocked) return
+
     // Clear own typing status
     if (myTypingTimeoutRef.current) clearTimeout(myTypingTimeoutRef.current)
     typingChannelRef.current?.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: false } })
@@ -1836,8 +1883,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           message_type: "user", attachment_url: publicUrl,
           attachment_type: attachment.type, attachment_name: attachment.name, attachment_size: attachment.size,
         }
+        // Block mode on a flagged caption → send the attachment with NO caption.
+        const captionText = contentMod.blocked ? "" : contentMod.text
         setMessages(prev => [...prev, optimisticMsg])
-        bumpChatListForOwnSend(content || attachment.name)
+        bumpChatListForOwnSend(captionText || attachment.name)
         const { data } = await supabase.from("messages").insert({
           group_id: groupId, sender_id: userId, content: "",
           reply_to_id: replyTarget?.id ?? null,
@@ -1847,18 +1896,18 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         if (data) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m))
 
         // Send caption as a separate plain text message immediately after
-        if (content) {
+        if (captionText) {
           const captionOptimisticId = `optimistic-cap-${Date.now()}`
           const captionMsg: Message = {
             id: captionOptimisticId, group_id: groupId, sender_id: userId,
-            content, created_at: new Date().toISOString(), sender_name: userName,
+            content: captionText, created_at: new Date().toISOString(), sender_name: userName,
             reply_to_id: null, reply_to_content: null, reply_to_sender: null,
             message_type: "user", attachment_url: null,
             attachment_type: null, attachment_name: null, attachment_size: null,
           }
           setMessages(prev => [...prev, captionMsg])
           const { data: capData } = await supabase.from("messages").insert({
-            group_id: groupId, sender_id: userId, content,
+            group_id: groupId, sender_id: userId, content: captionText,
           }).select("id").single()
           if (capData) setMessages(prev => prev.map(m => m.id === captionOptimisticId ? { ...m, id: capData.id } : m))
         }
@@ -1868,21 +1917,23 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       return
     }
 
-    // Text-only message
+    // Text-only message — send the moderated text (softened/censored, or the
+    // original when nothing was flagged; block mode already returned above).
+    const sendText = contentMod.text
     const optimisticId = `optimistic-${Date.now()}`
     const optimisticMsg: Message = {
-      id: optimisticId, group_id: groupId, sender_id: userId, content,
+      id: optimisticId, group_id: groupId, sender_id: userId, content: sendText,
       created_at: new Date().toISOString(), sender_name: userName,
       reply_to_id: replyTarget?.id ?? null,
       reply_to_content: replyTarget ? replyPreviewLabel(replyTarget.content, replyTarget.attachment_type, replyTarget.attachment_name) : null,
       reply_to_sender: replyTarget?.sender_name ?? null,
     }
     setMessages((prev) => [...prev, optimisticMsg])
-    bumpChatListForOwnSend(content)
+    bumpChatListForOwnSend(sendText)
 
     const { data, error } = await supabase
       .from("messages")
-      .insert({ group_id: groupId, sender_id: userId, content, reply_to_id: replyTarget?.id ?? null })
+      .insert({ group_id: groupId, sender_id: userId, content: sendText, reply_to_id: replyTarget?.id ?? null })
       .select("id")
       .single()
 
@@ -1892,7 +1943,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       setMessages((prev) => prev.map((m) => m.id === optimisticId ? { ...m, id: data.id } : m))
     }
     setSending(false)
-  }, [supabase, groupId, userId, userName, bumpChatListForOwnSend])
+  }, [supabase, groupId, userId, userName, bumpChatListForOwnSend, modSettings, modIsChurch, modIsPersonal, modIsMinistryDefault])
 
   // For each own message: which other members have it as their most-recently-read own message.
   // Reuses the PRIOR array reference for any message whose receipts didn't change, so
@@ -2338,6 +2389,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           </div>
         )}
       </div>
+
+      {moderationWarning && (
+        <div className="flex-shrink-0 mx-4 mb-2 rounded-xl bg-[var(--plum)]/8 px-4 py-2.5 text-[13px] text-[var(--plum)] font-medium">
+          {moderationWarning}
+        </div>
+      )}
 
       <Composer
         groupArchived={groupArchived}
