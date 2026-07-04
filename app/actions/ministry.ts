@@ -289,6 +289,20 @@ export async function submitMinistryApplication(data: {
   }
 
   const admin = createAdminClient()
+
+  // Duplicate-registration guard — a re-fire (double-submit, back-button, retry)
+  // must not create a second pending ministry that orphans the first. If this
+  // user already has a pending registration, surface it instead of inserting.
+  const { data: existingPending } = await admin
+    .from("ministries")
+    .select("id")
+    .eq("created_by", user.id)
+    .eq("status", "pending")
+    .maybeSingle()
+  if (existingPending) {
+    return { error: "You already have a pending registration — it's waiting for approval." }
+  }
+
   const inviteCode = await uniqueInviteCode(admin)
   const staffCode = await uniqueStaffCode(admin)
 
