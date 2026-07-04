@@ -203,6 +203,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/home/components/receipts-workspace.tsx` | The **Receipts** workspace (in Plan, sentinel `activeTeamId==='receipts'`): teams sidebar + per-team category subtab strip + submit modal + one-line entries + immersive read-only detail. |
 | `app/home/governance.ts` | Governance helpers: `isGovernanceAdmin`, `teamAccessLevel` (roster × per-team none/view/write matrix). |
 | `app/home/team-type.ts` | `classifyTeam()` — the single team-type classifier (by `team_type`, then name; **NEVER** by permission). Drives both plan-tab dispatch + home-app sidebar. |
+| `app/home/workspace-presets.ts` | Fixed workspace/team presets — single source of truth for onboarding, approval, and in-app "Add workspace". **Worship-team family is BACKLOGGED (indefinite):** Praise Team, Tech Team, DG Praise, One-Time Event are `comingSoon: true` (shown disabled in Add-workspace + onboarding). Their code (`PraiseTeamTab`/`DgPraiseTeamTab`/`OneTimeTeamTab`/`TechTeamTab` in plan-tab.tsx) is FROZEN — do not refactor or invest there (the audit's worship dedup + worship field/chip migrations were deliberately deferred) until the family is actively resumed. |
 | `app/actions/finance-auth.ts` | Finance authorization (single source of truth): `getFinanceCapability`/`computeFinanceCapability` — treasurer approve / president sign-off / budget write. |
 | `app/actions/receipt-categories.ts` | Per-team receipt category CRUD (team-membership RLS). |
 | `app/home/tabs/profile-tab.tsx` | Profile tab — spiritual profile fields, journal (devotionals/prayers/verses sub-tabs), sign out |
@@ -214,7 +215,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/home/components/desktop-nav.tsx` | Desktop sidebar navigation |
 | `app/home/components/shared.tsx` | Shared UI primitives used across tab files |
 | `app/home/types.ts` | All shared TypeScript types for home and tabs |
-| `app/home/utils.ts` | Shared utility functions (formatRelativeTime, getInitials, getAvatarColor) |
+| `app/home/utils.ts` | Shared utility functions (formatRelativeTime, getInitials, getAvatarColor). NOTE: getAvatarColor is NOT exported here — avatar color/shape is owned by `MonogramChip` (plum + cream, circle); do not reintroduce a parallel color util. |
 | `app/home/page.tsx` | Server component — auth check, profile load, renders `<HomeApp>` |
 | `app/(auth)/shared.tsx` | Canonical shared auth components: `AuthPhotoPanel`, `SplitShell`, `GoogleButton`, `OrDivider`, `EyeButton`. All auth pages must use these — do not reimplement the split layout inline. |
 | `app/(auth)/login/page.tsx` | Email + password login |
@@ -240,7 +241,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `lib/group-algorithm.ts` | Small group generation algorithm |
 | `components/ui/bottom-nav.tsx` | Bottom tab navigation (mobile only) |
 | `components/ui/chats-section.tsx` | Recent chats list used on Home tab |
-| `components/central/` | Shared design-system components (Button, Card, PageTitle, SectionHeader, StatCard, UpNextCard, ChatStrip, MonogramChip, etc.) |
+| `components/central/` | Shared design-system components: `CentralButton`/`IconButton` (button.tsx), `CentralCard`, `ListRow`, `FilterChip`, `Input`/`Select`/`Textarea`/`SerifInput`/`AddInlineSelect`/`FormField` (field.tsx), `PageTitle`, `SectionHeader`, `ContentHeader`, `EventSectionHeader`, `PlanSubTabStrip`, `MonogramChip`, `UpNextCard`, `ChatStrip`, `InsetHairline`, and `EYEBROW_STYLE`/`MONO_STYLE` (typography.ts — the canonical mono-label constants; shared.tsx re-exports them; `components/central` is a LEAF and must not import from `app/`). |
 | `components/central/home-hero-carousel.tsx` | Curated home hero carousel — one shared `--hero-h` frame (`HeroFrame`, radius `--r-hero`) with a constant "Featured" eyebrow (`HeroSectionLabel`) and tall flanking side-pill arrows + dot row. Renders three slide types: `photo` (full-bleed image; stored `panel_color` fades solid→transparent across the seam via `--hero-panel-fade`, over a left-anchored `--ink` legibility scrim; cream caption), event-with-photo (same + glass date/RSVP chip), and ivory reference slides (announcement / event-without-photo) via `UpNextCard`. Static CSS panel — no live blur, SSR-safe. Manual prev/next only (no auto-rotation/motion/swipe). Exports `HeroFrame`/`HeroSectionLabel` reused by the home-tab fallback. |
 | `permissions.md` | **Canonical source of truth** for role-based access — who can do what across every feature |
 

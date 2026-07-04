@@ -15,6 +15,8 @@ import {
   excommunicateMember,
   getBannedMembers,
   archiveMinistry,
+  cancelArchiveRequest,
+  getMinistryCodes,
   runDepartedMemberCleanup,
 } from "@/app/actions/ministry"
 import { updateAutomationSettings, runAnnualClassMaintenance, retroactivelyApplyToggle, archiveToggleChats } from "@/app/actions/auto-chats"
@@ -24,7 +26,7 @@ import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderH
 import type { HomeVerse } from "@/app/actions/home-verses"
 import { updateGovernanceSettings, updateTeamAdminAccess } from "@/app/actions/governance"
 import type { GovernanceSettings } from "../types"
-import { getInitials } from "../utils"
+import { getInitials, formatRelativeTime } from "../utils"
 import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip } from "@/components/central"
 import { useNavState } from "../nav-state"
 
@@ -191,10 +193,14 @@ export function SettingsTab({
   const [showArchiveWarning, setShowArchiveWarning] = useState(false)
   const [pendingArchiveLabels, setPendingArchiveLabels] = useState<string[]>([])
 
-  // Danger Zone
+  // Danger Zone — archiving is two-step (Q4): one admin requests, a DIFFERENT
+  // admin confirms. archiveRequest mirrors ministries.archive_requested_by/_at.
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
   const [archiveConfirmText, setArchiveConfirmText] = useState("")
   const [archiving, setArchiving] = useState(false)
+  const [archiveRequest, setArchiveRequest] = useState<{ by: string; at: string | null; name: string | null } | null>(null)
+  const [cancelingArchive, setCancelingArchive] = useState(false)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
 
   // Schools
   const [schools, setSchools] = useState<{ id: string; name: string; abbreviation: string; sort_order: number }[]>([])
@@ -243,20 +249,30 @@ export function SettingsTab({
 
   useEffect(() => {
     async function load() {
-      const [{ data: min }, { data: profiles }, { data: schoolRows }, limitsRes, verses, { data: teamRows }] = await Promise.all([
-        supabase.from("ministries").select("name, university, size, invite_code, staff_invite_code, is_public, automation_settings, governance_settings").eq("id", ministryId).maybeSingle(),
+      const [{ data: min }, { data: profiles }, { data: schoolRows }, limitsRes, verses, { data: teamRows }, codesRes] = await Promise.all([
+        // invite_code/staff_invite_code are column-revoked for browser clients
+        // (Q2 migration) — they load via the admin-scoped getMinistryCodes action.
+        supabase.from("ministries").select("name, university, size, is_public, automation_settings, governance_settings, archive_requested_by, archive_requested_at").eq("id", ministryId).maybeSingle(),
         supabase.from("profiles").select("id, name, email, role, graduation_year").eq("ministry_id", ministryId).order("name"),
         supabase.from("ministry_schools").select("id, name, abbreviation, sort_order").eq("ministry_id", ministryId).order("sort_order"),
         getReceiptLimits(ministryId),
         getHomeVerses(ministryId),
         supabase.from("teams").select("id, name, icon, admin_access").eq("ministry_id", ministryId).order("name"),
+        getMinistryCodes(ministryId),
       ])
 
+      setInviteCode(codesRes.inviteCode)
+      setStaffCode(codesRes.staffInviteCode)
       if (min) {
         setMinistryInfo({ name: min.name, university: min.university, size: min.size })
-        setInviteCode(min.invite_code)
-        setStaffCode(min.staff_invite_code ?? null)
         setIsPublic(min.is_public ?? false)
+        if (min.archive_requested_by) {
+          setArchiveRequest({
+            by: min.archive_requested_by,
+            at: min.archive_requested_at ?? null,
+            name: (profiles ?? []).find(p => p.id === min.archive_requested_by)?.name ?? null,
+          })
+        }
         if (min.automation_settings) {
           const merged = { ...AUTOMATION_DEFAULTS, ...(min.automation_settings as Record<string, boolean>) }
           setAutomationSettings(merged)
@@ -476,13 +492,34 @@ export function SettingsTab({
     setToggling(false)
   }
 
-  // ── Archive ─────────────────────────────────────────────────────────────────
+  // ── Archive (two-step: request → second-admin confirm) ──────────────────────
+  // The same action serves both steps: with no pending request it records one
+  // ("requested"); called by a DIFFERENT admin with a request pending it
+  // completes the archive ("archived"). The requester can never self-confirm.
   async function handleArchive() {
     setArchiving(true)
-    await archiveMinistry()
+    setArchiveError(null)
+    const { state, error } = await archiveMinistry()
     setArchiving(false)
+    if (error) { setArchiveError(error); return }
     setShowArchiveConfirm(false)
-    window.location.href = "/landing"
+    setArchiveConfirmText("")
+    if (state === "requested") {
+      setArchiveRequest({ by: userId, at: new Date().toISOString(), name: userName })
+      return
+    }
+    if (state === "archived") window.location.href = "/landing"
+  }
+
+  async function handleCancelArchiveRequest() {
+    setCancelingArchive(true)
+    setArchiveError(null)
+    const { error } = await cancelArchiveRequest(ministryId)
+    setCancelingArchive(false)
+    if (error) { setArchiveError(error); return }
+    setArchiveRequest(null)
+    setShowArchiveConfirm(false)
+    setArchiveConfirmText("")
   }
 
   async function handleAddSchool() {
@@ -854,17 +891,37 @@ export function SettingsTab({
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
                     <div style={{ flex: 1 }}>
                       <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "var(--ink)", marginBottom: 6 }}>Archive ministry</p>
-                      <p style={{ fontSize: "13px", color: "var(--body)", lineHeight: 1.6, maxWidth: "560px" }}>Deactivates the ministry. Members lose access immediately. Data is preserved and can be restored by contacting support.</p>
+                      {archiveRequest === null ? (
+                        <p style={{ fontSize: "13px", color: "var(--body)", lineHeight: 1.6, maxWidth: "560px" }}>Deactivates the ministry. Members lose access immediately. Data is preserved and can be restored by contacting support. Requesting archive requires a second admin to confirm.</p>
+                      ) : archiveRequest.by === userId ? (
+                        <p style={{ fontSize: "13px", color: "var(--body)", lineHeight: 1.6, maxWidth: "560px" }}>Archive requested — awaiting a different admin to confirm. You can&apos;t confirm your own request.</p>
+                      ) : (
+                        <p style={{ fontSize: "13px", color: "var(--body)", lineHeight: 1.6, maxWidth: "560px" }}>
+                          Archive requested by <strong style={{ color: "var(--ink)" }}>{archiveRequest.name ?? "another admin"}</strong>
+                          {archiveRequest.at ? <> · {formatRelativeTime(archiveRequest.at)} ago</> : null} — confirm to deactivate the ministry. Members lose access immediately.
+                        </p>
+                      )}
+                      {archiveError && <p style={{ fontSize: "12px", color: "var(--danger)", marginTop: 8 }}>{archiveError}</p>}
                     </div>
-                    {!showArchiveConfirm ? (
-                      <CentralButton variant="destructive" size="md" onClick={() => setShowArchiveConfirm(true)} style={{ flexShrink: 0 }}>Archive</CentralButton>
+                    {archiveRequest !== null && archiveRequest.by === userId ? (
+                      /* Pending, requested by ME — no self-confirm; cancel only. */
+                      <CentralButton variant="secondary" size="md" onClick={handleCancelArchiveRequest} disabled={cancelingArchive} style={{ flexShrink: 0 }}>{cancelingArchive ? "Canceling…" : "Cancel request"}</CentralButton>
+                    ) : !showArchiveConfirm ? (
+                      <div style={{ flexShrink: 0, display: "flex", gap: 8 }}>
+                        {archiveRequest !== null && (
+                          <CentralButton variant="secondary" size="md" onClick={handleCancelArchiveRequest} disabled={cancelingArchive}>{cancelingArchive ? "Canceling…" : "Cancel request"}</CentralButton>
+                        )}
+                        <CentralButton variant="destructive" size="md" onClick={() => setShowArchiveConfirm(true)}>{archiveRequest === null ? "Archive" : "Confirm archive"}</CentralButton>
+                      </div>
                     ) : (
                       <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
                         <p style={{ fontSize: "12px", color: "var(--muted-text)", textAlign: "right" }}>Type <strong style={{ color: "var(--ink)" }}>{ministryInfo?.name ?? ministryName}</strong> to confirm</p>
                         <input value={archiveConfirmText} onChange={e => setArchiveConfirmText(e.target.value)} placeholder="Ministry name…" style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid var(--danger)", fontSize: 13, color: "var(--ink)", outline: "none", background: "var(--cream-panel)", width: 192, fontFamily: "inherit" }} />
                         <div style={{ display: "flex", gap: 8 }}>
                           <CentralButton variant="secondary" size="sm" onClick={() => { setShowArchiveConfirm(false); setArchiveConfirmText("") }}>Cancel</CentralButton>
-                          <CentralButton variant="danger-solid" size="sm" onClick={handleArchive} disabled={archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName)}>{archiving ? "Archiving…" : "Archive ministry"}</CentralButton>
+                          <CentralButton variant="danger-solid" size="sm" onClick={handleArchive} disabled={archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName)}>
+                            {archiveRequest === null ? (archiving ? "Requesting…" : "Request archive") : (archiving ? "Archiving…" : "Archive ministry")}
+                          </CentralButton>
                         </div>
                       </div>
                     )}

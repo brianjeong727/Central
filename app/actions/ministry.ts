@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
-import { requireSameMinistry, isAdminTier } from "./authz"
+import { requireSameMinistry, requireMinistryAdmin, isAdminTier } from "./authz"
 import { autoAddUserToChats, ensureMinistryChats } from "./auto-chats"
 import { presetById } from "@/app/home/workspace-presets"
 
@@ -316,6 +316,11 @@ async function createOnboardingWorkspaces(
         description: preset.description,
         team_type: preset.teamType,
         created_by: createdBy,
+        // Gov-WRITE by default so admins can manage onboarding-created teams
+        // without first being members (consistent with AddWorkspaceModal). This
+        // insert is service-role so it isn't RLS-blocked, but the column keeps
+        // the resulting teams admin-manageable under Full-gov RLS.
+        admin_access: "write",
       })
       .select("id")
       .single()
@@ -647,19 +652,84 @@ export async function removeMember(targetUserId: string): Promise<{ error: strin
   return { error: null }
 }
 
-// ─── Admin: archive ministry ─────────────────────────────────────────────────
-export async function archiveMinistry(): Promise<{ error: string | null }> {
+// ─── Admin: archive ministry (two-step, second-admin confirmation) ───────────
+// Q4: archiving requires TWO distinct admins. The first admin's call records a
+// request (archive_requested_by/_at, status stays active); a DIFFERENT admin's
+// call completes it (status → archived). The requester can never self-confirm.
+export async function archiveMinistry(): Promise<{ state: "requested" | "archived" | null; error: string | null }> {
   const supabase = await createClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
-  if (authErr || !user) return { error: "Not authenticated." }
+  if (authErr || !user) return { state: null, error: "Not authenticated." }
 
   const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
-  if (!profile?.ministry_id) return { error: "No ministry found." }
-  if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { error: "Only admins can archive the ministry." }
+  if (!profile?.ministry_id) return { state: null, error: "No ministry found." }
+  if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { state: null, error: "Only admins can archive the ministry." }
 
   const admin = createAdminClient()
-  const { error } = await admin.from("ministries").update({ status: "archived" }).eq("id", profile.ministry_id)
+  const { data: ministry } = await admin
+    .from("ministries")
+    .select("archive_requested_by")
+    .eq("id", profile.ministry_id)
+    .maybeSingle()
+  if (!ministry) return { state: null, error: "Ministry not found." }
+
+  // Step 1 — no pending request: record this admin's request. Status stays active.
+  if (!ministry.archive_requested_by) {
+    const { error } = await admin
+      .from("ministries")
+      .update({ archive_requested_by: user.id, archive_requested_at: new Date().toISOString() })
+      .eq("id", profile.ministry_id)
+    if (error) return { state: null, error: error.message }
+    return { state: "requested", error: null }
+  }
+
+  // The requester cannot confirm their own request.
+  if (ministry.archive_requested_by === user.id) {
+    return { state: null, error: "You've already requested archiving — a different admin must confirm." }
+  }
+
+  // Step 2 — a SECOND admin confirms: flip to archived and clear the request.
+  const { error } = await admin
+    .from("ministries")
+    .update({ status: "archived", archive_requested_by: null, archive_requested_at: null })
+    .eq("id", profile.ministry_id)
+  if (error) return { state: null, error: error.message }
+  return { state: "archived", error: null }
+}
+
+// ─── Admin: cancel a pending archive request ─────────────────────────────────
+export async function cancelArchiveRequest(ministryId: string): Promise<{ error: string | null }> {
+  const authz = await requireMinistryAdmin(ministryId)
+  if (authz.error !== null) return { error: authz.error }
+
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from("ministries")
+    .update({ archive_requested_by: null, archive_requested_at: null })
+    .eq("id", ministryId)
   return { error: error?.message ?? null }
+}
+
+// ─── Admin: read invite codes (scoped server action) ─────────────────────────
+// The invite_code/staff_invite_code columns are revoked from `authenticated`
+// (Q2 SELECT-narrow migration) — clients can no longer read them directly.
+// Admins of the ministry read them via this service-role action instead.
+export async function getMinistryCodes(ministryId: string): Promise<{
+  inviteCode: string | null
+  staffInviteCode: string | null
+  error: string | null
+}> {
+  const authz = await requireMinistryAdmin(ministryId)
+  if (authz.error !== null) return { inviteCode: null, staffInviteCode: null, error: authz.error }
+
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from("ministries")
+    .select("invite_code, staff_invite_code")
+    .eq("id", ministryId)
+    .maybeSingle()
+  if (error || !data) return { inviteCode: null, staffInviteCode: null, error: error?.message ?? "Ministry not found." }
+  return { inviteCode: data.invite_code ?? null, staffInviteCode: data.staff_invite_code ?? null, error: null }
 }
 
 // ─── Admin: excommunicate a member (permanent ban — can never rejoin) ───────────
