@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useState, useEffect } from "react"
+import { memo, useState, useEffect, useRef, useLayoutEffect } from "react"
 import dynamic from "next/dynamic"
 import { Check, MoreHorizontal, Trash2, CornerUpLeft, Plus, Pencil, Forward, Pin, FileDown } from "lucide-react"
 import { MonogramChip } from "@/components/central"
@@ -106,7 +106,6 @@ function highlightText(text: string, query: string, isCurrent: boolean): React.R
 function MessageRowBase({
   msg,
   isOwn,
-  isFirstMessage,
   isFirstInGroup,
   isLastInGroup,
   showDateSep,
@@ -161,6 +160,36 @@ function MessageRowBase({
   setReplyingTo,
   setPollMenuFor,
 }: MessageRowProps) {
+  // Menu placement — decide above-vs-below by MEASUREMENT so a long-press
+  // menu / reaction bar never clips under the chat header when the message is
+  // near the top of the scroll viewport. Runs in useLayoutEffect (before
+  // paint) so the menu paints in its final position — no visible flicker.
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [placeBelow, setPlaceBelow] = useState(false)
+  const anyMenuOpen = isEmojiPickerOpen || isFullPickerOpen || isContextMenuOpen
+  useLayoutEffect(() => {
+    if (!anyMenuOpen) { setPlaceBelow(false); return }
+    const menuEl = menuRef.current
+    const wrapper = menuEl?.parentElement            // the `flex flex-col relative` message wrapper
+    if (!menuEl || !wrapper) return
+    const measure = () => {
+      // nearest scrollable ancestor = the messages scroll container (its top edge is the clip line under the header)
+      let c: HTMLElement | null = wrapper
+      while (c) { const oy = getComputedStyle(c).overflowY; if (oy === "auto" || oy === "scroll") break; c = c.parentElement }
+      const containerTop = c ? c.getBoundingClientRect().top : 0
+      const wrapperTop = wrapper.getBoundingClientRect().top
+      const menuHeight = menuEl.getBoundingClientRect().height
+      // Placement-INDEPENDENT test (uses height + message top, NOT the menu's own top, so it can't oscillate):
+      // above-placement puts the menu top at ~ wrapperTop - 4 - menuHeight. Flip below if that clips the container top.
+      setPlaceBelow((wrapperTop - 4 - menuHeight) < (containerTop + 8))
+    }
+    measure()
+    // Re-measure if the menu's height changes after mount (e.g. the lazy full picker finishing load).
+    const ro = new ResizeObserver(measure)
+    ro.observe(menuEl)
+    return () => ro.disconnect()
+  }, [anyMenuOpen])
+
   const groupGap = showGroupGap ? "mt-3" : ""
 
   const incomingRadius = isFirstInGroup && isLastInGroup
@@ -347,7 +376,8 @@ function MessageRowBase({
         {/* Emoji picker */}
         {isEmojiPickerOpen && (
           <div
-            className={`absolute z-[160] ${isFirstMessage ? "top-[calc(100%-4px)]" : "bottom-[calc(100%-4px)]"} ${isOwn ? "right-0" : "left-0"}`}
+            ref={menuRef}
+            className={`absolute z-[160] ${placeBelow ? "top-[calc(100%-4px)]" : "bottom-[calc(100%-4px)]"} ${isOwn ? "right-0" : "left-0"}`}
             onPointerDown={(e) => e.stopPropagation()}
           >
             <div className="bg-[var(--cream-panel)] rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-[#EFEFEF] px-3 py-2.5 flex gap-3 items-center">
@@ -376,7 +406,8 @@ function MessageRowBase({
         {/* Full reaction picker — independent of entry point (emoji bar or context menu) */}
         {isFullPickerOpen && (
           <div
-            className={`absolute z-[161] ${isFirstMessage ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
+            ref={menuRef}
+            className={`absolute z-[161] ${placeBelow ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
             onPointerDown={(e) => e.stopPropagation()}
           >
             <LazyEmojiPicker onEmojiSelect={(e: { native: string }) => { onReact(msg.id, e.native); setFullReactionPickerFor(null) }} />
@@ -386,7 +417,8 @@ function MessageRowBase({
         {/* Context menu */}
         {isContextMenuOpen && (
           <div
-            className={`absolute z-[160] ${isFirstMessage ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
+            ref={menuRef}
+            className={`absolute z-[160] ${placeBelow ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
             onPointerDown={(e) => e.stopPropagation()}
           >
             <div className="bg-[var(--cream-panel)] rounded-2xl shadow-lg border border-[#EFEFEF] overflow-hidden min-w-[160px]">
