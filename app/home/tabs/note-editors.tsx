@@ -111,7 +111,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
   const currentColor = (editor.getAttributes("textStyle") as { color?: string }).color
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 1, padding: "5px 8px", borderBottom: "1px solid #F0EDE8", flexWrap: "wrap", background: "#FDFBF7" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 1, padding: "5px 8px", borderBottom: "1px solid #F0EDE8", flexWrap: "wrap", background: "var(--cream)" }}>
       {btn(editor.isActive("bold"),      () => editor.chain().focus().toggleBold().run(),   "Bold",          <Bold size={12} />)}
       {btn(editor.isActive("italic"),    () => editor.chain().focus().toggleItalic().run(), "Italic",        <Italic size={12} />)}
       {btn(editor.isActive("underline"), () => editor.chain().focus().toggleUnderline().run(), "Underline",  <UnderlineIcon size={12} />)}
@@ -158,7 +158,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
             top: "calc(100% + 4px)",
             left: "50%",
             transform: "translateX(-50%)",
-            background: "white",
+            background: "var(--cream)",
             border: "1px solid var(--line)",
             borderRadius: 8,
             boxShadow: "0 4px 14px rgba(19,16,26,0.12)",
@@ -188,7 +188,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
               onMouseDown={e => { e.preventDefault(); editor.chain().focus().unsetColor().run(); setShowColors(false) }}
               style={{
                 width: 18, height: 18, borderRadius: 4,
-                background: "white", border: "1.5px solid var(--line)",
+                background: "var(--cream)", border: "1.5px solid var(--line)",
                 cursor: "pointer", fontSize: 9, color: "var(--muted-text)",
                 display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
               }}
@@ -395,7 +395,7 @@ export function MeetingNoteEditor({
     <div className="meeting-note-editor">
       {/* Presence bar */}
       {activeUsers.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 20px", borderBottom: "1px solid #F0EDE8", background: "#FDFBF7" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 20px", borderBottom: "1px solid #F0EDE8", background: "var(--cream)" }}>
           <div style={{ display: "flex" }}>
             {activeUsers.slice(0, 4).map((u, i) => (
               <MonogramChip

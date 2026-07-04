@@ -166,7 +166,7 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
         <div key={field.id}>
           <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginBottom: 10 }}>
             {field.label}
-            {field.required && <span style={{ color: "#9D2D2D", marginLeft: 4 }}>*</span>}
+            {field.required && <span style={{ color: "var(--danger)", marginLeft: 4 }}>*</span>}
           </p>
           {field.type === 'text' && (
             <textarea
@@ -195,7 +195,7 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
                   }}>
                     <span style={{
                       width: 16, height: 16, borderRadius: '50%', flexShrink: 0, display: 'inline-block',
-                      border: `2px solid ${selected ? 'var(--cream-on-dark)' : '#C4C0B0'}`,
+                      border: `2px solid ${selected ? 'var(--cream-on-dark)' : 'var(--dashed)'}`,
                       background: selected ? 'rgba(246,244,239,0.25)' : 'transparent',
                     }} />
                     {opt}
@@ -218,7 +218,7 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
                   }}>
                     <span style={{
                       width: 16, height: 16, borderRadius: 3, flexShrink: 0,
-                      border: `2px solid ${checked ? 'var(--cream-on-dark)' : '#C4C0B0'}`,
+                      border: `2px solid ${checked ? 'var(--cream-on-dark)' : 'var(--dashed)'}`,
                       background: checked ? 'rgba(246,244,239,0.25)' : 'transparent',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>

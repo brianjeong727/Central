@@ -127,7 +127,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto min-h-0 px-5 py-5 flex flex-col gap-5">
           {error && (
-            <div className="rounded-xl bg-[#3E1540]/8 px-4 py-3 text-[13px] text-[var(--plum)] font-medium">
+            <div className="rounded-xl bg-[var(--plum)]/8 px-4 py-3 text-[13px] text-[var(--plum)] font-medium">
               {error}
             </div>
           )}
@@ -142,7 +142,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
                 placeholder={groupType === "church" ? "e.g. Freshman Bible Study" : "e.g. Prayer Group"}
-                className="w-full text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent"
+                className="w-full text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none bg-transparent"
                 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4" }}
               />
             </div>
@@ -168,7 +168,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                   onChange={(e) => setCustomName(e.target.value)}
                   placeholder={defaultName}
                   autoFocus
-                  className="w-full text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none bg-transparent"
+                  className="w-full text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none bg-transparent"
                   style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4" }}
                 />
               ) : (
@@ -188,13 +188,13 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
               )}
             </div>
             <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A8497]/40" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-text)]/40" />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search members…"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[#C4C4C4] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[var(--line)] focus:border-[#3E1540]/30 transition-all shadow-[0_1px_2px_rgba(19,16,26,0.04)]"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[var(--faint)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 border border-[var(--line)] focus:border-[var(--plum)]/30 transition-all shadow-[0_1px_2px_rgba(19,16,26,0.04)]"
               />
             </div>
 
@@ -217,7 +217,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
 
             <div className="flex flex-col rounded-2xl border border-[var(--line)] bg-[var(--cream-panel)] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
               {filtered.length === 0 ? (
-                <p className="text-center text-[13px] text-[#8A8497]/50 py-8">No members found</p>
+                <p className="text-center text-[13px] text-[var(--muted-text)]/50 py-8">No members found</p>
               ) : (
                 filtered.map((member, idx) => {
                   const isSelected = selectedIds.has(member.id)
@@ -228,7 +228,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                       onClick={() => toggleMember(member.id)}
                       className={`flex items-center gap-3 px-4 py-3 transition-all text-left ${
                         idx > 0 ? "border-t border-[#F2EDE8]" : ""
-                      } ${isSelected ? "bg-[#3E1540]/[0.04]" : "hover:bg-[#FAFAF8]"}`}
+                      } ${isSelected ? "bg-[var(--plum)]/[0.04]" : "hover:bg-[#FAFAF8]"}`}
                     >
                       <MonogramChip
                         initials={getInitials(member.name)}
@@ -611,7 +611,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     {canManage && member.user_id !== userId && (
                       isConfirming ? (
                         <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
-                          <button onClick={(e) => { e.stopPropagation(); handleRemoveMember(member.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check className="w-4 h-4" /></button>
+                          <button onClick={(e) => { e.stopPropagation(); handleRemoveMember(member.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--danger)" }}><Check className="w-4 h-4" /></button>
                           <button onClick={(e) => { e.stopPropagation(); setConfirmRemoveMemberId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X className="w-4 h-4" /></button>
                         </div>
                       ) : (
@@ -636,11 +636,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           )}
           {(canArchive || canUnarchive || canLeave || canDelete) && (
             <div className="flex flex-col gap-3 pb-4">
-              <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9F3030", margin: 0 }}>Danger zone</p>
+              <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--danger)", margin: 0 }}>Danger zone</p>
               {canArchive && <button onClick={() => setConfirmAction("archive")} className="w-full py-3.5 rounded-xl font-semibold text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Archive chat</button>}
               {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} className="w-full py-3.5 rounded-xl font-semibold text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Unarchive chat</button>}
               {canLeave && <button onClick={handleLeave} className="w-full py-3.5 rounded-xl font-semibold text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Leave chat</button>}
-              {canDelete && <button onClick={() => setConfirmAction("delete")} className="w-full py-3.5 rounded-xl font-semibold text-[13px]" style={{ background: "transparent", color: "#B0413E", border: "1px solid rgba(176,65,62,0.25)" }}>Delete chat</button>}
+              {canDelete && <button onClick={() => setConfirmAction("delete")} className="w-full py-3.5 rounded-xl font-semibold text-[13px]" style={{ background: "transparent", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)" }}>Delete chat</button>}
             </div>
           )}
         </div>
@@ -731,7 +731,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     {canManage && member.user_id !== userId ? (
                       isConfirming ? (
                         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                          <button onClick={() => handleRemoveMember(member.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "#9F3030" }}><Check style={{ width: 14, height: 14 }} /></button>
+                          <button onClick={() => handleRemoveMember(member.user_id)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--danger)" }}><Check style={{ width: 14, height: 14 }} /></button>
                           <button onClick={() => setConfirmRemoveMemberId(null)} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X style={{ width: 14, height: 14 }} /></button>
                         </div>
                       ) : (
@@ -751,13 +751,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             )}
             {(canArchive || canUnarchive || canLeave || canDelete) && (
               <div style={{ marginTop: 36 }}>
-                <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9F3030", margin: "0 0 12px" }}>Danger zone</p>
+                <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--danger)", margin: "0 0 12px" }}>Danger zone</p>
                 <div style={{ height: 1, background: "var(--line)", marginBottom: 16 }} />
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                   {canArchive && <button onClick={() => setConfirmAction("archive")} style={{ height: 36, padding: "0 18px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Archive chat</button>}
                   {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} style={{ height: 36, padding: "0 18px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Unarchive chat</button>}
                   {canLeave && <button onClick={handleLeave} style={{ height: 36, padding: "0 18px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Leave chat</button>}
-                  {canDelete && <button onClick={() => setConfirmAction("delete")} style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 18px", background: "transparent", border: "1px solid rgba(176,65,62,0.25)", borderRadius: "var(--r-chip)", color: "#B0413E", fontSize: 14, cursor: "pointer" }}><Trash2 style={{ width: 14, height: 14 }} /> Delete chat</button>}
+                  {canDelete && <button onClick={() => setConfirmAction("delete")} style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 18px", background: "transparent", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: "var(--r-chip)", color: "var(--danger)", fontSize: 14, cursor: "pointer" }}><Trash2 style={{ width: 14, height: 14 }} /> Delete chat</button>}
                 </div>
               </div>
             )}
@@ -789,7 +789,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               <button onClick={() => setConfirmAction(null)} style={{ height: 38, padding: "0 16px", background: "transparent", border: "1px solid var(--line)", borderRadius: 10, color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Cancel</button>
               <button
                 onClick={() => { const a = confirmAction; setConfirmAction(null); if (a === "archive") handleArchive(); else if (a === "unarchive") handleUnarchive(); else handleDelete() }}
-                style={{ height: 38, padding: "0 20px", background: confirmAction === "unarchive" ? "var(--plum-2)" : "#9F3030", color: "var(--cream)", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}
+                style={{ height: 38, padding: "0 20px", background: confirmAction === "unarchive" ? "var(--plum-2)" : "var(--danger)", color: "var(--cream)", borderRadius: 10, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer" }}
               >
                 {confirmAction === "archive" ? "Archive" : confirmAction === "unarchive" ? "Unarchive" : "Delete"}
               </button>
@@ -2126,7 +2126,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 else if (e.key === "ArrowUp") { e.preventDefault(); goToPrevMatch() }
               }}
               placeholder="Search messages…"
-              className="flex-1 bg-transparent outline-none text-[14px] text-[var(--ink)] placeholder:text-[#A09A8C] min-w-0"
+              className="flex-1 bg-transparent outline-none text-[14px] text-[var(--ink)] placeholder:text-[var(--faint)] min-w-0"
             />
             {searchQuery.trim() && (
               <span style={{ fontSize: "12px", color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>
@@ -2213,7 +2213,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       {/* ── Pinned message banner ── */}
       {pinnedMessage && (
         <div
-          className="flex-shrink-0 border-b border-[var(--line)] bg-[#F8F4EA] px-4 py-2 flex items-center gap-2.5 cursor-pointer"
+          className="flex-shrink-0 border-b border-[var(--line)] bg-[var(--cream-2)] px-4 py-2 flex items-center gap-2.5 cursor-pointer"
           onClick={() => scrollToMessage(pinnedMessage.id)}
         >
           <Pin className="w-3.5 h-3.5 text-[var(--plum)] flex-shrink-0" />
@@ -2226,7 +2226,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           {canPin && (
             <button
               onClick={(e) => { e.stopPropagation(); handleUnpin() }}
-              className="flex-shrink-0 p-1 text-[#C4C4C4] hover:text-[var(--body)] transition-colors"
+              className="flex-shrink-0 p-1 text-[var(--faint)] hover:text-[var(--body)] transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -2241,8 +2241,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <p className="text-[14px] font-semibold text-[#13101A]/40">No messages yet</p>
-              <p className="text-[12px] text-[#8A8497]/40 mt-1">Say hello! 👋</p>
+              <p className="text-[14px] font-semibold text-[var(--ink)]/40">No messages yet</p>
+              <p className="text-[12px] text-[var(--muted-text)]/40 mt-1">Say hello! 👋</p>
             </div>
           </div>
         ) : (
@@ -2390,7 +2390,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                     See all votes
                   </button>
                 )}
-                <button onClick={closeFn} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
+                <button onClick={closeFn} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--body-bg)] transition-colors">
                   <X className="w-4 h-4 text-[var(--body)]" />
                 </button>
               </div>
@@ -2457,7 +2457,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   <div className="px-5 pb-5 pt-3 border-t border-[#F0EDE6] flex-shrink-0 flex gap-2">
                     <button
                       onClick={closeFn}
-                      className="flex-1 py-2.5 rounded-xl border border-[var(--line)] text-[13px] font-semibold text-[var(--body)] hover:bg-[#F4F1E8] transition-colors"
+                      className="flex-1 py-2.5 rounded-xl border border-[var(--line)] text-[13px] font-semibold text-[var(--body)] hover:bg-[var(--body-bg)] transition-colors"
                     >
                       Cancel
                     </button>
@@ -2497,7 +2497,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             <div className="w-full max-w-[390px] md:max-w-[440px] bg-[var(--cream-panel)] rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
               <div className="flex items-center px-5 pt-5 pb-3 border-b border-[#F0EDE6] flex-shrink-0">
                 <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", flex: 1 }}>Votes</p>
-                <button onClick={() => setVotersPollId(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
+                <button onClick={() => setVotersPollId(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--body-bg)] transition-colors">
                   <X className="w-4 h-4 text-[var(--body)]" />
                 </button>
               </div>
@@ -2543,7 +2543,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           <div className="w-full max-w-[390px] md:max-w-[440px] bg-[var(--cream-panel)] rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F0EEF8]">
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Create a poll</p>
-              <button onClick={() => setShowPollCreator(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
+              <button onClick={() => setShowPollCreator(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--body-bg)] transition-colors">
                 <X className="w-4 h-4 text-[var(--body)]" />
               </button>
             </div>
@@ -2555,7 +2555,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   value={pollQuestion}
                   onChange={e => setPollQuestion(e.target.value)}
                   placeholder="Ask something…"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--cream-panel)] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-colors"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--cream-panel)] text-[14px] text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--plum)]/40 transition-colors"
                 />
               </div>
               <div>
@@ -2567,10 +2567,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                         value={opt}
                         onChange={e => setPollOptions(prev => { const next = [...prev]; next[oi] = e.target.value; return next })}
                         placeholder={`Option ${oi + 1}`}
-                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--cream-panel)] text-[14px] text-[var(--ink)] placeholder:text-[#C4C4C4] focus:outline-none focus:border-[#3E1540]/40 transition-colors"
+                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--cream-panel)] text-[14px] text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--plum)]/40 transition-colors"
                       />
                       {pollOptions.length > 2 && (
-                        <button onClick={() => setPollOptions(prev => prev.filter((_, i) => i !== oi))} className="text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
+                        <button onClick={() => setPollOptions(prev => prev.filter((_, i) => i !== oi))} className="text-[var(--faint)] hover:text-[var(--body)] transition-colors">
                           <X className="w-4 h-4" />
                         </button>
                       )}
@@ -2607,7 +2607,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           <div className="w-full max-w-[390px] md:max-w-[420px] bg-[var(--cream-panel)] rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F0EEF8]">
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Forward to</p>
-              <button onClick={() => setForwardingMsg(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors">
+              <button onClick={() => setForwardingMsg(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--body-bg)] transition-colors">
                 <X className="w-4 h-4 text-[var(--body)]" />
               </button>
             </div>
@@ -2628,7 +2628,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                     {forwardSentTo === g.id ? (
                       <Check className="w-4 h-4 text-green-500" />
                     ) : (
-                      <Forward className="w-4 h-4 text-[#C4C4C4]" />
+                      <Forward className="w-4 h-4 text-[var(--faint)]" />
                     )}
                   </button>
                 ))
@@ -2759,13 +2759,13 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   return (
     <div className="pb-2 md:pb-0 md:h-full md:flex md:flex-col">
       {/* Desktop Plan C header */}
-      <div className="hidden md:block px-5 pt-5 pb-4 border-b border-[#E5E0D2] flex-shrink-0">
+      <div className="hidden md:block px-5 pt-5 pb-4 border-b border-[var(--line-2)] flex-shrink-0">
         <p style={monoStyle}>Workspace</p>
         <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", lineHeight: 1.1, color: "var(--ink)", marginTop: "4px" }}>{ministryName}</p>
       </div>
 
       {/* Desktop search */}
-      <div className="hidden md:flex items-center gap-2 mx-3 my-3 px-3.5 py-2.5 border border-[#E5E0D2] rounded-lg bg-[#F4F1E8] text-[var(--muted-text)] flex-shrink-0">
+      <div className="hidden md:flex items-center gap-2 mx-3 my-3 px-3.5 py-2.5 border border-[var(--line-2)] rounded-lg bg-[var(--body-bg)] text-[var(--muted-text)] flex-shrink-0">
         <Search className="w-4 h-4 flex-shrink-0" />
         <input
           type="text"
@@ -2844,13 +2844,13 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
 
       {/* Search bar — mobile only (desktop has one in the panel header above) */}
       <div className="relative mb-4 md:hidden">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8A8497]/40" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-text)]/40" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search chats…"
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[#C4C4C4] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 border border-[#EFEFEF] focus:border-[#3E1540]/30 transition-all"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[var(--faint)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 border border-[#EFEFEF] focus:border-[var(--plum)]/30 transition-all"
         />
       </div>
 
@@ -2901,10 +2901,10 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
                 onClick={() => setShowArchived((s) => !s)}
                 className="w-full flex items-center justify-between py-3 px-1 md:px-4"
               >
-                <span className="text-[11px] font-bold text-[#8A8497]/40 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-[var(--muted-text)]/40 uppercase tracking-wider">
                   Archived · {archivedChurchChats.length}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-[#8A8497]/30 transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-4 h-4 text-[var(--muted-text)]/30 transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />
               </button>
               {showArchived && (
                 <div className="flex flex-col gap-2.5">
@@ -3123,7 +3123,7 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search chats"
-            className="w-full pl-9 pr-3 py-2 rounded-lg border text-[12.5px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+            className="w-full pl-9 pr-3 py-2 rounded-lg border text-[12.5px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20"
             style={{ background: "var(--cream)", borderColor: "var(--line-2)", color: "var(--ink)" }}
           />
         </div>

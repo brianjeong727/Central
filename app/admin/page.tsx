@@ -69,7 +69,7 @@ export default function AdminPage() {
     <div className="min-h-screen bg-[var(--cream-panel)]">
 
       {/* Header */}
-      <div className="border-b border-[#E5E0D2] bg-white px-6 py-4 flex items-center gap-4">
+      <div className="border-b border-[var(--line-2)] bg-[var(--cream)] px-6 py-4 flex items-center gap-4">
         <div className="flex items-center gap-2.5">
           <svg width="24" height="24" viewBox="0 0 100 100" fill="none">
             <path d="M70 28 A32 32 0 1 0 70 72" stroke="var(--plum)" strokeWidth="8" strokeLinecap="round" />
@@ -79,7 +79,7 @@ export default function AdminPage() {
             Central
           </span>
         </div>
-        <div className="h-5 w-px bg-[#E5E0D2]" />
+        <div className="h-5 w-px bg-[var(--line-2)]" />
         <span className="text-[13px] font-semibold text-[var(--muted-text)] uppercase tracking-wider">Admin</span>
         <div className="flex-1" />
         {!loading && (
@@ -89,7 +89,7 @@ export default function AdminPage() {
         )}
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#E5E0D2] text-[13px] text-[var(--muted-text)] hover:text-[#9D2D2D] hover:border-red-200 hover:bg-red-50 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--line-2)] text-[13px] text-[var(--muted-text)] hover:text-[var(--danger)] hover:border-red-200 hover:bg-red-50 transition-colors"
         >
           <LogOut className="w-3.5 h-3.5" />
           Sign out
@@ -111,7 +111,7 @@ export default function AdminPage() {
         )}
 
         {error && (
-          <div className="rounded-xl bg-[#3E1540]/8 px-5 py-4 text-[14px] text-[var(--plum)] font-medium">
+          <div className="rounded-xl bg-[var(--plum)]/8 px-5 py-4 text-[14px] text-[var(--plum)] font-medium">
             {error}
           </div>
         )}
@@ -128,7 +128,7 @@ export default function AdminPage() {
 
         <div className="flex flex-col gap-5">
           {ministries.map((m) => (
-            <div key={m.id} className="bg-white rounded-2xl border border-[#E5E0D2] p-6 shadow-[0_2px_8px_rgba(19,16,26,0.04)]">
+            <div key={m.id} className="bg-[var(--cream)] rounded-2xl border border-[var(--line-2)] p-6">
 
               {/* Ministry name + date */}
               <div className="flex items-start justify-between gap-4 mb-4">
@@ -167,7 +167,7 @@ export default function AdminPage() {
                   <p className="text-[11px] font-semibold text-[var(--muted-text)] uppercase tracking-wider mb-2">Teams</p>
                   <div className="flex flex-wrap gap-2">
                     {m.teams.map((t, i) => (
-                      <span key={i} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F4F1E8] border border-[#E5E0D2] text-[12px] text-[var(--ink)]">
+                      <span key={i} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--body-bg)] border border-[var(--line-2)] text-[12px] text-[var(--ink)]">
                         {t.icon} {t.name}
                       </span>
                     ))}
@@ -176,7 +176,7 @@ export default function AdminPage() {
               )}
 
               {/* Creator */}
-              <div className="pt-4 border-t border-[#F4F1E8] flex items-center justify-between">
+              <div className="pt-4 border-t border-[var(--body-bg)] flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-semibold text-[var(--muted-text)] uppercase tracking-wider mb-1">Applied by</p>
                   <p className="text-[13px] text-[var(--ink)] font-medium">{m.creatorName ?? "—"}</p>
@@ -187,7 +187,7 @@ export default function AdminPage() {
                   <button
                     onClick={() => handleReject(m.id)}
                     disabled={acting === m.id}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-[#E5E0D2] text-[13px] font-semibold text-[#9D2D2D] hover:bg-red-50 hover:border-red-200 disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-[var(--line-2)] text-[13px] font-semibold text-[var(--danger)] hover:bg-red-50 hover:border-red-200 disabled:opacity-50 transition-colors"
                   >
                     <X className="w-3.5 h-3.5" />
                     Reject

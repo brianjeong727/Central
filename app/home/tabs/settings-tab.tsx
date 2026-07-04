@@ -714,7 +714,7 @@ export function SettingsTab({
                         {isAdmin && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} />}
                       </div>
                     )}
-                    {infoError && <p style={{ fontSize: "12px", color: "#DC2626", marginTop: 4 }}>{infoError}</p>}
+                    {infoError && <p style={{ fontSize: "12px", color: "var(--danger)", marginTop: 4 }}>{infoError}</p>}
                   </div>
                 </div>
               </section>
@@ -729,7 +729,7 @@ export function SettingsTab({
                     </div>
                     <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
                       <button onClick={isAdmin ? handleToggle : undefined} disabled={toggling || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: isPublic ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
-                        <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "#FDFCF8", top: 2, ...(isPublic ? { right: 2 } : { left: 2 }) }} />
+                        <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(isPublic ? { right: 2 } : { left: 2 }) }} />
                       </button>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Public discovery</div>
@@ -757,8 +757,8 @@ export function SettingsTab({
                         </div>
                       )}
                       {isAdmin && addingSchool && (
-                        <div style={{ padding: "16px 18px", borderTop: schools.length > 0 ? "1px solid #EFE9DA" : undefined }}>
-                          {schoolError && <p style={{ fontSize: 12, color: "#E53E3E", marginBottom: 8 }}>{schoolError}</p>}
+                        <div style={{ padding: "16px 18px", borderTop: schools.length > 0 ? "1px solid var(--line-3)" : undefined }}>
+                          {schoolError && <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>{schoolError}</p>}
                           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
                             <input autoFocus type="text" placeholder="School name (e.g. University of Pittsburgh)" value={newSchoolName} onChange={e => setNewSchoolName(e.target.value)} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                             <input type="text" placeholder="Abbreviation (e.g. Pitt)" value={newSchoolAbbr} onChange={e => setNewSchoolAbbr(e.target.value)} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
@@ -788,7 +788,7 @@ export function SettingsTab({
                     {homeVerses.map((v, idx) => {
                       const isToday = v.id === todayVerseId
                       return (
-                        <div key={v.id} style={{ background: dragOverVerseIdx === idx ? "#F7F4EF" : isToday ? "#F6F2E8" : undefined, borderBottom: "1px solid #EFE9DA", transition: "background 100ms" }} draggable={editingVerseId !== v.id && confirmDeleteVerseId !== v.id} onDragStart={e => handleVerseDragStart(e, idx)} onDragOver={e => { e.preventDefault(); setDragOverVerseIdx(idx) }} onDragLeave={() => setDragOverVerseIdx(null)} onDrop={e => handleVerseDrop(e, idx)}>
+                        <div key={v.id} style={{ background: dragOverVerseIdx === idx ? "#F7F4EF" : isToday ? "var(--cream-3)" : undefined, borderBottom: "1px solid var(--line-3)", transition: "background 100ms" }} draggable={editingVerseId !== v.id && confirmDeleteVerseId !== v.id} onDragStart={e => handleVerseDragStart(e, idx)} onDragOver={e => { e.preventDefault(); setDragOverVerseIdx(idx) }} onDragLeave={() => setDragOverVerseIdx(null)} onDrop={e => handleVerseDrop(e, idx)}>
                           {editingVerseId === v.id ? (
                             <div style={{ padding: "16px 22px", display: "flex", flexDirection: "column", gap: 8 }}>
                               <input autoFocus value={verseRefDraft} onChange={e => setVerseRefDraft(e.target.value)} placeholder="Reference (e.g. John 3:16)" style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
@@ -803,12 +803,12 @@ export function SettingsTab({
                               <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>Remove &ldquo;{v.reference}&rdquo;?</p>
                               <div style={{ display: "flex", gap: 8 }}>
                                 <button onClick={() => setConfirmDeleteVerseId(null)} style={{ flex: 1, padding: "5px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
-                                <button onClick={() => handleDeleteVerse(v.id)} disabled={deletingVerseId === v.id} style={{ flex: 1, padding: "5px 0", background: "#9D2D2D", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "white", opacity: deletingVerseId === v.id ? 0.6 : 1 }}>{deletingVerseId === v.id ? "Removing…" : "Remove"}</button>
+                                <button onClick={() => handleDeleteVerse(v.id)} disabled={deletingVerseId === v.id} style={{ flex: 1, padding: "5px 0", background: "var(--danger)", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", color: "white", opacity: deletingVerseId === v.id ? 0.6 : 1 }}>{deletingVerseId === v.id ? "Removing…" : "Remove"}</button>
                               </div>
                             </div>
                           ) : (
                             <div className="group" style={{ display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 22px" }}>
-                              <span style={{ color: "#A09A8C", cursor: "grab", fontSize: 16, marginTop: 2, userSelect: "none", fontFamily: "ui-monospace, Menlo, monospace", flexShrink: 0 }}>⋮⋮</span>
+                              <span style={{ color: "var(--faint)", cursor: "grab", fontSize: 16, marginTop: 2, userSelect: "none", fontFamily: "ui-monospace, Menlo, monospace", flexShrink: 0 }}>⋮⋮</span>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                   <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{v.reference}</span>
@@ -826,7 +826,7 @@ export function SettingsTab({
                       )
                     })}
                     {addingVerse ? (
-                      <div style={{ padding: "16px 22px", display: "flex", flexDirection: "column", gap: 8, borderTop: homeVerses.length > 0 ? "1px solid #EFE9DA" : undefined }}>
+                      <div style={{ padding: "16px 22px", display: "flex", flexDirection: "column", gap: 8, borderTop: homeVerses.length > 0 ? "1px solid var(--line-3)" : undefined }}>
                         <input autoFocus value={newVerseRef} onChange={e => setNewVerseRef(e.target.value)} placeholder="Reference (e.g. John 3:16)" style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                         <textarea value={newVerseText} onChange={e => setNewVerseText(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAddVerse() } }} placeholder="Verse text" rows={3} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
                         <div style={{ display: "flex", gap: 8 }}>
@@ -835,7 +835,7 @@ export function SettingsTab({
                         </div>
                       </div>
                     ) : (
-                      <div style={{ padding: "14px 22px", borderTop: homeVerses.length > 0 ? "1px solid #EFE9DA" : undefined }}>
+                      <div style={{ padding: "14px 22px", borderTop: homeVerses.length > 0 ? "1px solid var(--line-3)" : undefined }}>
                         <button onClick={() => setAddingVerse(true)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--plum)", fontWeight: 500, fontFamily: "inherit", padding: 0 }}>+ Add verse</button>
                       </div>
                     )}
@@ -848,7 +848,7 @@ export function SettingsTab({
                 <section>
                   <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 22 }}>
                     <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", fontWeight: 400, letterSpacing: "1.2px", textTransform: "uppercase", color: "#9F3030", whiteSpace: "nowrap" }}>Danger Zone</p>
+                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", fontWeight: 400, letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--danger)", whiteSpace: "nowrap" }}>Danger Zone</p>
                     <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
                   </div>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
@@ -857,14 +857,14 @@ export function SettingsTab({
                       <p style={{ fontSize: "13px", color: "var(--body)", lineHeight: 1.6, maxWidth: "560px" }}>Deactivates the ministry. Members lose access immediately. Data is preserved and can be restored by contacting support.</p>
                     </div>
                     {!showArchiveConfirm ? (
-                      <button onClick={() => setShowArchiveConfirm(true)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 10, border: "1px solid #9F3030", color: "#9F3030", background: "transparent", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Archive</button>
+                      <button onClick={() => setShowArchiveConfirm(true)} style={{ flexShrink: 0, padding: "10px 18px", borderRadius: 10, border: "1px solid var(--danger)", color: "var(--danger)", background: "transparent", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Archive</button>
                     ) : (
                       <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
                         <p style={{ fontSize: "12px", color: "var(--muted-text)", textAlign: "right" }}>Type <strong style={{ color: "var(--ink)" }}>{ministryInfo?.name ?? ministryName}</strong> to confirm</p>
-                        <input value={archiveConfirmText} onChange={e => setArchiveConfirmText(e.target.value)} placeholder="Ministry name…" style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid #9F3030", fontSize: 13, color: "var(--ink)", outline: "none", background: "var(--cream-panel)", width: 192, fontFamily: "inherit" }} />
+                        <input value={archiveConfirmText} onChange={e => setArchiveConfirmText(e.target.value)} placeholder="Ministry name…" style={{ padding: "8px 12px", borderRadius: 10, border: "1.5px solid var(--danger)", fontSize: 13, color: "var(--ink)", outline: "none", background: "var(--cream-panel)", width: 192, fontFamily: "inherit" }} />
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => { setShowArchiveConfirm(false); setArchiveConfirmText("") }} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                          <button onClick={handleArchive} disabled={archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName)} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid #9F3030", fontSize: 12, fontWeight: 600, color: "#9F3030", background: "transparent", cursor: "pointer", opacity: archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName) ? 0.5 : 1 }}>{archiving ? "Archiving…" : "Archive ministry"}</button>
+                          <button onClick={handleArchive} disabled={archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName)} style={{ padding: "6px 12px", borderRadius: 10, border: "1px solid var(--danger)", fontSize: 12, fontWeight: 600, color: "var(--danger)", background: "transparent", cursor: "pointer", opacity: archiving || archiveConfirmText !== (ministryInfo?.name ?? ministryName) ? 0.5 : 1 }}>{archiving ? "Archiving…" : "Archive ministry"}</button>
                         </div>
                       </div>
                     )}
@@ -921,7 +921,7 @@ export function SettingsTab({
                     <AlertTriangle style={{ width: 16, height: 16, color: "#F87171", flexShrink: 0 }} />
                     <p style={{ fontSize: 13, color: "var(--body)", flex: 1, margin: 0 }}>Remove <strong style={{ color: "var(--ink)" }}>{target?.name}</strong> from this ministry?</p>
                     <button onClick={() => setPeopleRemoveConfirmId(null)} style={{ fontSize: 12, color: "var(--body)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
-                    <button onClick={async () => { setPeopleRemoving(true); await handleRemoveMember(peopleRemoveConfirmId); setPeopleRemoving(false); setPeopleRemoveConfirmId(null) }} disabled={peopleRemoving} style={{ fontSize: 12, fontWeight: 600, color: "#9F3030", border: "1px solid #9F3030", background: "transparent", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: peopleRemoving ? 0.6 : 1 }}>
+                    <button onClick={async () => { setPeopleRemoving(true); await handleRemoveMember(peopleRemoveConfirmId); setPeopleRemoving(false); setPeopleRemoveConfirmId(null) }} disabled={peopleRemoving} style={{ fontSize: 12, fontWeight: 600, color: "var(--danger)", border: "1px solid var(--danger)", background: "transparent", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: peopleRemoving ? 0.6 : 1 }}>
                       {peopleRemoving ? "Removing…" : "Remove"}
                     </button>
                   </div>
@@ -936,7 +936,7 @@ export function SettingsTab({
                   const isMe = m.id === userId
                   const menuOpen = peopleRoleMenuOpen === m.id
                   return (
-                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < peopleFiltered.length - 1 ? "1px solid #EFE9DA" : "none", position: "relative" }}>
+                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < peopleFiltered.length - 1 ? "1px solid var(--line-3)" : "none", position: "relative" }}>
                       <MonogramChip initials={getInitials(m.name)} className="w-[38px] h-[38px] text-[13px] font-semibold" />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -950,7 +950,7 @@ export function SettingsTab({
                         <div style={{ position: "relative" }}>
                           {menuOpen && <div style={{ position: "fixed", inset: 0, zIndex: 5 }} onClick={() => setPeopleRoleMenuOpen(null)} />}
                           <button onClick={() => setPeopleRoleMenuOpen(menuOpen ? null : m.id)} style={{ width: 28, height: 28, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer" }}>
-                            <MoreHorizontal style={{ width: 16, height: 16, color: "#A09A8C" }} />
+                            <MoreHorizontal style={{ width: 16, height: 16, color: "var(--faint)" }} />
                           </button>
                           {menuOpen && (
                             <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "var(--cream-panel)", borderRadius: 12, boxShadow: "0 4px 20px rgba(19,16,26,0.12)", border: "1px solid var(--line)", padding: "6px 0", minWidth: 160 }}>
@@ -961,8 +961,8 @@ export function SettingsTab({
                                   {m.role.toLowerCase() === r && <Check style={{ width: 14, height: 14, color: "var(--plum)" }} />}
                                 </button>
                               ))}
-                              <div style={{ margin: "6px 12px", borderTop: "1px solid #EFE9DA" }} />
-                              <button onClick={() => { setPeopleRemoveConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#9F3030", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>Remove from ministry</button>
+                              <div style={{ margin: "6px 12px", borderTop: "1px solid var(--line-3)" }} />
+                              <button onClick={() => { setPeopleRemoveConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>Remove from ministry</button>
                               <button onClick={() => { setPeopleExcomConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#7A1010", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box", fontWeight: 600 }}>Excommunicate</button>
                             </div>
                           )}
@@ -978,10 +978,10 @@ export function SettingsTab({
                 const target = members.find(m => m.id === peopleExcomConfirmId)
                 return (
                   <div style={{ borderRadius: 10, border: "1px solid #F87171", background: "#FFF0F0", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-                    <AlertTriangle style={{ width: 16, height: 16, color: "#9F3030", flexShrink: 0 }} />
+                    <AlertTriangle style={{ width: 16, height: 16, color: "var(--danger)", flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
                       <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 2px" }}>Excommunicate <strong style={{ color: "var(--ink)" }}>{target?.name}</strong>?</p>
-                      <p style={{ fontSize: 12, color: "#9F3030", margin: 0 }}>This is permanent. They will never be able to rejoin this ministry.</p>
+                      <p style={{ fontSize: 12, color: "var(--danger)", margin: 0 }}>This is permanent. They will never be able to rejoin this ministry.</p>
                     </div>
                     <button onClick={() => setPeopleExcomConfirmId(null)} style={{ fontSize: 12, color: "var(--body)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
                     <button onClick={() => handleExcommunicate(peopleExcomConfirmId)} disabled={excomming} style={{ fontSize: 12, fontWeight: 700, color: "var(--cream-panel)", border: "none", background: "#7A1010", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: excomming ? 0.6 : 1 }}>
@@ -1003,7 +1003,7 @@ export function SettingsTab({
                           <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{b.name ?? "Unknown"}</div>
                           <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 1 }}>{b.email ?? ""}</div>
                         </div>
-                        <span style={{ fontSize: 11, color: "#9F3030", fontFamily: "ui-monospace, Menlo, monospace", letterSpacing: "0.05em", textTransform: "uppercase" }}>Banned</span>
+                        <span style={{ fontSize: 11, color: "var(--danger)", fontFamily: "ui-monospace, Menlo, monospace", letterSpacing: "0.05em", textTransform: "uppercase" }}>Banned</span>
                       </div>
                     ))}
                   </div>
@@ -1032,7 +1032,7 @@ export function SettingsTab({
 
                 <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
                   <button onClick={handleToggleAllAdmins} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: governanceSettings.all_admins ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
-                    <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "#FDFCF8", top: 2, ...(governanceSettings.all_admins ? { right: 2 } : { left: 2 }) }} />
+                    <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(governanceSettings.all_admins ? { right: 2 } : { left: 2 }) }} />
                   </button>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>All admins can govern teams</div>
@@ -1049,7 +1049,7 @@ export function SettingsTab({
                       ) : adminMembers.map((m, i) => {
                         const included = governanceSettings.roster_ids.includes(m.id)
                         return (
-                          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 22px", borderBottom: i < adminMembers.length - 1 ? "1px solid #EFE9DA" : "none" }}>
+                          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 22px", borderBottom: i < adminMembers.length - 1 ? "1px solid var(--line-3)" : "none" }}>
                             <MonogramChip initials={getInitials(m.name)} className="w-9 h-9 text-[13px] font-semibold" />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{m.name}</div>
@@ -1057,7 +1057,7 @@ export function SettingsTab({
                             </div>
                             {roleBadge(m.role)}
                             <button onClick={() => handleToggleRosterMember(m.id)} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: included ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
-                              <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "#FDFCF8", top: 2, ...(included ? { right: 2 } : { left: 2 }) }} />
+                              <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(included ? { right: 2 } : { left: 2 }) }} />
                             </button>
                           </div>
                         )
@@ -1089,7 +1089,7 @@ export function SettingsTab({
                   {govTeams.length === 0 ? (
                     <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "20px 22px", textAlign: "center" }}>No teams yet.</p>
                   ) : govTeams.map((team, i) => (
-                    <div key={team.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < govTeams.length - 1 ? "1px solid #EFE9DA" : "none" }}>
+                    <div key={team.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < govTeams.length - 1 ? "1px solid var(--line-3)" : "none" }}>
                       <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{team.icon ?? "•"}</div>
                       <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{team.name}</div>
                       <div style={{ display: "inline-flex", border: "1px solid var(--line-2)", borderRadius: 999, padding: 2, background: "var(--ivory)", flexShrink: 0 }}>
@@ -1130,7 +1130,7 @@ export function SettingsTab({
                   return (
                     <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, outline: changed ? "2px solid var(--plum)" : "none", outlineOffset: -2 }}>
                       <button onClick={() => handleAutomationToggle(key)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
-                        <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "#FDFCF8", top: 2, ...(on ? { right: 2 } : { left: 2 }) }} />
+                        <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(on ? { right: 2 } : { left: 2 }) }} />
                       </button>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{label}</div>
@@ -1149,9 +1149,9 @@ export function SettingsTab({
                     { key: "auto_praise_chat",    label: "Auto-create praise team chats", sub: "When a Sunday week is confirmed, a new chat is opened with that week's lineup." },
                     { key: "auto_archive_praise", label: "Auto-archive praise team chats", sub: "After Sunday at 11:59 pm, the chat is archived from your active list." },
                   ] as { key: string; label: string; sub: string }[]).map(({ key, label, sub }) => (
-                    <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "#F8F4EA", opacity: 0.6, pointerEvents: "none" }}>
+                    <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "var(--cream-2)", opacity: 0.6, pointerEvents: "none" }}>
                       <div style={{ width: 38, height: 22, borderRadius: 999, background: "#D6D0C0", position: "relative", flexShrink: 0 }}>
-                        <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "#FDFCF8", top: 2, left: 2 }} />
+                        <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, left: 2 }} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", display: "flex", alignItems: "center", gap: 8 }}>
@@ -1169,7 +1169,7 @@ export function SettingsTab({
               {showArchiveWarning && (
                 <div style={{ ...CARD, padding: 20, borderColor: "#FECACA", background: "#FFF5F5" }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                    <AlertTriangle style={{ width: 18, height: 18, color: "#DC2626", flexShrink: 0, marginTop: 1 }} />
+                    <AlertTriangle style={{ width: 18, height: 18, color: "var(--danger)", flexShrink: 0, marginTop: 1 }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 6 }}>This will archive chats</div>
                       <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.55, marginBottom: 14 }}>
@@ -1177,7 +1177,7 @@ export function SettingsTab({
                       </div>
                       <div style={{ display: "flex", gap: 10 }}>
                         <button onClick={() => setShowArchiveWarning(false)} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
-                        <button onClick={commitSaveAutomations} disabled={savingAutomations} style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "#DC2626", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
+                        <button onClick={commitSaveAutomations} disabled={savingAutomations} style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--danger)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
                           {savingAutomations ? "Saving…" : "Archive & Save"}
                         </button>
                       </div>
@@ -1208,7 +1208,7 @@ export function SettingsTab({
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Run annual class maintenance</div>
                     <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Creates the new incoming class chat for this fall, and converts the graduating class chat from a church chat to a my-chat. Safe to run multiple times.</div>
-                    {maintenanceResult && <div style={{ marginTop: 8, fontSize: 12, color: maintenanceResult.startsWith("Error") ? "#9F3030" : "#3E7A40" }}>{maintenanceResult}</div>}
+                    {maintenanceResult && <div style={{ marginTop: 8, fontSize: 12, color: maintenanceResult.startsWith("Error") ? "var(--danger)" : "#3E7A40" }}>{maintenanceResult}</div>}
                   </div>
                   <button onClick={handleRunMaintenance} disabled={maintenanceRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: maintenanceRunning ? "var(--line-2)" : "var(--cream-panel)", color: maintenanceRunning ? "var(--muted-text)" : "var(--ink)", fontSize: 13, fontWeight: 500, cursor: maintenanceRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
                     {maintenanceRunning ? "Running…" : "Run now"}
@@ -1222,7 +1222,7 @@ export function SettingsTab({
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Departed member cleanup</div>
                     <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Permanently anonymizes messages from members who left more than 30 days ago. Their messages remain but show as "Former Member."</div>
-                    {cleanupResult && <div style={{ marginTop: 8, fontSize: 12, color: cleanupResult.startsWith("Error") ? "#9F3030" : "#3E7A40" }}>{cleanupResult}</div>}
+                    {cleanupResult && <div style={{ marginTop: 8, fontSize: 12, color: cleanupResult.startsWith("Error") ? "var(--danger)" : "#3E7A40" }}>{cleanupResult}</div>}
                   </div>
                   <button onClick={handleRunDepartedCleanup} disabled={cleanupRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: cleanupRunning ? "var(--line-2)" : "var(--cream-panel)", color: cleanupRunning ? "var(--muted-text)" : "var(--ink)", fontSize: 13, fontWeight: 500, cursor: cleanupRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
                     {cleanupRunning ? "Running…" : "Run now"}
@@ -1333,7 +1333,7 @@ export function SettingsTab({
                       const catLabel = { dg_dinner: "DG Dinner", welcoming_week: "Welcoming Week", coffeehouse: "Coffeehouse", turkeybowl: "Turkey Bowl", supplies: "Supplies", other: "Other" }[l.category] ?? l.category
                       const fundLabel = { church: "Church", cmu: "CMU", pitt: "Pitt" }[l.fund] ?? l.fund
                       return (
-                        <div key={l.id} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr auto auto", alignItems: "center", gap: 18, padding: "16px 22px", borderBottom: i < receiptLimits.length - 1 ? "1px solid #EFE9DA" : "none" }}>
+                        <div key={l.id} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr auto auto", alignItems: "center", gap: 18, padding: "16px 22px", borderBottom: i < receiptLimits.length - 1 ? "1px solid var(--line-3)" : "none" }}>
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{catLabel}</div>
                             <div style={{ marginTop: 2, fontSize: 13, color: "var(--muted-text)" }}>{fundLabel} fund</div>
@@ -1348,7 +1348,7 @@ export function SettingsTab({
                                 value={editingLimitAmount}
                                 onChange={e => setEditingLimitAmount(e.target.value)}
                                 onKeyDown={e => { if (e.key === "Enter") handleSaveLimitEdit(l.id, l.category, l.fund); if (e.key === "Escape") { setEditingLimitId(null); setEditingLimitAmount("") } }}
-                                style={{ padding: "6px 10px", border: "1.5px solid var(--plum)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none", width: "100%" }}
+                                style={{ padding: "6px 10px", border: "1.5px solid var(--plum)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "var(--cream)", outline: "none", width: "100%" }}
                               />
                               <button
                                 onClick={() => handleSaveLimitEdit(l.id, l.category, l.fund)}
@@ -1364,24 +1364,24 @@ export function SettingsTab({
                             <>
                               <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "var(--ink)", letterSpacing: -0.2 }}>${Number(l.max_amount).toFixed(0)}</div>
                               <button onClick={() => { setEditingLimitId(l.id); setEditingLimitAmount(String(Math.round(l.max_amount))) }} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>Edit</button>
-                              <button onClick={() => handleDeleteLimit(l.id)} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "#9F3030", fontSize: 12, cursor: "pointer" }}>Remove</button>
+                              <button onClick={() => handleDeleteLimit(l.id)} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--danger)", fontSize: 12, cursor: "pointer" }}>Remove</button>
                             </>
                           )}
                         </div>
                       )
                     })}
                     {addingLimit && (
-                      <div style={{ padding: "16px 22px", borderTop: receiptLimits.length > 0 ? "1px solid #EFE9DA" : undefined }}>
+                      <div style={{ padding: "16px 22px", borderTop: receiptLimits.length > 0 ? "1px solid var(--line-3)" : undefined }}>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: 8, marginBottom: 10 }}>
-                          <select value={newLimitCategory} onChange={e => setNewLimitCategory(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }}>
+                          <select value={newLimitCategory} onChange={e => setNewLimitCategory(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "var(--cream)", outline: "none" }}>
                             {[["dg_dinner","DG Dinner"],["welcoming_week","Welcoming Week"],["coffeehouse","Coffeehouse"],["turkeybowl","Turkey Bowl"],["supplies","Supplies"],["other","Other"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
                           </select>
-                          <select value={newLimitFund} onChange={e => setNewLimitFund(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }}>
+                          <select value={newLimitFund} onChange={e => setNewLimitFund(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "var(--cream)", outline: "none" }}>
                             {[["church","Church"],["cmu","CMU"],["pitt","Pitt"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
                           </select>
-                          <input type="number" min="0" step="1" placeholder="$" value={newLimitAmount} onChange={e => setNewLimitAmount(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "#FDFBF7", outline: "none" }} />
+                          <input type="number" min="0" step="1" placeholder="$" value={newLimitAmount} onChange={e => setNewLimitAmount(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "var(--cream)", outline: "none" }} />
                         </div>
-                        {limitError && <p style={{ fontSize: 12, color: "#9D2D2D", marginBottom: 8 }}>{limitError}</p>}
+                        {limitError && <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>{limitError}</p>}
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => { setAddingLimit(false); setNewLimitAmount(""); setLimitError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
                           <button onClick={handleAddLimit} disabled={savingLimit || !newLimitAmount} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingLimit ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingLimit ? 0.6 : 1 }}>{savingLimit ? "Saving…" : "Add limit"}</button>
@@ -1403,7 +1403,7 @@ export function SettingsTab({
               {auditLoading ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
               ) : auditLogs.length === 0 ? (
-                <div style={{ border: "1px dashed #C4C0B0", borderRadius: 14, background: "transparent", padding: "28px 22px", textAlign: "center" }}>
+                <div style={{ border: "1px dashed var(--dashed)", borderRadius: 14, background: "transparent", padding: "28px 22px", textAlign: "center" }}>
                   <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No admin actions have been recorded yet.</p>
                 </div>
               ) : (
@@ -1430,12 +1430,12 @@ export function SettingsTab({
                     const ts = new Date(log.created_at)
                     const timeStr = ts.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " at " + ts.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
                     return (
-                      <div key={log.id} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", gap: 16, padding: "14px 20px", borderBottom: i < auditLogs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
+                      <div key={log.id} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", gap: 16, padding: "14px 20px", borderBottom: i < auditLogs.length - 1 ? "1px solid var(--line-3)" : "none" }}>
                         <div>
                           <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{label}{log.entity_label ? ` "${log.entity_label}"` : ""}{roleChange}</div>
                           <div style={{ marginTop: 2, fontSize: 12, color: "var(--muted-text)" }}>by {log.actor_name}</div>
                         </div>
-                        <div style={{ fontSize: 12, color: "#A09A8C", whiteSpace: "nowrap", paddingTop: 2 }}>{timeStr}</div>
+                        <div style={{ fontSize: 12, color: "var(--faint)", whiteSpace: "nowrap", paddingTop: 2 }}>{timeStr}</div>
                       </div>
                     )
                   })}

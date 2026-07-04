@@ -92,7 +92,7 @@ export function DirectoryMemberListPanel({
             placeholder="Search members"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-lg border text-[12.5px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20"
+            className="w-full pl-9 pr-3 py-2 rounded-lg border text-[12.5px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20"
             style={{
               background: "var(--cream)",
               borderColor: "var(--line-2)",
@@ -248,7 +248,7 @@ export function DirectoryTab({
         <div className="px-5 pt-14 pb-5">
           <div className="flex items-center gap-2.5 mb-4">
             {onBack && (
-              <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[#F4F1E8] transition-colors -ml-1 mr-0.5" aria-label="Back">
+              <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[var(--body-bg)] transition-colors -ml-1 mr-0.5" aria-label="Back">
                 <ArrowLeft className="w-5 h-5" style={{ color: "var(--plum)" }} />
               </button>
             )}
@@ -261,7 +261,7 @@ export function DirectoryTab({
               placeholder="Search members…"
               value={mobileSearch}
               onChange={(e) => setMobileSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border text-[13px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[#3E1540]/20 focus:border-[#3E1540]/30 transition-all"
+              className="w-full pl-10 pr-4 py-3 rounded-xl border text-[13px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 focus:border-[var(--plum)]/30 transition-all"
               style={{ background: "var(--cream)", borderColor: "var(--line)", color: "var(--ink)" }}
             />
           </div>
@@ -287,7 +287,6 @@ export function DirectoryTab({
                 style={{
                   background: "var(--cream)",
                   borderColor: "var(--line)",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
                 }}
               >
                 <div className="flex items-center gap-3.5">
@@ -302,7 +301,7 @@ export function DirectoryTab({
                     <div className="flex items-center gap-2">
                       {member.graduation_year && <span className="text-[11px] font-medium" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
                       {member.role && (
-                        <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[#F4F1E8] text-[var(--plum)] border-transparent"}`}>
+                        <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
                           {member.role}
                         </span>
                       )}
@@ -583,12 +582,12 @@ export function MemberSheet({
                 <span className="text-[12px] text-[var(--muted-text)]">Class of {member.graduation_year}</span>
               )}
               {member.role && (
-                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[#F4F1E8] text-[var(--plum)] border-transparent"}`}>
+                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
                   {member.role}
                 </span>
               )}
               {isOwnProfile && (
-                <span className="text-[10px] bg-[#3E1540]/10 text-[var(--plum)] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">You</span>
+                <span className="text-[10px] bg-[var(--plum)]/10 text-[var(--plum)] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">You</span>
               )}
             </div>
             <p className="mt-3 text-[12px] text-[var(--muted-text)] text-center leading-relaxed max-w-[270px]">
@@ -640,7 +639,7 @@ export function MemberSheet({
             if (sections.length === 0) {
               return (
                 <div className="flex items-center justify-center py-10">
-                  <p className="text-[13px] text-[#8A8497]/60">No details shared yet</p>
+                  <p className="text-[13px] text-[var(--muted-text)]/60">No details shared yet</p>
                 </div>
               )
             }

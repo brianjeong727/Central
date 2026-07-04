@@ -89,7 +89,7 @@ function highlightText(text: string, query: string, isCurrent: boolean): React.R
     if (idx === -1) { parts.push(text.slice(i)); break }
     if (idx > i) parts.push(text.slice(i, idx))
     parts.push(
-      <mark key={key++} style={{ background: isCurrent ? "#D4A45C" : "rgba(212,164,92,0.45)", color: "var(--ink)", borderRadius: 2, padding: "0 1px" }}>
+      <mark key={key++} style={{ background: isCurrent ? "var(--gold)" : "rgba(212,164,92,0.45)", color: "var(--ink)", borderRadius: 2, padding: "0 1px" }}>
         {text.slice(idx, idx + q.length)}
       </mark>
     )
@@ -285,7 +285,7 @@ function MessageRowBase({
                 <div className="px-4 pb-4 pt-1">
                   <button
                     onClick={() => onOpenVoteSheet(msg.poll_id!, hasVoted)}
-                    className={`w-full py-2.5 rounded-xl transition-all text-[13px] font-semibold ${hasVoted ? "bg-[#F4F1E8] hover:bg-[var(--line)] text-[var(--body)]" : "bg-[var(--plum)] hover:bg-[var(--plum-2)] text-white"}`}
+                    className={`w-full py-2.5 rounded-xl transition-all text-[13px] font-semibold ${hasVoted ? "bg-[var(--body-bg)] hover:bg-[var(--line)] text-[var(--body)]" : "bg-[var(--plum)] hover:bg-[var(--plum-2)] text-white"}`}
                   >
                     {hasVoted ? "Change vote" : "Vote"}
                   </button>
@@ -322,11 +322,11 @@ function MessageRowBase({
           </div>
         )}
         <div className="flex items-center gap-3 my-2 px-1">
-          <div className="flex-1 h-px bg-[#E8E2D2]/70" />
+          <div className="flex-1 h-px bg-[var(--line)]/70" />
           <span style={{ fontSize: "12px", color: "var(--muted-text)", fontStyle: "italic", whiteSpace: "nowrap", maxWidth: "72%" }} className="text-center select-none">
             {displayContent}
           </span>
-          <div className="flex-1 h-px bg-[#E8E2D2]/70" />
+          <div className="flex-1 h-px bg-[var(--line)]/70" />
         </div>
       </div>
     )
@@ -365,7 +365,7 @@ function MessageRowBase({
               <button
                 onClick={(e) => { e.stopPropagation(); setEmojiPickerFor(null); setFullReactionPickerFor(msg.id) }}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="w-7 h-7 rounded-full bg-[#F4F1E8] flex items-center justify-center text-[var(--body)] hover:bg-[var(--line)] transition-colors"
+                className="w-7 h-7 rounded-full bg-[var(--body-bg)] flex items-center justify-center text-[var(--body)] hover:bg-[var(--line)] transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
@@ -405,7 +405,7 @@ function MessageRowBase({
                   <button
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setFullReactionPickerFor(msg.id) }}
-                    className="w-7 h-7 rounded-full bg-[#F4F1E8] flex items-center justify-center text-[var(--body)] hover:bg-[var(--line)] transition-colors"
+                    className="w-7 h-7 rounded-full bg-[var(--body-bg)] flex items-center justify-center text-[var(--body)] hover:bg-[var(--line)] transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
@@ -479,7 +479,7 @@ function MessageRowBase({
           <div className="flex items-baseline gap-1.5 mb-1 ml-9">
             <span className="text-[13px] font-semibold text-[var(--ink)]">{msg.sender_name || "Former Member"}</span>
             {senderDeparted && (
-              <span className="text-[11px] text-[#A09A8C] italic">· left the ministry</span>
+              <span className="text-[11px] text-[var(--faint)] italic">· left the ministry</span>
             )}
             <span className="text-[12px] text-[var(--muted-text)]">{formatMessageTime(msg.created_at)}</span>
           </div>
@@ -506,7 +506,7 @@ function MessageRowBase({
             className={`max-w-[75%] text-[14px] leading-[1.4] select-none overflow-hidden ${
               msg.deleted
                 ? isOwn
-                  ? `bg-[#2D0F2E]/30 text-white/50 ${outgoingRadius} px-4 py-2`
+                  ? `bg-[var(--plum-2)]/30 text-white/50 ${outgoingRadius} px-4 py-2`
                   : `bg-[var(--cream-panel)] border border-[var(--line)] text-[var(--muted-text)] ${incomingRadius} px-4 py-2`
                 : isOwn
                   ? `bg-[var(--plum-2)] text-[var(--cream-on-dark)] ${outgoingRadius}`
@@ -563,7 +563,7 @@ function MessageRowBase({
                     </div>
                     <div className="flex gap-2 justify-end mt-1.5">
                       <button onClick={() => setEditingId(null)} className={`text-[12px] transition-opacity ${isOwn ? "text-white/50 hover:text-white/80" : "text-[var(--muted-text)] hover:text-[var(--body)]"}`}>Cancel</button>
-                      <button onClick={onSaveEdit} className={`text-[12px] font-semibold px-2.5 py-0.5 rounded-md transition-colors ${isOwn ? "bg-[var(--cream-panel)]/20 hover:bg-[var(--cream-panel)]/30 text-white" : "bg-[#3E1540]/10 hover:bg-[#3E1540]/20 text-[var(--plum)]"}`}>Save</button>
+                      <button onClick={onSaveEdit} className={`text-[12px] font-semibold px-2.5 py-0.5 rounded-md transition-colors ${isOwn ? "bg-[var(--cream-panel)]/20 hover:bg-[var(--cream-panel)]/30 text-white" : "bg-[var(--plum)]/10 hover:bg-[var(--plum)]/20 text-[var(--plum)]"}`}>Save</button>
                     </div>
                   </div>
                 ) : (
@@ -594,7 +594,7 @@ function MessageRowBase({
                             <p className={`text-[11px] ${isOwn ? "text-white/50" : "text-[var(--muted-text)]"}`}>{formatFileSize(msg.attachment_size)}</p>
                           )}
                         </div>
-                        <FileDown className={`w-4 h-4 flex-shrink-0 ${isOwn ? "text-white/40" : "text-[#C4C4C4]"}`} />
+                        <FileDown className={`w-4 h-4 flex-shrink-0 ${isOwn ? "text-white/40" : "text-[var(--faint)]"}`} />
                       </div>
                     )}
                     {/* Text content */}
@@ -615,7 +615,7 @@ function MessageRowBase({
                             rel="noopener noreferrer"
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => e.stopPropagation()}
-                            className={`block mx-3 mb-2 rounded-xl overflow-hidden border text-left transition-opacity hover:opacity-90 ${isOwn ? "border-white/20 bg-[var(--cream-panel)]/10" : "border-[var(--line)] bg-[#F4F1E8]"}`}
+                            className={`block mx-3 mb-2 rounded-xl overflow-hidden border text-left transition-opacity hover:opacity-90 ${isOwn ? "border-white/20 bg-[var(--cream-panel)]/10" : "border-[var(--line)] bg-[var(--body-bg)]"}`}
                             style={{ textDecoration: "none" }}
                           >
                             {linkPreview.image && (

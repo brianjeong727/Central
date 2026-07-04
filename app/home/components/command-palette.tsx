@@ -123,10 +123,10 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Jump to anything…"
-            className="flex-1 bg-transparent text-[14px] text-[var(--ink)] placeholder-[#C4C4C4] outline-none"
+            className="flex-1 bg-transparent text-[14px] text-[var(--ink)] placeholder-[var(--faint)] outline-none"
           />
           {loading && <div className="w-4 h-4 border-2 border-[var(--plum)] border-t-transparent rounded-full animate-spin flex-shrink-0" />}
-          <kbd className="text-[10px] px-1.5 py-0.5 border border-[#E5E0D2] rounded bg-[#F4F1E8] text-[var(--muted-text)] leading-none flex-shrink-0">esc</kbd>
+          <kbd className="text-[10px] px-1.5 py-0.5 border border-[var(--line-2)] rounded bg-[var(--body-bg)] text-[var(--muted-text)] leading-none flex-shrink-0">esc</kbd>
         </div>
 
         {/* Results */}
@@ -136,7 +136,7 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
           )}
           {grouped.map((group) => (
             <div key={group.label}>
-              <div className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-[#C4C4C4]">{group.label}</div>
+              <div className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--faint)]">{group.label}</div>
               {group.items.map((item) => {
                 const idx = flatIdx++
                 const active = idx === selectedIdx
@@ -162,10 +162,10 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-3 px-4 py-2.5 border-t border-[var(--line)] text-[10px] text-[#C4C4C4]">
-          <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 border border-[#E5E0D2] rounded bg-[#F4F1E8] leading-none">↑</kbd><kbd className="px-1 py-0.5 border border-[#E5E0D2] rounded bg-[#F4F1E8] leading-none">↓</kbd> navigate</span>
-          <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 border border-[#E5E0D2] rounded bg-[#F4F1E8] leading-none">↵</kbd> select</span>
-          <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 border border-[#E5E0D2] rounded bg-[#F4F1E8] leading-none">esc</kbd> close</span>
+        <div className="flex items-center gap-3 px-4 py-2.5 border-t border-[var(--line)] text-[10px] text-[var(--faint)]">
+          <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 border border-[var(--line-2)] rounded bg-[var(--body-bg)] leading-none">↑</kbd><kbd className="px-1 py-0.5 border border-[var(--line-2)] rounded bg-[var(--body-bg)] leading-none">↓</kbd> navigate</span>
+          <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 border border-[var(--line-2)] rounded bg-[var(--body-bg)] leading-none">↵</kbd> select</span>
+          <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 border border-[var(--line-2)] rounded bg-[var(--body-bg)] leading-none">esc</kbd> close</span>
         </div>
       </div>
     </div>

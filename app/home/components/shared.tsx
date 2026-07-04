@@ -46,7 +46,7 @@ export function SectionLabel({ children }: { children: React.ReactNode }) {
 export function Spinner() {
   return (
     <div className="flex items-center justify-center py-12">
-      <div className="w-6 h-6 rounded-full border-2 border-[#3E1540]/20 border-t-[var(--plum)] animate-spin" />
+      <div className="w-6 h-6 rounded-full border-2 border-[var(--plum)]/20 border-t-[var(--plum)] animate-spin" />
     </div>
   )
 }
@@ -121,8 +121,8 @@ export function EmptyState({
         {icon}
       </div>
       <div>
-        <p className="text-[14px] font-semibold text-[#13101A]/60">{title}</p>
-        <p className="text-[13px] text-[#5A5466]/50 mt-0.5">{subtitle}</p>
+        <p className="text-[14px] font-semibold text-[var(--ink)]/60">{title}</p>
+        <p className="text-[13px] text-[var(--body)]/50 mt-0.5">{subtitle}</p>
       </div>
     </div>
   )
