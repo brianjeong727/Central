@@ -228,7 +228,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/register-ministry/page.tsx` | Role-gated ministry registration entry point (server component). Not logged in → `/signup?intent=register`; admin-tier → `/onboarding`; non-admin logged-in → "only admins can register" gate. **All "Register your ministry" CTAs must point here.** |
 | `app/admin/page.tsx` | Founder-only admin panel (gated by hardcoded email in proxy.ts) |
 | `app/announcements/[id]/page.tsx` | Shareable announcement detail route |
-| `app/not-admin/page.tsx` | Shown when a non-admin tries to reach an admin route |
+| `app/not-admin/page.tsx` | ORPHANED — nothing routes here anymore (the non-admin gate renders inline in `/register-ministry`); public-path allowlist entry is its only reference. Candidate for deletion. |
 | `app/pending/page.tsx` | Shown when user's ministry has `status = 'pending'` |
 | `app/pick-ministry/page.tsx` | Multi-ministry switcher |
 | `app/actions/create-group.ts` | Server action: create chat group + add members |

@@ -82,24 +82,32 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/home', request.url))
   }
 
-  // Any authenticated user can reach /onboarding to register a ministry
-  if (pathname.startsWith('/onboarding')) {
-    return supabaseResponse
-  }
-
-  // Look up ministry_id
+  // Look up ministry_id + role (role gates /onboarding below)
   const { data: profile } = await supabase
     .from('profiles')
-    .select('ministry_id')
+    .select('ministry_id, role')
     .eq('id', user.id)
     .maybeSingle()
 
-  // No ministry yet — allow join/onboarding/public paths, otherwise send to landing
+  // No ministry yet — allow join/onboarding/public paths, otherwise send to landing.
+  // Fresh registrants land on /onboarding straight from signup, so it stays open here.
   if (!profile?.ministry_id) {
-    if (!pathname.startsWith('/join') && !isPublicPath) {
+    if (!pathname.startsWith('/join') && !pathname.startsWith('/onboarding') && !isPublicPath) {
       return NextResponse.redirect(new URL('/landing', request.url))
     }
     return supabaseResponse
+  }
+
+  // /onboarding gate — the wizard can self-promote a user to a founder role, so
+  // for users who already belong to a ministry it's admin-tier only. Non-admin
+  // members are bounced to the /register-ministry gate card. Runs BEFORE the
+  // ministry-status branches so pending/rejected FOUNDERS (who hold admin-tier
+  // roles) keep their ability to reach /onboarding.
+  if (pathname.startsWith('/onboarding')) {
+    if (['admin', 'deacon', 'elder', 'pastor'].includes((profile.role ?? '').toLowerCase())) {
+      return supabaseResponse
+    }
+    return NextResponse.redirect(new URL('/register-ministry', request.url))
   }
 
   // Check ministry status

@@ -36,7 +36,7 @@ The model has two independent planes — keep them distinct:
 - A **global governance roster** lives in church settings. Defaults to **all admin-tier users**. Toggle it off to curate a roster of specific admins. Roster = who governs, ministry-wide. (`ministries.governance_settings = { all_admins, roster_ids }`; `governance.ts` `isGovernanceAdmin`.)
 
 ### What they get, per team — the matrix
-- A **per-team admin matrix** (church settings) gives governance-admins **none / view / write** on each team. Default **view**.
+- A **per-team admin matrix** (church settings) gives governance-admins **none / view / write** on each team. Default **write** (DB column default and all code fallbacks are `write`).
   - `none` — locked out; only the team's own members manage it.
   - `view` — read content (read-only) **+ govern structure** (manage roster, edit team settings, delete the team).
   - `write` — `view` + **domain write** (act on the team's work without being a member).
