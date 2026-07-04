@@ -2329,6 +2329,7 @@ export function PlanTab({
   sglSection, onSglSectionChange,
   financeSection: financeSectionProp, onFinanceSectionChange,
   activeReceiptsTeamId, onReceiptsTeamChange,
+  closeSubpageSignal,
 }: PlanTabProps) {
   // Resolve from membership first, then from allTeams (a governance admin may be
   // viewing a team they don't belong to), then the ministry-name fallback.
@@ -2432,6 +2433,18 @@ export function PlanTab({
     onStudentOrgPlanningEventChange?.(null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTeamId])
+
+  // Close the team-settings subpage when the user clicks a workspace section-nav item
+  // (finance/student-org/DGL section, or a receipts team). The section state lives in
+  // home-app, which can't reach this local `openTeam` — so it bumps `closeSubpageSignal`
+  // on every such click and we drop the subpage here. Skip the initial mount so opening
+  // the workspace (or a remount) doesn't immediately close a freshly-opened subpage.
+  const closeSignalRef = useRef(false)
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    if (!closeSignalRef.current) { closeSignalRef.current = true; return }
+    setOpenTeam(null)
+  }, [closeSubpageSignal])
 
   const hasAnyPlanning = isAdmin || userTeams.length > 0
 

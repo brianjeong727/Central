@@ -181,6 +181,9 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     // One atomic replace (Convention #5) via the shared nav-state module.
     // Assert the owning tab so a mount-fired write can't clobber ?tab (race fix).
     setParams({ tab: "plan", rteam: teamId })
+    // Selecting another receipts team must also drop any open team-settings subpage
+    // (defined below; only invoked on click, so the closure is resolved by then).
+    bumpCloseSubpage()
   }
 
   function handleProfileSectionChange(section: "spiritual-profile" | "journal") {
@@ -315,9 +318,17 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   const [studentOrgPlanningEvent, setStudentOrgPlanningEvent] = useState<CalendarEvent | null>(null)
   const [studentOrgCalEvents, setStudentOrgCalEvents] = useState<CalendarEvent[]>([])
 
+  // Bumped on every workspace section-nav click (finance/student-org/DGL section, or
+  // a receipts team). PlanTab watches this to close any open team-settings subpage —
+  // that subpage's state is local to PlanTab, so these handlers can't clear it directly.
+  // A counter (not a value watch) so re-clicking the already-selected section also exits.
+  const [closeSubpageSignal, setCloseSubpageSignal] = useState(0)
+  const bumpCloseSubpage = () => setCloseSubpageSignal((n) => n + 1)
+
   function handleStudentOrgSectionChange(s: string) {
     setStudentOrgSection(s)
     replaceParam("sotab", s === "Events" ? null : s)
+    bumpCloseSubpage()
   }
 
   // Small Group Leaders section state — lifted here for sidebar
@@ -330,6 +341,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   function handleSglSectionChange(s: string) {
     setSglSection(s)
     replaceParam("sgltab", s === "bible_study" ? null : s)
+    bumpCloseSubpage()
   }
 
   // Finance Team section state — lifted here so it drives the sidebar nav (not a content strip)
@@ -342,6 +354,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   function handleFinanceSectionChange(s: string) {
     setFinanceTeamSection(s)
     replaceParam("fsec", s === "reimbursements" ? null : s)
+    bumpCloseSubpage()
   }
 
   // Congregation sub-view — lifted so shell can build accurate crumbs
@@ -1120,6 +1133,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 onFinanceSectionChange={handleFinanceSectionChange}
                 activeReceiptsTeamId={activeReceiptsTeamId}
                 onReceiptsTeamChange={handleReceiptsTeamChange}
+                closeSubpageSignal={closeSubpageSignal}
               />
             </div>
           )}
