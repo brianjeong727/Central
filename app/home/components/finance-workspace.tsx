@@ -53,7 +53,7 @@ const WARN_BG = "#FFF8E1"
 const WARN_TEXT = "#B45309"
 const DANGER_TINT_BG = "#FDF1F1"
 const DANGER_TINT_BORDER = "#E8C5C5"
-const DANGER_ROW_BG = "#FDF9F9"
+const DANGER_ROW_BG = "var(--cream)"
 const DELETE_CONFIRM_BG = "#FEF2F2"
 const BUDGET_GREEN = "#2D5445"
 const REIMBURSED_TINT = "#EDE5F0"
@@ -236,7 +236,7 @@ function InboxRow({ receipt: r, first, onClick }: { receipt: InboxReceipt; first
   return (
     <button
       onClick={onClick}
-      className="hover:bg-[#F4F1E8] transition-colors"
+      className="hover:bg-[var(--body-bg)] transition-colors"
       style={{
         display: "flex", alignItems: "center", gap: 12, width: "100%",
         padding: "11px 16px", background: "transparent", border: "none",

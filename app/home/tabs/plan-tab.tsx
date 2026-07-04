@@ -118,9 +118,9 @@ const MINISTRY_FEATURES = [
 
 export function PlanFeatureCard({ icon, name, desc }: { icon: string; name: string; desc: string }) {
   return (
-    <div className="bg-white rounded-2xl border border-[var(--line)] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] opacity-70">
+    <div className="bg-[var(--cream)] rounded-2xl border border-[var(--line)] p-4 opacity-70">
       <div className="flex items-start gap-3">
-        <PlanLineIcon iconKey={icon} bg="#ffffff" fg="var(--plum)" />
+        <PlanLineIcon iconKey={icon} bg="var(--cream)" fg="var(--plum)" />
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <p className="text-[14px] font-semibold text-[var(--ink)]">{name}</p>
@@ -2939,8 +2939,8 @@ export function PlanTab({
               <div className="mb-8">
                 <PlanSectionHeader>Teams</PlanSectionHeader>
                 {allTeams.length === 0 ? (
-                  <div className="bg-white rounded-2xl border border-dashed border-[var(--line)] p-6 text-center">
-                    <p className="text-[14px] font-semibold text-[#13101A]/60 mb-1">No teams yet.</p>
+                  <div className="bg-[var(--cream)] rounded-2xl border border-dashed border-[var(--line)] p-6 text-center">
+                    <p className="text-[14px] font-semibold text-[var(--ink)]/60 mb-1">No teams yet.</p>
                     <p className="text-[13px] text-[var(--muted-text)]">Tap + above to create your first team.</p>
                   </div>
                 ) : (
@@ -2949,7 +2949,7 @@ export function PlanTab({
                       <button
                         key={team.id}
                         onClick={() => openSettings(team)}
-                        className="w-full bg-white rounded-2xl border border-[var(--line)] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] text-left flex items-center gap-3 hover:bg-[#FDFBF7] transition-colors"
+                        className="w-full bg-[var(--cream)] rounded-2xl border border-[var(--line)] p-4 text-left flex items-center gap-3 hover:bg-[var(--cream)] transition-colors"
                       >
                         <PlanLineIcon iconKey={team.icon ?? "👥"} bg="var(--plum)" fg="var(--cream-on-dark)" />
                         <div className="flex-1 min-w-0">
@@ -2967,8 +2967,8 @@ export function PlanTab({
               <PlanSectionHeader>Tools</PlanSectionHeader>
               <div className="grid grid-cols-2 gap-2">
                 {[{ icon: "set", name: "Set" }, { icon: "sparkle", name: "Slides" }, { icon: "calendar", name: "Schedule" }, { icon: "book", name: "Bible Study" }].map((tool) => (
-                  <div key={tool.name} className="bg-white rounded-2xl border border-[var(--line)] p-4 shadow-[0_1px_4px_rgba(19,16,26,0.06)] opacity-60 flex flex-col gap-2">
-                    <PlanLineIcon iconKey={tool.icon} bg="#ffffff" fg="var(--plum)" size={36} />
+                  <div key={tool.name} className="bg-[var(--cream)] rounded-2xl border border-[var(--line)] p-4 opacity-60 flex flex-col gap-2">
+                    <PlanLineIcon iconKey={tool.icon} bg="var(--cream)" fg="var(--plum)" size={36} />
                     <div>
                       <p className="text-[13px] font-semibold text-[var(--ink)]">{tool.name}</p>
                       <p style={{ fontFamily: "var(--mono)", fontSize: "9px", color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
@@ -3180,7 +3180,7 @@ export function worshipWeekDateLabel(dateStr: string) {
 export function WorshipStatusBadge({ status, onChange }: { status: "draft" | "filled" | "confirmed"; onChange?: (s: string) => void }) {
   const cfg = {
     draft:     { label: "Draft",     bg: "#F3F0F7", color: "var(--body)" },
-    filled:    { label: "Filled",    bg: "#F4F1E8", color: "var(--plum)" },
+    filled:    { label: "Filled",    bg: "var(--body-bg)", color: "var(--plum)" },
     confirmed: { label: "Confirmed", bg: "#EDE5F0", color: "var(--plum)" },
   }[status]
   if (onChange) {
@@ -3671,7 +3671,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--body)", marginBottom: 4 }}>Date — Sundays only</label>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 148, overflowY: "auto", padding: "10px", background: "white", border: "1px solid var(--line)", borderRadius: 10 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 148, overflowY: "auto", padding: "10px", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10 }}>
                     {getUpcomingSundays(26).map(({ date, label }) => {
                       const isSelected = newDate === date
                       const alreadyExists = weekDates.includes(date)
@@ -3683,7 +3683,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                           style={{
                             padding: "5px 11px", borderRadius: 20,
                             border: isSelected ? "1.5px solid var(--plum)" : "1px solid var(--line-2)",
-                            background: isSelected ? "var(--plum)" : alreadyExists ? "#F4F1EA" : "white",
+                            background: isSelected ? "var(--plum)" : alreadyExists ? "#F4F1EA" : "var(--cream)",
                             color: isSelected ? "var(--cream-on-dark)" : alreadyExists ? "#C5C0CC" : "var(--ink)",
                             fontSize: 12, fontWeight: isSelected ? 600 : 400,
                             cursor: alreadyExists ? "default" : "pointer",
@@ -3747,7 +3747,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                   <div key={week.id} ref={isHighlighted ? (el => { if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); setHighlightWeek(null) } }) : undefined} style={{ background: "var(--cream-panel)", border: isHighlighted ? "2px solid var(--plum)" : "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
 
                     {/* ── Date / status / delete row ── */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px 20px", borderBottom: "1px solid #EFE9DA" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "14px 20px", borderBottom: "1px solid var(--line-3)" }}>
                       <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", lineHeight: 1.2, margin: 0 }}>
                         {worshipWeekDateLabel(week.week_date)}
                       </p>
@@ -3763,7 +3763,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
 
                     {/* ── Auto-archive date (president only) ── */}
                     {canManage && (
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 20px", borderBottom: "1px solid #EFE9DA" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 20px", borderBottom: "1px solid var(--line-3)" }}>
                         <span style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--font-inter)", flexShrink: 0 }}>Auto-archive</span>
                         <input
                           type="date"
@@ -3780,7 +3780,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
 
                     {/* ── Confirm delete ── */}
                     {confirmDeleteWeekId === week.id && (
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: "1px solid #EFE9DA" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: "1px solid var(--line-3)" }}>
                         <span style={{ fontSize: 13, color: "var(--body)" }}>Delete this week?</span>
                         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                           <button onClick={() => setConfirmDeleteWeekId(null)} style={{ fontSize: 13, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Cancel</button>
@@ -3807,12 +3807,12 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
 
                     {/* ── Member roster rows ── */}
                     {week.roles.length === 0 && !(canManageSchedule || isLeader) && (
-                      <div style={{ padding: "13px 20px", borderTop: "1px solid #EFE9DA" }}>
+                      <div style={{ padding: "13px 20px", borderTop: "1px solid var(--line-3)" }}>
                         <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>No members assigned yet.</p>
                       </div>
                     )}
                     {week.roles.map(role => (
-                      <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 52, borderTop: "1px solid #EFE9DA" }}>
+                      <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 52, borderTop: "1px solid var(--line-3)" }}>
                         <span style={{ ...monoStyle, flexShrink: 0, width: 80 }}>{role.role_name}</span>
                         <span style={{ fontSize: 14, color: "var(--ink)", flex: 1 }}>{role.user_name}</span>
                         {(canManageSchedule || isLeader) && (
@@ -3829,7 +3829,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                         onClick={() => { setAddMemberToWeekId(week.id); setAddMemberSearch(""); setAddMemberUserId(""); setAddMemberRole("Vocals") }}
                         style={{
                           display: "block", width: "100%", padding: "14px 20px",
-                          borderTop: "1px solid #EFE9DA", borderRight: "none", borderBottom: "none", borderLeft: "none",
+                          borderTop: "1px solid var(--line-3)", borderRight: "none", borderBottom: "none", borderLeft: "none",
                           background: "transparent", cursor: "pointer", textAlign: "left" as const,
                           fontSize: 14, color: "var(--body)",
                         }}
@@ -3840,16 +3840,16 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
 
                     {/* ── Inline add-member form ── */}
                     {isThisWeekAddTarget && (
-                      <div style={{ padding: "14px 20px", borderTop: "1px solid #EFE9DA" }}>
+                      <div style={{ padding: "14px 20px", borderTop: "1px solid var(--line-3)" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           <div style={{ position: "relative" }}>
                             <input type="text" placeholder="Search member…" value={addMemberSearch}
                               onChange={e => { setAddMemberSearch(e.target.value); setAddMemberUserId("") }}
                               onFocus={() => setAddMemberFocused(true)}
                               onBlur={() => setTimeout(() => setAddMemberFocused(false), 150)}
-                              style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, color: "var(--ink)", outline: "none", boxSizing: "border-box" as const }} />
+                              style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", fontSize: 13, color: "var(--ink)", outline: "none", boxSizing: "border-box" as const }} />
                             {addMemberFocused && !addMemberUserId && filteredMembers.length > 0 && (
-                              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream)", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
                                 {filteredMembers.map(m => (
                                   <button key={m.user_id}
                                     onMouseDown={e => { e.preventDefault(); setAddMemberUserId(m.user_id); setAddMemberSearch(m.name); setAddMemberFocused(false) }}
@@ -3861,7 +3861,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                             )}
                           </div>
                           <select value={addMemberRole} onChange={e => setAddMemberRole(e.target.value)}
-                            style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, color: "var(--ink)", outline: "none" }}>
+                            style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", fontSize: 13, color: "var(--ink)", outline: "none" }}>
                             {WORSHIP_ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
                           </select>
                           <div style={{ display: "flex", gap: 6 }}>
@@ -3929,7 +3929,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                           const needsKey = !song.key
                           const isOcr = ocrInProgress.has(song.id)
                           return (
-                            <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 18px", borderBottom: idx < songs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
+                            <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 18px", borderBottom: idx < songs.length - 1 ? "1px solid var(--line-3)" : "none" }}>
                               {/* Position number */}
                               <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16, flexShrink: 0 }}>{idx + 1}</span>
 
@@ -3987,9 +3987,9 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                               {canManage && (
                                 <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
                                   <button onClick={() => handleReorderSong(week.id, song.id, "up")} disabled={idx === 0}
-                                    style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#E5E0D2" : "var(--muted-text)", fontSize: 13, lineHeight: 1 }}>↑</button>
+                                    style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "var(--line-2)" : "var(--muted-text)", fontSize: 13, lineHeight: 1 }}>↑</button>
                                   <button onClick={() => handleReorderSong(week.id, song.id, "down")} disabled={idx === songs.length - 1}
-                                    style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === songs.length - 1 ? "default" : "pointer", color: idx === songs.length - 1 ? "#E5E0D2" : "var(--muted-text)", fontSize: 13, lineHeight: 1 }}>↓</button>
+                                    style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === songs.length - 1 ? "default" : "pointer", color: idx === songs.length - 1 ? "var(--line-2)" : "var(--muted-text)", fontSize: 13, lineHeight: 1 }}>↓</button>
                                   <IconButton dim={24} onClick={() => handleDeleteSong(week.id, song.id)} title="Delete song">
                                     <Trash2 className="w-3 h-3" />
                                   </IconButton>
@@ -3999,7 +3999,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                           )
                         })}
                         {isUploadingThis && (
-                          <div style={{ padding: "12px 18px", borderTop: songs.length > 0 ? "1px solid #EFE9DA" : "none", display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ padding: "12px 18px", borderTop: songs.length > 0 ? "1px solid var(--line-3)" : "none", display: "flex", alignItems: "center", gap: 10 }}>
                             <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16 }}>—</span>
                             <span style={{ fontSize: 13, color: "var(--muted-text)" }}>Parsing chart…</span>
                           </div>
@@ -4345,7 +4345,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
           <p style={{ ...monoStyle, marginBottom: 14 }}>Team members</p>
           {teamMembers.length === 0 && <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 12 }}>No members yet.</p>}
           {teamMembers.map(m => (
-            <div key={m.user_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #EFE9DA" }}>
+            <div key={m.user_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--line-3)" }}>
               <span style={{ fontSize: 14, color: "var(--ink)" }}>{m.name}</span>
               {canManage && m.user_id !== userId && (
                 <IconButton dim={22} onClick={() => handleRemoveTeamMember(m.user_id)} title="Remove"><X style={{ width: 12, height: 12 }} /></IconButton>
@@ -4358,9 +4358,9 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                 onChange={e => { setAddMemberSearch(e.target.value); setAddMemberId("") }}
                 onFocus={() => setAddMemberFocused(true)}
                 onBlur={() => setTimeout(() => setAddMemberFocused(false), 150)}
-                style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
+                style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
               {addMemberFocused && filteredForAdd.length > 0 && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream)", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
                   {filteredForAdd.map(m => (
                     <button key={m.id} onMouseDown={e => { e.preventDefault(); setAddMemberId(m.id); setAddMemberSearch(m.name); setAddMemberFocused(false) }}
                       style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: addMemberId === m.id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
@@ -4388,7 +4388,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
             <div>
               <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--body)", marginBottom: 4 }}>Date</label>
               <input type="date" value={newEventDate} onChange={e => setNewEventDate(e.target.value)}
-                style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid var(--line)", background: "white", fontSize: 14, color: "var(--ink)", outline: "none" }} />
+                style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--cream)", fontSize: 14, color: "var(--ink)", outline: "none" }} />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <CentralButton variant="primary" size="sm" onClick={handleAddEvent} disabled={!newEventDate || addingEvent}
@@ -4420,7 +4420,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
             return (
               <div key={event.id} style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
                 {/* Date header */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #EFE9DA" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid var(--line-3)" }}>
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)" }}>
                     {new Date(event.week_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                   </p>
@@ -4433,7 +4433,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
 
                 {/* Roles */}
                 {event.roles.map(role => (
-                  <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 48, borderBottom: "1px solid #EFE9DA" }}>
+                  <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 48, borderBottom: "1px solid var(--line-3)" }}>
                     <span style={{ ...monoStyle, flexShrink: 0, width: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{role.role_name}</span>
                     <span style={{ fontSize: 14, color: "var(--ink)", flex: 1 }}>{role.user_name}</span>
                     {canManage && <IconButton dim={24} onClick={() => handleRemoveRole(role.id)} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>}
@@ -4443,20 +4443,20 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                 {/* Add role row */}
                 {canManage && !isAddRoleTarget && (
                   <button onClick={() => { setAddRoleToEventId(event.id); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleValue(WORSHIP_ROLE_OPTIONS[0]); setAddRoleCustom("") }}
-                    style={{ display: "block", width: "100%", padding: "12px 20px", borderTop: event.roles.length > 0 ? "1px solid #EFE9DA" : "none", borderRight: "none", borderBottom: "none", borderLeft: "none", background: "transparent", cursor: "pointer", textAlign: "left" as const, fontSize: 14, color: "var(--body)" }}>
+                    style={{ display: "block", width: "100%", padding: "12px 20px", borderTop: event.roles.length > 0 ? "1px solid var(--line-3)" : "none", borderRight: "none", borderBottom: "none", borderLeft: "none", background: "transparent", cursor: "pointer", textAlign: "left" as const, fontSize: 14, color: "var(--body)" }}>
                     + Add person
                   </button>
                 )}
                 {isAddRoleTarget && (
-                  <div style={{ padding: "12px 20px", borderTop: "1px solid #EFE9DA" }}>
+                  <div style={{ padding: "12px 20px", borderTop: "1px solid var(--line-3)" }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       <div style={{ position: "relative" }}>
                         <input type="text" placeholder="Search member…" value={addRoleSearch}
                           onChange={e => { setAddRoleSearch(e.target.value); setAddRoleUserId("") }}
                           onFocus={() => setAddRoleFocused(true)} onBlur={() => setTimeout(() => setAddRoleFocused(false), 150)}
-                          style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
+                          style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
                         {addRoleFocused && !addRoleUserId && availableMembers.length > 0 && (
-                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream)", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
                             {availableMembers.map(m => (
                               <button key={m.user_id} onMouseDown={e => { e.preventDefault(); setAddRoleUserId(m.user_id); setAddRoleSearch(m.name); setAddRoleFocused(false) }}
                                 style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: addRoleUserId === m.user_id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
@@ -4467,12 +4467,12 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                         )}
                       </div>
                       <select value={addRoleValue} onChange={e => setAddRoleValue(e.target.value)}
-                        style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none" }}>
+                        style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", fontSize: 13, outline: "none" }}>
                         {WORSHIP_ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
                       </select>
                       {addRoleValue === "Other" && (
                         <input type="text" placeholder="Custom role (e.g. Violin)…" value={addRoleCustom} onChange={e => setAddRoleCustom(e.target.value)}
-                          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none" }} />
+                          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", fontSize: 13, outline: "none" }} />
                       )}
                       <div style={{ display: "flex", gap: 6 }}>
                         <CentralButton variant="primary" size="sm" onClick={() => handleAddRole(event.id)} disabled={!addRoleUserId || addingRole}
@@ -4489,7 +4489,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                 )}
 
                 {/* Setlist */}
-                <div style={{ borderTop: "1px solid #EFE9DA" }}>
+                <div style={{ borderTop: "1px solid var(--line-3)" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px" }}>
                     <p style={monoStyle}>Set list</p>
                     {canManage && (
@@ -4510,7 +4510,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                         const isEditingKey = editingSong?.songId === song.id && editingSong?.field === "key"
                         const isOcr = ocrInProgress.has(song.id)
                         return (
-                          <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid #EFE9DA" }}>
+                          <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid var(--line-3)" }}>
                             <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16 }}>{idx + 1}</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               {isOcr ? <span style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
@@ -4745,12 +4745,12 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
             <div>
               <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--body)", marginBottom: 4 }}>Event name</label>
               <input type="text" placeholder="e.g. Welcome Week Praise Night" value={newEventName} onChange={e => setNewEventName(e.target.value)}
-                style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: "1px solid var(--line)", background: "white", fontSize: 14, color: "var(--ink)", outline: "none", boxSizing: "border-box" as const }} />
+                style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--cream)", fontSize: 14, color: "var(--ink)", outline: "none", boxSizing: "border-box" as const }} />
             </div>
             <div>
               <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--body)", marginBottom: 4 }}>Date</label>
               <input type="date" value={newEventDate} onChange={e => setNewEventDate(e.target.value)}
-                style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid var(--line)", background: "white", fontSize: 14, color: "var(--ink)", outline: "none" }} />
+                style={{ padding: "9px 12px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--cream)", fontSize: 14, color: "var(--ink)", outline: "none" }} />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <CentralButton variant="primary" size="sm" onClick={handleAddEvent} disabled={!newEventDate || addingEvent}
@@ -4780,7 +4780,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
             const availableForRole = filteredForRole.filter(m => !assignedIds.has(m.id))
             return (
               <div key={event.id} style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #EFE9DA" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid var(--line-3)" }}>
                   <div>
                     {event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", lineHeight: 1.2 }}>{event.event_name}</p>}
                     <p style={{ fontSize: 13, color: event.event_name ? "var(--muted-text)" : "var(--ink)", fontFamily: event.event_name ? "var(--font-inter)" : "var(--font-instrument-serif)", ...(event.event_name ? {} : { fontSize: 17 }) }}>
@@ -4795,7 +4795,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                 </div>
 
                 {event.roles.map(role => (
-                  <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 48, borderBottom: "1px solid #EFE9DA" }}>
+                  <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 48, borderBottom: "1px solid var(--line-3)" }}>
                     <span style={{ ...monoStyle, flexShrink: 0, width: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{role.role_name}</span>
                     <span style={{ fontSize: 14, color: "var(--ink)", flex: 1 }}>{role.user_name}</span>
                     {canManage && <IconButton dim={24} onClick={() => handleRemoveRole(role.id)} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>}
@@ -4804,20 +4804,20 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
 
                 {canManage && !isAddRoleTarget && (
                   <button onClick={() => { setAddRoleToEventId(event.id); setAddRoleSearch(""); setAddRoleUserId(""); setAddRoleValue(WORSHIP_ROLE_OPTIONS[0]); setAddRoleCustom("") }}
-                    style={{ display: "block", width: "100%", padding: "12px 20px", borderTop: event.roles.length > 0 ? "1px solid #EFE9DA" : "none", borderRight: "none", borderBottom: "none", borderLeft: "none", background: "transparent", cursor: "pointer", textAlign: "left" as const, fontSize: 14, color: "var(--body)" }}>
+                    style={{ display: "block", width: "100%", padding: "12px 20px", borderTop: event.roles.length > 0 ? "1px solid var(--line-3)" : "none", borderRight: "none", borderBottom: "none", borderLeft: "none", background: "transparent", cursor: "pointer", textAlign: "left" as const, fontSize: 14, color: "var(--body)" }}>
                     + Add person
                   </button>
                 )}
                 {isAddRoleTarget && (
-                  <div style={{ padding: "12px 20px", borderTop: "1px solid #EFE9DA" }}>
+                  <div style={{ padding: "12px 20px", borderTop: "1px solid var(--line-3)" }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       <div style={{ position: "relative" }}>
                         <input type="text" placeholder="Search member…" value={addRoleSearch}
                           onChange={e => { setAddRoleSearch(e.target.value); setAddRoleUserId("") }}
                           onFocus={() => setAddRoleFocused(true)} onBlur={() => setTimeout(() => setAddRoleFocused(false), 150)}
-                          style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
+                          style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
                         {addRoleFocused && !addRoleUserId && availableForRole.length > 0 && (
-                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "white", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream)", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
                             {availableForRole.map(m => (
                               <button key={m.id} onMouseDown={e => { e.preventDefault(); setAddRoleUserId(m.id); setAddRoleSearch(m.name); setAddRoleFocused(false) }}
                                 style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: addRoleUserId === m.id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
@@ -4828,12 +4828,12 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                         )}
                       </div>
                       <select value={addRoleValue} onChange={e => setAddRoleValue(e.target.value)}
-                        style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none" }}>
+                        style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", fontSize: 13, outline: "none" }}>
                         {WORSHIP_ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
                       </select>
                       {addRoleValue === "Other" && (
                         <input type="text" placeholder="Custom role (e.g. Violin)…" value={addRoleCustom} onChange={e => setAddRoleCustom(e.target.value)}
-                          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "white", fontSize: 13, outline: "none" }} />
+                          style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", fontSize: 13, outline: "none" }} />
                       )}
                       <div style={{ display: "flex", gap: 6 }}>
                         <CentralButton variant="primary" size="sm" onClick={() => handleAddRole(event.id)} disabled={!addRoleUserId || addingRole}
@@ -4849,7 +4849,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                   </div>
                 )}
 
-                <div style={{ borderTop: "1px solid #EFE9DA" }}>
+                <div style={{ borderTop: "1px solid var(--line-3)" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px" }}>
                     <p style={monoStyle}>Set list</p>
                     {canManage && (
@@ -4870,7 +4870,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                         const isEditingKey = editingSong?.songId === song.id && editingSong?.field === "key"
                         const isOcr = ocrInProgress.has(song.id)
                         return (
-                          <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid #EFE9DA" }}>
+                          <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid var(--line-3)" }}>
                             <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16 }}>{idx + 1}</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               {isOcr ? <span style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
@@ -5063,7 +5063,7 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
     const dateStr = new Date(event.week_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
     return (
       <div key={event.id} style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: songs.length > 0 ? "1px solid #EFE9DA" : "none" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 18px", borderBottom: songs.length > 0 ? "1px solid var(--line-3)" : "none" }}>
           <div>
             {event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 16, color: "var(--ink)" }}>{event.event_name}</p>}
             {showTeamName && !event.event_name && <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 16, color: "var(--ink)" }}>{event.teamName}</p>}
@@ -5085,7 +5085,7 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
           )}
         </div>
         {songs.map((song, i) => (
-          <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderBottom: i < songs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
+          <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderBottom: i < songs.length - 1 ? "1px solid var(--line-3)" : "none" }}>
             <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 18 }}>{i + 1}</span>
             <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", flex: 1 }}>{song.title || <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "var(--faint)" }}>Untitled</span>}</span>
             {song.key && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 7 }}>{song.key}</span>}
@@ -5376,7 +5376,7 @@ function SetListPdfViewer({
                 style={{
                   position: "absolute", left: `${pendingAnnotation.x}%`, top: `${pendingAnnotation.y}%`,
                   transform: "translate(-50%, -50%)",
-                  background: "white", borderRadius: 10, padding: 12,
+                  background: "var(--cream)", borderRadius: 10, padding: 12,
                   boxShadow: "0 4px 24px rgba(0,0,0,0.5)", zIndex: 20, width: 190,
                 }}>
                 <input
@@ -5417,7 +5417,7 @@ function SetListPdfViewer({
 
 const CATEGORY_CONFIG = {
   welcoming: { label: "Welcoming", dot: "var(--plum)", bg: "#EDE5F0", text: "var(--plum)" },
-  retreat:   { label: "Retreat",   dot: "var(--body)", bg: "#F4F1E8", text: "var(--plum)" },
+  retreat:   { label: "Retreat",   dot: "var(--body)", bg: "var(--body-bg)", text: "var(--plum)" },
   social:    { label: "Social",    dot: "var(--muted-text)", bg: "var(--cream-panel)", text: "var(--body)" },
   service:   { label: "Service",   dot: "var(--plum)", bg: "#F0EDE8", text: "var(--plum)" },
   regular:   { label: "Regular",   dot: "var(--muted-text)", bg: "#F3F0F7", text: "var(--body)" },
@@ -5473,7 +5473,7 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
     extraTabs: ["sub_events"],
   },
   coffeehouse: {
-    label: "Coffeehouse", icon: "☕", dot: "#9D7B4F", bg: "#FDF6EC", text: "#6B4C1E",
+    label: "Coffeehouse", icon: "☕", dot: "var(--warm-tan)", bg: "#FDF6EC", text: "#6B4C1E",
     budgetCategory: "coffeehouse", canHaveSubEvents: false,
     description: "Annual talent show — performances, praise, and testimony. Held at Rangos Hall (CMU). ~$123 budget for coffee and snacks.",
     defaultPhases: [
@@ -5512,7 +5512,7 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
     extraTabs: ["acts"],
   },
   turkey_bowl: {
-    label: "Turkey Bowl", icon: "🏈", dot: "#5B7A6C", bg: "#EEF4F1", text: "#2D5445",
+    label: "Turkey Bowl", icon: "🏈", dot: "var(--sage)", bg: "#EEF4F1", text: "#2D5445",
     budgetCategory: "turkeybowl", canHaveSubEvents: false,
     description: "Annual flag football tournament in November. Separate men's and women's divisions. Budget ~$1,500–1,700 (shirts are the dominant cost).",
     defaultPhases: [
@@ -5552,7 +5552,7 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
     extraTabs: ["teams"],
   },
   retreat: {
-    label: "Retreat", icon: "⛺", dot: "var(--body)", bg: "#F4F1E8", text: "var(--plum)",
+    label: "Retreat", icon: "⛺", dot: "var(--body)", bg: "var(--body-bg)", text: "var(--plum)",
     budgetCategory: "retreat", canHaveSubEvents: false,
     description: "Overnight or weekend retreat. Retreat leaders run the program; CCSF handles logistics support. Women's: October · Men's: February · EM: March.",
     defaultPhases: [
@@ -5701,7 +5701,7 @@ export function MonthGrid({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 12 }}>
         <button
           onClick={() => onMonthChange(new Date(year, month - 1, 1))}
-          style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #E5E0D2", background: "var(--cream-panel)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+          style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <ChevronLeft className="w-4 h-4 text-[var(--body)]" />
         </button>
@@ -5710,7 +5710,7 @@ export function MonthGrid({
         </span>
         <button
           onClick={() => onMonthChange(new Date(year, month + 1, 1))}
-          style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid #E5E0D2", background: "var(--cream-panel)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+          style={{ width: 28, height: 28, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <ChevronRight className="w-4 h-4 text-[var(--body)]" />
         </button>
@@ -5726,7 +5726,7 @@ export function MonthGrid({
       </div>
 
       {/* Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", border: "1px solid #E5E0D2", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", border: "1px solid var(--line-2)", borderRadius: 10, overflow: "hidden" }}>
         {cells.map((day, idx) => {
           const dayEvents = day ? eventsOnDay(day) : []
           const visible = dayEvents.slice(0, 2)
@@ -5737,8 +5737,8 @@ export function MonthGrid({
               key={idx}
               style={{
                 minHeight: 80,
-                borderRight: idx % 7 !== 6 ? "1px solid #E5E0D2" : "none",
-                borderBottom: idx < cells.length - 7 ? "1px solid #E5E0D2" : "none",
+                borderRight: idx % 7 !== 6 ? "1px solid var(--line-2)" : "none",
+                borderBottom: idx < cells.length - 7 ? "1px solid var(--line-2)" : "none",
                 background: day && isToday(day) ? "#F4F0F8" : "var(--cream-panel)",
                 padding: "4px 3px 3px",
                 position: "relative",
@@ -5855,7 +5855,7 @@ export function TimelineView({
                       alignItems: "flex-start",
                       gap: 10,
                       background: "var(--cream-panel)",
-                      border: "1px solid #E5E0D2",
+                      border: "1px solid var(--line-2)",
                       borderRadius: 10,
                       padding: "10px 12px",
                       cursor: "pointer",
@@ -6324,7 +6324,7 @@ export function AddEventModal({
           )}
 
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-            <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #E5E0D2", background: "var(--cream-panel)", fontSize: 14, color: "var(--body)", cursor: "pointer" }}>
+            <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", fontSize: 14, color: "var(--body)", cursor: "pointer" }}>
               Cancel
             </button>
             <CentralButton variant="primary" size="md" onClick={handleSave} disabled={saving}>
@@ -6406,9 +6406,9 @@ export function MinistryCalendar({
   if (!tableReady) {
     return (
       <div className="px-14 py-7">
-        <div style={{ borderTop: "1px solid #E5E0D2", paddingTop: 24, marginBottom: 32 }}>
+        <div style={{ borderTop: "1px solid var(--line-2)", paddingTop: 24, marginBottom: 32 }}>
         <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "var(--ink)", marginBottom: 8 }}>Ministry Calendar</p>
-        <div style={{ background: "var(--cream-panel)", border: "1px dashed #E5E0D2", borderRadius: 12, padding: "24px 20px", textAlign: "center" }}>
+        <div style={{ background: "var(--cream-panel)", border: "1px dashed var(--line-2)", borderRadius: 12, padding: "24px 20px", textAlign: "center" }}>
           <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 4 }}>Calendar database table not set up yet.</p>
           <p style={{ fontSize: 12, color: "var(--muted-text)" }}>Run <code style={{ background: "#EFEAE0", padding: "1px 5px", borderRadius: 4 }}>supabase/calendar_migration.sql</code> in the Supabase SQL Editor to enable this feature.</p>
         </div>
@@ -6486,7 +6486,7 @@ export function MinistryCalendar({
         </div>
 
         {/* Events panel — right */}
-        <div style={{ width: 232, flexShrink: 0, borderLeft: "1px solid #E5E0D2", paddingLeft: 20 }}>
+        <div style={{ width: 232, flexShrink: 0, borderLeft: "1px solid var(--line-2)", paddingLeft: 20 }}>
           <p style={{ ...MONO_STYLE, margin: "0 0 10px" }}>
             Events · {events.length || 3}
           </p>
@@ -7549,7 +7549,7 @@ export function EventPlanWorkspace({
 
   const cardStyle: React.CSSProperties = {
     background: "var(--cream-panel)",
-    border: "1px solid #E5E0D2",
+    border: "1px solid var(--line-2)",
     borderRadius: 12,
     padding: "20px 24px",
     marginBottom: 16,
@@ -8707,13 +8707,13 @@ function ActsTab({
       />
 
       {acts.length === 0 && (
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No acts yet. Add performers to build your lineup.</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>No acts yet. Add performers to build your lineup.</p>
       )}
 
       {acts.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "0 4px 8px", borderBottom: "1px solid var(--line)" }}>
           {["#", "Performer", "Type", "Duration", "Sound Check", ""].map((h, i) => (
-            <span key={i} style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#A09A8C" }}>{h}</span>
+            <span key={i} style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--faint)" }}>{h}</span>
           ))}
         </div>
       )}
@@ -8721,11 +8721,11 @@ function ActsTab({
       <div style={{ display: "flex", flexDirection: "column" }}>
         {acts.map((act, idx) => (
           <ListRow key={act.id} last={idx === acts.length - 1} style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "12px 4px", alignItems: "center" }}>
-            <span style={{ fontSize: 13, color: "#A09A8C", textAlign: "center" }}>{idx + 1}</span>
+            <span style={{ fontSize: 13, color: "var(--faint)", textAlign: "center" }}>{idx + 1}</span>
             {canEdit ? (
               <input value={act.performer} onChange={e => updateAct(act.id, "performer", e.target.value)} placeholder="Performer name…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", width: "100%" }} />
             ) : (
-              <span style={{ fontSize: 14, color: "var(--ink)" }}>{act.performer || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
+              <span style={{ fontSize: 14, color: "var(--ink)" }}>{act.performer || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>—</span>}</span>
             )}
             {canEdit ? (
               <select value={act.type} onChange={e => updateAct(act.id, "type", e.target.value)} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
@@ -8910,7 +8910,7 @@ function TransportTab({
       </div>
 
       {cars.length === 0 && (
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "#A09A8C" }}>No cars added yet. Add drivers to organize carpooling.</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>No cars added yet. Add drivers to organize carpooling.</p>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -9030,7 +9030,7 @@ function ProgramTab({
             <div style={{ borderTop: "1px solid var(--line)" }} />
 
             {daySessions.length === 0 && (
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "12px 4px" }}>No sessions yet.</p>
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--faint)", padding: "12px 4px" }}>No sessions yet.</p>
             )}
 
             {daySessions.map((session, sIdx) => (
@@ -9043,7 +9043,7 @@ function ProgramTab({
                 {canEdit ? (
                   <input value={session.title} onChange={e => updateSession(session.id, { title: e.target.value })} placeholder="Session title…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", width: "100%" }} />
                 ) : (
-                  <span style={{ fontSize: 14, color: "var(--ink)" }}>{session.title || <span style={{ color: "#A09A8C", fontStyle: "italic" }}>—</span>}</span>
+                  <span style={{ fontSize: 14, color: "var(--ink)" }}>{session.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>—</span>}</span>
                 )}
                 {canEdit ? (
                   <select value={session.leader_id} onChange={e => updateSession(session.id, { leader_id: e.target.value })} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
@@ -9178,13 +9178,13 @@ function GroupsTab({
           onClick={canEdit ? () => setShowWizard(true) : undefined}
           disabled={!canEdit}
           style={{
-            width: "100%", padding: "48px 24px", border: "1px dashed #C4C0B0",
+            width: "100%", padding: "48px 24px", border: "1px dashed var(--dashed)",
             borderRadius: 14, background: "transparent",
             cursor: canEdit ? "pointer" : "default",
             display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
           }}
         >
-          <div style={{ width: 44, height: 44, borderRadius: 12, border: "1px dashed #C4C0B0", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted-text)" }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, border: "1px dashed var(--dashed)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted-text)" }}>
             <Plus style={{ width: 20, height: 20 }} />
           </div>
           <div style={{ textAlign: "center" }}>
@@ -9903,14 +9903,14 @@ function GroupGeneratorWizard({
                   style={{
                     display: "flex", alignItems: "flex-start", gap: 14, padding: "16px 18px",
                     border: sourceType === opt.value ? "1px solid var(--plum)" : "1px solid var(--line-2)",
-                    borderRadius: 12, background: sourceType === opt.value ? "#F6F2E8" : "var(--cream-panel)",
+                    borderRadius: 12, background: sourceType === opt.value ? "var(--cream-3)" : "var(--cream-panel)",
                     cursor: "pointer", textAlign: "left", fontFamily: "inherit",
                     boxShadow: sourceType === opt.value ? "inset 0 0 0 1px var(--plum)" : "none",
                   }}
                 >
                   <div style={{
                     width: 18, height: 18, borderRadius: 999, flexShrink: 0, marginTop: 2,
-                    border: "2px solid " + (sourceType === opt.value ? "var(--plum)" : "#C4C0B0"),
+                    border: "2px solid " + (sourceType === opt.value ? "var(--plum)" : "var(--dashed)"),
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
                     {sourceType === opt.value && <div style={{ width: 8, height: 8, borderRadius: 999, background: "var(--plum)" }} />}
@@ -9965,7 +9965,7 @@ function GroupGeneratorWizard({
             )}
 
             {/* Pool count preview */}
-            <div style={{ marginTop: 20, padding: "14px 18px", background: "#F6F2E8", border: "1px solid var(--line)", borderRadius: 10 }}>
+            <div style={{ marginTop: 20, padding: "14px 18px", background: "var(--cream-3)", border: "1px solid var(--line)", borderRadius: 10 }}>
               {countLoading ? (
                 <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>Counting…</p>
               ) : poolCount !== null ? (
@@ -10006,7 +10006,7 @@ function GroupGeneratorWizard({
 
             {/* SG mode DGL count display */}
             {smallGroupMode && sglRosterConfirmed && sgDGLs.length > 0 && (
-              <div style={{ marginBottom: 28, padding: "14px 18px", background: "#F6F2E8", border: "1px solid var(--line)", borderRadius: 10 }}>
+              <div style={{ marginBottom: 28, padding: "14px 18px", background: "var(--cream-3)", border: "1px solid var(--line)", borderRadius: 10 }}>
                 <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: "0 0 3px" }}>
                   {sgDGLs.length} group{sgDGLs.length !== 1 ? "s" : ""} — one per DGL on the {semester} roster
                 </p>
@@ -10054,7 +10054,7 @@ function GroupGeneratorWizard({
 
             {/* CSV upload — only for non-DGL small group mode */}
             {smallGroupMode && !(sglRosterConfirmed && sgDGLs.length > 0) && (
-              <div style={{ marginTop: 18, padding: "16px 18px", background: "#F6F2E8", border: "1px solid var(--line)", borderRadius: 12 }}>
+              <div style={{ marginTop: 18, padding: "16px 18px", background: "var(--cream-3)", border: "1px solid var(--line)", borderRadius: 12 }}>
                 <p style={{ ...mono, marginBottom: 8 }}>Last year&apos;s groupings (CSV)</p>
                 <p style={{ fontSize: 12, color: "var(--body)", margin: "0 0 10px" }}>
                   Format: <code style={{ fontFamily: "var(--mono)", background: "var(--line)", padding: "1px 5px", borderRadius: 4 }}>Name, Group</code> — one row per person. First row is header.
@@ -10190,7 +10190,7 @@ function GroupGeneratorWizard({
                               cursor: "grab",
                             }}
                           >
-                            <GripVertical style={{ width: 12, height: 12, color: "#C4C0B0", flexShrink: 0 }} />
+                            <GripVertical style={{ width: 12, height: 12, color: "var(--dashed)", flexShrink: 0 }} />
                             <div style={{ width: 24, height: 24, borderRadius: 6, background: "var(--plum)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                               <span style={{ fontSize: 9, fontWeight: 700, color: "var(--cream-panel)" }}>
                                 {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
@@ -10248,7 +10248,7 @@ function GroupGeneratorWizard({
                               cursor: "grab",
                             }}
                           >
-                            <GripVertical style={{ width: 12, height: 12, color: "#C4C0B0", flexShrink: 0 }} />
+                            <GripVertical style={{ width: 12, height: 12, color: "var(--dashed)", flexShrink: 0 }} />
                             <div style={{ width: 24, height: 24, borderRadius: 6, background: "var(--plum)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
                               <span style={{ fontSize: 9, fontWeight: 700, color: "var(--cream-panel)" }}>
                                 {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
@@ -10924,7 +10924,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
       {roles.length > 0 && (
         <div>
           <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 6 }}>Default role</p>
-          <p style={{ fontSize: 12, color: "#A09A8C", marginBottom: 10 }}>Pre-fills for all selections — change individually below.</p>
+          <p style={{ fontSize: 12, color: "var(--faint)", marginBottom: 10 }}>Pre-fills for all selections — change individually below.</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
             {roles.map((r) => (
               <button
@@ -10960,7 +10960,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
       {/* Member list */}
       <div>
         {filteredAdd.length === 0 ? (
-          <div style={{ border: "1px dashed #C4C0B0", borderRadius: 12, padding: "32px 24px", textAlign: "center" as const }}>
+          <div style={{ border: "1px dashed var(--dashed)", borderRadius: 12, padding: "32px 24px", textAlign: "center" as const }}>
             <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>No members to add.</p>
           </div>
         ) : (
@@ -10989,7 +10989,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                     display: "flex", alignItems: "center", gap: 14, width: "100%",
                     padding: selected && roles.length > 1 ? "12px 0" : "14px 0",
                     borderTop: "none", borderLeft: "none", borderRight: "none",
-                    borderBottom: isLast ? "none" : "1px solid #EFE9DA",
+                    borderBottom: isLast ? "none" : "1px solid var(--line-3)",
                     background: selected ? "var(--ivory)" : "transparent",
                     cursor: "pointer", textAlign: "left" as const,
                     transition: "background 0.12s",
@@ -11068,7 +11068,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                 <button
                   onClick={handleCreateGroupChat}
                   disabled={creatingChat}
-                  className="size-9 flex items-center justify-center rounded-full hover:bg-[#F4F1E8] transition-colors"
+                  className="size-9 flex items-center justify-center rounded-full hover:bg-[var(--body-bg)] transition-colors"
                   style={{ border: "none", background: "transparent", cursor: creatingChat ? "not-allowed" : "pointer", opacity: creatingChat ? 0.5 : 1 }}
                 >
                   <MessageCircle className="w-4 h-4 text-[var(--muted-text)]" />
@@ -11503,7 +11503,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                   <div style={{ marginTop: 36 }}>
                     <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 12px" }}>Danger zone</p>
                     <div style={{ height: 1, background: "var(--line)", marginBottom: 16 }} />
-                    <button onClick={() => setConfirmDelete(true)} style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 18px", background: "transparent", border: "1px solid rgba(176,65,62,0.25)", borderRadius: "var(--r-chip)", color: "#B0413E", fontSize: 14, cursor: "pointer" }}>
+                    <button onClick={() => setConfirmDelete(true)} style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 18px", background: "transparent", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: "var(--r-chip)", color: "var(--danger)", fontSize: 14, cursor: "pointer" }}>
                       <Trash2 style={{ width: 14, height: 14 }} /> Delete team
                     </button>
                   </div>
@@ -12365,14 +12365,14 @@ function SmallGroupLeadersTab({
                         key={a.id}
                         className="flex items-center gap-4 px-5 py-4"
                         style={{
-                          borderTop: i === 0 ? "none" : "1px solid #EFE9DA",
+                          borderTop: i === 0 ? "none" : "1px solid var(--line-3)",
                           borderLeft: isNext ? "3px solid var(--plum)" : "3px solid transparent",
-                          background: isNext ? "#F6F2E8" : "transparent",
+                          background: isNext ? "var(--cream-3)" : "transparent",
                           opacity: isPast ? 0.4 : 1,
                           transition: "opacity 0.15s",
                         }}
                       >
-                        <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "#EDE5F5" : "#F6F2E8", border: `1px solid ${isNext ? "#C9B8D4" : "var(--line)"}` }}>
+                        <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "#EDE5F5" : "var(--cream-3)", border: `1px solid ${isNext ? "#C9B8D4" : "var(--line)"}` }}>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase" as const }}>{dow}</span>
                           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: isNext ? "var(--plum)" : "var(--plum-2)", lineHeight: 1, marginTop: 1 }}>{dayNum}</span>
                         </div>
@@ -12436,7 +12436,7 @@ function SmallGroupLeadersTab({
               {/* Add / Edit mode — member picker */}
               {(rosterAddMode || editingRoster) && (
                 <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
-                  <div className="px-4 pt-4 pb-3 border-b border-[#EFE9DA]">
+                  <div className="px-4 pt-4 pb-3 border-b border-[var(--line-3)]">
                     <input
                       type="text"
                       placeholder="Search members…"
@@ -12454,7 +12454,7 @@ function SmallGroupLeadersTab({
                           <div
                             key={m.id}
                             onClick={() => setPendingRosterIds(prev => { const n = new Set(prev); selected ? n.delete(m.id) : n.add(m.id); return n })}
-                            className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < arr.length - 1 ? "border-b border-[#EFE9DA]" : ""}`}
+                            className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < arr.length - 1 ? "border-b border-[var(--line-3)]" : ""}`}
                             style={{ background: selected ? "rgba(62,21,64,0.04)" : "transparent" }}
                           >
                             <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[12px] font-semibold" />
@@ -12464,7 +12464,7 @@ function SmallGroupLeadersTab({
                         )
                       })}
                   </div>
-                  <div className="flex gap-2 px-4 py-3 border-t border-[#EFE9DA]">
+                  <div className="flex gap-2 px-4 py-3 border-t border-[var(--line-3)]">
                     <button
                       onClick={() => { setRosterAddMode(false); setEditingRoster(false); setPendingRosterIds(new Set()); setMemberSearch("") }}
                       style={{ flex: 1, padding: "8px 0", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
@@ -12487,7 +12487,7 @@ function SmallGroupLeadersTab({
               {rosterStatus?.confirmed && !rosterAddMode && !editingRoster && (
                 <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                   {rosterMembers.map((m, i) => (
-                    <div key={m.user_id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
+                    <div key={m.user_id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)" }}>
                       <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
                       <p className="flex-1 text-[14px] text-[var(--ink)]">{m.name}</p>
                     </div>
@@ -12536,7 +12536,7 @@ function SmallGroupLeadersTab({
                         const isPendingRemove = pendingRemoveMemberIds.has(m.user_id)
                         const isConfirming = confirmRemoveSgMemberId === m.user_id
                         return (
-                          <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA", background: isPendingRemove || isConfirming ? "#FDF8F8" : "transparent" }}>
+                          <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)", background: isPendingRemove || isConfirming ? "#FDF8F8" : "transparent" }}>
                             <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
                             <p className={`flex-1 text-[14px] ${isPendingRemove ? "line-through text-[var(--danger)]" : "text-[var(--ink)]"}`}>{m.name}</p>
                             {isEditing ? (
@@ -12562,7 +12562,7 @@ function SmallGroupLeadersTab({
                         const person = allMembersForPicker.find(p => p.id === uid)
                         if (!person) return null
                         return (
-                          <div key={uid} className="flex items-center gap-3 px-4 py-3 border-t border-[#EFE9DA]" style={{ background: "rgba(62,21,64,0.03)" }}>
+                          <div key={uid} className="flex items-center gap-3 px-4 py-3 border-t border-[var(--line-3)]" style={{ background: "rgba(62,21,64,0.03)" }}>
                             <MonogramChip initials={getInitials(person.name)} className="w-7 h-7 text-[11px] font-semibold" />
                             <p className="flex-1 text-[14px] text-[var(--ink)]">{person.name}</p>
                             <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "var(--plum)", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px", marginRight: 4 }}>ADDING</span>
@@ -12573,7 +12573,7 @@ function SmallGroupLeadersTab({
                     </>
                   )}
                   {isEditing && (
-                    <div className="border-t border-[#EFE9DA]">
+                    <div className="border-t border-[var(--line-3)]">
                       {showSgAddPicker ? (
                         <div className="p-3">
                           <input type="text" placeholder="Search members…" value={sgAddPickerSearch} onChange={e => setSgAddPickerSearch(e.target.value)} autoFocus style={{ width: "100%", border: "1px solid var(--line-2)", borderRadius: 10, padding: "7px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "var(--cream-panel)", marginBottom: 6 }} />
@@ -12581,7 +12581,7 @@ function SmallGroupLeadersTab({
                             {addableMembers.length === 0 ? (
                               <div className="px-4 py-4 text-center"><p style={{ fontSize: 12, color: "var(--muted-text)" }}>No members to add</p></div>
                             ) : addableMembers.map((p, i) => (
-                              <div key={p.id} onClick={() => { setPendingAddMemberIds(prev => new Set([...prev, p.id])); setSgAddPickerSearch(""); setShowSgAddPicker(false) }} className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < addableMembers.length - 1 ? "border-b border-[#EFE9DA]" : ""}`}>
+                              <div key={p.id} onClick={() => { setPendingAddMemberIds(prev => new Set([...prev, p.id])); setSgAddPickerSearch(""); setShowSgAddPicker(false) }} className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < addableMembers.length - 1 ? "border-b border-[var(--line-3)]" : ""}`}>
                                 <MonogramChip initials={getInitials(p.name)} className="w-7 h-7 text-[11px] font-semibold" />
                                 <p style={{ fontSize: 13, color: "var(--ink)" }}>{p.name}</p>
                               </div>
@@ -12616,7 +12616,7 @@ function SmallGroupLeadersTab({
                       {pairedMs.length === 0 ? (
                         <div className="px-4 py-5 text-center"><p className="text-[13px] text-[var(--muted-text)]">No members yet.</p></div>
                       ) : pairedMs.map((m, i) => (
-                        <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid #EFE9DA" }}>
+                        <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)" }}>
                           <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
                           <p className="text-[14px] text-[var(--ink)]">{m.name}</p>
                         </div>
@@ -12697,12 +12697,12 @@ function SmallGroupLeadersTab({
                         <thead>
                           {/* Month eyebrow row */}
                           <tr>
-                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#F6F2E8", zIndex: 2, borderBottom: "1px solid var(--line)" }} />
+                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "var(--cream-3)", zIndex: 2, borderBottom: "1px solid var(--line)" }} />
                             {monthGroups.map(group => (
                               <th
                                 key={group.label}
                                 colSpan={group.dates.length}
-                                style={{ padding: "6px 8px 4px", fontSize: 9, fontWeight: 700, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase" as const, borderBottom: "1px solid var(--line)", borderLeft: "1px solid var(--line)", background: "#F6F2E8", textAlign: "left", whiteSpace: "nowrap" }}
+                                style={{ padding: "6px 8px 4px", fontSize: 9, fontWeight: 700, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase" as const, borderBottom: "1px solid var(--line)", borderLeft: "1px solid var(--line)", background: "var(--cream-3)", textAlign: "left", whiteSpace: "nowrap" }}
                               >
                                 {group.label}
                               </th>
@@ -12710,7 +12710,7 @@ function SmallGroupLeadersTab({
                           </tr>
                           {/* Date header row */}
                           <tr>
-                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "#F6F2E8", zIndex: 2, borderBottom: "1px solid var(--line)", borderRight: "1px solid var(--line)" }} />
+                            <th style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "var(--cream-3)", zIndex: 2, borderBottom: "1px solid var(--line)", borderRight: "1px solid var(--line)" }} />
                             {semesterDates.map(({ date, slot }) => {
                               const [, m, d] = date.split("-")
                               const isPast = date < today
@@ -12725,7 +12725,7 @@ function SmallGroupLeadersTab({
                         </thead>
                         <tbody>
                           {displayMembers.map((member, i) => (
-                            <tr key={member.user_id} style={{ borderBottom: i < displayMembers.length - 1 ? "1px solid #EFE9DA" : undefined }}>
+                            <tr key={member.user_id} style={{ borderBottom: i < displayMembers.length - 1 ? "1px solid var(--line-3)" : undefined }}>
                               <td style={{ width: nameColW, minWidth: nameColW, position: "sticky", left: 0, background: "var(--cream-panel)", zIndex: 1, padding: "7px 12px", fontSize: 12, color: "var(--body)", fontWeight: 500, whiteSpace: "nowrap", borderRight: "1px solid var(--line)" }}>
                                 {member.name.split(" ")[0]}
                               </td>
@@ -12812,7 +12812,7 @@ function SmallGroupLeadersTab({
                   <div className="flex items-center gap-2">
                     {(rotationPhase === "saved" || rotationPhase === "published") && (
                       <>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, background: rotationPhase === "published" ? "rgba(62,21,64,0.08)" : "#F4F1E8", color: "var(--plum)", fontSize: 11, fontWeight: 500, letterSpacing: "0.02em" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, background: rotationPhase === "published" ? "rgba(62,21,64,0.08)" : "var(--body-bg)", color: "var(--plum)", fontSize: 11, fontWeight: 500, letterSpacing: "0.02em" }}>
                           {rotationPhase === "published" ? "Published" : "Draft"}
                         </span>
                         <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "6px 12px", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5 }}>
@@ -12830,7 +12830,7 @@ function SmallGroupLeadersTab({
               {/* DGL readiness summary */}
               {rosterConfirmedForSchedule && scheduleRosterMembers.length > 0 && (
                 <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
-                  <div className="px-5 py-3 border-b border-[#EFE9DA]" style={{ background: "#F6F2E8" }}>
+                  <div className="px-5 py-3 border-b border-[var(--line-3)]" style={{ background: "var(--cream-3)" }}>
                     <p style={{ ...MONO_STYLE, margin: 0 }}>
                       Availability Status · {scheduleRosterMembers.filter(m => memberReadiness.get(m.user_id)).length}/{scheduleRosterMembers.length} Done
                     </p>
@@ -12839,7 +12839,7 @@ function SmallGroupLeadersTab({
                     {scheduleRosterMembers.map(m => {
                       const ready = memberReadiness.get(m.user_id) ?? false
                       return (
-                        <span key={m.user_id} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, padding: "4px 10px", borderRadius: 999, background: ready ? "color-mix(in srgb, var(--success) 8%, transparent)" : "#F4F1E8", border: `1px solid ${ready ? "color-mix(in srgb, var(--success) 20%, transparent)" : "var(--line)"}`, color: ready ? "var(--success)" : "var(--muted-text)", fontWeight: ready ? 500 : 400 }}>
+                        <span key={m.user_id} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, padding: "4px 10px", borderRadius: 999, background: ready ? "color-mix(in srgb, var(--success) 8%, transparent)" : "var(--body-bg)", border: `1px solid ${ready ? "color-mix(in srgb, var(--success) 20%, transparent)" : "var(--line)"}`, color: ready ? "var(--success)" : "var(--muted-text)", fontWeight: ready ? 500 : 400 }}>
                           {ready && <Check style={{ width: 10, height: 10 }} />}
                           {m.name.split(" ")[0]}
                           {!ready && <span style={{ fontSize: 10, opacity: 0.6 }}>…</span>}
@@ -12897,14 +12897,14 @@ function SmallGroupLeadersTab({
                               <button
                                 onClick={() => setOpenRotMonths(prev => { const n = new Set(prev); isOpen ? n.delete(month) : n.add(month); return n })}
                                 className="w-full flex items-center gap-3 px-5 py-4 text-left"
-                                style={{ background: isOpen ? "#F6F2E8" : "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                                style={{ background: isOpen ? "var(--cream-3)" : "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}
                               >
                                 <ChevronDown style={{ width: 15, height: 15, color: "var(--body)", flexShrink: 0, transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
                                 <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", letterSpacing: "-0.01em", flex: 1 }}>{month}</span>
                                 <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)" }}>{weekDates.length} WEEKS</span>
                               </button>
                               {isOpen && (
-                                <div style={{ borderTop: "1px solid #EFE9DA" }}>
+                                <div style={{ borderTop: "1px solid var(--line-3)" }}>
                                   <DGLAssignmentTable
                                     assignments={rows}
                                     flaggedKeys={new Set()}
@@ -13342,7 +13342,7 @@ function BibleStudySubTab({
       {progress.length > 0 && (
         <div>
           <PlanSectionHeader>Where We Left Off</PlanSectionHeader>
-          <div style={{ background: "white", borderRadius: 14, border: "1px solid var(--line)", overflow: "hidden" }}>
+          <div style={{ background: "var(--cream)", borderRadius: 14, border: "1px solid var(--line)", overflow: "hidden" }}>
             {progress.map((p, i) => {
               const isMe = p.user_id === userId
               const isLast = i === progress.length - 1
@@ -13368,7 +13368,7 @@ function BibleStudySubTab({
                       </button>
                     )}
                     {!isMe && !p.progress_note && (
-                      <Circle style={{ width: 13, height: 13, color: "#C4C0B0", flexShrink: 0 }} />
+                      <Circle style={{ width: 13, height: 13, color: "var(--dashed)", flexShrink: 0 }} />
                     )}
                   </div>
                   {isMe && editingNote && (
@@ -13466,7 +13466,7 @@ function BibleStudySubTab({
                       <button
                         onClick={() => setConfirmingDeleteId(s.id)}
                         title="Delete"
-                        style={{ background: "none", border: "none", cursor: "pointer", padding: "3px", color: "#C4C0B0", display: "flex", flexShrink: 0 }}
+                        style={{ background: "none", border: "none", cursor: "pointer", padding: "3px", color: "var(--dashed)", display: "flex", flexShrink: 0 }}
                       >
                         <Trash2 style={{ width: 12, height: 12 }} />
                       </button>
@@ -13489,20 +13489,20 @@ function BibleStudySubTab({
 
       {/* Create form */}
       {creating && (
-        <div style={{ background: "white", borderRadius: 16, border: "1px solid var(--line)", padding: "20px" }}>
+        <div style={{ background: "var(--cream)", borderRadius: 16, border: "1px solid var(--line)", padding: "20px" }}>
           <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 12 }}>New chapter</p>
           <input
             value={newTitle}
             onChange={e => setNewTitle(e.target.value)}
             placeholder="Chapter name (e.g. Romans 1)"
-            style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 8, fontFamily: "inherit", color: "var(--ink)", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
+            style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 8, fontFamily: "inherit", color: "var(--ink)", background: "var(--cream)", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
           />
           <input
             type="url"
             value={newDocUrl}
             onChange={e => setNewDocUrl(e.target.value)}
             placeholder="https://docs.google.com/document/d/..."
-            style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 8, fontFamily: "inherit", color: "var(--ink)", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
+            style={{ width: "100%", padding: "9px 12px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 8, fontFamily: "inherit", color: "var(--ink)", background: "var(--cream)", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
           />
           <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 10 }}>Make sure the doc is set to &ldquo;Anyone with the link can view&rdquo; before finalizing.</p>
           {createError && <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>{createError}</p>}
@@ -13519,8 +13519,8 @@ function BibleStudySubTab({
 
       {/* Empty state (no chapters yet) */}
       {sheets.length === 0 && !creating && (
-        <div style={{ background: "white", borderRadius: 16, border: "1.5px dashed var(--line)", padding: "32px 24px", textAlign: "center" as const }}>
-          <FileText style={{ width: 32, height: 32, color: "#C4C0B0", margin: "0 auto 12px" }} />
+        <div style={{ background: "var(--cream)", borderRadius: 16, border: "1.5px dashed var(--line)", padding: "32px 24px", textAlign: "center" as const }}>
+          <FileText style={{ width: 32, height: 32, color: "var(--dashed)", margin: "0 auto 12px" }} />
           <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>No chapters yet</p>
           <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: isPastor ? 16 : 0 }}>
             {isPastor ? "Create the first chapter to get started." : "Check back when the pastor has added the first chapter."}
@@ -13559,7 +13559,7 @@ function BibleStudySubTab({
 
           {/* DRAFT: iframe preview */}
           {sheet.status === "draft" && (
-            <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--line)", overflow: "hidden" }}>
+            <div style={{ background: "var(--cream)", borderRadius: 12, border: "1px solid var(--line)", overflow: "hidden" }}>
               <iframe
                 src={sheet.google_doc_url.replace(/\/edit.*$/, "") + "/preview"}
                 style={{ width: "100%", height: 600, border: "none", display: "block" }}
@@ -13577,7 +13577,7 @@ function BibleStudySubTab({
                 </div>
               )}
               {!renderingPdf && pdfPages.length === 0 && sheet.pdf_url && (
-                <div style={{ background: "white", borderRadius: 12, border: "1px solid var(--line)", padding: 20, textAlign: "center" as const }}>
+                <div style={{ background: "var(--cream)", borderRadius: 12, border: "1px solid var(--line)", padding: 20, textAlign: "center" as const }}>
                   <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 12 }}>PDF preview unavailable.</p>
                   <a href={sheet.pdf_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--plum)", fontWeight: 600, textDecoration: "none" }}>
                     Download PDF →
@@ -13627,7 +13627,7 @@ function BibleStudySubTab({
                             whiteSpace: "nowrap" as const, maxWidth: 200, zIndex: 20, pointerEvents: "none" as const,
                           }}>
                             {ann.text}
-                            <div style={{ fontSize: 10, color: "#A09A8C" }}>Click to delete</div>
+                            <div style={{ fontSize: 10, color: "var(--faint)" }}>Click to delete</div>
                           </div>
                         )}
                       </div>
@@ -13645,7 +13645,7 @@ function BibleStudySubTab({
 
           {/* Pending annotation input */}
           {pendingAnnotation !== null && (
-            <div style={{ background: "white", borderRadius: 14, border: "1.5px solid var(--line)", padding: 16, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+            <div style={{ background: "var(--cream)", borderRadius: 14, border: "1.5px solid var(--line)", padding: 16 }}>
               <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>Add annotation</p>
               <textarea
                 autoFocus
@@ -13653,7 +13653,7 @@ function BibleStudySubTab({
                 onChange={e => setAnnotationText(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleAddAnnotation() } }}
                 placeholder="Type your note…"
-                style={{ width: "100%", resize: "none" as const, height: 68, padding: "8px 10px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 8, fontFamily: "inherit", color: "var(--ink)", background: "#FDFBF7", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
+                style={{ width: "100%", resize: "none" as const, height: 68, padding: "8px 10px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 8, fontFamily: "inherit", color: "var(--ink)", background: "var(--cream)", outline: "none", boxSizing: "border-box" as const, marginBottom: 8 }}
               />
               <div style={{ display: "flex", gap: 8 }}>
                 <CentralButton variant="primary" size="sm" onClick={handleAddAnnotation} disabled={savingAnnotation || !annotationText.trim()} style={{ flex: 1 }}>
@@ -13677,10 +13677,10 @@ function BibleStudySubTab({
                 value={noteDraft}
                 onChange={e => handleNoteChange(e.target.value)}
                 placeholder="Add notes for the DGLs…"
-                style={{ width: "100%", resize: "vertical" as const, minHeight: 100, padding: "10px 12px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 10, fontFamily: "inherit", color: "var(--ink)", background: "white", outline: "none", boxSizing: "border-box" as const }}
+                style={{ width: "100%", resize: "vertical" as const, minHeight: 100, padding: "10px 12px", fontSize: 13, border: "1.5px solid var(--line)", borderRadius: 10, fontFamily: "inherit", color: "var(--ink)", background: "var(--cream)", outline: "none", boxSizing: "border-box" as const }}
               />
             ) : sheet.pastor_notes ? (
-              <div style={{ padding: "12px 16px", background: "#F4F1E8", borderRadius: 10, border: "1px solid var(--line)", fontSize: 13, color: "var(--ink)", lineHeight: 1.6, whiteSpace: "pre-wrap" as const }}>
+              <div style={{ padding: "12px 16px", background: "var(--body-bg)", borderRadius: 10, border: "1px solid var(--line)", fontSize: 13, color: "var(--ink)", lineHeight: 1.6, whiteSpace: "pre-wrap" as const }}>
                 {sheet.pastor_notes}
               </div>
             ) : (
@@ -13784,7 +13784,7 @@ function DGLAssignmentTable({
         const hasFlagged = SLOTS.some(s => flaggedKeys.has(`${wd}::${s}`))
         return (
           <div key={wd} className={`rounded-[12px] border overflow-hidden ${hasFlagged ? "border-[#FDE68A]" : "border-[var(--line)]"}`} style={{ background: "var(--cream-panel)" }}>
-            <div className={`px-4 py-2.5 border-b flex items-center justify-between ${hasFlagged ? "border-[#FDE68A] bg-[#FFFBEB]" : "border-[#EFE9DA]"}`} style={hasFlagged ? {} : { background: "#F6F2E8" }}>
+            <div className={`px-4 py-2.5 border-b flex items-center justify-between ${hasFlagged ? "border-[#FDE68A] bg-[#FFFBEB]" : "border-[var(--line-3)]"}`} style={hasFlagged ? {} : { background: "var(--cream-3)" }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: hasFlagged ? "#92400E" : "var(--body)" }}>{dateStr}</span>
               {hasFlagged && (
                 <span style={{ fontSize: 10, fontWeight: 600, color: "#92400E", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
@@ -13800,7 +13800,7 @@ function DGLAssignmentTable({
               const isEditing = !isFriday && editingCell?.weekDate === wd && editingCell?.slot === slot
               const isHovered = !isFriday && hoveredCell?.weekDate === wd && hoveredCell?.slot === slot
               return (
-                <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[#EFE9DA]" : ""} ${isFlagged ? "bg-[#FFFBEB]" : ""}`}>
+                <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[var(--line-3)]" : ""} ${isFlagged ? "bg-[#FFFBEB]" : ""}`}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: isFlagged ? "#B45309" : "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                     {DGL_SLOT_LABELS[slot]}
                   </span>
@@ -13818,7 +13818,7 @@ function DGLAssignmentTable({
                         setEditingCell(null)
                       }}
                       onBlur={() => setEditingCell(null)}
-                      style={{ fontSize: 13, border: "1.5px solid #D4CEDF", borderRadius: 6, padding: "3px 6px", fontFamily: "inherit", background: "white", color: "var(--ink)", maxWidth: 160 }}
+                      style={{ fontSize: 13, border: "1.5px solid #D4CEDF", borderRadius: 6, padding: "3px 6px", fontFamily: "inherit", background: "var(--cream)", color: "var(--ink)", maxWidth: 160 }}
                     >
                       <option value="" disabled>Select…</option>
                       {rosterMembers.map(m => (
