@@ -557,6 +557,39 @@ export async function regenerateStaffCode(): Promise<{ code: string | null; erro
   return { code: newCode, error: null }
 }
 
+// ─── Last-admin hard block ───────────────────────────────────────────────────
+// A ministry must never reach zero admin-tier members. Returns an error string
+// if the target is currently admin-tier AND is the last admin-tier member of
+// the ministry (so demoting/removing them would lock the ministry out).
+// Returns null when the action is safe to proceed.
+const ADMIN_TIER_ROLES = ["admin", "deacon", "elder", "pastor"]
+const LAST_ADMIN_ERROR = "This is the last admin — a ministry must keep at least one admin. Promote someone else first."
+
+async function lastAdminBlockError(
+  admin: ReturnType<typeof createAdminClient>,
+  ministryId: string,
+  targetUserId: string,
+): Promise<string | null> {
+  const { data: target } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", targetUserId)
+    .eq("ministry_id", ministryId)
+    .maybeSingle()
+
+  // Target isn't admin-tier (or isn't in this ministry) — no last-admin risk.
+  if (!target || !ADMIN_TIER_ROLES.includes((target.role ?? "").toLowerCase())) return null
+
+  // Count remaining admin-tier members (case-insensitive role match).
+  const { count } = await admin
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("ministry_id", ministryId)
+    .or(ADMIN_TIER_ROLES.map((r) => `role.ilike.${r}`).join(","))
+
+  return (count ?? 0) <= 1 ? LAST_ADMIN_ERROR : null
+}
+
 // ─── Admin: change a member's role ──────────────────────────────────────────
 export async function updateMemberRole(targetUserId: string, newRole: "visitor" | "member" | "leader" | "admin" | "deacon" | "elder" | "pastor"): Promise<{ error: string | null }> {
   const supabase = await createClient()
@@ -572,6 +605,14 @@ export async function updateMemberRole(targetUserId: string, newRole: "visitor" 
   if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { error: "Only admins can change member roles." }
 
   const admin = createAdminClient()
+
+  // Hard-block last admin: if the new role drops the target out of admin-tier,
+  // the target must not be the ministry's last admin-tier member.
+  if (!ADMIN_TIER_ROLES.includes(newRole.toLowerCase())) {
+    const blockErr = await lastAdminBlockError(admin, profile.ministry_id, targetUserId)
+    if (blockErr) return { error: blockErr }
+  }
+
   const { error } = await admin.from("profiles").update({ role: newRole }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
   return { error: error?.message ?? null }
 }
@@ -589,6 +630,12 @@ export async function removeMember(targetUserId: string): Promise<{ error: strin
   if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { error: "Only admins can remove members." }
 
   const admin = createAdminClient()
+
+  // Hard-block last admin: removal drops the target out of admin-tier, so the
+  // target must not be the ministry's last admin-tier member.
+  const blockErr = await lastAdminBlockError(admin, profile.ministry_id, targetUserId)
+  if (blockErr) return { error: blockErr }
+
   const { error } = await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
   if (error) return { error: error.message }
 
@@ -630,6 +677,12 @@ export async function excommunicateMember(targetUserId: string): Promise<{ error
   const admin = createAdminClient()
 
   const targetMinistryId = profile.ministry_id
+
+  // Hard-block last admin: excommunication drops the target out of admin-tier,
+  // so the target must not be the ministry's last admin-tier member. Runs
+  // before the ban insert so a blocked action mutates nothing.
+  const blockErr = await lastAdminBlockError(admin, targetMinistryId, targetUserId)
+  if (blockErr) return { error: blockErr }
 
   // Insert the ban record first
   const { error: banErr } = await admin.from("ministry_bans").upsert(
