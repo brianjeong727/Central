@@ -9,16 +9,20 @@ export function PlanSubTabStrip({
   tabs,
   active,
   onChange,
+  flush = false,
 }: {
   tabs: readonly { key: string; label: string }[]
   active: string
   onChange: (key: string) => void
+  // When true, drop the strip's own horizontal inset (label row md:pl-14 + hairline
+  // md:mx-14) so it aligns to the host's padding edge instead of double-insetting.
+  flush?: boolean
 }) {
   return (
     // Outer div: scroll container only — no border (replaced by soft hairline below)
     <div style={{ overflowX: "auto", scrollbarWidth: "none" as const }}>
       {/* Label row: 56px left inset on desktop, aligns with TabPageHeader's px-14 */}
-      <div className="md:pl-14" style={{ display: "flex", gap: 32 }}>
+      <div className={flush ? undefined : "md:pl-14"} style={{ display: "flex", gap: 32 }}>
         {tabs.map(({ key, label }) => (
           <button
             key={key}
@@ -44,7 +48,7 @@ export function PlanSubTabStrip({
         ))}
       </div>
       {/* Soft inset hairline — matches InsetHairline: var(--line), 0.65 opacity, 56px inset on desktop */}
-      <InsetHairline className="md:mx-14" />
+      <InsetHairline className={flush ? "" : "md:mx-14"} />
     </div>
   )
 }

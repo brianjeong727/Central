@@ -34,11 +34,11 @@ import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamCh
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
-import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, HeaderActionButton, sidebarItemStyle, EYEBROW_STYLE } from "../components/shared"
+import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -136,17 +136,6 @@ export function PlanFeatureCard({ icon, name, desc }: { icon: string; name: stri
 }
 
 // Shared field styling for the Resources edit forms (§4.4 inputs).
-const RESOURCE_INPUT_STYLE: React.CSSProperties = {
-  width: "100%",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--r-input)",
-  padding: "9px 12px",
-  fontSize: 14,
-  fontFamily: "var(--sans)",
-  color: "var(--ink)",
-  background: "var(--cream)",
-  outline: "none",
-}
 const RESOURCE_LABEL_STYLE: React.CSSProperties = {
   ...EYEBROW_STYLE,
   fontSize: 10,
@@ -154,13 +143,6 @@ const RESOURCE_LABEL_STYLE: React.CSSProperties = {
   display: "block",
   marginBottom: 6,
 }
-function resourceFocusPlum(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
-  e.currentTarget.style.borderColor = "var(--plum)"
-}
-function resourceBlurLine(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {
-  e.currentTarget.style.borderColor = "var(--line-2)"
-}
-
 // Inline add/edit form for a relevant link. Rendered inside a plum-bordered card
 // by the parent. Label + URL sit in a 2-col grid; Description spans below.
 export function LinkForm({
@@ -183,37 +165,28 @@ export function LinkForm({
       <div className="grid grid-cols-2 gap-3.5">
         <div>
           <label style={RESOURCE_LABEL_STYLE}>Label</label>
-          <input
+          <Input
             value={form.title}
             onChange={e => setForm({ ...form, title: e.target.value })}
-            onFocus={resourceFocusPlum}
-            onBlur={resourceBlurLine}
             placeholder="e.g. Room booking"
-            style={RESOURCE_INPUT_STYLE}
           />
         </div>
         <div>
           <label style={RESOURCE_LABEL_STYLE}>URL</label>
-          <input
+          <Input
             value={form.url}
             onChange={e => setForm({ ...form, url: e.target.value })}
-            onFocus={resourceFocusPlum}
-            onBlur={resourceBlurLine}
             placeholder="https://…"
             type="url"
-            style={RESOURCE_INPUT_STYLE}
           />
         </div>
       </div>
       <div style={{ marginTop: 12 }}>
         <label style={RESOURCE_LABEL_STYLE}>Description (optional)</label>
-        <input
+        <Input
           value={form.description}
           onChange={e => setForm({ ...form, description: e.target.value })}
-          onFocus={resourceFocusPlum}
-          onBlur={resourceBlurLine}
           placeholder="What it's for"
-          style={RESOURCE_INPUT_STYLE}
         />
       </div>
       <div className="flex gap-3 items-center" style={{ marginTop: 16 }}>
@@ -380,13 +353,11 @@ export function StudentOrgRoleTabContent({
         {editingDesc ? (
           <div style={{ border: "1px solid var(--plum)", borderRadius: "var(--r-callout)", padding: "20px 22px", background: "var(--cream)" }}>
             <label style={RESOURCE_LABEL_STYLE}>Summary</label>
-            <textarea
+            <Textarea
               value={summaryDraft}
               onChange={e => setSummaryDraft(e.target.value)}
-              onFocus={resourceFocusPlum}
-              onBlur={resourceBlurLine}
               placeholder={`Describe the ${roleName} role…`}
-              style={{ ...RESOURCE_INPUT_STYLE, fontSize: 15, padding: "12px 13px", minHeight: 70, resize: "vertical", lineHeight: 1.5 }}
+              style={{ minHeight: 70 }}
             />
 
             <div style={respEyebrow}>Responsibilities</div>
@@ -396,13 +367,11 @@ export function StudentOrgRoleTabContent({
                   <span style={{ color: "var(--dashed)", flexShrink: 0, display: "grid", placeItems: "center", cursor: "grab" }} aria-hidden>
                     <GripVertical className="w-3.5 h-3.5" />
                   </span>
-                  <input
+                  <Input
                     value={r}
                     onChange={e => setRespDraft(d => d.map((v, idx) => idx === i ? e.target.value : v))}
-                    onFocus={resourceFocusPlum}
-                    onBlur={resourceBlurLine}
                     placeholder="A responsibility…"
-                    style={{ ...RESOURCE_INPUT_STYLE, flex: 1 }}
+                    style={{ flex: 1 }}
                   />
                   <IconButton dim={26} onClick={() => setRespDraft(d => d.filter((_, idx) => idx !== i))} title="Remove" className="resource-remove-btn">
                     <X className="w-3.5 h-3.5" />
@@ -427,7 +396,7 @@ export function StudentOrgRoleTabContent({
             </div>
           </div>
         ) : (
-          <div style={{ border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: "20px 22px", background: "var(--cream)" }}>
+          <CentralCard variant="standard" radius="var(--r-callout)" padding="22px 22px">
             {hasNewContent ? (
               <>
                 {summaryText && (
@@ -463,7 +432,7 @@ export function StudentOrgRoleTabContent({
                 {canWrite ? "No description yet. Click Edit to add one." : "No description yet."}
               </p>
             )}
-          </div>
+          </CentralCard>
         )}
       </div>
 
@@ -618,7 +587,7 @@ export function MeetingNoteDetail({
             background: "var(--cream-2)",
           }}
         >
-          <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+          <span style={MONO_STYLE}>
             {noteDateLabel}
           </span>
         </div>
@@ -627,7 +596,9 @@ export function MeetingNoteDetail({
 
         {/* Document body */}
         <div style={{ padding: "28px 32px 0" }}>
-          <input
+          <SerifInput
+            fontSize={26}
+            underline={false}
             value={localTitle}
             readOnly={!canWrite}
             onChange={e => {
@@ -641,16 +612,9 @@ export function MeetingNoteDetail({
             }}
             placeholder="Untitled"
             style={{
-              fontFamily: "var(--font-instrument-serif)",
-              fontSize: 26,
               fontWeight: 400,
-              color: "var(--ink)",
               letterSpacing: "-0.02em",
               lineHeight: 1.2,
-              width: "100%",
-              border: "none",
-              background: "transparent",
-              outline: "none",
               padding: 0,
               display: "block",
             }}
@@ -1353,6 +1317,8 @@ export function StudentOrgTeamHome({
   const [groupGenerateTrigger, setGroupGenerateTrigger] = useState(0)
   // Notes tab — trigger createNote from header button
   const [notesTrigger, setNotesTrigger] = useState(0)
+  // Rotations tab — trigger New-semester modal from header button
+  const [rotationNewSemesterTrigger, setRotationNewSemesterTrigger] = useState(0)
   // Meeting Notes — which note is open (URL-synced via ?notetab); null = list view.
   const [openNoteId, setOpenNoteId] = useState<string | null>(() =>
     typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("notetab") : null,
@@ -1438,11 +1404,6 @@ export function StudentOrgTeamHome({
     setDeleteConfirmId(null)
     setDeleting(false)
     if (planningEvent?.id === evId) onPlanningEventChange(null)
-  }
-
-  const mono: React.CSSProperties = {
-    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
   }
 
   if (planningEvent) {
@@ -1548,46 +1509,17 @@ export function StudentOrgTeamHome({
         </div>
       )}
 
-      {/* Desktop section header — shared TabPageHeader + PageTitle (suppressed when a note is open) */}
-      {isDesktopView && !meetingNoteOpen && (() => {
-        const sectionMeta: Record<string, string> = {
-          General: "General", "Meeting Notes": "Meeting Notes", Events: "Events",
-          Resources: "Resources", Groups: "Groups", Rotations: "Rotations",
-        }
-        const sectionTitle = sectionMeta[displaySection] ?? displaySection
-        return (
-          <TabPageHeader>
-            <PageTitle title={sectionTitle} compact />
-            {displaySection === "Events" && canEdit && (
-              <HeaderActionButton label="New Event" onClick={() => setShowAddModal(true)} />
-            )}
-            {displaySection === "Resources" && userRosterRole && (
-              <span style={{ fontSize: 11, fontWeight: 600, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginLeft: "auto" }}>
-                {userRosterRole}
-              </span>
-            )}
-            {displaySection === "Meeting Notes" && canEdit && (
-              <HeaderActionButton label="New notes" onClick={() => setNotesTrigger(t => t + 1)} />
-            )}
-            {displaySection === "Groups" && canEdit && (
-              <HeaderActionButton label="Generate groups" onClick={() => setGroupGenerateTrigger(t => t + 1)} />
-            )}
-            {onTeamSettings && (
-              <IconButton dim={32} onClick={onTeamSettings} title="Team settings" className="ml-auto">
-                <Settings className="w-4 h-4" />
-              </IconButton>
-            )}
-          </TabPageHeader>
-        )
-      })()}
-
-      {/* Desktop Resources role sub-strip (replaces pill buttons) */}
-      {isDesktopView && displaySection === "Resources" && resourcesRoles.length > 0 && (
-        <PlanSubTabStrip
-          tabs={resourcesRoles.map(r => ({ key: r, label: r }))}
-          active={activeResourcesRole}
-          onChange={setResourcesRole}
-        />
+      {/* Desktop object header — workspace name + settings gear only.
+          Per-section titles + creates now live in each section body (Zone C). */}
+      {isDesktopView && !meetingNoteOpen && (
+        <TabPageHeader>
+          <PageTitle title={teamName} compact />
+          {onTeamSettings && (
+            <IconButton dim={32} onClick={onTeamSettings} title="Team settings" className="ml-auto">
+              <Settings className="w-4 h-4" />
+            </IconButton>
+          )}
+        </TabPageHeader>
       )}
 
       {/* ── Tab content ── */}
@@ -1600,6 +1532,7 @@ export function StudentOrgTeamHome({
         {/* GENERAL — calendar full-width + meeting notes */}
         {displaySection === "General" && (
           <div>
+            <ContentHeader label="General" style={{ marginBottom: 24 }} />
             <section>
               {calLoading ? (
                 <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
@@ -1623,12 +1556,18 @@ export function StudentOrgTeamHome({
         {/* NOTES — meeting notes timeline */}
         {displaySection === "Meeting Notes" && (
           <div>
-            {!isDesktopView && (
-              <div style={{ marginBottom: 28 }}>
-                <p style={mono}>Meeting Notes</p>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "var(--ink)" }}>Meeting Notes</h2>
-              </div>
-            )}
+            <ContentHeader
+              label="Meeting Notes"
+              style={{ marginBottom: 24 }}
+              action={canEdit && (
+                <ContentActionButton
+                  variant="primary"
+                  icon={<Plus style={{ width: 13, height: 13 }} />}
+                  label="New note"
+                  onClick={() => setNotesTrigger(t => t + 1)}
+                />
+              )}
+            />
             <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} openNoteId={openNoteId} onOpenNote={setOpenNoteAndUrl} />
           </div>
         )}
@@ -1636,24 +1575,18 @@ export function StudentOrgTeamHome({
         {/* PLAN — events list with Plan → links */}
         {displaySection === "Events" && (
           <div>
-            {/* Mobile header + New Event (desktop header is TabPageHeader above) */}
-            {!isDesktopView && (
-              <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28 }}>
-                <div>
-                  <p style={mono}>Events & planning</p>
-                  <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: "-0.01em", color: "var(--ink)" }}>Events</h2>
-                </div>
-                {canEdit && (
-                  <CentralButton
-                    variant="primary" size="sm"
-                    onClick={() => setShowAddModal(true)}
-                    style={{ flexShrink: 0, marginBottom: 4 }}
-                  >
-                    <Plus className="w-3.5 h-3.5" /> New Event
-                  </CentralButton>
-                )}
-              </div>
-            )}
+            <ContentHeader
+              label="Events"
+              style={{ marginBottom: 24 }}
+              action={canEdit && (
+                <ContentActionButton
+                  variant="primary"
+                  icon={<Plus style={{ width: 13, height: 13 }} />}
+                  label="New Event"
+                  onClick={() => setShowAddModal(true)}
+                />
+              )}
+            />
             <EventsAgendaList
               events={calEvents}
               allEvents={calData?.events ?? []}
@@ -1671,30 +1604,25 @@ export function StudentOrgTeamHome({
         {/* RESOURCES — role links/docs */}
         {displaySection === "Resources" && (
           <div>
-            {/* Mobile header + role pills (desktop gets TabPageHeader + PlanSubTabStrip above) */}
-            {!isDesktopView && (
-              <>
-                <div style={{ marginBottom: 20 }}>
-                  <p style={mono}>Team resources</p>
-                  <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 6, gap: 12 }}>
-                    <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: 0, letterSpacing: "-0.01em", color: "var(--ink)" }}>Resources</h2>
-                    {userRosterRole && (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0, marginBottom: 4 }}>
-                        {userRosterRole}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {resourcesRoles.length > 0 && (
-                  <div style={{ marginBottom: 22 }}>
-                    <PlanSubTabStrip
-                      tabs={resourcesRoles.map(r => ({ key: r, label: r }))}
-                      active={activeResourcesRole}
-                      onChange={setResourcesRole}
-                    />
-                  </div>
-                )}
-              </>
+            {/* Header + role sub-strip render once for both breakpoints. */}
+            <ContentHeader
+              label="Resources"
+              style={{ marginBottom: 24 }}
+              action={userRosterRole && (
+                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}>
+                  {userRosterRole}
+                </span>
+              )}
+            />
+            {resourcesRoles.length > 0 && (
+              <div style={{ marginBottom: 22 }}>
+                <PlanSubTabStrip
+                  tabs={resourcesRoles.map(r => ({ key: r, label: r }))}
+                  active={activeResourcesRole}
+                  onChange={setResourcesRole}
+                  flush
+                />
+              </div>
             )}
             <StudentOrgRoleTabContent key={activeResourcesRole} teamId={teamId} roleName={activeResourcesRole} userId={userId} canWrite={canWriteActiveRole} />
           </div>
@@ -1702,22 +1630,51 @@ export function StudentOrgTeamHome({
 
         {/* GROUPS — group generator */}
         {displaySection === "Groups" && (
-          <GroupsTab
-            teamId={teamId}
-            ministryId={ministryId}
-            userId={userId}
-            canEdit={canEdit}
-            generateTrigger={groupGenerateTrigger}
-          />
+          <div>
+            <ContentHeader
+              label="Groups"
+              style={{ marginBottom: 24 }}
+              action={canEdit && (
+                <ContentActionButton
+                  variant="primary"
+                  icon={<Plus style={{ width: 13, height: 13 }} />}
+                  label="Generate groups"
+                  onClick={() => setGroupGenerateTrigger(t => t + 1)}
+                />
+              )}
+            />
+            <GroupsTab
+              teamId={teamId}
+              ministryId={ministryId}
+              userId={userId}
+              canEdit={canEdit}
+              generateTrigger={groupGenerateTrigger}
+            />
+          </div>
         )}
 
         {displaySection === "Rotations" && teamId && (
-          <RotationsTab
-            teamId={teamId}
-            ministryId={ministryId}
-            userId={userId}
-            canEdit={canEdit}
-          />
+          <div>
+            <ContentHeader
+              label="Rotations"
+              style={{ marginBottom: 24 }}
+              action={canEdit && (
+                <ContentActionButton
+                  variant="primary"
+                  icon={<Plus style={{ width: 13, height: 13 }} />}
+                  label="New semester"
+                  onClick={() => setRotationNewSemesterTrigger(t => t + 1)}
+                />
+              )}
+            />
+            <RotationsTab
+              teamId={teamId}
+              ministryId={ministryId}
+              userId={userId}
+              canEdit={canEdit}
+              newSemesterTrigger={rotationNewSemesterTrigger}
+            />
+          </div>
         )}
       </div>
       )}
@@ -1803,8 +1760,8 @@ function RotationAvatar({ name, mine }: { name: string; mine: boolean }) {
   )
 }
 
-function RotationsTab({ teamId, ministryId, userId, canEdit }: {
-  teamId: string; ministryId: string; userId: string; canEdit: boolean
+function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger }: {
+  teamId: string; ministryId: string; userId: string; canEdit: boolean; newSemesterTrigger?: number
 }) {
   const supabase = createClient()
   const [semesters, setSemesters] = useState<RotationSemester[]>([])
@@ -1816,6 +1773,9 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
   const [confirmSlot, setConfirmSlot] = useState<RotationSlot | null>(null)
   const [confirmBusy, setConfirmBusy] = useState(false)
   const [showNewSemester, setShowNewSemester] = useState(false)
+
+  // Open the New-semester modal from the section ContentHeader create button.
+  useEffect(() => { if (newSemesterTrigger) setShowNewSemester(true) }, [newSemesterTrigger])
 
   const loadSemesters = useCallback(async () => {
     setLoading(true)
@@ -1917,29 +1877,23 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
             {semesters.map(sem => {
               const active = sem.id === activeSemesterId
               return (
-                <button
+                <FilterChip
                   key={sem.id}
+                  selected={active}
                   onClick={() => setActiveSemesterId(sem.id)}
+                  tone="ivory"
                   style={{
                     display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
-                    padding: "7px 14px", borderRadius: 11, cursor: "pointer",
-                    background: active ? "var(--ivory)" : "transparent",
-                    border: active ? "1px solid var(--plum)" : "1px solid var(--line-2)",
-                    fontFamily: "var(--sans)", textAlign: "left",
-                    transition: "border-color 150ms, background-color 150ms",
+                    padding: "8px 14px", borderRadius: 12, whiteSpace: "normal", textAlign: "left",
+                    ...(active ? {} : { background: "transparent" }),
                   }}
                 >
                   <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: active ? "var(--plum)" : "var(--body)" }}>{sem.name}</span>
                   <span style={{ fontSize: 10.5, color: "var(--muted-text)" }}>{shortMonthDay(sem.start_date)} – {shortMonthDay(sem.end_date)}</span>
-                </button>
+                </FilterChip>
               )
             })}
           </div>
-          {canEdit && (
-            <CentralButton variant="primary" size="sm" onClick={() => setShowNewSemester(true)} style={{ flexShrink: 0 }}>
-              <Plus className="w-4 h-4" /> New semester
-            </CentralButton>
-          )}
         </div>
       )}
 
@@ -1952,7 +1906,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit }: {
             subtitle={canEdit ? "Create a semester to open up sign-up slots." : "Ask a leader to set up a semester."}
           />
           {canEdit && (
-            <CentralButton variant="primary" size="sm" onClick={() => setShowNewSemester(true)}>
+            <CentralButton variant="secondary" size="sm" onClick={() => setShowNewSemester(true)}>
               <Plus className="w-4 h-4" /> New semester
             </CentralButton>
           )}
@@ -2138,7 +2092,6 @@ function NewSemesterModal({ onClose, onCreate }: {
   }
 
   const labelStyle: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }
-  const inputStyle: React.CSSProperties = { marginTop: 7, width: "100%", padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14.5, color: "var(--ink)", outline: "none", boxSizing: "border-box", fontFamily: "var(--sans)" }
 
   return (
     <div
@@ -2161,20 +2114,17 @@ function NewSemesterModal({ onClose, onCreate }: {
         </div>
 
         <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 16 }}>
-          <label style={{ display: "block" }}>
-            <span style={labelStyle}>Semester name</span>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Fall 2026" style={inputStyle} />
-          </label>
+          <FormField label="Semester name">
+            <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Fall 2026" />
+          </FormField>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }} className="max-md:!grid-cols-1">
-            <label style={{ display: "block" }}>
-              <span style={labelStyle}>Starts</span>
-              <input type="date" value={start} onChange={e => setStart(e.target.value)} style={inputStyle} />
-            </label>
-            <label style={{ display: "block" }}>
-              <span style={labelStyle}>Ends</span>
-              <input type="date" value={end} onChange={e => setEnd(e.target.value)} style={inputStyle} />
-            </label>
+            <FormField label="Starts">
+              <Input type="date" value={start} onChange={e => setStart(e.target.value)} />
+            </FormField>
+            <FormField label="Ends">
+              <Input type="date" value={end} onChange={e => setEnd(e.target.value)} />
+            </FormField>
           </div>
           {!validDates && start !== "" && end !== "" && (
             <p style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--danger)", margin: 0 }}>End date must be on or after the start date.</p>
@@ -2435,13 +2385,7 @@ export function PlanTab({
 
   const hasAnyPlanning = isAdmin || userTeams.length > 0
 
-  const monoStyle: React.CSSProperties = {
-    fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
-    fontSize: "11px",
-    letterSpacing: "0.04em",
-    textTransform: "uppercase",
-    color: "var(--muted-text)",
-  }
+  const monoStyle: React.CSSProperties = EYEBROW_STYLE
 
   const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
   const activeTeamPerms = activeUserTeam?.permissions ?? []
@@ -2726,7 +2670,7 @@ export function PlanTab({
             /* EMPTY STATE — strictly 0 teams */
             <div className="px-14 py-7">
               <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.14em", color: "var(--muted-text)", textTransform: "uppercase" as const, marginBottom: 12 }}>
+                <div style={{ ...MONO_STYLE, marginBottom: 12 }}>
                   {isAdmin ? "YOUR TEAMS · 0" : "NO TEAM YET"}
                 </div>
                 <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
@@ -3012,7 +2956,7 @@ export function PlanTab({
                           <p className="text-[14px] font-semibold text-[var(--ink)]">{team.name}</p>
                           <p className="text-[12px] text-[var(--muted-text)]">{team.member_count} member{team.member_count !== 1 ? "s" : ""}</p>
                         </div>
-                        <ChevronRight className="w-4 h-4 text-[#C4C4C4] flex-shrink-0" />
+                        <ChevronRight className="w-4 h-4 text-[var(--faint)] flex-shrink-0" />
                       </button>
                     ))}
                   </div>
@@ -3124,17 +3068,7 @@ export function StudentOrgSectionNav({
                         <button
                           key={ev.id}
                           onClick={() => { onPlanningEventChange(ev); onSectionChange("Events") }}
-                          style={{
-                            display: "flex", alignItems: "center", gap: 7,
-                            width: "100%", padding: "5px 10px",
-                            background: isEvActive ? "var(--ivory)" : "none",
-                            border: "none", borderRadius: "var(--r-chip)",
-                            cursor: "pointer", textAlign: "left" as const,
-                            fontFamily: "var(--sans)", fontSize: 12,
-                            color: isEvActive ? "var(--ink)" : "var(--muted-text)",
-                            fontWeight: isEvActive ? 500 : 400,
-                            transition: "background 100ms ease",
-                          }}
+                          style={{ ...sidebarItemStyle(isEvActive), gap: 7, fontSize: 12, borderLeftColor: "transparent" }}
                         >
                           <span style={{ width: 4, height: 4, borderRadius: "50%", background: isEvActive ? PLUM : LINE, flexShrink: 0 }} />
                           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{ev.title}</span>
@@ -3333,7 +3267,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
 
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)" }
+  const monoStyle: React.CSSProperties = EYEBROW_STYLE
   async function loadSchedule() {
     const gen = ++loadScheduleGenRef.current
     setScheduleLoading(true)
@@ -3984,7 +3918,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                     {/* Song list */}
                     {songs.length === 0 && !isUploadingThis ? (
                       <div style={{ padding: "20px 18px", textAlign: "center" }}>
-                        <p style={{ fontSize: 13, color: "#C4C4C4" }}>No charts uploaded yet.</p>
+                        <p style={{ fontSize: 13, color: "var(--faint)" }}>No charts uploaded yet.</p>
                       </div>
                     ) : (
                       <div>
@@ -3997,7 +3931,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                           return (
                             <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 18px", borderBottom: idx < songs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
                               {/* Position number */}
-                              <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16, flexShrink: 0 }}>{idx + 1}</span>
+                              <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16, flexShrink: 0 }}>{idx + 1}</span>
 
                               {/* Title */}
                               <div style={{ flex: 1, minWidth: 0 }}>
@@ -4036,12 +3970,12 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                                       onFocus={() => { if (!isEditingKey) setEditingSong({ songId: song.id, field: "key", value: "" }) }}
                                       onBlur={handleSaveInlineEdit}
                                       onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                      style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }}
+                                      style={{ width: 52, border: "none", outline: "none", fontFamily: "var(--mono)", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }}
                                     />
                                   ) : (
                                     <button
                                       onClick={() => setEditingSong({ songId: song.id, field: "key", value: song.key })}
-                                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer" }}
+                                      style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer" }}
                                     >
                                       {song.key || "—"}
                                     </button>
@@ -4066,7 +4000,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                         })}
                         {isUploadingThis && (
                           <div style={{ padding: "12px 18px", borderTop: songs.length > 0 ? "1px solid #EFE9DA" : "none", display: "flex", alignItems: "center", gap: 10 }}>
-                            <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16 }}>—</span>
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16 }}>—</span>
                             <span style={{ fontSize: 13, color: "var(--muted-text)" }}>Parsing chart…</span>
                           </div>
                         )}
@@ -4140,9 +4074,9 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid var(--line-2)" }}>
-                          <th style={{ textAlign: "left", padding: "10px 16px", color: "var(--muted-text)", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap" as const }}>Member</th>
+                          <th style={{ textAlign: "left", padding: "10px 16px", color: "var(--muted-text)", fontFamily: "var(--mono)", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap" as const }}>Member</th>
                           {weeks.map(w => (
-                            <th key={w.id} style={{ textAlign: "center", padding: "10px 12px", color: "var(--muted-text)", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", whiteSpace: "nowrap" as const }}>
+                            <th key={w.id} style={{ textAlign: "center", padding: "10px 12px", color: "var(--muted-text)", fontFamily: "var(--mono)", fontWeight: 400, fontSize: 11, letterSpacing: "0.1em", whiteSpace: "nowrap" as const }}>
                               {new Date(w.week_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                             </th>
                           ))}
@@ -4162,7 +4096,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                                       ? <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "#F4E2E2", color: "#8A2C2C", fontSize: 11, fontWeight: 700 }}>✕</span>
                                       : a === "unsure"
                                         ? <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: "50%", background: "#F4ECDB", color: "#B58940", fontSize: 11, fontWeight: 700 }}>?</span>
-                                        : <span style={{ color: "#C4C4C4", fontSize: 13 }}>—</span>
+                                        : <span style={{ color: "var(--faint)", fontSize: 13 }}>—</span>
                                   }
                                 </td>
                               )
@@ -4187,7 +4121,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
 
 function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: string; ministryId: string; userId: string; canManage: boolean }) {
   const supabase = createClient()
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)" }
+  const monoStyle: React.CSSProperties = EYEBROW_STYLE
 
   const [events, setEvents] = useState<{ id: string; week_date: string; roles: WorshipRoleRow[] }[]>([])
   const [teamMembers, setTeamMembers] = useState<{ user_id: string; name: string }[]>([])
@@ -4568,7 +4502,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                     )}
                   </div>
                   {songs.length === 0 ? (
-                    <p style={{ fontSize: 13, color: "#C4C4C4", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
+                    <p style={{ fontSize: 13, color: "var(--faint)", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
                   ) : (
                     <div>
                       {songs.map((song, idx) => {
@@ -4577,7 +4511,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                         const isOcr = ocrInProgress.has(song.id)
                         return (
                           <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid #EFE9DA" }}>
-                            <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16 }}>{idx + 1}</span>
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16 }}>{idx + 1}</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               {isOcr ? <span style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
                                 <input autoFocus value={isEditingTitle ? (editingSong?.value ?? "") : ""}
@@ -4599,10 +4533,10 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                                     placeholder="Key" onChange={e => setEditingSong({ songId: song.id, field: "key", value: e.target.value })}
                                     onFocus={() => { if (!isEditingKey) setEditingSong({ songId: song.id, field: "key", value: "" }) }}
                                     onBlur={handleSaveInlineEdit} onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
+                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "var(--mono)", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
                                 ) : (
                                   <button onClick={() => setEditingSong({ songId: song.id, field: "key", value: song.key })}
-                                    style={{ width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                                    style={{ width: 28, height: 28, fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                                     {song.key || "—"}
                                   </button>
                                 )}
@@ -4632,7 +4566,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
 
 function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: string; ministryId: string; userId: string; canManage: boolean }) {
   const supabase = createClient()
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)" }
+  const monoStyle: React.CSSProperties = EYEBROW_STYLE
 
   const [events, setEvents] = useState<{ id: string; week_date: string; event_name: string | null; roles: WorshipRoleRow[] }[]>([])
   const [songsByEvent, setSongsByEvent] = useState<Record<string, WorshipSong[]>>({})
@@ -4928,7 +4862,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                     )}
                   </div>
                   {songs.length === 0 ? (
-                    <p style={{ fontSize: 13, color: "#C4C4C4", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
+                    <p style={{ fontSize: 13, color: "var(--faint)", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
                   ) : (
                     <div>
                       {songs.map((song, idx) => {
@@ -4937,7 +4871,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                         const isOcr = ocrInProgress.has(song.id)
                         return (
                           <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid #EFE9DA" }}>
-                            <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 16 }}>{idx + 1}</span>
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16 }}>{idx + 1}</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               {isOcr ? <span style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
                                 <input autoFocus value={isEditingTitle ? (editingSong?.value ?? "") : ""}
@@ -4959,10 +4893,10 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                                     placeholder="Key" onChange={e => setEditingSong({ songId: song.id, field: "key", value: e.target.value })}
                                     onFocus={() => { if (!isEditingKey) setEditingSong({ songId: song.id, field: "key", value: "" }) }}
                                     onBlur={handleSaveInlineEdit} onKeyDown={e => { if (e.key === "Enter") handleSaveInlineEdit() }}
-                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
+                                    style={{ width: 52, border: "none", outline: "none", fontFamily: "var(--mono)", fontSize: 12, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, padding: "3px 8px", textAlign: "center" as const }} />
                                 ) : (
                                   <button onClick={() => setEditingSong({ songId: song.id, field: "key", value: song.key })}
-                                    style={{ width: 28, height: 28, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                                    style={{ width: 28, height: 28, fontFamily: "var(--mono)", fontSize: 12, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 8, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
                                     {song.key || "—"}
                                   </button>
                                 )}
@@ -4992,7 +4926,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
 
 function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; userId: string; canManage: boolean }) {
   const supabase = createClient()
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)" }
+  const monoStyle: React.CSSProperties = EYEBROW_STYLE
 
   type TeamInfo = { id: string; name: string; team_type: string }
   type EventWithMeta = { id: string; week_date: string; event_name: string | null; team_id: string; teamName: string; teamType: string }
@@ -5152,12 +5086,12 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
         </div>
         {songs.map((song, i) => (
           <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderBottom: i < songs.length - 1 ? "1px solid #EFE9DA" : "none" }}>
-            <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "#C4C4C4", minWidth: 18 }}>{i + 1}</span>
-            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", flex: 1 }}>{song.title || <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "#C4C4C4" }}>Untitled</span>}</span>
-            {song.key && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 7 }}>{song.key}</span>}
+            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 18 }}>{i + 1}</span>
+            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", flex: 1 }}>{song.title || <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "var(--faint)" }}>Untitled</span>}</span>
+            {song.key && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 7 }}>{song.key}</span>}
           </div>
         ))}
-        {songs.length === 0 && <p style={{ fontSize: 13, color: "#C4C4C4", padding: "12px 18px" }}>No songs in set.</p>}
+        {songs.length === 0 && <p style={{ fontSize: 13, color: "var(--faint)", padding: "12px 18px" }}>No songs in set.</p>}
       </div>
     )
   }
@@ -5349,7 +5283,7 @@ function SetListPdfViewer({
     setEditingField(null)
   }
 
-  const monoStyle: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)" }
+  const monoStyle: React.CSSProperties = EYEBROW_STYLE
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "var(--ink)", display: "flex", flexDirection: "column" }}>
@@ -5785,7 +5719,7 @@ export function MonthGrid({
       {/* Week header */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 4 }}>
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-          <div key={d} style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 10, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted-text)", textAlign: "center", paddingBottom: 4 }}>
+          <div key={d} style={{ ...MONO_STYLE, textAlign: "center", paddingBottom: 4 }}>
             {d}
           </div>
         ))}
@@ -5898,7 +5832,7 @@ export function TimelineView({
         const monthLabel = new Date(Number(yyyy), Number(mm) - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
         return (
           <div key={key}>
-            <div style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 8 }}>
+            <div style={{ ...MONO_STYLE, marginBottom: 8 }}>
               {monthLabel}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -6250,13 +6184,8 @@ export function AddEventModal({
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%", background: "var(--cream-panel)", border: "1px solid #E5E0D2", borderRadius: 8,
-    padding: "8px 12px", fontSize: 14, color: "var(--ink)", outline: "none", boxSizing: "border-box",
-  }
-
   const labelStyle: React.CSSProperties = {
-    fontSize: 11, fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+    fontSize: 11, fontFamily: "var(--mono)",
     letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 4, display: "block",
   }
 
@@ -6313,22 +6242,19 @@ export function AddEventModal({
           )}
 
           {/* Title */}
-          <div>
-            <label style={labelStyle}>Title *</label>
-            <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" />
-          </div>
+          <FormField label="Title *">
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" />
+          </FormField>
 
           {/* Description */}
-          <div>
-            <label style={labelStyle}>Description</label>
-            <textarea style={{ ...inputStyle, resize: "vertical", minHeight: 80 }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional details…" />
-          </div>
+          <FormField label="Description">
+            <Textarea style={{ minHeight: 80 }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional details…" />
+          </FormField>
 
           {/* Location */}
-          <div>
-            <label style={labelStyle}>Location</label>
-            <input style={inputStyle} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Room, building, or address" />
-          </div>
+          <FormField label="Location">
+            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Room, building, or address" />
+          </FormField>
 
           {/* All day toggle */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -6338,47 +6264,38 @@ export function AddEventModal({
 
           {/* Dates + times */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <label style={labelStyle}>Start date *</label>
-              <input type="date" style={inputStyle} value={startDateStr} onChange={(e) => setStartDateStr(e.target.value)} />
-            </div>
-            <div>
-              <label style={labelStyle}>Start time</label>
-              <input type="time" style={{ ...inputStyle, opacity: allDay ? 0.4 : 1 }} value={startTimeStr} onChange={(e) => setStartTimeStr(e.target.value)} disabled={allDay} />
-            </div>
-            <div>
-              <label style={labelStyle}>End date *</label>
-              <input type="date" style={inputStyle} value={endDateStr} onChange={(e) => setEndDateStr(e.target.value)} />
-            </div>
-            <div>
-              <label style={labelStyle}>End time</label>
-              <input type="time" style={{ ...inputStyle, opacity: allDay ? 0.4 : 1 }} value={endTimeStr} onChange={(e) => setEndTimeStr(e.target.value)} disabled={allDay} />
-            </div>
+            <FormField label="Start date *">
+              <Input type="date" value={startDateStr} onChange={(e) => setStartDateStr(e.target.value)} />
+            </FormField>
+            <FormField label="Start time">
+              <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={startTimeStr} onChange={(e) => setStartTimeStr(e.target.value)} disabled={allDay} />
+            </FormField>
+            <FormField label="End date *">
+              <Input type="date" value={endDateStr} onChange={(e) => setEndDateStr(e.target.value)} />
+            </FormField>
+            <FormField label="End time">
+              <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={endTimeStr} onChange={(e) => setEndTimeStr(e.target.value)} disabled={allDay} />
+            </FormField>
           </div>
 
           {/* Planning window — edit mode only; persisted to the event's plan row */}
           {isEditing && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={labelStyle}>Plan start date</label>
-                <input type="date" style={inputStyle} value={planStartDate} onChange={(e) => setPlanStartDate(e.target.value)} />
-              </div>
-              <div>
-                <label style={{ ...labelStyle, display: "flex", alignItems: "baseline", gap: 6 }}>
-                  Crunch date
-                  <span style={{ textTransform: "none", letterSpacing: 0, fontSize: 10, color: "var(--faint)" }}>optional</span>
-                </label>
-                <input type="date" style={inputStyle} value={crunchDate} onChange={(e) => setCrunchDate(e.target.value)} />
+              <FormField label="Plan start date">
+                <Input type="date" value={planStartDate} onChange={(e) => setPlanStartDate(e.target.value)} />
+              </FormField>
+              <FormField label={<>Crunch date <span style={{ textTransform: "none", letterSpacing: 0, fontSize: 10, color: "var(--faint)" }}>optional</span></>}>
+                <Input type="date" value={crunchDate} onChange={(e) => setCrunchDate(e.target.value)} />
                 {crunchDate && (
                   <button
                     type="button"
                     onClick={() => setCrunchDate("")}
-                    style={{ marginTop: 6, background: "none", border: "none", padding: 0, fontSize: 12, color: "var(--muted-text)", cursor: "pointer" }}
+                    style={{ background: "none", border: "none", padding: 0, fontSize: 12, color: "var(--muted-text)", cursor: "pointer" }}
                   >
                     Clear crunch date
                   </button>
                 )}
-              </div>
+              </FormField>
             </div>
           )}
 
@@ -6505,7 +6422,7 @@ export function MinistryCalendar({
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>
+          <p style={{ fontFamily: "var(--mono)", fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>
             Upcoming
           </p>
           <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, fontWeight: 400, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>
@@ -6570,7 +6487,7 @@ export function MinistryCalendar({
 
         {/* Events panel — right */}
         <div style={{ width: 232, flexShrink: 0, borderLeft: "1px solid #E5E0D2", paddingLeft: 20 }}>
-          <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 10px" }}>
+          <p style={{ ...MONO_STYLE, margin: "0 0 10px" }}>
             Events · {events.length || 3}
           </p>
 
@@ -7447,18 +7364,18 @@ export function EventPlanWorkspace({
         />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginTop: 16 }}>
           <label style={{ display: "block" }}>
-            <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Assignee</span>
-            <select value={editTaskAssignee} onChange={(e) => setEditTaskAssignee(e.target.value)} style={{ ...selectStyle, width: "100%" }}>
+            <span style={{ ...MONO_STYLE, display: "block", marginBottom: 6 }}>Assignee</span>
+            <Select size="sm" value={editTaskAssignee} onChange={(e) => setEditTaskAssignee(e.target.value)}>
               <option value="">Unassigned</option>
               {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+            </Select>
           </label>
           <label style={{ display: "block" }}>
-            <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Due date</span>
-            <input type="date" value={editTaskDue} min={planStartDate || undefined} max={eventPlusTwoMonthsYMD} onChange={(e) => setEditTaskDue(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }} />
+            <span style={{ ...MONO_STYLE, display: "block", marginBottom: 6 }}>Due date</span>
+            <Input size="sm" type="date" value={editTaskDue} min={planStartDate || undefined} max={eventPlusTwoMonthsYMD} onChange={(e) => setEditTaskDue(e.target.value)} style={{ cursor: "pointer" }} />
           </label>
           <div>
-            <span style={{ display: "block", fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>Priority</span>
+            <span style={{ ...MONO_STYLE, display: "block", marginBottom: 6 }}>Priority</span>
             <button type="button" onClick={() => setEditTaskPriority((p) => (p === "high" ? "none" : "high"))}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 999, fontSize: 12, cursor: "pointer",
                 background: isHighPriority ? "var(--cream-3)" : "var(--cream-2)", border: "1px solid " + (isHighPriority ? "var(--plum)" : "var(--line-2)"), color: isHighPriority ? "var(--plum)" : "var(--body)", fontFamily: "var(--font-inter)" }}>
@@ -7519,11 +7436,7 @@ export function EventPlanWorkspace({
           borderRadius: isDragOver ? 8 : 0,
         }}
       >
-        {/* grip */}
-        <span style={{ display: "grid", placeItems: "center", cursor: "grab", color: "var(--dashed)", opacity: canEdit && hovered ? 1 : 0, flexShrink: 0, width: 14 }}>
-          <GripVertical style={{ width: 14, height: 14 }} />
-        </span>
-        {/* disclosure or spacer */}
+        {/* disclosure or spacer (no drag-grip gutter — rows sit flush left; the row itself stays draggable) */}
         {!isChild && hasKids ? (
           <button type="button" onClick={(e) => { e.stopPropagation(); setCollapsedTasks((prev) => { const n = new Set(prev); if (n.has(task.id)) n.delete(task.id); else n.add(task.id); return n }) }}
             style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "grid", placeItems: "center", color: "var(--faint)", flexShrink: 0, width: 14 }}>
@@ -7544,7 +7457,7 @@ export function EventPlanWorkspace({
         <span style={{ flex: 1, minWidth: 0, fontSize: isChild ? 14.5 : 15.5, color: task.completed ? "var(--faint)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
         {/* subcount */}
         {!isChild && hasKids && (
-          <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap", flexShrink: 0 }}>✓ {doneKids}/{kids.length}</span>
+          <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap", flexShrink: 0 }}>✓ {doneKids}/{kids.length}</span>
         )}
         {/* assignee */}
         {task.assigned_name && (
@@ -7552,7 +7465,7 @@ export function EventPlanWorkspace({
         )}
         {/* due */}
         {task.due_date && (
-          <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{fmtMD(task.due_date)}</span>
+          <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{fmtMD(task.due_date)}</span>
         )}
         {/* hover actions — two-step delete confirm (§14) takes over the cluster */}
         {canEdit && (
@@ -7632,29 +7545,6 @@ export function EventPlanWorkspace({
         )}
       </Fragment>
     )
-  }
-
-  const inputStyle: React.CSSProperties = {
-    background: "var(--cream-panel)",
-    border: "1px solid #E5E0D2",
-    borderRadius: 8,
-    padding: "8px 12px",
-    fontSize: 13,
-    color: "var(--ink)",
-    outline: "none",
-    width: "100%",
-    boxSizing: "border-box",
-  }
-
-  const selectStyle: React.CSSProperties = {
-    background: "var(--cream-panel)",
-    border: "1px solid #E5E0D2",
-    borderRadius: 8,
-    padding: "8px 12px",
-    fontSize: 13,
-    color: "var(--ink)",
-    outline: "none",
-    cursor: "pointer",
   }
 
   const cardStyle: React.CSSProperties = {
@@ -7744,12 +7634,11 @@ export function EventPlanWorkspace({
                 { k: "Crunch start", v: crunchDate ? fmtMD(crunchDate) : "—", muted: !crunchDate },
               ]
 
-              const monoLabel: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }
+              const monoLabel: React.CSSProperties = { ...MONO_STYLE, margin: 0 }
               const eyebrow: React.CSSProperties = { ...monoLabel, marginBottom: 14 }
-              const statCard: React.CSSProperties = { background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: 20 }
-              const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: 34, fontWeight: 600, letterSpacing: -0.6, lineHeight: 1.05, marginTop: 10 }
+              const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: 34, fontWeight: 400, letterSpacing: -0.6, lineHeight: 1.05, marginTop: 10 }
               const bigInput: React.CSSProperties = { ...bigNumber, color: "var(--ink)", background: "transparent", border: "none", outline: "none", padding: 0, width: "100%" }
-              const factKey: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }
+              const factKey: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }
               const renderFact = (f: { k: string; v: string; muted?: boolean }, keyW: number) => (
                 <div key={f.k} style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
                   <span style={{ ...factKey, width: keyW, flexShrink: 0 }}>{f.k}</span>
@@ -7848,7 +7737,7 @@ export function EventPlanWorkspace({
                 {/* ── RIGHT column — stat cards ── */}
                 <aside style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }} className="max-md:mt-8">
                   {/* Expected turnout */}
-                  <div style={statCard}>
+                  <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
                     <p style={monoLabel}>Expected turnout</p>
                     {canEdit && editingTurnout ? (
                       <input
@@ -7873,10 +7762,10 @@ export function EventPlanWorkspace({
                         <span style={{ fontWeight: 500, color: "var(--plum)" }}>{rsvpCount}</span> RSVPed via announcement
                       </p>
                     )}
-                  </div>
+                  </CentralCard>
 
                   {/* Budget */}
-                  <div style={statCard}>
+                  <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <p style={monoLabel}>Budget</p>
                       {!canEditBudget && <span style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Treasurer only</span>}
@@ -7920,10 +7809,10 @@ export function EventPlanWorkspace({
                         )}
                       </div>
                     )}
-                  </div>
+                  </CentralCard>
 
                   {/* Readiness */}
-                  <div style={statCard}>
+                  <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
                     <p style={monoLabel}>Readiness</p>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
                       <span style={{ width: 8, height: 8, borderRadius: 99, background: readiness.color, flexShrink: 0 }} />
@@ -7940,7 +7829,7 @@ export function EventPlanWorkspace({
                         <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)" }}>{pct}%</span>
                       </div>
                     )}
-                  </div>
+                  </CentralCard>
                 </aside>
               </div>
               )
@@ -7953,13 +7842,13 @@ export function EventPlanWorkspace({
 
                 {/* Pinned band — top-level pinned tasks (+ their children) */}
                 {pinnedTop.length > 0 && (
-                  <div style={{ background: "var(--cream-3)", border: "1px solid var(--line-2)", borderRadius: 14, padding: "6px 14px 8px", marginBottom: 24 }}>
+                  <CentralCard variant="inset" radius="var(--r-callout)" padding="6px 14px 8px" style={{ marginBottom: 24 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0 6px" }}>
                       <Star style={{ width: 12, height: 12, color: "var(--plum)", fill: "currentColor" }} />
-                      <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 600 }}>Pinned</span>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 600 }}>Pinned</span>
                     </div>
                     {pinnedTop.map((task) => renderTaskTree(task))}
-                  </div>
+                  </CentralCard>
                 )}
 
                 {/* Date-driven sections — top-level, non-pinned tasks grouped by window */}
@@ -7987,15 +7876,15 @@ export function EventPlanWorkspace({
                         })}
                         style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "0 0 10px", width: "100%", textAlign: "left" }}
                       >
-                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{section.label}</span>
-                        <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10.5, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px" }}>{remaining} remaining</span>
+                        <span style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{section.label}</span>
+                        <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px" }}>{remaining} remaining</span>
                         <ChevronRight style={{ marginLeft: "auto", width: 14, height: 14, color: "var(--faint)", transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform .15s ease" }} />
                       </button>
                       <div style={{ borderTop: "1px solid var(--line)" }} />
 
                       {isDropZone && (
                         <div style={{ margin: "10px 0", padding: "12px", border: "1.5px dashed var(--plum)", borderRadius: 10, textAlign: "center" }}>
-                          <span style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--plum)" }}>Drop here to make it a standalone task</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--plum)" }}>Drop here to make it a standalone task</span>
                         </div>
                       )}
 
@@ -8096,8 +7985,6 @@ export function EventPlanWorkspace({
               const needs = roles.filter(r => !r.assigned_to)
               const covered = roles.filter(r => r.assigned_to)
               const iconBtnBase: React.CSSProperties = { background: "none", border: "none", padding: 3, borderRadius: 6, cursor: "pointer", display: "grid", placeItems: "center", color: "var(--faint)" }
-              const editInput: React.CSSProperties = { ...inputStyle, borderRadius: 10, fontSize: 15, fontFamily: "var(--font-inter)", border: "1px solid var(--line-2)" }
-              const editSelect: React.CSSProperties = { ...selectStyle, width: "100%", borderRadius: 10, fontSize: 15, fontFamily: "var(--font-inter)", border: "1px solid var(--line-2)" }
 
               const GroupHeader = ({ label, count, allSet }: { label: string; count?: number; allSet?: boolean }) => (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "28px 0 4px" }}>
@@ -8117,13 +8004,13 @@ export function EventPlanWorkspace({
                     <div key={role.id} style={{ borderBottom: isLast ? "none" : "1px solid var(--line-3)" }}>
                       <div style={{ padding: "14px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                          <input value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} placeholder="Role name" className="roleinput" style={editInput} />
-                          <select value={editRoleAssignee} onChange={(e) => setEditRoleAssignee(e.target.value)} className="roleinput" style={editSelect}>
+                          <Input value={editRoleName} onChange={(e) => setEditRoleName(e.target.value)} placeholder="Role name" className="roleinput" />
+                          <Select value={editRoleAssignee} onChange={(e) => setEditRoleAssignee(e.target.value)} className="roleinput">
                             <option value="">Unassigned</option>
                             {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                          </select>
+                          </Select>
                         </div>
-                        <input value={editRoleNotes} onChange={(e) => setEditRoleNotes(e.target.value)} placeholder="Notes (optional)" className="roleinput" style={editInput} />
+                        <Input value={editRoleNotes} onChange={(e) => setEditRoleNotes(e.target.value)} placeholder="Notes (optional)" className="roleinput" />
                         <div style={{ display: "flex", gap: 8 }}>
                           <CentralButton variant="primary" size="sm" onClick={() => handleSaveRoleEdit(role.id)}>Save</CentralButton>
                           <button onClick={() => setEditingRoleId(null)} style={{ padding: "6px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", cursor: "pointer" }}>Cancel</button>
@@ -8135,7 +8022,7 @@ export function EventPlanWorkspace({
                 const isCovered = !!role.assigned_to
                 const initials = role.assigned_name?.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase() ?? ""
                 return (
-                  <div key={role.id} className="rrow" style={{ display: "grid", gridTemplateColumns: "38px 1fr auto", gap: 16, alignItems: "center", padding: "14px 8px", borderRadius: 8, borderBottom: isLast ? "none" : "1px solid var(--line-3)" }}>
+                  <ListRow key={role.id} hover={false} last={isLast} className="rrow" style={{ display: "grid", gridTemplateColumns: "38px 1fr auto", gap: 16, alignItems: "center", padding: "14px 8px" }}>
                     {isCovered ? (
                       <MonogramChip initials={initials} style={{ width: 38, height: 38, fontSize: 13, fontWeight: 600 }} />
                     ) : (
@@ -8182,7 +8069,7 @@ export function EventPlanWorkspace({
                         </>
                       )}
                     </div>
-                  </div>
+                  </ListRow>
                 )
               }
 
@@ -8196,7 +8083,6 @@ export function EventPlanWorkspace({
                   .rolesui .role-icon:hover{color:var(--body)}
                   .rolesui .role-icon.danger:hover{color:var(--danger)}
                   .rolesui .assignbtn:hover{border-color:var(--plum)}
-                  .rolesui .roleinput:focus{border-color:var(--plum)}
                 `}</style>
                 <EventSectionHeader
                   title="Roles"
@@ -8235,29 +8121,27 @@ export function EventPlanWorkspace({
                 {/* Inline add-role form */}
                 {canEdit && showAddRole && (
                   <div style={{ display: "grid", gridTemplateColumns: "230px 1fr 180px auto auto", gap: 14, alignItems: "center", border: "1px dashed var(--dashed)", borderRadius: 14, padding: "14px 18px", marginTop: 20, background: "var(--cream-2)" }}>
-                    <input
+                    <Input
                       value={newRoleName}
                       onChange={(e) => setNewRoleName(e.target.value)}
                       placeholder="Role name…"
                       className="roleinput"
-                      style={{ border: "1px solid var(--line-2)", borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: "var(--font-inter)", fontWeight: 600, color: "var(--ink)", background: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box" }}
+                      style={{ fontWeight: 500 }}
                     />
-                    <input
+                    <Input
                       value={newRoleNotes}
                       onChange={(e) => setNewRoleNotes(e.target.value)}
                       placeholder="What they're responsible for…"
                       className="roleinput"
-                      style={{ border: "1px solid var(--line-2)", borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)", background: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box" }}
                     />
-                    <select
+                    <Select
                       value={newRoleAssignee}
                       onChange={(e) => setNewRoleAssignee(e.target.value)}
                       className="roleinput"
-                      style={{ border: "1px solid var(--line-2)", borderRadius: 10, padding: "10px 12px", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)", background: "var(--cream)", outline: "none", width: "100%", boxSizing: "border-box", cursor: "pointer" }}
                     >
                       <option value="">Unassigned</option>
                       {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
+                    </Select>
                     <CentralButton variant="primary" size="sm" onClick={handleAddRole} disabled={addingRole || !newRoleName.trim()}>Add</CentralButton>
                     <button onClick={() => setShowAddRole(false)} style={{ padding: "8px 14px", borderRadius: 10, border: "none", background: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", cursor: "pointer" }}>Cancel</button>
                   </div>
@@ -8304,19 +8188,15 @@ export function EventPlanWorkspace({
                   {PP_FILTERS.map(cat => {
                     const active = ppCategoryFilter === cat
                     return (
-                      <button
+                      <FilterChip
                         key={cat}
+                        selected={active}
                         onClick={() => setPpCategoryFilter(cat)}
-                        style={{
-                          padding: "6px 14px", borderRadius: 9999, fontSize: 12.5, fontWeight: 500, cursor: "pointer",
-                          fontFamily: "var(--font-inter)",
-                          background: active ? "var(--plum)" : "var(--cream)",
-                          color: active ? "var(--cream-on-dark)" : "var(--body)",
-                          border: active ? "1px solid var(--plum)" : "1px solid var(--line-2)",
-                        }}
+                        tone="plum"
+                        style={{ fontWeight: 500 }}
                       >
                         {cat}
-                      </button>
+                      </FilterChip>
                     )
                   })}
                 </div>
@@ -8357,9 +8237,11 @@ export function EventPlanWorkspace({
                         ) : (
                           <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
                             {yearNotes.map(pp => (
-                              <article
+                              <CentralCard
                                 key={pp.id}
-                                style={{ background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 14, padding: "20px 22px" }}
+                                variant="callout"
+                                radius="var(--r-callout)"
+                                padding="22px 22px"
                               >
                                 {/* Title + category */}
                                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
@@ -8398,7 +8280,7 @@ export function EventPlanWorkspace({
                                   <span style={{ color: "var(--body)", fontWeight: 500 }}>{pp.created_by_name ?? "Someone"}</span>
                                   {" · "}{new Date(pp.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                                 </p>
-                              </article>
+                              </CentralCard>
                             ))}
                           </div>
                         )}
@@ -8434,63 +8316,57 @@ export function EventPlanWorkspace({
 
                   <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 16 }}>
                     {/* Pain point (title) */}
-                    <label style={{ display: "block" }}>
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>Pain point</span>
-                      <input
+                    <FormField label="Pain point">
+                      <Input
                         value={ppTitle}
                         onChange={e => setPpTitle(e.target.value)}
                         placeholder="What went wrong?"
-                        style={{ marginTop: 7, width: "100%", padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14.5, color: "var(--ink)", outline: "none", boxSizing: "border-box", fontFamily: "var(--font-inter)" }}
                       />
-                    </label>
+                    </FormField>
 
                     {/* Category + Class */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }} className="max-md:!grid-cols-1">
-                      <label style={{ display: "block" }}>
-                        <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>Category</span>
-                        <select
+                      <FormField label="Category">
+                        <Select
                           value={ppCategory}
                           onChange={e => setPpCategory(e.target.value)}
-                          style={{ marginTop: 7, width: "100%", padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14, color: "var(--ink)", outline: "none", boxSizing: "border-box", fontFamily: "var(--font-inter)", appearance: "none" }}
+                          style={{ appearance: "none" }}
                         >
                           {PP_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                      </label>
-                      <label style={{ display: "block" }}>
-                        <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>Class</span>
-                        <select
+                        </Select>
+                      </FormField>
+                      <FormField label="Class">
+                        <Select
                           value={CURRENT_CLASS_YEAR}
                           disabled
-                          style={{ marginTop: 7, width: "100%", padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--ivory)", fontSize: 14, color: "var(--muted-text)", outline: "none", boxSizing: "border-box", fontFamily: "var(--font-inter)", appearance: "none", cursor: "not-allowed" }}
+                          style={{ appearance: "none", background: "var(--ivory)", color: "var(--muted-text)", cursor: "not-allowed" }}
                         >
                           <option value={CURRENT_CLASS_YEAR}>{CURRENT_CLASS_YEAR.replace("-", "–")}</option>
-                        </select>
-                      </label>
+                        </Select>
+                      </FormField>
                     </div>
 
                     {/* Watch */}
-                    <label style={{ display: "block" }}>
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>What to look out for</span>
-                      <textarea
+                    <FormField label="What to look out for">
+                      <Textarea
                         value={ppWatch}
                         onChange={e => setPpWatch(e.target.value)}
                         rows={3}
                         placeholder="The trap the next class should see coming…"
-                        style={{ marginTop: 7, width: "100%", minHeight: 76, padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14, color: "var(--ink)", outline: "none", resize: "vertical", boxSizing: "border-box", fontFamily: "var(--font-inter)", lineHeight: 1.5 }}
+                        style={{ minHeight: 76 }}
                       />
-                    </label>
+                    </FormField>
 
                     {/* Solved */}
-                    <label style={{ display: "block" }}>
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }}>How you solved it</span>
-                      <textarea
+                    <FormField label="How you solved it">
+                      <Textarea
                         value={ppSolved}
                         onChange={e => setPpSolved(e.target.value)}
                         rows={3}
                         placeholder="What actually worked…"
-                        style={{ marginTop: 7, width: "100%", minHeight: 76, padding: "11px 13px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)", fontSize: 14, color: "var(--ink)", outline: "none", resize: "vertical", boxSizing: "border-box", fontFamily: "var(--font-inter)", lineHeight: 1.5 }}
+                        style={{ minHeight: 76 }}
                       />
-                    </label>
+                    </FormField>
                   </div>
 
                   <div style={{ marginTop: 22, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
@@ -8699,6 +8575,10 @@ function SubEventsTab({
               <div
                 onMouseEnter={() => setHoveredId(ev.id)}
                 onMouseLeave={() => setHoveredId(null)}
+                onClick={drillable ? () => onOpenChild!(ev) : undefined}
+                role={drillable ? "button" : undefined}
+                tabIndex={drillable ? 0 : undefined}
+                onKeyDown={drillable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenChild!(ev) } } : undefined}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -8709,6 +8589,7 @@ function SubEventsTab({
                   background: "var(--cream)",
                   marginBottom: 10,
                   transition: "border-color .15s",
+                  cursor: drillable ? "pointer" : "default",
                 }}
               >
                 {/* emoji badge — derived from event_type via getEventConfig */}
@@ -8750,16 +8631,11 @@ function SubEventsTab({
                   )}
                 </div>
 
-                {/* drill affordance — omitted when nesting-capped (non-drillable) */}
+                {/* drill affordance — decorative; the whole row is the click target. Omitted when nesting-capped. */}
                 {drillable && (
-                  <IconButton
-                    dim={34}
-                    onClick={() => onOpenChild!(ev)}
-                    title="Open planning"
-                    style={{ borderRadius: "var(--r-input)", border: "1px solid var(--line)", color: "var(--body)" }}
-                  >
+                  <span aria-hidden style={{ width: 34, height: 34, display: "grid", placeItems: "center", borderRadius: "var(--r-input)", border: "1px solid var(--line)", color: "var(--body)", flexShrink: 0 }}>
                     <ArrowRight style={{ width: 16, height: 16 }} />
-                  </IconButton>
+                  </span>
                 )}
               </div>
             </Fragment>
@@ -8837,14 +8713,14 @@ function ActsTab({
       {acts.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "0 4px 8px", borderBottom: "1px solid var(--line)" }}>
           {["#", "Performer", "Type", "Duration", "Sound Check", ""].map((h, i) => (
-            <span key={i} style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#A09A8C" }}>{h}</span>
+            <span key={i} style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "#A09A8C" }}>{h}</span>
           ))}
         </div>
       )}
 
       <div style={{ display: "flex", flexDirection: "column" }}>
         {acts.map((act, idx) => (
-          <div key={act.id} style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "12px 4px", borderBottom: "1px solid #F0EBE0", alignItems: "center" }}>
+          <ListRow key={act.id} last={idx === acts.length - 1} style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "12px 4px", alignItems: "center" }}>
             <span style={{ fontSize: 13, color: "#A09A8C", textAlign: "center" }}>{idx + 1}</span>
             {canEdit ? (
               <input value={act.performer} onChange={e => updateAct(act.id, "performer", e.target.value)} placeholder="Performer name…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", width: "100%" }} />
@@ -8865,7 +8741,7 @@ function ActsTab({
             {canEdit ? (
               <IconButton dim={24} onClick={() => deleteAct(act.id)} title="Remove act"><X className="w-3.5 h-3.5" /></IconButton>
             ) : <span />}
-          </div>
+          </ListRow>
         ))}
       </div>
     </div>
@@ -8913,7 +8789,7 @@ function TeamsTab({
   }
 
   const renderTeam = (teamKey: "teamA" | "teamB", team: TurkeyTeam) => (
-    <div style={{ flex: 1, padding: 22, border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)" }}>
+    <CentralCard variant="standard" radius="var(--r-callout)" padding={22} style={{ flex: 1 }}>
       {canEdit ? (
         <input value={team.name} onChange={e => updateTeamName(teamKey, e.target.value)} style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "var(--ink)", letterSpacing: -0.3, background: "transparent", border: "none", outline: "none", width: "100%", padding: 0, marginBottom: 14 }} />
       ) : (
@@ -8930,21 +8806,18 @@ function TeamsTab({
           )
         })}
         {canEdit && (
-          <select onChange={e => { addMember(teamKey, e.target.value); e.target.value = "" }} style={{ padding: "6px 10px", borderRadius: 8, border: "1px dashed #C4C0B0", background: "#F8F4EA", color: "var(--muted-text)", fontSize: 12, cursor: "pointer", marginTop: 4 }}>
+          <AddInlineSelect onChange={e => { addMember(teamKey, e.target.value); e.target.value = "" }} style={{ width: "auto", padding: "6px 10px", borderRadius: 8, color: "var(--muted-text)", fontSize: 12, marginTop: 4 }}>
             <option value="">+ Add member…</option>
             {members.filter(m => !teamsData.teamA.members.includes(m.id) && !teamsData.teamB.members.includes(m.id)).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
+          </AddInlineSelect>
         )}
       </div>
-    </div>
+    </CentralCard>
   )
 
   return (
     <div>
-      <div style={{ marginBottom: 28 }}>
-        <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>Turkey Bowl</p>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 36, margin: "6px 0 0", letterSpacing: -0.4, color: "var(--ink)", fontWeight: 400 }}>Teams</h2>
-      </div>
+      <EventSectionHeader title="Teams" />
 
       <div style={{ display: "flex", gap: 20, marginBottom: 24 }} className="max-md:!flex-col">
         {renderTeam("teamA", teamsData.teamA)}
@@ -9045,7 +8918,7 @@ function TransportTab({
           const driver = members.find(m => m.id === car.driver_id)
           const availableRiders = members.filter(m => !allRiderIds.includes(m.id) && m.id !== car.driver_id)
           return (
-            <div key={car.id} style={{ padding: "18px 20px", border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)" }}>
+            <CentralCard key={car.id} variant="standard" radius="var(--r-callout)" padding="18px 22px">
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
                 {canEdit ? (
                   <select value={car.driver_id} onChange={e => updateCar(car.id, { driver_id: e.target.value })} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--plum-2)", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
@@ -9077,13 +8950,13 @@ function TransportTab({
                   )
                 })}
                 {canEdit && car.rider_ids.length < car.seats && (
-                  <select onChange={e => { addRider(car.id, e.target.value); e.target.value = "" }} style={{ padding: "4px 10px", borderRadius: 999, border: "1px dashed #C4C0B0", background: "#F8F4EA", color: "var(--muted-text)", fontSize: 12, cursor: "pointer" }}>
+                  <AddInlineSelect onChange={e => { addRider(car.id, e.target.value); e.target.value = "" }} style={{ width: "auto", padding: "4px 10px", borderRadius: 999, color: "var(--muted-text)", fontSize: 12 }}>
                     <option value="">+ Add rider…</option>
                     {availableRiders.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
+                  </AddInlineSelect>
                 )}
               </div>
-            </div>
+            </CentralCard>
           )
         })}
       </div>
@@ -9147,7 +9020,7 @@ function ProgramTab({
         return (
           <div key={dayIdx} style={{ marginBottom: 36 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--body)", fontWeight: 600 }}>
+              <p style={{ fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--body)", fontWeight: 600 }}>
                 Day {dayIdx + 1} — {dayLabel}
               </p>
               {canEdit && (
@@ -9160,8 +9033,8 @@ function ProgramTab({
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "#A09A8C", padding: "12px 4px" }}>No sessions yet.</p>
             )}
 
-            {daySessions.map(session => (
-              <div key={session.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 28px", gap: 12, padding: "12px 4px", borderBottom: "1px solid #F0EBE0", alignItems: "center" }}>
+            {daySessions.map((session, sIdx) => (
+              <ListRow key={session.id} last={sIdx === daySessions.length - 1} style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 28px", gap: 12, padding: "12px 4px", alignItems: "center" }}>
                 {canEdit ? (
                   <input value={session.time} onChange={e => updateSession(session.id, { time: e.target.value })} placeholder="7:00 PM" style={{ background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
                 ) : (
@@ -9183,7 +9056,7 @@ function ProgramTab({
                 {canEdit ? (
                   <IconButton dim={24} onClick={() => deleteSession(session.id)} title="Remove session"><X className="w-3.5 h-3.5" /></IconButton>
                 ) : <span />}
-              </div>
+              </ListRow>
             ))}
           </div>
         )
@@ -9223,10 +9096,7 @@ function GroupsTab({
 
   useEffect(() => { if (generateTrigger) setShowWizard(true) }, [generateTrigger])
 
-  const mono: React.CSSProperties = {
-    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
-  }
+  const mono: React.CSSProperties = EYEBROW_STYLE
 
   async function loadSessions() {
     if (!teamId) { setLoading(false); return }
@@ -9325,9 +9195,12 @@ function GroupsTab({
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {sessions.map(session => (
-            <div
+            <CentralCard
               key={session.id}
-              style={{ background: "var(--cream-panel)", border: "1px solid " + (confirmDeleteId === session.id ? "var(--danger)" : "var(--line)"), borderRadius: 14, padding: "18px 22px", transition: "border-color 0.15s" }}
+              variant="standard"
+              radius="var(--r-callout)"
+              padding="18px 22px"
+              style={{ ...(confirmDeleteId === session.id ? { border: "1px solid var(--danger)" } : {}), transition: "border-color 0.15s" }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -9335,7 +9208,7 @@ function GroupsTab({
                   <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "4px 0 0" }}>
                     {session.num_groups} groups · {session.num_people} people · {new Date(session.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     {session.config.smallGroupMode === true && (
-                      <span style={{ marginLeft: 6, padding: "1px 7px", borderRadius: 999, background: "#F0EDE8", fontSize: 10, fontWeight: 600, color: "var(--body)", letterSpacing: "0.04em", textTransform: "uppercase" }}>SG Mode</span>
+                      <span style={{ marginLeft: 6, padding: "1px 7px", borderRadius: 999, background: "var(--ivory)", fontSize: 10, fontWeight: 600, color: "var(--body)", letterSpacing: "0.04em", textTransform: "uppercase" }}>SG Mode</span>
                     )}
                   </p>
                 </div>
@@ -9360,7 +9233,7 @@ function GroupsTab({
 
               {/* Inline confirmation row */}
               {confirmDeleteId === session.id && (
-                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid #F0EDE8", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line-3)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 600, color: "var(--danger)", margin: 0 }}>Delete this grouping?</p>
                     {session.config.smallGroupMode === true && (
@@ -9383,7 +9256,7 @@ function GroupsTab({
                   </div>
                 </div>
               )}
-            </div>
+            </CentralCard>
           ))}
         </div>
       )}
@@ -9408,10 +9281,7 @@ function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; on
   const [groups, setGroups] = useState<{ id: string; name: string; order_index: number; members: { id: string; name: string; graduation_year: number | null; role: string }[] }[]>([])
   const [loading, setLoading] = useState(true)
 
-  const mono: React.CSSProperties = {
-    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
-  }
+  const mono: React.CSSProperties = EYEBROW_STYLE
 
   // Back nav is the shell breadcrumb (§175) — "Groups" crumb returns to the list.
   useSubpageCrumbs([{ label: "Groups", onClick: onBack }, { label: session.name }])
@@ -9573,10 +9443,7 @@ function GroupGeneratorWizard({
   const [sgConfirmResult, setSgConfirmResult] = useState<string | null>(null)
   const semester = useMemo(() => getSemesterLabel(), [])
 
-  const mono: React.CSSProperties = {
-    fontFamily: "ui-monospace,'SF Mono',Menlo,monospace",
-    fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
-  }
+  const mono: React.CSSProperties = EYEBROW_STYLE
 
   // Load announcements + forms on mount
   useEffect(() => {
@@ -10190,14 +10057,14 @@ function GroupGeneratorWizard({
               <div style={{ marginTop: 18, padding: "16px 18px", background: "#F6F2E8", border: "1px solid var(--line)", borderRadius: 12 }}>
                 <p style={{ ...mono, marginBottom: 8 }}>Last year&apos;s groupings (CSV)</p>
                 <p style={{ fontSize: 12, color: "var(--body)", margin: "0 0 10px" }}>
-                  Format: <code style={{ fontFamily: "ui-monospace,monospace", background: "var(--line)", padding: "1px 5px", borderRadius: 4 }}>Name, Group</code> — one row per person. First row is header.
+                  Format: <code style={{ fontFamily: "var(--mono)", background: "var(--line)", padding: "1px 5px", borderRadius: 4 }}>Name, Group</code> — one row per person. First row is header.
                 </p>
                 <textarea
                   value={prevCSVText}
                   onChange={e => setPrevCSVText(e.target.value)}
                   placeholder={"Name,Group\nJane Smith,Group 1\nJohn Doe,Group 2"}
                   rows={6}
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream-panel)", fontSize: 12, fontFamily: "ui-monospace,monospace", resize: "vertical", color: "var(--ink)", boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream-panel)", fontSize: 12, fontFamily: "var(--mono)", resize: "vertical", color: "var(--ink)", boxSizing: "border-box" }}
                 />
               </div>
             )}
@@ -11809,7 +11676,7 @@ function SglSH({ eyebrow, title, sub, right }: { eyebrow: string; title: string;
   return (
     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
       <div>
-        <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.12em", color: "var(--muted-text)", textTransform: "uppercase" as const }}>{eyebrow}</div>
+        <div style={MONO_STYLE}>{eyebrow}</div>
         <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 400, color: "var(--ink)", margin: "4px 0 0", letterSpacing: "-0.015em", lineHeight: 1.15 }}>{title}</h2>
         {sub && <div style={{ fontSize: 13, color: "var(--body)", marginTop: 3 }}>{sub}</div>}
       </div>
@@ -12506,12 +12373,12 @@ function SmallGroupLeadersTab({
                         }}
                       >
                         <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "#EDE5F5" : "#F6F2E8", border: `1px solid ${isNext ? "#C9B8D4" : "var(--line)"}` }}>
-                          <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 9, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase" as const }}>{dow}</span>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase" as const }}>{dow}</span>
                           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: isNext ? "var(--plum)" : "var(--plum-2)", lineHeight: 1, marginTop: 1 }}>{dayNum}</span>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: isPast ? "var(--muted-text)" : "var(--ink)", letterSpacing: "-0.01em", textDecoration: isPast ? "line-through" : "none" }}>{DGL_SLOT_LABELS[a.slot]}</p>
-                          <p style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase" as const, marginTop: 3 }}>
+                          <p style={{ ...MONO_STYLE, marginTop: 3 }}>
                             {subLabel}
                           </p>
                         </div>
@@ -12777,7 +12644,7 @@ function SmallGroupLeadersTab({
           {/* Semester selector — president/admin only */}
           {isPresident && (
             <div className="flex items-center gap-3">
-              <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 11, color: "var(--muted-text)", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>Semester</p>
+              <p style={{ ...EYEBROW_STYLE, margin: 0 }}>Semester</p>
               <select
                 value={semester}
                 onChange={e => setSemester(e.target.value)}
@@ -12964,7 +12831,7 @@ function SmallGroupLeadersTab({
               {rosterConfirmedForSchedule && scheduleRosterMembers.length > 0 && (
                 <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                   <div className="px-5 py-3 border-b border-[#EFE9DA]" style={{ background: "#F6F2E8" }}>
-                    <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase", margin: 0 }}>
+                    <p style={{ ...MONO_STYLE, margin: 0 }}>
                       Availability Status · {scheduleRosterMembers.filter(m => memberReadiness.get(m.user_id)).length}/{scheduleRosterMembers.length} Done
                     </p>
                   </div>
@@ -13034,7 +12901,7 @@ function SmallGroupLeadersTab({
                               >
                                 <ChevronDown style={{ width: 15, height: 15, color: "var(--body)", flexShrink: 0, transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
                                 <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", letterSpacing: "-0.01em", flex: 1 }}>{month}</span>
-                                <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)" }}>{weekDates.length} WEEKS</span>
+                                <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)" }}>{weekDates.length} WEEKS</span>
                               </button>
                               {isOpen && (
                                 <div style={{ borderTop: "1px solid #EFE9DA" }}>

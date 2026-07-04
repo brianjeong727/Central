@@ -425,6 +425,18 @@
 .central-btn[data-variant="destructive"]:not(:disabled):hover { background: color-mix(in srgb, var(--danger) 8%, transparent); }
 .central-btn[data-variant="quiet"]:not(:disabled):hover { filter: brightness(1.15); }
 
+/* Central form-control focus: border → plum (DESIGN_SYSTEM §4.4). Applied via
+   the .central-field / .central-field-serif class on the Input/Select/Textarea
+   primitives so no per-site onFocus state is needed. */
+.central-field { transition: border-color var(--dur-fast) var(--ease-out); }
+.central-field:focus { border-color: var(--plum); }
+.central-field-serif { transition: border-color var(--dur-fast) var(--ease-out); }
+.central-field-serif:focus { border-bottom-color: var(--plum); }
+
+/* ListRow (§8.3) — table-row hover highlight */
+.central-list-row { transition: background var(--dur-fast) var(--ease-out); }
+.central-list-row:hover { background: var(--cream-2); }
+
 .central-icon-btn { transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
 .central-icon-btn:not(:disabled):hover { background: var(--ivory); color: var(--ink); }
 .central-icon-btn:not(:disabled):active { transform: scale(0.94); }

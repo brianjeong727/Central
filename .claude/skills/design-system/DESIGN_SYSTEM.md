@@ -180,6 +180,8 @@ Every action button has exactly one zone it's allowed to live in; its **scope** 
 - **Zone C — Content header (by the collection).** The page's single **plum primary** create action ("Add entry", "Add category", "New question") sits right of the header for the collection it fills. List-level helpers (Export, Filter, a view toggle) are **ghost buttons to its left**.
 - **Kebab (⋯).** Only for low-frequency, destructive, or per-row actions (Duplicate, Move, Delete, Leave; per-row table actions). Never primary navigation or the main create.
 
+> **The one-line rule (read this first):** the top / object header carries **only object-config** — the Settings **gear** (→ kebab at 3+). It **never** holds a create / add / generate button. Every add / create / generate action is a **plum primary in the body content header** of the collection it fills (Zone C). On a **multi-section workspace** (a team/workspace home with General / Events / Groups / … sidebar sections), the top header shows the **workspace name + gear**, and each section's create lives in **that section's own body header** — not the page header. The header-hosted create primitive (`HeaderActionButton` in a `TabPageHeader`) is therefore **retired for multi-section workspaces**; use `SectionHeader`/`ContentHeader` + `ContentActionButton`/`CentralButton` in the body instead. (The only exception is the single-feed case below.)
+
 **Scale:** 1 action → direct button; 2 → side by side in the zone; 3+ → collapse to a kebab, keeping the single most-used action visible beside it.
 
 **Single-feed exception:** when the page title directly heads its one collection (the Announcements feed, the Congregation questions list), the create primary may sit in the title row's right slot — that slot *is* the content header. On **object + sub-collection** pages (Receipts → its *Categories*; Finance Team → its *Expense ledger*) the create moves off the title row down to the collection's own header, while the Zone-B gear stays by the title.
@@ -286,7 +288,7 @@ Buttons are assigned by **semantic role**, never ad-hoc color. **Exactly one pri
 - **Standard input:** 12×14 padding, 1px `#E2DDCF`, radius 10, `#FDFCF8` bg, 15px sans.
 - **Inline serif input** (announcement title, journal entries): 8×0 padding, no border, `border-bottom: 1px solid #E2DDCF`, transparent bg, 36px serif weight 600, letter-spacing -0.02em. Placeholder uses helper-text `--faint` (quiet guidance), not label `--muted-text`.
 - **Textarea body** (announcement, transition note): 19px serif, line-height 1.65, no border, transparent bg, vertical resize, min-height 540 for full-page editors.
-- **Pill picker row** (audience, options): horizontal flex wrap gap 6–8. Off state: 1px `#E2DDCF`, cream bg, body color. On state: 1px `#3E1540`, `#2D0F2E` bg, cream text.
+- **Pill picker row** (audience, options): horizontal flex wrap gap 6–8. Off state: 1px `#E2DDCF`, cream bg, body color. On state: 1px `#3E1540`, `#3E1540` bg, cream text. (The selected pill is a `--plum` accent fill — an active-state indicator per §1.2 — not the `--plum-2` primary-CTA fill. The shared `FilterChip` primitive is the canonical implementation.)
 
 ### 4.5 Cards
 - **Standard card:** `#FDFCF8` bg, 1px `#E8E2D2` border, radius 12–14, padding 18–22. Shares the same tone as the page body — separation from the background is by hairline border alone, not by tone contrast.
@@ -783,7 +785,7 @@ const btnDestructive = {
   <button key={p.label} style={{
     padding: "7px 12px", borderRadius: 999,
     border: "1px solid " + (p.on ? "#3E1540" : "#E2DDCF"),
-    background:  p.on ? "#2D0F2E" : "#FDFCF8",
+    background:  p.on ? "#3E1540" : "#FDFCF8",
     color:       p.on ? "#FDFCF8" : "#5A5466",
     fontSize: 12, fontWeight: p.on ? 500 : 400,
     fontFamily: "var(--sans)", cursor: "pointer",
