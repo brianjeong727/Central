@@ -49,7 +49,6 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/update-password') ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/api/calendar/') ||
-    pathname.startsWith('/not-admin') ||
     pathname.startsWith('/register-ministry')
 
   // No auth — gate protected paths to login/signup

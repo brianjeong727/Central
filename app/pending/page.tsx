@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
+import { RingCrossLogo } from "@/app/home/components/shared"
 import { getMinistryCodes } from "@/app/actions/ministry"
 
 export default function PendingPage() {
@@ -83,17 +84,14 @@ export default function PendingPage() {
 
         {/* Logo */}
         <Link href="/" aria-label="Central — home" className="inline-flex items-center gap-2.5 mb-10 transition-opacity hover:opacity-70" style={{ textDecoration: "none", color: "inherit" }}>
-          <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
-            <path d="M70 28 A32 32 0 1 0 70 72" stroke="var(--plum)" strokeWidth="8" strokeLinecap="round" />
-            <circle cx="50" cy="50" r="6" fill="var(--plum)" />
-          </svg>
+          <RingCrossLogo size={32} />
           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>
             Central
           </span>
         </Link>
 
         {/* Status icon */}
-        <div className="w-16 h-16 rounded-full bg-[#3E1540]/10 flex items-center justify-center mb-6">
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6" style={{ background: "color-mix(in srgb, var(--plum) 10%, transparent)" }}>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--plum)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
@@ -110,7 +108,7 @@ export default function PendingPage() {
         </h1>
 
         {ministryName && (
-          <p className="text-[14px] font-semibold text-[var(--plum)] mb-3">{ministryName}</p>
+          <p className="text-[14px] font-medium text-[var(--plum)] mb-3">{ministryName}</p>
         )}
 
         <p className="text-[14px] text-[var(--body)] leading-relaxed mb-8 max-w-[300px]">
@@ -158,7 +156,7 @@ export default function PendingPage() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 gap: 12,
-                padding: "13px 15px",
+                padding: "12px 14px",
                 border: "1px solid var(--line)",
                 borderRadius: 10,
                 background: "var(--cream)",
@@ -186,7 +184,7 @@ export default function PendingPage() {
                   alignItems: "center",
                   justifyContent: "space-between",
                   gap: 12,
-                  padding: "11px 15px",
+                  padding: "10px 14px",
                   marginTop: 10,
                   border: "1px solid var(--line)",
                   borderRadius: 10,
@@ -217,14 +215,14 @@ export default function PendingPage() {
               <button
                 onClick={checkStatus}
                 disabled={checking}
-                className="w-full py-3.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-60 text-[var(--cream-on-dark)] font-bold text-[14px] transition-colors"
+                className="w-full py-3.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-60 text-[var(--cream-on-dark)] font-medium text-[14px] transition-colors"
               >
                 {checking ? "Checking…" : "Check status"}
               </button>
 
               <button
                 onClick={() => window.location.href = "/landing"}
-                className="w-full py-3.5 rounded-xl border border-[#E5E0D2] text-[14px] font-semibold text-[var(--body)] hover:border-[#3E1540]/40 hover:text-[var(--plum)] transition-colors"
+                className="w-full py-3.5 rounded-xl border border-[var(--line-2)] text-[14px] font-medium text-[var(--body)] hover:border-[color-mix(in_srgb,var(--plum)_40%,transparent)] hover:text-[var(--plum)] transition-colors"
               >
                 Back to home
               </button>
@@ -233,7 +231,7 @@ export default function PendingPage() {
             <>
               <button
                 onClick={() => window.location.href = "/ministries"}
-                className="w-full py-3.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] text-[var(--cream-on-dark)] font-bold text-[14px] transition-colors"
+                className="w-full py-3.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] text-[var(--cream-on-dark)] font-medium text-[14px] transition-colors"
               >
                 Browse ministries
               </button>
@@ -241,7 +239,7 @@ export default function PendingPage() {
               {status === "rejected" && (
                 <button
                   onClick={() => window.location.href = "/register-ministry"}
-                  className="w-full py-3.5 rounded-xl border border-[#E5E0D2] text-[14px] font-semibold text-[var(--body)] hover:border-[#3E1540]/40 hover:text-[var(--plum)] transition-colors"
+                  className="w-full py-3.5 rounded-xl border border-[var(--line-2)] text-[14px] font-medium text-[var(--body)] hover:border-[color-mix(in_srgb,var(--plum)_40%,transparent)] hover:text-[var(--plum)] transition-colors"
                 >
                   Register again
                 </button>
