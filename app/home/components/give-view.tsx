@@ -191,6 +191,14 @@ export function GiveView({
             {zelleInfo && !editing && (
               <div className="flex flex-col gap-4 mt-4 md:mt-0">
                 <GivingTrustPanel zelleName={zelleName} zelleInfo={zelleInfo} onCopy={handleCopy} copied={copied} />
+                {/* In-app card / Apple Pay giving — coming soon (Zelle above stays the live path). */}
+                <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, padding: "18px 20px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+                    <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)" }}>Card &amp; Apple Pay</p>
+                    <span style={{ fontSize: 10, letterSpacing: "0.08em", padding: "2px 8px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line-2)", textTransform: "uppercase", fontWeight: 500, color: "var(--muted-text)" }}>Coming soon</span>
+                  </div>
+                  <p style={{ fontSize: 12.5, color: "var(--body)", lineHeight: 1.55 }}>Giving in-app with a card or Apple Pay is coming soon. For now, give through Zelle above.</p>
+                </div>
               </div>
             )}
           </div>
