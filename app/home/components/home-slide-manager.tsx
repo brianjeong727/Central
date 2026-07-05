@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { X, ChevronUp, ChevronDown, Plus, CalendarDays, Megaphone, Image as ImageIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner } from "./shared"
-import { CentralModal } from "@/components/central"
+import { CentralModal, ConfirmDialog } from "@/components/central"
 
 // Curation overlay for the home hero carousel. Reference slides (upcoming events
 // / announcements); add, reorder, remove. Writes go straight to home_slides
@@ -55,6 +55,7 @@ export function HomeSlideManager({
   const [events, setEvents] = useState<EventOpt[]>([])
   const [anns, setAnns] = useState<AnnOpt[]>([])
   const [userId, setUserId] = useState<string | null>(null)
+  const [confirmRemove, setConfirmRemove] = useState<SlideRow | null>(null)
 
   const refresh = useCallback(async () => {
     const nowIso = new Date().toISOString()
@@ -226,7 +227,7 @@ export function HomeSlideManager({
                       </button>
                       <button
                         type="button"
-                        onClick={() => removeSlide(s.id)}
+                        onClick={() => setConfirmRemove(s)}
                         disabled={busy}
                         aria-label="Remove slide"
                         style={iconBtn(busy)}
@@ -306,6 +307,15 @@ export function HomeSlideManager({
             </section>
           </div>
         )}
+        <ConfirmDialog
+          open={!!confirmRemove}
+          title="Remove this slide?"
+          message={confirmRemove ? `"${confirmRemove.title}" will no longer appear in the home hero.` : undefined}
+          confirmLabel="Remove"
+          loading={busy}
+          onConfirm={() => { const s = confirmRemove; setConfirmRemove(null); if (s) removeSlide(s.id) }}
+          onClose={() => setConfirmRemove(null)}
+        />
     </CentralModal>
   )
 }

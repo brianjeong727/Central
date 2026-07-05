@@ -34,3 +34,4 @@ export {
   ProfileTabSkeleton,
 } from "./skeletons"
 export { CentralModal } from "./central-modal"
+export { ConfirmDialog } from "./confirm-dialog"

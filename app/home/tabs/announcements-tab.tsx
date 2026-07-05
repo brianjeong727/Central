@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import { createPortal } from "react-dom"
 import useSWR from "swr"
 import { ArrowLeft, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE } from "../components/shared"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee } from "../types"
@@ -695,6 +696,95 @@ function InlineEditFields({
 
 // ── Announcements Tab ────────────────────────────────────────────────────────
 
+// Desktop ⋯ overflow menu — one helper reused by all three desktop layouts
+// (pinned hero, compact table, editorial cards). Matches the hand-rolled
+// absolute-dropdown + fixed-backdrop shape used by the mobile AnnouncementCard.
+function DesktopActionMenu({
+  open, onToggle, onClose, isPinned, isSubPinned, showPin, showSubPin,
+  onPin, onSubPin, onEdit, onDelete,
+}: {
+  open: boolean
+  onToggle: () => void
+  onClose: () => void
+  isPinned: boolean
+  isSubPinned: boolean
+  showPin: boolean
+  showSubPin: boolean
+  onPin: () => void
+  onSubPin: () => void
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const item = "w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium hover:bg-[var(--cream-2)] transition-colors text-left"
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  // Fixed-position anchor measured from the trigger so the portaled panel hugs
+  // the trigger's right edge and escapes every overflow-hidden ancestor.
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+
+  const measure = useCallback(() => {
+    const r = triggerRef.current?.getBoundingClientRect()
+    if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+  }, [])
+
+  // While open, keep the panel anchored and dismiss on scroll/resize so a stale
+  // fixed menu never floats away from its trigger as the list scrolls.
+  useEffect(() => {
+    if (!open) return
+    measure()
+    const onScroll = () => onClose()
+    const onResize = () => onClose()
+    window.addEventListener("scroll", onScroll, true)
+    window.addEventListener("resize", onResize)
+    return () => {
+      window.removeEventListener("scroll", onScroll, true)
+      window.removeEventListener("resize", onResize)
+    }
+  }, [open, measure, onClose])
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        onClick={(e) => { e.stopPropagation(); onToggle() }}
+        className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[var(--line-3)] transition-colors"
+        title="More actions"
+      >
+        <MoreHorizontal className="w-4 h-4 text-[var(--muted-text)]" />
+      </button>
+      {open && pos && typeof document !== "undefined" && createPortal(
+        <>
+          <div className="fixed inset-0 z-[200]" onClick={onClose} />
+          <div
+            className="fixed z-[201] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] py-1 min-w-[176px]"
+            style={{ top: pos.top, right: pos.right }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {showPin && (
+              <button onClick={() => { onClose(); onPin() }} className={`${item} text-[var(--ink)]`}>
+                {isPinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />}
+                {isPinned ? "Unpin hero" : "Pin as hero"}
+              </button>
+            )}
+            {showSubPin && (
+              <button onClick={() => { onClose(); onSubPin() }} className={`${item} text-[var(--ink)]`}>
+                <Pin className="w-3.5 h-3.5 text-[var(--plum)]" style={{ transform: "rotate(-45deg)" }} />
+                {isSubPinned ? "Remove from For You" : "Pin to For You"}
+              </button>
+            )}
+            <button onClick={() => { onClose(); onEdit() }} className={`${item} text-[var(--ink)]`}>
+              <Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit
+            </button>
+            <button onClick={() => { onClose(); onDelete() }} className={`${item} text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)]`}>
+              <Trash2 className="w-3.5 h-3.5" />Delete
+            </button>
+          </div>
+        </>,
+        document.body
+      )}
+    </>
+  )
+}
+
 export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, ministryName, onOpenAnnouncement }: AnnouncementsTabProps) {
   const supabase = createClient()
   // Compose/edit is ephemeral plain state — never in the URL. A reload mid-compose
@@ -707,6 +797,10 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
   // Form fill overlay state
   const [formFillState, setFormFillState] = useState<{ formId: string; announcementId: string; title: string } | null>(null)
+  // Desktop delete confirmation — routes handleDesktopDelete through ConfirmDialog.
+  const [deleteConfirmAnn, setDeleteConfirmAnn] = useState<EnrichedAnnouncement | null>(null)
+  // Which desktop row's ⋯ overflow menu is open (announcement id).
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
   function openCreate() {
     setEditingAnnouncement(null)
@@ -1059,12 +1153,19 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                   </div>
                   {isLeaderOrAdmin && (
                     <div className="flex gap-2 items-center self-start">
-                      <button onClick={() => openEdit(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: "8px", cursor: "pointer" }} title="Edit">
-                        <Edit3 className="w-3.5 h-3.5" style={{ color: "var(--body)" }} />
-                      </button>
-                      <button onClick={() => handleDesktopDelete(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: "8px", cursor: "pointer" }} title="Delete">
-                        <Trash2 className="w-3.5 h-3.5 text-[var(--danger)]" />
-                      </button>
+                      <DesktopActionMenu
+                        open={openMenuId === pinnedAnn.id}
+                        onToggle={() => setOpenMenuId((id) => (id === pinnedAnn.id ? null : pinnedAnn.id))}
+                        onClose={() => setOpenMenuId(null)}
+                        isPinned={pinnedAnn.is_pinned}
+                        isSubPinned={pinnedAnn.is_sub_pinned}
+                        showPin
+                        showSubPin={false}
+                        onPin={() => handlePinToggle(pinnedAnn.id, pinnedAnn.is_pinned)}
+                        onSubPin={() => handleSubPinToggle(pinnedAnn.id, pinnedAnn.is_sub_pinned)}
+                        onEdit={() => openEdit(pinnedAnn)}
+                        onDelete={() => setDeleteConfirmAnn(pinnedAnn)}
+                      />
                     </div>
                   )}
                 </div>
@@ -1103,16 +1204,19 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                           </button>
                         )}
                         {isLeaderOrAdmin && (
-                          <>
-                            <button onClick={() => handlePinToggle(ann.id, ann.is_pinned)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--line-3)] transition-colors" title={ann.is_pinned ? "Unpin hero" : "Pin as hero"}>
-                              {ann.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--body)]" />}
-                            </button>
-                            <button onClick={() => handleSubPinToggle(ann.id, ann.is_sub_pinned)} className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${ann.is_sub_pinned ? "bg-[#F1ECFF] hover:bg-[#E8E0F8]" : "hover:bg-[var(--line-3)]"}`} title={ann.is_sub_pinned ? "Remove from For You" : "Pin to For You"}>
-                              <Pin className={`w-3.5 h-3.5 ${ann.is_sub_pinned ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`} style={{ transform: "rotate(-45deg)" }} />
-                            </button>
-                            <button onClick={() => openEdit(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--line-3)] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[var(--body)]" /></button>
-                            <button onClick={() => handleDesktopDelete(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-[var(--danger)]" /></button>
-                          </>
+                          <DesktopActionMenu
+                            open={openMenuId === ann.id}
+                            onToggle={() => setOpenMenuId((id) => (id === ann.id ? null : ann.id))}
+                            onClose={() => setOpenMenuId(null)}
+                            isPinned={ann.is_pinned}
+                            isSubPinned={ann.is_sub_pinned}
+                            showPin
+                            showSubPin
+                            onPin={() => handlePinToggle(ann.id, ann.is_pinned)}
+                            onSubPin={() => handleSubPinToggle(ann.id, ann.is_sub_pinned)}
+                            onEdit={() => openEdit(ann)}
+                            onDelete={() => setDeleteConfirmAnn(ann)}
+                          />
                         )}
                       </div>
                     </div>
@@ -1152,16 +1256,19 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                               </button>
                             )}
                             {isLeaderOrAdmin && (
-                              <>
-                                <button onClick={() => handlePinToggle(ann.id, ann.is_pinned)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[var(--line-3)] transition-colors" title={ann.is_pinned ? "Unpin hero" : "Pin as hero"}>
-                                  {ann.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--body)]" />}
-                                </button>
-                                <button onClick={() => handleSubPinToggle(ann.id, ann.is_sub_pinned)} className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${ann.is_sub_pinned ? "border-[#D8CAFF] bg-[#F1ECFF] hover:bg-[#E8E0F8]" : "border-[var(--line)] hover:bg-[var(--line-3)]"}`} title={ann.is_sub_pinned ? "Remove from For You" : "Pin to For You"}>
-                                  <Pin className={`w-3.5 h-3.5 ${ann.is_sub_pinned ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`} style={{ transform: "rotate(-45deg)" }} />
-                                </button>
-                                <button onClick={() => openEdit(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[var(--line-3)] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[var(--body)]" /></button>
-                                <button onClick={() => handleDesktopDelete(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] hover:border-[color-mix(in_srgb,var(--danger)_25%,transparent)] transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-[var(--danger)]" /></button>
-                              </>
+                              <DesktopActionMenu
+                                open={openMenuId === ann.id}
+                                onToggle={() => setOpenMenuId((id) => (id === ann.id ? null : ann.id))}
+                                onClose={() => setOpenMenuId(null)}
+                                isPinned={ann.is_pinned}
+                                isSubPinned={ann.is_sub_pinned}
+                                showPin
+                                showSubPin
+                                onPin={() => handlePinToggle(ann.id, ann.is_pinned)}
+                                onSubPin={() => handleSubPinToggle(ann.id, ann.is_sub_pinned)}
+                                onEdit={() => openEdit(ann)}
+                                onDelete={() => setDeleteConfirmAnn(ann)}
+                              />
                             )}
                           </div>
                         </div>
@@ -1214,6 +1321,15 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         }}
       />
     )}
+
+    <ConfirmDialog
+      open={deleteConfirmAnn !== null}
+      title="Delete announcement?"
+      message="This permanently removes it for everyone."
+      confirmLabel="Delete"
+      onConfirm={() => { const a = deleteConfirmAnn; setDeleteConfirmAnn(null); if (a) handleDesktopDelete(a) }}
+      onClose={() => setDeleteConfirmAnn(null)}
+    />
     </>
   )
 }
@@ -1226,7 +1342,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
+  const isAdminOrLeader = ["admin", "leader", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
 
   // Persistence is owned by the parent's handleRsvpToggle (single source of truth);
   // this only triggers the optimistic toggle, which reads back via the prop.

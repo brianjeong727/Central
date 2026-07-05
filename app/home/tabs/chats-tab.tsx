@@ -288,7 +288,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const [pinned, setPinned] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [confirmAction, setConfirmAction] = useState<"archive" | "unarchive" | "delete" | null>(null)
+  const [confirmAction, setConfirmAction] = useState<"archive" | "unarchive" | "delete" | "leave" | null>(null)
   const [confirmRemoveMemberId, setConfirmRemoveMemberId] = useState<string | null>(null)
   const [hoveredMemberId, setHoveredMemberId] = useState<string | null>(null)
   const [mobileRevealMemberId, setMobileRevealMemberId] = useState<string | null>(null)
@@ -642,7 +642,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--danger)", margin: 0 }}>Danger zone</p>
               {canArchive && <button onClick={() => setConfirmAction("archive")} className="w-full py-3.5 rounded-xl font-medium text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Archive chat</button>}
               {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} className="w-full py-3.5 rounded-xl font-medium text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Unarchive chat</button>}
-              {canLeave && <button onClick={handleLeave} className="w-full py-3.5 rounded-xl font-medium text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Leave chat</button>}
+              {canLeave && <button onClick={() => setConfirmAction("leave")} className="w-full py-3.5 rounded-xl font-medium text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Leave chat</button>}
               {canDelete && <button onClick={() => setConfirmAction("delete")} className="w-full py-3.5 rounded-xl font-medium text-[13px]" style={{ background: "transparent", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)" }}>Delete chat</button>}
             </div>
           )}
@@ -759,7 +759,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                   {canArchive && <button onClick={() => setConfirmAction("archive")} style={{ height: 36, padding: "0 18px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Archive chat</button>}
                   {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} style={{ height: 36, padding: "0 18px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Unarchive chat</button>}
-                  {canLeave && <button onClick={handleLeave} style={{ height: 36, padding: "0 18px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Leave chat</button>}
+                  {canLeave && <button onClick={() => setConfirmAction("leave")} style={{ height: 36, padding: "0 18px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Leave chat</button>}
                   {canDelete && <button onClick={() => setConfirmAction("delete")} style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 18px", background: "transparent", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: "var(--r-chip)", color: "var(--danger)", fontSize: 14, cursor: "pointer" }}><Trash2 style={{ width: 14, height: 14 }} /> Delete chat</button>}
                 </div>
               </div>
@@ -775,8 +775,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       {mounted && confirmAction && createPortal(
         <CentralModal
           onClose={() => setConfirmAction(null)}
-          eyebrow={confirmAction === "delete" ? "Danger zone" : "Confirm"}
-          title={confirmAction === "archive" ? "Archive this chat?" : confirmAction === "unarchive" ? "Unarchive this chat?" : "Delete this chat?"}
+          eyebrow={confirmAction === "delete" || confirmAction === "leave" ? "Danger zone" : "Confirm"}
+          title={confirmAction === "archive" ? "Archive this chat?" : confirmAction === "unarchive" ? "Unarchive this chat?" : confirmAction === "leave" ? "Leave this chat?" : "Delete this chat?"}
           maxWidth={420}
           footer={
             <>
@@ -784,15 +784,15 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               <CentralButton
                 variant={confirmAction === "unarchive" ? "primary" : "danger-solid"}
                 size="md"
-                onClick={() => { const a = confirmAction; setConfirmAction(null); if (a === "archive") handleArchive(); else if (a === "unarchive") handleUnarchive(); else handleDelete() }}
+                onClick={() => { const a = confirmAction; setConfirmAction(null); if (a === "archive") handleArchive(); else if (a === "unarchive") handleUnarchive(); else if (a === "leave") handleLeave(); else handleDelete() }}
               >
-                {confirmAction === "archive" ? "Archive" : confirmAction === "unarchive" ? "Unarchive" : "Delete"}
+                {confirmAction === "archive" ? "Archive" : confirmAction === "unarchive" ? "Unarchive" : confirmAction === "leave" ? "Leave" : "Delete"}
               </CentralButton>
             </>
           }
         >
           <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
-            {confirmAction === "archive" ? "Members won't be able to send new messages." : confirmAction === "unarchive" ? "Members will be able to send messages again." : "This chat and all its messages will be permanently removed. This can't be undone."}
+            {confirmAction === "archive" ? "Members won't be able to send new messages." : confirmAction === "unarchive" ? "Members will be able to send messages again." : confirmAction === "leave" ? "You'll stop receiving its messages." : "This chat and all its messages will be permanently removed. This can't be undone."}
           </p>
         </CentralModal>,
         document.body

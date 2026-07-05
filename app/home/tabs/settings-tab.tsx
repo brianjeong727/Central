@@ -31,7 +31,7 @@ import { MODERATION_DEFAULTS } from "@/lib/moderation"
 import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@/lib/moderation"
 import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
-import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip } from "@/components/central"
+import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog } from "@/components/central"
 import { useNavState } from "../nav-state"
 
 interface MemberRow {
@@ -219,6 +219,7 @@ export function SettingsTab({
   const [newSchoolAbbr, setNewSchoolAbbr] = useState("")
   const [savingSchool, setSavingSchool] = useState(false)
   const [schoolError, setSchoolError] = useState<string | null>(null)
+  const [confirmDeleteSchool, setConfirmDeleteSchool] = useState<{ id: string; name: string } | null>(null)
 
   // Receipt limits
   const [receiptLimits, setReceiptLimits] = useState<ReceiptLimit[]>([])
@@ -229,6 +230,7 @@ export function SettingsTab({
   const [savingLimit, setSavingLimit] = useState(false)
   const [limitError, setLimitError] = useState<string | null>(null)
   const [editingLimitId, setEditingLimitId] = useState<string | null>(null)
+  const [confirmDeleteLimit, setConfirmDeleteLimit] = useState<ReceiptLimit | null>(null)
   const [editingLimitAmount, setEditingLimitAmount] = useState("")
   const [savingLimitEdit, setSavingLimitEdit] = useState(false)
 
@@ -844,7 +846,7 @@ export function SettingsTab({
                             <span key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, background: "var(--ivory)", color: "var(--plum-2)", border: "1px solid var(--line-2)", fontSize: 13 }}>
                               <span style={{ fontWeight: 500 }}>{s.name}</span>
                               {s.abbreviation && <span style={{ color: "var(--muted-text)", fontSize: 12 }}>({s.abbreviation})</span>}
-                              {isAdmin && <button onClick={() => handleDeleteSchool(s.id)} style={{ background: "none", border: "none", padding: 0, color: "var(--muted-text)", cursor: "pointer", lineHeight: 1, fontSize: 16 }}>×</button>}
+                              {isAdmin && <button onClick={() => setConfirmDeleteSchool({ id: s.id, name: s.name })} style={{ background: "none", border: "none", padding: 0, color: "var(--muted-text)", cursor: "pointer", lineHeight: 1, fontSize: 16 }}>×</button>}
                             </span>
                           ))}
                         </div>
@@ -1628,7 +1630,7 @@ export function SettingsTab({
                             <>
                               <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "var(--ink)", letterSpacing: -0.2 }}>${Number(l.max_amount).toFixed(0)}</div>
                               <button onClick={() => { setEditingLimitId(l.id); setEditingLimitAmount(String(Math.round(l.max_amount))) }} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>Edit</button>
-                              <button onClick={() => handleDeleteLimit(l.id)} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--danger)", fontSize: 12, cursor: "pointer" }}>Remove</button>
+                              <button onClick={() => setConfirmDeleteLimit(l)} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--danger)", fontSize: 12, cursor: "pointer" }}>Remove</button>
                             </>
                           )}
                         </div>
@@ -1711,6 +1713,22 @@ export function SettingsTab({
           </>
         )}
       </div>
+      <ConfirmDialog
+        open={!!confirmDeleteSchool}
+        title="Remove school?"
+        message={confirmDeleteSchool ? `${confirmDeleteSchool.name} will be removed from this ministry.` : undefined}
+        confirmLabel="Remove"
+        onConfirm={() => { const s = confirmDeleteSchool; setConfirmDeleteSchool(null); if (s) handleDeleteSchool(s.id) }}
+        onClose={() => setConfirmDeleteSchool(null)}
+      />
+      <ConfirmDialog
+        open={!!confirmDeleteLimit}
+        title="Remove receipt limit?"
+        message="This spending limit will no longer be enforced."
+        confirmLabel="Remove"
+        onConfirm={() => { const l = confirmDeleteLimit; setConfirmDeleteLimit(null); if (l) handleDeleteLimit(l.id) }}
+        onClose={() => setConfirmDeleteLimit(null)}
+      />
     </div>
   )
 }

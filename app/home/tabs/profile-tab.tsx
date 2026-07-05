@@ -10,7 +10,7 @@ import { MONO_STYLE, RingCrossLogo } from "../components/shared"
 import { getInitials } from "../utils"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
-import { CentralButton, IconButton, InsetHairline, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton } from "@/components/central"
+import { CentralButton, IconButton, InsetHairline, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog } from "@/components/central"
 import { useNavState } from "../nav-state"
 import type { Profile, Devotional, Prayer, Verse } from "../types"
 
@@ -72,6 +72,7 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
   const [uploadingImage, setUploadingImage] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   // Report count + entry dates to the parent whenever the cached list changes.
   useEffect(() => {
@@ -201,7 +202,7 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
                           <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 9, zIndex: 20, minWidth: 130, overflow: "hidden" }}>
                             <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
                             <div style={{ height: 1, background: "var(--line)" }} />
-                            <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
+                            <button onClick={e => { e.stopPropagation(); setOpenMenuId(null); setConfirmDeleteId(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
                           </div>
                         )}
                       </div>
@@ -220,6 +221,13 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
           })}
         </div>
       )}
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        title="Delete this devotional?"
+        confirmLabel="Delete"
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) handleDelete(id) }}
+        onClose={() => setConfirmDeleteId(null)}
+      />
     </div>
   )
 }
@@ -240,6 +248,7 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
   const [saving, setSaving] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   // Report count to the parent whenever the cached list changes.
   useEffect(() => {
@@ -348,7 +357,7 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
                           <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 9, zIndex: 20, minWidth: 130, overflow: "hidden" }}>
                             <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
                             <div style={{ height: 1, background: "var(--line)" }} />
-                            <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
+                            <button onClick={e => { e.stopPropagation(); setOpenMenuId(null); setConfirmDeleteId(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
                           </div>
                         )}
                       </div>
@@ -366,6 +375,13 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
           })}
         </div>
       )}
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        title="Delete this prayer?"
+        confirmLabel="Delete"
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) handleDelete(id) }}
+        onClose={() => setConfirmDeleteId(null)}
+      />
     </div>
   )
 }
@@ -386,6 +402,7 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
   const [saving, setSaving] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     if (!searchQuery.trim()) return entries
@@ -478,7 +495,7 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
                           <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 9, zIndex: 20, minWidth: 130, overflow: "hidden" }}>
                             <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
                             <div style={{ height: 1, background: "var(--line)" }} />
-                            <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
+                            <button onClick={e => { e.stopPropagation(); setOpenMenuId(null); setConfirmDeleteId(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
                           </div>
                         )}
                       </div>
@@ -504,6 +521,13 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
           })}
         </div>
       )}
+      <ConfirmDialog
+        open={!!confirmDeleteId}
+        title="Delete this verse?"
+        confirmLabel="Delete"
+        onConfirm={() => { const id = confirmDeleteId; setConfirmDeleteId(null); if (id) handleDelete(id) }}
+        onClose={() => setConfirmDeleteId(null)}
+      />
     </div>
   )
 }
