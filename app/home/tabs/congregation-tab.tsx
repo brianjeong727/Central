@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from "react"
 import { useNavState } from "../nav-state"
 import { Plus, X, BarChart2, ChevronLeft } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { Spinner, MONO_STYLE, EmptyState, HeaderActionButton } from "../components/shared"
-import { TabPageHeader, PageTitle, CentralButton } from "@/components/central"
+import { Spinner, MONO_STYLE, EmptyState } from "../components/shared"
+import { TabPageHeader, PageTitle, CentralButton, ContentActionButton } from "@/components/central"
 import type { CongregationTabProps, CongregationQuestion } from "../types"
 
 interface Response {
@@ -264,14 +264,14 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
               Ask your congregation — responses are anonymous.
             </p>
           </div>
-          <HeaderActionButton label="New question" onClick={() => goTo("create")} />
+          <ContentActionButton label="New question" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => goTo("create")} />
         </div>
       )}
 
       {/* Desktop header */}
       <TabPageHeader className="justify-between">
         <PageTitle title="Congregation" compact />
-        {view === "list" && <HeaderActionButton label="New question" onClick={() => goTo("create")} />}
+        {view === "list" && <ContentActionButton label="New question" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => goTo("create")} />}
       </TabPageHeader>
 
       <div
