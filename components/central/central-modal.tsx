@@ -17,7 +17,7 @@
 // Modals remain for CREATION/CONFIG ONLY — never navigation (§4.17). Callers
 // conditionally render: `{open && <CentralModal …>}`.
 
-import { ReactNode, useEffect } from "react"
+import { ReactNode, useEffect, useState } from "react"
 import { X } from "lucide-react"
 
 export function CentralModal({
@@ -29,6 +29,7 @@ export function CentralModal({
   maxWidth = 480,
   z = 200,
   sheet = false,
+  dirty = false,
 }: {
   onClose: () => void
   /** Serif panel title. Omit only for bare pickers that carry their own heading. */
@@ -43,13 +44,30 @@ export function CentralModal({
   z?: number
   /** Bottom-sheet on mobile (rounded top corners, pinned to the bottom edge); centered panel on desktop. */
   sheet?: boolean
+  /**
+   * Accidental-dismiss guard. When `true`, X / backdrop / Escape do NOT close
+   * immediately — they surface an inline "Discard changes?" confirm so a
+   * half-filled form isn't lost to a stray click. `false` (default) = close
+   * immediately, exactly as before.
+   */
+  dirty?: boolean
 }) {
-  // Escape closes — standard across every modal.
+  // When dirty, all three close triggers route through a confirm step instead of
+  // closing outright. When clean, requestClose() is a straight onClose().
+  const [confirmingClose, setConfirmingClose] = useState(false)
+  const requestClose = () => { if (dirty) setConfirmingClose(true); else onClose() }
+
+  // Clean state can never keep a stale confirm open (e.g. after a save flips
+  // dirty→false while the confirm was showing).
+  useEffect(() => { if (!dirty) setConfirmingClose(false) }, [dirty])
+
+  // Escape closes — standard across every modal (guarded when dirty).
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") requestClose() }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [onClose])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, onClose])
 
   return (
     <div
@@ -61,11 +79,12 @@ export function CentralModal({
         background: "rgba(19,16,26,0.55)",
         padding: sheet ? 0 : "0 20px",
       }}
-      onClick={onClose}
+      onClick={requestClose}
     >
       <div
         className={sheet ? "animate-dialog-in rounded-t-[var(--r-callout)] md:rounded-[var(--r-callout)]" : "animate-dialog-in"}
         style={{
+          position: "relative",
           background: "var(--cream-2)",
           ...(sheet ? {} : { borderRadius: "var(--r-callout)" }),
           width: "100%",
@@ -103,7 +122,7 @@ export function CentralModal({
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               aria-label="Close"
               style={{
                 width: 32,
@@ -141,6 +160,62 @@ export function CentralModal({
             }}
           >
             {footer}
+          </div>
+        )}
+
+        {/* Accidental-dismiss guard (§4.17) — a centered token card over a soft
+            ink scrim, clipped to the panel by its overflow:hidden. Calm copy,
+            no native confirm. */}
+        {confirmingClose && (
+          <div
+            className="animate-backdrop-in"
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 20,
+              background: "rgba(19,16,26,0.4)",
+            }}
+            onClick={(e) => { e.stopPropagation(); setConfirmingClose(false) }}
+          >
+            <div
+              className="animate-dialog-in"
+              style={{
+                background: "var(--cream-2)",
+                border: "1px solid var(--line)",
+                borderRadius: "var(--r-callout)",
+                padding: "20px 22px",
+                width: "100%",
+                maxWidth: 340,
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 400, color: "var(--ink)", margin: 0 }}>
+                Discard changes?
+              </h3>
+              <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.5, margin: "8px 0 0" }}>
+                Your changes haven&apos;t been saved. If you leave now, they&apos;ll be lost.
+              </p>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingClose(false)}
+                  style={{ padding: "7px 15px", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: "pointer", background: "transparent", border: "1px solid var(--line)", color: "var(--body)" }}
+                >
+                  Keep editing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setConfirmingClose(false); onClose() }}
+                  style={{ padding: "7px 15px", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: "pointer", background: "var(--danger)", border: "none", color: "var(--cream)" }}
+                >
+                  Discard
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -372,12 +372,12 @@ For meeting notes, transition notes, activity feeds.
 - **Composer bar container:** no top divider, background continuous with the chat body background token. The bar blends into the thread — only the input pill itself carries a distinct affordance. The reply preview, attachment preview, and archived-state bars use the same background and no top border.
 
 ### 4.17 Modal (for **creation/config only**, never navigation)
-Modals are reserved for *new-X* and configure-X flows where context needs to be preserved (e.g. quick-add behind a calendar, curating the home hero). For opening existing entities, **always navigate to a page**. Use sparingly.
+Modals are reserved for *new-X* and configure-X flows where context needs to be preserved (e.g. quick-add behind a calendar, curating the home hero). For opening existing entities to **read/browse**, navigate to a page. Use sparingly. **Forms are modal-eligible (ratified 2026-07-05):** the form builder (create/edit) *and* the member fill-out both render in `CentralModal` at the hefty-form width — they're config / short data-entry, not browsing. **Data-entry modals (builder, fill) MUST pass `dirty`** so a stray backdrop/Escape shows a "Discard changes?" confirm instead of silently losing input.
 
 **Every modal renders through `CentralModal`** (`components/central/central-modal.tsx`) — hand-rolled fixed-overlay panels are design debt. The canonical anatomy (ratified 2026-07-04, from the curate-hero manager):
 
 - **Backdrop:** `rgba(19,16,26,0.55)` ink veil, no blur, `animate-backdrop-in`. Click-away closes.
-- **Panel:** `var(--cream-2)` surface, radius `var(--r-callout)`, **no border, no shadow** — separation comes from the dark veil, not elevation. `maxWidth` per content (360 pickers · 420–480 forms · 520–560 wide forms), `maxHeight 85vh`, `animate-dialog-in`.
+- **Panel:** `var(--cream-2)` surface, radius `var(--r-callout)`, **no border, no shadow** — separation comes from the dark veil, not elevation. `maxWidth` per content (360 pickers · 420–480 forms · 520–560 wide forms · **~720 hefty/multi-question forms** — the form builder & fill-out), `maxHeight 85vh`, `animate-dialog-in`.
 - **Header:** optional mono eyebrow (10px, 1.2px tracking, uppercase, `--muted-text`) over a serif 22/400 `--ink` title; hairline (`--line`) below; 32px circular X top-right (`--ivory` fill, 1px `--line`).
 - **Body:** scrollable, `20px 24px` padding. Section labels inside use the mono eyebrow style.
 - **Footer (optional):** action row above a top hairline — confirm/submit buttons live here, right-aligned (or full-width for single primary actions).
@@ -388,7 +388,7 @@ Modals are reserved for *new-X* and configure-X flows where context needs to be 
 Exceptions (not CentralModal): the command palette (top-anchored nav chrome), the image lightbox, and full-screen page-like overlays (§4.18 subpages, ChatScreen).
 
 ### 4.18 Triggered subpage
-A **subpage** is a body button opening a temporary view or action surface (a note detail, a record detail, a fill-out form, an editor). It is **not** a modal.
+A **subpage** is a body button opening a temporary view or action surface (a note detail, a record detail, a responses view). It is **not** a modal. (Forms are the exception — builder + fill-out are §4.17 modals, not subpages.)
 - **Consumes the full content body AND the page's own header.** The originating page's `TabPageHeader` does NOT survive — the subpage replaces it.
 - **Content is full-width or centered** — never a small randomly-margined slice, never inline-within-the-parent's-padding. `width="full"` uses the standard `md:px-14` content inset; `width="centered"` uses a centered `maxWidth` column for small content.
 - **Cream-on-cream only.** Background is `--cream`; components inside use `--cream-2` / `--ivory` / `--line`. Never `bg-white`, never inverted/dark.
@@ -396,7 +396,7 @@ A **subpage** is a body button opening a temporary view or action surface (a not
 - **The shell breadcrumb persists and IS the back.** The subpage appends its own crumb(s) via the breadcrumb context; the parent crumb's `onClick` is the back. There is **NO** standalone "← Back" / "All workspaces" button.
 - It renders **in the content area** — **never** a `fixed inset-0` portal.
 - **Mobile** has no breadcrumb (it's desktop-only), so `SubpageShell` renders a single `md:hidden` back row derived from the parent crumb. Desktop stays breadcrumb-only; mobile gets that one back affordance automatically — never hand-roll a second one.
-- Modals (scrim / centered, §4.17) are reserved for *tiny* confirmations only. Anything that could plausibly be a full-bleed page is a subpage.
+- Modals (scrim / centered, §4.17) cover *tiny* confirmations, creation/config, and **forms** (the builder + the member fill-out, at §4.17's hefty-form width with the `dirty` guard). Everything else that could plausibly be a full-bleed page — reading an existing entity, a record/note detail, a responses view — stays a subpage.
 - **VERTICAL RHYTHM — HARD RULE (mirror top-level pages exactly; never hand-roll or eyeball these gaps):** a subpage's header/strip/body spacing is FIXED and identical to a `TabPageHeader` + `PlanSubTabStrip` + body composition. Do NOT add ad-hoc `marginTop`/`marginBottom` between the breadcrumb, header, strip, and body — they stack and drift.
   - **Header:** pass `title` to `SubpageShell` (never hand-roll an `<h1>` in the body). It renders `InsetHairline → var(--space-8) (22px) → PageTitle compact (25px serif) → var(--space-8) (22px) → InsetHairline`, butting the breadcrumb with **no top gap**.
   - **Header → section strip:** nothing. The `PlanSubTabStrip` owns its `12px` button top-padding; the strip wrapper gets **no** `marginTop`/`marginBottom`.

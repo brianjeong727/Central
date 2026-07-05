@@ -943,31 +943,13 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     )
   }
 
-  // Body swap: filling out a form replaces the feed (in-content subpage §4.18) —
-  // the "Announcements" crumb (and mobile back) returns to the feed.
-  if (formFillState) {
-    const closeFill = () => setFormFillState(null)
-    return (
-      <SubpageShell
-        crumbs={[{ label: "Announcements", onClick: closeFill }, { label: formFillState.title }]}
-        width="centered"
-        maxWidth={640}
-      >
-        <FormFillView
-          formId={formFillState.formId}
-          announcementId={formFillState.announcementId}
-          userId={userId}
-          ministryId={ministryId}
-          onSubmitted={() => {
-            mutateAnnouncements(prev => (prev ?? []).map(a => a.form_id === formFillState.formId ? { ...a, user_has_responded: true } : a), { revalidate: false })
-            setFormFillState(null)
-          }}
-        />
-      </SubpageShell>
-    )
-  }
+  // Fill-out-form is a self-wrapping CentralModal (FormFillView owns it) overlaid
+  // on the feed (DESIGN_SYSTEM §4.17) — X / backdrop / Escape close it (guarded by
+  // its own `dirty` prompt once answered); the feed stays mounted underneath.
+  const closeFill = () => setFormFillState(null)
 
   return (
+    <>
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile Header */}
       <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
@@ -1210,6 +1192,22 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         </button>
       )}
     </div>
+
+    {formFillState && (
+      <FormFillView
+        title={formFillState.title}
+        onClose={closeFill}
+        formId={formFillState.formId}
+        announcementId={formFillState.announcementId}
+        userId={userId}
+        ministryId={ministryId}
+        onSubmitted={() => {
+          mutateAnnouncements(prev => (prev ?? []).map(a => a.form_id === formFillState.formId ? { ...a, user_has_responded: true } : a), { revalidate: false })
+          setFormFillState(null)
+        }}
+      />
+    )}
+    </>
   )
 }
 
@@ -1692,36 +1690,31 @@ export function AnnouncementDetailView({
   // In-content subpage (DESIGN_SYSTEM §4.18) — the shell breadcrumb is the back
   // affordance; no standalone X. The "Announcements" crumb routes to the list AND
   // closes the detail (one atomic URL update upstream). Cream-on-cream, no shadow.
-  // When the form is open, the SAME SubpageShell swaps its body to FormFillView and
-  // extends the trail with a "Form" crumb; the announcement-title crumb becomes the
-  // back into the detail (closeForm). The crumbs array is derived from formFillOpen,
-  // so useSubpageCrumbs re-pushes automatically on toggle — no nested SubpageShell.
+  // Filling out the form is a self-wrapping CentralModal (FormFillView owns it,
+  // §4.17) overlaid on the detail — the detail stays mounted underneath; X /
+  // backdrop / Escape close it (guarded by its own `dirty` prompt once answered).
   const closeForm = () => setFormFillOpen(false)
   const title = ann?.title || "Announcement"
   const formOpen = formFillOpen && !!ann?.form_id
-  const crumbs = formOpen
-    ? [
-        { label: "Announcements", onClick: onGoToList },
-        { label: title, onClick: closeForm },
-        { label: "Form" },
-      ]
-    : [
-        { label: "Announcements", onClick: onGoToList },
-        { label: title },
-      ]
+  const crumbs = [
+    { label: "Announcements", onClick: onGoToList },
+    { label: title },
+  ]
 
   return (
     <SubpageShell crumbs={crumbs} width="full">
-      {formOpen ? (
+      <DetailContent />
+
+      {formOpen && (
         <FormFillView
+          title={title}
+          onClose={closeForm}
           formId={ann!.form_id!}
           announcementId={ann!.id}
           userId={userId}
           ministryId={ministryId}
           onSubmitted={() => { setAnn((prev) => prev ? { ...prev, user_has_responded: true } : prev); setFormFillOpen(false) }}
         />
-      ) : (
-        <DetailContent />
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

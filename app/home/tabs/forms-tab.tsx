@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { ArrowLeft, Archive, ArchiveRestore, Check, ChevronDown, ChevronLeft, ChevronRight, Edit3, FileText, Plus, Trash2 } from "lucide-react"
+import { useState, useEffect, useCallback, type ReactNode } from "react"
+import { Archive, ArchiveRestore, Check, ChevronDown, ChevronLeft, ChevronRight, Edit3, FileText, Plus, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE, EYEBROW_STYLE, AnimateIn } from "../components/shared"
-import { TabPageHeader, PageTitle, PlanSubTabStrip, ContentHeader, ContentActionButton, CentralButton } from "@/components/central"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, ContentHeader, ContentActionButton, CentralButton, CentralModal } from "@/components/central"
 import { useNavState } from "../nav-state"
 import type { FormsTabProps, FieldType } from "../types"
 
@@ -67,14 +67,17 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
 
 // ── Form Fill View ────────────────────────────────────────────────────────────
 
-// In-content subpage body (DESIGN_SYSTEM §4.18). Renders ONLY the form body +
-// an inline submitted state — no fixed overlay, no own header, no X/back. The
-// host drops this inside a SubpageShell whose breadcrumb is the back affordance.
-export function FormFillView({ formId, userId, ministryId, announcementId, onSubmitted }: {
+// Self-wrapping fill modal (DESIGN_SYSTEM §4.17). Owns its own CentralModal so it
+// can pass its own `dirty` guard (any answer entered) — a half-filled form isn't
+// lost to a stray backdrop-click/Escape. Callers render <FormFillView title=…
+// onClose=… …/> directly (no outer CentralModal). Mirrors FormBuilder's self-wrap.
+export function FormFillView({ formId, userId, ministryId, announcementId, title, onClose, onSubmitted }: {
   formId: string
   userId: string
   ministryId: string
   announcementId: string
+  title: string
+  onClose: () => void
   onSubmitted: () => void
 }) {
   const supabase = createClient()
@@ -151,12 +154,20 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
     setTimeout(() => onSubmitted(), 1400)
   }
 
-  if (loading) {
-    return <div className="flex items-center justify-center" style={{ minHeight: 240 }}><Spinner /></div>
-  }
+  const answeredCount = fields.filter(f => {
+    const a = answers[f.id]
+    return f.type === 'checkbox' ? (a as string[]).length > 0 : !!(a as string)?.trim()
+  }).length
 
-  if (done) {
-    return (
+  // Accidental-dismiss guard: any answer entered = dirty. Cleared once submitted
+  // (`done`) so the 1400ms success auto-close never trips the discard prompt.
+  const dirty = !done && Object.values(answers).some(v => Array.isArray(v) ? v.length > 0 : String(v ?? "").trim() !== "")
+
+  let body: ReactNode
+  if (loading) {
+    body = <div className="flex items-center justify-center" style={{ minHeight: 240 }}><Spinner /></div>
+  } else if (done) {
+    body = (
       <AnimateIn className="flex flex-col items-center justify-center gap-4" style={{ minHeight: 320 }}>
         <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "rgba(62,21,64,0.1)" }}>
           <Check className="w-8 h-8 text-[var(--plum)]" />
@@ -167,25 +178,15 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
         </div>
       </AnimateIn>
     )
-  }
-
-  if (fields.length === 0) {
-    return (
+  } else if (fields.length === 0) {
+    body = (
       <div className="flex items-center justify-center" style={{ minHeight: 240 }}>
         <EmptyState icon={<FileText className="w-7 h-7" />} title="No questions" subtitle="This form has no questions yet." />
       </div>
     )
-  }
-
-  const answeredCount = fields.filter(f => {
-    const a = answers[f.id]
-    return f.type === 'checkbox' ? (a as string[]).length > 0 : !!(a as string)?.trim()
-  }).length
-
-  return (
-    // Self-constrain to a readable form column + center, so the form looks
-    // identical whether the host SubpageShell is width="full" (inside the
-    // announcement detail) or width="centered" (from the feed).
+  } else {
+    body = (
+    // Self-constrain to a readable form column + center inside the modal body.
     //
     // Editorial question groups (§1.3): mono eyebrow ("QUESTION N · REQUIRED")
     // over a serif question, quiet option rows. Plum stays SURGICAL — selection
@@ -281,14 +282,22 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
         </CentralButton>
       </div>
     </AnimateIn>
+    )
+  }
+
+  return (
+    <CentralModal onClose={onClose} title={title} maxWidth={720} sheet dirty={dirty}>
+      {body}
+    </CentralModal>
   )
 }
 
-// ── Form Builder (full-page, body-swap) ───────────────────────────────────────
+// ── Form Builder (CentralModal — DESIGN_SYSTEM §4.17) ─────────────────────────
 
-// A first-class form editor. Renders as the Forms-tab body (like the announcement
-// compose page), NOT a fixed overlay. Once a form has ≥1 response its FIELDS lock
-// (edits/add/delete/reorder disabled); the title stays editable.
+// A first-class form editor. Renders inside a large CentralModal (maxWidth 720,
+// mobile bottom-sheet); Save lives in the modal footer. Once a form has ≥1
+// response its FIELDS lock (edits/add/delete/reorder disabled); the title stays
+// editable.
 export function FormBuilder({ ministryId, userId, formId, onDone }: {
   ministryId: string
   userId: string
@@ -306,6 +315,9 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
   const [loading, setLoading] = useState(!!formId)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Snapshot of the loaded {title, fields} for an existing form — the baseline
+  // the accidental-dismiss guard diffs against. Null for a new form (no baseline).
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null)
 
   // Load existing form (title + fields) + lock if it already has responses.
   useEffect(() => {
@@ -317,21 +329,26 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
         .eq("id", formId!)
         .eq("ministry_id", ministryId)
         .maybeSingle()
-      setTitle(formRow?.title ?? "")
+      const loadedTitle = formRow?.title ?? ""
+      setTitle(loadedTitle)
 
       const { data: fieldData } = await supabase
         .from("form_fields")
         .select("*")
         .eq("form_id", formId!)
         .order("order_index")
-      setFields((fieldData ?? []).map(f => ({
+      const loadedFields: DraftField[] = (fieldData ?? []).map(f => ({
         tempId: newTempId(),
         existingId: f.id,
         label: f.label,
         type: f.type as FieldType,
         options: Array.isArray(f.options) ? f.options : [],
         required: f.required ?? false,
-      })))
+      }))
+      setFields(loadedFields)
+      // tempIds are baked into the baseline and preserved across edits, so an
+      // untouched form diffs equal; edits/reorders/add/delete diff as dirty.
+      setInitialSnapshot(JSON.stringify({ title: loadedTitle, fields: loadedFields }))
 
       const { count } = await supabase
         .from("form_responses")
@@ -404,6 +421,15 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
 
   const titleText = isEditing ? "Edit form" : "New form"
 
+  // Unsaved-edits guard: while saving, force clean so save→close never prompts.
+  // Existing form → diff against the loaded baseline; new form → any typed title
+  // or question label counts as dirty.
+  const dirty = saving
+    ? false
+    : initialSnapshot !== null
+      ? JSON.stringify({ title, fields }) !== initialSnapshot
+      : title.trim() !== "" || fields.some(f => f.label.trim() !== "")
+
   const SaveButton = (
     <button
       type="button"
@@ -417,27 +443,11 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
   )
 
   return (
-    <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden" style={{ background: "var(--cream)" }}>
-      {/* Mobile header — safe-area inset, back affordance */}
-      <div className="md:hidden flex items-center gap-3 px-5 pt-12 pb-4" style={{ borderBottom: "1px solid var(--line)" }}>
-        <button onClick={onDone} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-xl -ml-1 hover:bg-[var(--ivory)] transition-colors">
-          <ArrowLeft className="w-5 h-5" style={{ color: "var(--plum)" }} />
-        </button>
-        <span style={{ fontFamily: "var(--serif)", fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05 }}>{titleText}</span>
-        <div className="ml-auto">{SaveButton}</div>
-      </div>
-
-      {/* Desktop header — back is the shell breadcrumb (§3.2 Zone A); Save on the right */}
-      <TabPageHeader>
-        <PageTitle title={titleText} compact />
-        <div className="ml-auto pb-1.5">{SaveButton}</div>
-      </TabPageHeader>
-
-      <div className="md:flex-1 md:overflow-y-auto">
-        {loading ? (
-          <div className="px-5 md:px-14 py-6 flex items-center justify-center"><Spinner /></div>
-        ) : (
-          <div className="px-5 md:px-14 py-6 w-full mx-auto flex flex-col gap-6" style={{ maxWidth: 640 }}>
+    <CentralModal onClose={onDone} title={titleText} footer={SaveButton} maxWidth={720} sheet dirty={dirty}>
+      {loading ? (
+        <div className="flex items-center justify-center" style={{ minHeight: 240 }}><Spinner /></div>
+      ) : (
+        <div className="flex flex-col gap-6">
             {error && (
               <div style={{ background: "rgba(62,21,64,0.08)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>{error}</div>
             )}
@@ -556,10 +566,9 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
                 </button>
               )}
             </div>
-          </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </CentralModal>
   )
 }
 
@@ -808,19 +817,16 @@ function StatusPill({ item }: { item: FormListItem }) {
 
 // ── Forms Tab ─────────────────────────────────────────────────────────────────
 
+// Only Responses is still a body-swap page (URL ?fresp). Create/Edit (builder)
+// and Fill are now CentralModals — no URL param, no breadcrumb detail crumb.
 type FormsView =
   | { mode: "list" }
-  | { mode: "builder"; formId: string | null }
   | { mode: "responses"; formId: string; title: string }
 
 function initialFormsView(): FormsView {
   if (typeof window === "undefined") return { mode: "list" }
   const p = new URLSearchParams(window.location.search)
-  const fedit = p.get("fedit")
-  const fbuild = p.get("fbuild")
   const fresp = p.get("fresp")
-  if (fedit) return { mode: "builder", formId: fedit }
-  if (fbuild === "new") return { mode: "builder", formId: null }
   if (fresp) return { mode: "responses", formId: fresp, title: "" }
   return { mode: "list" }
 }
@@ -833,22 +839,27 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
   const [showArchived, setShowArchived] = useState(false)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
   const [view, setView] = useState<FormsView>(initialFormsView)
+  // Builder is a CentralModal overlaid on the list — component state, no URL.
+  const [builder, setBuilder] = useState<{ formId: string | null } | null>(null)
 
   function openBuilder(formId: string | null) {
-    setView({ mode: "builder", formId })
-    setParams({ fedit: formId ?? null, fbuild: formId ? null : "new", fresp: null })
-    onViewChange?.("detail", formId ? "Edit form" : "New form")
+    setBuilder({ formId })
+  }
+
+  function closeBuilder() {
+    setBuilder(null)
+    load()
   }
 
   function openResponses(formId: string, title: string) {
     setView({ mode: "responses", formId, title })
-    setParams({ fresp: formId, fedit: null, fbuild: null })
+    setParams({ fresp: formId })
     onViewChange?.("detail", title)
   }
 
   function backToList() {
     setView({ mode: "list" })
-    setParams({ fresp: null, fedit: null, fbuild: null })
+    setParams({ fresp: null })
     onViewChange?.("list")
     load()
   }
@@ -858,7 +869,6 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
   // backfill effect below announces the detail crumb then.)
   useEffect(() => {
     if (view.mode === "list") onViewChange?.("list")
-    else if (view.mode === "builder") onViewChange?.("detail", view.formId ? "Edit form" : "New form")
     else if (view.mode === "responses" && view.title) onViewChange?.("detail", view.title)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -925,10 +935,7 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
     await supabase.from("announcement_forms").delete().eq("id", item.id).eq("ministry_id", ministryId)
   }
 
-  // ── Body-swap dispatch ──
-  if (view.mode === "builder") {
-    return <FormBuilder ministryId={ministryId} userId={userId} formId={view.formId} onDone={backToList} />
-  }
+  // ── Body-swap dispatch (Responses only; builder is a modal overlay below) ──
   if (view.mode === "responses") {
     return (
       <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
@@ -990,6 +997,7 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
   }
 
   return (
+    <>
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile header — compact */}
       <div className="md:hidden px-5 pt-14 pb-5 flex items-end justify-between">
@@ -1051,5 +1059,10 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
         )}
       </div>
     </div>
+
+    {builder && (
+      <FormBuilder ministryId={ministryId} userId={userId} formId={builder.formId} onDone={closeBuilder} />
+    )}
+    </>
   )
 }
