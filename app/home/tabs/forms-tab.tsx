@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { ArrowLeft, Archive, ArchiveRestore, Check, ChevronDown, ChevronLeft, ChevronRight, Edit3, FileText, Plus, Trash2 } from "lucide-react"
+import { Archive, ArchiveRestore, Check, ChevronDown, ChevronLeft, ChevronRight, Edit3, FileText, Plus, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE, EYEBROW_STYLE, AnimateIn } from "../components/shared"
-import { TabPageHeader, PageTitle, PlanSubTabStrip, ContentHeader, ContentActionButton, CentralButton } from "@/components/central"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, ContentHeader, ContentActionButton, CentralButton, CentralModal } from "@/components/central"
 import { useNavState } from "../nav-state"
 import type { FormsTabProps, FieldType } from "../types"
 
@@ -67,9 +67,10 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
 
 // ── Form Fill View ────────────────────────────────────────────────────────────
 
-// In-content subpage body (DESIGN_SYSTEM §4.18). Renders ONLY the form body +
-// an inline submitted state — no fixed overlay, no own header, no X/back. The
-// host drops this inside a SubpageShell whose breadcrumb is the back affordance.
+// Modal-body content (DESIGN_SYSTEM §4.17). Renders ONLY the form body + an
+// inline submitted state — no own header/title/X (the host CentralModal owns the
+// title = form title, the X, and scroll). Used as CentralModal children from the
+// feed and the announcement detail.
 export function FormFillView({ formId, userId, ministryId, announcementId, onSubmitted }: {
   formId: string
   userId: string
@@ -183,9 +184,7 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
   }).length
 
   return (
-    // Self-constrain to a readable form column + center, so the form looks
-    // identical whether the host SubpageShell is width="full" (inside the
-    // announcement detail) or width="centered" (from the feed).
+    // Self-constrain to a readable form column + center inside the modal body.
     //
     // Editorial question groups (§1.3): mono eyebrow ("QUESTION N · REQUIRED")
     // over a serif question, quiet option rows. Plum stays SURGICAL — selection
@@ -284,11 +283,12 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
   )
 }
 
-// ── Form Builder (full-page, body-swap) ───────────────────────────────────────
+// ── Form Builder (CentralModal — DESIGN_SYSTEM §4.17) ─────────────────────────
 
-// A first-class form editor. Renders as the Forms-tab body (like the announcement
-// compose page), NOT a fixed overlay. Once a form has ≥1 response its FIELDS lock
-// (edits/add/delete/reorder disabled); the title stays editable.
+// A first-class form editor. Renders inside a large CentralModal (maxWidth 720,
+// mobile bottom-sheet); Save lives in the modal footer. Once a form has ≥1
+// response its FIELDS lock (edits/add/delete/reorder disabled); the title stays
+// editable.
 export function FormBuilder({ ministryId, userId, formId, onDone }: {
   ministryId: string
   userId: string
@@ -417,27 +417,11 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
   )
 
   return (
-    <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden" style={{ background: "var(--cream)" }}>
-      {/* Mobile header — safe-area inset, back affordance */}
-      <div className="md:hidden flex items-center gap-3 px-5 pt-12 pb-4" style={{ borderBottom: "1px solid var(--line)" }}>
-        <button onClick={onDone} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-xl -ml-1 hover:bg-[var(--ivory)] transition-colors">
-          <ArrowLeft className="w-5 h-5" style={{ color: "var(--plum)" }} />
-        </button>
-        <span style={{ fontFamily: "var(--serif)", fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05 }}>{titleText}</span>
-        <div className="ml-auto">{SaveButton}</div>
-      </div>
-
-      {/* Desktop header — back is the shell breadcrumb (§3.2 Zone A); Save on the right */}
-      <TabPageHeader>
-        <PageTitle title={titleText} compact />
-        <div className="ml-auto pb-1.5">{SaveButton}</div>
-      </TabPageHeader>
-
-      <div className="md:flex-1 md:overflow-y-auto">
-        {loading ? (
-          <div className="px-5 md:px-14 py-6 flex items-center justify-center"><Spinner /></div>
-        ) : (
-          <div className="px-5 md:px-14 py-6 w-full mx-auto flex flex-col gap-6" style={{ maxWidth: 640 }}>
+    <CentralModal onClose={onDone} title={titleText} footer={SaveButton} maxWidth={720} sheet>
+      {loading ? (
+        <div className="flex items-center justify-center" style={{ minHeight: 240 }}><Spinner /></div>
+      ) : (
+        <div className="flex flex-col gap-6">
             {error && (
               <div style={{ background: "rgba(62,21,64,0.08)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>{error}</div>
             )}
@@ -556,10 +540,9 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
                 </button>
               )}
             </div>
-          </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </CentralModal>
   )
 }
 
@@ -808,19 +791,16 @@ function StatusPill({ item }: { item: FormListItem }) {
 
 // ── Forms Tab ─────────────────────────────────────────────────────────────────
 
+// Only Responses is still a body-swap page (URL ?fresp). Create/Edit (builder)
+// and Fill are now CentralModals — no URL param, no breadcrumb detail crumb.
 type FormsView =
   | { mode: "list" }
-  | { mode: "builder"; formId: string | null }
   | { mode: "responses"; formId: string; title: string }
 
 function initialFormsView(): FormsView {
   if (typeof window === "undefined") return { mode: "list" }
   const p = new URLSearchParams(window.location.search)
-  const fedit = p.get("fedit")
-  const fbuild = p.get("fbuild")
   const fresp = p.get("fresp")
-  if (fedit) return { mode: "builder", formId: fedit }
-  if (fbuild === "new") return { mode: "builder", formId: null }
   if (fresp) return { mode: "responses", formId: fresp, title: "" }
   return { mode: "list" }
 }
@@ -833,22 +813,27 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
   const [showArchived, setShowArchived] = useState(false)
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
   const [view, setView] = useState<FormsView>(initialFormsView)
+  // Builder is a CentralModal overlaid on the list — component state, no URL.
+  const [builder, setBuilder] = useState<{ formId: string | null } | null>(null)
 
   function openBuilder(formId: string | null) {
-    setView({ mode: "builder", formId })
-    setParams({ fedit: formId ?? null, fbuild: formId ? null : "new", fresp: null })
-    onViewChange?.("detail", formId ? "Edit form" : "New form")
+    setBuilder({ formId })
+  }
+
+  function closeBuilder() {
+    setBuilder(null)
+    load()
   }
 
   function openResponses(formId: string, title: string) {
     setView({ mode: "responses", formId, title })
-    setParams({ fresp: formId, fedit: null, fbuild: null })
+    setParams({ fresp: formId })
     onViewChange?.("detail", title)
   }
 
   function backToList() {
     setView({ mode: "list" })
-    setParams({ fresp: null, fedit: null, fbuild: null })
+    setParams({ fresp: null })
     onViewChange?.("list")
     load()
   }
@@ -858,7 +843,6 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
   // backfill effect below announces the detail crumb then.)
   useEffect(() => {
     if (view.mode === "list") onViewChange?.("list")
-    else if (view.mode === "builder") onViewChange?.("detail", view.formId ? "Edit form" : "New form")
     else if (view.mode === "responses" && view.title) onViewChange?.("detail", view.title)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -925,10 +909,7 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
     await supabase.from("announcement_forms").delete().eq("id", item.id).eq("ministry_id", ministryId)
   }
 
-  // ── Body-swap dispatch ──
-  if (view.mode === "builder") {
-    return <FormBuilder ministryId={ministryId} userId={userId} formId={view.formId} onDone={backToList} />
-  }
+  // ── Body-swap dispatch (Responses only; builder is a modal overlay below) ──
   if (view.mode === "responses") {
     return (
       <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
@@ -990,6 +971,7 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
   }
 
   return (
+    <>
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile header — compact */}
       <div className="md:hidden px-5 pt-14 pb-5 flex items-end justify-between">
@@ -1051,5 +1033,10 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
         )}
       </div>
     </div>
+
+    {builder && (
+      <FormBuilder ministryId={ministryId} userId={userId} formId={builder.formId} onDone={closeBuilder} />
+    )}
+    </>
   )
 }

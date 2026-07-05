@@ -19,7 +19,7 @@ export const TAB_PARAMS: Record<Tab, string[]> = {
   give: [],
   profile: ["section", "jtab"],
   settings: ["stab"],
-  forms: ["fresp", "fbuild", "fedit"],
+  forms: ["fresp"],
   congregation: ["cq"],
   network: [],
 }
@@ -34,7 +34,7 @@ export const TAB_FOLDED_PARAMS: Record<Tab, string[]> = {
   plan: ["sotab", "ptab", "sgltab", "evtab", "week", "fsec", "notetab"],
   profile: ["section", "jtab"],
   settings: ["stab"],
-  forms: ["fresp", "fbuild", "fedit"],
+  forms: ["fresp"],
   congregation: ["cq"],
   network: [],
 }
