@@ -15,7 +15,7 @@ const SANS  = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
 
 type MyMinistry     = { id: string; name: string; university: string; role: string }
-type PublicMinistry = { id: string; name: string; university: string; size: string; location: string | null }
+type PublicMinistry = { id: string; name: string; university: string; size: string; location: string | null; is_public: boolean }
 type Tab = "browse" | "code"
 
 // ─── Avatar ──────────────────────────────────────────────────────
@@ -339,20 +339,35 @@ function MinistriesContent() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 16, fontWeight: 500, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</div>
                       <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 3 }}>
-                        {m.university}{m.size ? ` · ${SIZE_LABELS[m.size] ?? m.size}` : ""}
+                        {m.university}{m.size ? ` · ${SIZE_LABELS[m.size] ?? m.size}` : ""}{!m.is_public ? " · Private" : ""}
                       </div>
                     </div>
                     <div style={{ marginLeft: "auto", flexShrink: 0 }}>
-                      <button onClick={() => handleJoin(m)} disabled={joiningId === m.id} style={{
-                        padding: "10px 22px", border: "none", borderRadius: 10,
-                        background: joiningId === m.id ? "var(--line-2)" : "var(--plum-2)",
-                        color: joiningId === m.id ? "var(--faint)" : "var(--cream-on-dark)",
-                        fontFamily: SANS, fontSize: 14, fontWeight: 500,
-                        cursor: joiningId === m.id ? "not-allowed" : "pointer",
-                        transition: "opacity .12s ease",
-                      }}>
-                        {joiningId === m.id ? "Joining…" : "Join"}
-                      </button>
+                      {m.is_public ? (
+                        <button onClick={() => handleJoin(m)} disabled={joiningId === m.id} style={{
+                          padding: "10px 22px", border: "none", borderRadius: 10,
+                          background: joiningId === m.id ? "var(--line-2)" : "var(--plum-2)",
+                          color: joiningId === m.id ? "var(--faint)" : "var(--cream-on-dark)",
+                          fontFamily: SANS, fontSize: 14, fontWeight: 500,
+                          cursor: joiningId === m.id ? "not-allowed" : "pointer",
+                          transition: "opacity .12s ease",
+                        }}>
+                          {joiningId === m.id ? "Joining…" : "Join"}
+                        </button>
+                      ) : (
+                        /* Private ministry — discoverable, but code is the only door. */
+                        <button onClick={() => changeTab("code")} title="This ministry is private — joining requires an invite code" style={{
+                          padding: "10px 18px", borderRadius: 10,
+                          border: "1px solid var(--line-2)", background: "transparent",
+                          color: "var(--body)", fontFamily: SANS, fontSize: 13, fontWeight: 500,
+                          cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 7,
+                        }}>
+                          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                          </svg>
+                          Invite code
+                        </button>
+                      )}
                     </div>
                   </MinRow>
                 ))}
@@ -365,8 +380,8 @@ function MinistriesContent() {
                   {search
                     ? "No ministries match your search."
                     : myIds.size > 0
-                    ? "You've joined all available public ministries."
-                    : "No public ministries to show."}
+                    ? "You've joined all listed ministries."
+                    : "No ministries to show."}
                 </p>
                 {!search && myIds.size === 0 && (
                   <button type="button" onClick={() => changeTab("code")} style={{

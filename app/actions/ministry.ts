@@ -144,16 +144,21 @@ export async function joinMinistryByCode(
   return { ministryName: ministry.name, error: null }
 }
 
+// Browse listing: ALL active ministries, public and private. Private ministries
+// are discoverable by name (so students can find their church) but carry
+// is_public=false — the UI renders an "invite code" affordance instead of a
+// Join button, and joinMinistryById still hard-blocks private joins server-side
+// (code entry is the only private join path).
 export async function getPublicMinistries(search?: string): Promise<{
-  data: Array<{ id: string; name: string; university: string; size: string; location: string | null }> | null
+  data: Array<{ id: string; name: string; university: string; size: string; location: string | null; is_public: boolean }> | null
   error: string | null
 }> {
   const admin = createAdminClient()
   let query = admin
     .from("ministries")
-    .select("id, name, university, size, location")
-    .eq("is_public", true)
+    .select("id, name, university, size, location, is_public")
     .eq("status", "active")
+    .order("is_public", { ascending: false })
     .order("name")
 
   if (search?.trim()) {
