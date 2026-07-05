@@ -2486,9 +2486,12 @@ export function PlanTab({
       userId={userId}
       ministryId={ministryId}
       isAdmin={isAdmin}
-      // Gov-WRITE to THIS team (matrix = 'write'), mirroring the RLS
-      // auth_can_manage_team: gov-view admins get a read-only settings view.
-      govWrite={isGovernanceAdmin && openTeam.admin_access === "write"}
+      // Governance roster power — structure governance holds at view AND write
+      // (permissions.md §matrix), member or not. The old matrix-narrowed govWrite
+      // wrongly locked member-admins + the picker's assign-a-president flow to
+      // read-only (and the openTeam built by userTeamToTeam hardcodes
+      // admin_access:'view', making the old check always-false on that path).
+      isGovernanceAdmin={isGovernanceAdmin}
       onClose={closeSettings}
       onChanged={() => { closeSettings(); onTeamsChange() }}
       onOpenChat={onOpenChat}
@@ -10541,15 +10544,17 @@ async function fetchTeamSettings([, teamId]: readonly [string, string]) {
   return { roles, members }
 }
 
-export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite, onClose, onChanged, onOpenChat }: {
+export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGovernanceAdmin, onClose, onChanged, onOpenChat }: {
   team: Team
   userId: string
   ministryId: string
   isAdmin: boolean
-  // Governance-WRITE to this specific team: the caller is a governance admin AND
-  // the team's admin_access matrix grants 'write'. Mirrors the RLS
-  // auth_can_manage_team — gov-view (or a non-governing admin) is read-only here.
-  govWrite: boolean
+  // Governance roster power (permissions.md §matrix): a governance admin governs
+  // STRUCTURE (roster, roles, presidents, settings) at BOTH view and write —
+  // independent of whether they're also a team member, and independent of the
+  // domain matrix. Only DOMAIN content is write-gated (handled elsewhere).
+  // Mirrors the RLS auth_can_manage_team (view+write governance arm).
+  isGovernanceAdmin: boolean
   onClose: () => void
   onChanged: () => void
   onOpenChat?: (id: string, name: string, type?: string) => void
@@ -10597,9 +10602,11 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
   const isPresident = roles.some(r => r.id === myRoleId && r.is_president)
   const myRolePerms = roles.find(r => r.id === members.find(m => m.user_id === userId)?.role_id)?.permissions ?? []
   // Matches the RLS auth_can_manage_team exactly: this team's president, OR a
-  // member whose role grants can_manage_team, OR a governance admin the matrix
-  // grants WRITE on this team. Gov-view opens settings but sees it read-only.
-  const canManageTeam = isPresident || myRolePerms.includes("can_manage_team") || govWrite
+  // member whose role grants can_manage_team, OR a governance admin (roster) —
+  // whose STRUCTURE power holds at view AND write, member or not (the old
+  // govWrite gate wrongly demoted member-admins and the picker's
+  // assign-a-president flow to read-only).
+  const canManageTeam = isPresident || myRolePerms.includes("can_manage_team") || isGovernanceAdmin
   // Delete parity with auth_can_manage_team (same three arms as canManageTeam):
   // president, can_manage_team member, or gov-write. UI previously omitted the
   // can_manage arm, hiding the delete button from a member RLS would authorize.
