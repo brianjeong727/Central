@@ -31,6 +31,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--plum-2`      | `#2D0F2E` | Active breadcrumb text, identity hero gradient base (rare) — NOT a button fill (primary CTA fill is `--plum`, see §4.3) |
 | `--plum-deep`   | `#1B0A1E` | Hero gradient dark stop |
 | `--plum-light`  | `#4A1B4D` | Hero gradient light stop |
+| `--plum-tint`   | `#EDE3EE` | Soft plum-tinted pill/badge/panel background — the ONLY sanctioned light-plum surface |
 | `--ink`         | `#13101A` | Primary text |
 | `--body`        | `#5A5466` | Body text, sub-labels |
 | `--muted`       | `#8A8497` | Tertiary text, eyebrow mono, labels |

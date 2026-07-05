@@ -124,7 +124,7 @@ export function PlanFeatureCard({ icon, name, desc }: { icon: string; name: stri
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <p className="text-[14px] font-medium text-[var(--ink)]">{name}</p>
-            <span className="text-[10px] font-medium text-[var(--muted-text)] bg-[#F0EDE8] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 mt-0.5">
+            <span className="text-[10px] font-medium text-[var(--muted-text)] bg-[var(--body-bg)] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 mt-0.5">
               Soon
             </span>
           </div>
@@ -1609,7 +1609,7 @@ export function StudentOrgTeamHome({
               label="Resources"
               style={{ marginBottom: 24 }}
               action={userRosterRole && (
-                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}>
+                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--plum)", background: "var(--plum-tint)", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}>
                   {userRosterRole}
                 </span>
               )}
@@ -5449,11 +5449,11 @@ const PLAN_STATUS_PILL: Record<"planned" | "needsPlanning", React.CSSProperties>
 }
 
 const CATEGORY_CONFIG = {
-  welcoming: { label: "Welcoming", dot: "var(--plum)", bg: "#EDE5F0", text: "var(--plum)" },
+  welcoming: { label: "Welcoming", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--plum)" },
   retreat:   { label: "Retreat",   dot: "var(--body)", bg: "var(--body-bg)", text: "var(--plum)" },
   social:    { label: "Social",    dot: "var(--muted-text)", bg: "var(--cream-panel)", text: "var(--body)" },
-  service:   { label: "Service",   dot: "var(--plum)", bg: "#F0EDE8", text: "var(--plum)" },
-  regular:   { label: "Regular",   dot: "var(--muted-text)", bg: "#F3F0F7", text: "var(--body)" },
+  service:   { label: "Service",   dot: "var(--plum)", bg: "var(--body-bg)", text: "var(--plum)" },
+  regular:   { label: "Regular",   dot: "var(--muted-text)", bg: "var(--plum-tint)", text: "var(--body)" },
 } as const
 
 type EventTypeConfig = {
@@ -5466,7 +5466,7 @@ type EventTypeConfig = {
 
 const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
   welcome_week: {
-    label: "Welcome Week", icon: "🎉", dot: "var(--plum)", bg: "#EDE5F0", text: "var(--plum)",
+    label: "Welcome Week", icon: "🎉", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--plum)",
     budgetCategory: "welcoming_week", canHaveSubEvents: true,
     description: "Multi-day freshman welcome — Popsicle Socials, Game Night, Sports Day, Welcoming Night, Praise Night. Plan in June; reserve all venues in June.",
     defaultPhases: [
@@ -5672,7 +5672,7 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
     extraTabs: [],
   },
   ministry: {
-    label: "Ministry Event", icon: "🙏", dot: "var(--plum)", bg: "#F3F0F7", text: "var(--body)",
+    label: "Ministry Event", icon: "🙏", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--body)",
     budgetCategory: null, canHaveSubEvents: false,
     description: "Prayer Meeting (PM), Bible study, outreach (campus involvement fairs), or service events.",
     defaultPhases: [
@@ -5772,7 +5772,7 @@ export function MonthGrid({
                 minHeight: 80,
                 borderRight: idx % 7 !== 6 ? "1px solid var(--line-2)" : "none",
                 borderBottom: idx < cells.length - 7 ? "1px solid var(--line-2)" : "none",
-                background: day && isToday(day) ? "#F4F0F8" : "var(--cream-panel)",
+                background: day && isToday(day) ? "var(--plum-tint)" : "var(--cream-panel)",
                 padding: "4px 3px 3px",
                 position: "relative",
               }}
@@ -6407,7 +6407,7 @@ export function MinistryCalendar({
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* View toggle */}
-          <div style={{ display: "flex", background: "#F0EDE8", borderRadius: 8, padding: 2, gap: 2 }}>
+          <div style={{ display: "flex", background: "var(--body-bg)", borderRadius: 8, padding: 2, gap: 2 }}>
             <button
               onClick={() => setView("month")}
               style={{
@@ -6474,7 +6474,7 @@ export function MinistryCalendar({
             ].map((item) => {
               const cfg = CATEGORY_CONFIG[item.category]
               return (
-                <div key={item.title} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid #F0EDE8" }}>
+                <div key={item.title} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid var(--body-bg)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: cfg.dot, flexShrink: 0 }} />
                     <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</span>
@@ -6492,7 +6492,7 @@ export function MinistryCalendar({
               const isPlanned = plannedEventIds.has(ev.id)
               const dateStr = new Date(ev.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
               return (
-                <div key={ev.id} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid #F0EDE8" }}>
+                <div key={ev.id} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid var(--body-bg)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: cfg.dot, flexShrink: 0 }} />
                     <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</span>
@@ -10080,7 +10080,7 @@ function GroupGeneratorWizard({
 
             {/* Success message after SG confirm */}
             {sgConfirmResult && (
-              <div style={{ marginBottom: 20, padding: "12px 16px", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.2)", borderRadius: 10 }}>
+              <div style={{ marginBottom: 20, padding: "12px 16px", background: "color-mix(in srgb, var(--plum) 6%, transparent)", border: "1px solid rgba(62,21,64,0.2)", borderRadius: 10 }}>
                 <p style={{ fontSize: 13, color: "var(--plum)", fontWeight: 500, margin: 0 }}>{sgConfirmResult}</p>
                 <button onClick={onSaved} style={{ fontSize: 12, color: "var(--plum)", background: "none", border: "none", padding: 0, marginTop: 8, cursor: "pointer", fontWeight: 500 }}>Done →</button>
               </div>
@@ -10119,7 +10119,7 @@ function GroupGeneratorWizard({
                           <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{g.name}</p>
                           <span style={{
                             fontSize: 10, padding: "2px 8px", borderRadius: 999, fontWeight: 500,
-                            background: g.leader_gender === "male" ? "#E8F0FC" : g.leader_gender === "female" ? "#FCE8F0" : "#F0EDE8",
+                            background: g.leader_gender === "male" ? "#E8F0FC" : g.leader_gender === "female" ? "#FCE8F0" : "var(--body-bg)",
                             color: g.leader_gender === "male" ? "#2D5FA3" : g.leader_gender === "female" ? "#A32D5F" : "var(--muted-text)",
                           }}>
                             {g.leader_gender === "male" ? "Brothers" : g.leader_gender === "female" ? "Sisters" : "Group"}
@@ -10137,7 +10137,7 @@ function GroupGeneratorWizard({
                             style={{
                               display: "flex", alignItems: "center", gap: 8, padding: "7px 8px",
                               border: "1px solid var(--line)", borderRadius: 8,
-                              background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "var(--cream-panel)",
+                              background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "var(--body-bg)" : "var(--cream-panel)",
                               cursor: "grab",
                             }}
                           >
@@ -10194,7 +10194,7 @@ function GroupGeneratorWizard({
                             onDragEnd={() => { setDragSource(null); setDragOver(null) }}
                             style={{
                               display: "flex", alignItems: "center", gap: 8, padding: "7px 8px",
-                              border: "1px solid var(--line)", borderRadius: 8, background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "var(--cream-panel)",
+                              border: "1px solid var(--line)", borderRadius: 8, background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "var(--body-bg)" : "var(--cream-panel)",
                               cursor: "grab",
                             }}
                           >
@@ -12325,7 +12325,7 @@ function SmallGroupLeadersTab({
                           transition: "opacity 0.15s",
                         }}
                       >
-                        <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "#EDE5F5" : "var(--cream-3)", border: `1px solid ${isNext ? "#C9B8D4" : "var(--line)"}` }}>
+                        <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "var(--plum-tint)" : "var(--cream-3)", border: `1px solid ${isNext ? "#C9B8D4" : "var(--line)"}` }}>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase" as const }}>{dow}</span>
                           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: isNext ? "var(--plum)" : "var(--plum-2)", lineHeight: 1, marginTop: 1 }}>{dayNum}</span>
                         </div>
@@ -12336,7 +12336,7 @@ function SmallGroupLeadersTab({
                           </p>
                         </div>
                         {isNext && (
-                          <span style={{ fontSize: 10, fontWeight: 500, color: "var(--plum)", background: "#EDE5F5", border: "1px solid #C9B8D4", padding: "2px 8px", borderRadius: 999, letterSpacing: "0.05em", flexShrink: 0 }}>UP NEXT</span>
+                          <span style={{ fontSize: 10, fontWeight: 500, color: "var(--plum)", background: "var(--plum-tint)", border: "1px solid #C9B8D4", padding: "2px 8px", borderRadius: 999, letterSpacing: "0.05em", flexShrink: 0 }}>UP NEXT</span>
                         )}
                       </div>
                     )
@@ -12408,7 +12408,7 @@ function SmallGroupLeadersTab({
                             key={m.id}
                             onClick={() => setPendingRosterIds(prev => { const n = new Set(prev); selected ? n.delete(m.id) : n.add(m.id); return n })}
                             className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < arr.length - 1 ? "border-b border-[var(--line-3)]" : ""}`}
-                            style={{ background: selected ? "rgba(62,21,64,0.04)" : "transparent" }}
+                            style={{ background: selected ? "color-mix(in srgb, var(--plum) 4%, transparent)" : "transparent" }}
                           >
                             <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[12px] font-medium" />
                             <p className="flex-1 text-[13px] text-[var(--ink)]">{m.name}</p>
@@ -12504,7 +12504,7 @@ function SmallGroupLeadersTab({
                                 <IconButton dim={24} onClick={() => setConfirmRemoveSgMemberId(m.user_id)} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>
                               )
                             ) : (
-                              <button onClick={() => toggleMeal(m)} style={{ padding: "4px 10px", borderRadius: 8, cursor: "pointer", border: mealDone ? "none" : "1px solid var(--line-2)", background: mealDone ? "#EDE5F0" : "transparent", fontSize: 11, fontWeight: 500, color: mealDone ? "var(--plum)" : "var(--muted-text)", letterSpacing: "0.03em", textTransform: "uppercase" as const }}>
+                              <button onClick={() => toggleMeal(m)} style={{ padding: "4px 10px", borderRadius: 8, cursor: "pointer", border: mealDone ? "none" : "1px solid var(--line-2)", background: mealDone ? "var(--plum-tint)" : "transparent", fontSize: 11, fontWeight: 500, color: mealDone ? "var(--plum)" : "var(--muted-text)", letterSpacing: "0.03em", textTransform: "uppercase" as const }}>
                                 {mealDone ? "Meal ✓" : "Meal"}
                               </button>
                             )}
@@ -12515,10 +12515,10 @@ function SmallGroupLeadersTab({
                         const person = allMembersForPicker.find(p => p.id === uid)
                         if (!person) return null
                         return (
-                          <div key={uid} className="flex items-center gap-3 px-4 py-3 border-t border-[var(--line-3)]" style={{ background: "rgba(62,21,64,0.03)" }}>
+                          <div key={uid} className="flex items-center gap-3 px-4 py-3 border-t border-[var(--line-3)]" style={{ background: "color-mix(in srgb, var(--plum) 3%, transparent)" }}>
                             <MonogramChip initials={getInitials(person.name)} className="w-7 h-7 text-[11px] font-medium" />
                             <p className="flex-1 text-[14px] text-[var(--ink)]">{person.name}</p>
-                            <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: "0.05em", color: "var(--plum)", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px", marginRight: 4 }}>ADDING</span>
+                            <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: "0.05em", color: "var(--plum)", background: "color-mix(in srgb, var(--plum) 6%, transparent)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px", marginRight: 4 }}>ADDING</span>
                             <IconButton dim={24} onClick={() => setPendingAddMemberIds(prev => { const n = new Set(prev); n.delete(uid); return n })} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>
                           </div>
                         )
@@ -12765,7 +12765,7 @@ function SmallGroupLeadersTab({
                   <div className="flex items-center gap-2">
                     {(rotationPhase === "saved" || rotationPhase === "published") && (
                       <>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, background: rotationPhase === "published" ? "rgba(62,21,64,0.08)" : "var(--body-bg)", color: "var(--plum)", fontSize: 11, fontWeight: 500, letterSpacing: "0.02em" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, background: rotationPhase === "published" ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--body-bg)", color: "var(--plum)", fontSize: 11, fontWeight: 500, letterSpacing: "0.02em" }}>
                           {rotationPhase === "published" ? "Published" : "Draft"}
                         </span>
                         <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "6px 12px", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5 }}>
@@ -13315,7 +13315,7 @@ function BibleStudySubTab({
                     {!isPastor && isMe && !editingNote && (
                       <button
                         onClick={() => setEditingNote(true)}
-                        style={{ fontSize: 11, color: "var(--plum)", fontWeight: 500, background: "rgba(62,21,64,0.07)", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, fontFamily: "inherit", flexShrink: 0 }}
+                        style={{ fontSize: 11, color: "var(--plum)", fontWeight: 500, background: "color-mix(in srgb, var(--plum) 7%, transparent)", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, fontFamily: "inherit", flexShrink: 0 }}
                       >
                         {p.progress_note ? "Edit" : "Add note"}
                       </button>

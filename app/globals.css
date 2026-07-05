@@ -57,6 +57,7 @@
   --plum-2:      #2D0F2E;
   --plum-deep:   #1B0A1E;
   --plum-light:  #4A1B4D;
+  --plum-tint:   #EDE3EE;  /* soft plum-tinted pill/badge/panel background — the ONLY sanctioned light-plum surface */
 
   /* Text colors */
   --ink:         #13101A;
