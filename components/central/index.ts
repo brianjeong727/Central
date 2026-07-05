@@ -35,3 +35,4 @@ export {
 } from "./skeletons"
 export { CentralModal } from "./central-modal"
 export { ConfirmDialog } from "./confirm-dialog"
+export { SuperSwitcher } from "./super-switcher"

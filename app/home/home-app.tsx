@@ -30,7 +30,7 @@ import { BreadcrumbProvider, useBreadcrumbExtra } from "./breadcrumb-context"
 // the matching Item-2 skeleton where one exists, otherwise the shared Spinner.
 import { HomeTab } from "./tabs/home-tab"
 import { Spinner } from "./components/shared"
-import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, ProfileTabSkeleton, CentralModal } from "@/components/central"
+import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, ProfileTabSkeleton, CentralModal, SuperSwitcher } from "@/components/central"
 import type { CalendarEvent } from "./types"
 import type { DirectoryMember } from "./types"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
@@ -1312,6 +1312,9 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             </div>
         </CentralModal>
       )}
+
+      {/* Super-account POV switcher — renders only for the super (gated on id). */}
+      <SuperSwitcher profile={{ id: initialProfile.id, role: initialProfile.role }} />
     </div>
   )
 }
