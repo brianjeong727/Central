@@ -210,14 +210,26 @@ function ComposerImpl({
               <X className="w-4 h-4" />
             </button>
           </div>
-          <div className="overflow-y-auto h-[188px]">
+          <div className="overflow-y-auto h-[188px] flex flex-col">
             {gifLoading ? (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex items-center justify-center flex-1">
                 <div className="w-5 h-5 border-2 border-[var(--plum)] border-t-transparent rounded-full animate-spin" />
               </div>
             ) : gifResults.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-[13px] text-[var(--muted-text)]">No GIFs found</p>
+              /* Empty state = the announcement. One prominent card explaining why
+                 there's nothing here, instead of a mumbled "No GIFs found". */
+              <div className="flex items-center justify-center flex-1 px-6">
+                <div style={{ background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 28px", textAlign: "center", maxWidth: 360 }}>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>
+                    Coming soon
+                  </div>
+                  <div style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.15, marginBottom: 6 }}>
+                    Custom GIFs
+                  </div>
+                  <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.55, margin: 0 }}>
+                    GIF search isn&apos;t live yet — a custom GIF library for your ministry is on the way.
+                  </p>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-1 p-1">
