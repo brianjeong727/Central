@@ -43,7 +43,7 @@ function Wordmark({ tone = "ink" }: { tone?: "ink" | "plum" }) {
 }
 
 // ─── data ────────────────────────────────────────────────────────
-type Ministry ={ id: string; name: string; university: string; size: string; location: string | null }
+type Ministry = { id: string; name: string; university: string; size: string; location: string | null; is_public: boolean }
 type Tab = "browse" | "code"
 
 function JoinContent() {
@@ -306,7 +306,7 @@ function JoinContent() {
                     </div>
                     <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>No ministries found</p>
                     <p style={{ fontSize: 13, color: "var(--muted-text)", textAlign: "center" }}>
-                      {search ? "Try a different search." : "Your ministry might be private."}
+                      {search ? "Try a different search." : "Can't find your ministry? Ask a leader for an invite code."}
                     </p>
                     {!search && (
                       <button type="button" onClick={() => setTab("code")} style={{
@@ -325,7 +325,11 @@ function JoinContent() {
                       const isSelected = selected?.id === m.id
                       const isMember = myMinistryIds.has(m.id)
                       return (
-                        <button key={m.id} onClick={() => { setSelected(isSelected ? null : m); setConfirmError(null) }} style={{
+                        <button key={m.id} onClick={() => {
+                          // Private ministry (non-member): code is the only door — route to the invite-code tab.
+                          if (!m.is_public && !isMember) { setTab("code"); return }
+                          setSelected(isSelected ? null : m); setConfirmError(null)
+                        }} style={{
                           display: "flex", alignItems: "center", gap: 16, borderRadius: 14,
                           padding: "16px 18px", textAlign: "left", width: "100%", cursor: "pointer",
                           border: `1px solid ${isSelected ? "var(--plum)" : "var(--line-2)"}`,
@@ -337,9 +341,9 @@ function JoinContent() {
                             style={{ width: 44, height: 44, fontFamily: SERIF, fontSize: 17, fontWeight: 400 }}
                           />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
+                            <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
                             <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {m.university} · {SIZE_LABELS[m.size] ?? m.size}
+                              {m.university} · {SIZE_LABELS[m.size] ?? m.size}{!m.is_public ? " · Private" : ""}
                             </p>
                           </div>
                           {isMember && (
@@ -348,7 +352,20 @@ function JoinContent() {
                               background: "var(--ivory)", color: "var(--plum)", fontSize: 12, fontWeight: 500,
                             }}>Member</span>
                           )}
-                          <Icon d="M9 18l6-6-6-6" size={16} stroke={1.5}/>
+                          {!m.is_public && !isMember ? (
+                            <span style={{
+                              display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0,
+                              padding: "3px 10px", borderRadius: 999,
+                              border: "1px solid var(--line-2)", color: "var(--muted-text)", fontSize: 12, fontWeight: 500,
+                            }}>
+                              <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                              </svg>
+                              Invite code
+                            </span>
+                          ) : (
+                            <Icon d="M9 18l6-6-6-6" size={16} stroke={1.5}/>
+                          )}
                         </button>
                       )
                     })}
