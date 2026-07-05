@@ -7,14 +7,10 @@ import { createClient, siteOrigin } from "@/lib/supabase"
 import { Spinner } from "@/app/home/components/shared"
 import { signUpWithAutoConfirm } from "@/app/actions/auth"
 import { SplitShell, GoogleButton, OrDivider, EyeButton } from "@/app/(auth)/shared"
+import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 
 const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
-
-const mono: React.CSSProperties = {
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
-}
 const serif: React.CSSProperties = { fontFamily: SERIF, fontWeight: 400, color: "var(--ink)", margin: 0 }
 
 type View = "role-choice" | "admin" | "member"
@@ -56,7 +52,7 @@ function Field({ label, hint, helper, value, onChange, placeholder, type = "text
         />
         {trailing}
       </div>
-      {helper && <div style={{ fontSize: 12, color: "#A09A8C", marginTop: 8 }}>{helper}</div>}
+      {helper && <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 8 }}>{helper}</div>}
     </label>
   )
 }
@@ -69,7 +65,7 @@ function Primary({ children, disabled, loading, onClick }: {
     <button type={onClick ? "button" : "submit"} disabled={disabled} onClick={onClick} style={{
       width: "100%", padding: "14px 22px", borderRadius: 12, border: "none",
       background: disabled ? "var(--line-2)" : "var(--plum-2)",
-      color: disabled ? "#A09A8C" : "var(--cream-panel)",
+      color: disabled ? "var(--faint)" : "var(--cream-panel)",
       fontSize: 15, fontWeight: 500, fontFamily: SANS,
       cursor: disabled ? "not-allowed" : "pointer", letterSpacing: "0.01em",
       transition: "background .15s",
@@ -148,7 +144,7 @@ function PathRow({ icon, iconBg, iconFg, title, body, onClick }: {
         <span style={{ display: "block", fontFamily: SANS, fontSize: 19, fontWeight: 500, color: "var(--ink)", lineHeight: 1.2 }}>{title}</span>
         <span style={{ display: "block", fontSize: 14, color: "var(--body)", marginTop: 3, lineHeight: 1.5 }}>{body}</span>
       </span>
-      <Icon d="M9 6l6 6-6 6" size={18} style={{ color: "#A09A8C" }}/>
+      <Icon d="M9 6l6 6-6 6" size={18} style={{ color: "var(--faint)" }}/>
     </button>
   )
 }
@@ -156,7 +152,7 @@ function PathRow({ icon, iconBg, iconFg, title, body, onClick }: {
 // ─── error banner ──────────────────────────────────────────────
 function ErrorBanner({ msg }: { msg: string }) {
   return (
-    <div style={{ borderRadius: 10, background: "rgba(220,38,38,0.07)", border: "1px solid rgba(220,38,38,0.15)", padding: "10px 14px", fontSize: 13, color: "#B91C1C", fontWeight: 500, display: "flex", gap: 8 }} role="alert">
+    <div style={{ borderRadius: 10, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 18%, transparent)", padding: "10px 14px", fontSize: 13, color: "var(--danger)", fontWeight: 500, display: "flex", gap: 8 }} role="alert">
       <span style={{ flexShrink: 0 }}>⚠</span> {msg}
     </div>
   )

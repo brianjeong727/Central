@@ -2,14 +2,10 @@
 
 import Link from "next/link"
 import { RingCrossLogo } from "@/app/home/components/shared"
+import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 
 const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
-
-const mono: React.CSSProperties = {
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
-}
 
 // ── AuthPhotoPanel ─────────────────────────────────────────────
 // Sticky grid item — must be a direct child of SplitShell's grid.
@@ -118,9 +114,9 @@ export function GoogleButton({ onClick }: { onClick: () => void }) {
 // No built-in margin — callers control vertical spacing.
 export function OrDivider() {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 16, color: "#A09A8C" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 16, color: "var(--faint)" }}>
       <span style={{ flex: 1, height: 1, background: "var(--line)" }}/>
-      <span style={{ ...mono, color: "#A09A8C", textTransform: "lowercase", letterSpacing: "0.06em" }}>or</span>
+      <span style={{ ...mono, color: "var(--faint)", textTransform: "lowercase", letterSpacing: "0.06em" }}>or</span>
       <span style={{ flex: 1, height: 1, background: "var(--line)" }}/>
     </div>
   )

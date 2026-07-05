@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Check, X, Clock, Users, MapPin, Building2, LogOut } from "lucide-react"
 import { getPendingMinistries, approveMinistry, rejectMinistry } from "@/app/actions/ministry"
 import { createClient } from "@/lib/supabase"
+import { SIZE_LABELS } from "@/app/join/post-join-pickers"
 import { PlanLineIcon } from "@/app/home/components/shared"
 import { teamIconKey } from "@/app/home/workspace-presets"
 
@@ -20,11 +21,6 @@ type Ministry = {
   teams: Array<{ name: string; icon: string | null }>
 }
 
-const SIZE_LABELS: Record<string, string> = {
-  small: "Under 50",
-  medium: "50–100",
-  large: "100+",
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })

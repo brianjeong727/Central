@@ -8,19 +8,11 @@ import { getUserMinistries, getPublicMinistries, joinMinistryById, joinMinistryB
 import { Spinner, RingCrossLogo } from "@/app/home/components/shared"
 import { MonogramChip } from "@/components/central/MonogramChip"
 import { PlanSubTabStrip } from "@/components/central/plan-sub-tab-strip"
-import { usePostJoinPickers, PostJoinPickerModals } from "@/app/join/post-join-pickers"
+import { usePostJoinPickers, PostJoinPickerModals, SIZE_LABELS } from "@/app/join/post-join-pickers"
+import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 
 const SANS  = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
-
-const mono: React.CSSProperties = {
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
-}
-
-const SIZE_LABELS: Record<string, string> = {
-  small: "Under 50", medium: "50–100", large: "100+",
-}
 
 type MyMinistry     = { id: string; name: string; university: string; role: string }
 type PublicMinistry = { id: string; name: string; university: string; size: string; location: string | null }

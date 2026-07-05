@@ -5,14 +5,10 @@ import Link from "next/link"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { SplitShell } from "@/app/(auth)/shared"
+import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 
 const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
-
-const mono: React.CSSProperties = {
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
-}
 const serif: React.CSSProperties = { fontFamily: SERIF, fontWeight: 400, color: "var(--ink)", margin: 0 }
 
 export default function ForgotPasswordPage() {

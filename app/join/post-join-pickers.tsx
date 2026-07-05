@@ -25,6 +25,13 @@ const GENDERS = [
   { value: "female", label: "Female" },
 ] as const
 
+// Ministry-size display labels — shared by /join and /ministries.
+export const SIZE_LABELS: Record<string, string> = {
+  small: "Under 50",
+  medium: "50–100",
+  large: "100+",
+}
+
 // Shared modal primary button — also used by /join's staff-role modal.
 export function ModalAction({ children, onClick, disabled }: {
   children: React.ReactNode; onClick?: () => void; disabled?: boolean
@@ -33,7 +40,7 @@ export function ModalAction({ children, onClick, disabled }: {
     <button type="button" onClick={disabled ? undefined : onClick} disabled={disabled} style={{
       width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
       background: disabled ? "var(--line-2)" : "var(--plum-2)",
-      color: disabled ? "#A09A8C" : "var(--cream-panel)",
+      color: disabled ? "var(--faint)" : "var(--cream-panel)",
       fontSize: 15, fontWeight: 500, fontFamily: SANS,
       cursor: disabled ? "not-allowed" : "pointer",
       transition: "background .15s ease",

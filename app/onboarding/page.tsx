@@ -5,14 +5,10 @@ import Link from "next/link"
 import { submitMinistryApplication } from "@/app/actions/ministry"
 import { RingCrossLogo, PlanLineIcon } from "@/app/home/components/shared"
 import { WORKSPACE_PRESETS } from "@/app/home/workspace-presets"
+import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 
 const SANS  = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
-
-const mono: React.CSSProperties = {
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
-}
 
 // ─── Rail stepper ────────────────────────────────────────────────
 const STEPS = [
@@ -546,8 +542,8 @@ export default function OnboardingPage() {
 
               {error && (
                 <div style={{
-                  borderRadius: 10, background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.15)",
-                  padding: "12px 16px", fontSize: 13, color: "#B91C1C", fontWeight: 500, marginBottom: 16,
+                  borderRadius: 10, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 18%, transparent)",
+                  padding: "12px 16px", fontSize: 13, color: "var(--danger)", fontWeight: 500, marginBottom: 16,
                 }}>{error}</div>
               )}
 

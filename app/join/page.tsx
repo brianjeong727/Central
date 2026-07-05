@@ -8,17 +8,13 @@ import { Spinner } from "@/app/home/components/shared"
 import { MonogramChip } from "@/components/central/MonogramChip"
 import { PlanSubTabStrip } from "@/components/central/plan-sub-tab-strip"
 import { getInitials } from "@/app/home/utils"
-import { usePostJoinPickers, PostJoinPickerModals, ModalAction } from "./post-join-pickers"
+import { usePostJoinPickers, PostJoinPickerModals, ModalAction, SIZE_LABELS } from "./post-join-pickers"
 import { CentralModal } from "@/components/central"
+import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 
 // ─── design tokens ──────────────────────────────────────────────
 const SANS = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
-
-const mono: React.CSSProperties = {
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
-}
 
 function Icon({ d, size = 16, stroke = 1.5 }: { d: string; size?: number; stroke?: number }) {
   return (
@@ -47,13 +43,7 @@ function Wordmark({ tone = "ink" }: { tone?: "ink" | "plum" }) {
 }
 
 // ─── data ────────────────────────────────────────────────────────
-const SIZE_LABELS: Record<string, string> = {
-  small: "Under 50",
-  medium: "50–100",
-  large: "100+",
-}
-
-type Ministry = { id: string; name: string; university: string; size: string; location: string | null }
+type Ministry ={ id: string; name: string; university: string; size: string; location: string | null }
 type Tab = "browse" | "code"
 
 function JoinContent() {
@@ -375,7 +365,7 @@ function JoinContent() {
                 <button onClick={handleBrowseJoin} disabled={!selected || confirming || !!switching} style={{
                   width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
                   background: (!selected || confirming || !!switching) ? "var(--line-2)" : "var(--plum-2)",
-                  color: (!selected || confirming || !!switching) ? "#A09A8C" : "var(--cream-panel)",
+                  color: (!selected || confirming || !!switching) ? "var(--faint)" : "var(--cream-panel)",
                   fontSize: 15, fontWeight: 500, fontFamily: SANS,
                   cursor: (!selected || confirming || !!switching) ? "not-allowed" : "pointer",
                   transition: "background .15s ease",
@@ -425,7 +415,7 @@ function JoinContent() {
               <button type="submit" disabled={joining || inviteCode.trim().length < 4} style={{
                 width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
                 background: (joining || inviteCode.trim().length < 4) ? "var(--line-2)" : "var(--plum-2)",
-                color: (joining || inviteCode.trim().length < 4) ? "#A09A8C" : "var(--cream-panel)",
+                color: (joining || inviteCode.trim().length < 4) ? "var(--faint)" : "var(--cream-panel)",
                 fontSize: 15, fontWeight: 500, fontFamily: SANS,
                 cursor: (joining || inviteCode.trim().length < 4) ? "not-allowed" : "pointer",
                 transition: "background .15s ease",
