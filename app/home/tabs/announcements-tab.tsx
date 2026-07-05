@@ -346,7 +346,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           <p style={monoStyle}>Options</p>
           <div className="flex items-start gap-3">
             <button type="button" onClick={() => setIsEvent((v) => !v)} style={{ width: 34, height: 20, borderRadius: 999, background: isEvent ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}>
-              <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: isEvent ? "16px" : "2px" }} />
+              <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.2s", left: isEvent ? "16px" : "2px" }} />
             </button>
             <div>
               <p className="text-[13px] font-medium text-[var(--ink)]">This is an event</p>
@@ -364,7 +364,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
               </div>
               <div className="flex items-start gap-3">
                 <button type="button" onClick={() => setShowAttendees((v) => !v)} style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}>
-                  <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
+                  <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
                 </button>
                 <div>
                   <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
@@ -479,7 +479,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                 onClick={() => setIsEvent((v) => !v)}
                 style={{ width: 34, height: 20, borderRadius: 999, background: isEvent ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
               >
-                <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: isEvent ? "16px" : "2px" }} />
+                <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.2s", left: isEvent ? "16px" : "2px" }} />
               </button>
               <div>
                 <p className="text-[13px] font-medium text-[var(--ink)]">This is an event</p>
@@ -501,7 +501,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                     onClick={() => setShowAttendees((v) => !v)}
                     style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
                   >
-                    <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
+                    <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
                   </button>
                   <div>
                     <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
@@ -1116,7 +1116,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
               /* Editorial 2-col cards */
               <div className="grid gap-5" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 {filteredDesktop.map((ann) => (
-                  <article key={ann.id} className="rounded-2xl border border-[var(--line)] bg-[var(--cream)] overflow-hidden hover:shadow-[0_2px_8px_rgba(19,16,26,0.06)] transition-shadow duration-200">
+                  <article key={ann.id} className="rounded-2xl border border-[var(--line)] bg-[var(--cream)] overflow-hidden">
                     <div style={{ padding: "26px 28px 22px" }}>
                       <div className="flex justify-between items-center mb-4">
                         <span style={MONO_STYLE}>{formatDate(ann.created_at)}</span>
@@ -1237,7 +1237,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
   if (featured) {
     return (
       <>
-        <div className="relative rounded-[22px] bg-[var(--plum)] overflow-hidden shadow-[0_2px_8px_rgba(19,16,26,0.08)]">
+        <div className="relative rounded-[22px] bg-[var(--plum)] overflow-hidden">
           <div className="absolute -top-[70px] -right-[70px] w-[220px] h-[220px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.18)_0%,transparent_70%)] pointer-events-none" />
 
           {announcement.image_url && (
@@ -1266,7 +1266,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
                       <MoreHorizontal className="w-4 h-4 text-[rgba(246,244,239,0.6)]" />
                     </button>
                     {showMenu && (
-                      <div className="absolute top-8 right-0 z-[10] bg-[var(--cream-panel)] rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[var(--line)] py-1 min-w-[140px]">
+                      <div className="absolute top-8 right-0 z-[10] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] py-1 min-w-[140px]">
                         <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left">
                           {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />}
                           {announcement.is_pinned ? "Unpin hero" : "Pin as hero"}
@@ -1338,7 +1338,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
   // ── Ivory card ──
   return (
     <>
-      <div className="relative rounded-[22px] bg-[var(--cream)] border border-[var(--line)] overflow-hidden shadow-[0_1px_4px_rgba(19,16,26,0.06)]">
+      <div className="relative rounded-[22px] bg-[var(--cream)] border border-[var(--line)] overflow-hidden">
         {announcement.image_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={announcement.image_url} alt={announcement.title} className="w-full h-36 object-cover" />
@@ -1359,7 +1359,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
                   <MoreHorizontal className="w-4 h-4 text-[var(--muted-text)]" />
                 </button>
                 {showMenu && (
-                  <div className="absolute top-8 right-0 z-[10] bg-[var(--cream-panel)] rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[var(--line)] py-1 min-w-[140px]">
+                  <div className="absolute top-8 right-0 z-[10] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] py-1 min-w-[140px]">
                     <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left">
                       {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />}
                       {announcement.is_pinned ? "Unpin" : "Pin"}

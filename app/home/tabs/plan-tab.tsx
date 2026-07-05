@@ -6466,8 +6466,7 @@ export function MinistryCalendar({
                 background: view === "month" ? "var(--cream-panel)" : "transparent",
                 border: "none", cursor: "pointer", fontSize: 12, color: view === "month" ? "var(--ink)" : "var(--muted-text)",
                 fontWeight: view === "month" ? 500 : 400,
-                boxShadow: view === "month" ? "0 1px 3px rgba(19,16,26,0.08)" : "none",
-              }}
+                              }}
             >
               <Grid3x3 className="w-3 h-3" /> Month
             </button>
@@ -6478,8 +6477,7 @@ export function MinistryCalendar({
                 background: view === "list" ? "var(--cream-panel)" : "transparent",
                 border: "none", cursor: "pointer", fontSize: 12, color: view === "list" ? "var(--ink)" : "var(--muted-text)",
                 fontWeight: view === "list" ? 500 : 400,
-                boxShadow: view === "list" ? "0 1px 3px rgba(19,16,26,0.08)" : "none",
-              }}
+                              }}
             >
               <List className="w-3 h-3" /> List
             </button>
@@ -11406,7 +11404,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
                                   >
                                     <p style={{ flex: 1, fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{PERMISSION_LABELS[perm]}</p>
                                     <div style={{ width: 38, height: 22, borderRadius: 999, background: on ? "var(--plum)" : "var(--line)", position: "relative", flexShrink: 0, transition: "background 0.15s" }}>
-                                      <div style={{ position: "absolute", top: 3, left: on ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 3px rgba(0,0,0,0.15)", transition: "left 0.15s" }} />
+                                      <div style={{ position: "absolute", top: 3, left: on ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.15s" }} />
                                     </div>
                                   </div>
                                 )

@@ -34,8 +34,7 @@ export function LazyEmojiPicker({
       <div
         style={{
           width: 280, height: 56, display: "flex", alignItems: "center", justifyContent: "center",
-          background: "var(--cream)", border: "1px solid var(--line)", borderRadius: "var(--r-card)",
-          boxShadow: "0 8px 30px color-mix(in srgb, var(--ink) 12%, transparent)",
+          background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: "var(--r-card)",
         }}
       >
         <div style={{ width: 18, height: 18, borderRadius: "50%", border: "2px solid var(--line)", borderTopColor: "var(--plum)", animation: "spin 0.7s linear infinite" }} />
@@ -243,7 +242,7 @@ function MessageRowBase({
           </div>
         )}
         <div className="flex flex-col items-center mt-4 mb-1">
-          <div className="w-full max-w-[290px] bg-[var(--cream-panel)] border border-[var(--line)] rounded-2xl overflow-hidden shadow-sm">
+          <div className="w-full max-w-[290px] bg-[var(--cream-panel)] border border-[var(--line)] rounded-2xl overflow-hidden">
             {poll ? (
               <>
                 {/* Card header */}
@@ -262,7 +261,7 @@ function MessageRowBase({
                         <MoreHorizontal className="w-3.5 h-3.5 text-[var(--muted-text)]" />
                       </button>
                       {isPollMenuOpen && (
-                        <div className="absolute right-0 top-8 z-[160] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] shadow-lg overflow-hidden min-w-[130px]">
+                        <div className="absolute right-0 top-8 z-[160] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] overflow-hidden min-w-[130px]">
                           <button
                             onClick={() => onDeletePoll(msg.id, msg.poll_id!)}
                             className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-red-500 hover:bg-[#FEF2F2] transition-colors"
@@ -380,7 +379,7 @@ function MessageRowBase({
             className={`absolute z-[160] ${placeBelow ? "top-[calc(100%-4px)]" : "bottom-[calc(100%-4px)]"} ${isOwn ? "right-0" : "left-0"}`}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <div className="bg-[var(--cream-panel)] rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-[#EFEFEF] px-3 py-2.5 flex gap-3 items-center">
+            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[#EFEFEF] px-3 py-2.5 flex gap-3 items-center">
               {REACTION_EMOJIS.map((emoji) => (
                 <button
                   key={emoji}
@@ -421,7 +420,7 @@ function MessageRowBase({
             className={`absolute z-[160] ${placeBelow ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <div className="bg-[var(--cream-panel)] rounded-2xl shadow-lg border border-[#EFEFEF] overflow-hidden min-w-[160px]">
+            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] overflow-hidden min-w-[160px]">
               {!msg.deleted && (
                 <div className="flex gap-3 items-center px-3 py-2.5 border-b border-[#F3EDE6]">
                   {REACTION_EMOJIS.map((emoji) => (

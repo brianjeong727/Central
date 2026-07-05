@@ -111,7 +111,7 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
-        className="w-full max-w-[560px] mx-4 rounded-2xl overflow-hidden shadow-[0_24px_64px_rgba(19,16,26,0.22)]"
+        className="w-full max-w-[560px] mx-4 rounded-2xl overflow-hidden"
         style={{ background: "var(--cream-panel)", border: "1px solid var(--line)" }}
       >
         {/* Search input */}

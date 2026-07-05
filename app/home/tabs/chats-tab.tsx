@@ -102,14 +102,14 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
 
   return (
     <div className="fixed inset-0 z-[60] bg-[var(--cream-panel)] flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
-      <div className="flex flex-col w-full h-full bg-[var(--cream-panel)] md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
+      <div className="flex flex-col w-full h-full bg-[var(--cream-panel)] md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:border md:border-[var(--line)] md:overflow-hidden">
 
         {/* Header */}
         <div className="flex-shrink-0 border-b border-[var(--line)]">
           <div className="flex items-center justify-between px-5 pt-12 pb-3 md:pt-6">
             <button
               onClick={onClose}
-              className="size-9 bg-[var(--cream-panel)] border border-[var(--line)] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]"
+              className="size-9 bg-[var(--cream-panel)] border border-[var(--line)] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
             >
               <X className="w-4 h-4 text-[var(--ink)]" />
             </button>
@@ -138,7 +138,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
           {/* Chat name — adapts to selection state */}
           {noMembers && (
             // No members selected: show traditional name input (needed for church chats)
-            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
+            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] px-4 pt-4 pb-4">
               <label className="text-[10px] font-semibold text-[var(--muted-text)] tracking-wider uppercase block mb-2">Chat Name</label>
               <input
                 type="text"
@@ -153,7 +153,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
 
           {isGroup && (
             // 2+ members: show auto-name with optional edit link
-            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
+            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] px-4 pt-4 pb-4">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-[10px] font-semibold text-[var(--muted-text)] tracking-wider uppercase">Chat Name</label>
                 <button
@@ -197,7 +197,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search members…"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[var(--faint)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 border border-[var(--line)] focus:border-[var(--plum)]/30 transition-all shadow-[0_1px_2px_rgba(19,16,26,0.04)]"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[var(--faint)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 border border-[var(--line)] focus:border-[var(--plum)]/30 transition-all"
               />
             </div>
 
@@ -218,7 +218,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
               </div>
             )}
 
-            <div className="flex flex-col rounded-2xl border border-[var(--line)] bg-[var(--cream-panel)] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+            <div className="flex flex-col rounded-2xl border border-[var(--line)] bg-[var(--cream-panel)] overflow-hidden">
               {filtered.length === 0 ? (
                 <p className="text-center text-[13px] text-[var(--muted-text)]/50 py-8">No members found</p>
               ) : (
@@ -236,7 +236,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                       <MonogramChip
                         initials={getInitials(member.name)}
                         avatarUrl={member.avatar_url}
-                        className="w-9 h-9 font-bold text-[11px] shadow-sm"
+                        className="w-9 h-9 font-bold text-[11px]"
                         style={{ fontFamily: "var(--font-instrument-serif)" }}
                       />
                       <div className="flex-1 min-w-0">

@@ -84,7 +84,6 @@ export function FilterDropdown({
             background: "var(--cream)",
             border: "1px solid var(--line)",
             borderRadius: "var(--r-card)",
-            boxShadow: "0 4px 14px rgba(19,16,26,0.12)",
             padding: 4,
             transformOrigin: align === "right" ? "top right" : "top left",
             transform: shown ? "scale(1)" : "scale(0.96)",
