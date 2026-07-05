@@ -143,3 +143,29 @@ CREATE POLICY "Users can insert their own answers"
       WHERE id = form_answers.response_id AND user_id = auth.uid()
     )
   );
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 2026-07-04  forms-first-class redesign (applied via MCP)
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Forms became first-class objects: created on their own page in the Forms tab,
+-- listed with a status, then ATTACHED to an announcement via a picker. A form now
+-- belongs to 0-or-1 announcement (was: born inside an announcement, exactly 1).
+-- The three statements below were executed directly against the live DB (Supabase
+-- MCP), NOT run from this file — recorded here so the file reflects live schema.
+
+-- announcement_id is now NULLABLE (a form can exist unattached / "Draft").
+ALTER TABLE announcement_forms ALTER COLUMN announcement_id DROP NOT NULL;
+
+-- Deleting an announcement DETACHES its form (keep the form + its responses)
+-- instead of cascade-deleting it. The UNIQUE(announcement_id) constraint stays
+-- (Postgres allows many NULLs), so 0-or-1 attachment is still enforced.
+ALTER TABLE announcement_forms DROP CONSTRAINT announcement_forms_announcement_id_fkey;
+ALTER TABLE announcement_forms
+  ADD CONSTRAINT announcement_forms_announcement_id_fkey
+  FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE SET NULL;
+
+-- A form now carries its own title (independent of any announcement) and can be
+-- archived out of the active list. Existing rows were backfilled: title <- the
+-- attached announcement's title; archived <- false.
+ALTER TABLE announcement_forms ADD COLUMN IF NOT EXISTS title    TEXT;
+ALTER TABLE announcement_forms ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false;
