@@ -5918,73 +5918,6 @@ export function TimelineView({
   )
 }
 
-export function EventDetailPopover({
-  event,
-  canEdit,
-  userId,
-  onClose,
-  onDelete,
-  onPlan,
-}: {
-  event: CalendarEvent
-  canEdit: boolean
-  userId: string
-  onClose: () => void
-  onDelete: (id: string) => void
-  onPlan: (ev: CalendarEvent) => void
-}) {
-  const cfg = getEventConfig(event)
-  const startDate = new Date(event.start_date)
-  const endDate = new Date(event.end_date)
-
-  const dateStr = event.all_day
-    ? startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-    : startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) +
-      " · " + startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
-      " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-
-  return (
-    <CentralModal
-      onClose={onClose}
-      title={event.title}
-      maxWidth={480}
-      z={200}
-      footer={
-        <>
-          {(canEdit || event.created_by === userId) && (
-            <button
-              onClick={() => onDelete(event.id)}
-              style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--line)", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, color: "var(--danger)" }}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Delete event
-            </button>
-          )}
-          <CentralButton
-            variant="primary" size="sm"
-            onClick={() => onPlan(event)}
-          >
-            Plan this event →
-          </CentralButton>
-        </>
-      }
-    >
-      <div style={{ marginBottom: 12 }}>
-        <span style={{ fontSize: 11, fontWeight: 500, color: cfg.text, background: cfg.bg, padding: "3px 10px", borderRadius: 9999 }}>
-          {cfg.label}
-        </span>
-      </div>
-      <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 6px" }}>{dateStr}</p>
-      {event.location && (
-        <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 12px" }}>📍 {event.location}</p>
-      )}
-      {event.description && (
-        <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.6, margin: 0 }}>{event.description}</p>
-      )}
-    </CentralModal>
-  )
-}
-
 export function AddEventModal({
   ministryId,
   teamId,
@@ -6391,14 +6324,9 @@ export function MinistryCalendar({
   const plannedEventIds = calData?.plannedIds ?? EMPTY_ID_SET
   const tableReady = calData?.tableReady ?? true
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [planningEvent, setPlanningEvent] = useState<CalendarEvent | null>(null)
-
-  async function handleDelete(id: string) {
-    await supabase.from("calendar_events").delete().eq("id", id)
-    void mutateCal()
-  }
+  const [showEditEvent, setShowEditEvent] = useState(false)
 
   // Event planning view — replaces the calendar while an event is open.
   // SubpageShell consumes the page body (cream, in-content) and supplies the
@@ -6408,9 +6336,10 @@ export function MinistryCalendar({
   // dedupes the team crumb against the shell-resolved trail (planningEvent is
   // local to MinistryCalendar, invisible to getShellCrumbs). key={planningEvent.id}
   // re-inits the workspace to Overview per event. EventPlanWorkspace runs `bare`
-  // so its own px doesn't double-pad under the shell. No onEditEvent — MinistryCalendar
-  // has no edit-event flow (AddEventModal here is create-only), so the gated
-  // "Edit event" button simply won't render.
+  // so its own px doesn't double-pad under the shell. onEditEvent opens the
+  // AddEventModal in edit mode — this is where "Edit event" AND delete-event now
+  // live (per §4.14/§8: click navigates to the plan directly, no intermediate
+  // modal; the removed EventDetailPopover's delete affordance is preserved here).
   if (planningEvent) {
     return (
       <SubpageShell crumbs={[{ label: teamName, onClick: () => setPlanningEvent(null) }, { label: planningEvent.title }]} title={planningEvent.title} width="full">
@@ -6425,7 +6354,27 @@ export function MinistryCalendar({
           teamId={teamId}
           onClose={() => setPlanningEvent(null)}
           onOpenChat={onOpenChat}
+          onEditEvent={() => setShowEditEvent(true)}
         />
+        {showEditEvent && (
+          <AddEventModal
+            ministryId={ministryId}
+            teamId={teamId}
+            userId={userId}
+            existing={planningEvent}
+            onClose={() => setShowEditEvent(false)}
+            onSaved={(updated) => {
+              void mutateCal()
+              setPlanningEvent(updated)
+              setShowEditEvent(false)
+            }}
+            onDelete={() => {
+              void mutateCal()
+              setShowEditEvent(false)
+              setPlanningEvent(null)
+            }}
+          />
+        )}
       </SubpageShell>
     )
   }
@@ -6503,10 +6452,10 @@ export function MinistryCalendar({
               events={events}
               currentMonth={currentMonth}
               onMonthChange={setCurrentMonth}
-              onSelectEvent={setSelectedEvent}
+              onSelectEvent={setPlanningEvent}
             />
           ) : (
-            <TimelineView events={events} onSelectEvent={setSelectedEvent} />
+            <TimelineView events={events} onSelectEvent={setPlanningEvent} />
           )}
         </div>
 
@@ -6572,17 +6521,6 @@ export function MinistryCalendar({
           )}
         </div>
       </div>
-
-      {selectedEvent && (
-        <EventDetailPopover
-          event={selectedEvent}
-          canEdit={canEdit}
-          userId={userId}
-          onClose={() => setSelectedEvent(null)}
-          onDelete={(id) => { handleDelete(id); setSelectedEvent(null) }}
-          onPlan={(ev) => { setSelectedEvent(null); setPlanningEvent(ev) }}
-        />
-      )}
 
       {showAdd && (
         <AddEventModal
