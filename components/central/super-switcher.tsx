@@ -14,7 +14,7 @@
 // fresh profile fetch drives every gate + RLS with the new role.
 
 import { useState } from "react"
-import { switchMinistryRole, resetToSuper } from "@/app/actions/super"
+import { switchMinistryRole, resetToSuper, getSandboxTeams, switchWorkspaceRole, type SandboxTeam } from "@/app/actions/super"
 import { SUPER_UUID, HOME_ROLE, MINISTRY_ROLES } from "@/app/actions/super-constants"
 
 function cap(role: string): string {
@@ -25,6 +25,12 @@ export function SuperSwitcher({ profile }: { profile: { id: string; role: string
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Workspace-role picker state.
+  const [teams, setTeams] = useState<SandboxTeam[] | null>(null)
+  const [teamsLoading, setTeamsLoading] = useState(false)
+  const [selTeamId, setSelTeamId] = useState<string>("")
+  const [selRoleId, setSelRoleId] = useState<string>("")
 
   // Hard gate on identity — never the role. Rendered nowhere for anyone else.
   if (profile.id !== SUPER_UUID) return null
@@ -45,12 +51,50 @@ export function SuperSwitcher({ profile }: { profile: { id: string; role: string
     window.location.reload()
   }
 
+  // Lazily load the sandbox teams the first time the popover opens.
+  async function loadTeams() {
+    if (teams !== null || teamsLoading) return
+    setTeamsLoading(true)
+    const res = await getSandboxTeams()
+    setTeamsLoading(false)
+    if (res.error) {
+      setError(res.error)
+      return
+    }
+    setTeams(res.teams)
+  }
+
+  function toggleOpen() {
+    setError(null)
+    setOpen((v) => {
+      const next = !v
+      if (next) void loadTeams()
+      return next
+    })
+  }
+
+  const selTeam = teams?.find((t) => t.id === selTeamId) ?? null
+  const selRoles = selTeam?.roles ?? []
+
   const chip: React.CSSProperties = {
     position: "fixed",
     bottom: 80,
     left: 12,
     zIndex: 140,
     fontFamily: "var(--font-inter), system-ui, sans-serif",
+  }
+
+  const selectStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "7px 8px",
+    borderRadius: "var(--r-input)",
+    border: "1px solid var(--line-2)",
+    background: "var(--cream)",
+    color: "var(--ink)",
+    fontFamily: "inherit",
+    fontSize: 12.5,
+    fontWeight: 500,
+    cursor: "pointer",
   }
 
   return (
@@ -109,7 +153,7 @@ export function SuperSwitcher({ profile }: { profile: { id: string; role: string
               position: "absolute",
               bottom: "calc(100% + 8px)",
               left: 0,
-              width: 200,
+              width: 220,
               background: "var(--cream-panel)",
               border: "1px solid var(--line-2)",
               borderRadius: "var(--r-card)",
@@ -152,6 +196,79 @@ export function SuperSwitcher({ profile }: { profile: { id: string; role: string
                 </button>
               )
             })}
+
+            {/* Workspace-role POV — become a team-role of a sandbox workspace. */}
+            <div style={{ height: 1, background: "var(--line)", margin: "6px 4px" }} />
+            <div
+              style={{
+                padding: "2px 10px 6px",
+                fontSize: 10.5,
+                fontWeight: 600,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                color: "var(--muted-text)",
+              }}
+            >
+              Workspace role
+            </div>
+            {teamsLoading ? (
+              <div style={{ padding: "4px 10px 8px", fontSize: 12, color: "var(--ink)", opacity: 0.6 }}>
+                Loading teams…
+              </div>
+            ) : teams && teams.length === 0 ? (
+              <div style={{ padding: "4px 10px 8px", fontSize: 12, color: "var(--ink)", opacity: 0.6 }}>
+                No sandbox teams.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "0 6px 4px" }}>
+                <select
+                  value={selTeamId}
+                  disabled={pending || !teams}
+                  onChange={(e) => { setSelTeamId(e.target.value); setSelRoleId("") }}
+                  style={selectStyle}
+                >
+                  <option value="">Select team…</option>
+                  {(teams ?? []).map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.icon ? `${t.icon} ` : ""}{t.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={selRoleId}
+                  disabled={pending || !selTeamId}
+                  onChange={(e) => setSelRoleId(e.target.value)}
+                  style={selectStyle}
+                >
+                  <option value="">Select role…</option>
+                  {selRoles.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}{r.is_president ? " ★" : ""}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => run(() => switchWorkspaceRole(selTeamId, selRoleId))}
+                  disabled={pending || !selTeamId || !selRoleId}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: "var(--r-input)",
+                    border: "none",
+                    background: "var(--plum-2)",
+                    color: "var(--cream-on-dark)",
+                    fontFamily: "inherit",
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    cursor: pending || !selTeamId || !selRoleId ? "not-allowed" : "pointer",
+                    opacity: pending || !selTeamId || !selRoleId ? 0.5 : 1,
+                    textAlign: "center",
+                  }}
+                >
+                  Apply workspace role
+                </button>
+              </div>
+            )}
+
             <div style={{ height: 1, background: "var(--line)", margin: "6px 4px" }} />
             <button
               onClick={() => run(resetToSuper)}
@@ -178,7 +295,7 @@ export function SuperSwitcher({ profile }: { profile: { id: string; role: string
         )}
 
         <button
-          onClick={() => { setError(null); setOpen((v) => !v) }}
+          onClick={toggleOpen}
           disabled={pending}
           style={{
             display: "flex",
