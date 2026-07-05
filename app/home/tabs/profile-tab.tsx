@@ -8,6 +8,7 @@ import { ChevronRight, ChevronDown, X, Check, Camera, Pencil, BookOpen, Search, 
 import { createClient } from "@/lib/supabase"
 import { MONO_STYLE, RingCrossLogo } from "../components/shared"
 import { getInitials } from "../utils"
+import { roleLabel } from "@/app/actions/super-constants"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { CentralButton, IconButton, InsetHairline, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog } from "@/components/central"
@@ -1091,7 +1092,7 @@ export function ProfileTab({
             <div style={{ flex: 1, minWidth: 0 }}>
               <h1 style={{ fontFamily: "var(--serif)", fontSize: 26, fontWeight: 400, letterSpacing: "-0.02em", color: "var(--ink)", margin: 0, lineHeight: 1.1 }}>{profile.name}</h1>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "2px 8px", textTransform: "capitalize" as const }}>{profile.role}</span>
+                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "2px 8px", textTransform: "capitalize" as const }}>{roleLabel(profile.role, profile.id)}</span>
                 {profile.graduation_year && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Class of {profile.graduation_year}</span>}
                 {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
               </div>
@@ -1123,7 +1124,7 @@ export function ProfileTab({
             {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(19,16,26,0.4)" }}><div className="animate-spin" style={{ width: 20, height: 20, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
           </label>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>Your Profile · {profile.role}</p>
+            <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>Your Profile · {roleLabel(profile.role, profile.id)}</p>
             <h1 style={{ fontFamily: "var(--serif)", fontSize: 44, fontWeight: 400, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 10px", lineHeight: 1.05 }}>{profile.name}</h1>
             <div style={{ display: "flex", gap: 20, fontSize: 14, color: "var(--body)", flexWrap: "wrap", alignItems: "center" }}>
               {profile.graduation_year && <span>Class of {profile.graduation_year}</span>}

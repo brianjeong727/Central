@@ -15,7 +15,7 @@
 
 import { useState } from "react"
 import { switchMinistryRole, resetToSuper, getSandboxTeams, switchWorkspaceRole, type SandboxTeam } from "@/app/actions/super"
-import { SUPER_UUID, HOME_ROLE, MINISTRY_ROLES } from "@/app/actions/super-constants"
+import { SUPER_UUID, HOME_ROLE, MINISTRY_ROLES, roleLabel } from "@/app/actions/super-constants"
 
 function cap(role: string): string {
   return role.charAt(0).toUpperCase() + role.slice(1)
@@ -123,7 +123,7 @@ export function SuperSwitcher({ profile }: { profile: { id: string; role: string
             borderBottom: "1px solid var(--plum-deep)",
           }}
         >
-          <span>⚠ Acting as {cap(currentRole)} in Central</span>
+          <span>⚠ Acting as {roleLabel(currentRole, SUPER_UUID)} in Central</span>
           <button
             onClick={() => run(resetToSuper)}
             disabled={pending}
@@ -317,7 +317,7 @@ export function SuperSwitcher({ profile }: { profile: { id: string; role: string
             aria-hidden
             style={{ width: 6, height: 6, borderRadius: "50%", background: isActingAs ? "var(--cream-on-dark)" : "color-mix(in srgb, var(--cream-on-dark) 55%, transparent)" }}
           />
-          {pending ? "Switching…" : `Acting as: ${cap(currentRole)}`}
+          {pending ? "Switching…" : `Acting as: ${roleLabel(currentRole, SUPER_UUID)}`}
         </button>
       </div>
     </>

@@ -11,6 +11,7 @@ import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
+import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
 import { useNavState } from "../nav-state"
 import { InsetHairline } from "@/components/central/hairline"
@@ -469,7 +470,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) } }, { label: "Add members" }]
     : [{ label: displayGroupName, onClick: onBack }, { label: "Settings" }]
 
-  function roleBadge(role: string, size: "sm" | "md") {
+  function roleBadge(role: string, size: "sm" | "md", personId?: string | null) {
     const r = role.toLowerCase()
     const isAdminTier = ["admin", "leader", "deacon", "elder"].includes(r)
     const isVisitor = r === "visitor"
@@ -482,7 +483,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         border: isVisitor ? "1px solid var(--line-2)" : "1px solid transparent",
         letterSpacing: "0.04em", textTransform: "uppercase",
       }}>
-        {role.charAt(0).toUpperCase() + role.slice(1)}
+        {roleLabel(role, personId)}
       </span>
     )
   }
@@ -531,7 +532,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-medium truncate" style={{ color: "var(--ink)" }}>{profile.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {profile.role && roleBadge(profile.role, "sm")}
+                        {profile.role && roleBadge(profile.role, "sm", profile.id)}
                         {profile.graduation_year && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>Class of {profile.graduation_year}</span>}
                       </div>
                     </div>
@@ -607,7 +608,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                         {member.user_id === userId && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        {member.role && roleBadge(member.role, "sm")}
+                        {member.role && roleBadge(member.role, "sm", member.user_id)}
                         {member.graduation_year && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
                       </div>
                     </div>
@@ -729,7 +730,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                       {member.graduation_year && <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Class of {member.graduation_year}</p>}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {member.role && roleBadge(member.role, "md")}
+                      {member.role && roleBadge(member.role, "md", member.user_id)}
                     </div>
                     {canManage && member.user_id !== userId ? (
                       isConfirming ? (

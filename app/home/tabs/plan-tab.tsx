@@ -36,6 +36,7 @@ import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/b
 import { elevateToLeader } from "@/app/actions/ministry"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
 import { getInitials, formatRelativeTime } from "../utils"
+import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
 import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill } from "@/components/central"
@@ -9369,7 +9370,7 @@ function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; on
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
                       <p style={{ fontSize: 11, color: "var(--muted-text)", margin: 0 }}>
-                        {m.graduation_year ? `'${String(m.graduation_year).slice(-2)}` : ""}{m.graduation_year && m.role ? " · " : ""}{m.role}
+                        {m.graduation_year ? `'${String(m.graduation_year).slice(-2)}` : ""}{m.graduation_year && m.role ? " · " : ""}{roleLabel(m.role, m.id)}
                       </p>
                     </div>
                   </div>
@@ -10193,7 +10194,7 @@ function GroupGeneratorWizard({
                               <p style={{ fontSize: 10, color: "var(--muted-text)", margin: 0 }}>
                                 {m.graduation_year ? `'${String(m.graduation_year).slice(-2)}` : ""}
                                 {m.graduation_year && m.role ? " · " : ""}
-                                {m.role}
+                                {roleLabel(m.role, m.id)}
                               </p>
                             </div>
                           </div>
@@ -10250,7 +10251,7 @@ function GroupGeneratorWizard({
                               <p style={{ fontSize: 10, color: "var(--muted-text)", margin: 0 }}>
                                 {m.graduation_year ? `'${String(m.graduation_year).slice(-2)}` : ""}
                                 {m.graduation_year && m.role ? " · " : ""}
-                                {m.role}
+                                {roleLabel(m.role, m.id)}
                               </p>
                             </div>
                           </div>

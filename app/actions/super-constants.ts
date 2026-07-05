@@ -11,3 +11,14 @@ export const HOME_ROLE = "pastor"
 export const MINISTRY_ROLES = ["visitor", "member", "leader", "admin", "deacon", "elder", "pastor"] as const
 
 export type MinistryRole = (typeof MINISTRY_ROLES)[number]
+
+// Display-label alias for the super account. Its real profiles.role stays "pastor"
+// (all gates/access unchanged); this only aliases the VISIBLE label. Only the super
+// account in its home role ("pastor") shows "Super"; the super acting-as any other
+// tier shows that tier's name; everyone else shows their role, capitalized.
+export function roleLabel(role: string | null | undefined, userId?: string | null): string {
+  const r = (role ?? "").toString().trim()
+  if (!r) return ""
+  if (userId === SUPER_UUID && r.toLowerCase() === HOME_ROLE) return "Super"
+  return r.charAt(0).toUpperCase() + r.slice(1).toLowerCase()
+}
