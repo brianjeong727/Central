@@ -21,6 +21,7 @@ export const TAB_PARAMS: Record<Tab, string[]> = {
   settings: ["stab"],
   forms: ["fresp"],
   congregation: ["cq"],
+  network: [],
 }
 
 // ── Folded-in (transient) sub-params ─────────────────────────────────────────
@@ -35,6 +36,7 @@ export const TAB_FOLDED_PARAMS: Record<Tab, string[]> = {
   settings: ["stab"],
   forms: ["fresp"],
   congregation: ["cq"],
+  network: [],
 }
 export const ALL_FOLDED_PARAMS: string[] = Object.values(TAB_FOLDED_PARAMS).flat()
 
