@@ -436,7 +436,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       case "announcements": return [root, { label: "Announcements" }]
       case "give":          return [root, { label: "Give" }]
       case "forms":         return formsView === "detail"
-        ? [root, { label: "Forms", onClick: () => { setNavResetKey(k => k + 1); setParam("fresp", null) } }, { label: formsDetailTitle }]
+        ? [root, { label: "Forms", onClick: () => { setNavResetKey(k => k + 1); setParams({ fresp: null, fbuild: null, fedit: null }) } }, { label: formsDetailTitle }]
         : [root, { label: "Forms" }]
       case "settings":      return [root, { label: "Settings" }]
       case "chats":         return [root, { label: "Chats" }]

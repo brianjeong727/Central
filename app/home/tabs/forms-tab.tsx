@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Check, ChevronDown, ChevronLeft, ChevronRight, FileText } from "lucide-react"
+import { ArrowLeft, Archive, ArchiveRestore, Check, ChevronDown, ChevronLeft, ChevronRight, Edit3, FileText, Plus, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { Spinner, EmptyState, MONO_STYLE, AnimateIn } from "../components/shared"
-import { TabPageHeader, PageTitle, PlanSubTabStrip, CentralButton } from "@/components/central"
+import { Spinner, EmptyState, MONO_STYLE, EYEBROW_STYLE, AnimateIn } from "../components/shared"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, ContentHeader, ContentActionButton, CentralButton } from "@/components/central"
 import { useNavState } from "../nav-state"
 import type { FormsTabProps, FieldType } from "../types"
 
@@ -33,14 +33,37 @@ interface RespondentRow {
   answers: FormAnswerRow[]
 }
 
-interface AnnouncementWithForm {
+// A standalone form (first-class object). 0-or-1 announcement.
+interface FormListItem {
   id: string
   title: string
-  body: string
+  announcement_id: string | null
+  announcement_title: string | null
+  archived: boolean
   created_at: string
-  form_id: string
   response_count: number
 }
+
+// ── Form builder draft model (colocated with forms) ───────────────────────────
+
+interface DraftField {
+  tempId: string
+  existingId?: string
+  label: string
+  type: FieldType
+  options: string[]
+  required: boolean
+}
+
+let _tempIdCounter = 0
+function newTempId() { return `draft-${++_tempIdCounter}` }
+
+const FIELD_TYPES: { value: FieldType; label: string }[] = [
+  { value: 'text', label: 'Text' },
+  { value: 'multiple_choice', label: 'Multiple' },
+  { value: 'checkbox', label: 'Checkboxes' },
+  { value: 'dropdown', label: 'Dropdown' },
+]
 
 // ── Form Fill View ────────────────────────────────────────────────────────────
 
@@ -261,11 +284,290 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
   )
 }
 
+// ── Form Builder (full-page, body-swap) ───────────────────────────────────────
+
+// A first-class form editor. Renders as the Forms-tab body (like the announcement
+// compose page), NOT a fixed overlay. Once a form has ≥1 response its FIELDS lock
+// (edits/add/delete/reorder disabled); the title stays editable.
+export function FormBuilder({ ministryId, userId, formId, onDone }: {
+  ministryId: string
+  userId: string
+  formId?: string | null
+  onDone: () => void
+}) {
+  const supabase = createClient()
+  const isEditing = !!formId
+
+  const [title, setTitle] = useState("")
+  const [fields, setFields] = useState<DraftField[]>(
+    formId ? [] : [{ tempId: newTempId(), label: '', type: 'text', options: [], required: false }]
+  )
+  const [locked, setLocked] = useState(false)
+  const [loading, setLoading] = useState(!!formId)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Load existing form (title + fields) + lock if it already has responses.
+  useEffect(() => {
+    if (!formId) return
+    async function load() {
+      const { data: formRow } = await supabase
+        .from("announcement_forms")
+        .select("title")
+        .eq("id", formId!)
+        .eq("ministry_id", ministryId)
+        .maybeSingle()
+      setTitle(formRow?.title ?? "")
+
+      const { data: fieldData } = await supabase
+        .from("form_fields")
+        .select("*")
+        .eq("form_id", formId!)
+        .order("order_index")
+      setFields((fieldData ?? []).map(f => ({
+        tempId: newTempId(),
+        existingId: f.id,
+        label: f.label,
+        type: f.type as FieldType,
+        options: Array.isArray(f.options) ? f.options : [],
+        required: f.required ?? false,
+      })))
+
+      const { count } = await supabase
+        .from("form_responses")
+        .select("id", { count: "exact", head: true })
+        .eq("form_id", formId!)
+      setLocked((count ?? 0) >= 1)
+      setLoading(false)
+    }
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formId])
+
+  async function handleSave() {
+    if (!title.trim()) { setError("Give the form a title before saving."); return }
+    if (!isEditing && fields.length === 0) { setError("Add at least one question."); return }
+    setSaving(true)
+    setError(null)
+
+    let savedId = formId ?? null
+    if (!savedId) {
+      const { data, error: insertError } = await supabase
+        .from("announcement_forms")
+        .insert({ ministry_id: ministryId, title: title.trim(), announcement_id: null, created_by: userId })
+        .select("id").single()
+      if (insertError || !data) { setError(insertError?.message ?? "Could not create the form."); setSaving(false); return }
+      savedId = data.id
+    } else {
+      const { error: updateError } = await supabase
+        .from("announcement_forms")
+        .update({ title: title.trim() })
+        .eq("id", savedId).eq("ministry_id", ministryId)
+      if (updateError) { setError(updateError.message); setSaving(false); return }
+    }
+
+    // Fields are immutable once the form has responses. `locked` is only known as
+    // of load — re-query the live count for an existing form just before the
+    // destructive rewrite (TOCTOU): a response arriving mid-edit must NOT get its
+    // answers cascade-deleted. New forms (formId null) can't have responses yet.
+    let effectiveLocked = locked
+    if (formId) {
+      const { count: liveCount } = await supabase
+        .from("form_responses")
+        .select("id", { count: "exact", head: true })
+        .eq("form_id", formId)
+      if ((liveCount ?? 0) >= 1) effectiveLocked = true
+    }
+
+    if (!effectiveLocked) {
+      await supabase.from("form_fields").delete().eq("form_id", savedId)
+      if (fields.length > 0) {
+        const { error: fieldError } = await supabase.from("form_fields").insert(
+          fields.map((f, i) => ({ form_id: savedId, label: f.label, type: f.type, options: f.options, required: f.required, order_index: i }))
+        )
+        if (fieldError) { setError(fieldError.message); setSaving(false); return }
+      }
+    } else if (!locked) {
+      // Became locked mid-edit (a response landed after load): the title rename
+      // above still persisted, but the existing fields are left untouched. Lock the
+      // editor, surface the notice, and stay on the page so the change is visible —
+      // do NOT navigate away as if the field edits had been saved.
+      setLocked(true)
+      setError("A response just arrived — this form's questions are now locked, so your question edits weren't saved. The title change was saved.")
+      setSaving(false)
+      return
+    }
+
+    setSaving(false)
+    onDone()
+  }
+
+  const titleText = isEditing ? "Edit form" : "New form"
+
+  const SaveButton = (
+    <button
+      type="button"
+      disabled={saving}
+      onClick={handleSave}
+      className="flex items-center justify-center transition-colors disabled:opacity-50"
+      style={{ height: 28, padding: "0 16px", borderRadius: 9, background: "var(--plum-2)", color: "var(--cream)", fontSize: 13, fontWeight: 500, border: "none", cursor: saving ? "default" : "pointer", flexShrink: 0 }}
+    >
+      {saving ? "Saving…" : isEditing ? "Save changes" : "Create form"}
+    </button>
+  )
+
+  return (
+    <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden" style={{ background: "var(--cream)" }}>
+      {/* Mobile header — safe-area inset, back affordance */}
+      <div className="md:hidden flex items-center gap-3 px-5 pt-12 pb-4" style={{ borderBottom: "1px solid var(--line)" }}>
+        <button onClick={onDone} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-xl -ml-1 hover:bg-[var(--ivory)] transition-colors">
+          <ArrowLeft className="w-5 h-5" style={{ color: "var(--plum)" }} />
+        </button>
+        <span style={{ fontFamily: "var(--serif)", fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05 }}>{titleText}</span>
+        <div className="ml-auto">{SaveButton}</div>
+      </div>
+
+      {/* Desktop header — back is the shell breadcrumb (§3.2 Zone A); Save on the right */}
+      <TabPageHeader>
+        <PageTitle title={titleText} compact />
+        <div className="ml-auto pb-1.5">{SaveButton}</div>
+      </TabPageHeader>
+
+      <div className="md:flex-1 md:overflow-y-auto">
+        {loading ? (
+          <div className="px-5 md:px-14 py-6 flex items-center justify-center"><Spinner /></div>
+        ) : (
+          <div className="px-5 md:px-14 py-6 w-full mx-auto flex flex-col gap-6" style={{ maxWidth: 640 }}>
+            {error && (
+              <div style={{ background: "rgba(62,21,64,0.08)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>{error}</div>
+            )}
+
+            {locked && (
+              <div style={{ background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
+                This form has responses — its questions are locked. You can still rename it or archive it.
+              </div>
+            )}
+
+            {/* Title */}
+            <div>
+              <p style={EYEBROW_STYLE} className="mb-3">Form title</p>
+              <input
+                type="text"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="e.g. Retreat sign-up"
+                className="placeholder:text-[var(--faint)]"
+                style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", width: "100%", paddingBottom: 12 }}
+              />
+            </div>
+
+            {/* Questions */}
+            <div className="flex flex-col gap-4">
+              <p style={EYEBROW_STYLE}>Questions</p>
+              {fields.map((field, idx) => (
+                <div key={field.tempId} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", background: "var(--ivory)", opacity: locked ? 0.7 : 1 }}>
+                  {/* Field label */}
+                  <input
+                    type="text"
+                    value={field.label}
+                    disabled={locked}
+                    onChange={e => setFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, label: e.target.value } : f))}
+                    placeholder="Question label…"
+                    style={{ width: "100%", fontSize: 13, color: "var(--ink)", background: "transparent", border: "none", outline: "none", borderBottom: "1px solid var(--line-2)", paddingBottom: 6, marginBottom: 10 }}
+                  />
+                  {/* Type pills */}
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {FIELD_TYPES.map(t => (
+                      <button
+                        key={t.value}
+                        type="button"
+                        disabled={locked}
+                        onClick={() => setFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, type: t.value, options: t.value !== 'text' && f.options.length === 0 ? ['Option 1'] : f.options } : f))}
+                        style={{
+                          padding: "3px 9px", borderRadius: 999, fontSize: 11, cursor: locked ? "default" : "pointer",
+                          border: `1px solid ${field.type === t.value ? "var(--plum)" : "var(--line-2)"}`,
+                          background: field.type === t.value ? "var(--plum)" : "transparent",
+                          color: field.type === t.value ? "var(--cream)" : "var(--body)",
+                        }}
+                      >{t.label}</button>
+                    ))}
+                  </div>
+
+                  {/* Options for choice-based types */}
+                  {field.type !== 'text' && (
+                    <div className="flex flex-col gap-1.5 mb-3">
+                      {field.options.map((opt, oi) => (
+                        <div key={oi} className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={opt}
+                            disabled={locked}
+                            onChange={e => setFields(prev => prev.map(f => {
+                              if (f.tempId !== field.tempId) return f
+                              const opts = [...f.options]; opts[oi] = e.target.value
+                              return { ...f, options: opts }
+                            }))}
+                            style={{ flex: 1, fontSize: 12, color: "var(--ink)", background: "transparent", border: "none", outline: "none", borderBottom: "1px solid var(--line-2)", paddingBottom: 3 }}
+                            placeholder={`Option ${oi + 1}`}
+                          />
+                          {!locked && (
+                            <button
+                              type="button"
+                              onClick={() => setFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, options: f.options.filter((_, i) => i !== oi) } : f))}
+                              style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "var(--dashed)", flexShrink: 0 }}
+                            ><Trash2 style={{ width: 11, height: 11 }} /></button>
+                          )}
+                        </div>
+                      ))}
+                      {!locked && (
+                        <button
+                          type="button"
+                          onClick={() => setFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, options: [...f.options, `Option ${f.options.length + 1}`] } : f))}
+                          style={{ fontSize: 11, color: "var(--muted-text)", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", padding: "2px 0", marginTop: 2 }}
+                        >+ Add option</button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Row: required + reorder + delete */}
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-1.5" style={{ cursor: locked ? "default" : "pointer" }}>
+                      <input type="checkbox" disabled={locked} checked={field.required} onChange={e => setFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, required: e.target.checked } : f))} className="w-3 h-3" />
+                      <span style={{ fontSize: 11, color: "var(--muted-text)" }}>Required</span>
+                    </label>
+                    {!locked && (
+                      <div className="flex items-center gap-1">
+                        <button type="button" disabled={idx === 0} onClick={() => setFields(prev => { const a = [...prev]; [a[idx-1], a[idx]] = [a[idx], a[idx-1]]; return a })} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "var(--dashed)" : "var(--muted-text)" }}><ChevronLeft style={{ width: 12, height: 12, transform: "rotate(90deg)" }} /></button>
+                        <button type="button" disabled={idx === fields.length - 1} onClick={() => setFields(prev => { const a = [...prev]; [a[idx], a[idx+1]] = [a[idx+1], a[idx]]; return a })} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: idx === fields.length - 1 ? "default" : "pointer", color: idx === fields.length - 1 ? "var(--dashed)" : "var(--muted-text)" }}><ChevronDown style={{ width: 12, height: 12 }} /></button>
+                        <button type="button" onClick={() => setFields(prev => prev.filter(f => f.tempId !== field.tempId))} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "var(--dashed)", marginLeft: 2 }}><Trash2 style={{ width: 11, height: 11 }} /></button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {!locked && (
+                <button
+                  type="button"
+                  onClick={() => setFields(prev => [...prev, { tempId: newTempId(), label: '', type: 'text', options: [], required: false }])}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 8, border: "1px dashed var(--dashed)", background: "transparent", color: "var(--muted-text)", fontSize: 12, cursor: "pointer", width: "fit-content" }}
+                >
+                  <Plus style={{ width: 12, height: 12 }} /> Add question
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Form Responses View ───────────────────────────────────────────────────────
 
-export function FormResponsesView({ formId, announcementTitle, onClose }: {
+export function FormResponsesView({ formId, title, onClose }: {
   formId: string
-  announcementTitle: string
+  title: string
   onClose: () => void
 }) {
   const supabase = createClient()
@@ -366,13 +668,13 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
         </button>
         <p style={MONO_STYLE}>Responses · {loading ? '…' : respondents.length}</p>
         <h1 className="line-clamp-2" style={{ fontFamily: "var(--serif)", fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, margin: "8px 0 0" }}>
-          {announcementTitle}
+          {title}
         </h1>
       </div>
 
       {/* Desktop header — back is the shell breadcrumb (§3.2 Zone A); no in-header back */}
       <TabPageHeader>
-        <PageTitle eyebrow={`Responses · ${loading ? '…' : respondents.length}`} title={announcementTitle} compact />
+        <PageTitle eyebrow={`Responses · ${loading ? '…' : respondents.length}`} title={title} compact />
       </TabPageHeader>
 
       {/* Subtabs — desktop (root sibling, outside the padded content wrapper) */}
@@ -445,7 +747,7 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
           <div className="px-5 md:px-14 py-6" style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
             {respondents.length === 0 ? (
               <EmptyState icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="The summary will appear once people submit." />
-            ) : summaryByField.map(({ field, counts, textAnswers, maxCount }) => (
+            ) : summaryByField.map(({ field, counts, textAnswers }) => (
               <div key={field.id}>
                 <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 14 }}>{field.label}</p>
                 {field.type === 'text' ? (
@@ -484,86 +786,127 @@ export function FormResponsesView({ formId, announcementTitle, onClose }: {
   )
 }
 
+// ── Status pill ───────────────────────────────────────────────────────────────
+
+function StatusPill({ item }: { item: FormListItem }) {
+  const base = { fontSize: 10, letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, textTransform: "uppercase" as const, fontWeight: 500 as const, whiteSpace: "nowrap" as const }
+  if (item.archived) {
+    return <span style={{ ...base, background: "var(--line-3)", color: "var(--muted-text)" }}>Archived</span>
+  }
+  if (!item.announcement_id) {
+    return <span style={{ ...base, background: "var(--ivory)", border: "1px solid var(--line)", color: "var(--body)" }}>Draft</span>
+  }
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+      <span style={{ ...base, background: "var(--plum)", color: "var(--cream)" }}>Attached</span>
+      {item.announcement_title && (
+        <span className="line-clamp-1" style={{ fontSize: 12, color: "var(--muted-text)" }}>· {item.announcement_title}</span>
+      )}
+    </span>
+  )
+}
+
 // ── Forms Tab ─────────────────────────────────────────────────────────────────
 
-export function FormsTab({ ministryId, onViewChange }: FormsTabProps) {
+type FormsView =
+  | { mode: "list" }
+  | { mode: "builder"; formId: string | null }
+  | { mode: "responses"; formId: string; title: string }
+
+function initialFormsView(): FormsView {
+  if (typeof window === "undefined") return { mode: "list" }
+  const p = new URLSearchParams(window.location.search)
+  const fedit = p.get("fedit")
+  const fbuild = p.get("fbuild")
+  const fresp = p.get("fresp")
+  if (fedit) return { mode: "builder", formId: fedit }
+  if (fbuild === "new") return { mode: "builder", formId: null }
+  if (fresp) return { mode: "responses", formId: fresp, title: "" }
+  return { mode: "list" }
+}
+
+export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
   const supabase = createClient()
-  const { setParam } = useNavState()
+  const { setParams } = useNavState()
   const [loading, setLoading] = useState(true)
-  const [items, setItems] = useState<AnnouncementWithForm[]>([])
-  // "View responses" is a read view → restore from ?fresp on reload
-  // (title is backfilled from items once they load).
-  const [responsesState, setResponsesState] = useState<{ formId: string; title: string } | null>(() => {
-    if (typeof window === "undefined") return null
-    const formId = new URLSearchParams(window.location.search).get("fresp")
-    return formId ? { formId, title: "" } : null
-  })
+  const [items, setItems] = useState<FormListItem[]>([])
+  const [showArchived, setShowArchived] = useState(false)
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+  const [view, setView] = useState<FormsView>(initialFormsView)
+
+  function openBuilder(formId: string | null) {
+    setView({ mode: "builder", formId })
+    setParams({ fedit: formId ?? null, fbuild: formId ? null : "new", fresp: null })
+    onViewChange?.("detail", formId ? "Edit form" : "New form")
+  }
 
   function openResponses(formId: string, title: string) {
-    setResponsesState({ formId, title })
-    setParam("fresp", formId)
+    setView({ mode: "responses", formId, title })
+    setParams({ fresp: formId, fedit: null, fbuild: null })
     onViewChange?.("detail", title)
   }
 
-  function closeResponses() {
-    setResponsesState(null)
-    setParam("fresp", null)
+  function backToList() {
+    setView({ mode: "list" })
+    setParams({ fresp: null, fedit: null, fbuild: null })
     onViewChange?.("list")
+    load()
   }
 
-  // Propagate the URL-restored initial view to the shell breadcrumb on mount.
-  // No ?fresp → list immediately. With ?fresp → the detail crumb is announced
-  // by the title-backfill effect below, since the form title isn't known until
-  // items load. (Mirrors CongregationTab's mount-effect view lift.)
+  // Lift the URL-restored initial view to the shell breadcrumb on mount.
+  // (For a restored ?fresp the title is unknown until items load — the
+  // backfill effect below announces the detail crumb then.)
   useEffect(() => {
-    if (!responsesState) onViewChange?.("list")
+    if (view.mode === "list") onViewChange?.("list")
+    else if (view.mode === "builder") onViewChange?.("detail", view.formId ? "Edit form" : "New form")
+    else if (view.mode === "responses" && view.title) onViewChange?.("detail", view.title)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Backfill the responses-view title from items for a URL-restored ?fresp,
   // and lift the detail view + title to the shell the same moment.
   useEffect(() => {
-    if (!responsesState || responsesState.title !== "") return
-    const match = items.find((i) => i.form_id === responsesState.formId)
+    if (view.mode !== "responses" || view.title !== "") return
+    const match = items.find(i => i.id === view.formId)
     if (match) {
-      setResponsesState((prev) => prev && prev.title === "" ? { ...prev, title: match.title } : prev)
+      setView(prev => prev.mode === "responses" && prev.title === "" ? { ...prev, title: match.title } : prev)
       onViewChange?.("detail", match.title)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [responsesState, items])
+  }, [view, items])
 
   const load = useCallback(async () => {
     const { data: forms } = await supabase
       .from("announcement_forms")
-      .select("id, announcement_id")
+      .select("id, title, announcement_id, archived, created_at")
       .eq("ministry_id", ministryId)
+      .order("created_at", { ascending: false })
 
     if (!forms || forms.length === 0) { setItems([]); setLoading(false); return }
 
-    const announcementIds = forms.map(f => f.announcement_id)
-    const formByAnn: Record<string, string> = {}
-    for (const f of forms) formByAnn[f.announcement_id] = f.id
-
-    const { data: annData } = await supabase
-      .from("announcements")
-      .select("id, title, body, created_at")
-      .in("id", announcementIds)
-      .order("created_at", { ascending: false })
-
     const formIds = forms.map(f => f.id)
+    const announcementIds = [...new Set(forms.map(f => f.announcement_id).filter((v): v is string => !!v))]
+
+    const [{ data: annData }, { data: countData }] = await Promise.all([
+      announcementIds.length > 0
+        ? supabase.from("announcements").select("id, title").in("id", announcementIds)
+        : Promise.resolve({ data: null }),
+      supabase.from("form_responses").select("form_id").in("form_id", formIds),
+    ])
+
+    const annTitleById: Record<string, string> = {}
+    for (const a of annData ?? []) annTitleById[a.id] = a.title
+
     const responseCounts: Record<string, number> = {}
-    const { data: countData } = await supabase
-      .from("form_responses")
-      .select("form_id")
-      .in("form_id", formIds)
     for (const r of countData ?? []) responseCounts[r.form_id] = (responseCounts[r.form_id] ?? 0) + 1
 
-    setItems((annData ?? []).map(ann => ({
-      id: ann.id,
-      title: ann.title,
-      body: ann.body,
-      created_at: ann.created_at,
-      form_id: formByAnn[ann.id],
-      response_count: responseCounts[formByAnn[ann.id]] ?? 0,
+    setItems(forms.map(f => ({
+      id: f.id,
+      title: f.title ?? "Untitled form",
+      announcement_id: f.announcement_id,
+      announcement_title: f.announcement_id ? (annTitleById[f.announcement_id] ?? null) : null,
+      archived: !!f.archived,
+      created_at: f.created_at,
+      response_count: responseCounts[f.id] ?? 0,
     })))
     setLoading(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -571,63 +914,142 @@ export function FormsTab({ ministryId, onViewChange }: FormsTabProps) {
 
   useEffect(() => { load() }, [load])
 
+  async function toggleArchive(item: FormListItem) {
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, archived: !i.archived } : i))
+    await supabase.from("announcement_forms").update({ archived: !item.archived }).eq("id", item.id).eq("ministry_id", ministryId)
+  }
+
+  async function deleteForm(item: FormListItem) {
+    setConfirmingDeleteId(null)
+    setItems(prev => prev.filter(i => i.id !== item.id))
+    await supabase.from("announcement_forms").delete().eq("id", item.id).eq("ministry_id", ministryId)
+  }
+
+  // ── Body-swap dispatch ──
+  if (view.mode === "builder") {
+    return <FormBuilder ministryId={ministryId} userId={userId} formId={view.formId} onDone={backToList} />
+  }
+  if (view.mode === "responses") {
+    return (
+      <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
+        <FormResponsesView formId={view.formId} title={view.title} onClose={backToList} />
+      </div>
+    )
+  }
+
+  const activeItems = items.filter(i => !i.archived)
+  const archivedItems = items.filter(i => i.archived)
+
+  function FormCard({ item }: { item: FormListItem }) {
+    const confirming = confirmingDeleteId === item.id
+    const canViewResponses = item.response_count > 0
+    return (
+      <div style={{ border: '1px solid var(--line)', borderRadius: 14, background: 'var(--cream)', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div className="flex items-start justify-between gap-4">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 className="line-clamp-2" style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--ink)', lineHeight: 1.15, margin: 0, fontWeight: 400 }}>{item.title}</h3>
+            <div className="flex items-center gap-2.5 flex-wrap" style={{ marginTop: 8, minWidth: 0 }}>
+              <StatusPill item={item} />
+              <span style={{ fontSize: 13, color: 'var(--muted-text)' }}>
+                {item.response_count} response{item.response_count !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {confirming ? (
+          <div className="flex items-center justify-end gap-2">
+            <span style={{ fontSize: 13, color: 'var(--body)', marginRight: 'auto' }}>Delete this form and its responses?</span>
+            <button onClick={() => setConfirmingDeleteId(null)} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer', background: 'transparent', border: '1px solid var(--line)', color: 'var(--body)' }}>Cancel</button>
+            <button onClick={() => deleteForm(item)} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', background: 'var(--danger)', color: 'var(--cream)', border: 'none' }}>Delete</button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-end gap-1.5 flex-wrap">
+            {canViewResponses && (
+              <button
+                onClick={() => openResponses(item.id, item.title)}
+                style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 13, fontWeight: 500, color: 'var(--plum)', background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 8px', marginRight: 'auto' }}
+              >
+                View responses
+                <ChevronRight style={{ width: 15, height: 15 }} />
+              </button>
+            )}
+            <button onClick={() => openBuilder(item.id)} title="Edit" className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[var(--line-3)] transition-colors">
+              <Edit3 className="w-3.5 h-3.5" style={{ color: 'var(--body)' }} />
+            </button>
+            <button onClick={() => toggleArchive(item)} title={item.archived ? 'Unarchive' : 'Archive'} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[var(--line-3)] transition-colors">
+              {item.archived ? <ArchiveRestore className="w-3.5 h-3.5" style={{ color: 'var(--body)' }} /> : <Archive className="w-3.5 h-3.5" style={{ color: 'var(--body)' }} />}
+            </button>
+            <button onClick={() => setConfirmingDeleteId(item.id)} title="Delete" className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-red-50 hover:border-red-200 transition-colors">
+              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
-      {responsesState ? (
-        /* ── DETAIL: responses fill the content body (navigate-to, not overlay) ── */
-        <FormResponsesView
-          formId={responsesState.formId}
-          announcementTitle={responsesState.title}
-          onClose={closeResponses}
-        />
-      ) : (
-        /* ── LIST ── */
-        <>
-          {/* Mobile header — compact */}
-          <div className="md:hidden px-5 pt-14 pb-5">
-            <p style={MONO_STYLE}>Forms</p>
-            <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>Forms</h1>
-          </div>
+      {/* Mobile header — compact */}
+      <div className="md:hidden px-5 pt-14 pb-5 flex items-end justify-between">
+        <div>
+          <p style={MONO_STYLE}>Forms</p>
+          <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>Forms</h1>
+        </div>
+        <button onClick={() => openBuilder(null)} aria-label="Create form" className="size-9 bg-[var(--plum)] rounded-xl flex items-center justify-center hover:bg-[var(--plum-2)] transition-colors">
+          <Plus className="w-4 h-4 text-[var(--cream)]" />
+        </button>
+      </div>
 
-          <TabPageHeader>
-            <PageTitle title="Forms" compact />
-          </TabPageHeader>
+      <TabPageHeader>
+        <PageTitle title="Forms" compact />
+      </TabPageHeader>
 
-          <div className="md:flex-1 md:overflow-y-auto">
-            {loading ? (
-              <div className="px-5 md:px-14"><Spinner /></div>
-            ) : items.length === 0 ? (
-              <div className="px-5 md:px-14">
-                <EmptyState icon={<FileText className="w-7 h-7" />} title="No forms yet" subtitle="Forms you attach to announcements will show here with their responses." />
-              </div>
+      <div className="md:flex-1 md:overflow-y-auto">
+        {loading ? (
+          <div className="px-5 md:px-14 py-6"><Spinner /></div>
+        ) : (
+          <div className="px-5 md:px-14 py-6 flex flex-col gap-5">
+            {/* Body content header — the create CTA lives here (Convention #15) */}
+            <ContentHeader
+              label="Your forms"
+              action={<ContentActionButton label="Create form" icon={<Plus className="w-4 h-4" />} onClick={() => openBuilder(null)} />}
+            />
+
+            {items.length === 0 ? (
+              <EmptyState icon={<FileText className="w-7 h-7" />} title="No forms yet" subtitle="Create a form, then attach it to an announcement to collect responses." />
             ) : (
-              <div className="px-5 md:px-14 py-6 flex flex-col gap-3">
-                {items.map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => openResponses(item.form_id, item.title)}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, width: '100%', textAlign: 'left',
-                      border: '1px solid var(--line)', borderRadius: 14, background: 'var(--cream)', padding: '18px 20px', cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <h3 style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--ink)', lineHeight: 1.1, margin: 0, fontWeight: 400 }}>{item.title}</h3>
-                      <p style={{ fontSize: 13, color: 'var(--muted-text)', marginTop: 6 }}>
-                        {item.response_count} response{item.response_count !== 1 ? 's' : ''}
-                      </p>
-                    </div>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, fontSize: 13, fontWeight: 500, color: 'var(--plum)' }}>
-                      View responses
-                      <ChevronRight style={{ width: 16, height: 16 }} />
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <>
+                {activeItems.length === 0 ? (
+                  <p style={{ fontSize: 13, color: 'var(--muted-text)' }}>No active forms.</p>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {activeItems.map(item => <FormCard key={item.id} item={item} />)}
+                  </div>
+                )}
+
+                {archivedItems.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={() => setShowArchived(v => !v)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, ...EYEBROW_STYLE }}
+                    >
+                      <ChevronDown style={{ width: 13, height: 13, transform: showArchived ? 'none' : 'rotate(-90deg)', transition: 'transform 0.15s' }} />
+                      Archived · {archivedItems.length}
+                    </button>
+                    {showArchived && (
+                      <div className="flex flex-col gap-3">
+                        {archivedItems.map(item => <FormCard key={item.id} item={item} />)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   )
 }
