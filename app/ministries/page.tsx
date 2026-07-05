@@ -42,7 +42,7 @@ function MinRow({ children }: { children: React.ReactNode }) {
     <div style={{
       display: "flex", alignItems: "center", gap: 16,
       padding: "16px 18px", border: "1px solid var(--line)", borderRadius: 12,
-      background: "#FDFCF8", marginBottom: 12,
+      background: "var(--cream)", marginBottom: 12,
     }}>
       {children}
     </div>
@@ -194,7 +194,7 @@ function MinistriesContent() {
   }
 
   return (
-    <div style={{ minHeight: "100svh", background: "#FDFCF8", fontFamily: SANS, color: "var(--ink)" }}>
+    <div style={{ minHeight: "100svh", background: "var(--cream)", fontFamily: SANS, color: "var(--ink)" }}>
 
       {/* ── Gender + school picker modals (shared with /join) ── */}
       <PostJoinPickerModals pickers={pickers} />
@@ -202,7 +202,7 @@ function MinistriesContent() {
       {/* ── Top bar ── */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "22px 48px", borderBottom: "1px solid #EFE9DA",
+        padding: "22px 48px", borderBottom: "1px solid var(--line-3)",
       }}>
         <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 11, textDecoration: "none", color: "inherit" }}>
           <span style={{
@@ -255,7 +255,7 @@ function MinistriesContent() {
             <div style={{
               display: "flex", alignItems: "center", gap: 12,
               padding: "14px 18px", border: "1px solid var(--line-2)", borderRadius: 10,
-              background: "#FDFCF8",
+              background: "var(--cream)",
             }}>
               <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--muted-text)" strokeWidth={1.6} strokeLinecap="round" aria-hidden style={{ flexShrink: 0 }}>
                 <path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3"/>
@@ -272,7 +272,7 @@ function MinistriesContent() {
             </div>
 
             {(joinError || browseError) && (
-              <div style={{ marginTop: 14, borderRadius: 10, background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.15)", padding: "10px 14px", fontSize: 13, color: "#B91C1C" }}>
+              <div style={{ marginTop: 14, borderRadius: 10, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 18%, transparent)", padding: "10px 14px", fontSize: 13, color: "var(--danger)" }}>
                 {joinError ?? browseError}
               </div>
             )}
@@ -354,7 +354,7 @@ function MinistriesContent() {
                       <button onClick={() => handleJoin(m)} disabled={joiningId === m.id} style={{
                         padding: "10px 22px", border: "none", borderRadius: 10,
                         background: joiningId === m.id ? "var(--line-2)" : "var(--plum-2)",
-                        color: joiningId === m.id ? "#A09A8C" : "#FDFCF8",
+                        color: joiningId === m.id ? "var(--faint)" : "var(--cream-on-dark)",
                         fontFamily: SANS, fontSize: 14, fontWeight: 500,
                         cursor: joiningId === m.id ? "not-allowed" : "pointer",
                         transition: "opacity .12s ease",
@@ -397,7 +397,7 @@ function MinistriesContent() {
             </p>
 
             {codeError && (
-              <div style={{ marginBottom: 16, borderRadius: 10, background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.15)", padding: "10px 14px", fontSize: 13, color: "#B91C1C" }}>
+              <div style={{ marginBottom: 16, borderRadius: 10, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 18%, transparent)", padding: "10px 14px", fontSize: 13, color: "var(--danger)" }}>
                 {codeError}
               </div>
             )}
@@ -411,7 +411,7 @@ function MinistriesContent() {
                 autoComplete="off" autoCapitalize="characters" maxLength={10}
                 style={{
                   width: "100%", padding: "16px 18px",
-                  border: "1px solid var(--line-2)", borderRadius: 10, background: "#FDFCF8",
+                  border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream)",
                   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                   fontSize: 22, letterSpacing: "4px", textTransform: "uppercase",
                   color: "var(--ink)", outline: "none", boxSizing: "border-box",
@@ -421,7 +421,7 @@ function MinistriesContent() {
                 <button type="submit" disabled={joiningCode || inviteCode.trim().length < 4} style={{
                   marginTop: 20, padding: "14px 28px", border: "none", borderRadius: 10,
                   background: (joiningCode || inviteCode.trim().length < 4) ? "var(--line-2)" : "var(--plum-2)",
-                  color: (joiningCode || inviteCode.trim().length < 4) ? "#A09A8C" : "#FDFCF8",
+                  color: (joiningCode || inviteCode.trim().length < 4) ? "var(--faint)" : "var(--cream-on-dark)",
                   fontFamily: SANS, fontSize: 15, fontWeight: 500,
                   cursor: (joiningCode || inviteCode.trim().length < 4) ? "not-allowed" : "pointer",
                 }}>

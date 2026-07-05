@@ -228,7 +228,6 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/register-ministry/page.tsx` | Role-gated ministry registration entry point (server component). Not logged in → `/signup?intent=register`; admin-tier → `/onboarding`; non-admin logged-in → "only admins can register" gate. **All "Register your ministry" CTAs must point here.** |
 | `app/admin/page.tsx` | Founder-only admin panel (gated by hardcoded email in proxy.ts) |
 | `app/announcements/[id]/page.tsx` | Shareable announcement detail route |
-| `app/not-admin/page.tsx` | ORPHANED — nothing routes here anymore (the non-admin gate renders inline in `/register-ministry`); public-path allowlist entry is its only reference. Candidate for deletion. |
 | `app/pending/page.tsx` | Shown when user's ministry has `status = 'pending'` |
 | `app/pick-ministry/page.tsx` | Multi-ministry switcher |
 | `app/actions/create-group.ts` | Server action: create chat group + add members |
@@ -253,7 +252,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 ### Middleware
 The auth middleware lives in `proxy.ts` — **not** `middleware.ts` (that file was deleted).
 
-Public routes allowed through: `/`, `/landing`, `/ministries`, `/login`, `/signup`, `/forgot-password`, `/update-password`, `/auth/`, `/api/calendar/`, `/not-admin`, `/register-ministry`.
+Public routes allowed through: `/`, `/landing`, `/ministries`, `/login`, `/signup`, `/forgot-password`, `/update-password`, `/auth/`, `/api/calendar/`, `/register-ministry`.
 
 ### Multi-tenant model
 Every workspace is a **ministry**. All tenant data carries a `ministry_id` FK. RLS policies enforce isolation. Two SECURITY DEFINER helpers bypass profile-table RLS without recursion:

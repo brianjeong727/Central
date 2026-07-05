@@ -91,7 +91,7 @@ export default function AdminPage() {
         )}
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--line-2)] text-[13px] text-[var(--muted-text)] hover:text-[var(--danger)] hover:border-red-200 hover:bg-red-50 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--line-2)] text-[13px] text-[var(--muted-text)] hover:text-[var(--danger)] hover:border-[color-mix(in_srgb,var(--danger)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] transition-colors"
         >
           <LogOut className="w-3.5 h-3.5" />
           Sign out
@@ -120,7 +120,7 @@ export default function AdminPage() {
 
         {!loading && !error && ministries.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-12 h-12 rounded-full bg-[#EFEAE0] flex items-center justify-center mb-4">
+            <div className="w-12 h-12 rounded-full bg-[var(--line-3)] flex items-center justify-center mb-4">
               <Check className="w-5 h-5 text-[var(--muted-text)]" />
             </div>
             <p className="text-[15px] font-semibold text-[var(--ink)] mb-1">All caught up</p>
@@ -190,7 +190,7 @@ export default function AdminPage() {
                   <button
                     onClick={() => handleReject(m.id)}
                     disabled={acting === m.id}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-[var(--line-2)] text-[13px] font-semibold text-[var(--danger)] hover:bg-red-50 hover:border-red-200 disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-[var(--line-2)] text-[13px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] hover:border-[color-mix(in_srgb,var(--danger)_30%,transparent)] disabled:opacity-50 transition-colors"
                   >
                     <X className="w-3.5 h-3.5" />
                     Reject
