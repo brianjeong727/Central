@@ -9,7 +9,7 @@ import {
   Edit3, ArrowLeft, ArrowRight, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
   ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle, ArrowUpRight,
-  FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle, Eye,
+  FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle,
   Sparkles, Layers, Bus, Clock, Star, CornerUpLeft, AlertTriangle, PlusCircle,
 } from "lucide-react"
 import type { Editor } from "@tiptap/core"
@@ -38,7 +38,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sideba
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -2588,18 +2588,13 @@ export function PlanTab({
         )}
 
         {/* Team settings subpage swaps the whole team body (mirrors the event page). */}
-        {openTeam ? teamSettingsEl : (
+        {openTeam ? teamSettingsEl : (() => {
+        // Scrollable team content. Under gov-view (a governance admin viewing a
+        // team they don't belong to), the whole region sits inside the matted
+        // read-only frame — its inner scroll REPLACES the plain scroller below.
+        // Every other path (writable team, picker, receipts) is unchanged.
+        const teamContent = (
         <>
-        {/* Scrollable team content */}
-        <div className="flex-1 overflow-y-auto">
-        {activeTeamId && activeTeamId !== "receipts" && govView && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 56px", background: "var(--ivory)", borderBottom: "1px solid var(--line)" }}>
-            <Eye style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />
-            <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 500 }}>
-              Viewing as admin · read-only
-            </span>
-          </div>
-        )}
         {/* Receipt submission now lives exclusively in the Receipts workspace
             (sidebar → Receipts), filed under a team's receipt category. The old
             per-team-workspace "Submit receipt" affordance was removed in B2. */}
@@ -2840,9 +2835,15 @@ export function PlanTab({
             />
           )
         })()}
-      </div>
         </>
-        )}
+        )
+        const useMat = !!activeTeamId && activeTeamId !== "receipts" && govView
+        return useMat ? (
+          <ReadOnlyMat>{teamContent}</ReadOnlyMat>
+        ) : (
+          <div className="flex-1 overflow-y-auto">{teamContent}</div>
+        )
+        })()}
       </div>
 
       {/* Mobile content. Receipts + Finance render FULL-BLEED (no px-5 wrapper) so their
@@ -2868,16 +2869,12 @@ export function PlanTab({
         </div>
       ) : teamKind === "finance" && activeTeamId && financeCanAccess ? (
         <div className="md:hidden pb-4">
-          {/* govView banner + section strip each carry their own px-5 mobile inset;
-              FinanceWorkspace is bare so its detail SubpageShell stays full-bleed. */}
+          {/* Read-only pill + section strip each carry their own px-5 mobile inset;
+              FinanceWorkspace is bare so its detail SubpageShell stays full-bleed.
+              Mobile uses the lightweight pill (no full mat frame — too cramped). */}
           {govView && (
-            <div className="px-5">
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 10, marginBottom: 16 }}>
-                <Eye style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />
-                <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 500 }}>
-                  Viewing as admin · read-only
-                </span>
-              </div>
+            <div className="px-5" style={{ marginBottom: 16 }}>
+              <ReadOnlyPill />
             </div>
           )}
           <div className="px-5" style={{ marginBottom: 16 }}>
@@ -2902,11 +2899,8 @@ export function PlanTab({
       ) : (
       <div className="md:hidden px-5 pb-4">
         {activeTeamId && govView && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 10, marginBottom: 16 }}>
-            <Eye style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />
-            <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 500 }}>
-              Viewing as admin · read-only
-            </span>
+          <div style={{ marginBottom: 16 }}>
+            <ReadOnlyPill />
           </div>
         )}
         {teamKind === "dgPraise" && activeTeamId && activeTeamAllowed ? (
