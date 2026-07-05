@@ -12325,7 +12325,7 @@ function SmallGroupLeadersTab({
                           transition: "opacity 0.15s",
                         }}
                       >
-                        <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "var(--plum-tint)" : "var(--cream-3)", border: `1px solid ${isNext ? "#C9B8D4" : "var(--line)"}` }}>
+                        <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "var(--plum-tint)" : "var(--cream-3)", border: `1px solid ${isNext ? "color-mix(in srgb, var(--plum) 25%, transparent)" : "var(--line)"}` }}>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase" as const }}>{dow}</span>
                           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: isNext ? "var(--plum)" : "var(--plum-2)", lineHeight: 1, marginTop: 1 }}>{dayNum}</span>
                         </div>
@@ -12336,7 +12336,7 @@ function SmallGroupLeadersTab({
                           </p>
                         </div>
                         {isNext && (
-                          <span style={{ fontSize: 10, fontWeight: 500, color: "var(--plum)", background: "var(--plum-tint)", border: "1px solid #C9B8D4", padding: "2px 8px", borderRadius: 999, letterSpacing: "0.05em", flexShrink: 0 }}>UP NEXT</span>
+                          <span style={{ fontSize: 10, fontWeight: 500, color: "var(--plum)", background: "var(--plum-tint)", border: "1px solid color-mix(in srgb, var(--plum) 25%, transparent)", padding: "2px 8px", borderRadius: 999, letterSpacing: "0.05em", flexShrink: 0 }}>UP NEXT</span>
                         )}
                       </div>
                     )
@@ -12368,7 +12368,7 @@ function SmallGroupLeadersTab({
               />
 
               {rosterError && (
-                <div className="mt-3 px-3 py-2 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl text-[13px] text-red-700">
+                <div className="mt-3 px-3 py-2 bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] rounded-xl text-[13px] text-[var(--danger)]">
                   {rosterError}
                 </div>
               )}
@@ -12553,7 +12553,7 @@ function SmallGroupLeadersTab({
 
                 {isEditing && (
                   <div style={{ marginTop: 10 }}>
-                    {editError && <div style={{ marginBottom: 8, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, fontSize: 12, color: "#B91C1C" }}>{editError}</div>}
+                    {editError && <div style={{ marginBottom: 8, padding: "8px 12px", background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: 10, fontSize: 12, color: "var(--danger)" }}>{editError}</div>}
                     <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8, lineHeight: 1.5 }}>Changes sync to your group chat and will reflect immediately.</p>
                     <div className="flex gap-2">
                       <button onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }} style={{ flex: 1, padding: "9px 0", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
@@ -12813,7 +12813,7 @@ function SmallGroupLeadersTab({
               ) : (
                 <>
                   {rotErr && (
-                    <div className="mt-3 mb-1 px-3 py-2.5 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl text-[13px] text-red-700">
+                    <div className="mt-3 mb-1 px-3 py-2.5 bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] rounded-xl text-[13px] text-[var(--danger)]">
                       {rotErr}
                     </div>
                   )}
@@ -13493,8 +13493,8 @@ function BibleStudySubTab({
               <span style={{
                 fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" as const,
                 padding: "3px 8px", borderRadius: 6,
-                background: sheet.status === "finalized" ? "#E8F5E9" : "#FFF8E7",
-                color: sheet.status === "finalized" ? "var(--success)" : "#8A6200",
+                background: sheet.status === "finalized" ? "color-mix(in srgb, var(--success) 15%, transparent)" : "color-mix(in srgb, var(--warm-tan) 12%, transparent)",
+                color: sheet.status === "finalized" ? "var(--sage)" : "color-mix(in srgb, var(--warm-tan) 75%, var(--ink))",
               }}>
                 {sheet.status === "finalized" ? "Finalized" : "Draft"}
               </span>
@@ -13503,7 +13503,7 @@ function BibleStudySubTab({
               href={sheet.google_doc_url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--plum)", fontWeight: 600, textDecoration: "none" }}
+              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--plum)", fontWeight: 500, textDecoration: "none" }}
             >
               <ExternalLink style={{ width: 12, height: 12 }} />
               Open doc
@@ -13532,7 +13532,7 @@ function BibleStudySubTab({
               {!renderingPdf && pdfPages.length === 0 && sheet.pdf_url && (
                 <div style={{ background: "var(--cream)", borderRadius: 12, border: "1px solid var(--line)", padding: 20, textAlign: "center" as const }}>
                   <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 12 }}>PDF preview unavailable.</p>
-                  <a href={sheet.pdf_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--plum)", fontWeight: 600, textDecoration: "none" }}>
+                  <a href={sheet.pdf_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--plum)", fontWeight: 500, textDecoration: "none" }}>
                     Download PDF →
                   </a>
                 </div>
@@ -13599,7 +13599,7 @@ function BibleStudySubTab({
           {/* Pending annotation input */}
           {pendingAnnotation !== null && (
             <div style={{ background: "var(--cream)", borderRadius: 14, border: "1.5px solid var(--line)", padding: 16 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>Add annotation</p>
+              <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", marginBottom: 8 }}>Add annotation</p>
               <textarea
                 autoFocus
                 value={annotationText}
