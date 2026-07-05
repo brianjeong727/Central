@@ -5433,6 +5433,21 @@ function SetListPdfViewer({
 
 // ── MinistryCalendar ──────────────────────────────────────────────────────────
 
+// Planned / needs-planning status pills — semantic tokens only (DESIGN_SYSTEM §8:
+// no raw traffic-light hex). Text colors are darkened for AA contrast at 10px.
+const PLAN_STATUS_PILL: Record<"planned" | "needsPlanning", React.CSSProperties> = {
+  planned: {
+    fontSize: 10, fontWeight: 500, borderRadius: 9999, padding: "2px 8px",
+    color: "var(--sage)",
+    background: "color-mix(in srgb, var(--success) 15%, transparent)",
+  },
+  needsPlanning: {
+    fontSize: 10, fontWeight: 500, borderRadius: 9999, padding: "2px 8px",
+    color: "color-mix(in srgb, var(--warm-tan) 75%, var(--ink))",
+    background: "color-mix(in srgb, var(--warm-tan) 12%, transparent)",
+  },
+}
+
 const CATEGORY_CONFIG = {
   welcoming: { label: "Welcoming", dot: "var(--plum)", bg: "#EDE5F0", text: "var(--plum)" },
   retreat:   { label: "Retreat",   dot: "var(--body)", bg: "var(--body-bg)", text: "var(--plum)" },
@@ -6518,7 +6533,7 @@ export function MinistryCalendar({
                     <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</span>
                   </div>
                   <span style={{ fontSize: 11, color: "var(--muted-text)", paddingLeft: 14 }}>{item.date}</span>
-                  <span style={{ marginLeft: 14, display: "inline-block", fontSize: 10, fontWeight: 500, color: "#92400E", background: "#FEF3C7", borderRadius: 9999, padding: "2px 8px", width: "fit-content" }}>
+                  <span style={{ ...PLAN_STATUS_PILL.needsPlanning, marginLeft: 14, display: "inline-block", width: "fit-content" }}>
                     Needs planning
                   </span>
                 </div>
@@ -6538,9 +6553,9 @@ export function MinistryCalendar({
                   <span style={{ fontSize: 11, color: "var(--muted-text)", paddingLeft: 14 }}>{dateStr}</span>
                   <div style={{ paddingLeft: 14, display: "flex", alignItems: "center", gap: 6 }}>
                     {isPlanned ? (
-                      <span style={{ fontSize: 10, fontWeight: 500, color: "#14532D", background: "#DCFCE7", borderRadius: 9999, padding: "2px 8px" }}>Planned ✓</span>
+                      <span style={PLAN_STATUS_PILL.planned}>Planned ✓</span>
                     ) : (
-                      <span style={{ fontSize: 10, fontWeight: 500, color: "#92400E", background: "#FEF3C7", borderRadius: 9999, padding: "2px 8px" }}>Needs planning</span>
+                      <span style={PLAN_STATUS_PILL.needsPlanning}>Needs planning</span>
                     )}
                     {canEdit && (
                       <button
