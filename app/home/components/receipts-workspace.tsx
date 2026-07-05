@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { X, Plus, Image as ImageIcon, Settings } from "lucide-react"
-import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, SubpageShell } from "@/components/central"
+import { Plus, Image as ImageIcon, Settings } from "lucide-react"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, SubpageShell, CentralModal } from "@/components/central"
 import { HeaderActionButton } from "./shared"
 import { createClient } from "@/lib/supabase"
 import { SubmitReceiptModal, STATUS_META } from "./finance-workspace"
@@ -526,19 +526,21 @@ function AddCategoryModal({
     onCreated(data)
   }
 
+  // CentralModal shell (§4.17); the submit stays a full-width plum action in the
+  // footer slot.
   return (
-    <div
-      style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(19,16,26,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    <CentralModal onClose={onClose} title="Add category" maxWidth={420}
+      footer={
+        <button
+          onClick={handleSave}
+          disabled={saving || !name.trim()}
+          style={{ width: "100%", height: 46, background: "var(--plum)", color: "var(--cream)", borderRadius: 12, border: "none", fontSize: 15, fontWeight: 600, cursor: saving || !name.trim() ? "default" : "pointer", opacity: saving || !name.trim() ? 0.6 : 1 }}
+        >
+          {saving ? "Adding…" : "Add category"}
+        </button>
+      }
     >
-      <div style={{ background: "var(--cream)", borderRadius: 20, width: "100%", maxWidth: 420, overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px 14px", borderBottom: "1px solid var(--line)" }}>
-          <p style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)" }}>Add category</p>
-          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--ivory)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <X size={14} color="var(--body)" />
-          </button>
-        </div>
-        <div style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
             <label style={labelStyle}>Name</label>
             <input
@@ -559,17 +561,7 @@ function AddCategoryModal({
           </div>
           {error && <p style={{ fontSize: 13, color: "var(--danger)" }}>{error}</p>}
         </div>
-        <div style={{ padding: "12px 20px 20px", borderTop: "1px solid var(--line)" }}>
-          <button
-            onClick={handleSave}
-            disabled={saving || !name.trim()}
-            style={{ width: "100%", height: 46, background: "var(--plum)", color: "var(--cream)", borderRadius: 12, border: "none", fontSize: 15, fontWeight: 600, cursor: saving || !name.trim() ? "default" : "pointer", opacity: saving || !name.trim() ? 0.6 : 1 }}
-          >
-            {saving ? "Adding…" : "Add category"}
-          </button>
-        </div>
-      </div>
-    </div>
+    </CentralModal>
   )
 }
 

@@ -38,7 +38,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sideba
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -1967,29 +1967,12 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
         const label = ROTATION_TYPES.find(r => r.type === confirmSlot.rotation_type)?.label ?? ""
         const dateLine = new Date(confirmSlot.week_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
         return (
-          <div
-            onClick={() => { if (!confirmBusy) setConfirmSlot(null) }}
-            onKeyDown={e => { if (e.key === "Escape" && !confirmBusy) setConfirmSlot(null) }}
-            style={{ position: "fixed", inset: 0, zIndex: 200, background: "color-mix(in srgb, var(--ink) 34%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
-          >
-            <div
-              onClick={e => e.stopPropagation()}
-              style={{ width: "100%", maxWidth: 380, background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 18, padding: "24px 26px", boxShadow: "0 24px 60px color-mix(in srgb, var(--ink) 22%, transparent)" }}
-            >
-              <h3 style={{ fontFamily: "var(--sans)", fontSize: 19, fontWeight: 600, color: "var(--ink)", margin: 0 }}>
-                {isMine ? "Drop this slot?" : "Take this slot?"}
-              </h3>
-              {/* slot detail card */}
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, padding: "12px 14px", background: "var(--cream-2)", border: "1px solid var(--line-2)", borderRadius: 12 }}>
-                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", color: "var(--plum)", flexShrink: 0 }}>
-                  <Calendar className="w-4 h-4" />
-                </span>
-                <div style={{ minWidth: 0 }}>
-                  <p style={{ fontFamily: "var(--sans)", fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{label}</p>
-                  <p style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--body)", margin: "2px 0 0" }}>{dateLine}</p>
-                </div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <CentralModal
+            onClose={() => { if (!confirmBusy) setConfirmSlot(null) }}
+            title={isMine ? "Drop this slot?" : "Take this slot?"}
+            maxWidth={380}
+            footer={
+              <>
                 <CentralButton variant="quiet" size="sm" onClick={() => setConfirmSlot(null)} disabled={confirmBusy}>
                   {isMine ? "Keep it" : "Cancel"}
                 </CentralButton>
@@ -2002,9 +1985,20 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
                     {confirmBusy ? "Signing up…" : "Yes, sign me up"}
                   </CentralButton>
                 )}
+              </>
+            }
+          >
+            {/* slot detail card */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "var(--cream-2)", border: "1px solid var(--line-2)", borderRadius: 12 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", color: "var(--plum)", flexShrink: 0 }}>
+                <Calendar className="w-4 h-4" />
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontFamily: "var(--sans)", fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{label}</p>
+                <p style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--body)", margin: "2px 0 0" }}>{dateLine}</p>
               </div>
             </div>
-          </div>
+          </CentralModal>
         )
       })()}
 
@@ -2103,26 +2097,21 @@ function NewSemesterModal({ onClose, onCreate }: {
   const labelStyle: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }
 
   return (
-    <div
-      onClick={() => { if (!busy) onClose() }}
-      onKeyDown={e => { if (e.key === "Escape" && !busy) onClose() }}
-      style={{ position: "fixed", inset: 0, zIndex: 200, background: "color-mix(in srgb, var(--ink) 34%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+    <CentralModal
+      onClose={() => { if (!busy) onClose() }}
+      eyebrow="Rotations"
+      title="New semester"
+      maxWidth={520}
+      footer={
+        <>
+          <CentralButton variant="quiet" size="sm" onClick={() => { if (!busy) onClose() }} disabled={busy}>Cancel</CentralButton>
+          <CentralButton variant="primary" size="sm" onClick={submit} disabled={!canCreate}>
+            {busy ? "Creating…" : "Create"}
+          </CentralButton>
+        </>
+      }
     >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto", background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 18, padding: "26px 28px", boxShadow: "0 24px 60px color-mix(in srgb, var(--ink) 22%, transparent)" }}
-      >
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-          <div>
-            <p style={{ ...labelStyle, margin: 0 }}>Rotations</p>
-            <h3 style={{ fontFamily: "var(--sans)", fontSize: 22, fontWeight: 600, color: "var(--ink)", margin: "5px 0 0" }}>New semester</h3>
-          </div>
-          <button onClick={() => { if (!busy) onClose() }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--muted-text)", flexShrink: 0 }}>
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <FormField label="Semester name">
             <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Fall 2026" />
           </FormField>
@@ -2168,15 +2157,7 @@ function NewSemesterModal({ onClose, onCreate }: {
             </div>
           </div>
         </div>
-
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 24 }}>
-          <CentralButton variant="quiet" size="sm" onClick={() => { if (!busy) onClose() }} disabled={busy}>Cancel</CentralButton>
-          <CentralButton variant="primary" size="sm" onClick={submit} disabled={!canCreate}>
-            {busy ? "Creating…" : "Create"}
-          </CentralButton>
-        </div>
-      </div>
-    </div>
+    </CentralModal>
   )
 }
 
@@ -5948,50 +5929,44 @@ export function EventDetailPopover({
       " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
 
   return (
-    <div
-      style={{ position: "fixed", inset: 0, zIndex: 120, background: "rgba(19,16,26,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}
-      onClick={onClose}
-    >
-      <div
-        style={{ background: "var(--cream-panel)", borderRadius: 16, padding: "24px", maxWidth: 480, width: "100%", maxHeight: 500, overflowY: "auto", boxShadow: "0 8px 40px rgba(19,16,26,0.16)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
-          <span style={{ fontSize: 11, fontWeight: 500, color: cfg.text, background: cfg.bg, padding: "3px 10px", borderRadius: 9999 }}>
-            {cfg.label}
-          </span>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-            <X className="w-4 h-4 text-[var(--muted-text)]" />
-          </button>
-        </div>
-        <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 24, fontWeight: 400, color: "var(--ink)", margin: "0 0 8px" }}>
-          {event.title}
-        </h2>
-        <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 6px" }}>{dateStr}</p>
-        {event.location && (
-          <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 12px" }}>📍 {event.location}</p>
-        )}
-        {event.description && (
-          <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.6, margin: "0 0 16px" }}>{event.description}</p>
-        )}
-        <CentralButton
-          variant="primary" size="sm"
-          onClick={() => onPlan(event)}
-          style={{ marginBottom: 8, width: "100%" }}
-        >
-          Plan this event →
-        </CentralButton>
-        {(canEdit || event.created_by === userId) && (
-          <button
-            onClick={() => onDelete(event.id)}
-            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--line)", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, color: "var(--danger)" }}
+    <CentralModal
+      onClose={onClose}
+      title={event.title}
+      maxWidth={480}
+      z={200}
+      footer={
+        <>
+          {(canEdit || event.created_by === userId) && (
+            <button
+              onClick={() => onDelete(event.id)}
+              style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--line)", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, color: "var(--danger)" }}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete event
+            </button>
+          )}
+          <CentralButton
+            variant="primary" size="sm"
+            onClick={() => onPlan(event)}
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            Delete event
-          </button>
-        )}
+            Plan this event →
+          </CentralButton>
+        </>
+      }
+    >
+      <div style={{ marginBottom: 12 }}>
+        <span style={{ fontSize: 11, fontWeight: 500, color: cfg.text, background: cfg.bg, padding: "3px 10px", borderRadius: 9999 }}>
+          {cfg.label}
+        </span>
       </div>
-    </div>
+      <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 6px" }}>{dateStr}</p>
+      {event.location && (
+        <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 12px" }}>📍 {event.location}</p>
+      )}
+      {event.description && (
+        <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.6, margin: 0 }}>{event.description}</p>
+      )}
+    </CentralModal>
   )
 }
 
@@ -7984,18 +7959,13 @@ export function EventPlanWorkspace({
 
                 {/* Section-move date-change confirmation (dated task → different window) */}
                 {pendingSectionMove && (
-                  <div
-                    style={{ position: "fixed", inset: 0, zIndex: 210, background: "color-mix(in srgb, var(--ink) 35%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
-                    onClick={() => { if (!sectionMoveBusy) setPendingSectionMove(null) }}
-                  >
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-callout)", padding: "22px 24px", maxWidth: 380, width: "100%", boxShadow: "0 8px 40px color-mix(in srgb, var(--ink) 16%, transparent)" }}
-                    >
-                      <p style={{ fontSize: 15, lineHeight: 1.5, color: "var(--ink)", margin: 0 }}>
-                        This will change this task&rsquo;s date to fit the {sectionDefs.find((s) => s.key === pendingSectionMove.sectionKey)?.label ?? "section"} window. Continue?
-                      </p>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12, marginTop: 20 }}>
+                  <CentralModal
+                    onClose={() => { if (!sectionMoveBusy) setPendingSectionMove(null) }}
+                    title="Change task date?"
+                    maxWidth={380}
+                    z={210}
+                    footer={
+                      <>
                         <button
                           onClick={() => setPendingSectionMove(null)}
                           disabled={sectionMoveBusy}
@@ -8010,9 +7980,13 @@ export function EventPlanWorkspace({
                         >
                           {sectionMoveBusy ? "Moving…" : "Continue"}
                         </button>
-                      </div>
-                    </div>
-                  </div>
+                      </>
+                    }
+                  >
+                    <p style={{ fontSize: 15, lineHeight: 1.5, color: "var(--ink)", margin: 0 }}>
+                      This will change this task&rsquo;s date to fit the {sectionDefs.find((s) => s.key === pendingSectionMove.sectionKey)?.label ?? "section"} window. Continue?
+                    </p>
+                  </CentralModal>
                 )}
               </div>
             )}
@@ -8330,28 +8304,34 @@ export function EventPlanWorkspace({
 
             {/* ── Log a pain point modal (§4.17 creation modal) ── */}
             {ppModalOpen && canEdit && (
-              <div
-                onClick={() => setPpModalOpen(false)}
-                style={{ position: "fixed", inset: 0, zIndex: 200, background: "color-mix(in srgb, var(--ink) 32%, transparent)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
-              >
-                <div
-                  onClick={e => e.stopPropagation()}
-                  style={{ width: "100%", maxWidth: 560, maxHeight: "88vh", overflowY: "auto", background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 18, padding: "26px 28px", boxShadow: "0 24px 60px color-mix(in srgb, var(--ink) 22%, transparent)" }}
-                >
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-                    <div>
-                      <p style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>Log a pain point</p>
-                      <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 400, color: "var(--ink)", letterSpacing: -0.3, margin: "5px 0 0" }}>Add to the record</h3>
-                      <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.5, margin: "8px 0 0", maxWidth: 420 }}>
-                        Capture what tripped this class up so the next one doesn&apos;t hit the same wall.
-                      </p>
+              <CentralModal
+                onClose={() => setPpModalOpen(false)}
+                eyebrow="Log a pain point"
+                title="Add to the record"
+                maxWidth={560}
+                footer={
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap", width: "100%" }}>
+                    <span style={{ fontSize: 12, color: "var(--muted-text)" }}>
+                      Adding to {CURRENT_CLASS_YEAR.replace("-", "–")} · signed as {members.find(m => m.id === userId)?.name ?? "you"}
+                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <CentralButton variant="secondary" size="sm" onClick={() => setPpModalOpen(false)}>Cancel</CentralButton>
+                      <CentralButton
+                        variant="primary" size="sm"
+                        onClick={handleAddPainPoint}
+                        disabled={addingPp || !ppTitle.trim()}
+                      >
+                        {addingPp ? "Adding…" : "Add to record"}
+                      </CentralButton>
                     </div>
-                    <button onClick={() => setPpModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: "var(--muted-text)", flexShrink: 0 }}>
-                      <X className="w-5 h-5" />
-                    </button>
                   </div>
+                }
+              >
+                  <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.5, margin: "0 0 20px", maxWidth: 420 }}>
+                    Capture what tripped this class up so the next one doesn&apos;t hit the same wall.
+                  </p>
 
-                  <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     {/* Pain point (title) */}
                     <FormField label="Pain point">
                       <Input
@@ -8405,24 +8385,7 @@ export function EventPlanWorkspace({
                       />
                     </FormField>
                   </div>
-
-                  <div style={{ marginTop: 22, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 12, color: "var(--muted-text)" }}>
-                      Adding to {CURRENT_CLASS_YEAR.replace("-", "–")} · signed as {members.find(m => m.id === userId)?.name ?? "you"}
-                    </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <CentralButton variant="secondary" size="sm" onClick={() => setPpModalOpen(false)}>Cancel</CentralButton>
-                      <CentralButton
-                        variant="primary" size="sm"
-                        onClick={handleAddPainPoint}
-                        disabled={addingPp || !ppTitle.trim()}
-                      >
-                        {addingPp ? "Adding…" : "Add to record"}
-                      </CentralButton>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              </CentralModal>
             )}
 
             {/* ── Sub-events (Welcome Week) ── */}
@@ -11594,25 +11557,22 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
       {mounted && createPortal(
         <>
         {confirmDelete && (
-          <div
-            className="fixed inset-0 z-[90] flex items-center justify-center animate-backdrop-in"
-            style={{ background: "rgba(20,16,26,0.32)" }}
-            onClick={e => { if (e.target === e.currentTarget) setConfirmDelete(false) }}
-          >
-            <div className="animate-dialog-in" style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
-              <div style={{ padding: "26px 26px 20px" }}>
-                <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 8 }}>Danger zone</p>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 400, color: "var(--ink)", lineHeight: 1.15, margin: "0 0 10px" }}>Delete this team?</h2>
-                <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
-                  <span style={{ fontWeight: 500, color: "var(--ink)" }}>{localTeamName}</span> and its roles will be permanently removed. This can&apos;t be undone.
-                </p>
-              </div>
-              <div style={{ display: "flex", gap: 10, padding: "0 26px 24px", justifyContent: "flex-end" }}>
+          <CentralModal
+            onClose={() => setConfirmDelete(false)}
+            eyebrow="Danger zone"
+            title="Delete this team?"
+            maxWidth={420}
+            footer={
+              <>
                 <CentralButton variant="secondary" onClick={() => setConfirmDelete(false)}>Cancel</CentralButton>
                 <CentralButton variant="danger-solid" onClick={handleDeleteTeam}>Delete team</CentralButton>
-              </div>
-            </div>
-          </div>
+              </>
+            }
+          >
+            <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+              <span style={{ fontWeight: 500, color: "var(--ink)" }}>{localTeamName}</span> and its roles will be permanently removed. This can&apos;t be undone.
+            </p>
+          </CentralModal>
         )}
         {replaceCtx && (() => {
         const isCoPres = presidentMembers.length >= 2
@@ -11620,57 +11580,52 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
         const close = () => { if (!replacing) { setReplaceCtx(null); setReplacePickId(null) } }
         const presLabel = (presidentRole?.name ?? "President")
         return (
-          <div
-            className="fixed inset-0 z-[90] flex items-center justify-center animate-backdrop-in"
-            style={{ background: "rgba(20,16,26,0.32)" }}
-            onClick={e => { if (e.target === e.currentTarget) close() }}
-          >
-            <div className="animate-dialog-in" style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
-              <div style={{ padding: "26px 26px 20px" }}>
-                <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 8 }}>{presLabel}</p>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 400, color: "var(--ink)", lineHeight: 1.15, margin: "0 0 10px" }}>
-                  {isCoPres ? "Replace a co-president?" : `Replace the ${presLabel.toLowerCase()}?`}
-                </h2>
-                {isCoPres ? (
-                  <>
-                    <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: "0 0 16px" }}>
-                      There are 2 co-presidents. Which one is{" "}
-                      <span style={{ fontWeight: 500, color: "var(--ink)" }}>{replaceCtx.targetName}</span> replacing?
-                    </p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {presidentMembers.map(p => {
-                        const picked = replacePickId === p.user_id
-                        return (
-                          <button
-                            key={p.user_id}
-                            onClick={() => setReplacePickId(p.user_id)}
-                            style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${picked ? "var(--plum)" : "var(--line)"}`, background: picked ? "var(--ivory)" : "var(--cream)", cursor: "pointer", textAlign: "left" as const, transition: "all 0.12s" }}
-                          >
-                            <MonogramChip initials={getInitials(p.name)} className="w-8 h-8 text-[12px] font-semibold" />
-                            <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{p.name}</span>
-                            <div style={{ width: 18, height: 18, borderRadius: 999, border: `1.5px solid ${picked ? "var(--plum)" : "var(--line-2)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                              {picked && <div style={{ width: 9, height: 9, borderRadius: 999, background: "var(--plum)" }} />}
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </>
-                ) : (
-                  <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
-                    <span style={{ fontWeight: 500, color: "var(--ink)" }}>{presidentMembers[0]?.name}</span> is the {presLabel.toLowerCase()}. Replace them with{" "}
-                    <span style={{ fontWeight: 500, color: "var(--ink)" }}>{replaceCtx.targetName}</span>?
-                  </p>
-                )}
-              </div>
-              <div style={{ display: "flex", gap: 10, padding: "0 26px 24px", justifyContent: "flex-end" }}>
+          <CentralModal
+            onClose={close}
+            eyebrow={presLabel}
+            title={isCoPres ? "Replace a co-president?" : `Replace the ${presLabel.toLowerCase()}?`}
+            maxWidth={420}
+            footer={
+              <>
                 <button onClick={close} disabled={replacing} style={{ height: 38, padding: "0 16px", background: "transparent", border: "1px solid var(--line)", borderRadius: 10, color: "var(--body)", fontSize: 14, cursor: replacing ? "not-allowed" : "pointer" }}>Cancel</button>
                 <CentralButton variant="primary" size="md" onClick={confirmReplace} disabled={confirmDisabled} style={{ height: 38, padding: "0 20px" }}>
                   {replacing ? "Replacing…" : "Replace"}
                 </CentralButton>
-              </div>
-            </div>
-          </div>
+              </>
+            }
+          >
+            {isCoPres ? (
+              <>
+                <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: "0 0 16px" }}>
+                  There are 2 co-presidents. Which one is{" "}
+                  <span style={{ fontWeight: 500, color: "var(--ink)" }}>{replaceCtx.targetName}</span> replacing?
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {presidentMembers.map(p => {
+                    const picked = replacePickId === p.user_id
+                    return (
+                      <button
+                        key={p.user_id}
+                        onClick={() => setReplacePickId(p.user_id)}
+                        style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${picked ? "var(--plum)" : "var(--line)"}`, background: picked ? "var(--ivory)" : "var(--cream)", cursor: "pointer", textAlign: "left" as const, transition: "all 0.12s" }}
+                      >
+                        <MonogramChip initials={getInitials(p.name)} className="w-8 h-8 text-[12px] font-semibold" />
+                        <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{p.name}</span>
+                        <div style={{ width: 18, height: 18, borderRadius: 999, border: `1.5px solid ${picked ? "var(--plum)" : "var(--line-2)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          {picked && <div style={{ width: 9, height: 9, borderRadius: 999, background: "var(--plum)" }} />}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            ) : (
+              <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+                <span style={{ fontWeight: 500, color: "var(--ink)" }}>{presidentMembers[0]?.name}</span> is the {presLabel.toLowerCase()}. Replace them with{" "}
+                <span style={{ fontWeight: 500, color: "var(--ink)" }}>{replaceCtx.targetName}</span>?
+              </p>
+            )}
+          </CentralModal>
         )
       })()}
         </>,
