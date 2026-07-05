@@ -2,7 +2,9 @@
 
 import { Home, MessageCircle, User, ClipboardList, BookOpen } from "lucide-react"
 
-type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "give" | "profile" | "settings" | "forms" | "congregation"
+// "network" is included so activeTab can carry it (admin-only, desktop-nav-only);
+// it is intentionally NOT added to TABS_BASE so it never renders in the mobile nav.
+type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "give" | "profile" | "settings" | "forms" | "congregation" | "network"
 
 interface BottomNavProps {
   activeTab: Tab

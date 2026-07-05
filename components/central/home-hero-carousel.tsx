@@ -98,7 +98,10 @@ export function HeroFrame({ children, style, bare = false }: { children: ReactNo
 // ── Constant section eyebrow above the hero ("Featured" + plum dot) ───────────
 // (No arrow offset anymore — carousel nav lives BELOW the frame, so the label
 // always sits flush with the frame's left edge.)
-export function HeroSectionLabel({ breathe = false }: { breathe?: boolean }) {
+// `action` — right-aligned slot for the section's object action (e.g. the
+// leader-only Curate button). This row IS the hero's body content header
+// (Convention #15: section actions live here, never in the TabPageHeader).
+export function HeroSectionLabel({ breathe = false, action }: { breathe?: boolean; action?: React.ReactNode }) {
   return (
     <div
       style={{
@@ -120,6 +123,7 @@ export function HeroSectionLabel({ breathe = false }: { breathe?: boolean }) {
       >
         Featured
       </span>
+      {action && <div style={{ marginLeft: "auto", flexShrink: 0 }}>{action}</div>}
     </div>
   )
 }

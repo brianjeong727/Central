@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
-export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "give" | "profile" | "settings" | "forms" | "congregation"
+export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "give" | "profile" | "settings" | "forms" | "congregation" | "network"
 
 export interface Profile {
   id: string
@@ -306,7 +306,9 @@ export interface CreateAnnouncementModalProps {
   ministryId: string
   existing?: Announcement
   onClose: () => void
-  onSuccess: (ann: Announcement) => void
+  // formMeta carries the final attachment state so the optimistic card can
+  // show/hide "Fill out form" immediately (no wait for revalidation).
+  onSuccess: (ann: Announcement, formMeta: { has_form: boolean; form_id: string | null }) => void
 }
 
 export interface AnnouncementsTabProps {

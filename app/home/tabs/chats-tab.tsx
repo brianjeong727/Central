@@ -9,7 +9,7 @@ import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
 import { useNavState } from "../nav-state"
@@ -773,22 +773,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       {/* Destructive-action confirm — top-layer portal (transform-safe), matching
           the team-settings migration's delete dialog. */}
       {mounted && confirmAction && createPortal(
-        <div
-          className="fixed inset-0 z-[130] flex items-center justify-center animate-backdrop-in"
-          style={{ background: "rgba(20,16,26,0.32)" }}
-          onClick={(e) => { if (e.target === e.currentTarget) setConfirmAction(null) }}
-        >
-          <div className="animate-dialog-in" style={{ width: 420, maxWidth: "calc(100vw - 32px)", background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 18, boxShadow: "0 30px 80px rgba(20,16,26,0.18)", overflow: "hidden" }}>
-            <div style={{ padding: "26px 26px 20px" }}>
-              <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 8px" }}>{confirmAction === "delete" ? "Danger zone" : "Confirm"}</p>
-              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 400, color: "var(--ink)", lineHeight: 1.15, margin: "0 0 10px" }}>
-                {confirmAction === "archive" ? "Archive this chat?" : confirmAction === "unarchive" ? "Unarchive this chat?" : "Delete this chat?"}
-              </h2>
-              <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
-                {confirmAction === "archive" ? "Members won't be able to send new messages." : confirmAction === "unarchive" ? "Members will be able to send messages again." : "This chat and all its messages will be permanently removed. This can't be undone."}
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: 10, padding: "0 26px 24px", justifyContent: "flex-end" }}>
+        <CentralModal
+          onClose={() => setConfirmAction(null)}
+          eyebrow={confirmAction === "delete" ? "Danger zone" : "Confirm"}
+          title={confirmAction === "archive" ? "Archive this chat?" : confirmAction === "unarchive" ? "Unarchive this chat?" : "Delete this chat?"}
+          maxWidth={420}
+          footer={
+            <>
               <CentralButton variant="secondary" size="md" onClick={() => setConfirmAction(null)}>Cancel</CentralButton>
               <CentralButton
                 variant={confirmAction === "unarchive" ? "primary" : "danger-solid"}
@@ -797,9 +788,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               >
                 {confirmAction === "archive" ? "Archive" : confirmAction === "unarchive" ? "Unarchive" : "Delete"}
               </CentralButton>
-            </div>
-          </div>
-        </div>,
+            </>
+          }
+        >
+          <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+            {confirmAction === "archive" ? "Members won't be able to send new messages." : confirmAction === "unarchive" ? "Members will be able to send messages again." : "This chat and all its messages will be permanently removed. This can't be undone."}
+          </p>
+        </CentralModal>,
         document.body
       )}
     </SubpageShell>
@@ -2440,28 +2435,50 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         const hasPending = pendingVoteOption !== undefined
         const confirmLabel = pendingVoteOption === "unvote" ? "Remove vote" : vUserVote !== undefined ? "Change vote" : "Submit vote"
         return (
-          <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/40" onClick={closeFn}>
-            <div className="w-full max-w-[390px] md:max-w-[440px] bg-[var(--cream-panel)] rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center px-5 pt-5 pb-3 border-b border-[#F0EDE6] flex-shrink-0">
-                <div className="flex-1">
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Poll</p>
-                  {vPoll && <p className="text-[11px] text-[var(--muted-text)] mt-0.5">{vTotal} vote{vTotal !== 1 ? "s" : ""}</p>}
-                </div>
-                {vTotal > 0 && (
-                  <button
-                    onClick={() => { setVotersPollId(votingPollId); closeFn() }}
-                    className="text-[12px] font-semibold text-[var(--plum)] hover:opacity-70 transition-opacity mr-3"
-                  >
-                    See all votes
-                  </button>
-                )}
-                <button onClick={closeFn} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--body-bg)] transition-colors">
-                  <X className="w-4 h-4 text-[var(--body)]" />
+          <CentralModal
+            onClose={closeFn}
+            title="Poll"
+            sheet
+            maxWidth={440}
+            footer={vPoll ? (
+              <>
+                <button
+                  onClick={closeFn}
+                  className="flex-1 py-2.5 rounded-xl border border-[var(--line)] text-[13px] font-semibold text-[var(--body)] hover:bg-[var(--body-bg)] transition-colors"
+                >
+                  Cancel
                 </button>
-              </div>
+                <button
+                  disabled={!hasPending}
+                  onClick={async () => {
+                    if (pendingVoteOption === "unvote") {
+                      await handleVote(votingPollId, vUserVote!)
+                    } else if (pendingVoteOption !== undefined) {
+                      await handleVote(votingPollId, pendingVoteOption)
+                    }
+                    closeFn()
+                  }}
+                  className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-colors"
+                  style={{ background: hasPending ? "var(--plum)" : "var(--line)", color: hasPending ? "var(--cream-on-dark)" : "var(--muted-text)", cursor: hasPending ? "pointer" : "default" }}
+                >
+                  {hasPending ? confirmLabel : "Select an option"}
+                </button>
+              </>
+            ) : undefined}
+          >
               {vPoll ? (
-                <>
-                  <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-2">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] text-[var(--muted-text)]">{vTotal} vote{vTotal !== 1 ? "s" : ""}</p>
+                      {vTotal > 0 && (
+                        <button
+                          onClick={() => { setVotersPollId(votingPollId); closeFn() }}
+                          className="text-[12px] font-semibold text-[var(--plum)] hover:opacity-70 transition-opacity"
+                        >
+                          See all votes
+                        </button>
+                      )}
+                    </div>
                     <p className="text-[15px] font-bold text-[var(--ink)] leading-snug mb-2">{vPoll.question}</p>
                     {vPoll.options.map((opt, oi) => {
                       const count = vCounts[oi] ?? 0
@@ -2519,38 +2536,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                       )
                     })}
                   </div>
-                  {/* Confirm footer — only shown when user has made a selection */}
-                  <div className="px-5 pb-5 pt-3 border-t border-[#F0EDE6] flex-shrink-0 flex gap-2">
-                    <button
-                      onClick={closeFn}
-                      className="flex-1 py-2.5 rounded-xl border border-[var(--line)] text-[13px] font-semibold text-[var(--body)] hover:bg-[var(--body-bg)] transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      disabled={!hasPending}
-                      onClick={async () => {
-                        if (pendingVoteOption === "unvote") {
-                          await handleVote(votingPollId, vUserVote!)
-                        } else if (pendingVoteOption !== undefined) {
-                          await handleVote(votingPollId, pendingVoteOption)
-                        }
-                        closeFn()
-                      }}
-                      className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-colors"
-                      style={{ background: hasPending ? "var(--plum)" : "var(--line)", color: hasPending ? "var(--cream-on-dark)" : "var(--muted-text)", cursor: hasPending ? "pointer" : "default" }}
-                    >
-                      {hasPending ? confirmLabel : "Select an option"}
-                    </button>
-                  </div>
-                </>
               ) : (
                 <div className="flex items-center justify-center py-10">
                   <div className="w-5 h-5 border-2 border-[var(--plum)] border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
-            </div>
-          </div>
+          </CentralModal>
         )
       })()}
 
@@ -2559,15 +2550,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         const vPoll = pollsData[votersPollId]
         const vVoters = pollVoters[votersPollId] ?? []
         return (
-          <div className="fixed inset-0 z-[210] flex items-end md:items-center justify-center bg-black/40" onClick={() => setVotersPollId(null)}>
-            <div className="w-full max-w-[390px] md:max-w-[440px] bg-[var(--cream-panel)] rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center px-5 pt-5 pb-3 border-b border-[#F0EDE6] flex-shrink-0">
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)", flex: 1 }}>Votes</p>
-                <button onClick={() => setVotersPollId(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--body-bg)] transition-colors">
-                  <X className="w-4 h-4 text-[var(--body)]" />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
+          <CentralModal onClose={() => setVotersPollId(null)} title="Votes" sheet maxWidth={440} z={210}>
+              <div className="flex flex-col gap-5">
                 {vPoll ? vPoll.options.map((opt, oi) => {
                   const optVoters = vVoters.filter(v => v.option_index === oi)
                   if (optVoters.length === 0) return null
@@ -2598,22 +2582,28 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   </div>
                 )}
               </div>
-            </div>
-          </div>
+          </CentralModal>
         )
       })()}
 
       {/* Poll creator modal */}
       {showPollCreator && !groupArchived && (
-        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/40" onClick={() => setShowPollCreator(false)}>
-          <div className="w-full max-w-[390px] md:max-w-[440px] bg-[var(--cream-panel)] rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F0EEF8]">
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Create a poll</p>
-              <button onClick={() => setShowPollCreator(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--body-bg)] transition-colors">
-                <X className="w-4 h-4 text-[var(--body)]" />
-              </button>
-            </div>
-            <div className="px-5 py-4 flex flex-col gap-3">
+        <CentralModal
+          onClose={() => setShowPollCreator(false)}
+          title="Create a poll"
+          sheet
+          maxWidth={440}
+          footer={
+            <button
+              onClick={handleCreatePoll}
+              disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}
+              className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-colors text-[14px]"
+            >
+              Create poll
+            </button>
+          }
+        >
+            <div className="flex flex-col gap-3">
               <div>
                 <label className="text-[11px] font-semibold text-[var(--muted-text)] uppercase tracking-wide mb-1.5 block">Question</label>
                 <input
@@ -2654,30 +2644,20 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 </div>
               </div>
             </div>
-            <div className="px-5 pb-5">
-              <button
-                onClick={handleCreatePoll}
-                disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}
-                className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-colors text-[14px]"
-              >
-                Create poll
-              </button>
-            </div>
-          </div>
-        </div>
+        </CentralModal>
       )}
 
-      {/* Forward sheet */}
+      {/* Forward sheet — the forwarded-message preview lives in the BODY (footer
+          is reserved for action rows per §4.17). */}
       {forwardingMsg && (
-        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center" onClick={() => setForwardingMsg(null)}>
-          <div className="w-full max-w-[390px] md:max-w-[420px] bg-[var(--cream-panel)] rounded-t-2xl md:rounded-2xl shadow-2xl border border-[var(--line)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-[#F0EEF8]">
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Forward to</p>
-              <button onClick={() => setForwardingMsg(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--body-bg)] transition-colors">
-                <X className="w-4 h-4 text-[var(--body)]" />
-              </button>
-            </div>
-            <div className="px-3 py-2 max-h-[50vh] overflow-y-auto">
+        <CentralModal
+          onClose={() => setForwardingMsg(null)}
+          title="Forward to"
+          sheet
+          maxWidth={420}
+        >
+            <p className="text-[11px] text-[var(--muted-text)] truncate mb-2">&ldquo;{replyPreviewLabel(forwardingMsg.content, forwardingMsg.attachment_type, forwardingMsg.attachment_name).slice(0, 60)}{forwardingMsg.content.length > 60 ? "…" : ""}&rdquo;</p>
+            <div>
               {forwardGroups.length === 0 ? (
                 <p className="text-[13px] text-[var(--muted-text)] px-3 py-4">No other chats available.</p>
               ) : (
@@ -2700,11 +2680,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 ))
               )}
             </div>
-            <div className="px-5 py-3 border-t border-[#F0EEF8]">
-              <p className="text-[11px] text-[var(--muted-text)] truncate">"{replyPreviewLabel(forwardingMsg.content, forwardingMsg.attachment_type, forwardingMsg.attachment_name).slice(0, 60)}{forwardingMsg.content.length > 60 ? "…" : ""}"</p>
-            </div>
-          </div>
-        </div>
+        </CentralModal>
       )}
     </div>
     </AnimateIn>

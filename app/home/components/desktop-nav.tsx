@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Receipt } from "lucide-react"
+import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Receipt, Waypoints } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { PlanLineIcon, sidebarItemStyle } from "./shared"
 import { DirectoryListSkeleton } from "@/components/central"
@@ -112,6 +112,7 @@ export function DesktopSidebar({
     { id: "chats",     label: "Messages",  icon: MessageCircle },
     ...(showPlan ? [{ id: "plan" as Tab, label: "Workspace", icon: ClipboardList }] : []),
     { id: "directory", label: "People",    icon: BookOpen },
+    ...(isAdmin ? [{ id: "network" as Tab, label: "Network", icon: Waypoints }] : []),
     { id: "profile",   label: "You",       icon: User },
   ]
 
@@ -126,6 +127,7 @@ export function DesktopSidebar({
         return activeTeamName ?? userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? "Workspace"
       }
       case "directory":    return "People"
+      case "network":      return "Network"
       case "congregation": return "Congregation"
       case "profile":      return profileSection === "journal" ? "Journal" : "Profile"
       default:             return "Home"
@@ -177,6 +179,17 @@ export function DesktopSidebar({
             <Receipt className="w-3.5 h-3.5" style={{ marginRight: 8, flexShrink: 0 }} />
             <span style={{ flex: 1 }}>Receipts</span>
           </button>
+        </div>
+      )
+    }
+
+    // ── Network: standalone top-level tab — clean panel, no sub-items ─────────
+    if (activeTab === "network") {
+      return (
+        <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
+          <p style={{ fontSize: 12, color: MUTED, padding: "4px 8px", lineHeight: 1.5 }}>
+            Cross-ministry — coming soon
+          </p>
         </div>
       )
     }
