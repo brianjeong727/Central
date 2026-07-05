@@ -263,6 +263,8 @@ export function SettingsTab({
   const [givingSaved, setGivingSaved] = useState({ name: "", info: "" })
   const [savingGiving, setSavingGiving] = useState(false)
   const [givingSaveMsg, setGivingSaveMsg] = useState(false)
+  const [editingGiving, setEditingGiving] = useState(false)
+  const [givingError, setGivingError] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -351,17 +353,18 @@ export function SettingsTab({
   }
 
   // ── Giving (offering) info ──────────────────────────────────────────────────
-  const givingChanged = givingName.trim() !== givingSaved.name.trim() || givingInfo.trim() !== givingSaved.info.trim()
   async function handleSaveGiving() {
     if (!isAdmin) return
     const info = givingInfo.trim(); const name = givingName.trim()
     setSavingGiving(true)
+    setGivingError(null)
     const { error } = await supabase.from("ministry_giving").upsert(
       { ministry_id: ministryId, zelle_info: info || null, zelle_name: name || null, updated_by: userId, updated_at: new Date().toISOString() },
       { onConflict: "ministry_id" }
     )
     setSavingGiving(false)
-    if (!error) { setGivingSaved({ name, info }); setGivingSaveMsg(true); setTimeout(() => setGivingSaveMsg(false), 2500) }
+    if (error) { setGivingError(error.message || "Couldn't save offering info."); return }
+    setGivingSaved({ name, info }); setEditingGiving(false); setGivingSaveMsg(true); setTimeout(() => setGivingSaveMsg(false), 2500)
   }
 
   // ── Role change ─────────────────────────────────────────────────────────────
@@ -577,11 +580,11 @@ export function SettingsTab({
   async function handleAddSchool() {
     const name = newSchoolName.trim()
     const abbr = newSchoolAbbr.trim()
-    if (!name || !abbr) return
+    if (!name) return
     setSavingSchool(true)
     setSchoolError(null)
     const { data, error } = await supabase.from("ministry_schools").insert({ ministry_id: ministryId, name, abbreviation: abbr, sort_order: schools.length }).select("id, name, abbreviation, sort_order").single()
-    if (error || !data) { setSchoolError("Failed to add school."); setSavingSchool(false); return }
+    if (error || !data) { setSchoolError(error?.message ? `Couldn't add school — ${error.message}` : "Failed to add school."); setSavingSchool(false); return }
     setSchools(prev => [...prev, data as { id: string; name: string; abbreviation: string; sort_order: number }])
     setNewSchoolName("")
     setNewSchoolAbbr("")
@@ -840,7 +843,7 @@ export function SettingsTab({
                           {schools.map(s => (
                             <span key={s.id} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, background: "var(--ivory)", color: "var(--plum-2)", border: "1px solid var(--line-2)", fontSize: 13 }}>
                               <span style={{ fontWeight: 500 }}>{s.name}</span>
-                              <span style={{ color: "var(--muted-text)", fontSize: 12 }}>({s.abbreviation})</span>
+                              {s.abbreviation && <span style={{ color: "var(--muted-text)", fontSize: 12 }}>({s.abbreviation})</span>}
                               {isAdmin && <button onClick={() => handleDeleteSchool(s.id)} style={{ background: "none", border: "none", padding: 0, color: "var(--muted-text)", cursor: "pointer", lineHeight: 1, fontSize: 16 }}>×</button>}
                             </span>
                           ))}
@@ -851,11 +854,11 @@ export function SettingsTab({
                           {schoolError && <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>{schoolError}</p>}
                           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
                             <input autoFocus type="text" placeholder="School name (e.g. University of Pittsburgh)" value={newSchoolName} onChange={e => setNewSchoolName(e.target.value)} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
-                            <input type="text" placeholder="Abbreviation (e.g. Pitt)" value={newSchoolAbbr} onChange={e => setNewSchoolAbbr(e.target.value)} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+                            <input type="text" placeholder="Abbreviation (optional, e.g. Pitt)" value={newSchoolAbbr} onChange={e => setNewSchoolAbbr(e.target.value)} style={{ width: "100%", border: "1.5px solid var(--line-2)", borderRadius: 8, padding: "7px 10px", fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                           </div>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={() => { setAddingSchool(false); setNewSchoolName(""); setNewSchoolAbbr(""); setSchoolError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
-                            <button onClick={handleAddSchool} disabled={savingSchool || !newSchoolName.trim() || !newSchoolAbbr.trim()} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingSchool ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingSchool ? 0.6 : 1 }}>{savingSchool ? "Adding…" : "Add"}</button>
+                            <button onClick={handleAddSchool} disabled={savingSchool || !newSchoolName.trim()} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (savingSchool || !newSchoolName.trim()) ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: (savingSchool || !newSchoolName.trim()) ? 0.45 : 1 }}>{savingSchool ? "Adding…" : "Add"}</button>
                           </div>
                         </div>
                       )}
@@ -868,22 +871,44 @@ export function SettingsTab({
               {isAdmin && (
                 <section>
                   <div style={{ marginBottom: 16 }}>
-                    <SectionHeader eyebrow="Giving" title="Offering info" titleSize={20} />
+                    <SectionHeader eyebrow="Giving" title="Offering info" titleSize={20} action={isAdmin && !editingGiving && (givingSaved.name || givingSaved.info) ? (<button onClick={() => { setGivingName(givingSaved.name); setGivingInfo(givingSaved.info); setGivingError(null); setEditingGiving(true) }} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>Edit</button>) : undefined} />
                     <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>The Zelle destination members see on the Give tab. The recipient name lets givers confirm they&apos;re sending to the right place.</p>
                   </div>
-                  <div style={{ ...CARD, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 520 }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                      <label style={{ fontSize: 12, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Recipient name</label>
-                      <input type="text" value={givingName} onChange={e => setGivingName(e.target.value)} placeholder="The Korean Central Church of Pittsburgh" style={{ background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 12, padding: "12px 14px", fontSize: 14, color: "var(--ink)", outline: "none", width: "100%", boxSizing: "border-box" }} />
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                      <label style={{ fontSize: 12, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Zelle email or phone</label>
-                      <input type="text" value={givingInfo} onChange={e => setGivingInfo(e.target.value)} placeholder="giving@yourministry.org" style={{ background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 12, padding: "12px 14px", fontSize: 14, color: "var(--ink)", outline: "none", width: "100%", boxSizing: "border-box" }} />
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <button onClick={handleSaveGiving} disabled={!givingChanged || savingGiving} style={{ height: 40, padding: "0 20px", background: "var(--plum)", color: "var(--cream-panel)", borderRadius: 10, fontSize: 13, fontWeight: 500, border: "none", cursor: (!givingChanged || savingGiving) ? "default" : "pointer", opacity: (!givingChanged || savingGiving) ? 0.5 : 1 }}>{savingGiving ? "Saving…" : "Save offering info"}</button>
-                      {givingSaveMsg && <span style={{ fontSize: 13, color: "var(--plum)" }}>Saved</span>}
-                    </div>
+                  <div style={{ ...CARD, padding: "20px 22px", maxWidth: 520 }}>
+                    {editingGiving ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                        {givingError && <p style={{ fontSize: 13, color: "var(--danger)", margin: 0 }}>{givingError}</p>}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                          <label style={{ fontSize: 12, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Recipient name</label>
+                          <input type="text" value={givingName} onChange={e => setGivingName(e.target.value)} placeholder="The Korean Central Church of Pittsburgh" style={{ background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 12, padding: "12px 14px", fontSize: 14, color: "var(--ink)", outline: "none", width: "100%", boxSizing: "border-box" }} />
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                          <label style={{ fontSize: 12, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Zelle email or phone</label>
+                          <input type="text" value={givingInfo} onChange={e => setGivingInfo(e.target.value)} placeholder="giving@yourministry.org" style={{ background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 12, padding: "12px 14px", fontSize: 14, color: "var(--ink)", outline: "none", width: "100%", boxSizing: "border-box" }} />
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <CentralButton variant="secondary" size="sm" onClick={() => { setGivingName(givingSaved.name); setGivingInfo(givingSaved.info); setGivingError(null); setEditingGiving(false) }} style={{ flex: 1 }}>Cancel</CentralButton>
+                          <CentralButton variant="primary" size="sm" onClick={handleSaveGiving} disabled={savingGiving} style={{ flex: 1 }}>{savingGiving ? "Saving…" : "Save changes"}</CentralButton>
+                        </div>
+                      </div>
+                    ) : (givingSaved.name || givingSaved.info) ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                        <div>
+                          <p style={{ fontSize: 12, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>Recipient name</p>
+                          <p style={{ fontSize: 14, color: "var(--ink)", margin: "5px 0 0" }}>{givingSaved.name || <span style={{ color: "var(--muted-text)" }}>Not set</span>}</p>
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 12, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>Zelle email or phone</p>
+                          <p style={{ fontSize: 14, color: "var(--ink)", margin: "5px 0 0" }}>{givingSaved.info || <span style={{ color: "var(--muted-text)" }}>Not set</span>}</p>
+                        </div>
+                        {givingSaveMsg && <p style={{ fontSize: 13, color: "var(--plum)", margin: 0 }}>Saved ✓</p>}
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
+                        <p style={{ fontSize: 14, color: "var(--muted-text)", margin: 0, lineHeight: 1.55 }}>No offering info set yet. Add your Zelle destination so members can give on the Give tab.</p>
+                        <CentralButton variant="primary" size="sm" onClick={() => { setGivingName(givingSaved.name); setGivingInfo(givingSaved.info); setGivingError(null); setEditingGiving(true) }}>Add offering info</CentralButton>
+                      </div>
+                    )}
                   </div>
                 </section>
               )}
