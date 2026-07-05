@@ -210,7 +210,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/home/tabs/settings-tab.tsx` | Settings tab — admin-only; ministry settings, member management, roles |
 | `app/home/tabs/forms-tab.tsx` | Forms tab — announcement-linked forms, form fill overlay (FormFillView), admin responses view (FormResponsesView) |
 | `app/home/tabs/congregation-tab.tsx` | Congregation tab — pastor-only; congregation polling and pulse questions |
-| `app/home/components/home-slide-manager.tsx` | Home hero curation overlay — leaders add upcoming events / announcements (published only) as reference slides AND upload photo slides (caption + eyebrow; dark `panel_color` computed once at upload via client canvas), reorder, and remove; writes to `home_slides` (ministry_id on every write). Photo uploads reuse the `announcement-images` bucket under `home-slides/{ministryId}/`. |
+| `app/home/components/home-slide-manager.tsx` | Home hero curation overlay — leaders add upcoming events / announcements (published only) as reference slides, reorder, and remove; photo-slide upload is SHELVED behind a "Coming soon" placeholder (the `panel_color` upload pipeline exists but is not exposed); writes to `home_slides` (ministry_id on every write). Photo uploads reuse the `announcement-images` bucket under `home-slides/{ministryId}/`. |
 | `app/home/components/command-palette.tsx` | ⌘K command palette — quick nav, person/chat/announcement search |
 | `app/home/components/desktop-nav.tsx` | Desktop sidebar navigation |
 | `app/home/components/shared.tsx` | Shared UI primitives used across tab files |
@@ -431,6 +431,7 @@ Permission tiers:
 | Chat settings | 110 |
 | Emoji dismiss overlay | 155 |
 | Emoji picker | 160 |
+| Modals (`CentralModal`) | 200 (override e.g. 210 only to stack above another overlay) |
 
 ## Layout Rules
 - **Mobile container:** `max-w-[390px] mx-auto` — always, never full-width on mobile views.

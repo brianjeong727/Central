@@ -371,12 +371,21 @@ For meeting notes, transition notes, activity feeds.
 - Helper line below: 11px `#A09A8C`, left = keyboard hint, right = audience scope.
 - **Composer bar container:** no top divider, background continuous with the chat body background token. The bar blends into the thread — only the input pill itself carries a distinct affordance. The reply preview, attachment preview, and archived-state bars use the same background and no top border.
 
-### 4.17 Modal (for **creation only**, never navigation)
-Modals are reserved for *new-X* flows where context needs to be preserved (e.g. quick-add behind a calendar). For opening existing entities, **always navigate to a page**. Use sparingly.
+### 4.17 Modal (for **creation/config only**, never navigation)
+Modals are reserved for *new-X* and configure-X flows where context needs to be preserved (e.g. quick-add behind a calendar, curating the home hero). For opening existing entities, **always navigate to a page**. Use sparingly.
 
-- Backdrop: `rgba(20,16,26,0.32)`.
-- Panel: 520–600 wide, cream bg, 1px `#E2DDCF`, radius 18, shadow `0 30px 80px rgba(20,16,26,0.18)`.
-- Close button: 28 sq, radius 8, 1px `#E2DDCF`, top-right.
+**Every modal renders through `CentralModal`** (`components/central/central-modal.tsx`) — hand-rolled fixed-overlay panels are design debt. The canonical anatomy (ratified 2026-07-04, from the curate-hero manager):
+
+- **Backdrop:** `rgba(19,16,26,0.55)` ink veil, no blur, `animate-backdrop-in`. Click-away closes.
+- **Panel:** `var(--cream-2)` surface, radius `var(--r-callout)`, **no border, no shadow** — separation comes from the dark veil, not elevation. `maxWidth` per content (360 pickers · 420–480 forms · 520–560 wide forms), `maxHeight 85vh`, `animate-dialog-in`.
+- **Header:** optional mono eyebrow (10px, 1.2px tracking, uppercase, `--muted-text`) over a serif 22/400 `--ink` title; hairline (`--line`) below; 32px circular X top-right (`--ivory` fill, 1px `--line`).
+- **Body:** scrollable, `20px 24px` padding. Section labels inside use the mono eyebrow style.
+- **Footer (optional):** action row above a top hairline — confirm/submit buttons live here, right-aligned (or full-width for single primary actions).
+- **Closes three ways, always:** X · backdrop click · Escape (built into the component).
+- **Z-index:** 200 default; override (e.g. 210) only when a modal must stack above another overlay.
+- **Sheet variant** (`sheet` prop): bottom-pinned with rounded top corners on mobile, centered panel on md+ — for thumb-reach flows (polls, receipt submit).
+
+Exceptions (not CentralModal): the command palette (top-anchored nav chrome), the image lightbox, and full-screen page-like overlays (§4.18 subpages, ChatScreen).
 
 ### 4.18 Triggered subpage
 A **subpage** is a body button opening a temporary view or action surface (a note detail, a record detail, a fill-out form, an editor). It is **not** a modal.
@@ -559,7 +568,7 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 7. **No left-border-accent rounded callout cards.** The only left-rule pattern allowed is the editorial quote (§4.13), the timeline rail (§4.12), and — as a **single authorized exception (July 2026)** — the **Events "Up Next" card** (§4.21): a `cream-3` rounded callout with a `border-left: 3px solid var(--plum)` marking the closest upcoming event in the team Events agenda. This is the one sanctioned left-border rounded callout; do not generalize it to any other card.
 8. **No gradient backgrounds outside the hero banner.** Cream surfaces never have gradients. **Scoped exception (July 2026): the checklist high-priority row highlight.** A `priority === 'high'` task row in the event Checklist carries a solid light-plum tint across the whole row — `background: color-mix(in srgb, var(--plum) 7%, transparent)` (a flat highlight, NOT a gradient and NOT a left-border rail). This is the one place a light-plum row highlight marks state; it reads as a subtle "flagged" wash, not a plum surface. Scoped to this list — do not reuse it elsewhere. (Priority is a binary high/not-high flag, toggled in the row editor.)
 9. **No iconography invented for "fun" decoration.** Icons are functional. If a slot would otherwise be empty, prefer a dashed placeholder over decorative icons.
-10. **No drop shadows on cards.** The only shadow allowed is on a centered modal panel (§4.17).
+10. **No drop shadows anywhere.** Cards separate by border and surface tone; modals separate via the §4.17 ink veil, not elevation (ratified 2026-07-04 — the modal-shadow carve-out is retired).
 11. **No `Inter` for big numbers.** Stat numbers are serif.
 12. **Sidebar holds workspace, teams, and a team's nested sections/events — never a global event dump.** Within a team's planning workspace, the team's sections (General, Plan, Resources, Groups, Rotations) live in the sidebar, and events nest under the Plan section as children. This is intentional and scoped to the target ministry size (see §0): a team carries a small, bounded set of events (roughly under ten), so nesting them keeps navigation to a single vertical hierarchy and avoids stacked horizontal tab rows. Events are sorted by date. Do NOT nest events in the sidebar OUTSIDE a team's Plan section, and do NOT treat unbounded event growth as a case to design for here — that is explicitly out of scope (§0).
 13. **No "Plan this event" launchpad modal between calendar and event.** Removed.

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { X, ChevronUp, ChevronDown, Plus, CalendarDays, Megaphone, Image as ImageIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner } from "./shared"
+import { CentralModal } from "@/components/central"
 
 // Curation overlay for the home hero carousel. Reference slides (upcoming events
 // / announcements); add, reorder, remove. Writes go straight to home_slides
@@ -152,85 +153,16 @@ export function HomeSlideManager({
     return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" })
   }
 
+  // Shell is the shared CentralModal (§4.17) — this manager's anatomy IS the
+  // canonical modal pattern; it now consumes the component that codifies it.
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 120,
-        background: "rgba(19,16,26,0.55)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "0 20px",
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: "var(--cream-2, var(--cream-panel))",
-          borderRadius: "var(--r-callout)",
-          width: "100%",
-          maxWidth: 480,
-          maxHeight: "85vh",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "20px 24px",
-            borderBottom: "1px solid var(--line)",
-            flexShrink: 0,
-          }}
-        >
-          <div>
-            <div style={MONO}>Home hero</div>
-            <h2
-              style={{
-                fontFamily: "var(--serif)",
-                fontSize: 22,
-                fontWeight: 400,
-                color: "var(--ink)",
-                margin: "4px 0 0",
-              }}
-            >
-              Curate slides
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 999,
-              border: "1px solid var(--line)",
-              background: "var(--ivory)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            <X style={{ width: 16, height: 16, color: "var(--ink)" }} />
-          </button>
-        </div>
-
+    <CentralModal onClose={onClose} eyebrow="Home hero" title="Curate slides" maxWidth={480}>
         {loading ? (
-          <div style={{ padding: 24 }}>
+          <div style={{ padding: 4 }}>
             <Spinner />
           </div>
         ) : (
-          <div style={{ overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 24 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
             {/* Current slides */}
             <section>
               <div style={{ ...MONO, marginBottom: 12 }}>Current slides · {slides.length}</div>
@@ -374,8 +306,7 @@ export function HomeSlideManager({
             </section>
           </div>
         )}
-      </div>
-    </div>
+    </CentralModal>
   )
 }
 

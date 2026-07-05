@@ -30,7 +30,7 @@ import { BreadcrumbProvider, useBreadcrumbExtra } from "./breadcrumb-context"
 // the matching Item-2 skeleton where one exists, otherwise the shared Spinner.
 import { HomeTab } from "./tabs/home-tab"
 import { Spinner } from "./components/shared"
-import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, ProfileTabSkeleton } from "@/components/central"
+import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, ProfileTabSkeleton, CentralModal } from "@/components/central"
 import type { CalendarEvent } from "./types"
 import type { DirectoryMember } from "./types"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
@@ -1259,11 +1259,16 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       />
 
 
+      {/* Grad prompt — CentralModal shell (§4.17). Dismissing without choosing
+          (X / click-away / Escape) is a soft close: it re-prompts next session,
+          unlike "Stay" which persists grad_prompt_dismissed. */}
       {showGradPrompt && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "rgba(19,16,26,0.55)", backdropFilter: "blur(4px)" }}>
-          <div style={{ background: "var(--cream-panel)", borderRadius: 20, padding: "36px 32px", maxWidth: 400, width: "100%", boxShadow: "0 24px 80px rgba(19,16,26,0.18)" }}>
-            <div style={{ fontFamily: "ui-monospace, Menlo, monospace", fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase", marginBottom: 10 }}>Class of {initialProfile.graduation_year}</div>
-            <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, lineHeight: 1.08, letterSpacing: "-0.02em", color: "var(--ink)", margin: "0 0 10px" }}>Congratulations, graduate.</h2>
+        <CentralModal
+          onClose={() => setShowGradPrompt(false)}
+          eyebrow={`Class of ${initialProfile.graduation_year}`}
+          title="Congratulations, graduate."
+          maxWidth={400}
+        >
             <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.6, margin: "0 0 28px" }}>
               You&apos;ve reached your graduation year. Would you like to stay in {ministryName} or remove yourself from the ministry?
             </p>
@@ -1289,8 +1294,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 {gradPromptLoading ? "Leaving…" : "Leave ministry"}
               </button>
             </div>
-          </div>
-        </div>
+        </CentralModal>
       )}
     </div>
   )
