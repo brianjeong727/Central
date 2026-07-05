@@ -106,6 +106,19 @@ export const WORKSPACE_PRESETS: WorkspacePreset[] = [
     ],
   },
   {
+    id: "slides",
+    name: "Slides",
+    emoji: "📽️",
+    iconKey: "slides",
+    description: "Sunday slides and lyric decks",
+    teamType: "standard",
+    comingSoon: true,
+    roles: [
+      { name: "President", is_president: true, permissions: ["can_generate_slides", "can_view_worship_set", "can_manage_team"] },
+      { name: "Member", permissions: ["can_generate_slides", "can_view_worship_set"] },
+    ],
+  },
+  {
     id: "dg_praise",
     name: "DG Praise Team",
     emoji: "🎵",
