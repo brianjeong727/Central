@@ -102,18 +102,18 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
 
   return (
     <div className="fixed inset-0 z-[60] bg-[var(--cream-panel)] flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
-      <div className="flex flex-col w-full h-full bg-[var(--cream-panel)] md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:shadow-2xl md:overflow-hidden">
+      <div className="flex flex-col w-full h-full bg-[var(--cream-panel)] md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:border md:border-[var(--line)] md:overflow-hidden">
 
         {/* Header */}
         <div className="flex-shrink-0 border-b border-[var(--line)]">
           <div className="flex items-center justify-between px-5 pt-12 pb-3 md:pt-6">
             <button
               onClick={onClose}
-              className="size-9 bg-[var(--cream-panel)] border border-[var(--line)] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0 shadow-[0_1px_3px_rgba(19,16,26,0.05)]"
+              className="size-9 bg-[var(--cream-panel)] border border-[var(--line)] rounded-full flex items-center justify-center hover:bg-[var(--cream-2)] transition-colors flex-shrink-0"
             >
               <X className="w-4 h-4 text-[var(--ink)]" />
             </button>
-            <span style={{ fontSize: "10px", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: 600, color: "var(--muted-text)" }}>
+            <span style={{ fontSize: "10px", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: 400, color: "var(--muted-text)" }}>
               {groupType === "church" ? "Church Chat" : "New Chat"}
             </span>
           </div>
@@ -138,8 +138,8 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
           {/* Chat name — adapts to selection state */}
           {noMembers && (
             // No members selected: show traditional name input (needed for church chats)
-            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
-              <label className="text-[10px] font-semibold text-[var(--muted-text)] tracking-wider uppercase block mb-2">Chat Name</label>
+            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] px-4 pt-4 pb-4">
+              <label className="text-[10px] font-normal text-[var(--muted-text)] tracking-wider uppercase block mb-2">Chat Name</label>
               <input
                 type="text"
                 value={customName}
@@ -153,13 +153,13 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
 
           {isGroup && (
             // 2+ members: show auto-name with optional edit link
-            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] shadow-[0_1px_3px_rgba(19,16,26,0.04)] px-4 pt-4 pb-4">
+            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] px-4 pt-4 pb-4">
               <div className="flex items-center justify-between mb-2">
-                <label className="text-[10px] font-semibold text-[var(--muted-text)] tracking-wider uppercase">Chat Name</label>
+                <label className="text-[10px] font-normal text-[var(--muted-text)] tracking-wider uppercase">Chat Name</label>
                 <button
                   type="button"
                   onClick={() => { setShowNameEdit((v) => !v); if (!showNameEdit) setCustomName("") }}
-                  className="text-[11px] font-semibold text-[var(--muted-text)] hover:text-[var(--plum)] transition-colors"
+                  className="text-[11px] font-medium text-[var(--muted-text)] hover:text-[var(--plum)] transition-colors"
                 >
                   {showNameEdit ? "Use default" : "Edit name"}
                 </button>
@@ -185,9 +185,9 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
           {/* Member search */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <label style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }}>Add Members</label>
+              <label style={{ fontSize: "10px", fontWeight: 400, letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }}>Add Members</label>
               {selectedMembers.length > 0 && (
-                <span className="text-[12px] text-[var(--plum)] font-semibold">{selectedMembers.length} selected</span>
+                <span className="text-[12px] text-[var(--plum)] font-medium">{selectedMembers.length} selected</span>
               )}
             </div>
             <div className="relative">
@@ -197,7 +197,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search members…"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[var(--faint)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 border border-[var(--line)] focus:border-[var(--plum)]/30 transition-all shadow-[0_1px_2px_rgba(19,16,26,0.04)]"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[var(--faint)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 border border-[var(--line)] focus:border-[var(--plum)]/30 transition-all"
               />
             </div>
 
@@ -209,7 +209,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                     key={m.id}
                     type="button"
                     onClick={() => toggleMember(m.id)}
-                    className="flex items-center gap-1.5 bg-[var(--plum)] text-white px-3 py-1.5 rounded-full text-[12px] font-semibold hover:bg-[var(--plum-2)] transition-colors"
+                    className="flex items-center gap-1.5 bg-[var(--plum)] text-white px-3 py-1.5 rounded-full text-[12px] font-medium hover:bg-[var(--plum-2)] transition-colors"
                   >
                     {m.name.split(" ")[0]}
                     <X className="w-3 h-3 opacity-70" />
@@ -218,7 +218,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
               </div>
             )}
 
-            <div className="flex flex-col rounded-2xl border border-[var(--line)] bg-[var(--cream-panel)] overflow-hidden shadow-[0_1px_3px_rgba(19,16,26,0.04)]">
+            <div className="flex flex-col rounded-2xl border border-[var(--line)] bg-[var(--cream-panel)] overflow-hidden">
               {filtered.length === 0 ? (
                 <p className="text-center text-[13px] text-[var(--muted-text)]/50 py-8">No members found</p>
               ) : (
@@ -230,17 +230,17 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                       type="button"
                       onClick={() => toggleMember(member.id)}
                       className={`flex items-center gap-3 px-4 py-3 transition-all text-left ${
-                        idx > 0 ? "border-t border-[#F2EDE8]" : ""
-                      } ${isSelected ? "bg-[var(--plum)]/[0.04]" : "hover:bg-[#FAFAF8]"}`}
+                        idx > 0 ? "border-t border-[var(--cream-2)]" : ""
+                      } ${isSelected ? "bg-[var(--plum)]/[0.04]" : "hover:bg-[var(--cream)]"}`}
                     >
                       <MonogramChip
                         initials={getInitials(member.name)}
                         avatarUrl={member.avatar_url}
-                        className="w-9 h-9 font-bold text-[11px] shadow-sm"
+                        className="w-9 h-9 font-medium text-[11px]"
                         style={{ fontFamily: "var(--font-instrument-serif)" }}
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-[var(--ink)]">{member.name}</p>
+                        <p className="text-[13px] font-medium text-[var(--ink)]">{member.name}</p>
                         {member.graduation_year && (
                           <p className="text-[11px] text-[var(--muted-text)]">Class of {member.graduation_year}</p>
                         )}
@@ -263,7 +263,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
           <button
             onClick={handleCreate}
             disabled={creating || !effectiveName.trim()}
-            className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-bold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide"
+            className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-medium py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide"
           >
             {creating ? "Creating…" : isDM ? `Message ${selectedMembers[0]?.name.split(" ")[0]}` : `Create Chat${selectedMembers.length > 0 ? ` · ${selectedMembers.length + 1} members` : ""}`}
           </button>
@@ -475,7 +475,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     const isVisitor = r === "visitor"
     return (
       <span style={{
-        fontSize: size === "sm" ? 9 : 11, fontWeight: 600,
+        fontSize: size === "sm" ? 9 : 11, fontWeight: 500,
         padding: size === "sm" ? "2px 6px" : "3px 10px", borderRadius: 999,
         background: isAdminTier ? "color-mix(in srgb, var(--plum) 8%, transparent)" : isVisitor ? "var(--cream)" : "var(--ivory)",
         color: isAdminTier ? "var(--plum)" : "var(--muted-text)",
@@ -527,9 +527,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     className="w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left"
                     style={{ background: selected ? "color-mix(in srgb, var(--plum) 6%, transparent)" : "var(--cream)", borderColor: selected ? "color-mix(in srgb, var(--plum) 20%, transparent)" : "var(--line)" }}
                   >
-                    <MonogramChip initials={getInitials(profile.name)} avatarUrl={profile.avatar_url} className="w-9 h-9 font-bold text-[10px]" />
+                    <MonogramChip initials={getInitials(profile.name)} avatarUrl={profile.avatar_url} className="w-9 h-9 font-medium text-[10px]" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold truncate" style={{ color: "var(--ink)" }}>{profile.name}</p>
+                      <p className="text-[13px] font-medium truncate" style={{ color: "var(--ink)" }}>{profile.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {profile.role && roleBadge(profile.role, "sm")}
                         {profile.graduation_year && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>Class of {profile.graduation_year}</span>}
@@ -547,7 +547,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             <div className="py-4 pb-8 md:pb-5 mt-5" style={{ borderTop: "1px solid var(--line)" }}>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[14px]" style={{ color: "var(--body)", margin: 0 }}>
-                  <span style={{ fontWeight: 600, color: "var(--ink)" }}>{selectedToAdd.length}</span> {selectedToAdd.length === 1 ? "person" : "people"} selected
+                  <span style={{ fontWeight: 500, color: "var(--ink)" }}>{selectedToAdd.length}</span> {selectedToAdd.length === 1 ? "person" : "people"} selected
                 </p>
                 <ContentActionButton label={saving ? "Adding…" : `Add ${selectedToAdd.length} ${selectedToAdd.length === 1 ? "member" : "members"}`} onClick={handleAddMembers} disabled={saving} />
               </div>
@@ -560,7 +560,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         {/* Mobile (SubpageShell title is desktop-only, so mobile keeps its own header) */}
         <div className="md:hidden">
           <div className="flex items-center gap-4 mb-6" style={{ paddingTop: 4 }}>
-            <MonogramChip initials={getInitials(displayGroupName)} className="w-12 h-12 font-bold text-[14px]" />
+            <MonogramChip initials={getInitials(displayGroupName)} className="w-12 h-12 font-medium text-[14px]" />
             <div className="flex-1 min-w-0">
               {renaming ? (
                 <input
@@ -569,12 +569,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
                   onBlur={handleRename}
-                  className="text-[17px] font-bold bg-transparent outline-none border-none w-full"
+                  className="text-[17px] font-medium bg-transparent outline-none border-none w-full"
                   style={{ color: "var(--ink)", borderBottom: "1px solid var(--line-2)", padding: 0 }}
                 />
               ) : (
                 <div className="group flex items-center gap-1.5" style={{ cursor: canManage && !isCentralChat ? "text" : "default" }} onClick={canManage && !isCentralChat ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}>
-                  <h2 className="text-[17px] font-bold truncate" style={{ color: "var(--ink)" }}>{displayGroupName}</h2>
+                  <h2 className="text-[17px] font-medium truncate" style={{ color: "var(--ink)" }}>{displayGroupName}</h2>
                   {canManage && !isCentralChat && <Pencil style={{ width: 12, height: 12, color: "var(--muted-text)", flexShrink: 0 }} />}
                 </div>
               )}
@@ -585,7 +585,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           <div className="flex items-center justify-between mb-3">
             <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Members</span>
             {canManage && (
-              <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="text-[12px] font-semibold" style={{ color: "var(--plum)" }}>+ Add</button>
+              <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="text-[12px] font-medium" style={{ color: "var(--plum)" }}>+ Add</button>
             )}
           </div>
           {loading ? <Spinner /> : (
@@ -600,11 +600,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     style={{ background: isConfirming ? "#FDF0F0" : "var(--cream)", borderColor: "var(--line)", transition: "background 0.1s" }}
                     onClick={() => { if (canManage && member.user_id !== userId && !isConfirming) setMobileRevealMemberId((id) => id === member.user_id ? null : member.user_id) }}
                   >
-                    <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-bold text-[10px]" />
+                    <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-medium text-[10px]" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="text-[13px] font-semibold truncate" style={{ color: "var(--ink)" }}>{member.name}</p>
-                        {member.user_id === userId && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
+                        <p className="text-[13px] font-medium truncate" style={{ color: "var(--ink)" }}>{member.name}</p>
+                        {member.user_id === userId && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                         {member.role && roleBadge(member.role, "sm")}
@@ -639,11 +639,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           )}
           {(canArchive || canUnarchive || canLeave || canDelete) && (
             <div className="flex flex-col gap-3 pb-4">
-              <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--danger)", margin: 0 }}>Danger zone</p>
-              {canArchive && <button onClick={() => setConfirmAction("archive")} className="w-full py-3.5 rounded-xl font-semibold text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Archive chat</button>}
-              {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} className="w-full py-3.5 rounded-xl font-semibold text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Unarchive chat</button>}
-              {canLeave && <button onClick={handleLeave} className="w-full py-3.5 rounded-xl font-semibold text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Leave chat</button>}
-              {canDelete && <button onClick={() => setConfirmAction("delete")} className="w-full py-3.5 rounded-xl font-semibold text-[13px]" style={{ background: "transparent", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)" }}>Delete chat</button>}
+              <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--danger)", margin: 0 }}>Danger zone</p>
+              {canArchive && <button onClick={() => setConfirmAction("archive")} className="w-full py-3.5 rounded-xl font-medium text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Archive chat</button>}
+              {canUnarchive && <button onClick={() => setConfirmAction("unarchive")} className="w-full py-3.5 rounded-xl font-medium text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Unarchive chat</button>}
+              {canLeave && <button onClick={handleLeave} className="w-full py-3.5 rounded-xl font-medium text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Leave chat</button>}
+              {canDelete && <button onClick={() => setConfirmAction("delete")} className="w-full py-3.5 rounded-xl font-medium text-[13px]" style={{ background: "transparent", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)" }}>Delete chat</button>}
             </div>
           )}
         </div>
@@ -655,7 +655,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             {/* Hero strip — chat identity + inline rename (page title "Settings" is
                 supplied by SubpageShell, so this name stays ≤ PageTitle scale). */}
             <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 32 }}>
-              <MonogramChip initials={getInitials(displayGroupName)} className="w-[52px] h-[52px] font-bold text-[16px]" />
+              <MonogramChip initials={getInitials(displayGroupName)} className="w-[52px] h-[52px] font-medium text-[16px]" />
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 4 }}>{typeLabel}</p>
                 {renaming ? (
@@ -720,7 +720,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     onMouseLeave={() => setHoveredMemberId(null)}
                     style={{ display: "grid", gridTemplateColumns: "40px 1fr auto auto", alignItems: "center", gap: 14, padding: "15px 20px", borderBottom: i < members.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "#FDF0F0" : "transparent", transition: "background 0.1s" }}
                   >
-                    <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-bold text-[11px]" />
+                    <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-medium text-[11px]" />
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <p style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{member.name}</p>
@@ -754,7 +754,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             )}
             {(canArchive || canUnarchive || canLeave || canDelete) && (
               <div style={{ marginTop: 36 }}>
-                <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--danger)", margin: "0 0 12px" }}>Danger zone</p>
+                <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--danger)", margin: "0 0 12px" }}>Danger zone</p>
                 <div style={{ height: 1, background: "var(--line)", marginBottom: 16 }} />
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                   {canArchive && <button onClick={() => setConfirmAction("archive")} style={{ height: 36, padding: "0 18px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--body)", fontSize: 14, cursor: "pointer" }}>Archive chat</button>}
@@ -2203,7 +2203,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             {!inline && (
               <button
                 onClick={onClose}
-                className="flex-shrink-0 -ml-1 p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors md:hidden"
+                className="flex-shrink-0 -ml-1 p-1 hover:bg-[var(--cream-2)] rounded-lg transition-colors md:hidden"
               >
                 <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
               </button>
@@ -2224,7 +2224,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                       style={{
                         width: 16, height: 16, borderRadius: 99,
                         background: "var(--plum)",
-                        color: "var(--cream-panel)", fontSize: 9, fontWeight: 600,
+                        color: "var(--cream-panel)", fontSize: 9, fontWeight: 500,
                         display: "inline-grid", placeItems: "center",
                         marginLeft: i ? -4 : 0,
                         border: "1.5px solid var(--cream-panel)",
@@ -2252,10 +2252,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             </div>
             {/* Mobile: search + settings */}
             <div className="flex items-center gap-1 flex-shrink-0 md:hidden">
-              <button onClick={openSearch} className="p-1.5 hover:bg-[#F2EDE0] rounded-lg transition-colors">
+              <button onClick={openSearch} className="p-1.5 hover:bg-[var(--cream-2)] rounded-lg transition-colors">
                 <Search className="w-4 h-4 text-[var(--muted-text)]" />
               </button>
-              <button onClick={() => setShowSettings(true)} className="p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors">
+              <button onClick={() => setShowSettings(true)} className="p-1 hover:bg-[var(--cream-2)] rounded-lg transition-colors">
                 <Settings className="w-5 h-5 text-[var(--muted-text)]" />
               </button>
             </div>
@@ -2272,7 +2272,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         >
           <Pin className="w-3.5 h-3.5 text-[var(--plum)] flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-semibold text-[var(--plum)]">{pinnedMessage.sender_name}</p>
+            <p className="text-[11px] font-medium text-[var(--plum)]">{pinnedMessage.sender_name}</p>
             <p className="text-[12px] text-[var(--body)] truncate">
               {replyPreviewLabel(pinnedMessage.content, pinnedMessage.attachment_type, pinnedMessage.attachment_name)}
             </p>
@@ -2295,7 +2295,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <p className="text-[14px] font-semibold text-[var(--ink)]/40">No messages yet</p>
+              <p className="text-[14px] font-medium text-[var(--ink)]/40">No messages yet</p>
               <p className="text-[12px] text-[var(--muted-text)]/40 mt-1">Say hello! 👋</p>
             </div>
           </div>
@@ -2377,7 +2377,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             {/* Typing indicators */}
             {Object.entries(typingUsers).slice(0, 3).map(([uid, { name, avatarUrl }]) => (
               <div key={uid} className="flex items-center gap-2 mt-3">
-                <MonogramChip initials={name.charAt(0).toUpperCase()} avatarUrl={avatarUrl || undefined} className="w-7 h-7 text-[11px] font-bold" />
+                <MonogramChip initials={name.charAt(0).toUpperCase()} avatarUrl={avatarUrl || undefined} className="w-7 h-7 text-[11px] font-medium" />
                 <div className="bg-[var(--cream-panel)] border border-[var(--line)] rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex items-center gap-1">
                   <span className="typing-dot" />
                   <span className="typing-dot" />
@@ -2444,7 +2444,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
               <>
                 <button
                   onClick={closeFn}
-                  className="flex-1 py-2.5 rounded-xl border border-[var(--line)] text-[13px] font-semibold text-[var(--body)] hover:bg-[var(--body-bg)] transition-colors"
+                  className="flex-1 py-2.5 rounded-xl border border-[var(--line)] text-[13px] font-medium text-[var(--body)] hover:bg-[var(--body-bg)] transition-colors"
                 >
                   Cancel
                 </button>
@@ -2458,7 +2458,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                     }
                     closeFn()
                   }}
-                  className="flex-1 py-2.5 rounded-xl text-[13px] font-semibold transition-colors"
+                  className="flex-1 py-2.5 rounded-xl text-[13px] font-medium transition-colors"
                   style={{ background: hasPending ? "var(--plum)" : "var(--line)", color: hasPending ? "var(--cream-on-dark)" : "var(--muted-text)", cursor: hasPending ? "pointer" : "default" }}
                 >
                   {hasPending ? confirmLabel : "Select an option"}
@@ -2473,13 +2473,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                       {vTotal > 0 && (
                         <button
                           onClick={() => { setVotersPollId(votingPollId); closeFn() }}
-                          className="text-[12px] font-semibold text-[var(--plum)] hover:opacity-70 transition-opacity"
+                          className="text-[12px] font-medium text-[var(--plum)] hover:opacity-70 transition-opacity"
                         >
                           See all votes
                         </button>
                       )}
                     </div>
-                    <p className="text-[15px] font-bold text-[var(--ink)] leading-snug mb-2">{vPoll.question}</p>
+                    <p className="text-[15px] font-medium text-[var(--ink)] leading-snug mb-2">{vPoll.question}</p>
                     {vPoll.options.map((opt, oi) => {
                       const count = vCounts[oi] ?? 0
                       const pct = vTotal > 0 ? Math.round((count / vTotal) * 100) : 0
@@ -2502,10 +2502,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isSelected ? "border-[var(--plum)] bg-[var(--plum)]" : "border-[#D8D3C8]"}`}>
+                              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isSelected ? "border-[var(--plum)] bg-[var(--plum)]" : "border-[var(--dashed)]"}`}>
                                 {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                               </div>
-                              <span className={`text-[14px] font-semibold truncate ${isSelected ? "text-[var(--plum)]" : "text-[var(--ink)]"}`}>{opt}</span>
+                              <span className={`text-[14px] font-medium truncate ${isSelected ? "text-[var(--plum)]" : "text-[var(--ink)]"}`}>{opt}</span>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                               {optVoters.length > 0 && (
@@ -2516,21 +2516,21 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                                       initials={v.name.charAt(0).toUpperCase()}
                                       avatarUrl={v.avatar_url}
                                       className={`w-5 h-5 border border-white${vi > 0 ? " -ml-1.5" : ""}`}
-                                      style={{ fontSize: 7, fontWeight: 700 }}
+                                      style={{ fontSize: 7, fontWeight: 500 }}
                                     />
                                   ))}
                                   {count > 3 && (
                                     <div className="-ml-1.5 w-5 h-5 rounded-full bg-[var(--line)] border border-white flex items-center justify-center flex-shrink-0">
-                                      <span style={{ fontSize: 7, fontWeight: 700, color: "var(--body)" }}>+{count - 3}</span>
+                                      <span style={{ fontSize: 7, fontWeight: 500, color: "var(--body)" }}>+{count - 3}</span>
                                     </div>
                                   )}
                                 </div>
                               )}
-                              <span className={`text-[12px] font-semibold ${isSelected ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`}>{count > 0 ? `${pct}%` : ""}</span>
+                              <span className={`text-[12px] font-medium ${isSelected ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`}>{count > 0 ? `${pct}%` : ""}</span>
                             </div>
                           </div>
                           <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-500" style={{ width: vTotal > 0 ? `${pct}%` : "0%", background: isSelected ? "var(--plum)" : "#C4BDB8" }} />
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: vTotal > 0 ? `${pct}%` : "0%", background: isSelected ? "var(--plum)" : "var(--dashed)" }} />
                           </div>
                         </button>
                       )
@@ -2558,7 +2558,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   return (
                     <div key={oi}>
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-[13px] font-semibold text-[var(--ink)]">{opt}</p>
+                        <p className="text-[13px] font-medium text-[var(--ink)]">{opt}</p>
                         <span className="text-[11px] text-[var(--muted-text)] font-medium">{optVoters.length} vote{optVoters.length !== 1 ? "s" : ""}</span>
                       </div>
                       <div className="flex flex-col gap-1.5">
@@ -2568,7 +2568,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                               initials={v.name.charAt(0).toUpperCase()}
                               avatarUrl={v.avatar_url}
                               className="w-7 h-7"
-                              style={{ fontSize: 10, fontWeight: 700 }}
+                              style={{ fontSize: 10, fontWeight: 500 }}
                             />
                             <span className="text-[13px] text-[var(--ink)]">{v.name}</span>
                           </div>
@@ -2597,7 +2597,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             <button
               onClick={handleCreatePoll}
               disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}
-              className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-colors text-[14px]"
+              className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-medium py-3.5 rounded-xl transition-colors text-[14px]"
             >
               Create poll
             </button>
@@ -2605,7 +2605,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         >
             <div className="flex flex-col gap-3">
               <div>
-                <label className="text-[11px] font-semibold text-[var(--muted-text)] uppercase tracking-wide mb-1.5 block">Question</label>
+                <label className="text-[11px] font-normal text-[var(--muted-text)] uppercase tracking-wide mb-1.5 block">Question</label>
                 <input
                   autoFocus
                   value={pollQuestion}
@@ -2615,7 +2615,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 />
               </div>
               <div>
-                <label className="text-[11px] font-semibold text-[var(--muted-text)] uppercase tracking-wide mb-1.5 block">Options</label>
+                <label className="text-[11px] font-normal text-[var(--muted-text)] uppercase tracking-wide mb-1.5 block">Options</label>
                 <div className="flex flex-col gap-2">
                   {pollOptions.map((opt, oi) => (
                     <div key={oi} className="flex items-center gap-2">
@@ -2668,7 +2668,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                     className="w-full flex items-center justify-between px-3 py-3 rounded-xl hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <MonogramChip initials={g.name.charAt(0).toUpperCase()} className="w-9 h-9 text-[12px] font-semibold" />
+                      <MonogramChip initials={g.name.charAt(0).toUpperCase()} className="w-9 h-9 text-[12px] font-medium" />
                       <span className="text-[14px] font-medium text-[var(--ink)]">{g.name}</span>
                     </div>
                     {forwardSentTo === g.id ? (
@@ -2829,7 +2829,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
               setParam("chats", t === "church" ? null : t)
             }}
             style={{
-              flex: 1, padding: "14px 0", fontSize: "14px", fontWeight: 600,
+              flex: 1, padding: "14px 0", fontSize: "14px", fontWeight: 500,
               color: subTab === t ? "var(--ink)" : "var(--muted-text)",
               background: "transparent", border: "none",
               borderBottom: `2px solid ${subTab === t ? "var(--plum)" : "transparent"}`,
@@ -2892,7 +2892,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search chats…"
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[var(--faint)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 border border-[#EFEFEF] focus:border-[var(--plum)]/30 transition-all"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[var(--faint)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 border border-[var(--line-3)] focus:border-[var(--plum)]/30 transition-all"
         />
       </div>
 
@@ -2909,7 +2909,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         {showPlusButton && (
           <button
             onClick={() => setShowCreateChat(subTab)}
-            className="size-8 rounded-xl bg-[var(--cream-panel)] border border-[var(--line)] flex items-center justify-center hover:bg-[#F2EDE0] active:scale-95 transition-all md:size-7 md:rounded-lg"
+            className="size-8 rounded-xl bg-[var(--cream-panel)] border border-[var(--line)] flex items-center justify-center hover:bg-[var(--cream-2)] active:scale-95 transition-all md:size-7 md:rounded-lg"
           >
             <Plus className="w-4 h-4 text-[var(--plum)] md:w-3.5 md:h-3.5" />
           </button>
@@ -2943,7 +2943,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
                 onClick={() => setShowArchived((s) => !s)}
                 className="w-full flex items-center justify-between py-3 px-1 md:px-4"
               >
-                <span className="text-[11px] font-bold text-[var(--muted-text)]/40 uppercase tracking-wider">
+                <span className="text-[11px] font-normal text-[var(--muted-text)]/40 uppercase tracking-wider">
                   Archived · {archivedChurchChats.length}
                 </span>
                 <ChevronDown className={`w-4 h-4 text-[var(--muted-text)]/30 transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />
@@ -3007,17 +3007,17 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="text-[15px] font-semibold text-[var(--ink)] truncate pr-2">{group.name}</h3>
+              <h3 className="text-[15px] font-medium text-[var(--ink)] truncate pr-2">{group.name}</h3>
               {group.last_message_time && <span className="text-[11px] text-[var(--muted-text)] flex-shrink-0">{formatRelativeTime(group.last_message_time)}</span>}
             </div>
             <div className="flex items-center justify-between gap-2">
               <p className="text-[13px] text-[var(--body)] truncate">
                 {group.last_message
-                  ? group.last_sender ? <><span className="font-semibold text-[var(--body)]">{group.last_sender}:</span> {group.last_message}</> : group.last_message
+                  ? group.last_sender ? <><span className="font-medium text-[var(--body)]">{group.last_sender}:</span> {group.last_message}</> : group.last_message
                   : <span className="italic text-[var(--muted-text)]">No messages yet</span>}
               </p>
               {group.unread_count > 0 && (
-                <span className="w-6 h-6 bg-[#C9A34B] rounded-full text-[11px] font-bold text-[var(--ink)] flex items-center justify-center flex-shrink-0">{group.unread_count}</span>
+                <span className="w-6 h-6 bg-[#C9A34B] rounded-full text-[11px] font-medium text-[var(--ink)] flex items-center justify-center flex-shrink-0">{group.unread_count}</span>
               )}
             </div>
           </div>
@@ -3186,7 +3186,7 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
                 flex: 1,
                 padding: "9px 0",
                 fontSize: "11px",
-                fontWeight: 600,
+                fontWeight: 500,
                 color: subTab === t ? "var(--ink)" : "var(--muted-text)",
                 background: "transparent",
                 border: "none",

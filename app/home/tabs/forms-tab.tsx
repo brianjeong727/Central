@@ -987,8 +987,8 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
             <button onClick={() => toggleArchive(item)} title={item.archived ? 'Unarchive' : 'Archive'} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[var(--line-3)] transition-colors">
               {item.archived ? <ArchiveRestore className="w-3.5 h-3.5" style={{ color: 'var(--body)' }} /> : <Archive className="w-3.5 h-3.5" style={{ color: 'var(--body)' }} />}
             </button>
-            <button onClick={() => setConfirmingDeleteId(item.id)} title="Delete" className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-red-50 hover:border-red-200 transition-colors">
-              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+            <button onClick={() => setConfirmingDeleteId(item.id)} title="Delete" className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] hover:border-[color-mix(in_srgb,var(--danger)_25%,transparent)] transition-colors">
+              <Trash2 className="w-3.5 h-3.5 text-[var(--danger)]" />
             </button>
           </div>
         )}

@@ -309,7 +309,7 @@ export function DesktopSidebar({
                 background: "var(--plum-2)", color: "var(--cream)",
                 fontFamily: "var(--sans)", fontSize: 11, lineHeight: 1,
                 padding: "6px 11px", borderRadius: 999,
-                boxShadow: "var(--shadow-modal)", whiteSpace: "nowrap",
+                whiteSpace: "nowrap",
               }}
             >
               {/* Left-pointing caret */}

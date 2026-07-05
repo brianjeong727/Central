@@ -31,6 +31,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--plum-2`      | `#2D0F2E` | Active breadcrumb text, identity hero gradient base (rare) — NOT a button fill (primary CTA fill is `--plum`, see §4.3) |
 | `--plum-deep`   | `#1B0A1E` | Hero gradient dark stop |
 | `--plum-light`  | `#4A1B4D` | Hero gradient light stop |
+| `--plum-tint`   | `#EDE3EE` | Soft plum-tinted pill/badge/panel background — the ONLY sanctioned light-plum surface |
 | `--ink`         | `#13101A` | Primary text |
 | `--body`        | `#5A5466` | Body text, sub-labels |
 | `--muted`       | `#8A8497` | Tertiary text, eyebrow mono, labels |
@@ -569,6 +570,8 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 8. **No gradient backgrounds outside the hero banner.** Cream surfaces never have gradients. **Scoped exception (July 2026): the checklist high-priority row highlight.** A `priority === 'high'` task row in the event Checklist carries a solid light-plum tint across the whole row — `background: color-mix(in srgb, var(--plum) 7%, transparent)` (a flat highlight, NOT a gradient and NOT a left-border rail). This is the one place a light-plum row highlight marks state; it reads as a subtle "flagged" wash, not a plum surface. Scoped to this list — do not reuse it elsewhere. (Priority is a binary high/not-high flag, toggled in the row editor.)
 9. **No iconography invented for "fun" decoration.** Icons are functional. If a slot would otherwise be empty, prefer a dashed placeholder over decorative icons.
 10. **No drop shadows anywhere.** Cards separate by border and surface tone; modals separate via the §4.17 ink veil, not elevation (ratified 2026-07-04 — the modal-shadow carve-out is retired).
+
+**Ratified exception — Home greeting sheen (2026-07-05):** the Home page greeting's animated text sheen (`.greeting-sheen` / `.greeting-sheen-plum`, globals.css) is an approved living-accent: a slow gradient text-fill shimmer on the greeting line only, static under `prefers-reduced-motion`. Scoped to the Home greeting — not a license for gradient text or ambient animation elsewhere.
 11. **No `Inter` for big numbers.** Stat numbers are serif.
 12. **Sidebar holds workspace, teams, and a team's nested sections/events — never a global event dump.** Within a team's planning workspace, the team's sections (General, Plan, Resources, Groups, Rotations) live in the sidebar, and events nest under the Plan section as children. This is intentional and scoped to the target ministry size (see §0): a team carries a small, bounded set of events (roughly under ten), so nesting them keeps navigation to a single vertical hierarchy and avoids stacked horizontal tab rows. Events are sorted by date. Do NOT nest events in the sidebar OUTSIDE a team's Plan section, and do NOT treat unbounded event growth as a case to design for here — that is explicitly out of scope (§0).
 13. **No "Plan this event" launchpad modal between calendar and event.** Removed.

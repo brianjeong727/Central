@@ -346,7 +346,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           <p style={monoStyle}>Options</p>
           <div className="flex items-start gap-3">
             <button type="button" onClick={() => setIsEvent((v) => !v)} style={{ width: 34, height: 20, borderRadius: 999, background: isEvent ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}>
-              <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: isEvent ? "16px" : "2px" }} />
+              <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.2s", left: isEvent ? "16px" : "2px" }} />
             </button>
             <div>
               <p className="text-[13px] font-medium text-[var(--ink)]">This is an event</p>
@@ -364,7 +364,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
               </div>
               <div className="flex items-start gap-3">
                 <button type="button" onClick={() => setShowAttendees((v) => !v)} style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}>
-                  <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
+                  <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
                 </button>
                 <div>
                   <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
@@ -479,7 +479,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                 onClick={() => setIsEvent((v) => !v)}
                 style={{ width: 34, height: 20, borderRadius: 999, background: isEvent ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
               >
-                <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: isEvent ? "16px" : "2px" }} />
+                <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.2s", left: isEvent ? "16px" : "2px" }} />
               </button>
               <div>
                 <p className="text-[13px] font-medium text-[var(--ink)]">This is an event</p>
@@ -501,7 +501,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                     onClick={() => setShowAttendees((v) => !v)}
                     style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
                   >
-                    <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
+                    <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
                   </button>
                   <div>
                     <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
@@ -1062,8 +1062,8 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                       <button onClick={() => openEdit(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: "8px", cursor: "pointer" }} title="Edit">
                         <Edit3 className="w-3.5 h-3.5" style={{ color: "var(--body)" }} />
                       </button>
-                      <button onClick={() => handleDesktopDelete(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "8px", cursor: "pointer" }} title="Delete">
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      <button onClick={() => handleDesktopDelete(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: "8px", cursor: "pointer" }} title="Delete">
+                        <Trash2 className="w-3.5 h-3.5 text-[var(--danger)]" />
                       </button>
                     </div>
                   )}
@@ -1111,7 +1111,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                               <Pin className={`w-3.5 h-3.5 ${ann.is_sub_pinned ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`} style={{ transform: "rotate(-45deg)" }} />
                             </button>
                             <button onClick={() => openEdit(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--line-3)] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[var(--body)]" /></button>
-                            <button onClick={() => handleDesktopDelete(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-50 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                            <button onClick={() => handleDesktopDelete(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-[var(--danger)]" /></button>
                           </>
                         )}
                       </div>
@@ -1123,7 +1123,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
               /* Editorial 2-col cards */
               <div className="grid gap-5" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 {filteredDesktop.map((ann) => (
-                  <article key={ann.id} className="rounded-2xl border border-[var(--line)] bg-[var(--cream)] overflow-hidden hover:shadow-[0_2px_8px_rgba(19,16,26,0.06)] transition-shadow duration-200">
+                  <article key={ann.id} className="rounded-2xl border border-[var(--line)] bg-[var(--cream)] overflow-hidden">
                     <div style={{ padding: "26px 28px 22px" }}>
                       <div className="flex justify-between items-center mb-4">
                         <span style={MONO_STYLE}>{formatDate(ann.created_at)}</span>
@@ -1160,7 +1160,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                                   <Pin className={`w-3.5 h-3.5 ${ann.is_sub_pinned ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`} style={{ transform: "rotate(-45deg)" }} />
                                 </button>
                                 <button onClick={() => openEdit(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[var(--line-3)] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[var(--body)]" /></button>
-                                <button onClick={() => handleDesktopDelete(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-red-50 hover:border-red-200 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                                <button onClick={() => handleDesktopDelete(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] hover:border-[color-mix(in_srgb,var(--danger)_25%,transparent)] transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-[var(--danger)]" /></button>
                               </>
                             )}
                           </div>
@@ -1244,7 +1244,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
   if (featured) {
     return (
       <>
-        <div className="relative rounded-[22px] bg-[var(--plum)] overflow-hidden shadow-[0_2px_8px_rgba(19,16,26,0.08)]">
+        <div className="relative rounded-[22px] bg-[var(--plum)] overflow-hidden">
           <div className="absolute -top-[70px] -right-[70px] w-[220px] h-[220px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.18)_0%,transparent_70%)] pointer-events-none" />
 
           {announcement.image_url && (
@@ -1273,17 +1273,17 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
                       <MoreHorizontal className="w-4 h-4 text-[rgba(246,244,239,0.6)]" />
                     </button>
                     {showMenu && (
-                      <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[var(--line)] py-1 min-w-[140px]">
-                        <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-panel)] transition-colors text-left">
+                      <div className="absolute top-8 right-0 z-[10] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] py-1 min-w-[140px]">
+                        <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left">
                           {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />}
                           {announcement.is_pinned ? "Unpin hero" : "Pin as hero"}
                         </button>
-                        <button onClick={() => { setShowMenu(false); onSubPinToggle?.(announcement.id, announcement.is_sub_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-panel)] transition-colors text-left">
+                        <button onClick={() => { setShowMenu(false); onSubPinToggle?.(announcement.id, announcement.is_sub_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left">
                           <Pin className="w-3.5 h-3.5 text-[var(--plum)]" style={{ transform: "rotate(-45deg)" }} />
                           {announcement.is_sub_pinned ? "Remove from For You" : "Pin to For You"}
                         </button>
-                        <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-panel)] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit</button>
-                        <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
+                        <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit</button>
+                        <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
                       </div>
                     )}
                   </div>
@@ -1298,7 +1298,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
             {announcement.is_event && (
               <>
                 <div className="flex items-center gap-4">
-                  <button onClick={handleRsvp} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[var(--cream-on-dark)] hover:bg-white/30 active:scale-[0.97]" : "bg-[var(--cream-on-dark)] text-[var(--plum)] hover:bg-white active:scale-[0.97]"}`}>
+                  <button onClick={handleRsvp} className={`font-medium py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[var(--cream-on-dark)] hover:bg-white/30 active:scale-[0.97]" : "bg-[var(--cream-on-dark)] text-[var(--plum)] hover:bg-white active:scale-[0.97]"}`}>
                     {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
                   </button>
                   {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "rgba(246,244,239,0.5)" }}>{announcement.rsvp_count} going</span>}
@@ -1327,12 +1327,12 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
 
           {showDeleteConfirm && (
             <div className="absolute inset-0 z-[20] bg-[#3E1540]/95 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-center gap-3 p-7">
-              <div className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-red-400" /></div>
-              <p className="text-[15px] font-bold text-[var(--cream-on-dark)] text-center">Delete this announcement?</p>
+              <div className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-[var(--cream-on-dark)]" /></div>
+              <p className="text-[15px] font-medium text-[var(--cream-on-dark)] text-center">Delete this announcement?</p>
               <p className="text-[12px] text-center -mt-1" style={{ color: "rgba(246,244,239,0.5)" }}>This can&apos;t be undone.</p>
               <div className="flex gap-3 w-full mt-1">
-                <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-white/20 text-[13px] font-semibold text-[var(--cream-on-dark)] hover:bg-white/10 transition-colors disabled:opacity-50">Cancel</button>
-                <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-semibold transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
+                <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-white/20 text-[13px] font-medium text-[var(--cream-on-dark)] hover:bg-white/10 transition-colors disabled:opacity-50">Cancel</button>
+                <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-medium transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
               </div>
             </div>
           )}
@@ -1345,7 +1345,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
   // ── Ivory card ──
   return (
     <>
-      <div className="relative rounded-[22px] bg-[var(--cream)] border border-[var(--line)] overflow-hidden shadow-[0_1px_4px_rgba(19,16,26,0.06)]">
+      <div className="relative rounded-[22px] bg-[var(--cream)] border border-[var(--line)] overflow-hidden">
         {announcement.image_url && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={announcement.image_url} alt={announcement.title} className="w-full h-36 object-cover" />
@@ -1366,13 +1366,13 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
                   <MoreHorizontal className="w-4 h-4 text-[var(--muted-text)]" />
                 </button>
                 {showMenu && (
-                  <div className="absolute top-8 right-0 z-[10] bg-white rounded-xl shadow-[0_4px_14px_rgba(19,16,26,0.12)] border border-[var(--line)] py-1 min-w-[140px]">
-                    <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream)] transition-colors text-left">
+                  <div className="absolute top-8 right-0 z-[10] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] py-1 min-w-[140px]">
+                    <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left">
                       {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />}
                       {announcement.is_pinned ? "Unpin" : "Pin"}
                     </button>
-                    <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream)] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit</button>
-                    <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
+                    <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit</button>
+                    <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
                   </div>
                 )}
               </div>
@@ -1386,7 +1386,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
           {announcement.is_event && (
             <div className="pt-3 border-t border-[var(--line-3)]">
               <div className="flex items-center gap-3">
-                <button onClick={handleRsvp} className={`font-semibold py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[var(--line-3)] text-[var(--body)] hover:bg-[var(--line)] active:scale-[0.97]" : "bg-[var(--plum)] text-[var(--cream)] hover:bg-[var(--plum-2)] active:scale-[0.97]"}`}>
+                <button onClick={handleRsvp} className={`font-medium py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[var(--line-3)] text-[var(--body)] hover:bg-[var(--line)] active:scale-[0.97]" : "bg-[var(--plum)] text-[var(--cream)] hover:bg-[var(--plum-2)] active:scale-[0.97]"}`}>
                   {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3 h-3" />Going</span> : "RSVP"}
                 </button>
                 {announcement.rsvp_count > 0 && <span className="text-[12px] text-[var(--muted-text)] font-medium">{announcement.rsvp_count} going</span>}
@@ -1415,12 +1415,12 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
 
         {showDeleteConfirm && (
           <div className="absolute inset-0 z-[20] bg-[var(--cream)]/95 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-center gap-3 p-7">
-            <div className="w-11 h-11 rounded-full bg-red-50 flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-red-400" /></div>
-            <p className="text-[15px] font-bold text-[var(--ink)] text-center">Delete this announcement?</p>
+            <div className="w-11 h-11 rounded-full bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-[var(--danger)]" /></div>
+            <p className="text-[15px] font-medium text-[var(--ink)] text-center">Delete this announcement?</p>
             <p className="text-[12px] text-[var(--muted-text)] text-center -mt-1">This can&apos;t be undone.</p>
             <div className="flex gap-3 w-full mt-1">
-              <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-[var(--line)] text-[13px] font-semibold text-[var(--body)] hover:bg-[var(--ivory)] transition-colors disabled:opacity-50">Cancel</button>
-              <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-semibold transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
+              <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-[var(--line)] text-[13px] font-medium text-[var(--body)] hover:bg-[var(--ivory)] transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-medium transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
             </div>
           </div>
         )}
@@ -1602,7 +1602,7 @@ export function AnnouncementDetailView({
           <div style={{ ...monoStyle }}>Event</div>
           {ann.event_date && (
             <>
-              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 600, color: "var(--ink)", marginTop: 14 }}>{detailWeekday(ann.event_date)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 14 }}>{detailWeekday(ann.event_date)}</div>
               <div style={{ fontFamily: DETAIL_SERIF, fontSize: 42, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date)}</div>
               <div style={{ fontFamily: DETAIL_SANS, fontSize: 18, color: "var(--ink)", marginTop: 9 }}>{detailTime(ann.event_date)}</div>
             </>
@@ -1628,7 +1628,7 @@ export function AnnouncementDetailView({
       asideModules.push(
         <div key="form">
           <div style={{ ...monoStyle }}>Form</div>
-          <div style={{ fontFamily: DETAIL_SERIF, fontSize: 19, fontWeight: 600, color: "var(--ink)", marginTop: 12 }}>Includes a form</div>
+          <div style={{ fontFamily: DETAIL_SERIF, fontSize: 19, fontWeight: 500, color: "var(--ink)", marginTop: 12 }}>Includes a form</div>
           {ann.user_has_responded ? (
             <div className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C", marginTop: 14 }}><FileText className="w-3.5 h-3.5" />Form submitted</div>
           ) : (

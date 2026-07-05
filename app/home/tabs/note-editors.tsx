@@ -158,10 +158,9 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
             top: "calc(100% + 4px)",
             left: "50%",
             transform: "translateX(-50%)",
-            background: "var(--cream)",
+            background: "var(--cream-panel)",
             border: "1px solid var(--line)",
             borderRadius: 8,
-            boxShadow: "0 4px 14px rgba(19,16,26,0.12)",
             padding: 8,
             display: "grid",
             gridTemplateColumns: "repeat(6, 1fr)",
@@ -402,7 +401,7 @@ export function MeetingNoteEditor({
                 key={u.userId}
                 title={u.userName}
                 initials={getInitials(u.userName)}
-                style={{ width: 22, height: 22, fontSize: 9, fontWeight: 700, border: "2px solid white", marginLeft: i === 0 ? 0 : -6 }}
+                style={{ width: 22, height: 22, fontSize: 9, fontWeight: 500, border: "2px solid white", marginLeft: i === 0 ? 0 : -6 }}
               />
             ))}
           </div>
@@ -412,7 +411,7 @@ export function MeetingNoteEditor({
               : `${activeUsers.length} others are editing`}
           </span>
           {/* Live pulse dot */}
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", marginLeft: 2, flexShrink: 0, boxShadow: "0 0 0 2px rgba(34,197,94,0.25)" }} />
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", marginLeft: 2, flexShrink: 0 }} />
         </div>
       )}
       <div style={{ padding: "20px 32px 44px" }}>

@@ -290,18 +290,18 @@ export function DirectoryTab({
                 }}
               >
                 <div className="flex items-center gap-3.5">
-                  <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-11 h-11 font-bold text-[11px] tracking-wide" />
+                  <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-11 h-11 font-medium text-[11px] tracking-wide" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-[14px] tracking-tight" style={{ color: "var(--ink)" }}>{member.name}</h3>
+                      <h3 className="font-medium text-[14px] tracking-tight" style={{ color: "var(--ink)" }}>{member.name}</h3>
                       {member.id === currentUserId && (
-                        <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide" style={{ background: "var(--ivory)", color: "var(--muted-text)" }}>You</span>
+                        <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full uppercase tracking-wide" style={{ background: "var(--ivory)", color: "var(--muted-text)" }}>You</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
                       {member.graduation_year && <span className="text-[11px] font-medium" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
                       {member.role && (
-                        <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
+                        <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-[var(--cream)] text-[var(--muted-text)] border-[var(--dashed)]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
                           {member.role}
                         </span>
                       )}
@@ -467,7 +467,7 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
       <div style={{ width: "100%", maxWidth: 480, borderTop: "1px solid var(--line)" }}>
         {infoRows.map((row) => (
           <div key={row.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid var(--line)", alignItems: "start" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase", paddingTop: 1 }}>{row.label}</span>
+            <span style={{ fontSize: 11, fontWeight: 400, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase", paddingTop: 1 }}>{row.label}</span>
             <span style={{ fontSize: 14, color: "var(--ink)" }}>{row.value}</span>
           </div>
         ))}
@@ -491,7 +491,7 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
           if (detail?.prayer_request) rows.push({ label: "PRAYER", value: detail.prayer_request })
           return rows.map(row => (
             <div key={row.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid var(--line)", alignItems: "start" }}>
-              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase", paddingTop: 1 }}>{row.label}</span>
+              <span style={{ fontSize: 11, fontWeight: 400, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase", paddingTop: 1 }}>{row.label}</span>
               <span style={{ fontSize: 14, color: row.italic ? "var(--plum)" : "var(--body)", lineHeight: 1.65, fontStyle: row.italic ? "italic" : "normal", fontFamily: row.italic ? "var(--serif)" : "inherit" }}>{row.value}</span>
             </div>
           ))
@@ -575,19 +575,19 @@ export function MemberSheet({
         {/* Identity block */}
         <div>
           <div className="flex flex-col items-center mb-7">
-            <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-20 h-20 font-bold text-2xl mb-4" />
-            <h1 className="text-[22px] font-bold text-[var(--ink)] tracking-tight mb-2">{member.name}</h1>
+            <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-20 h-20 font-medium text-2xl mb-4" />
+            <h1 className="text-[22px] font-medium text-[var(--ink)] tracking-tight mb-2">{member.name}</h1>
             <div className="flex items-center gap-2 flex-wrap justify-center">
               {member.graduation_year && (
                 <span className="text-[12px] text-[var(--muted-text)]">Class of {member.graduation_year}</span>
               )}
               {member.role && (
-                <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-white text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
+                <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-[var(--cream)] text-[var(--muted-text)] border-[var(--dashed)]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
                   {member.role}
                 </span>
               )}
               {isOwnProfile && (
-                <span className="text-[10px] bg-[var(--plum)]/10 text-[var(--plum)] font-semibold px-2.5 py-1 rounded-full uppercase tracking-wide">You</span>
+                <span className="text-[10px] bg-[var(--plum)]/10 text-[var(--plum)] font-medium px-2.5 py-1 rounded-full uppercase tracking-wide">You</span>
               )}
             </div>
             <p className="mt-3 text-[12px] text-[var(--muted-text)] text-center leading-relaxed max-w-[270px]">
@@ -669,7 +669,7 @@ export function MemberSheet({
             <button
               onClick={handleSendMessage}
               disabled={dmLoading}
-              className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-semibold py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide"
+              className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-medium py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide"
             >
               {dmLoading ? "Opening chat…" : "Send Message"}
             </button>

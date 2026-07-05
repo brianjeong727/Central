@@ -182,7 +182,7 @@ function ComposerImpl({
       {replyingTo && (
         <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-2 flex items-start gap-3">
           <div className="flex-1 border-l-2 border-[var(--plum)] pl-2.5 min-w-0">
-            <p className="text-[11px] font-semibold text-[var(--plum)] flex items-center gap-1 mb-0.5">
+            <p className="text-[11px] font-medium text-[var(--plum)] flex items-center gap-1 mb-0.5">
               <CornerUpLeft className="w-3 h-3 flex-shrink-0" />
               {replyingTo.sender_name}
             </p>
@@ -257,7 +257,7 @@ function ComposerImpl({
         <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 md:px-10 md:py-3.5 relative">
           {/* @mention dropdown */}
           {mentionQuery !== null && filteredMentions.length > 0 && (
-            <div className="absolute bottom-full left-4 mb-1 bg-[var(--cream-panel)] rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.14)] border border-[var(--line)] overflow-hidden min-w-[180px] z-10">
+            <div className="absolute bottom-full left-4 mb-1 bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] overflow-hidden min-w-[180px] z-10">
               {filteredMentions.map((member, idx) => (
                 <button
                   key={member.id}
@@ -265,7 +265,7 @@ function ComposerImpl({
                   onClick={() => handleMentionSelect(member.name)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${idx === mentionIndex ? "bg-[#F4F1E8]" : "hover:bg-[var(--cream-panel)]"} ${idx > 0 ? "border-t border-[#F0EDE6]" : ""}`}
                 >
-                  <MonogramChip initials={member.name.charAt(0).toUpperCase()} className="w-7 h-7 text-[11px] font-bold" />
+                  <MonogramChip initials={member.name.charAt(0).toUpperCase()} className="w-7 h-7 text-[11px] font-medium" />
                   <span className="text-[14px] font-medium text-[var(--ink)]">{member.name.split(" ")[0]}</span>
                 </button>
               ))}
@@ -293,7 +293,7 @@ function ComposerImpl({
             </button>
             <button
               onClick={() => { setShowGifPicker(p => !p); onSetPollOpen(false) }}
-              className={`flex-shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-md border transition-colors mb-2 ${showGifPicker ? "bg-[var(--plum)] text-white border-[var(--plum)]" : "text-[var(--body)] border-[var(--line-2)] hover:border-[#3E1540]/30 hover:text-[var(--ink)]"}`}
+              className={`flex-shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-md border transition-colors mb-2 ${showGifPicker ? "bg-[var(--plum)] text-white border-[var(--plum)]" : "text-[var(--body)] border-[var(--line-2)] hover:border-[#3E1540]/30 hover:text-[var(--ink)]"}`}
               title="Send a GIF"
             >
               GIF

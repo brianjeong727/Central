@@ -65,7 +65,7 @@ const ROLE_STYLE: Record<string, { bg: string; color: string; border: string; la
   pastor:  { bg: "var(--plum-2)",  color: "var(--cream-panel)", border: "var(--plum-2)",              label: "Pastor"  },
   leader:  { bg: "var(--ivory)",  color: "var(--plum)", border: "rgba(62,21,64,0.2)",   label: "Leader"  },
   member:  { bg: "var(--ivory)",  color: "var(--muted-text)", border: "var(--line-2)",              label: "Member"  },
-  visitor: { bg: "white",    color: "var(--muted-text)", border: "#D8D3C8",              label: "Visitor" },
+  visitor: { bg: "var(--cream)", color: "var(--muted-text)", border: "var(--dashed)",       label: "Visitor" },
 }
 
 function roleBadge(role: string) {
@@ -821,7 +821,7 @@ export function SettingsTab({
                       <SectionHeader eyebrow="Discovery" title={`Who can find ${ministryInfo?.name ?? ministryName}`} titleSize={20} />
                     </div>
                     <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
-                      <button onClick={isAdmin ? handleToggle : undefined} disabled={toggling || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: isPublic ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                      <button onClick={isAdmin ? handleToggle : undefined} disabled={toggling || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: isPublic ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
                         <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(isPublic ? { right: 2 } : { left: 2 }) }} />
                       </button>
                       <div style={{ flex: 1 }}>
@@ -858,7 +858,7 @@ export function SettingsTab({
                           </div>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={() => { setAddingSchool(false); setNewSchoolName(""); setNewSchoolAbbr(""); setSchoolError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
-                            <button onClick={handleAddSchool} disabled={savingSchool || !newSchoolName.trim()} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: (savingSchool || !newSchoolName.trim()) ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: (savingSchool || !newSchoolName.trim()) ? 0.45 : 1 }}>{savingSchool ? "Adding…" : "Add"}</button>
+                            <button onClick={handleAddSchool} disabled={savingSchool || !newSchoolName.trim()} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: (savingSchool || !newSchoolName.trim()) ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: (savingSchool || !newSchoolName.trim()) ? 0.45 : 1 }}>{savingSchool ? "Adding…" : "Add"}</button>
                           </div>
                         </div>
                       )}
@@ -1076,11 +1076,11 @@ export function SettingsTab({
               {peopleRemoveConfirmId && (() => {
                 const target = members.find(m => m.id === peopleRemoveConfirmId)
                 return (
-                  <div style={{ borderRadius: 10, border: "1px solid #FEE2E2", background: "#FFF5F5", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-                    <AlertTriangle style={{ width: 16, height: 16, color: "#F87171", flexShrink: 0 }} />
+                  <div style={{ borderRadius: 10, border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                    <AlertTriangle style={{ width: 16, height: 16, color: "var(--danger)", flexShrink: 0 }} />
                     <p style={{ fontSize: 13, color: "var(--body)", flex: 1, margin: 0 }}>Remove <strong style={{ color: "var(--ink)" }}>{target?.name}</strong> from this ministry?</p>
                     <button onClick={() => setPeopleRemoveConfirmId(null)} style={{ fontSize: 12, color: "var(--body)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
-                    <button onClick={async () => { setPeopleRemoving(true); await handleRemoveMember(peopleRemoveConfirmId); setPeopleRemoving(false); setPeopleRemoveConfirmId(null) }} disabled={peopleRemoving} style={{ fontSize: 12, fontWeight: 600, color: "var(--danger)", border: "1px solid var(--danger)", background: "transparent", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: peopleRemoving ? 0.6 : 1 }}>
+                    <button onClick={async () => { setPeopleRemoving(true); await handleRemoveMember(peopleRemoveConfirmId); setPeopleRemoving(false); setPeopleRemoveConfirmId(null) }} disabled={peopleRemoving} style={{ fontSize: 12, fontWeight: 500, color: "var(--danger)", border: "1px solid var(--danger)", background: "transparent", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: peopleRemoving ? 0.6 : 1 }}>
                       {peopleRemoving ? "Removing…" : "Remove"}
                     </button>
                   </div>
@@ -1096,7 +1096,7 @@ export function SettingsTab({
                   const menuOpen = peopleRoleMenuOpen === m.id
                   return (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < peopleFiltered.length - 1 ? "1px solid var(--line-3)" : "none", position: "relative" }}>
-                      <MonogramChip initials={getInitials(m.name)} className="w-[38px] h-[38px] text-[13px] font-semibold" />
+                      <MonogramChip initials={getInitials(m.name)} className="w-[38px] h-[38px] text-[13px] font-medium" />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{m.name}</span>
@@ -1112,7 +1112,7 @@ export function SettingsTab({
                             <MoreHorizontal style={{ width: 16, height: 16, color: "var(--faint)" }} />
                           </button>
                           {menuOpen && (
-                            <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "var(--cream-panel)", borderRadius: 12, boxShadow: "0 4px 20px rgba(19,16,26,0.12)", border: "1px solid var(--line)", padding: "6px 0", minWidth: 160 }}>
+                            <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "var(--cream-panel)", borderRadius: 12, border: "1px solid var(--line)", padding: "6px 0", minWidth: 160 }}>
                               <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "var(--muted-text)", padding: "4px 12px 6px", textTransform: "uppercase", letterSpacing: "1.2px", fontWeight: 400, margin: 0 }}>Set role</p>
                               {(["visitor", "member", "leader", "admin", "deacon", "elder", "pastor"] as const).map(r => (
                                 <button key={r} onClick={async () => { setPeopleChangingRole(m.id); setPeopleRoleMenuOpen(null); await handleRoleChange(m.id, r); setPeopleChangingRole(null) }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "var(--plum)" : "var(--ink)", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
@@ -1122,7 +1122,7 @@ export function SettingsTab({
                               ))}
                               <div style={{ margin: "6px 12px", borderTop: "1px solid var(--line-3)" }} />
                               <button onClick={() => { setPeopleRemoveConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>Remove from ministry</button>
-                              <button onClick={() => { setPeopleExcomConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#7A1010", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box", fontWeight: 600 }}>Excommunicate</button>
+                              <button onClick={() => { setPeopleExcomConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "color-mix(in srgb, var(--danger) 80%, var(--ink))", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box", fontWeight: 500 }}>Excommunicate</button>
                             </div>
                           )}
                         </div>
@@ -1136,14 +1136,14 @@ export function SettingsTab({
               {peopleExcomConfirmId && (() => {
                 const target = members.find(m => m.id === peopleExcomConfirmId)
                 return (
-                  <div style={{ borderRadius: 10, border: "1px solid #F87171", background: "#FFF0F0", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ borderRadius: 10, border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
                     <AlertTriangle style={{ width: 16, height: 16, color: "var(--danger)", flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
                       <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 2px" }}>Excommunicate <strong style={{ color: "var(--ink)" }}>{target?.name}</strong>?</p>
                       <p style={{ fontSize: 12, color: "var(--danger)", margin: 0 }}>This is permanent. They will never be able to rejoin this ministry.</p>
                     </div>
                     <button onClick={() => setPeopleExcomConfirmId(null)} style={{ fontSize: 12, color: "var(--body)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
-                    <button onClick={() => handleExcommunicate(peopleExcomConfirmId)} disabled={excomming} style={{ fontSize: 12, fontWeight: 700, color: "var(--cream-panel)", border: "none", background: "#7A1010", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: excomming ? 0.6 : 1 }}>
+                    <button onClick={() => handleExcommunicate(peopleExcomConfirmId)} disabled={excomming} style={{ fontSize: 12, fontWeight: 500, color: "var(--cream-panel)", border: "none", background: "color-mix(in srgb, var(--danger) 80%, var(--ink))", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: excomming ? 0.6 : 1 }}>
                       {excomming ? "Banning…" : "Excommunicate"}
                     </button>
                   </div>
@@ -1154,10 +1154,10 @@ export function SettingsTab({
               {isAdmin && bannedMembers.length > 0 && (
                 <div>
                   <p style={{ ...SECTION_LABEL, marginBottom: 10 }}>Excommunicated</p>
-                  <div style={{ border: "1px solid #F5D0D0", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
+                  <div style={{ border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
                     {bannedMembers.map((b, i) => (
-                      <div key={b.user_id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: i < bannedMembers.length - 1 ? "1px solid #F5D0D0" : "none" }}>
-                        <MonogramChip initials={getInitials(b.name ?? "?")} className="w-9 h-9 text-[13px] font-semibold" />
+                      <div key={b.user_id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: i < bannedMembers.length - 1 ? "1px solid color-mix(in srgb, var(--danger) 25%, transparent)" : "none" }}>
+                        <MonogramChip initials={getInitials(b.name ?? "?")} className="w-9 h-9 text-[13px] font-medium" />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{b.name ?? "Unknown"}</div>
                           <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 1 }}>{b.email ?? ""}</div>
@@ -1176,8 +1176,8 @@ export function SettingsTab({
             <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
 
               {govError && (
-                <div style={{ borderRadius: 10, border: "1px solid #FEE2E2", background: "#FFF5F5", padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
-                  <AlertTriangle style={{ width: 15, height: 15, color: "#F87171", flexShrink: 0 }} />
+                <div style={{ borderRadius: 10, border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <AlertTriangle style={{ width: 15, height: 15, color: "var(--danger)", flexShrink: 0 }} />
                   <p style={{ fontSize: 13, color: "var(--body)", margin: 0 }}>{govError}</p>
                 </div>
               )}
@@ -1190,7 +1190,7 @@ export function SettingsTab({
                 </div>
 
                 <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
-                  <button onClick={handleToggleAllAdmins} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: governanceSettings.all_admins ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
+                  <button onClick={handleToggleAllAdmins} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: governanceSettings.all_admins ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
                     <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(governanceSettings.all_admins ? { right: 2 } : { left: 2 }) }} />
                   </button>
                   <div style={{ flex: 1 }}>
@@ -1209,13 +1209,13 @@ export function SettingsTab({
                         const included = governanceSettings.roster_ids.includes(m.id)
                         return (
                           <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 22px", borderBottom: i < adminMembers.length - 1 ? "1px solid var(--line-3)" : "none" }}>
-                            <MonogramChip initials={getInitials(m.name)} className="w-9 h-9 text-[13px] font-semibold" />
+                            <MonogramChip initials={getInitials(m.name)} className="w-9 h-9 text-[13px] font-medium" />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{m.name}</div>
                               <div style={{ marginTop: 2, fontSize: 13, color: "var(--muted-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
                             </div>
                             {roleBadge(m.role)}
-                            <button onClick={() => handleToggleRosterMember(m.id)} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: included ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
+                            <button onClick={() => handleToggleRosterMember(m.id)} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: included ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
                               <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(included ? { right: 2 } : { left: 2 }) }} />
                             </button>
                           </div>
@@ -1290,7 +1290,7 @@ export function SettingsTab({
                   const changed = isToggleOn(key, pendingAutomationSettings) !== isToggleOn(key, automationSettings)
                   return (
                     <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, outline: changed ? "2px solid var(--plum)" : "none", outlineOffset: -2 }}>
-                      <button onClick={() => handleAutomationToggle(key)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                      <button onClick={() => handleAutomationToggle(key)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
                         <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(on ? { right: 2 } : { left: 2 }) }} />
                       </button>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1311,7 +1311,7 @@ export function SettingsTab({
                     { key: "auto_archive_praise", label: "Auto-archive praise team chats", sub: "After Sunday at 11:59 pm, the chat is archived from your active list." },
                   ] as { key: string; label: string; sub: string }[]).map(({ key, label, sub }) => (
                     <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "var(--cream-2)", opacity: 0.6, pointerEvents: "none" }}>
-                      <div style={{ width: 38, height: 22, borderRadius: 999, background: "#D6D0C0", position: "relative", flexShrink: 0 }}>
+                      <div style={{ width: 38, height: 22, borderRadius: 999, background: "var(--dashed)", position: "relative", flexShrink: 0 }}>
                         <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, left: 2 }} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1328,17 +1328,17 @@ export function SettingsTab({
 
               {/* Archive warning */}
               {showArchiveWarning && (
-                <div style={{ ...CARD, padding: 20, borderColor: "#FECACA", background: "#FFF5F5" }}>
+                <div style={{ ...CARD, padding: 20, borderColor: "color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 8%, transparent)" }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                     <AlertTriangle style={{ width: 18, height: 18, color: "var(--danger)", flexShrink: 0, marginTop: 1 }} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 6 }}>This will archive chats</div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginBottom: 6 }}>This will archive chats</div>
                       <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.55, marginBottom: 14 }}>
                         Turning these off will archive: <strong>{pendingArchiveLabels.join(", ")}</strong>. Members will lose access from their active list.
                       </div>
                       <div style={{ display: "flex", gap: 10 }}>
                         <button onClick={() => setShowArchiveWarning(false)} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
-                        <button onClick={commitSaveAutomations} disabled={savingAutomations} style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--danger)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
+                        <button onClick={commitSaveAutomations} disabled={savingAutomations} style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--danger)", color: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
                           {savingAutomations ? "Saving…" : "Archive & Save"}
                         </button>
                       </div>
@@ -1351,7 +1351,7 @@ export function SettingsTab({
               {hasAutomationChanges && !showArchiveWarning && (
                 <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
                   <button onClick={() => setPendingAutomationSettings(automationSettings)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Discard</button>
-                  <button onClick={handleSaveAutomations} disabled={savingAutomations} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 600, cursor: savingAutomations ? "not-allowed" : "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
+                  <button onClick={handleSaveAutomations} disabled={savingAutomations} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 500, cursor: savingAutomations ? "not-allowed" : "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
                     {savingAutomations ? "Saving…" : "Save changes"}
                   </button>
                 </div>
@@ -1403,7 +1403,7 @@ export function SettingsTab({
 
               {/* Enable toggle */}
               <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
-                <button onClick={() => setModField("enabled", !pendingModerationSettings.enabled)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.enabled ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                <button onClick={() => setModField("enabled", !pendingModerationSettings.enabled)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.enabled ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
                   <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(pendingModerationSettings.enabled ? { right: 2 } : { left: 2 }) }} />
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1452,7 +1452,7 @@ export function SettingsTab({
 
               {/* Reverent capitalization — independent of the language filter */}
               <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
-                <button onClick={() => setModField("reverent_caps", !pendingModerationSettings.reverent_caps)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.reverent_caps ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                <button onClick={() => setModField("reverent_caps", !pendingModerationSettings.reverent_caps)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.reverent_caps ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
                   <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(pendingModerationSettings.reverent_caps ? { right: 2 } : { left: 2 }) }} />
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1465,7 +1465,7 @@ export function SettingsTab({
               <div>
                 <p style={{ ...SECTION_LABEL, marginBottom: 12 }}>Coming soon</p>
                 <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "var(--cream-2)", opacity: 0.6, pointerEvents: "none" }}>
-                  <div style={{ width: 38, height: 22, borderRadius: 999, background: "#D6D0C0", position: "relative", flexShrink: 0 }}>
+                  <div style={{ width: 38, height: 22, borderRadius: 999, background: "var(--dashed)", position: "relative", flexShrink: 0 }}>
                     <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, left: 2 }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1482,7 +1482,7 @@ export function SettingsTab({
               {hasModerationChanges && (
                 <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
                   <button onClick={() => setPendingModerationSettings(moderationSettings)} disabled={!isAdmin} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: isAdmin ? "pointer" : "not-allowed", opacity: !isAdmin ? 0.5 : 1 }}>Discard</button>
-                  <button onClick={handleSaveModeration} disabled={savingModeration || !isAdmin} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 600, cursor: savingModeration || !isAdmin ? "not-allowed" : "pointer", opacity: savingModeration || !isAdmin ? 0.6 : 1 }}>
+                  <button onClick={handleSaveModeration} disabled={savingModeration || !isAdmin} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 500, cursor: savingModeration || !isAdmin ? "not-allowed" : "pointer", opacity: savingModeration || !isAdmin ? 0.6 : 1 }}>
                     {savingModeration ? "Saving…" : "Save changes"}
                   </button>
                 </div>
@@ -1512,7 +1512,7 @@ export function SettingsTab({
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Invite code</div>
                     <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Share with members to let them join directly.</div>
                     <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "var(--ink)", fontWeight: 600, textAlign: "center", display: "block" }}>{inviteCode ?? "———"}</span>
+                      <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "var(--ink)", fontWeight: 500, textAlign: "center", display: "block" }}>{inviteCode ?? "———"}</span>
                       <button onClick={copyInviteCode} disabled={!inviteCode} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                         {copied ? <Check style={{ width: 13, height: 13, color: "var(--plum)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
                         {copied ? "Copied" : "Copy"}
@@ -1523,7 +1523,7 @@ export function SettingsTab({
                         <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old code will stop working immediately.</p>
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => setShowRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                          <button onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 600, color: "var(--cream-panel)", cursor: "pointer", opacity: regenerating ? 0.6 : 1 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</button>
+                          <button onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 500, color: "var(--cream-panel)", cursor: "pointer", opacity: regenerating ? 0.6 : 1 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</button>
                         </div>
                       </div>
                     ) : (
@@ -1539,7 +1539,7 @@ export function SettingsTab({
                       <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Staff code</div>
                       <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>For pastors, deacons, and elders. Joining with this code assigns an admin-tier role.</div>
                       <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "var(--ink)", fontWeight: 600, textAlign: "center", display: "block" }}>{staffCode}</span>
+                        <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "var(--ink)", fontWeight: 500, textAlign: "center", display: "block" }}>{staffCode}</span>
                         <button onClick={copyStaffCode} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                           {staffCopied ? <Check style={{ width: 13, height: 13, color: "var(--plum)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
                           {staffCopied ? "Copied" : "Copy"}
@@ -1550,7 +1550,7 @@ export function SettingsTab({
                           <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old staff code will stop working immediately.</p>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={() => setShowStaffRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                            <button onClick={handleRegenerateStaff} disabled={regeneratingStaff} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 600, color: "var(--cream-panel)", cursor: "pointer", opacity: regeneratingStaff ? 0.6 : 1 }}>{regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}</button>
+                            <button onClick={handleRegenerateStaff} disabled={regeneratingStaff} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 500, color: "var(--cream-panel)", cursor: "pointer", opacity: regeneratingStaff ? 0.6 : 1 }}>{regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}</button>
                           </div>
                         </div>
                       ) : (
@@ -1617,7 +1617,7 @@ export function SettingsTab({
                               <button
                                 onClick={() => handleSaveLimitEdit(l.id, l.category, l.fund)}
                                 disabled={savingLimitEdit || !editingLimitAmount}
-                                style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--plum)", color: "var(--cream-on-dark)", fontSize: 12, fontWeight: 600, cursor: savingLimitEdit ? "not-allowed" : "pointer", opacity: savingLimitEdit || !editingLimitAmount ? 0.5 : 1, whiteSpace: "nowrap" }}
+                                style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--plum)", color: "var(--cream-on-dark)", fontSize: 12, fontWeight: 500, cursor: savingLimitEdit ? "not-allowed" : "pointer", opacity: savingLimitEdit || !editingLimitAmount ? 0.5 : 1, whiteSpace: "nowrap" }}
                               >{savingLimitEdit ? "…" : "Save"}</button>
                               <button
                                 onClick={() => { setEditingLimitId(null); setEditingLimitAmount("") }}
@@ -1648,7 +1648,7 @@ export function SettingsTab({
                         {limitError && <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>{limitError}</p>}
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => { setAddingLimit(false); setNewLimitAmount(""); setLimitError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
-                          <button onClick={handleAddLimit} disabled={savingLimit || !newLimitAmount} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingLimit ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingLimit ? 0.6 : 1 }}>{savingLimit ? "Saving…" : "Add limit"}</button>
+                          <button onClick={handleAddLimit} disabled={savingLimit || !newLimitAmount} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: savingLimit ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingLimit ? 0.6 : 1 }}>{savingLimit ? "Saving…" : "Add limit"}</button>
                         </div>
                       </div>
                     )}

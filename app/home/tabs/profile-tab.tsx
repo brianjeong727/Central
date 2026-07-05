@@ -198,7 +198,7 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
                       <div style={{ position: "relative" }}>
                         <IconButton dim={26} active={menuOpen} onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }}><MoreHorizontal size={15} /></IconButton>
                         {menuOpen && (
-                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
+                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 9, zIndex: 20, minWidth: 130, overflow: "hidden" }}>
                             <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
                             <div style={{ height: 1, background: "var(--line)" }} />
                             <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
@@ -345,7 +345,7 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
                       <div style={{ position: "relative" }}>
                         <IconButton dim={26} active={menuOpen} onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }}><MoreHorizontal size={15} /></IconButton>
                         {menuOpen && (
-                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
+                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 9, zIndex: 20, minWidth: 130, overflow: "hidden" }}>
                             <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
                             <div style={{ height: 1, background: "var(--line)" }} />
                             <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
@@ -475,7 +475,7 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
                       <div style={{ position: "relative" }}>
                         <IconButton dim={26} active={menuOpen} onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }}><MoreHorizontal size={15} /></IconButton>
                         {menuOpen && (
-                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 9, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, minWidth: 130, overflow: "hidden" }}>
+                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 9, zIndex: 20, minWidth: 130, overflow: "hidden" }}>
                             <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
                             <div style={{ height: 1, background: "var(--line)" }} />
                             <button onClick={e => { e.stopPropagation(); handleDelete(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
@@ -545,7 +545,7 @@ function JournalSettingsMenu({ showEntries, showStreak, onToggleEntries, onToggl
     <div style={{ position: "relative", flexShrink: 0 }}>
       <IconButton active={open} onClick={() => setOpen(v => !v)}><Settings size={14} /></IconButton>
       {open && (
-        <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, boxShadow: "0 4px 14px rgba(19,16,26,0.10)", zIndex: 20, padding: "12px 16px", minWidth: 210 }}>
+        <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 10, zIndex: 20, padding: "12px 16px", minWidth: 210 }}>
           <p style={{ ...MONO_STYLE, margin: "0 0 12px" }}>Display settings</p>
           <label style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12, cursor: "pointer" }}>
             <span style={{ fontSize: 13, color: "var(--ink)" }}>Show entry count</span>

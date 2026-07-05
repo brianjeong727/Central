@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Check, X, Clock, Users, MapPin, Building2, LogOut } from "lucide-react"
 import { getPendingMinistries, approveMinistry, rejectMinistry } from "@/app/actions/ministry"
 import { createClient } from "@/lib/supabase"
+import { SIZE_LABELS } from "@/app/join/post-join-pickers"
 import { PlanLineIcon } from "@/app/home/components/shared"
 import { teamIconKey } from "@/app/home/workspace-presets"
 
@@ -20,11 +21,6 @@ type Ministry = {
   teams: Array<{ name: string; icon: string | null }>
 }
 
-const SIZE_LABELS: Record<string, string> = {
-  small: "Under 50",
-  medium: "50–100",
-  large: "100+",
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -82,7 +78,7 @@ export default function AdminPage() {
           </span>
         </div>
         <div className="h-5 w-px bg-[var(--line-2)]" />
-        <span className="text-[13px] font-semibold text-[var(--muted-text)] uppercase tracking-wider">Admin</span>
+        <span className="text-[13px] font-normal text-[var(--muted-text)] uppercase tracking-wider">Admin</span>
         <div className="flex-1" />
         {!loading && (
           <span className="text-[13px] text-[var(--muted-text)]">
@@ -123,7 +119,7 @@ export default function AdminPage() {
             <div className="w-12 h-12 rounded-full bg-[var(--line-3)] flex items-center justify-center mb-4">
               <Check className="w-5 h-5 text-[var(--muted-text)]" />
             </div>
-            <p className="text-[15px] font-semibold text-[var(--ink)] mb-1">All caught up</p>
+            <p className="text-[15px] font-medium text-[var(--ink)] mb-1">All caught up</p>
             <p className="text-[13px] text-[var(--muted-text)]">No pending applications right now.</p>
           </div>
         )}
@@ -166,7 +162,7 @@ export default function AdminPage() {
               {/* Teams */}
               {m.teams.length > 0 && (
                 <div className="mb-4">
-                  <p className="text-[11px] font-semibold text-[var(--muted-text)] uppercase tracking-wider mb-2">Teams</p>
+                  <p className="text-[11px] font-normal text-[var(--muted-text)] uppercase tracking-wider mb-2">Teams</p>
                   <div className="flex flex-wrap gap-2">
                     {m.teams.map((t, i) => (
                       <span key={i} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--body-bg)] border border-[var(--line-2)] text-[12px] text-[var(--ink)]">
@@ -181,7 +177,7 @@ export default function AdminPage() {
               {/* Creator */}
               <div className="pt-4 border-t border-[var(--body-bg)] flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold text-[var(--muted-text)] uppercase tracking-wider mb-1">Applied by</p>
+                  <p className="text-[11px] font-normal text-[var(--muted-text)] uppercase tracking-wider mb-1">Applied by</p>
                   <p className="text-[13px] text-[var(--ink)] font-medium">{m.creatorName ?? "—"}</p>
                   <p className="text-[12px] text-[var(--muted-text)]">{m.creatorEmail ?? "—"}</p>
                 </div>
@@ -198,7 +194,7 @@ export default function AdminPage() {
                   <button
                     onClick={() => handleApprove(m.id)}
                     disabled={acting === m.id}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] text-[13px] font-semibold text-[var(--cream-on-dark)] disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[var(--plum)] hover:bg-[var(--plum-2)] text-[13px] font-medium text-[var(--cream-on-dark)] disabled:opacity-50 transition-colors"
                   >
                     <Check className="w-3.5 h-3.5" />
                     Approve

@@ -6,14 +6,10 @@ import Link from "next/link"
 import { AlertCircle } from "lucide-react"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { SplitShell, GoogleButton, OrDivider, EyeButton } from "@/app/(auth)/shared"
+import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 
 const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
-
-const mono: React.CSSProperties = {
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
-}
 const serif: React.CSSProperties = { fontFamily: SERIF, fontWeight: 400, color: "var(--ink)", margin: 0 }
 
 function LoginContent() {
@@ -112,8 +108,8 @@ function LoginContent() {
 
       {error && (
         <div style={{
-          borderRadius: 10, background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.15)",
-          padding: "10px 14px", fontSize: 13, color: "#B91C1C", fontWeight: 500,
+          borderRadius: 10, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 18%, transparent)",
+          padding: "10px 14px", fontSize: 13, color: "var(--danger)", fontWeight: 500,
           display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 18,
         }} role="alert">
           <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />

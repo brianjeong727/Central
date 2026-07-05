@@ -123,8 +123,8 @@ export function PlanFeatureCard({ icon, name, desc }: { icon: string; name: stri
         <PlanLineIcon iconKey={icon} bg="var(--cream)" fg="var(--plum)" />
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <p className="text-[14px] font-semibold text-[var(--ink)]">{name}</p>
-            <span className="text-[10px] font-medium text-[var(--muted-text)] bg-[#F0EDE8] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 mt-0.5">
+            <p className="text-[14px] font-medium text-[var(--ink)]">{name}</p>
+            <span className="text-[10px] font-medium text-[var(--muted-text)] bg-[var(--body-bg)] px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 mt-0.5">
               Soon
             </span>
           </div>
@@ -483,7 +483,7 @@ export function StudentOrgRoleTabContent({
                 >
                   {/* Favicon badge — initials from the label */}
                   <span
-                    style={{ width: 36, height: 36, borderRadius: "var(--r-input)", background: "var(--ivory)", display: "grid", placeItems: "center", fontFamily: "var(--sans)", fontWeight: 600, fontSize: 13, color: "var(--body)", flexShrink: 0 }}
+                    style={{ width: 36, height: 36, borderRadius: "var(--r-input)", background: "var(--ivory)", display: "grid", placeItems: "center", fontFamily: "var(--sans)", fontWeight: 500, fontSize: 13, color: "var(--body)", flexShrink: 0 }}
                     aria-hidden
                   >
                     {linkInitials(link.title)}
@@ -1609,7 +1609,7 @@ export function StudentOrgTeamHome({
               label="Resources"
               style={{ marginBottom: 24 }}
               action={userRosterRole && (
-                <span style={{ fontSize: 11, fontWeight: 600, color: "var(--plum)", background: "#F3EAF4", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}>
+                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--plum)", background: "var(--plum-tint)", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}>
                   {userRosterRole}
                 </span>
               )}
@@ -1749,7 +1749,7 @@ function RotationAvatar({ name, mine }: { name: string; mine: boolean }) {
     return (
       <MonogramChip
         initials={getInitials(name)}
-        style={{ width: 22, height: 22, fontSize: 9.5, fontWeight: 600, letterSpacing: "0.02em" }}
+        style={{ width: 22, height: 22, fontSize: 9.5, fontWeight: 500, letterSpacing: "0.02em" }}
       />
     )
   }
@@ -1758,7 +1758,7 @@ function RotationAvatar({ name, mine }: { name: string; mine: boolean }) {
       style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center",
         width: 22, height: 22, borderRadius: 999, flexShrink: 0,
-        fontFamily: "var(--sans)", fontSize: 9.5, fontWeight: 600, letterSpacing: "0.02em",
+        fontFamily: "var(--sans)", fontSize: 9.5, fontWeight: 500, letterSpacing: "0.02em",
         background: "var(--ivory)",
         color: "var(--body)",
         border: "1px solid var(--line-2)",
@@ -1939,7 +1939,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
               <div key={group.type}>
                 {/* header */}
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-                  <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
+                  <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
                     {group.label} · {weekdayName}s
                   </p>
                   <span style={{ fontFamily: "var(--sans)", fontSize: 11, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>
@@ -1994,7 +1994,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
                 <Calendar className="w-4 h-4" />
               </span>
               <div style={{ minWidth: 0 }}>
-                <p style={{ fontFamily: "var(--sans)", fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{label}</p>
+                <p style={{ fontFamily: "var(--sans)", fontSize: 14, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{label}</p>
                 <p style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--body)", margin: "2px 0 0" }}>{dateLine}</p>
               </div>
             </div>
@@ -2045,7 +2045,7 @@ function RotationSlotCell({ slot, userId, onClick }: {
     >
       {/* date */}
       <div style={{ display: "flex", flexDirection: "column", gap: 1, flexShrink: 0 }}>
-        <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)" }}>{shortDow(slot.week_date)}</span>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)" }}>{shortDow(slot.week_date)}</span>
         <span style={{ fontFamily: "var(--sans)", fontSize: 13.5, fontWeight: 500, color: "var(--ink)" }}>{shortMonthDay(slot.week_date)}</span>
       </div>
       {/* status */}
@@ -2225,7 +2225,7 @@ function WsTile({ initials, badge, name, sub, onClick }: {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <MonogramChip initials={initials} style={{ width: 38, height: 38, fontSize: 14, fontWeight: 600 }} />
+        <MonogramChip initials={initials} style={{ width: 38, height: 38, fontSize: 14, fontWeight: 500 }} />
         {badge}
       </div>
       <div style={{ marginTop: "auto", minWidth: 0 }}>
@@ -2958,7 +2958,7 @@ export function PlanTab({
                 <PlanSectionHeader>Teams</PlanSectionHeader>
                 {allTeams.length === 0 ? (
                   <div className="bg-[var(--cream)] rounded-2xl border border-dashed border-[var(--line)] p-6 text-center">
-                    <p className="text-[14px] font-semibold text-[var(--ink)]/60 mb-1">No teams yet.</p>
+                    <p className="text-[14px] font-medium text-[var(--ink)]/60 mb-1">No teams yet.</p>
                     <p className="text-[13px] text-[var(--muted-text)]">Tap + above to create your first team.</p>
                   </div>
                 ) : (
@@ -2971,7 +2971,7 @@ export function PlanTab({
                       >
                         <PlanLineIcon iconKey={team.icon ?? "👥"} bg="var(--plum)" fg="var(--cream-on-dark)" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-[14px] font-semibold text-[var(--ink)]">{team.name}</p>
+                          <p className="text-[14px] font-medium text-[var(--ink)]">{team.name}</p>
                           <p className="text-[12px] text-[var(--muted-text)]">{team.member_count} member{team.member_count !== 1 ? "s" : ""}</p>
                         </div>
                         <ChevronRight className="w-4 h-4 text-[var(--faint)] flex-shrink-0" />
@@ -2988,7 +2988,7 @@ export function PlanTab({
                   <div key={tool.name} className="bg-[var(--cream)] rounded-2xl border border-[var(--line)] p-4 opacity-60 flex flex-col gap-2">
                     <PlanLineIcon iconKey={tool.icon} bg="var(--cream)" fg="var(--plum)" size={36} />
                     <div>
-                      <p className="text-[13px] font-semibold text-[var(--ink)]">{tool.name}</p>
+                      <p className="text-[13px] font-medium text-[var(--ink)]">{tool.name}</p>
                       <p style={{ fontFamily: "var(--mono)", fontSize: "9px", color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
                     </div>
                   </div>
@@ -3206,7 +3206,7 @@ export function WorshipStatusBadge({ status, onChange }: { status: "draft" | "fi
       <select
         value={status}
         onChange={e => onChange(e.target.value)}
-        style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", textTransform: "uppercase" as const, border: "none", outline: "none", cursor: "pointer", borderRadius: 20, padding: "3px 9px", background: cfg.bg, color: cfg.color, appearance: "none" as const }}
+        style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.03em", textTransform: "uppercase" as const, border: "none", outline: "none", cursor: "pointer", borderRadius: 20, padding: "3px 9px", background: cfg.bg, color: cfg.color, appearance: "none" as const }}
       >
         <option value="draft">Draft</option>
         <option value="filled">Filled</option>
@@ -3215,7 +3215,7 @@ export function WorshipStatusBadge({ status, onChange }: { status: "draft" | "fi
     )
   }
   return (
-    <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", textTransform: "uppercase" as const, borderRadius: 20, padding: "3px 9px", background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+    <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.03em", textTransform: "uppercase" as const, borderRadius: 20, padding: "3px 9px", background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
   )
 }
 
@@ -5096,7 +5096,7 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
                 {slidesGenerating && slidesEventLabel === label ? "…" : "Slides"}
               </CentralButton>
               <button onClick={() => handleExportSlides(songs)}
-                style={{ padding: "6px 12px", background: "transparent", color: "var(--plum)", borderRadius: 8, fontSize: 12, fontWeight: 600, border: "1px solid var(--plum)", cursor: "pointer" }}>
+                style={{ padding: "6px 12px", background: "transparent", color: "var(--plum)", borderRadius: 8, fontSize: 12, fontWeight: 500, border: "1px solid var(--plum)", cursor: "pointer" }}>
                 Export
               </button>
             </div>
@@ -5433,12 +5433,27 @@ function SetListPdfViewer({
 
 // ── MinistryCalendar ──────────────────────────────────────────────────────────
 
+// Planned / needs-planning status pills — semantic tokens only (DESIGN_SYSTEM §8:
+// no raw traffic-light hex). Text colors are darkened for AA contrast at 10px.
+const PLAN_STATUS_PILL: Record<"planned" | "needsPlanning", React.CSSProperties> = {
+  planned: {
+    fontSize: 10, fontWeight: 500, borderRadius: 9999, padding: "2px 8px",
+    color: "var(--sage)",
+    background: "color-mix(in srgb, var(--success) 15%, transparent)",
+  },
+  needsPlanning: {
+    fontSize: 10, fontWeight: 500, borderRadius: 9999, padding: "2px 8px",
+    color: "color-mix(in srgb, var(--warm-tan) 75%, var(--ink))",
+    background: "color-mix(in srgb, var(--warm-tan) 12%, transparent)",
+  },
+}
+
 const CATEGORY_CONFIG = {
-  welcoming: { label: "Welcoming", dot: "var(--plum)", bg: "#EDE5F0", text: "var(--plum)" },
+  welcoming: { label: "Welcoming", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--plum)" },
   retreat:   { label: "Retreat",   dot: "var(--body)", bg: "var(--body-bg)", text: "var(--plum)" },
   social:    { label: "Social",    dot: "var(--muted-text)", bg: "var(--cream-panel)", text: "var(--body)" },
-  service:   { label: "Service",   dot: "var(--plum)", bg: "#F0EDE8", text: "var(--plum)" },
-  regular:   { label: "Regular",   dot: "var(--muted-text)", bg: "#F3F0F7", text: "var(--body)" },
+  service:   { label: "Service",   dot: "var(--plum)", bg: "var(--body-bg)", text: "var(--plum)" },
+  regular:   { label: "Regular",   dot: "var(--muted-text)", bg: "var(--plum-tint)", text: "var(--body)" },
 } as const
 
 type EventTypeConfig = {
@@ -5451,7 +5466,7 @@ type EventTypeConfig = {
 
 const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
   welcome_week: {
-    label: "Welcome Week", icon: "🎉", dot: "var(--plum)", bg: "#EDE5F0", text: "var(--plum)",
+    label: "Welcome Week", icon: "🎉", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--plum)",
     budgetCategory: "welcoming_week", canHaveSubEvents: true,
     description: "Multi-day freshman welcome — Popsicle Socials, Game Night, Sports Day, Welcoming Night, Praise Night. Plan in June; reserve all venues in June.",
     defaultPhases: [
@@ -5657,7 +5672,7 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
     extraTabs: [],
   },
   ministry: {
-    label: "Ministry Event", icon: "🙏", dot: "var(--plum)", bg: "#F3F0F7", text: "var(--body)",
+    label: "Ministry Event", icon: "🙏", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--body)",
     budgetCategory: null, canHaveSubEvents: false,
     description: "Prayer Meeting (PM), Bible study, outreach (campus involvement fairs), or service events.",
     defaultPhases: [
@@ -5757,7 +5772,7 @@ export function MonthGrid({
                 minHeight: 80,
                 borderRight: idx % 7 !== 6 ? "1px solid var(--line-2)" : "none",
                 borderBottom: idx < cells.length - 7 ? "1px solid var(--line-2)" : "none",
-                background: day && isToday(day) ? "#F4F0F8" : "var(--cream-panel)",
+                background: day && isToday(day) ? "var(--plum-tint)" : "var(--cream-panel)",
                 padding: "4px 3px 3px",
                 position: "relative",
               }}
@@ -5900,73 +5915,6 @@ export function TimelineView({
         )
       })}
     </div>
-  )
-}
-
-export function EventDetailPopover({
-  event,
-  canEdit,
-  userId,
-  onClose,
-  onDelete,
-  onPlan,
-}: {
-  event: CalendarEvent
-  canEdit: boolean
-  userId: string
-  onClose: () => void
-  onDelete: (id: string) => void
-  onPlan: (ev: CalendarEvent) => void
-}) {
-  const cfg = getEventConfig(event)
-  const startDate = new Date(event.start_date)
-  const endDate = new Date(event.end_date)
-
-  const dateStr = event.all_day
-    ? startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-    : startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) +
-      " · " + startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
-      " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-
-  return (
-    <CentralModal
-      onClose={onClose}
-      title={event.title}
-      maxWidth={480}
-      z={200}
-      footer={
-        <>
-          {(canEdit || event.created_by === userId) && (
-            <button
-              onClick={() => onDelete(event.id)}
-              style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid var(--line)", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 13, color: "var(--danger)" }}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Delete event
-            </button>
-          )}
-          <CentralButton
-            variant="primary" size="sm"
-            onClick={() => onPlan(event)}
-          >
-            Plan this event →
-          </CentralButton>
-        </>
-      }
-    >
-      <div style={{ marginBottom: 12 }}>
-        <span style={{ fontSize: 11, fontWeight: 500, color: cfg.text, background: cfg.bg, padding: "3px 10px", borderRadius: 9999 }}>
-          {cfg.label}
-        </span>
-      </div>
-      <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 6px" }}>{dateStr}</p>
-      {event.location && (
-        <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 12px" }}>📍 {event.location}</p>
-      )}
-      {event.description && (
-        <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.6, margin: 0 }}>{event.description}</p>
-      )}
-    </CentralModal>
   )
 }
 
@@ -6235,7 +6183,7 @@ export function AddEventModal({
                       }}
                     >
                       <div style={{ fontSize: 20, marginBottom: 4 }}>{tcfg.icon}</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: selected ? tcfg.text : "var(--ink)" }}>{tcfg.label}</div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: selected ? tcfg.text : "var(--ink)" }}>{tcfg.label}</div>
                       <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>{tcfg.description}</div>
                     </button>
                   )
@@ -6244,7 +6192,7 @@ export function AddEventModal({
               {/* Pre-seed preview */}
               {(cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
                 <div style={{ marginTop: 12, padding: "12px 14px", background: "#F5F1E8", borderRadius: 10, fontSize: 12, color: "var(--body)" }}>
-                  <span style={{ fontWeight: 600, color: "var(--plum)" }}>Pre-seeded: </span>
+                  <span style={{ fontWeight: 500, color: "var(--plum)" }}>Pre-seeded: </span>
                   {cfg.defaultRoles.map(r => r.name).join(", ")}
                   {cfg.defaultRoles.length > 0 && cfg.defaultPhases.length > 0 && " · "}
                   {cfg.defaultPhases.reduce((n, p) => n + p.tasks.length, 0)} checklist tasks across {cfg.defaultPhases.length} phases
@@ -6376,14 +6324,9 @@ export function MinistryCalendar({
   const plannedEventIds = calData?.plannedIds ?? EMPTY_ID_SET
   const tableReady = calData?.tableReady ?? true
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [planningEvent, setPlanningEvent] = useState<CalendarEvent | null>(null)
-
-  async function handleDelete(id: string) {
-    await supabase.from("calendar_events").delete().eq("id", id)
-    void mutateCal()
-  }
+  const [showEditEvent, setShowEditEvent] = useState(false)
 
   // Event planning view — replaces the calendar while an event is open.
   // SubpageShell consumes the page body (cream, in-content) and supplies the
@@ -6393,9 +6336,10 @@ export function MinistryCalendar({
   // dedupes the team crumb against the shell-resolved trail (planningEvent is
   // local to MinistryCalendar, invisible to getShellCrumbs). key={planningEvent.id}
   // re-inits the workspace to Overview per event. EventPlanWorkspace runs `bare`
-  // so its own px doesn't double-pad under the shell. No onEditEvent — MinistryCalendar
-  // has no edit-event flow (AddEventModal here is create-only), so the gated
-  // "Edit event" button simply won't render.
+  // so its own px doesn't double-pad under the shell. onEditEvent opens the
+  // AddEventModal in edit mode — this is where "Edit event" AND delete-event now
+  // live (per §4.14/§8: click navigates to the plan directly, no intermediate
+  // modal; the removed EventDetailPopover's delete affordance is preserved here).
   if (planningEvent) {
     return (
       <SubpageShell crumbs={[{ label: teamName, onClick: () => setPlanningEvent(null) }, { label: planningEvent.title }]} title={planningEvent.title} width="full">
@@ -6410,7 +6354,27 @@ export function MinistryCalendar({
           teamId={teamId}
           onClose={() => setPlanningEvent(null)}
           onOpenChat={onOpenChat}
+          onEditEvent={() => setShowEditEvent(true)}
         />
+        {showEditEvent && (
+          <AddEventModal
+            ministryId={ministryId}
+            teamId={teamId}
+            userId={userId}
+            existing={planningEvent}
+            onClose={() => setShowEditEvent(false)}
+            onSaved={(updated) => {
+              void mutateCal()
+              setPlanningEvent(updated)
+              setShowEditEvent(false)
+            }}
+            onDelete={() => {
+              void mutateCal()
+              setShowEditEvent(false)
+              setPlanningEvent(null)
+            }}
+          />
+        )}
       </SubpageShell>
     )
   }
@@ -6434,7 +6398,7 @@ export function MinistryCalendar({
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
         <div>
-          <p style={{ fontFamily: "var(--mono)", fontSize: "11px", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>
+          <p style={{ fontFamily: "var(--mono)", fontSize: "11px", fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>
             Upcoming
           </p>
           <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 30, fontWeight: 400, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>
@@ -6443,7 +6407,7 @@ export function MinistryCalendar({
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* View toggle */}
-          <div style={{ display: "flex", background: "#F0EDE8", borderRadius: 8, padding: 2, gap: 2 }}>
+          <div style={{ display: "flex", background: "var(--body-bg)", borderRadius: 8, padding: 2, gap: 2 }}>
             <button
               onClick={() => setView("month")}
               style={{
@@ -6451,8 +6415,7 @@ export function MinistryCalendar({
                 background: view === "month" ? "var(--cream-panel)" : "transparent",
                 border: "none", cursor: "pointer", fontSize: 12, color: view === "month" ? "var(--ink)" : "var(--muted-text)",
                 fontWeight: view === "month" ? 500 : 400,
-                boxShadow: view === "month" ? "0 1px 3px rgba(19,16,26,0.08)" : "none",
-              }}
+                              }}
             >
               <Grid3x3 className="w-3 h-3" /> Month
             </button>
@@ -6463,8 +6426,7 @@ export function MinistryCalendar({
                 background: view === "list" ? "var(--cream-panel)" : "transparent",
                 border: "none", cursor: "pointer", fontSize: 12, color: view === "list" ? "var(--ink)" : "var(--muted-text)",
                 fontWeight: view === "list" ? 500 : 400,
-                boxShadow: view === "list" ? "0 1px 3px rgba(19,16,26,0.08)" : "none",
-              }}
+                              }}
             >
               <List className="w-3 h-3" /> List
             </button>
@@ -6490,10 +6452,10 @@ export function MinistryCalendar({
               events={events}
               currentMonth={currentMonth}
               onMonthChange={setCurrentMonth}
-              onSelectEvent={setSelectedEvent}
+              onSelectEvent={setPlanningEvent}
             />
           ) : (
-            <TimelineView events={events} onSelectEvent={setSelectedEvent} />
+            <TimelineView events={events} onSelectEvent={setPlanningEvent} />
           )}
         </div>
 
@@ -6512,13 +6474,13 @@ export function MinistryCalendar({
             ].map((item) => {
               const cfg = CATEGORY_CONFIG[item.category]
               return (
-                <div key={item.title} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid #F0EDE8" }}>
+                <div key={item.title} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid var(--body-bg)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: cfg.dot, flexShrink: 0 }} />
                     <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</span>
                   </div>
                   <span style={{ fontSize: 11, color: "var(--muted-text)", paddingLeft: 14 }}>{item.date}</span>
-                  <span style={{ marginLeft: 14, display: "inline-block", fontSize: 10, fontWeight: 500, color: "#92400E", background: "#FEF3C7", borderRadius: 9999, padding: "2px 8px", width: "fit-content" }}>
+                  <span style={{ ...PLAN_STATUS_PILL.needsPlanning, marginLeft: 14, display: "inline-block", width: "fit-content" }}>
                     Needs planning
                   </span>
                 </div>
@@ -6530,7 +6492,7 @@ export function MinistryCalendar({
               const isPlanned = plannedEventIds.has(ev.id)
               const dateStr = new Date(ev.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
               return (
-                <div key={ev.id} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid #F0EDE8" }}>
+                <div key={ev.id} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid var(--body-bg)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                     <span style={{ width: 7, height: 7, borderRadius: "50%", background: cfg.dot, flexShrink: 0 }} />
                     <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</span>
@@ -6538,9 +6500,9 @@ export function MinistryCalendar({
                   <span style={{ fontSize: 11, color: "var(--muted-text)", paddingLeft: 14 }}>{dateStr}</span>
                   <div style={{ paddingLeft: 14, display: "flex", alignItems: "center", gap: 6 }}>
                     {isPlanned ? (
-                      <span style={{ fontSize: 10, fontWeight: 500, color: "#14532D", background: "#DCFCE7", borderRadius: 9999, padding: "2px 8px" }}>Planned ✓</span>
+                      <span style={PLAN_STATUS_PILL.planned}>Planned ✓</span>
                     ) : (
-                      <span style={{ fontSize: 10, fontWeight: 500, color: "#92400E", background: "#FEF3C7", borderRadius: 9999, padding: "2px 8px" }}>Needs planning</span>
+                      <span style={PLAN_STATUS_PILL.needsPlanning}>Needs planning</span>
                     )}
                     {canEdit && (
                       <button
@@ -6559,17 +6521,6 @@ export function MinistryCalendar({
           )}
         </div>
       </div>
-
-      {selectedEvent && (
-        <EventDetailPopover
-          event={selectedEvent}
-          canEdit={canEdit}
-          userId={userId}
-          onClose={() => setSelectedEvent(null)}
-          onDelete={(id) => { handleDelete(id); setSelectedEvent(null) }}
-          onPlan={(ev) => { setSelectedEvent(null); setPlanningEvent(ev) }}
-        />
-      )}
 
       {showAdd && (
         <AddEventModal
@@ -7489,7 +7440,7 @@ export function EventPlanWorkspace({
               <button
                 onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }}
                 disabled={isDeleting}
-                style={{ fontSize: 11, fontWeight: 600, color: "var(--danger)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 30%, transparent)", borderRadius: 6, padding: "3px 10px", cursor: isDeleting ? "default" : "pointer", whiteSpace: "nowrap" }}
+                style={{ fontSize: 11, fontWeight: 500, color: "var(--danger)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 30%, transparent)", borderRadius: 6, padding: "3px 10px", cursor: isDeleting ? "default" : "pointer", whiteSpace: "nowrap" }}
               >
                 {isDeleting ? "Deleting…" : kidCount > 0 ? `Delete +${kidCount}` : "Delete"}
               </button>
@@ -7857,7 +7808,7 @@ export function EventPlanWorkspace({
                   <CentralCard variant="inset" radius="var(--r-callout)" padding="6px 14px 8px" style={{ marginBottom: 24 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0 6px" }}>
                       <Star style={{ width: 12, height: 12, color: "var(--plum)", fill: "currentColor" }} />
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 600 }}>Pinned</span>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 500 }}>Pinned</span>
                     </div>
                     {pinnedTop.map((task) => renderTaskTree(task))}
                   </CentralCard>
@@ -7888,7 +7839,7 @@ export function EventPlanWorkspace({
                         })}
                         style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "0 0 10px", width: "100%", textAlign: "left" }}
                       >
-                        <span style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 600 }}>{section.label}</span>
+                        <span style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 500 }}>{section.label}</span>
                         <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px" }}>{remaining} remaining</span>
                         <ChevronRight style={{ marginLeft: "auto", width: 14, height: 14, color: "var(--faint)", transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform .15s ease" }} />
                       </button>
@@ -7976,7 +7927,7 @@ export function EventPlanWorkspace({
                         <button
                           onClick={confirmSectionMove}
                           disabled={sectionMoveBusy}
-                          style={{ fontSize: 13, fontWeight: 600, color: "var(--cream)", background: "var(--plum)", border: "none", borderRadius: 8, padding: "8px 16px", cursor: sectionMoveBusy ? "default" : "pointer" }}
+                          style={{ fontSize: 13, fontWeight: 500, color: "var(--cream)", background: "var(--plum)", border: "none", borderRadius: 8, padding: "8px 16px", cursor: sectionMoveBusy ? "default" : "pointer" }}
                         >
                           {sectionMoveBusy ? "Moving…" : "Continue"}
                         </button>
@@ -8035,7 +7986,7 @@ export function EventPlanWorkspace({
                 return (
                   <ListRow key={role.id} hover={false} last={isLast} className="rrow" style={{ display: "grid", gridTemplateColumns: "38px 1fr auto", gap: 16, alignItems: "center", padding: "14px 8px" }}>
                     {isCovered ? (
-                      <MonogramChip initials={initials} style={{ width: 38, height: 38, fontSize: 13, fontWeight: 600 }} />
+                      <MonogramChip initials={initials} style={{ width: 38, height: 38, fontSize: 13, fontWeight: 500 }} />
                     ) : (
                       <div style={{ width: 38, height: 38, border: "1px dashed var(--dashed)", borderRadius: 999, display: "grid", placeItems: "center" }}>
                         <Plus style={{ width: 16, height: 16, color: "var(--dashed)" }} />
@@ -8926,7 +8877,7 @@ function TransportTab({
                     {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                 ) : (
-                  <span style={{ fontSize: 14, fontWeight: 600, color: "var(--plum-2)" }}>{driver?.name ?? "No driver"}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: "var(--plum-2)" }}>{driver?.name ?? "No driver"}</span>
                 )}
                 {canEdit ? (
                   <input value={car.vehicle} onChange={e => updateCar(car.id, { vehicle: e.target.value })} placeholder="Vehicle (e.g. Honda CR-V)" style={{ flex: 1, background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: "6px 10px" }} />
@@ -9020,7 +8971,7 @@ function ProgramTab({
         return (
           <div key={dayIdx} style={{ marginBottom: 36 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <p style={{ fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--body)", fontWeight: 600 }}>
+              <p style={{ fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--body)", fontWeight: 500 }}>
                 Day {dayIdx + 1} — {dayLabel}
               </p>
               {canEdit && (
@@ -9204,11 +9155,11 @@ function GroupsTab({
             >
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{session.name}</p>
+                  <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{session.name}</p>
                   <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "4px 0 0" }}>
                     {session.num_groups} groups · {session.num_people} people · {new Date(session.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                     {session.config.smallGroupMode === true && (
-                      <span style={{ marginLeft: 6, padding: "1px 7px", borderRadius: 999, background: "var(--ivory)", fontSize: 10, fontWeight: 600, color: "var(--body)", letterSpacing: "0.04em", textTransform: "uppercase" }}>SG Mode</span>
+                      <span style={{ marginLeft: 6, padding: "1px 7px", borderRadius: 999, background: "var(--ivory)", fontSize: 10, fontWeight: 500, color: "var(--body)", letterSpacing: "0.04em", textTransform: "uppercase" }}>SG Mode</span>
                     )}
                   </p>
                 </div>
@@ -9235,7 +9186,7 @@ function GroupsTab({
               {confirmDeleteId === session.id && (
                 <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line-3)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: "var(--danger)", margin: 0 }}>Delete this grouping?</p>
+                    <p style={{ fontSize: 13, fontWeight: 500, color: "var(--danger)", margin: 0 }}>Delete this grouping?</p>
                     {session.config.smallGroupMode === true && (
                       <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "3px 0 0" }}>This will also clear all small group assignments. DGLs will see the empty state until groups are re-confirmed.</p>
                     )}
@@ -9249,7 +9200,7 @@ function GroupsTab({
                     </button>
                     <button
                       onClick={() => handleDelete(session)}
-                      style={{ padding: "6px 14px", border: "none", borderRadius: 8, background: "var(--danger)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                      style={{ padding: "6px 14px", border: "none", borderRadius: 8, background: "var(--danger)", color: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                     >
                       Delete
                     </button>
@@ -9362,14 +9313,14 @@ function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; on
           {groups.map(g => (
             <div key={g.id} style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 14, padding: "18px 20px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{g.name}</p>
+                <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{g.name}</p>
                 <span style={{ fontSize: 11, color: "var(--muted-text)" }}>{g.members.length}</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {g.members.map(m => (
                   <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{ width: 28, height: 28, borderRadius: 7, background: "var(--plum)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, color: "var(--cream-panel)" }}>
+                      <span style={{ fontSize: 10, fontWeight: 500, color: "var(--cream-panel)" }}>
                         {m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
                       </span>
                     </div>
@@ -9869,7 +9820,7 @@ function GroupGeneratorWizard({
                 background: i < stepIdx ? "var(--plum)" : i === stepIdx ? "var(--ink)" : "transparent",
                 border: i > stepIdx ? "1px solid var(--line-2)" : "none",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 10, color: i <= stepIdx ? "var(--cream-panel)" : "var(--muted-text)", fontWeight: 600,
+                fontSize: 10, color: i <= stepIdx ? "var(--cream-panel)" : "var(--muted-text)", fontWeight: 500,
               }}>
                 {i < stepIdx ? <Check style={{ width: 10, height: 10 }} /> : i + 1}
               </div>
@@ -9916,7 +9867,7 @@ function GroupGeneratorWizard({
                     {sourceType === opt.value && <div style={{ width: 8, height: 8, borderRadius: 999, background: "var(--plum)" }} />}
                   </div>
                   <div>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: 0 }}>{opt.label}</p>
+                    <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{opt.label}</p>
                     <p style={{ fontSize: 12, color: "var(--body)", margin: "3px 0 0" }}>{opt.desc}</p>
                   </div>
                 </button>
@@ -9969,7 +9920,7 @@ function GroupGeneratorWizard({
               {countLoading ? (
                 <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>Counting…</p>
               ) : poolCount !== null ? (
-                <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: 0 }}>
+                <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", margin: 0 }}>
                   {poolCount === 0 ? "No people in this pool" : `${poolCount} ${poolCount === 1 ? "person" : "people"} in this pool`}
                 </p>
               ) : (
@@ -10007,7 +9958,7 @@ function GroupGeneratorWizard({
             {/* SG mode DGL count display */}
             {smallGroupMode && sglRosterConfirmed && sgDGLs.length > 0 && (
               <div style={{ marginBottom: 28, padding: "14px 18px", background: "var(--cream-3)", border: "1px solid var(--line)", borderRadius: 10 }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: "0 0 3px" }}>
+                <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", margin: "0 0 3px" }}>
                   {sgDGLs.length} group{sgDGLs.length !== 1 ? "s" : ""} — one per DGL on the {semester} roster
                 </p>
                 <p style={{ fontSize: 12, color: "var(--muted-text)", margin: 0 }}>Gender matching is applied automatically.</p>
@@ -10129,9 +10080,9 @@ function GroupGeneratorWizard({
 
             {/* Success message after SG confirm */}
             {sgConfirmResult && (
-              <div style={{ marginBottom: 20, padding: "12px 16px", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.2)", borderRadius: 10 }}>
+              <div style={{ marginBottom: 20, padding: "12px 16px", background: "color-mix(in srgb, var(--plum) 6%, transparent)", border: "1px solid rgba(62,21,64,0.2)", borderRadius: 10 }}>
                 <p style={{ fontSize: 13, color: "var(--plum)", fontWeight: 500, margin: 0 }}>{sgConfirmResult}</p>
-                <button onClick={onSaved} style={{ fontSize: 12, color: "var(--plum)", background: "none", border: "none", padding: 0, marginTop: 8, cursor: "pointer", fontWeight: 600 }}>Done →</button>
+                <button onClick={onSaved} style={{ fontSize: 12, color: "var(--plum)", background: "none", border: "none", padding: 0, marginTop: 8, cursor: "pointer", fontWeight: 500 }}>Done →</button>
               </div>
             )}
 
@@ -10165,10 +10116,10 @@ function GroupGeneratorWizard({
                       {/* Leader header */}
                       <div style={{ marginBottom: 10 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <p style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", margin: 0 }}>{g.name}</p>
+                          <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{g.name}</p>
                           <span style={{
                             fontSize: 10, padding: "2px 8px", borderRadius: 999, fontWeight: 500,
-                            background: g.leader_gender === "male" ? "#E8F0FC" : g.leader_gender === "female" ? "#FCE8F0" : "#F0EDE8",
+                            background: g.leader_gender === "male" ? "#E8F0FC" : g.leader_gender === "female" ? "#FCE8F0" : "var(--body-bg)",
                             color: g.leader_gender === "male" ? "#2D5FA3" : g.leader_gender === "female" ? "#A32D5F" : "var(--muted-text)",
                           }}>
                             {g.leader_gender === "male" ? "Brothers" : g.leader_gender === "female" ? "Sisters" : "Group"}
@@ -10186,14 +10137,14 @@ function GroupGeneratorWizard({
                             style={{
                               display: "flex", alignItems: "center", gap: 8, padding: "7px 8px",
                               border: "1px solid var(--line)", borderRadius: 8,
-                              background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "var(--cream-panel)",
+                              background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "var(--body-bg)" : "var(--cream-panel)",
                               cursor: "grab",
                             }}
                           >
                             <GripVertical style={{ width: 12, height: 12, color: "var(--dashed)", flexShrink: 0 }} />
                             <MonogramChip
                               initials={m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
-                              style={{ width: 24, height: 24, fontSize: 10, fontWeight: 700 }}
+                              style={{ width: 24, height: 24, fontSize: 10, fontWeight: 500 }}
                             />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <p style={{ fontSize: 12, fontWeight: 500, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
@@ -10231,7 +10182,7 @@ function GroupGeneratorWizard({
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                        <p style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)", margin: 0 }}>{g.name}</p>
+                        <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{g.name}</p>
                         <span style={{ fontSize: 11, color: "var(--muted-text)" }}>{g.members.length}</span>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -10243,14 +10194,14 @@ function GroupGeneratorWizard({
                             onDragEnd={() => { setDragSource(null); setDragOver(null) }}
                             style={{
                               display: "flex", alignItems: "center", gap: 8, padding: "7px 8px",
-                              border: "1px solid var(--line)", borderRadius: 8, background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "#F0EDE8" : "var(--cream-panel)",
+                              border: "1px solid var(--line)", borderRadius: 8, background: dragSource?.groupIdx === gIdx && dragSource?.memberIdx === mIdx ? "var(--body-bg)" : "var(--cream-panel)",
                               cursor: "grab",
                             }}
                           >
                             <GripVertical style={{ width: 12, height: 12, color: "var(--dashed)", flexShrink: 0 }} />
                             <MonogramChip
                               initials={m.name.split(/\s+/).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
-                              style={{ width: 24, height: 24, fontSize: 10, fontWeight: 700 }}
+                              style={{ width: 24, height: 24, fontSize: 10, fontWeight: 500 }}
                             />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <p style={{ fontSize: 12, fontWeight: 500, color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</p>
@@ -10503,7 +10454,7 @@ export function AddWorkspaceModal({ ministryId, userId, ownedKeys, onClose, onCr
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20 }} className="text-[var(--muted-text)] leading-tight">{preset.name}</p>
-                        <span className="text-[10px] font-semibold tracking-wide uppercase bg-[var(--line)] text-[var(--muted-text)] px-2 py-0.5 rounded-full">Coming soon</span>
+                        <span className="text-[10px] font-normal tracking-wide uppercase bg-[var(--line)] text-[var(--muted-text)] px-2 py-0.5 rounded-full">Coming soon</span>
                       </div>
                       <p className="text-[12px] text-[var(--muted-text)] mt-1">{preset.description}</p>
                     </div>
@@ -11005,7 +10956,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
                     transition: "background 0.12s",
                   }}
                 >
-                  <MonogramChip initials={getInitials(member.name)} className="w-9 h-9 text-[13px] font-semibold" />
+                  <MonogramChip initials={getInitials(member.name)} className="w-9 h-9 text-[13px] font-medium" />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500, lineHeight: 1.3, margin: 0 }}>{member.name}</p>
                     {selected && roles.length > 1 ? (
@@ -11063,7 +11014,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
           <>
             <div className="flex items-center gap-2">
               <PlanLineIcon iconKey={team.icon ?? "users"} size={22} bg="var(--plum)" fg="var(--cream)" />
-              <span className="text-[14px] font-semibold text-[var(--ink)]">{localTeamName}</span>
+              <span className="text-[14px] font-medium text-[var(--ink)]">{localTeamName}</span>
             </div>
             <div className="flex items-center gap-2">
               {canCreateGroupChat && (chatCreated ? (
@@ -11112,7 +11063,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
                       )}
                       {roles.map((role) => (
                         <div key={role.id} className="bg-[var(--cream)] rounded-2xl border border-[var(--line)] p-4">
-                          <p className="text-[14px] font-semibold text-[var(--ink)] mb-2">{role.name}</p>
+                          <p className="text-[14px] font-medium text-[var(--ink)] mb-2">{role.name}</p>
                           {role.permissions.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                               {role.permissions.map((p) => (
@@ -11157,7 +11108,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
                         <div className="flex-1 h-px bg-[var(--line)]" />
                       </div>
                       {canManageTeam && (
-                        <button onClick={() => setShowAddMember(true)} className="text-[12px] font-semibold text-[var(--plum)] hover:opacity-70 flex-shrink-0">
+                        <button onClick={() => setShowAddMember(true)} className="text-[12px] font-medium text-[var(--plum)] hover:opacity-70 flex-shrink-0">
                           + Add
                         </button>
                       )}
@@ -11172,7 +11123,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
                             style={{ background: isConfirming ? "#FDF0F0" : "var(--cream)", transition: "background 0.1s" }}
                             onClick={() => { if (canManageTeam && m.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === m.user_id ? null : m.user_id) }}
                           >
-                            <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-semibold" />
+                            <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-medium" />
                             <div className="flex-1 min-w-0">
                               <p className="text-[14px] font-medium text-[var(--ink)] truncate">{m.name}</p>
                               {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
@@ -11391,7 +11342,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
                                   >
                                     <p style={{ flex: 1, fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{PERMISSION_LABELS[perm]}</p>
                                     <div style={{ width: 38, height: 22, borderRadius: 999, background: on ? "var(--plum)" : "var(--line)", position: "relative", flexShrink: 0, transition: "background 0.15s" }}>
-                                      <div style={{ position: "absolute", top: 3, left: on ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 3px rgba(0,0,0,0.15)", transition: "left 0.15s" }} />
+                                      <div style={{ position: "absolute", top: 3, left: on ? 19 : 3, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.15s" }} />
                                     </div>
                                   </div>
                                 )
@@ -11473,7 +11424,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
                           transition: "background 0.1s",
                         }}
                       >
-                        <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-semibold" />
+                        <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-medium" />
                         <span style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>{m.name}</span>
                         {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
                           <select
@@ -11511,7 +11462,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
                 {/* Danger zone — the delete confirm renders as a top-layer portal dialog. */}
                 {canDelete && (
                   <div style={{ marginTop: 36 }}>
-                    <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 12px" }}>Danger zone</p>
+                    <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 12px" }}>Danger zone</p>
                     <div style={{ height: 1, background: "var(--line)", marginBottom: 16 }} />
                     <button onClick={() => setConfirmDelete(true)} style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 18px", background: "transparent", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: "var(--r-chip)", color: "var(--danger)", fontSize: 14, cursor: "pointer" }}>
                       <Trash2 style={{ width: 14, height: 14 }} /> Delete team
@@ -11539,7 +11490,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <p style={{ fontSize: 14, color: "var(--body)", margin: 0 }}>
-              <span style={{ fontWeight: 600, color: "var(--ink)" }}>{selectedIds.size}</span> {selectedIds.size === 1 ? "member" : "members"} selected
+              <span style={{ fontWeight: 500, color: "var(--ink)" }}>{selectedIds.size}</span> {selectedIds.size === 1 ? "member" : "members"} selected
             </p>
             <CentralButton
               variant="primary" size="md"
@@ -11609,7 +11560,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
                         onClick={() => setReplacePickId(p.user_id)}
                         style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1px solid ${picked ? "var(--plum)" : "var(--line)"}`, background: picked ? "var(--ivory)" : "var(--cream)", cursor: "pointer", textAlign: "left" as const, transition: "all 0.12s" }}
                       >
-                        <MonogramChip initials={getInitials(p.name)} className="w-8 h-8 text-[12px] font-semibold" />
+                        <MonogramChip initials={getInitials(p.name)} className="w-8 h-8 text-[12px] font-medium" />
                         <span style={{ flex: 1, fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{p.name}</span>
                         <div style={{ width: 18, height: 18, borderRadius: 999, border: `1.5px solid ${picked ? "var(--plum)" : "var(--line-2)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                           {picked && <div style={{ width: 9, height: 9, borderRadius: 999, background: "var(--plum)" }} />}
@@ -12304,7 +12255,7 @@ function SmallGroupLeadersTab({
           {/* June 1 renewal banner (president only) */}
           {isPresident && rosterStatus?.needs_roster_renewal && (
             <div style={{ background: "#FFF8F0", border: "1.5px solid #F59E0B", borderRadius: 14, padding: "16px 18px" }}>
-              <p className="text-[14px] font-semibold text-[#92400E] mb-1">New semester — update your DGL roster?</p>
+              <p className="text-[14px] font-medium text-[#92400E] mb-1">New semester — update your DGL roster?</p>
               <p className="text-[13px] text-[#92400E] mb-4">
                 It&apos;s June 1. Do you want to carry over last semester&apos;s DGL roster for the fall, or start fresh?
               </p>
@@ -12320,7 +12271,7 @@ function SmallGroupLeadersTab({
                 <button
                   onClick={() => handleRosterRenewal("fresh")}
                   disabled={renewalLoading}
-                  style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#92400E", border: "1.5px solid #F59E0B", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
+                  style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#92400E", border: "1.5px solid #F59E0B", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
                 >
                   Start fresh
                 </button>
@@ -12374,7 +12325,7 @@ function SmallGroupLeadersTab({
                           transition: "opacity 0.15s",
                         }}
                       >
-                        <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "#EDE5F5" : "var(--cream-3)", border: `1px solid ${isNext ? "#C9B8D4" : "var(--line)"}` }}>
+                        <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "var(--plum-tint)" : "var(--cream-3)", border: `1px solid ${isNext ? "color-mix(in srgb, var(--plum) 25%, transparent)" : "var(--line)"}` }}>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase" as const }}>{dow}</span>
                           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: isNext ? "var(--plum)" : "var(--plum-2)", lineHeight: 1, marginTop: 1 }}>{dayNum}</span>
                         </div>
@@ -12385,7 +12336,7 @@ function SmallGroupLeadersTab({
                           </p>
                         </div>
                         {isNext && (
-                          <span style={{ fontSize: 10, fontWeight: 600, color: "var(--plum)", background: "#EDE5F5", border: "1px solid #C9B8D4", padding: "2px 8px", borderRadius: 999, letterSpacing: "0.05em", flexShrink: 0 }}>UP NEXT</span>
+                          <span style={{ fontSize: 10, fontWeight: 500, color: "var(--plum)", background: "var(--plum-tint)", border: "1px solid color-mix(in srgb, var(--plum) 25%, transparent)", padding: "2px 8px", borderRadius: 999, letterSpacing: "0.05em", flexShrink: 0 }}>UP NEXT</span>
                         )}
                       </div>
                     )
@@ -12417,7 +12368,7 @@ function SmallGroupLeadersTab({
               />
 
               {rosterError && (
-                <div className="mt-3 px-3 py-2 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl text-[13px] text-red-700">
+                <div className="mt-3 px-3 py-2 bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] rounded-xl text-[13px] text-[var(--danger)]">
                   {rosterError}
                 </div>
               )}
@@ -12429,9 +12380,9 @@ function SmallGroupLeadersTab({
                   className="w-full mt-4"
                   style={{ background: "transparent", border: "1.5px dashed #D4CEDF", borderRadius: 14, padding: "24px 16px", textAlign: "center" as const, cursor: "pointer" }}
                 >
-                  <p className="text-[14px] font-semibold text-[var(--ink)] mb-1">No roster yet</p>
+                  <p className="text-[14px] font-medium text-[var(--ink)] mb-1">No roster yet</p>
                   <p className="text-[13px] text-[var(--muted-text)] mb-3">Add DGLs to the {semesterLabel} roster.</p>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--plum)" }}>+ Add DGLs</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--plum)" }}>+ Add DGLs</span>
                 </button>
               )}
 
@@ -12457,9 +12408,9 @@ function SmallGroupLeadersTab({
                             key={m.id}
                             onClick={() => setPendingRosterIds(prev => { const n = new Set(prev); selected ? n.delete(m.id) : n.add(m.id); return n })}
                             className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < arr.length - 1 ? "border-b border-[var(--line-3)]" : ""}`}
-                            style={{ background: selected ? "rgba(62,21,64,0.04)" : "transparent" }}
+                            style={{ background: selected ? "color-mix(in srgb, var(--plum) 4%, transparent)" : "transparent" }}
                           >
-                            <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[12px] font-semibold" />
+                            <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[12px] font-medium" />
                             <p className="flex-1 text-[13px] text-[var(--ink)]">{m.name}</p>
                             {selected && <Check style={{ width: 14, height: 14, color: "var(--plum)" }} />}
                           </div>
@@ -12490,7 +12441,7 @@ function SmallGroupLeadersTab({
                 <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                   {rosterMembers.map((m, i) => (
                     <div key={m.user_id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)" }}>
-                      <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
+                      <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-medium" />
                       <p className="flex-1 text-[14px] text-[var(--ink)]">{m.name}</p>
                     </div>
                   ))}
@@ -12539,21 +12490,21 @@ function SmallGroupLeadersTab({
                         const isConfirming = confirmRemoveSgMemberId === m.user_id
                         return (
                           <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)", background: isPendingRemove || isConfirming ? "#FDF8F8" : "transparent" }}>
-                            <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
+                            <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-medium" />
                             <p className={`flex-1 text-[14px] ${isPendingRemove ? "line-through text-[var(--danger)]" : "text-[var(--ink)]"}`}>{m.name}</p>
                             {isEditing ? (
                               isPendingRemove ? (
-                                <button onClick={() => setPendingRemoveMemberIds(prev => { const n = new Set(prev); n.delete(m.user_id); return n })} style={{ fontSize: 11, fontWeight: 600, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Undo</button>
+                                <button onClick={() => setPendingRemoveMemberIds(prev => { const n = new Set(prev); n.delete(m.user_id); return n })} style={{ fontSize: 11, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Undo</button>
                               ) : isConfirming ? (
                                 <div style={{ display: "flex", gap: 8 }}>
-                                  <button onClick={() => { setPendingRemoveMemberIds(prev => new Set([...prev, m.user_id])); setConfirmRemoveSgMemberId(null) }} style={{ fontSize: 11, fontWeight: 600, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Remove</button>
+                                  <button onClick={() => { setPendingRemoveMemberIds(prev => new Set([...prev, m.user_id])); setConfirmRemoveSgMemberId(null) }} style={{ fontSize: 11, fontWeight: 500, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Remove</button>
                                   <button onClick={() => setConfirmRemoveSgMemberId(null)} style={{ fontSize: 11, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Keep</button>
                                 </div>
                               ) : (
                                 <IconButton dim={24} onClick={() => setConfirmRemoveSgMemberId(m.user_id)} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>
                               )
                             ) : (
-                              <button onClick={() => toggleMeal(m)} style={{ padding: "4px 10px", borderRadius: 8, cursor: "pointer", border: mealDone ? "none" : "1px solid var(--line-2)", background: mealDone ? "#EDE5F0" : "transparent", fontSize: 11, fontWeight: 600, color: mealDone ? "var(--plum)" : "var(--muted-text)", letterSpacing: "0.03em", textTransform: "uppercase" as const }}>
+                              <button onClick={() => toggleMeal(m)} style={{ padding: "4px 10px", borderRadius: 8, cursor: "pointer", border: mealDone ? "none" : "1px solid var(--line-2)", background: mealDone ? "var(--plum-tint)" : "transparent", fontSize: 11, fontWeight: 500, color: mealDone ? "var(--plum)" : "var(--muted-text)", letterSpacing: "0.03em", textTransform: "uppercase" as const }}>
                                 {mealDone ? "Meal ✓" : "Meal"}
                               </button>
                             )}
@@ -12564,10 +12515,10 @@ function SmallGroupLeadersTab({
                         const person = allMembersForPicker.find(p => p.id === uid)
                         if (!person) return null
                         return (
-                          <div key={uid} className="flex items-center gap-3 px-4 py-3 border-t border-[var(--line-3)]" style={{ background: "rgba(62,21,64,0.03)" }}>
-                            <MonogramChip initials={getInitials(person.name)} className="w-7 h-7 text-[11px] font-semibold" />
+                          <div key={uid} className="flex items-center gap-3 px-4 py-3 border-t border-[var(--line-3)]" style={{ background: "color-mix(in srgb, var(--plum) 3%, transparent)" }}>
+                            <MonogramChip initials={getInitials(person.name)} className="w-7 h-7 text-[11px] font-medium" />
                             <p className="flex-1 text-[14px] text-[var(--ink)]">{person.name}</p>
-                            <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.05em", color: "var(--plum)", background: "rgba(62,21,64,0.06)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px", marginRight: 4 }}>ADDING</span>
+                            <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: "0.05em", color: "var(--plum)", background: "color-mix(in srgb, var(--plum) 6%, transparent)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px", marginRight: 4 }}>ADDING</span>
                             <IconButton dim={24} onClick={() => setPendingAddMemberIds(prev => { const n = new Set(prev); n.delete(uid); return n })} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>
                           </div>
                         )
@@ -12584,7 +12535,7 @@ function SmallGroupLeadersTab({
                               <div className="px-4 py-4 text-center"><p style={{ fontSize: 12, color: "var(--muted-text)" }}>No members to add</p></div>
                             ) : addableMembers.map((p, i) => (
                               <div key={p.id} onClick={() => { setPendingAddMemberIds(prev => new Set([...prev, p.id])); setSgAddPickerSearch(""); setShowSgAddPicker(false) }} className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${i < addableMembers.length - 1 ? "border-b border-[var(--line-3)]" : ""}`}>
-                                <MonogramChip initials={getInitials(p.name)} className="w-7 h-7 text-[11px] font-semibold" />
+                                <MonogramChip initials={getInitials(p.name)} className="w-7 h-7 text-[11px] font-medium" />
                                 <p style={{ fontSize: 13, color: "var(--ink)" }}>{p.name}</p>
                               </div>
                             ))}
@@ -12602,7 +12553,7 @@ function SmallGroupLeadersTab({
 
                 {isEditing && (
                   <div style={{ marginTop: 10 }}>
-                    {editError && <div style={{ marginBottom: 8, padding: "8px 12px", background: "#FEF2F2", border: "1px solid #FCA5A5", borderRadius: 10, fontSize: 12, color: "#B91C1C" }}>{editError}</div>}
+                    {editError && <div style={{ marginBottom: 8, padding: "8px 12px", background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: 10, fontSize: 12, color: "var(--danger)" }}>{editError}</div>}
                     <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8, lineHeight: 1.5 }}>Changes sync to your group chat and will reflect immediately.</p>
                     <div className="flex gap-2">
                       <button onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }} style={{ flex: 1, padding: "9px 0", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
@@ -12613,13 +12564,13 @@ function SmallGroupLeadersTab({
 
                 {pairedGroup && (
                   <div className="mt-3">
-                    <p style={{ fontSize: 11, fontWeight: 600, color: "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: 8 }}>Paired — {pairedGroup.name}</p>
+                    <p style={{ fontSize: 11, fontWeight: 400, color: "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: 8 }}>Paired — {pairedGroup.name}</p>
                     <div className="rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                       {pairedMs.length === 0 ? (
                         <div className="px-4 py-5 text-center"><p className="text-[13px] text-[var(--muted-text)]">No members yet.</p></div>
                       ) : pairedMs.map((m, i) => (
                         <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)" }}>
-                          <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-semibold" />
+                          <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-medium" />
                           <p className="text-[14px] text-[var(--ink)]">{m.name}</p>
                         </div>
                       ))}
@@ -12665,7 +12616,7 @@ function SmallGroupLeadersTab({
 
             {!rosterConfirmedForSchedule ? (
               <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
-                <p className="text-[14px] font-semibold text-[var(--ink)] mb-1">Roster not confirmed</p>
+                <p className="text-[14px] font-medium text-[var(--ink)] mb-1">Roster not confirmed</p>
                 <p className="text-[13px] text-[var(--muted-text)]">
                   The president needs to confirm the DGL roster before availability can be set.
                 </p>
@@ -12691,7 +12642,7 @@ function SmallGroupLeadersTab({
               return (
                 <>
                   <p className="text-[12px] text-[var(--muted-text)] mb-3 mt-3">
-                    Check dates when you&apos;re <span className="font-semibold text-[var(--plum)]">not available</span>. Changes save automatically.
+                    Check dates when you&apos;re <span className="font-medium text-[var(--plum)]">not available</span>. Changes save automatically.
                   </p>
                   <div className="rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                     <div className="overflow-x-auto">
@@ -12704,7 +12655,7 @@ function SmallGroupLeadersTab({
                               <th
                                 key={group.label}
                                 colSpan={group.dates.length}
-                                style={{ padding: "6px 8px 4px", fontSize: 9, fontWeight: 700, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase" as const, borderBottom: "1px solid var(--line)", borderLeft: "1px solid var(--line)", background: "var(--cream-3)", textAlign: "left", whiteSpace: "nowrap" }}
+                                style={{ padding: "6px 8px 4px", fontSize: 9, fontWeight: 400, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase" as const, borderBottom: "1px solid var(--line)", borderLeft: "1px solid var(--line)", background: "var(--cream-3)", textAlign: "left", whiteSpace: "nowrap" }}
                               >
                                 {group.label}
                               </th>
@@ -12718,8 +12669,8 @@ function SmallGroupLeadersTab({
                               const isPast = date < today
                               return (
                                 <th key={`${date}::${slot}`} style={{ width: datColW, minWidth: datColW, padding: "4px 2px 5px", borderBottom: "1px solid var(--line)", textAlign: "center" }}>
-                                  <div style={{ fontSize: 9, fontWeight: 700, color: isPast ? "#C5C0CC" : "var(--body)", letterSpacing: "0.04em" }}>{SLOT_ABBR[slot]}</div>
-                                  <div style={{ fontSize: 9, fontWeight: 400, color: isPast ? "#C5C0CC" : "var(--muted-text)" }}>{parseInt(m)}/{parseInt(d)}</div>
+                                  <div style={{ fontSize: 9, fontWeight: 400, color: isPast ? "var(--dashed)" : "var(--body)", letterSpacing: "0.04em" }}>{SLOT_ABBR[slot]}</div>
+                                  <div style={{ fontSize: 9, fontWeight: 400, color: isPast ? "var(--dashed)" : "var(--muted-text)" }}>{parseInt(m)}/{parseInt(d)}</div>
                                 </th>
                               )
                             })}
@@ -12814,7 +12765,7 @@ function SmallGroupLeadersTab({
                   <div className="flex items-center gap-2">
                     {(rotationPhase === "saved" || rotationPhase === "published") && (
                       <>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, background: rotationPhase === "published" ? "rgba(62,21,64,0.08)" : "var(--body-bg)", color: "var(--plum)", fontSize: 11, fontWeight: 500, letterSpacing: "0.02em" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, background: rotationPhase === "published" ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--body-bg)", color: "var(--plum)", fontSize: 11, fontWeight: 500, letterSpacing: "0.02em" }}>
                           {rotationPhase === "published" ? "Published" : "Draft"}
                         </span>
                         <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "6px 12px", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5 }}>
@@ -12854,7 +12805,7 @@ function SmallGroupLeadersTab({
 
               {!rosterConfirmedForSchedule ? (
                 <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
-                  <p className="text-[14px] font-semibold text-[var(--ink)] mb-1">Roster required</p>
+                  <p className="text-[14px] font-medium text-[var(--ink)] mb-1">Roster required</p>
                   <p className="text-[13px] text-[var(--muted-text)]">
                     Confirm the DGL roster on the Home tab first to generate a rotation.
                   </p>
@@ -12862,14 +12813,14 @@ function SmallGroupLeadersTab({
               ) : (
                 <>
                   {rotErr && (
-                    <div className="mt-3 mb-1 px-3 py-2.5 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl text-[13px] text-red-700">
+                    <div className="mt-3 mb-1 px-3 py-2.5 bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] border border-[color-mix(in_srgb,var(--danger)_25%,transparent)] rounded-xl text-[13px] text-[var(--danger)]">
                       {rotErr}
                     </div>
                   )}
 
                   {rotationPhase === "idle" && (
                     <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
-                      <p className="text-[14px] font-semibold text-[var(--ink)] mb-1">No rotation yet</p>
+                      <p className="text-[14px] font-medium text-[var(--ink)] mb-1">No rotation yet</p>
                       <p className="text-[13px] text-[var(--muted-text)] mb-5">
                         Generate a fair rotation from DGL availability for {semesterLabel}.
                       </p>
@@ -12934,7 +12885,7 @@ function SmallGroupLeadersTab({
                     <div className="mt-4">
                       {flagged.length > 0 && (
                         <div className="mb-3 px-3 py-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl">
-                          <p style={{ fontSize: 12, fontWeight: 600, color: "#92400E", marginBottom: 4 }}>
+                          <p style={{ fontSize: 12, fontWeight: 500, color: "#92400E", marginBottom: 4 }}>
                             {flagged.length} week{flagged.length !== 1 ? "s" : ""} need review
                           </p>
                           {flagged.map((f, fi) => (
@@ -13351,7 +13302,7 @@ function BibleStudySubTab({
               return (
                 <div key={p.user_id} style={{ borderBottom: isLast ? "none" : "1px solid #F8F6F1" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px" }}>
-                    <MonogramChip initials={getInitials(p.name)} style={{ width: 28, height: 28, fontSize: 11, fontWeight: 600 }} />
+                    <MonogramChip initials={getInitials(p.name)} style={{ width: 28, height: 28, fontSize: 11, fontWeight: 500 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 13, color: "var(--ink)", fontWeight: isMe ? 600 : 400 }}>{p.name}{isMe ? " (you)" : ""}</p>
                       {p.progress_note && !isMe && (
@@ -13364,7 +13315,7 @@ function BibleStudySubTab({
                     {!isPastor && isMe && !editingNote && (
                       <button
                         onClick={() => setEditingNote(true)}
-                        style={{ fontSize: 11, color: "var(--plum)", fontWeight: 600, background: "rgba(62,21,64,0.07)", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, fontFamily: "inherit", flexShrink: 0 }}
+                        style={{ fontSize: 11, color: "var(--plum)", fontWeight: 500, background: "color-mix(in srgb, var(--plum) 7%, transparent)", border: "none", cursor: "pointer", padding: "4px 8px", borderRadius: 6, fontFamily: "inherit", flexShrink: 0 }}
                       >
                         {p.progress_note ? "Edit" : "Add note"}
                       </button>
@@ -13434,7 +13385,7 @@ function BibleStudySubTab({
               ) : isConfirmingDelete ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 10px", border: "1.5px solid #E57373", borderRadius: 20, background: "#FFF5F5" }}>
                   <span style={{ fontSize: 12, color: "var(--danger)", whiteSpace: "nowrap" as const }}>Delete?</span>
-                  <button onClick={() => void handleDelete(s.id)} disabled={deletingId === s.id} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--danger)", fontWeight: 700, fontSize: 12, fontFamily: "inherit" }}>
+                  <button onClick={() => void handleDelete(s.id)} disabled={deletingId === s.id} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--danger)", fontWeight: 500, fontSize: 12, fontFamily: "inherit" }}>
                     {deletingId === s.id ? "…" : "Yes"}
                   </button>
                   <button onClick={() => setConfirmingDeleteId(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)", display: "flex" }}>
@@ -13492,7 +13443,7 @@ function BibleStudySubTab({
       {/* Create form */}
       {creating && (
         <div style={{ background: "var(--cream)", borderRadius: 16, border: "1px solid var(--line)", padding: "20px" }}>
-          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 12 }}>New chapter</p>
+          <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginBottom: 12 }}>New chapter</p>
           <input
             value={newTitle}
             onChange={e => setNewTitle(e.target.value)}
@@ -13523,7 +13474,7 @@ function BibleStudySubTab({
       {sheets.length === 0 && !creating && (
         <div style={{ background: "var(--cream)", borderRadius: 16, border: "1.5px dashed var(--line)", padding: "32px 24px", textAlign: "center" as const }}>
           <FileText style={{ width: 32, height: 32, color: "var(--dashed)", margin: "0 auto 12px" }} />
-          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>No chapters yet</p>
+          <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginBottom: 4 }}>No chapters yet</p>
           <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: isPastor ? 16 : 0 }}>
             {isPastor ? "Create the first chapter to get started." : "Check back when the pastor has added the first chapter."}
           </p>
@@ -13542,8 +13493,8 @@ function BibleStudySubTab({
               <span style={{
                 fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" as const,
                 padding: "3px 8px", borderRadius: 6,
-                background: sheet.status === "finalized" ? "#E8F5E9" : "#FFF8E7",
-                color: sheet.status === "finalized" ? "var(--success)" : "#8A6200",
+                background: sheet.status === "finalized" ? "color-mix(in srgb, var(--success) 15%, transparent)" : "color-mix(in srgb, var(--warm-tan) 12%, transparent)",
+                color: sheet.status === "finalized" ? "var(--sage)" : "color-mix(in srgb, var(--warm-tan) 75%, var(--ink))",
               }}>
                 {sheet.status === "finalized" ? "Finalized" : "Draft"}
               </span>
@@ -13552,7 +13503,7 @@ function BibleStudySubTab({
               href={sheet.google_doc_url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--plum)", fontWeight: 600, textDecoration: "none" }}
+              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "var(--plum)", fontWeight: 500, textDecoration: "none" }}
             >
               <ExternalLink style={{ width: 12, height: 12 }} />
               Open doc
@@ -13581,7 +13532,7 @@ function BibleStudySubTab({
               {!renderingPdf && pdfPages.length === 0 && sheet.pdf_url && (
                 <div style={{ background: "var(--cream)", borderRadius: 12, border: "1px solid var(--line)", padding: 20, textAlign: "center" as const }}>
                   <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 12 }}>PDF preview unavailable.</p>
-                  <a href={sheet.pdf_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--plum)", fontWeight: 600, textDecoration: "none" }}>
+                  <a href={sheet.pdf_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--plum)", fontWeight: 500, textDecoration: "none" }}>
                     Download PDF →
                   </a>
                 </div>
@@ -13648,7 +13599,7 @@ function BibleStudySubTab({
           {/* Pending annotation input */}
           {pendingAnnotation !== null && (
             <div style={{ background: "var(--cream)", borderRadius: 14, border: "1.5px solid var(--line)", padding: 16 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>Add annotation</p>
+              <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", marginBottom: 8 }}>Add annotation</p>
               <textarea
                 autoFocus
                 value={annotationText}
@@ -13702,7 +13653,7 @@ function BibleStudySubTab({
                 </CentralButton>
               ) : (
                 <div style={{ padding: "14px 16px", background: "var(--cream-panel)", border: "1.5px solid var(--line)", borderRadius: 12 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: 4 }}>Finalize this week&apos;s study?</p>
+                  <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", marginBottom: 4 }}>Finalize this week&apos;s study?</p>
                   <p style={{ fontSize: 12, color: "var(--muted-text)", marginBottom: 10 }}>
                     The Google Doc will be exported to PDF and locked for annotation. Ensure the doc is publicly viewable.
                   </p>
@@ -13737,7 +13688,7 @@ function BibleStudySubTab({
                 <button
                   onClick={handleShare}
                   disabled={sharing}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: "transparent", color: "var(--plum)", border: "1.5px solid var(--plum)", borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: sharing ? "not-allowed" : "pointer", opacity: sharing ? 0.6 : 1, fontFamily: "inherit" }}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 18px", background: "transparent", color: "var(--plum)", border: "1.5px solid var(--plum)", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: sharing ? "not-allowed" : "pointer", opacity: sharing ? 0.6 : 1, fontFamily: "inherit" }}
                 >
                   <Share2 style={{ width: 13, height: 13 }} />
                   {sharing ? "Sharing…" : "Share to group chat"}
@@ -13787,9 +13738,9 @@ function DGLAssignmentTable({
         return (
           <div key={wd} className={`rounded-[12px] border overflow-hidden ${hasFlagged ? "border-[#FDE68A]" : "border-[var(--line)]"}`} style={{ background: "var(--cream-panel)" }}>
             <div className={`px-4 py-2.5 border-b flex items-center justify-between ${hasFlagged ? "border-[#FDE68A] bg-[#FFFBEB]" : "border-[var(--line-3)]"}`} style={hasFlagged ? {} : { background: "var(--cream-3)" }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: hasFlagged ? "#92400E" : "var(--body)" }}>{dateStr}</span>
+              <span style={{ fontSize: 12, fontWeight: 500, color: hasFlagged ? "#92400E" : "var(--body)" }}>{dateStr}</span>
               {hasFlagged && (
-                <span style={{ fontSize: 10, fontWeight: 600, color: "#92400E", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+                <span style={{ fontSize: 10, fontWeight: 500, color: "#92400E", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                   Needs Review
                 </span>
               )}
@@ -13803,7 +13754,7 @@ function DGLAssignmentTable({
               const isHovered = !isFriday && hoveredCell?.weekDate === wd && hoveredCell?.slot === slot
               return (
                 <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[var(--line-3)]" : ""} ${isFlagged ? "bg-[#FFFBEB]" : ""}`}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: isFlagged ? "#B45309" : "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: isFlagged ? "#B45309" : "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                     {DGL_SLOT_LABELS[slot]}
                   </span>
                   {isFriday ? (
