@@ -2486,11 +2486,15 @@ export function PlanTab({
       userId={userId}
       ministryId={ministryId}
       isAdmin={isAdmin}
-      // Gov-WRITE to THIS team (matrix = 'write'), mirroring the RLS
-      // auth_can_manage_team: gov-view admins get a read-only settings view.
-      govWrite={isGovernanceAdmin && openTeam.admin_access === "write"}
+      // Governance roster power — structure governance holds at view AND write
+      // (permissions.md §matrix), member or not. The old matrix-narrowed govWrite
+      // wrongly locked member-admins + the picker's assign-a-president flow to
+      // read-only (and the openTeam built by userTeamToTeam hardcodes
+      // admin_access:'view', making the old check always-false on that path).
+      isGovernanceAdmin={isGovernanceAdmin}
       onClose={closeSettings}
       onChanged={() => { closeSettings(); onTeamsChange() }}
+      onMutated={onTeamsChange}
       onOpenChat={onOpenChat}
     />
   ) : null
@@ -10541,17 +10545,23 @@ async function fetchTeamSettings([, teamId]: readonly [string, string]) {
   return { roles, members }
 }
 
-export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite, onClose, onChanged, onOpenChat }: {
+export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGovernanceAdmin, onClose, onChanged, onMutated, onOpenChat }: {
   team: Team
   userId: string
   ministryId: string
   isAdmin: boolean
-  // Governance-WRITE to this specific team: the caller is a governance admin AND
-  // the team's admin_access matrix grants 'write'. Mirrors the RLS
-  // auth_can_manage_team — gov-view (or a non-governing admin) is read-only here.
-  govWrite: boolean
+  // Governance roster power (permissions.md §matrix): a governance admin governs
+  // STRUCTURE (roster, roles, presidents, settings) at BOTH view and write —
+  // independent of whether they're also a team member, and independent of the
+  // domain matrix. Only DOMAIN content is write-gated (handled elsewhere).
+  // Mirrors the RLS auth_can_manage_team (view+write governance arm).
+  isGovernanceAdmin: boolean
   onClose: () => void
   onChanged: () => void
+  // Fired after in-place membership/role/name mutations that must propagate to
+  // the parent's team lists (picker pills like "Needs president", member counts)
+  // WITHOUT closing settings — unlike onChanged, which closes.
+  onMutated?: () => void
   onOpenChat?: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
@@ -10597,9 +10607,11 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
   const isPresident = roles.some(r => r.id === myRoleId && r.is_president)
   const myRolePerms = roles.find(r => r.id === members.find(m => m.user_id === userId)?.role_id)?.permissions ?? []
   // Matches the RLS auth_can_manage_team exactly: this team's president, OR a
-  // member whose role grants can_manage_team, OR a governance admin the matrix
-  // grants WRITE on this team. Gov-view opens settings but sees it read-only.
-  const canManageTeam = isPresident || myRolePerms.includes("can_manage_team") || govWrite
+  // member whose role grants can_manage_team, OR a governance admin (roster) —
+  // whose STRUCTURE power holds at view AND write, member or not (the old
+  // govWrite gate wrongly demoted member-admins and the picker's
+  // assign-a-president flow to read-only).
+  const canManageTeam = isPresident || myRolePerms.includes("can_manage_team") || isGovernanceAdmin
   // Delete parity with auth_can_manage_team (same three arms as canManageTeam):
   // president, can_manage_team member, or gov-write. UI previously omitted the
   // can_manage arm, hiding the delete button from a member RLS would authorize.
@@ -10741,6 +10753,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
     // Revalidate the cached settings (re-populates members via the SWR effect) and return to
     // settings — do NOT call onChanged() which closes settings.
     await mutateTeamSettings()
+    onMutated?.()
     setShowAddMember(false)
     setSelectedIds(new Set())
     setMemberRoles({})
@@ -10759,6 +10772,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
       { revalidate: false },
     )
     setConfirmRemoveId(null)
+    onMutated?.()
   }
 
   async function handleChangeRole(memberId: string, newRoleId: string) {
@@ -10778,6 +10792,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
     setMembers(prev => prev.map(m => m.user_id === memberId ? { ...m, role_id: newRoleId, role_name: newRole?.name ?? m.role_name } : m))
     const { error: err } = await supabase.from("team_members").update({ role_id: newRoleId }).eq("team_id", team.id).eq("user_id", memberId)
     if (err) { setMembers(snapshot); setError(err.message) }
+    else onMutated?.()
   }
 
   // Confirm the president swap: demote the outgoing president to the default non-president role and promote the target.
@@ -10800,6 +10815,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
       const { error: demoteErr } = await supabase.from("team_members").update({ role_id: defaultNonPresidentRole.id }).eq("team_id", team.id).eq("user_id", outgoing)
       const { error: promoteErr } = await supabase.from("team_members").update({ role_id: presidentRole.id }).eq("team_id", team.id).eq("user_id", targetUserId)
       if (demoteErr || promoteErr) { setMembers(snapshot); setError((demoteErr ?? promoteErr)!.message) }
+      else onMutated?.()
       setReplacing(false)
       setReplaceCtx(null)
       setReplacePickId(null)
@@ -10836,6 +10852,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
     await supabase.from("teams").update({ name: val }).eq("id", team.id).eq("ministry_id", ministryId)
     setLocalTeamName(val)
     setEditingTeamName(false)
+    onMutated?.()
   }
 
   async function handleToggleCoPresidency(next: boolean) {
@@ -10969,13 +10986,13 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
             <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>No members to add.</p>
           </div>
         ) : (
-          <div>
-            {filteredAdd.map((member, i) => {
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {filteredAdd.map((member) => {
               const selected = selectedIds.has(member.id)
-              const isLast = i === filteredAdd.length - 1
               return (
                 <button
                   key={member.id}
+                  className={selected ? undefined : "hover:bg-[var(--cream-2)]"}
                   onClick={() => {
                     const wasSelected = selectedIds.has(member.id)
                     setSelectedIds((prev) => {
@@ -10992,12 +11009,14 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
                   }}
                   style={{
                     display: "flex", alignItems: "center", gap: 14, width: "100%",
-                    padding: selected && roles.length > 1 ? "12px 0" : "14px 0",
-                    borderTop: "none", borderLeft: "none", borderRight: "none",
-                    borderBottom: isLast ? "none" : "1px solid var(--line-3)",
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    // Selected = ivory surface + plum border (the app's active-state
+                    // pattern); a transparent border otherwise so rows don't shift.
+                    border: `1px solid ${selected ? "var(--plum)" : "transparent"}`,
                     background: selected ? "var(--ivory)" : "transparent",
                     cursor: "pointer", textAlign: "left" as const,
-                    transition: "background 0.12s",
+                    transition: "background 0.12s, border-color 0.12s",
                   }}
                 >
                   <MonogramChip initials={getInitials(member.name)} className="w-9 h-9 text-[13px] font-medium" />
@@ -11012,8 +11031,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
                         }}
                         onClick={(e) => e.stopPropagation()}
                         style={{
-                          marginTop: 5, fontSize: 12, padding: "4px 8px",
-                          border: "1px solid #C9C0B0", borderRadius: 6,
+                          marginTop: 6, fontSize: 12, padding: "4px 8px",
+                          border: "1px solid var(--line-2)", borderRadius: 8,
                           background: "var(--cream-panel)", color: "var(--ink)", cursor: "pointer",
                           outline: "none", maxWidth: "100%",
                         }}
@@ -11028,7 +11047,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, govWrite,
                   </div>
                   {selected && (
                     <div style={{
-                      width: 20, height: 20, borderRadius: 5, background: "var(--plum)", flexShrink: 0,
+                      width: 20, height: 20, borderRadius: 6, background: "var(--plum)", flexShrink: 0,
                       display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
                       <Check style={{ width: 11, height: 11, color: "var(--cream-panel)" }} />
