@@ -149,8 +149,16 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   const [activeTeamId, setActiveTeamId] = useState<string | null>(() => {
     const urlTeam = searchParams.get("team")
     if (urlTeam) return urlTeam
-    // 0 teams → null (empty state); 1 team → auto-enter; 2+ teams → null (picker)
-    return (initialUserTeams?.length ?? 0) === 1 ? initialUserTeams![0].teamId : null
+    // 0 teams → null (empty state); 2+ teams → null (picker). A single member team
+    // auto-enters ONLY for a non-governance-admin. A governance admin (every admin
+    // by default) can reach other workspaces via the matrix, so they must land on
+    // the WORKSPACE PICKER — never get dropped straight into their one member team
+    // (e.g. Finance). If it later turns out they govern no other teams, the
+    // single-team auto-enter effect below re-enters them once allTeams loads.
+    if ((initialUserTeams?.length ?? 0) !== 1) return null
+    const govSettings = initialGovernanceSettings ?? { all_admins: true, roster_ids: [] }
+    const adminTier = ["admin", "deacon", "elder", "pastor"].includes(initialProfile.role.toLowerCase())
+    return computeIsGovernanceAdmin(userId, adminTier, govSettings) ? null : initialUserTeams![0].teamId
   })
   const [activeMemberId, setActiveMemberId] = useState<string | null>(searchParams.get("member"))
   const [selectedDirectoryMember, setSelectedDirectoryMember] = useState<DirectoryMember | null>(null)
