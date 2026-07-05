@@ -15,4 +15,4 @@ These are non-negotiable checks before writing or editing any UI code. Stop imme
 - A modal used for navigation (opening an existing entity) → **HARD STOP**, navigate to a page instead
 - The verse callout removed from the sidebar → **HARD STOP**, it is permanent brand
 - `Inter` or any sans font used for a stat number → **HARD STOP**, stat numbers are serif
-- A drop shadow on a card → **HARD STOP**, shadows only on modal panels (§4.17)
+- A drop shadow anywhere → **HARD STOP** — no-shadow system; modals separate via the §4.17 ink veil, not elevation

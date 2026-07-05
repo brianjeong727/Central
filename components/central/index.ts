@@ -33,3 +33,4 @@ export {
   JournalListSkeleton,
   ProfileTabSkeleton,
 } from "./skeletons"
+export { CentralModal } from "./central-modal"

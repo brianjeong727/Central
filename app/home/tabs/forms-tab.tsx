@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Check, ChevronDown, ChevronLeft, ChevronRight, FileText } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE, AnimateIn } from "../components/shared"
-import { TabPageHeader, PageTitle, PlanSubTabStrip } from "@/components/central"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, CentralButton } from "@/components/central"
 import { useNavState } from "../nav-state"
 import type { FormsTabProps, FieldType } from "../types"
 
@@ -154,19 +154,31 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
     )
   }
 
+  const answeredCount = fields.filter(f => {
+    const a = answers[f.id]
+    return f.type === 'checkbox' ? (a as string[]).length > 0 : !!(a as string)?.trim()
+  }).length
+
   return (
     // Self-constrain to a readable form column + center, so the form looks
     // identical whether the host SubpageShell is width="full" (inside the
     // announcement detail) or width="centered" (from the feed).
-    <AnimateIn className="flex flex-col gap-6 w-full mx-auto" style={{ maxWidth: 600 }}>
+    //
+    // Editorial question groups (§1.3): mono eyebrow ("QUESTION N · REQUIRED")
+    // over a serif question, quiet option rows. Plum stays SURGICAL — selection
+    // reads as an ivory surface + plum border + plum dot/check, never a plum
+    // flood across every chosen row.
+    <AnimateIn className="flex flex-col w-full mx-auto" style={{ maxWidth: 600, gap: 32 }}>
       {error && (
-        <div style={{ background: "rgba(62,21,64,0.07)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>{error}</div>
+        <div style={{ background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 18%, transparent)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--danger)", fontWeight: 500 }}>{error}</div>
       )}
-      {fields.map(field => (
+      {fields.map((field, i) => (
         <div key={field.id}>
-          <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginBottom: 10 }}>
+          <p style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
+            Question {i + 1}{field.required ? " · Required" : ""}
+          </p>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 400, color: "var(--ink)", lineHeight: 1.35, margin: "6px 0 14px" }}>
             {field.label}
-            {field.required && <span style={{ color: "var(--danger)", marginLeft: 4 }}>*</span>}
           </p>
           {field.type === 'text' && (
             <textarea
@@ -175,9 +187,10 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
               placeholder="Your answer…"
               rows={3}
               style={{
-                width: '100%', padding: '10px 12px', borderRadius: 10,
-                border: '1px solid var(--line-2)', background: 'var(--cream)',
-                fontSize: 14, color: 'var(--ink)', outline: 'none', resize: 'vertical', lineHeight: 1.55,
+                width: '100%', padding: '12px 14px', borderRadius: "var(--r-input)",
+                border: '1px solid var(--line-2)', background: 'var(--cream-2)',
+                fontSize: 15, color: 'var(--ink)', outline: 'none', resize: 'vertical', lineHeight: 1.55,
+                fontFamily: "var(--sans)",
               }}
             />
           )}
@@ -187,17 +200,19 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
                 const selected = answers[field.id] === opt
                 return (
                   <button key={opt} type="button" onClick={() => setSingleAnswer(field.id, opt)} style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
-                    cursor: 'pointer', textAlign: 'left', fontSize: 14, transition: 'all 0.12s',
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10,
+                    cursor: 'pointer', textAlign: 'left', fontSize: 14.5, transition: 'all 0.12s',
                     border: `1px solid ${selected ? 'var(--plum)' : 'var(--line-2)'}`,
-                    background: selected ? 'var(--plum)' : 'var(--cream)',
-                    color: selected ? 'var(--cream-on-dark)' : 'var(--ink)',
+                    background: selected ? 'var(--ivory)' : 'var(--cream)',
+                    color: 'var(--ink)', fontWeight: selected ? 500 : 400,
                   }}>
                     <span style={{
-                      width: 16, height: 16, borderRadius: '50%', flexShrink: 0, display: 'inline-block',
-                      border: `2px solid ${selected ? 'var(--cream-on-dark)' : 'var(--dashed)'}`,
-                      background: selected ? 'rgba(246,244,239,0.25)' : 'transparent',
-                    }} />
+                      width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                      border: `2px solid ${selected ? 'var(--plum)' : 'var(--dashed)'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {selected && <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--plum)' }} />}
+                    </span>
                     {opt}
                   </button>
                 )
@@ -210,19 +225,20 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
                 const checked = ((answers[field.id] as string[]) ?? []).includes(opt)
                 return (
                   <button key={opt} type="button" onClick={() => toggleCheckbox(field.id, opt)} style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10,
-                    cursor: 'pointer', textAlign: 'left', fontSize: 14, transition: 'all 0.12s',
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10,
+                    cursor: 'pointer', textAlign: 'left', fontSize: 14.5, transition: 'all 0.12s',
                     border: `1px solid ${checked ? 'var(--plum)' : 'var(--line-2)'}`,
-                    background: checked ? 'var(--plum)' : 'var(--cream)',
-                    color: checked ? 'var(--cream-on-dark)' : 'var(--ink)',
+                    background: checked ? 'var(--ivory)' : 'var(--cream)',
+                    color: 'var(--ink)', fontWeight: checked ? 500 : 400,
                   }}>
                     <span style={{
-                      width: 16, height: 16, borderRadius: 3, flexShrink: 0,
-                      border: `2px solid ${checked ? 'var(--cream-on-dark)' : 'var(--dashed)'}`,
-                      background: checked ? 'rgba(246,244,239,0.25)' : 'transparent',
+                      width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                      border: `2px solid ${checked ? 'var(--plum)' : 'var(--dashed)'}`,
+                      background: checked ? 'var(--plum)' : 'transparent',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all 0.12s',
                     }}>
-                      {checked && <Check style={{ width: 10, height: 10, color: 'var(--cream-on-dark)' }} />}
+                      {checked && <Check style={{ width: 10, height: 10, color: 'var(--cream)' }} />}
                     </span>
                     {opt}
                   </button>
@@ -232,17 +248,15 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
           )}
         </div>
       ))}
-      <button
-        onClick={handleSubmit}
-        disabled={submitting}
-        style={{
-          width: '100%', padding: '14px', borderRadius: 10, background: 'var(--plum-2)',
-          color: 'var(--cream-on-dark)', fontSize: 14, fontWeight: 500, border: 'none',
-          cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.6 : 1,
-        }}
-      >
-        {submitting ? 'Submitting…' : 'Submit Response'}
-      </button>
+      {/* Submit row — progress counter left, the view's single primary right. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, borderTop: '1px solid var(--line)', paddingTop: 20 }}>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)" }}>
+          {answeredCount} of {fields.length} answered
+        </span>
+        <CentralButton onClick={handleSubmit} disabled={submitting}>
+          {submitting ? 'Submitting…' : 'Submit response'}
+        </CentralButton>
+      </div>
     </AnimateIn>
   )
 }

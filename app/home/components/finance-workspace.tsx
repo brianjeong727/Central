@@ -8,7 +8,7 @@ import {
   ImageIcon,
 } from "lucide-react"
 import { Spinner, EYEBROW_STYLE } from "./shared"
-import { MonogramChip, FilterDropdown, SubpageShell } from "@/components/central"
+import { MonogramChip, FilterDropdown, SubpageShell, CentralModal } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
   getReimbursementInbox, approveReceipt, rejectReceipt, signOffReceipt, declineReceipt,
@@ -151,14 +151,16 @@ export function SubmitReceiptModal({
     onClose()
   }
 
+  // CentralModal shell (§4.17): bottom sheet on mobile, centered panel on desktop.
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(19,16,26,0.4)", display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: "var(--cream)", borderRadius: "20px 20px 0 0", width: "100%", maxWidth: 480, maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px 14px", borderBottom: "1px solid var(--line)" }}>
-          <p style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)" }}>Submit a receipt</p>
-          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--ivory)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={14} color="var(--body)" /></button>
-        </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+    <CentralModal onClose={onClose} title="Submit a receipt" maxWidth={480} sheet
+      footer={
+        <button onClick={handleSubmit} disabled={submitting || !amount} style={{ width: "100%", height: 46, background: "var(--plum)", color: "var(--cream)", borderRadius: 12, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: submitting || !amount ? 0.6 : 1 }}>
+          {submitting ? "Submitting…" : "Submit receipt"}
+        </button>
+      }
+    >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {categoryMode ? (
             <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
               {categoryName} · {FUNDS.find(f => f.value === categoryFund)?.label ?? categoryFund}
@@ -197,13 +199,7 @@ export function SubmitReceiptModal({
           </div>
           {error && <p style={{ fontSize: 13, color: "var(--danger)" }}>{error}</p>}
         </div>
-        <div style={{ padding: "12px 20px 24px", borderTop: "1px solid var(--line)" }}>
-          <button onClick={handleSubmit} disabled={submitting || !amount} style={{ width: "100%", height: 46, background: "var(--plum)", color: "var(--cream)", borderRadius: 12, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: submitting || !amount ? 0.6 : 1 }}>
-            {submitting ? "Submitting…" : "Submit receipt"}
-          </button>
-        </div>
-      </div>
-    </div>
+    </CentralModal>
   )
 }
 

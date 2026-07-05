@@ -15,14 +15,10 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase"
+import { CentralModal } from "@/components/central"
 
 const SANS = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
-
-const mono: React.CSSProperties = {
-  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: "0.13em", color: "var(--muted-text)", textTransform: "uppercase",
-}
 
 const GENDERS = [
   { value: "male",   label: "Male" },
@@ -155,19 +151,12 @@ export type PostJoinPickers = ReturnType<typeof usePostJoinPickers>
 export function PostJoinPickerModals({ pickers }: { pickers: PostJoinPickers }) {
   return (
     <>
-      {/* ── School picker modal ── */}
+      {/* ── School picker modal (CentralModal shell, §4.17) ──
+          Dismissing (X / click-away / Escape) = "skip": the stored redirect must
+          still run, so onClose maps to skipSchool, not a plain close. */}
       {pickers.schoolOpen && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
-          background: "rgba(19,16,26,0.6)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px",
-        }}>
-          <div style={{ background: "var(--cream-panel)", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
-            <div style={mono}>One more thing</div>
-            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "var(--ink)", margin: "6px 0", fontWeight: 400 }}>
-              Which school?
-            </h2>
-            <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 20, lineHeight: 1.5 }}>
+        <CentralModal onClose={pickers.skipSchool} eyebrow="One more thing" title="Which school?" maxWidth={360}>
+            <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 20px", lineHeight: 1.5 }}>
               This helps us organize groups and events by campus.
             </p>
             {pickers.schoolError && (
@@ -213,23 +202,13 @@ export function PostJoinPickerModals({ pickers }: { pickers: PostJoinPickers }) 
               style={{ width: "100%", background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
               Skip for now
             </button>
-          </div>
-        </div>
+        </CentralModal>
       )}
 
-      {/* ── Gender picker modal ── */}
+      {/* ── Gender picker modal (CentralModal shell, §4.17) ── */}
       {pickers.genderOpen && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
-          background: "rgba(19,16,26,0.6)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px",
-        }}>
-          <div style={{ background: "var(--cream-panel)", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
-            <div style={mono}>One more thing</div>
-            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "var(--ink)", margin: "6px 0", fontWeight: 400 }}>
-              What&apos;s your gender?
-            </h2>
-            <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 20, lineHeight: 1.5 }}>
+        <CentralModal onClose={pickers.cancelGender} eyebrow="One more thing" title="What&#39;s your gender?" maxWidth={360}>
+            <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 20px", lineHeight: 1.5 }}>
               Helps us place you in the right small group.
             </p>
             {pickers.genderError && (
@@ -261,8 +240,7 @@ export function PostJoinPickerModals({ pickers }: { pickers: PostJoinPickers }) 
               style={{ width: "100%", background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
               Cancel
             </button>
-          </div>
-        </div>
+        </CentralModal>
       )}
     </>
   )

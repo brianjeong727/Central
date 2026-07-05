@@ -9,6 +9,7 @@ import { MonogramChip } from "@/components/central/MonogramChip"
 import { PlanSubTabStrip } from "@/components/central/plan-sub-tab-strip"
 import { getInitials } from "@/app/home/utils"
 import { usePostJoinPickers, PostJoinPickerModals, ModalAction } from "./post-join-pickers"
+import { CentralModal } from "@/components/central"
 
 // ─── design tokens ──────────────────────────────────────────────
 const SANS = "var(--font-inter), system-ui, sans-serif"
@@ -187,19 +188,15 @@ function JoinContent() {
       {/* ── Gender + school picker modals (shared with /ministries) ── */}
       <PostJoinPickerModals pickers={pickers} />
 
-      {/* ── Staff role picker modal ── */}
+      {/* ── Staff role picker modal (CentralModal shell, §4.17) ── */}
       {needsStaffRole && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
-          background: "rgba(19,16,26,0.6)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px",
-        }}>
-          <div style={{ background: "var(--cream-panel)", borderRadius: 20, padding: "28px 24px 24px", width: "100%", maxWidth: 360 }}>
-            <div style={mono}>Staff invite code</div>
-            <h2 style={{ fontFamily: SERIF, fontSize: 26, color: "var(--ink)", margin: "6px 0", fontWeight: 400 }}>
-              {staffMinistryName ? `Join ${staffMinistryName}` : "Join ministry"}
-            </h2>
-            <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 20, lineHeight: 1.5 }}>
+        <CentralModal
+          onClose={() => { setNeedsStaffRole(false); setStaffRole(""); setStaffRoleError(null) }}
+          eyebrow="Staff invite code"
+          title={staffMinistryName ? `Join ${staffMinistryName}` : "Join ministry"}
+          maxWidth={360}
+        >
+            <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 20px", lineHeight: 1.5 }}>
               Select your staff role to continue.
             </p>
             {staffRoleError && (
@@ -234,8 +231,7 @@ function JoinContent() {
               style={{ width: "100%", background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
               Cancel
             </button>
-          </div>
-        </div>
+        </CentralModal>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", background: "var(--cream-panel)", height: "100svh", fontFamily: SANS }}>
