@@ -35,4 +35,5 @@ export {
 } from "./skeletons"
 export { CentralModal } from "./central-modal"
 export { ConfirmDialog } from "./confirm-dialog"
+export { ReadOnlyMat, ReadOnlyPill } from "./read-only-mat"
 export { SuperSwitcher } from "./super-switcher"
