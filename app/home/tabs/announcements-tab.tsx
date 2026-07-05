@@ -989,6 +989,13 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       ) : announcements.length === 0 ? (
         <div className="px-5 md:px-14">
           <EmptyState icon={<Bell className="w-7 h-7" />} title="No announcements yet" subtitle={isLeaderOrAdmin ? "Post the first announcement." : "Check back soon for updates"} />
+          {/* Desktop create for the empty feed (mobile keeps the header + button);
+              the toolbar's New button only renders once items exist. */}
+          {isLeaderOrAdmin && (
+            <div className="hidden md:flex justify-center mt-6">
+              <HeaderActionButton label="New announcement" onClick={openCreate} />
+            </div>
+          )}
         </div>
       ) : (
         <>
