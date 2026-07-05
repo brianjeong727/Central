@@ -185,9 +185,11 @@ export function PostJoinPickerModals({ pickers }: { pickers: PostJoinPickers }) 
                     <span style={{ fontFamily: SERIF, fontSize: 18, color: active ? "var(--cream-panel)" : "var(--ink)" }}>
                       {s.name}
                     </span>
+                    {s.abbreviation && (
                     <span style={{ fontSize: 12, color: active ? "rgba(251,248,242,0.65)" : "var(--muted-text)" }}>
                       {s.abbreviation}
                     </span>
+                    )}
                   </button>
                 )
               })}

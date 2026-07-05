@@ -5,8 +5,8 @@ import useSWR from "swr"
 import { ArrowLeft, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
-import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, HeaderActionButton } from "../components/shared"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell } from "@/components/central"
+import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE } from "../components/shared"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee } from "../types"
@@ -989,6 +989,13 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       ) : announcements.length === 0 ? (
         <div className="px-5 md:px-14">
           <EmptyState icon={<Bell className="w-7 h-7" />} title="No announcements yet" subtitle={isLeaderOrAdmin ? "Post the first announcement." : "Check back soon for updates"} />
+          {/* Desktop create for the empty feed (mobile keeps the header + button);
+              the toolbar's New button only renders once items exist. */}
+          {isLeaderOrAdmin && (
+            <div className="hidden md:flex justify-center mt-6">
+              <ContentActionButton label="New announcement" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={openCreate} />
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -1020,7 +1027,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
             <div className="flex items-center justify-between mb-6">
               <FilterDropdown options={FILTERS} value={filter} onSelect={(id) => setFilter(id as FilterType)} />
               {isLeaderOrAdmin && (
-                <HeaderActionButton label="New announcement" onClick={openCreate} />
+                <ContentActionButton label="New announcement" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={openCreate} />
               )}
             </div>
 
