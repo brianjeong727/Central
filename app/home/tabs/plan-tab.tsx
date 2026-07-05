@@ -38,7 +38,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sideba
 import { getInitials, formatRelativeTime } from "../utils"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -86,6 +86,11 @@ const TEAM_PERMISSION_FILTERS: Record<string, string[]> = {
   student_org: ["can_plan_events", "can_view_finances", "can_manage_members", "can_track_attendance", "can_manage_team"],
   small_group: ["can_create_dgs", "can_view_dgs", "can_generate_bible_study", "can_track_attendance", "can_manage_team"],
 }
+
+// Shared shape for the destructive-confirm state used across the delete/remove
+// affordances in this file. A delete button sets this target (title + label +
+// the actual mutation); one <ConfirmDialog> per component runs it on confirm.
+type ConfirmTarget = { title: string; confirmLabel?: string; onConfirm: () => void } | null
 
 function getVisiblePermissions(teamName: string): string[] {
   const lower = teamName.toLowerCase()
@@ -245,6 +250,7 @@ export function StudentOrgRoleTabContent({
   const [linkForm, setLinkForm] = useState({ title: "", description: "", url: "" })
   const [savingLink, setSavingLink] = useState(false)
   const [linkError, setLinkError] = useState<string | null>(null)
+  const [confirm, setConfirm] = useState<ConfirmTarget>(null)
 
   const loadContent = useCallback(async () => {
     if (!teamId) return
@@ -509,7 +515,7 @@ export function StudentOrgRoleTabContent({
                       <IconButton dim={26} onClick={() => startEditLink(link)} title="Edit link">
                         <Edit3 className="w-3.5 h-3.5" />
                       </IconButton>
-                      <IconButton dim={26} onClick={() => deleteLink(link.id)} title="Delete link" className="resource-remove-btn">
+                      <IconButton dim={26} onClick={() => setConfirm({ title: "Delete this link?", onConfirm: () => deleteLink(link.id) })} title="Delete link" className="resource-remove-btn">
                         <Trash2 className="w-3.5 h-3.5" />
                       </IconButton>
                     </div>
@@ -522,6 +528,13 @@ export function StudentOrgRoleTabContent({
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={!!confirm}
+        title={confirm?.title ?? ""}
+        confirmLabel={confirm?.confirmLabel}
+        onConfirm={() => { confirm?.onConfirm(); setConfirm(null) }}
+        onClose={() => setConfirm(null)}
+      />
     </div>
   )
 }
@@ -3280,6 +3293,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
 
   // Week delete confirmation
   const [confirmDeleteWeekId, setConfirmDeleteWeekId] = useState<string | null>(null)
+  const [confirm, setConfirm] = useState<ConfirmTarget>(null)
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
@@ -3834,7 +3848,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                         <span style={{ ...monoStyle, flexShrink: 0, width: 80 }}>{role.role_name}</span>
                         <span style={{ fontSize: 14, color: "var(--ink)", flex: 1 }}>{role.user_name}</span>
                         {(canManageSchedule || isLeader) && (
-                          <IconButton dim={24} onClick={() => handleRemoveMember(role.id)} title="Remove">
+                          <IconButton dim={24} onClick={() => setConfirm({ title: `Remove ${role.user_name}?`, confirmLabel: "Remove", onConfirm: () => handleRemoveMember(role.id) })} title="Remove">
                             <X style={{ width: 13, height: 13 }} />
                           </IconButton>
                         )}
@@ -4008,7 +4022,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                                     style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "var(--line-2)" : "var(--muted-text)", fontSize: 13, lineHeight: 1 }}>↑</button>
                                   <button onClick={() => handleReorderSong(week.id, song.id, "down")} disabled={idx === songs.length - 1}
                                     style={{ padding: "2px 5px", background: "transparent", border: "none", cursor: idx === songs.length - 1 ? "default" : "pointer", color: idx === songs.length - 1 ? "var(--line-2)" : "var(--muted-text)", fontSize: 13, lineHeight: 1 }}>↓</button>
-                                  <IconButton dim={24} onClick={() => handleDeleteSong(week.id, song.id)} title="Delete song">
+                                  <IconButton dim={24} onClick={() => setConfirm({ title: "Delete this song?", onConfirm: () => handleDeleteSong(week.id, song.id) })} title="Delete song">
                                     <Trash2 className="w-3 h-3" />
                                   </IconButton>
                                 </div>
@@ -4131,6 +4145,13 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
         </div>
       )}
       </div>
+      <ConfirmDialog
+        open={!!confirm}
+        title={confirm?.title ?? ""}
+        confirmLabel={confirm?.confirmLabel}
+        onConfirm={() => { confirm?.onConfirm(); setConfirm(null) }}
+        onClose={() => setConfirm(null)}
+      />
     </div>
   )
 }
@@ -4149,6 +4170,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
   const [newEventDate, setNewEventDate] = useState("")
   const [addingEvent, setAddingEvent] = useState(false)
   const [showMembers, setShowMembers] = useState(false)
+  const [confirm, setConfirm] = useState<ConfirmTarget>(null)
 
   // Add role to event
   const [addRoleToEventId, setAddRoleToEventId] = useState<string | null>(null)
@@ -4366,7 +4388,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
             <div key={m.user_id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--line-3)" }}>
               <span style={{ fontSize: 14, color: "var(--ink)" }}>{m.name}</span>
               {canManage && m.user_id !== userId && (
-                <IconButton dim={22} onClick={() => handleRemoveTeamMember(m.user_id)} title="Remove"><X style={{ width: 12, height: 12 }} /></IconButton>
+                <IconButton dim={22} onClick={() => setConfirm({ title: `Remove ${m.name}?`, confirmLabel: "Remove", onConfirm: () => handleRemoveTeamMember(m.user_id) })} title="Remove"><X style={{ width: 12, height: 12 }} /></IconButton>
               )}
             </div>
           ))}
@@ -4443,7 +4465,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                     {new Date(event.week_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                   </p>
                   {canManage && (
-                    <IconButton dim={26} onClick={() => handleDeleteEvent(event.id)} title="Delete event">
+                    <IconButton dim={26} onClick={() => setConfirm({ title: "Delete this event?", onConfirm: () => handleDeleteEvent(event.id) })} title="Delete event">
                       <Trash2 className="w-3.5 h-3.5" />
                     </IconButton>
                   )}
@@ -4454,7 +4476,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                   <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 48, borderBottom: "1px solid var(--line-3)" }}>
                     <span style={{ ...monoStyle, flexShrink: 0, width: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{role.role_name}</span>
                     <span style={{ fontSize: 14, color: "var(--ink)", flex: 1 }}>{role.user_name}</span>
-                    {canManage && <IconButton dim={24} onClick={() => handleRemoveRole(role.id)} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>}
+                    {canManage && <IconButton dim={24} onClick={() => setConfirm({ title: "Remove this role?", confirmLabel: "Remove", onConfirm: () => handleRemoveRole(role.id) })} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>}
                   </div>
                 ))}
 
@@ -4561,7 +4583,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                               </div>
                             )}
                             {canManage && (
-                              <IconButton dim={24} onClick={() => handleDeleteSong(event.id, song.id)} title="Delete song">
+                              <IconButton dim={24} onClick={() => setConfirm({ title: "Delete this song?", onConfirm: () => handleDeleteSong(event.id, song.id) })} title="Delete song">
                                 <Trash2 className="w-3 h-3" />
                               </IconButton>
                             )}
@@ -4576,6 +4598,13 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
           })}
         </div>
       )}
+      <ConfirmDialog
+        open={!!confirm}
+        title={confirm?.title ?? ""}
+        confirmLabel={confirm?.confirmLabel}
+        onConfirm={() => { confirm?.onConfirm(); setConfirm(null) }}
+        onClose={() => setConfirm(null)}
+      />
     </div>
   )
 }
@@ -4592,6 +4621,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
   const [showAddEvent, setShowAddEvent] = useState(false)
   const [newEventDate, setNewEventDate] = useState("")
   const [newEventName, setNewEventName] = useState("")
+  const [confirm, setConfirm] = useState<ConfirmTarget>(null)
   const [addingEvent, setAddingEvent] = useState(false)
   const [allMinistryMembers, setAllMinistryMembers] = useState<{ id: string; name: string }[]>([])
 
@@ -4806,7 +4836,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                     </p>
                   </div>
                   {canManage && (
-                    <IconButton dim={26} onClick={() => handleDeleteEvent(event.id)} title="Delete event">
+                    <IconButton dim={26} onClick={() => setConfirm({ title: "Delete this event?", onConfirm: () => handleDeleteEvent(event.id) })} title="Delete event">
                       <Trash2 className="w-3.5 h-3.5" />
                     </IconButton>
                   )}
@@ -4816,7 +4846,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                   <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 20px", minHeight: 48, borderBottom: "1px solid var(--line-3)" }}>
                     <span style={{ ...monoStyle, flexShrink: 0, width: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const }}>{role.role_name}</span>
                     <span style={{ fontSize: 14, color: "var(--ink)", flex: 1 }}>{role.user_name}</span>
-                    {canManage && <IconButton dim={24} onClick={() => handleRemoveRole(role.id)} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>}
+                    {canManage && <IconButton dim={24} onClick={() => setConfirm({ title: "Remove this role?", confirmLabel: "Remove", onConfirm: () => handleRemoveRole(role.id) })} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>}
                   </div>
                 ))}
 
@@ -4921,7 +4951,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                               </div>
                             )}
                             {canManage && (
-                              <IconButton dim={24} onClick={() => handleDeleteSong(event.id, song.id)} title="Delete song">
+                              <IconButton dim={24} onClick={() => setConfirm({ title: "Delete this song?", onConfirm: () => handleDeleteSong(event.id, song.id) })} title="Delete song">
                                 <Trash2 className="w-3 h-3" />
                               </IconButton>
                             )}
@@ -4936,6 +4966,13 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
           })}
         </div>
       )}
+      <ConfirmDialog
+        open={!!confirm}
+        title={confirm?.title ?? ""}
+        confirmLabel={confirm?.confirmLabel}
+        onConfirm={() => { confirm?.onConfirm(); setConfirm(null) }}
+        onClose={() => setConfirm(null)}
+      />
     </div>
   )
 }
@@ -6735,6 +6772,7 @@ export function EventPlanWorkspace({
   const [dragOverSection, setDragOverSection] = useState<string | null>(null)
   const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null) // row in two-step delete confirm
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)           // delete in flight
+  const [confirm, setConfirm] = useState<ConfirmTarget>(null)                          // destructive-confirm target (role delete)
   // A dated task dropped onto a different date-window section — pending until the
   // user confirms the date change (see §14 / date-reseed warning).
   const [pendingSectionMove, setPendingSectionMove] = useState<{ taskId: string; sectionKey: string } | null>(null)
@@ -8025,7 +8063,7 @@ export function EventPlanWorkspace({
                           <button className="role-icon" title="Edit role" onClick={() => { setShowAddRole(false); setEditingRoleId(role.id); setEditRoleName(role.role_name); setEditRoleAssignee(role.assigned_to ?? ""); setEditRoleNotes(role.notes ?? "") }} style={iconBtnBase}>
                             <Pencil style={{ width: 16, height: 16 }} />
                           </button>
-                          <button className="role-icon danger" title="Delete role" onClick={() => handleDeleteRole(role.id)} style={iconBtnBase}>
+                          <button className="role-icon danger" title="Delete role" onClick={() => setConfirm({ title: "Delete this role?", onConfirm: () => handleDeleteRole(role.id) })} style={iconBtnBase}>
                             <Trash2 style={{ width: 16, height: 16 }} />
                           </button>
                         </>
@@ -8393,7 +8431,13 @@ export function EventPlanWorkspace({
           </>
         )}
       </div>
-
+      <ConfirmDialog
+        open={!!confirm}
+        title={confirm?.title ?? ""}
+        confirmLabel={confirm?.confirmLabel}
+        onConfirm={() => { confirm?.onConfirm(); setConfirm(null) }}
+        onClose={() => setConfirm(null)}
+      />
     </div>
   )
 }

@@ -3,7 +3,7 @@
 import { memo, useState, useEffect, useRef, useLayoutEffect } from "react"
 import dynamic from "next/dynamic"
 import { Check, MoreHorizontal, Trash2, CornerUpLeft, Plus, Pencil, Forward, Pin, FileDown } from "lucide-react"
-import { MonogramChip } from "@/components/central"
+import { MonogramChip, ConfirmDialog } from "@/components/central"
 import { formatMessageTime, REACTION_EMOJIS } from "../utils"
 import type { MessageRowProps } from "../types"
 
@@ -165,6 +165,7 @@ function MessageRowBase({
   // paint) so the menu paints in its final position — no visible flicker.
   const menuRef = useRef<HTMLDivElement>(null)
   const [placeBelow, setPlaceBelow] = useState(false)
+  const [confirmDeletePoll, setConfirmDeletePoll] = useState(false)
   const anyMenuOpen = isEmojiPickerOpen || isFullPickerOpen || isContextMenuOpen
   useLayoutEffect(() => {
     if (!anyMenuOpen) { setPlaceBelow(false); return }
@@ -263,7 +264,7 @@ function MessageRowBase({
                       {isPollMenuOpen && (
                         <div className="absolute right-0 top-8 z-[160] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] overflow-hidden min-w-[130px]">
                           <button
-                            onClick={() => onDeletePoll(msg.id, msg.poll_id!)}
+                            onClick={() => { setPollMenuFor(null); setConfirmDeletePoll(true) }}
                             className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -271,6 +272,7 @@ function MessageRowBase({
                           </button>
                         </div>
                       )}
+                      <ConfirmDialog open={confirmDeletePoll} title="Delete this poll?" message="This removes the poll and its votes for everyone." confirmLabel="Delete" onConfirm={() => { setConfirmDeletePoll(false); onDeletePoll(msg.id, msg.poll_id!) }} onClose={() => setConfirmDeletePoll(false)} />
                     </div>
                   )}
                 </div>

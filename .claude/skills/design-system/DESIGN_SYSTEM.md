@@ -1001,6 +1001,33 @@ First click replaces the delete control with a compact inline confirm:
 - "Delete" button text changes to "Deleting…" during the async call and disables itself
 - Never use `window.confirm()` — it blocks the main thread and looks wrong on mobile
 
+### Modal confirmation — `ConfirmDialog` (for standalone / substantial destructive actions)
+
+For a destructive action that is **not** a dense table/list row — a delete/remove/leave triggered from a ⋯ overflow menu, a settings block, a card, a hero, or any single prominent affordance — use the shared **`ConfirmDialog`** (`components/central/confirm-dialog.tsx`, exported from `@/components/central`) instead of hand-rolling a `CentralModal` or a bare overlay. It is a thin wrapper over `CentralModal` (§4.17) that portals a centered confirm with a `secondary` Cancel + a `danger-solid` confirm button.
+
+```tsx
+const [confirmDelete, setConfirmDelete] = useState<Row | null>(null)
+// the affordance sets a target instead of firing the mutation:
+<button onClick={() => setConfirmDelete(row)}>…</button>
+// one dialog per section:
+<ConfirmDialog
+  open={!!confirmDelete}
+  title="Delete announcement?"
+  message="This permanently removes it for everyone."   // optional; defaults to "This can't be undone."
+  confirmLabel="Delete"          // "Remove" / "Leave" where the verb differs
+  loading={deleting}             // shows "…", disables both buttons
+  onConfirm={() => { const r = confirmDelete; setConfirmDelete(null); handleDelete(r) }}
+  onClose={() => setConfirmDelete(null)}
+/>
+```
+
+Props: `open, title, message?, confirmLabel="Delete", cancelLabel="Cancel", danger=true, loading=false, onConfirm, onClose`. Renders nothing when closed; portals to `document.body` (SSR-safe) so it escapes any `overflow-hidden` / transformed ancestor. `danger` uses `danger-solid`; pass `danger={false}` for a non-destructive confirm (uses `primary`).
+
+### Which pattern
+- **Inline two-step** — dense table rows and list items (member lists, category / link / verse rows). A modal would be overkill.
+- **`ConfirmDialog`** — everything else: ⋯-menu deletes, settings-block removals, card / hero actions, leave-chat, poll delete.
+- **Never fire a delete / remove / leave directly** — every destructive affordance routes through one of these two. A bespoke full-bleed-scrim confirm or a `window.confirm()` is design debt; migrate it to `ConfirmDialog`.
+
 ---
 
 ## 15. Final principle
