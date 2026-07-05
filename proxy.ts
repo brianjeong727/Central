@@ -197,6 +197,7 @@ export async function proxy(request: NextRequest) {
     '/forms': '/home?tab=forms',
     '/settings': '/home?tab=settings',
     '/church-settings': '/home?tab=settings',
+    '/network': '/home?tab=network',
     '/profile': '/home?tab=profile',
     '/messages': '/home?tab=chats',
     '/events': '/home?tab=announcements',

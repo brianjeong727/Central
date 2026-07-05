@@ -53,6 +53,7 @@ const ProfileTab = dynamic(() => import("./tabs/profile-tab").then(m => m.Profil
 const SettingsTab = dynamic(() => import("./tabs/settings-tab").then(m => m.SettingsTab), { loading: () => <Spinner />, ssr: false })
 const FormsTab = dynamic(() => import("./tabs/forms-tab").then(m => m.FormsTab), { loading: () => <Spinner />, ssr: false })
 const CongregationTab = dynamic(() => import("./tabs/congregation-tab").then(m => m.CongregationTab), { loading: () => <Spinner />, ssr: false })
+const NetworkTab = dynamic(() => import("./tabs/network-tab").then(m => m.NetworkTab), { loading: () => <Spinner />, ssr: false })
 
 function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
   const supabase = createClient()
@@ -103,7 +104,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     return () => { supabase.removeChannel(channel) }
   }, [userId, refreshMemberGroups])
 
-  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "give", "profile", "settings", "forms", "congregation"]
+  const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "give", "profile", "settings", "forms", "congregation", "network"]
   const TAB_ALIASES: Record<string, Tab> = { you: "profile" }
   const rawTab = searchParams.get("tab")
   const resolvedTab = rawTab ? (TAB_ALIASES[rawTab] ?? rawTab) as Tab : null
@@ -448,6 +449,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         if (isStudentOrgActive && studentOrgPlanningEvent) return [root, planningCrumb]
         return [root, planningCrumb, { label: activeTeamNameForPlan }]
       }
+      case "network":       return [root, { label: "Network" }]
       case "directory":     return [root, { label: "Directory" }]
       case "profile":       return profileSection === "journal" ? [root, { label: "Journal" }] : [root, { label: "Profile" }]
       case "congregation":  return congregationLabels[congregationView]
@@ -1213,6 +1215,12 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 userRole={initialProfile.role}
                 onViewChange={setCongregationView}
               />
+            </div>
+          )}
+
+          {activeTab === "network" && isAdmin && (
+            <div className="md:h-full md:overflow-y-auto">
+              <NetworkTab />
             </div>
           )}
 
