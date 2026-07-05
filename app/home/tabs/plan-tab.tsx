@@ -10976,13 +10976,13 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
             <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>No members to add.</p>
           </div>
         ) : (
-          <div>
-            {filteredAdd.map((member, i) => {
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {filteredAdd.map((member) => {
               const selected = selectedIds.has(member.id)
-              const isLast = i === filteredAdd.length - 1
               return (
                 <button
                   key={member.id}
+                  className={selected ? undefined : "hover:bg-[var(--cream-2)]"}
                   onClick={() => {
                     const wasSelected = selectedIds.has(member.id)
                     setSelectedIds((prev) => {
@@ -10999,12 +10999,14 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                   }}
                   style={{
                     display: "flex", alignItems: "center", gap: 14, width: "100%",
-                    padding: selected && roles.length > 1 ? "12px 0" : "14px 0",
-                    borderTop: "none", borderLeft: "none", borderRight: "none",
-                    borderBottom: isLast ? "none" : "1px solid var(--line-3)",
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    // Selected = ivory surface + plum border (the app's active-state
+                    // pattern); a transparent border otherwise so rows don't shift.
+                    border: `1px solid ${selected ? "var(--plum)" : "transparent"}`,
                     background: selected ? "var(--ivory)" : "transparent",
                     cursor: "pointer", textAlign: "left" as const,
-                    transition: "background 0.12s",
+                    transition: "background 0.12s, border-color 0.12s",
                   }}
                 >
                   <MonogramChip initials={getInitials(member.name)} className="w-9 h-9 text-[13px] font-medium" />
@@ -11019,8 +11021,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         }}
                         onClick={(e) => e.stopPropagation()}
                         style={{
-                          marginTop: 5, fontSize: 12, padding: "4px 8px",
-                          border: "1px solid #C9C0B0", borderRadius: 6,
+                          marginTop: 6, fontSize: 12, padding: "4px 8px",
+                          border: "1px solid var(--line-2)", borderRadius: 8,
                           background: "var(--cream-panel)", color: "var(--ink)", cursor: "pointer",
                           outline: "none", maxWidth: "100%",
                         }}
@@ -11035,7 +11037,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                   </div>
                   {selected && (
                     <div style={{
-                      width: 20, height: 20, borderRadius: 5, background: "var(--plum)", flexShrink: 0,
+                      width: 20, height: 20, borderRadius: 6, background: "var(--plum)", flexShrink: 0,
                       display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
                       <Check style={{ width: 11, height: 11, color: "var(--cream-panel)" }} />
