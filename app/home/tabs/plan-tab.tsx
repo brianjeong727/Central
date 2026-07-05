@@ -2494,6 +2494,7 @@ export function PlanTab({
       isGovernanceAdmin={isGovernanceAdmin}
       onClose={closeSettings}
       onChanged={() => { closeSettings(); onTeamsChange() }}
+      onMutated={onTeamsChange}
       onOpenChat={onOpenChat}
     />
   ) : null
@@ -10544,7 +10545,7 @@ async function fetchTeamSettings([, teamId]: readonly [string, string]) {
   return { roles, members }
 }
 
-export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGovernanceAdmin, onClose, onChanged, onOpenChat }: {
+export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGovernanceAdmin, onClose, onChanged, onMutated, onOpenChat }: {
   team: Team
   userId: string
   ministryId: string
@@ -10557,6 +10558,10 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   isGovernanceAdmin: boolean
   onClose: () => void
   onChanged: () => void
+  // Fired after in-place membership/role/name mutations that must propagate to
+  // the parent's team lists (picker pills like "Needs president", member counts)
+  // WITHOUT closing settings — unlike onChanged, which closes.
+  onMutated?: () => void
   onOpenChat?: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
@@ -10748,6 +10753,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
     // Revalidate the cached settings (re-populates members via the SWR effect) and return to
     // settings — do NOT call onChanged() which closes settings.
     await mutateTeamSettings()
+    onMutated?.()
     setShowAddMember(false)
     setSelectedIds(new Set())
     setMemberRoles({})
@@ -10766,6 +10772,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
       { revalidate: false },
     )
     setConfirmRemoveId(null)
+    onMutated?.()
   }
 
   async function handleChangeRole(memberId: string, newRoleId: string) {
@@ -10785,6 +10792,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
     setMembers(prev => prev.map(m => m.user_id === memberId ? { ...m, role_id: newRoleId, role_name: newRole?.name ?? m.role_name } : m))
     const { error: err } = await supabase.from("team_members").update({ role_id: newRoleId }).eq("team_id", team.id).eq("user_id", memberId)
     if (err) { setMembers(snapshot); setError(err.message) }
+    else onMutated?.()
   }
 
   // Confirm the president swap: demote the outgoing president to the default non-president role and promote the target.
@@ -10807,6 +10815,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
       const { error: demoteErr } = await supabase.from("team_members").update({ role_id: defaultNonPresidentRole.id }).eq("team_id", team.id).eq("user_id", outgoing)
       const { error: promoteErr } = await supabase.from("team_members").update({ role_id: presidentRole.id }).eq("team_id", team.id).eq("user_id", targetUserId)
       if (demoteErr || promoteErr) { setMembers(snapshot); setError((demoteErr ?? promoteErr)!.message) }
+      else onMutated?.()
       setReplacing(false)
       setReplaceCtx(null)
       setReplacePickId(null)
@@ -10843,6 +10852,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
     await supabase.from("teams").update({ name: val }).eq("id", team.id).eq("ministry_id", ministryId)
     setLocalTeamName(val)
     setEditingTeamName(false)
+    onMutated?.()
   }
 
   async function handleToggleCoPresidency(next: boolean) {
