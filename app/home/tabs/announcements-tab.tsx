@@ -18,6 +18,70 @@ interface AttachableForm {
   field_count: number
 }
 
+// ── Attach-a-form picker ──────────────────────────────────────────────────────
+// Shared by the desktop settings rail AND the mobile single-column composer — same
+// state (attachedFormId / availableForms), no data logic here. Header + hint +
+// single-select list (re-select to detach); "Detach" also lives in the header.
+function AttachFormSection({ attachedFormId, setAttachedFormId, availableForms, monoStyle }: {
+  attachedFormId: string | null
+  setAttachedFormId: (id: string | null) => void
+  availableForms: AttachableForm[]
+  monoStyle: React.CSSProperties
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between mb-1">
+        <p style={monoStyle}>Form</p>
+        {attachedFormId && (
+          <button
+            type="button"
+            onClick={() => setAttachedFormId(null)}
+            style={{ fontSize: 12, color: "var(--muted-text)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+          >Detach</button>
+        )}
+      </div>
+      <p className="text-[12px] text-[var(--muted-text)] mb-4">Attach a form to collect responses</p>
+
+      {availableForms.length === 0 ? (
+        <p className="text-[12px] text-[var(--muted-text)]">No forms yet — create one in the Forms tab.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {availableForms.map(f => {
+            const selected = attachedFormId === f.id
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setAttachedFormId(selected ? null : f.id)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10,
+                  cursor: "pointer", textAlign: "left", width: "100%",
+                  border: `1px solid ${selected ? "var(--plum)" : "var(--line-2)"}`,
+                  background: selected ? "var(--plum)" : "var(--ivory)",
+                  color: selected ? "var(--cream-on-dark)" : "var(--ink)",
+                  transition: "all 0.12s",
+                }}
+              >
+                <span style={{
+                  width: 16, height: 16, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                  border: `2px solid ${selected ? "var(--cream-on-dark)" : "var(--dashed)"}`,
+                  background: selected ? "rgba(246,244,239,0.25)" : "transparent",
+                }}>
+                  {selected && <Check style={{ width: 9, height: 9, color: "var(--cream-on-dark)" }} />}
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span className="line-clamp-1" style={{ fontSize: 13, fontWeight: 500 }}>{f.title}</span>
+                  <span style={{ display: "block", fontSize: 11, color: selected ? "rgba(246,244,239,0.7)" : "var(--muted-text)", marginTop: 1 }}>{f.field_count} question{f.field_count !== 1 ? "s" : ""}</span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </>
+  )
+}
+
 // Convert a stored ISO timestamp to the local `YYYY-MM-DDTHH:mm` value a
 // <input type="datetime-local"> expects (local time, not UTC).
 function isoToLocalInput(iso: string | null | undefined): string {
@@ -190,7 +254,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
       }
     }
 
-    onSuccess(resultAnn)
+    onSuccess(resultAnn, { has_form: attachedFormId != null, form_id: attachedFormId })
     onClose()
   }
 
@@ -330,6 +394,18 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           )}
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
         </div>
+
+        <div style={{ borderTop: "1px solid var(--line)" }} />
+
+        {/* Attach a form — same picker as the desktop rail */}
+        <div>
+          <AttachFormSection
+            attachedFormId={attachedFormId}
+            setAttachedFormId={setAttachedFormId}
+            availableForms={availableForms}
+            monoStyle={monoStyle}
+          />
+        </div>
       </div>
 
       {/* ── Desktop: two-column editorial layout, all on cream ── */}
@@ -467,54 +543,12 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
           {/* Attach a form — forms are built in the Forms tab and attached here */}
           <div className="px-6 py-6">
-            <div className="flex items-center justify-between mb-1">
-              <p style={monoStyle}>Form</p>
-              {attachedFormId && (
-                <button
-                  type="button"
-                  onClick={() => setAttachedFormId(null)}
-                  style={{ fontSize: 12, color: "var(--muted-text)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
-                >Detach</button>
-              )}
-            </div>
-            <p className="text-[12px] text-[var(--muted-text)] mb-4">Attach a form to collect responses</p>
-
-            {availableForms.length === 0 ? (
-              <p className="text-[12px] text-[var(--muted-text)]">No forms yet — create one in the Forms tab.</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {availableForms.map(f => {
-                  const selected = attachedFormId === f.id
-                  return (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => setAttachedFormId(selected ? null : f.id)}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10,
-                        cursor: "pointer", textAlign: "left", width: "100%",
-                        border: `1px solid ${selected ? "var(--plum)" : "var(--line-2)"}`,
-                        background: selected ? "var(--plum)" : "var(--ivory)",
-                        color: selected ? "var(--cream-on-dark)" : "var(--ink)",
-                        transition: "all 0.12s",
-                      }}
-                    >
-                      <span style={{
-                        width: 16, height: 16, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                        border: `2px solid ${selected ? "var(--cream-on-dark)" : "var(--dashed)"}`,
-                        background: selected ? "rgba(246,244,239,0.25)" : "transparent",
-                      }}>
-                        {selected && <Check style={{ width: 9, height: 9, color: "var(--cream-on-dark)" }} />}
-                      </span>
-                      <span style={{ flex: 1, minWidth: 0 }}>
-                        <span className="line-clamp-1" style={{ fontSize: 13, fontWeight: 500 }}>{f.title}</span>
-                        <span style={{ display: "block", fontSize: 11, color: selected ? "rgba(246,244,239,0.7)" : "var(--muted-text)", marginTop: 1 }}>{f.field_count} question{f.field_count !== 1 ? "s" : ""}</span>
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+            <AttachFormSection
+              attachedFormId={attachedFormId}
+              setAttachedFormId={setAttachedFormId}
+              availableForms={availableForms}
+              monoStyle={monoStyle}
+            />
           </div>
         </aside>
       </div>
@@ -832,8 +866,8 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     )
   }
 
-  function handleNewAnnouncement(newAnn: Announcement) {
-    mutateAnnouncements((prev) => [{ ...newAnn, show_attendees: newAnn.show_attendees ?? false, view_count: 0, rsvp_count: 0, user_has_rsvped: false, rsvp_attendees: [], has_form: false, form_id: null, user_has_responded: false }, ...(prev ?? [])], { revalidate: false })
+  function handleNewAnnouncement(newAnn: Announcement, formMeta: { has_form: boolean; form_id: string | null }) {
+    mutateAnnouncements((prev) => [{ ...newAnn, show_attendees: newAnn.show_attendees ?? false, view_count: 0, rsvp_count: 0, user_has_rsvped: false, rsvp_attendees: [], has_form: formMeta.has_form, form_id: formMeta.form_id, user_has_responded: false }, ...(prev ?? [])], { revalidate: false })
     logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.create", entityType: "announcement", entityId: newAnn.id, entityLabel: newAnn.title })
   }
 
@@ -843,8 +877,8 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.delete", entityType: "announcement", entityId: id, entityLabel: target?.title ?? null })
   }
 
-  function handleEditSuccess(updated: Announcement) {
-    mutateAnnouncements((prev) => (prev ?? []).map((ann) => ann.id === updated.id ? { ...ann, ...updated } : ann), { revalidate: false })
+  function handleEditSuccess(updated: Announcement, formMeta: { has_form: boolean; form_id: string | null }) {
+    mutateAnnouncements((prev) => (prev ?? []).map((ann) => ann.id === updated.id ? { ...ann, ...updated, has_form: formMeta.has_form, form_id: formMeta.form_id } : ann), { revalidate: false })
     logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.edit", entityType: "announcement", entityId: updated.id, entityLabel: updated.title })
   }
 
