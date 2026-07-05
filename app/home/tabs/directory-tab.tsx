@@ -301,7 +301,7 @@ export function DirectoryTab({
                     <div className="flex items-center gap-2">
                       {member.graduation_year && <span className="text-[11px] font-medium" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
                       {member.role && (
-                        <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-[var(--cream)] text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
+                        <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-[var(--cream)] text-[var(--muted-text)] border-[var(--dashed)]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
                           {member.role}
                         </span>
                       )}
@@ -582,7 +582,7 @@ export function MemberSheet({
                 <span className="text-[12px] text-[var(--muted-text)]">Class of {member.graduation_year}</span>
               )}
               {member.role && (
-                <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-[var(--cream)] text-[var(--muted-text)] border-[#D8D3C8]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
+                <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-[var(--cream)] text-[var(--muted-text)] border-[var(--dashed)]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
                   {member.role}
                 </span>
               )}

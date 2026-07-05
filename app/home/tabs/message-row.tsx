@@ -293,14 +293,14 @@ function MessageRowBase({
                             </>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <div className="w-3.5 h-3.5 rounded-full border-2 border-[#D8D3C8] flex-shrink-0" />
+                              <div className="w-3.5 h-3.5 rounded-full border-2 border-[var(--dashed)] flex-shrink-0" />
                               <span className="text-[13px] text-[var(--ink)]">{opt}</span>
                             </div>
                           )}
                         </div>
                         {hasVoted && (
                           <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: isSelected ? "var(--plum)" : "#C4BDB8" }} />
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: isSelected ? "var(--plum)" : "var(--dashed)" }} />
                           </div>
                         )}
                       </div>
@@ -379,7 +379,7 @@ function MessageRowBase({
             className={`absolute z-[160] ${placeBelow ? "top-[calc(100%-4px)]" : "bottom-[calc(100%-4px)]"} ${isOwn ? "right-0" : "left-0"}`}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[#EFEFEF] px-3 py-2.5 flex gap-3 items-center">
+            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line-3)] px-3 py-2.5 flex gap-3 items-center">
               {REACTION_EMOJIS.map((emoji) => (
                 <button
                   key={emoji}
@@ -719,7 +719,7 @@ function MessageRowBase({
                     initials={name.charAt(0).toUpperCase()}
                     avatarUrl={avatarUrl || undefined}
                     title={`Read by ${name}`}
-                    className={`w-4 h-4 border border-[#F1EDE6] text-[6px] font-medium${idx > 0 ? " -ml-1" : ""}`}
+                    className={`w-4 h-4 border border-[var(--line-3)] text-[6px] font-medium${idx > 0 ? " -ml-1" : ""}`}
                   />
                 ))}
               </div>

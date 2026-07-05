@@ -109,7 +109,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
           <div className="flex items-center justify-between px-5 pt-12 pb-3 md:pt-6">
             <button
               onClick={onClose}
-              className="size-9 bg-[var(--cream-panel)] border border-[var(--line)] rounded-full flex items-center justify-center hover:bg-[#F2EDE0] transition-colors flex-shrink-0"
+              className="size-9 bg-[var(--cream-panel)] border border-[var(--line)] rounded-full flex items-center justify-center hover:bg-[var(--cream-2)] transition-colors flex-shrink-0"
             >
               <X className="w-4 h-4 text-[var(--ink)]" />
             </button>
@@ -230,8 +230,8 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
                       type="button"
                       onClick={() => toggleMember(member.id)}
                       className={`flex items-center gap-3 px-4 py-3 transition-all text-left ${
-                        idx > 0 ? "border-t border-[#F2EDE8]" : ""
-                      } ${isSelected ? "bg-[var(--plum)]/[0.04]" : "hover:bg-[#FAFAF8]"}`}
+                        idx > 0 ? "border-t border-[var(--cream-2)]" : ""
+                      } ${isSelected ? "bg-[var(--plum)]/[0.04]" : "hover:bg-[var(--cream)]"}`}
                     >
                       <MonogramChip
                         initials={getInitials(member.name)}
@@ -2203,7 +2203,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             {!inline && (
               <button
                 onClick={onClose}
-                className="flex-shrink-0 -ml-1 p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors md:hidden"
+                className="flex-shrink-0 -ml-1 p-1 hover:bg-[var(--cream-2)] rounded-lg transition-colors md:hidden"
               >
                 <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
               </button>
@@ -2252,10 +2252,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             </div>
             {/* Mobile: search + settings */}
             <div className="flex items-center gap-1 flex-shrink-0 md:hidden">
-              <button onClick={openSearch} className="p-1.5 hover:bg-[#F2EDE0] rounded-lg transition-colors">
+              <button onClick={openSearch} className="p-1.5 hover:bg-[var(--cream-2)] rounded-lg transition-colors">
                 <Search className="w-4 h-4 text-[var(--muted-text)]" />
               </button>
-              <button onClick={() => setShowSettings(true)} className="p-1 hover:bg-[#F2EDE0] rounded-lg transition-colors">
+              <button onClick={() => setShowSettings(true)} className="p-1 hover:bg-[var(--cream-2)] rounded-lg transition-colors">
                 <Settings className="w-5 h-5 text-[var(--muted-text)]" />
               </button>
             </div>
@@ -2502,7 +2502,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isSelected ? "border-[var(--plum)] bg-[var(--plum)]" : "border-[#D8D3C8]"}`}>
+                              <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${isSelected ? "border-[var(--plum)] bg-[var(--plum)]" : "border-[var(--dashed)]"}`}>
                                 {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                               </div>
                               <span className={`text-[14px] font-medium truncate ${isSelected ? "text-[var(--plum)]" : "text-[var(--ink)]"}`}>{opt}</span>
@@ -2530,7 +2530,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                             </div>
                           </div>
                           <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
-                            <div className="h-full rounded-full transition-all duration-500" style={{ width: vTotal > 0 ? `${pct}%` : "0%", background: isSelected ? "var(--plum)" : "#C4BDB8" }} />
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: vTotal > 0 ? `${pct}%` : "0%", background: isSelected ? "var(--plum)" : "var(--dashed)" }} />
                           </div>
                         </button>
                       )
@@ -2892,7 +2892,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search chats…"
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[var(--faint)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 border border-[#EFEFEF] focus:border-[var(--plum)]/30 transition-all"
+          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[var(--faint)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 border border-[var(--line-3)] focus:border-[var(--plum)]/30 transition-all"
         />
       </div>
 
@@ -2909,7 +2909,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         {showPlusButton && (
           <button
             onClick={() => setShowCreateChat(subTab)}
-            className="size-8 rounded-xl bg-[var(--cream-panel)] border border-[var(--line)] flex items-center justify-center hover:bg-[#F2EDE0] active:scale-95 transition-all md:size-7 md:rounded-lg"
+            className="size-8 rounded-xl bg-[var(--cream-panel)] border border-[var(--line)] flex items-center justify-center hover:bg-[var(--cream-2)] active:scale-95 transition-all md:size-7 md:rounded-lg"
           >
             <Plus className="w-4 h-4 text-[var(--plum)] md:w-3.5 md:h-3.5" />
           </button>

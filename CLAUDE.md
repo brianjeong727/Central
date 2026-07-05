@@ -193,7 +193,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | File | Purpose |
 |------|---------|
 | `app/home/home-app.tsx` | Tab orchestrator — owns global state, **code-splits tabs via `next/dynamic`**, renders the active tab, mounts global overlays. Also owns governance (`governance_settings`/`govTeams`), the Receipts-workspace sidebar + `?rteam`/`?fsec` URL state, and the team-agnostic "← All workspaces" back button. |
-| `app/home/tabs/home-tab.tsx` | Home tab — greeting, role badge, up-next hero, recent chats, congregation question prompt. The Up Next slot renders `HomeHeroCarousel` when curated `home_slides` exist, else falls back to the pinned-or-latest announcement (existing behavior). Leader/admin "Curate hero" `HeaderActionButton` in the `TabPageHeader` right slot opens `HomeSlideManager` (desktop only). |
+| `app/home/tabs/home-tab.tsx` | Home tab — greeting, role badge, up-next hero, recent chats, congregation question prompt. The Up Next slot renders `HomeHeroCarousel` when curated `home_slides` exist, else falls back to the pinned-or-latest announcement (existing behavior). Leader/admin Curate action is a ghost `ContentActionButton` in the hero's `HeroSectionLabel` action slot (desktop only), opening `HomeSlideManager` — never in the `TabPageHeader` (Convention #15). |
 | `app/home/tabs/announcements-tab.tsx` | Announcements tab — full feed, RSVP, admin/leader CRUD, pinning, announcement detail view |
 | `app/home/tabs/chats-tab.tsx` | Chats tab — on desktop: `ChatListPanel` (conversation list) renders in `DesktopSidebar` via `chatPanelContent` prop; `ChatScreen inline` renders in the content area. Mobile: `ChatsTab` (full list + overlay chat) wrapped in `md:hidden`. Also exports `ChatScreen`, `ChatSettings`, `CreateChatScreen`. |
 | `app/home/tabs/plan-tab.tsx` | Plan tab — team planning. Desktop uses the shared shell pattern: `hidden md:flex` section + `TabPageHeader` (keeps its bottom `InsetHairline` always) + optional cream event sub-header (back-to-calendar, event title, edit pencil; `borderBottom: 1px solid var(--line)`) + `flex-1 overflow-y-auto` body. Strip-bearing teams (PraiseTeamTab, StudentOrgTeamHome, SmallGroupLeadersTab) render with no outer `px-14` wrapper; `PlanSubTabStrip` labels are inset via inner `md:pl-14`; the under-tabs hairline is `md:mx-14` inset matching `InsetHairline`. Non-strip teams (DgPraiseTeam, OneTimeTeam, TechTeam) use `px-14 py-7` wrappers. Mobile (`md:hidden`) is a sibling outside the desktop section, untouched. |
@@ -212,6 +212,18 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/home/tabs/congregation-tab.tsx` | Congregation tab — pastor-only; congregation polling and pulse questions |
 | `app/home/components/home-slide-manager.tsx` | Home hero curation overlay — leaders add upcoming events / announcements (published only) as reference slides, reorder, and remove; photo-slide upload is SHELVED behind a "Coming soon" placeholder (the `panel_color` upload pipeline exists but is not exposed); writes to `home_slides` (ministry_id on every write). Photo uploads reuse the `announcement-images` bucket under `home-slides/{ministryId}/`. |
 | `app/home/components/command-palette.tsx` | ⌘K command palette — quick nav, person/chat/announcement search |
+| `app/home/tabs/network-tab.tsx` | Admin-only Network tab — cross-ministry hub placeholder |
+| `app/home/tabs/message-row.tsx` | Memoized chat message row (reactions, polls, receipts) — extracted from ChatScreen |
+| `app/home/tabs/composer.tsx` | Chat composer (input, @mentions, GIF picker, attachments) — extracted from ChatScreen |
+| `app/home/tabs/note-editors.tsx` | Rich-text note editors (meeting notes etc.) |
+| `app/home/nav-state.ts` | Shared URL nav-state module — atomic param writes (Convention #5) |
+| `app/home/breadcrumb-context.tsx` | Breadcrumb provider — subpages push crumbs to the shell topbar (§4.18) |
+| `app/home/workspace-presets.ts` | WORKSPACE_PRESETS — the fixed team-preset pool (onboarding/approval/add-workspace all agree); comingSoon gating |
+| `app/home/chat-list.ts` | Chat-list data module (SWR fetchers for the conversations panel) |
+| `app/actions/authz.ts` | Shared server-action authz helpers (requireMinistryMember/SameMinistry/MinistryAdmin/TeamMemberOrAdmin) |
+| `app/actions/auto-chats.ts` | Auto-chat machinery: ministry chat, grade chats, staff chat creation + membership |
+| `app/actions/governance.ts` | Governance server actions (roster, matrix) |
+| `components/central/index.ts` | Barrel for all design-system components (CentralModal, CentralButton, ContentHeader, …) |
 | `app/home/components/desktop-nav.tsx` | Desktop sidebar navigation |
 | `app/home/components/shared.tsx` | Shared UI primitives used across tab files |
 | `app/home/types.ts` | All shared TypeScript types for home and tabs |
@@ -290,7 +302,7 @@ New users with no `ministry_id` are redirected to `/join` by middleware.
 ### Tab structure (orchestrated by `home-app.tsx`, each tab is its own file in `app/home/tabs/`)
 
 Valid tab values (from `app/home/types.ts`):
-`"home" | "announcements" | "chats" | "plan" | "directory" | "give" | "profile" | "settings" | "forms" | "congregation"`
+`"home" | "announcements" | "chats" | "plan" | "directory" | "give" | "profile" | "settings" | "forms" | "congregation" | "network"`
 
 ```
 HomeApp (root — owns all global state)

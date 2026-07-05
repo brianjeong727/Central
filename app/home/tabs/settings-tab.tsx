@@ -65,7 +65,7 @@ const ROLE_STYLE: Record<string, { bg: string; color: string; border: string; la
   pastor:  { bg: "var(--plum-2)",  color: "var(--cream-panel)", border: "var(--plum-2)",              label: "Pastor"  },
   leader:  { bg: "var(--ivory)",  color: "var(--plum)", border: "rgba(62,21,64,0.2)",   label: "Leader"  },
   member:  { bg: "var(--ivory)",  color: "var(--muted-text)", border: "var(--line-2)",              label: "Member"  },
-  visitor: { bg: "white",    color: "var(--muted-text)", border: "#D8D3C8",              label: "Visitor" },
+  visitor: { bg: "var(--cream)", color: "var(--muted-text)", border: "var(--dashed)",       label: "Visitor" },
 }
 
 function roleBadge(role: string) {
@@ -818,7 +818,7 @@ export function SettingsTab({
                       <SectionHeader eyebrow="Discovery" title={`Who can find ${ministryInfo?.name ?? ministryName}`} titleSize={20} />
                     </div>
                     <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
-                      <button onClick={isAdmin ? handleToggle : undefined} disabled={toggling || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: isPublic ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                      <button onClick={isAdmin ? handleToggle : undefined} disabled={toggling || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: isPublic ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
                         <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(isPublic ? { right: 2 } : { left: 2 }) }} />
                       </button>
                       <div style={{ flex: 1 }}>
@@ -1165,7 +1165,7 @@ export function SettingsTab({
                 </div>
 
                 <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
-                  <button onClick={handleToggleAllAdmins} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: governanceSettings.all_admins ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
+                  <button onClick={handleToggleAllAdmins} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: governanceSettings.all_admins ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
                     <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(governanceSettings.all_admins ? { right: 2 } : { left: 2 }) }} />
                   </button>
                   <div style={{ flex: 1 }}>
@@ -1190,7 +1190,7 @@ export function SettingsTab({
                               <div style={{ marginTop: 2, fontSize: 13, color: "var(--muted-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
                             </div>
                             {roleBadge(m.role)}
-                            <button onClick={() => handleToggleRosterMember(m.id)} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: included ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
+                            <button onClick={() => handleToggleRosterMember(m.id)} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: included ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
                               <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(included ? { right: 2 } : { left: 2 }) }} />
                             </button>
                           </div>
@@ -1265,7 +1265,7 @@ export function SettingsTab({
                   const changed = isToggleOn(key, pendingAutomationSettings) !== isToggleOn(key, automationSettings)
                   return (
                     <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, outline: changed ? "2px solid var(--plum)" : "none", outlineOffset: -2 }}>
-                      <button onClick={() => handleAutomationToggle(key)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                      <button onClick={() => handleAutomationToggle(key)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
                         <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(on ? { right: 2 } : { left: 2 }) }} />
                       </button>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1286,7 +1286,7 @@ export function SettingsTab({
                     { key: "auto_archive_praise", label: "Auto-archive praise team chats", sub: "After Sunday at 11:59 pm, the chat is archived from your active list." },
                   ] as { key: string; label: string; sub: string }[]).map(({ key, label, sub }) => (
                     <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "var(--cream-2)", opacity: 0.6, pointerEvents: "none" }}>
-                      <div style={{ width: 38, height: 22, borderRadius: 999, background: "#D6D0C0", position: "relative", flexShrink: 0 }}>
+                      <div style={{ width: 38, height: 22, borderRadius: 999, background: "var(--dashed)", position: "relative", flexShrink: 0 }}>
                         <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, left: 2 }} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1378,7 +1378,7 @@ export function SettingsTab({
 
               {/* Enable toggle */}
               <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
-                <button onClick={() => setModField("enabled", !pendingModerationSettings.enabled)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.enabled ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                <button onClick={() => setModField("enabled", !pendingModerationSettings.enabled)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.enabled ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
                   <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(pendingModerationSettings.enabled ? { right: 2 } : { left: 2 }) }} />
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1427,7 +1427,7 @@ export function SettingsTab({
 
               {/* Reverent capitalization — independent of the language filter */}
               <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
-                <button onClick={() => setModField("reverent_caps", !pendingModerationSettings.reverent_caps)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.reverent_caps ? "var(--plum)" : "#D6D0C0", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                <button onClick={() => setModField("reverent_caps", !pendingModerationSettings.reverent_caps)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.reverent_caps ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
                   <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(pendingModerationSettings.reverent_caps ? { right: 2 } : { left: 2 }) }} />
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1440,7 +1440,7 @@ export function SettingsTab({
               <div>
                 <p style={{ ...SECTION_LABEL, marginBottom: 12 }}>Coming soon</p>
                 <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "var(--cream-2)", opacity: 0.6, pointerEvents: "none" }}>
-                  <div style={{ width: 38, height: 22, borderRadius: 999, background: "#D6D0C0", position: "relative", flexShrink: 0 }}>
+                  <div style={{ width: 38, height: 22, borderRadius: 999, background: "var(--dashed)", position: "relative", flexShrink: 0 }}>
                     <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, left: 2 }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>

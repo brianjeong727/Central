@@ -12669,8 +12669,8 @@ function SmallGroupLeadersTab({
                               const isPast = date < today
                               return (
                                 <th key={`${date}::${slot}`} style={{ width: datColW, minWidth: datColW, padding: "4px 2px 5px", borderBottom: "1px solid var(--line)", textAlign: "center" }}>
-                                  <div style={{ fontSize: 9, fontWeight: 400, color: isPast ? "#C5C0CC" : "var(--body)", letterSpacing: "0.04em" }}>{SLOT_ABBR[slot]}</div>
-                                  <div style={{ fontSize: 9, fontWeight: 400, color: isPast ? "#C5C0CC" : "var(--muted-text)" }}>{parseInt(m)}/{parseInt(d)}</div>
+                                  <div style={{ fontSize: 9, fontWeight: 400, color: isPast ? "var(--dashed)" : "var(--body)", letterSpacing: "0.04em" }}>{SLOT_ABBR[slot]}</div>
+                                  <div style={{ fontSize: 9, fontWeight: 400, color: isPast ? "var(--dashed)" : "var(--muted-text)" }}>{parseInt(m)}/{parseInt(d)}</div>
                                 </th>
                               )
                             })}
