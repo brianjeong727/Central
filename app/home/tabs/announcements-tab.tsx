@@ -6,7 +6,7 @@ import { ArrowLeft, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal,
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, HeaderActionButton } from "../components/shared"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, CentralModal } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee } from "../types"
@@ -943,8 +943,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     )
   }
 
-  // Fill-out-form is a CentralModal overlaid on the feed (DESIGN_SYSTEM §4.17) —
-  // X / backdrop / Escape close it; the feed stays mounted underneath.
+  // Fill-out-form is a self-wrapping CentralModal (FormFillView owns it) overlaid
+  // on the feed (DESIGN_SYSTEM §4.17) — X / backdrop / Escape close it (guarded by
+  // its own `dirty` prompt once answered); the feed stays mounted underneath.
   const closeFill = () => setFormFillState(null)
 
   return (
@@ -1193,18 +1194,18 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     </div>
 
     {formFillState && (
-      <CentralModal onClose={closeFill} title={formFillState.title} maxWidth={720} sheet>
-        <FormFillView
-          formId={formFillState.formId}
-          announcementId={formFillState.announcementId}
-          userId={userId}
-          ministryId={ministryId}
-          onSubmitted={() => {
-            mutateAnnouncements(prev => (prev ?? []).map(a => a.form_id === formFillState.formId ? { ...a, user_has_responded: true } : a), { revalidate: false })
-            setFormFillState(null)
-          }}
-        />
-      </CentralModal>
+      <FormFillView
+        title={formFillState.title}
+        onClose={closeFill}
+        formId={formFillState.formId}
+        announcementId={formFillState.announcementId}
+        userId={userId}
+        ministryId={ministryId}
+        onSubmitted={() => {
+          mutateAnnouncements(prev => (prev ?? []).map(a => a.form_id === formFillState.formId ? { ...a, user_has_responded: true } : a), { revalidate: false })
+          setFormFillState(null)
+        }}
+      />
     )}
     </>
   )
@@ -1689,8 +1690,9 @@ export function AnnouncementDetailView({
   // In-content subpage (DESIGN_SYSTEM §4.18) — the shell breadcrumb is the back
   // affordance; no standalone X. The "Announcements" crumb routes to the list AND
   // closes the detail (one atomic URL update upstream). Cream-on-cream, no shadow.
-  // Filling out the form is a CentralModal (§4.17) overlaid on the detail — the
-  // detail stays mounted underneath; X / backdrop / Escape close it.
+  // Filling out the form is a self-wrapping CentralModal (FormFillView owns it,
+  // §4.17) overlaid on the detail — the detail stays mounted underneath; X /
+  // backdrop / Escape close it (guarded by its own `dirty` prompt once answered).
   const closeForm = () => setFormFillOpen(false)
   const title = ann?.title || "Announcement"
   const formOpen = formFillOpen && !!ann?.form_id
@@ -1704,15 +1706,15 @@ export function AnnouncementDetailView({
       <DetailContent />
 
       {formOpen && (
-        <CentralModal onClose={closeForm} title={title} maxWidth={720} sheet>
-          <FormFillView
-            formId={ann!.form_id!}
-            announcementId={ann!.id}
-            userId={userId}
-            ministryId={ministryId}
-            onSubmitted={() => { setAnn((prev) => prev ? { ...prev, user_has_responded: true } : prev); setFormFillOpen(false) }}
-          />
-        </CentralModal>
+        <FormFillView
+          title={title}
+          onClose={closeForm}
+          formId={ann!.form_id!}
+          announcementId={ann!.id}
+          userId={userId}
+          ministryId={ministryId}
+          onSubmitted={() => { setAnn((prev) => prev ? { ...prev, user_has_responded: true } : prev); setFormFillOpen(false) }}
+        />
       )}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

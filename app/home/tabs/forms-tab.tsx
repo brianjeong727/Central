@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, type ReactNode } from "react"
 import { Archive, ArchiveRestore, Check, ChevronDown, ChevronLeft, ChevronRight, Edit3, FileText, Plus, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE, EYEBROW_STYLE, AnimateIn } from "../components/shared"
@@ -67,15 +67,17 @@ const FIELD_TYPES: { value: FieldType; label: string }[] = [
 
 // ── Form Fill View ────────────────────────────────────────────────────────────
 
-// Modal-body content (DESIGN_SYSTEM §4.17). Renders ONLY the form body + an
-// inline submitted state — no own header/title/X (the host CentralModal owns the
-// title = form title, the X, and scroll). Used as CentralModal children from the
-// feed and the announcement detail.
-export function FormFillView({ formId, userId, ministryId, announcementId, onSubmitted }: {
+// Self-wrapping fill modal (DESIGN_SYSTEM §4.17). Owns its own CentralModal so it
+// can pass its own `dirty` guard (any answer entered) — a half-filled form isn't
+// lost to a stray backdrop-click/Escape. Callers render <FormFillView title=…
+// onClose=… …/> directly (no outer CentralModal). Mirrors FormBuilder's self-wrap.
+export function FormFillView({ formId, userId, ministryId, announcementId, title, onClose, onSubmitted }: {
   formId: string
   userId: string
   ministryId: string
   announcementId: string
+  title: string
+  onClose: () => void
   onSubmitted: () => void
 }) {
   const supabase = createClient()
@@ -152,12 +154,20 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
     setTimeout(() => onSubmitted(), 1400)
   }
 
-  if (loading) {
-    return <div className="flex items-center justify-center" style={{ minHeight: 240 }}><Spinner /></div>
-  }
+  const answeredCount = fields.filter(f => {
+    const a = answers[f.id]
+    return f.type === 'checkbox' ? (a as string[]).length > 0 : !!(a as string)?.trim()
+  }).length
 
-  if (done) {
-    return (
+  // Accidental-dismiss guard: any answer entered = dirty. Cleared once submitted
+  // (`done`) so the 1400ms success auto-close never trips the discard prompt.
+  const dirty = !done && Object.values(answers).some(v => Array.isArray(v) ? v.length > 0 : String(v ?? "").trim() !== "")
+
+  let body: ReactNode
+  if (loading) {
+    body = <div className="flex items-center justify-center" style={{ minHeight: 240 }}><Spinner /></div>
+  } else if (done) {
+    body = (
       <AnimateIn className="flex flex-col items-center justify-center gap-4" style={{ minHeight: 320 }}>
         <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "rgba(62,21,64,0.1)" }}>
           <Check className="w-8 h-8 text-[var(--plum)]" />
@@ -168,22 +178,14 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
         </div>
       </AnimateIn>
     )
-  }
-
-  if (fields.length === 0) {
-    return (
+  } else if (fields.length === 0) {
+    body = (
       <div className="flex items-center justify-center" style={{ minHeight: 240 }}>
         <EmptyState icon={<FileText className="w-7 h-7" />} title="No questions" subtitle="This form has no questions yet." />
       </div>
     )
-  }
-
-  const answeredCount = fields.filter(f => {
-    const a = answers[f.id]
-    return f.type === 'checkbox' ? (a as string[]).length > 0 : !!(a as string)?.trim()
-  }).length
-
-  return (
+  } else {
+    body = (
     // Self-constrain to a readable form column + center inside the modal body.
     //
     // Editorial question groups (§1.3): mono eyebrow ("QUESTION N · REQUIRED")
@@ -280,6 +282,13 @@ export function FormFillView({ formId, userId, ministryId, announcementId, onSub
         </CentralButton>
       </div>
     </AnimateIn>
+    )
+  }
+
+  return (
+    <CentralModal onClose={onClose} title={title} maxWidth={720} sheet dirty={dirty}>
+      {body}
+    </CentralModal>
   )
 }
 
@@ -306,6 +315,9 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
   const [loading, setLoading] = useState(!!formId)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Snapshot of the loaded {title, fields} for an existing form — the baseline
+  // the accidental-dismiss guard diffs against. Null for a new form (no baseline).
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null)
 
   // Load existing form (title + fields) + lock if it already has responses.
   useEffect(() => {
@@ -317,21 +329,26 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
         .eq("id", formId!)
         .eq("ministry_id", ministryId)
         .maybeSingle()
-      setTitle(formRow?.title ?? "")
+      const loadedTitle = formRow?.title ?? ""
+      setTitle(loadedTitle)
 
       const { data: fieldData } = await supabase
         .from("form_fields")
         .select("*")
         .eq("form_id", formId!)
         .order("order_index")
-      setFields((fieldData ?? []).map(f => ({
+      const loadedFields: DraftField[] = (fieldData ?? []).map(f => ({
         tempId: newTempId(),
         existingId: f.id,
         label: f.label,
         type: f.type as FieldType,
         options: Array.isArray(f.options) ? f.options : [],
         required: f.required ?? false,
-      })))
+      }))
+      setFields(loadedFields)
+      // tempIds are baked into the baseline and preserved across edits, so an
+      // untouched form diffs equal; edits/reorders/add/delete diff as dirty.
+      setInitialSnapshot(JSON.stringify({ title: loadedTitle, fields: loadedFields }))
 
       const { count } = await supabase
         .from("form_responses")
@@ -404,6 +421,15 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
 
   const titleText = isEditing ? "Edit form" : "New form"
 
+  // Unsaved-edits guard: while saving, force clean so save→close never prompts.
+  // Existing form → diff against the loaded baseline; new form → any typed title
+  // or question label counts as dirty.
+  const dirty = saving
+    ? false
+    : initialSnapshot !== null
+      ? JSON.stringify({ title, fields }) !== initialSnapshot
+      : title.trim() !== "" || fields.some(f => f.label.trim() !== "")
+
   const SaveButton = (
     <button
       type="button"
@@ -417,7 +443,7 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
   )
 
   return (
-    <CentralModal onClose={onDone} title={titleText} footer={SaveButton} maxWidth={720} sheet>
+    <CentralModal onClose={onDone} title={titleText} footer={SaveButton} maxWidth={720} sheet dirty={dirty}>
       {loading ? (
         <div className="flex items-center justify-center" style={{ minHeight: 240 }}><Spinner /></div>
       ) : (
