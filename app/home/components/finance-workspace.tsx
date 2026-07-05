@@ -54,15 +54,15 @@ const WARN_TEXT = "#B45309"
 const DANGER_TINT_BG = "#FDF1F1"
 const DANGER_TINT_BORDER = "#E8C5C5"
 const DANGER_ROW_BG = "var(--cream)"
-const DELETE_CONFIRM_BG = "#FEF2F2"
+const DELETE_CONFIRM_BG = "color-mix(in srgb, var(--danger) 8%, transparent)"
 const BUDGET_GREEN = "#2D5445"
 const REIMBURSED_TINT = "#EDE5F0"
 
 export const STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
   pending:    { label: "Pending",    bg: "var(--ivory)",  text: "var(--body)" },
   approved:   { label: "Approved",  bg: "#E6F4EA",       text: "#1E6B3C" },
-  rejected:   { label: "Rejected",  bg: "#FEE2E2",       text: "var(--danger)" },
-  declined:   { label: "Declined",  bg: "#FEE2E2",       text: "var(--danger)" },
+  rejected:   { label: "Rejected",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
+  declined:   { label: "Declined",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
   reimbursed: { label: "Reimbursed",bg: REIMBURSED_TINT, text: "var(--plum)" },
   flagged:    { label: "Flagged",   bg: WARN_BG,         text: WARN_TEXT },
 }
@@ -1056,7 +1056,7 @@ function AllocationSection({
                                 setDeletingCategory(null)
                               }}
                               disabled={deletingCategory === cat.value}
-                              style={{ fontSize: 11, fontWeight: 500, color: "var(--danger)", background: DELETE_CONFIRM_BG, border: "1px solid #FECACA", borderRadius: 6, padding: "2px 8px", cursor: "pointer", whiteSpace: "nowrap", opacity: deletingCategory === cat.value ? 0.5 : 1 }}
+                              style={{ fontSize: 11, fontWeight: 500, color: "var(--danger)", background: DELETE_CONFIRM_BG, border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: 6, padding: "2px 8px", cursor: "pointer", whiteSpace: "nowrap", opacity: deletingCategory === cat.value ? 0.5 : 1 }}
                             >
                               {deletingCategory === cat.value ? "Deleting…" : "Delete"}
                             </button>

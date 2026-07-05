@@ -1055,8 +1055,8 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                       <button onClick={() => openEdit(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: "8px", cursor: "pointer" }} title="Edit">
                         <Edit3 className="w-3.5 h-3.5" style={{ color: "var(--body)" }} />
                       </button>
-                      <button onClick={() => handleDesktopDelete(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "8px", cursor: "pointer" }} title="Delete">
-                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      <button onClick={() => handleDesktopDelete(pinnedAnn)} style={{ width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: "8px", cursor: "pointer" }} title="Delete">
+                        <Trash2 className="w-3.5 h-3.5 text-[var(--danger)]" />
                       </button>
                     </div>
                   )}
@@ -1104,7 +1104,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                               <Pin className={`w-3.5 h-3.5 ${ann.is_sub_pinned ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`} style={{ transform: "rotate(-45deg)" }} />
                             </button>
                             <button onClick={() => openEdit(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--line-3)] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[var(--body)]" /></button>
-                            <button onClick={() => handleDesktopDelete(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-50 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                            <button onClick={() => handleDesktopDelete(ann)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-[var(--danger)]" /></button>
                           </>
                         )}
                       </div>
@@ -1153,7 +1153,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                                   <Pin className={`w-3.5 h-3.5 ${ann.is_sub_pinned ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`} style={{ transform: "rotate(-45deg)" }} />
                                 </button>
                                 <button onClick={() => openEdit(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[var(--line-3)] transition-colors" title="Edit"><Edit3 className="w-3.5 h-3.5 text-[var(--body)]" /></button>
-                                <button onClick={() => handleDesktopDelete(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-red-50 hover:border-red-200 transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                                <button onClick={() => handleDesktopDelete(ann)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] hover:border-[color-mix(in_srgb,var(--danger)_25%,transparent)] transition-colors" title="Delete"><Trash2 className="w-3.5 h-3.5 text-[var(--danger)]" /></button>
                               </>
                             )}
                           </div>
@@ -1276,7 +1276,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
                           {announcement.is_sub_pinned ? "Remove from For You" : "Pin to For You"}
                         </button>
                         <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit</button>
-                        <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
+                        <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
                       </div>
                     )}
                   </div>
@@ -1320,7 +1320,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
 
           {showDeleteConfirm && (
             <div className="absolute inset-0 z-[20] bg-[#3E1540]/95 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-center gap-3 p-7">
-              <div className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-red-400" /></div>
+              <div className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-[var(--cream-on-dark)]" /></div>
               <p className="text-[15px] font-medium text-[var(--cream-on-dark)] text-center">Delete this announcement?</p>
               <p className="text-[12px] text-center -mt-1" style={{ color: "rgba(246,244,239,0.5)" }}>This can&apos;t be undone.</p>
               <div className="flex gap-3 w-full mt-1">
@@ -1365,7 +1365,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
                       {announcement.is_pinned ? "Unpin" : "Pin"}
                     </button>
                     <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit</button>
-                    <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-red-500 hover:bg-red-50 transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
+                    <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
                   </div>
                 )}
               </div>
@@ -1408,7 +1408,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
 
         {showDeleteConfirm && (
           <div className="absolute inset-0 z-[20] bg-[var(--cream)]/95 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-center gap-3 p-7">
-            <div className="w-11 h-11 rounded-full bg-red-50 flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-red-400" /></div>
+            <div className="w-11 h-11 rounded-full bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-[var(--danger)]" /></div>
             <p className="text-[15px] font-medium text-[var(--ink)] text-center">Delete this announcement?</p>
             <p className="text-[12px] text-[var(--muted-text)] text-center -mt-1">This can&apos;t be undone.</p>
             <div className="flex gap-3 w-full mt-1">

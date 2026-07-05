@@ -264,7 +264,7 @@ function MessageRowBase({
                         <div className="absolute right-0 top-8 z-[160] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] overflow-hidden min-w-[130px]">
                           <button
                             onClick={() => onDeletePoll(msg.id, msg.poll_id!)}
-                            className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-red-500 hover:bg-[#FEF2F2] transition-colors"
+                            className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                             Delete poll
@@ -482,7 +482,7 @@ function MessageRowBase({
                 <button
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setDeletingId(msg.id) }}
-                  className="w-full text-left px-4 py-3 text-[14px] text-red-500 flex items-center gap-2.5 hover:bg-red-50 active:bg-red-100 transition-colors"
+                  className="w-full text-left px-4 py-3 text-[14px] text-[var(--danger)] flex items-center gap-2.5 hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete
@@ -703,7 +703,7 @@ function MessageRowBase({
             onPointerDown={(e) => e.stopPropagation()}
           >
             <span className="text-[12px] text-[var(--body)]">Delete this message?</span>
-            <button onClick={() => onDeleteMessage(msg.id)} className="text-[12px] font-medium text-red-500 hover:text-red-600 transition-colors">Delete</button>
+            <button onClick={() => onDeleteMessage(msg.id)} className="text-[12px] font-medium text-[var(--danger)] hover:text-[color-mix(in_srgb,var(--danger)_80%,var(--ink))] transition-colors">Delete</button>
             <button onClick={() => setDeletingId(null)} className="text-[12px] text-[var(--muted-text)] hover:text-[var(--body)] transition-colors">Cancel</button>
           </div>
         )}

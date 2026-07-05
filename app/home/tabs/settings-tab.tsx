@@ -1051,8 +1051,8 @@ export function SettingsTab({
               {peopleRemoveConfirmId && (() => {
                 const target = members.find(m => m.id === peopleRemoveConfirmId)
                 return (
-                  <div style={{ borderRadius: 10, border: "1px solid #FEE2E2", background: "#FFF5F5", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
-                    <AlertTriangle style={{ width: 16, height: 16, color: "#F87171", flexShrink: 0 }} />
+                  <div style={{ borderRadius: 10, border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                    <AlertTriangle style={{ width: 16, height: 16, color: "var(--danger)", flexShrink: 0 }} />
                     <p style={{ fontSize: 13, color: "var(--body)", flex: 1, margin: 0 }}>Remove <strong style={{ color: "var(--ink)" }}>{target?.name}</strong> from this ministry?</p>
                     <button onClick={() => setPeopleRemoveConfirmId(null)} style={{ fontSize: 12, color: "var(--body)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
                     <button onClick={async () => { setPeopleRemoving(true); await handleRemoveMember(peopleRemoveConfirmId); setPeopleRemoving(false); setPeopleRemoveConfirmId(null) }} disabled={peopleRemoving} style={{ fontSize: 12, fontWeight: 500, color: "var(--danger)", border: "1px solid var(--danger)", background: "transparent", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: peopleRemoving ? 0.6 : 1 }}>
@@ -1097,7 +1097,7 @@ export function SettingsTab({
                               ))}
                               <div style={{ margin: "6px 12px", borderTop: "1px solid var(--line-3)" }} />
                               <button onClick={() => { setPeopleRemoveConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>Remove from ministry</button>
-                              <button onClick={() => { setPeopleExcomConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#7A1010", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box", fontWeight: 500 }}>Excommunicate</button>
+                              <button onClick={() => { setPeopleExcomConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "color-mix(in srgb, var(--danger) 80%, var(--ink))", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box", fontWeight: 500 }}>Excommunicate</button>
                             </div>
                           )}
                         </div>
@@ -1111,14 +1111,14 @@ export function SettingsTab({
               {peopleExcomConfirmId && (() => {
                 const target = members.find(m => m.id === peopleExcomConfirmId)
                 return (
-                  <div style={{ borderRadius: 10, border: "1px solid #F87171", background: "#FFF0F0", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ borderRadius: 10, border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
                     <AlertTriangle style={{ width: 16, height: 16, color: "var(--danger)", flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
                       <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 2px" }}>Excommunicate <strong style={{ color: "var(--ink)" }}>{target?.name}</strong>?</p>
                       <p style={{ fontSize: 12, color: "var(--danger)", margin: 0 }}>This is permanent. They will never be able to rejoin this ministry.</p>
                     </div>
                     <button onClick={() => setPeopleExcomConfirmId(null)} style={{ fontSize: 12, color: "var(--body)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
-                    <button onClick={() => handleExcommunicate(peopleExcomConfirmId)} disabled={excomming} style={{ fontSize: 12, fontWeight: 500, color: "var(--cream-panel)", border: "none", background: "#7A1010", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: excomming ? 0.6 : 1 }}>
+                    <button onClick={() => handleExcommunicate(peopleExcomConfirmId)} disabled={excomming} style={{ fontSize: 12, fontWeight: 500, color: "var(--cream-panel)", border: "none", background: "color-mix(in srgb, var(--danger) 80%, var(--ink))", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: excomming ? 0.6 : 1 }}>
                       {excomming ? "Banning…" : "Excommunicate"}
                     </button>
                   </div>
@@ -1129,9 +1129,9 @@ export function SettingsTab({
               {isAdmin && bannedMembers.length > 0 && (
                 <div>
                   <p style={{ ...SECTION_LABEL, marginBottom: 10 }}>Excommunicated</p>
-                  <div style={{ border: "1px solid #F5D0D0", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
+                  <div style={{ border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
                     {bannedMembers.map((b, i) => (
-                      <div key={b.user_id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: i < bannedMembers.length - 1 ? "1px solid #F5D0D0" : "none" }}>
+                      <div key={b.user_id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: i < bannedMembers.length - 1 ? "1px solid color-mix(in srgb, var(--danger) 25%, transparent)" : "none" }}>
                         <MonogramChip initials={getInitials(b.name ?? "?")} className="w-9 h-9 text-[13px] font-medium" />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{b.name ?? "Unknown"}</div>
@@ -1151,8 +1151,8 @@ export function SettingsTab({
             <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
 
               {govError && (
-                <div style={{ borderRadius: 10, border: "1px solid #FEE2E2", background: "#FFF5F5", padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
-                  <AlertTriangle style={{ width: 15, height: 15, color: "#F87171", flexShrink: 0 }} />
+                <div style={{ borderRadius: 10, border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <AlertTriangle style={{ width: 15, height: 15, color: "var(--danger)", flexShrink: 0 }} />
                   <p style={{ fontSize: 13, color: "var(--body)", margin: 0 }}>{govError}</p>
                 </div>
               )}
@@ -1303,7 +1303,7 @@ export function SettingsTab({
 
               {/* Archive warning */}
               {showArchiveWarning && (
-                <div style={{ ...CARD, padding: 20, borderColor: "#FECACA", background: "#FFF5F5" }}>
+                <div style={{ ...CARD, padding: 20, borderColor: "color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 8%, transparent)" }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                     <AlertTriangle style={{ width: 18, height: 18, color: "var(--danger)", flexShrink: 0, marginTop: 1 }} />
                     <div style={{ flex: 1 }}>
