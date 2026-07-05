@@ -71,7 +71,7 @@ function renderMentions(content: string, isOwn: boolean): React.ReactNode {
   const parts = content.split(/(@\S+)/g)
   return <>{parts.map((part, i) =>
     part.startsWith("@")
-      ? <span key={i} style={{ fontWeight: 700, color: isOwn ? "#F6C96A" : "#8B5E1A" }}>{part}</span>
+      ? <span key={i} style={{ fontWeight: 500, color: isOwn ? "#F6C96A" : "#8B5E1A" }}>{part}</span>
       : part
   )}</>
 }
@@ -248,7 +248,7 @@ function MessageRowBase({
                 {/* Card header */}
                 <div className="px-4 pt-4 pb-3 border-b border-[#F0EDE6] flex items-start gap-2">
                   <div className="flex-1 text-center">
-                    <p className="text-[15px] font-bold text-[var(--ink)] leading-snug">{poll.question}</p>
+                    <p className="text-[15px] font-medium text-[var(--ink)] leading-snug">{poll.question}</p>
                     <p className="text-[11px] text-[var(--muted-text)] mt-0.5">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</p>
                   </div>
                   {/* Delete button — visible to creator or admin/leader */}
@@ -285,10 +285,10 @@ function MessageRowBase({
                         <div className="flex items-center justify-between mb-1">
                           {hasVoted ? (
                             <>
-                              <span className={`text-[13px] font-semibold ${isSelected ? "text-[var(--plum)]" : "text-[var(--ink)]"}`}>{opt}</span>
+                              <span className={`text-[13px] font-medium ${isSelected ? "text-[var(--plum)]" : "text-[var(--ink)]"}`}>{opt}</span>
                               <div className="flex items-center gap-1 flex-shrink-0">
                                 {isSelected && <Check className="w-3 h-3 text-[var(--plum)]" />}
-                                <span className={`text-[12px] font-semibold ${isSelected ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`}>{count}</span>
+                                <span className={`text-[12px] font-medium ${isSelected ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`}>{count}</span>
                               </div>
                             </>
                           ) : (
@@ -313,7 +313,7 @@ function MessageRowBase({
                 <div className="px-4 pb-4 pt-1">
                   <button
                     onClick={() => onOpenVoteSheet(msg.poll_id!, hasVoted)}
-                    className={`w-full py-2.5 rounded-xl transition-all text-[13px] font-semibold ${hasVoted ? "bg-[var(--body-bg)] hover:bg-[var(--line)] text-[var(--body)]" : "bg-[var(--plum)] hover:bg-[var(--plum-2)] text-white"}`}
+                    className={`w-full py-2.5 rounded-xl transition-all text-[13px] font-medium ${hasVoted ? "bg-[var(--body-bg)] hover:bg-[var(--line)] text-[var(--body)]" : "bg-[var(--plum)] hover:bg-[var(--plum-2)] text-white"}`}
                   >
                     {hasVoted ? "Change vote" : "Vote"}
                   </button>
@@ -508,7 +508,7 @@ function MessageRowBase({
         )}
         {!isOwn && isFirstInGroup && (
           <div className="flex items-baseline gap-1.5 mb-1 ml-9">
-            <span className="text-[13px] font-semibold text-[var(--ink)]">{msg.sender_name || "Former Member"}</span>
+            <span className="text-[13px] font-medium text-[var(--ink)]">{msg.sender_name || "Former Member"}</span>
             {senderDeparted && (
               <span className="text-[11px] text-[var(--faint)] italic">· left the ministry</span>
             )}
@@ -523,7 +523,7 @@ function MessageRowBase({
             <MonogramChip
               initials={(msg.sender_name || "?").charAt(0).toUpperCase()}
               avatarUrl={!senderDeparted ? (msg.sender_avatar_url || undefined) : undefined}
-              className="w-7 h-7 text-[11px] font-bold"
+              className="w-7 h-7 text-[11px] font-medium"
               style={{ alignSelf: "flex-end", opacity: senderDeparted || !msg.sender_id ? 0.4 : 1 }}
             />
           )}
@@ -559,7 +559,7 @@ function MessageRowBase({
                           : "bg-[var(--ivory)] border-l-[2px] border-[var(--plum)]"
                       }`}
                     >
-                      <span className={`text-[11px] font-semibold flex items-center gap-1 ${isOwn ? "text-white/90" : "text-[var(--plum)]"}`}>
+                      <span className={`text-[11px] font-medium flex items-center gap-1 ${isOwn ? "text-white/90" : "text-[var(--plum)]"}`}>
                         <CornerUpLeft className="w-3 h-3" />
                         {msg.reply_to_sender}
                       </span>
@@ -594,7 +594,7 @@ function MessageRowBase({
                     </div>
                     <div className="flex gap-2 justify-end mt-1.5">
                       <button onClick={() => setEditingId(null)} className={`text-[12px] transition-opacity ${isOwn ? "text-white/50 hover:text-white/80" : "text-[var(--muted-text)] hover:text-[var(--body)]"}`}>Cancel</button>
-                      <button onClick={onSaveEdit} className={`text-[12px] font-semibold px-2.5 py-0.5 rounded-md transition-colors ${isOwn ? "bg-[var(--cream-panel)]/20 hover:bg-[var(--cream-panel)]/30 text-white" : "bg-[var(--plum)]/10 hover:bg-[var(--plum)]/20 text-[var(--plum)]"}`}>Save</button>
+                      <button onClick={onSaveEdit} className={`text-[12px] font-medium px-2.5 py-0.5 rounded-md transition-colors ${isOwn ? "bg-[var(--cream-panel)]/20 hover:bg-[var(--cream-panel)]/30 text-white" : "bg-[var(--plum)]/10 hover:bg-[var(--plum)]/20 text-[var(--plum)]"}`}>Save</button>
                     </div>
                   </div>
                 ) : (
@@ -654,7 +654,7 @@ function MessageRowBase({
                             )}
                             <div className="px-3 py-2">
                               <p className={`text-[10px] font-medium uppercase tracking-wide mb-0.5 ${isOwn ? "text-white/50" : "text-[var(--muted-text)]"}`}>{linkPreview.hostname}</p>
-                              {linkPreview.title && <p className={`text-[13px] font-semibold leading-snug ${isOwn ? "text-white" : "text-[var(--ink)]"}`}>{linkPreview.title.slice(0, 80)}</p>}
+                              {linkPreview.title && <p className={`text-[13px] font-medium leading-snug ${isOwn ? "text-white" : "text-[var(--ink)]"}`}>{linkPreview.title.slice(0, 80)}</p>}
                               {linkPreview.description && <p className={`text-[11px] mt-0.5 line-clamp-2 ${isOwn ? "text-white/60" : "text-[var(--body)]"}`}>{linkPreview.description.slice(0, 120)}</p>}
                             </div>
                           </a>
@@ -703,7 +703,7 @@ function MessageRowBase({
             onPointerDown={(e) => e.stopPropagation()}
           >
             <span className="text-[12px] text-[var(--body)]">Delete this message?</span>
-            <button onClick={() => onDeleteMessage(msg.id)} className="text-[12px] font-semibold text-red-500 hover:text-red-600 transition-colors">Delete</button>
+            <button onClick={() => onDeleteMessage(msg.id)} className="text-[12px] font-medium text-red-500 hover:text-red-600 transition-colors">Delete</button>
             <button onClick={() => setDeletingId(null)} className="text-[12px] text-[var(--muted-text)] hover:text-[var(--body)] transition-colors">Cancel</button>
           </div>
         )}
@@ -719,7 +719,7 @@ function MessageRowBase({
                     initials={name.charAt(0).toUpperCase()}
                     avatarUrl={avatarUrl || undefined}
                     title={`Read by ${name}`}
-                    className={`w-4 h-4 border border-[#F1EDE6] text-[6px] font-bold${idx > 0 ? " -ml-1" : ""}`}
+                    className={`w-4 h-4 border border-[#F1EDE6] text-[6px] font-medium${idx > 0 ? " -ml-1" : ""}`}
                   />
                 ))}
               </div>
@@ -750,7 +750,7 @@ function MessageRowBase({
                     <MonogramChip
                       initials={r.name.charAt(0).toUpperCase()}
                       avatarUrl={r.avatarUrl || undefined}
-                      className="w-5 h-5 text-[8px] font-bold"
+                      className="w-5 h-5 text-[8px] font-medium"
                     />
                   </div>
                 ))}

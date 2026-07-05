@@ -1291,7 +1291,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
             {announcement.is_event && (
               <>
                 <div className="flex items-center gap-4">
-                  <button onClick={handleRsvp} className={`font-bold py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[var(--cream-on-dark)] hover:bg-white/30 active:scale-[0.97]" : "bg-[var(--cream-on-dark)] text-[var(--plum)] hover:bg-white active:scale-[0.97]"}`}>
+                  <button onClick={handleRsvp} className={`font-medium py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[var(--cream-on-dark)] hover:bg-white/30 active:scale-[0.97]" : "bg-[var(--cream-on-dark)] text-[var(--plum)] hover:bg-white active:scale-[0.97]"}`}>
                     {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
                   </button>
                   {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "rgba(246,244,239,0.5)" }}>{announcement.rsvp_count} going</span>}
@@ -1321,11 +1321,11 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
           {showDeleteConfirm && (
             <div className="absolute inset-0 z-[20] bg-[#3E1540]/95 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-center gap-3 p-7">
               <div className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-red-400" /></div>
-              <p className="text-[15px] font-bold text-[var(--cream-on-dark)] text-center">Delete this announcement?</p>
+              <p className="text-[15px] font-medium text-[var(--cream-on-dark)] text-center">Delete this announcement?</p>
               <p className="text-[12px] text-center -mt-1" style={{ color: "rgba(246,244,239,0.5)" }}>This can&apos;t be undone.</p>
               <div className="flex gap-3 w-full mt-1">
-                <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-white/20 text-[13px] font-semibold text-[var(--cream-on-dark)] hover:bg-white/10 transition-colors disabled:opacity-50">Cancel</button>
-                <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-semibold transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
+                <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-white/20 text-[13px] font-medium text-[var(--cream-on-dark)] hover:bg-white/10 transition-colors disabled:opacity-50">Cancel</button>
+                <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-medium transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
               </div>
             </div>
           )}
@@ -1379,7 +1379,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
           {announcement.is_event && (
             <div className="pt-3 border-t border-[var(--line-3)]">
               <div className="flex items-center gap-3">
-                <button onClick={handleRsvp} className={`font-semibold py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[var(--line-3)] text-[var(--body)] hover:bg-[var(--line)] active:scale-[0.97]" : "bg-[var(--plum)] text-[var(--cream)] hover:bg-[var(--plum-2)] active:scale-[0.97]"}`}>
+                <button onClick={handleRsvp} className={`font-medium py-2 px-5 rounded-full transition-all text-[13px] ${announcement.user_has_rsvped ? "bg-[var(--line-3)] text-[var(--body)] hover:bg-[var(--line)] active:scale-[0.97]" : "bg-[var(--plum)] text-[var(--cream)] hover:bg-[var(--plum-2)] active:scale-[0.97]"}`}>
                   {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3 h-3" />Going</span> : "RSVP"}
                 </button>
                 {announcement.rsvp_count > 0 && <span className="text-[12px] text-[var(--muted-text)] font-medium">{announcement.rsvp_count} going</span>}
@@ -1409,11 +1409,11 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
         {showDeleteConfirm && (
           <div className="absolute inset-0 z-[20] bg-[var(--cream)]/95 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-center gap-3 p-7">
             <div className="w-11 h-11 rounded-full bg-red-50 flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-red-400" /></div>
-            <p className="text-[15px] font-bold text-[var(--ink)] text-center">Delete this announcement?</p>
+            <p className="text-[15px] font-medium text-[var(--ink)] text-center">Delete this announcement?</p>
             <p className="text-[12px] text-[var(--muted-text)] text-center -mt-1">This can&apos;t be undone.</p>
             <div className="flex gap-3 w-full mt-1">
-              <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-[var(--line)] text-[13px] font-semibold text-[var(--body)] hover:bg-[var(--ivory)] transition-colors disabled:opacity-50">Cancel</button>
-              <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-semibold transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
+              <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-[var(--line)] text-[13px] font-medium text-[var(--body)] hover:bg-[var(--ivory)] transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-medium transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
             </div>
           </div>
         )}
@@ -1595,7 +1595,7 @@ export function AnnouncementDetailView({
           <div style={{ ...monoStyle }}>Event</div>
           {ann.event_date && (
             <>
-              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 600, color: "var(--ink)", marginTop: 14 }}>{detailWeekday(ann.event_date)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 14 }}>{detailWeekday(ann.event_date)}</div>
               <div style={{ fontFamily: DETAIL_SERIF, fontSize: 42, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date)}</div>
               <div style={{ fontFamily: DETAIL_SANS, fontSize: 18, color: "var(--ink)", marginTop: 9 }}>{detailTime(ann.event_date)}</div>
             </>
@@ -1621,7 +1621,7 @@ export function AnnouncementDetailView({
       asideModules.push(
         <div key="form">
           <div style={{ ...monoStyle }}>Form</div>
-          <div style={{ fontFamily: DETAIL_SERIF, fontSize: 19, fontWeight: 600, color: "var(--ink)", marginTop: 12 }}>Includes a form</div>
+          <div style={{ fontFamily: DETAIL_SERIF, fontSize: 19, fontWeight: 500, color: "var(--ink)", marginTop: 12 }}>Includes a form</div>
           {ann.user_has_responded ? (
             <div className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "#5B7A6C", marginTop: 14 }}><FileText className="w-3.5 h-3.5" />Form submitted</div>
           ) : (

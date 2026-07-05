@@ -855,7 +855,7 @@ export function SettingsTab({
                           </div>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={() => { setAddingSchool(false); setNewSchoolName(""); setNewSchoolAbbr(""); setSchoolError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
-                            <button onClick={handleAddSchool} disabled={savingSchool || !newSchoolName.trim() || !newSchoolAbbr.trim()} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingSchool ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingSchool ? 0.6 : 1 }}>{savingSchool ? "Adding…" : "Add"}</button>
+                            <button onClick={handleAddSchool} disabled={savingSchool || !newSchoolName.trim() || !newSchoolAbbr.trim()} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: savingSchool ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingSchool ? 0.6 : 1 }}>{savingSchool ? "Adding…" : "Add"}</button>
                           </div>
                         </div>
                       )}
@@ -1055,7 +1055,7 @@ export function SettingsTab({
                     <AlertTriangle style={{ width: 16, height: 16, color: "#F87171", flexShrink: 0 }} />
                     <p style={{ fontSize: 13, color: "var(--body)", flex: 1, margin: 0 }}>Remove <strong style={{ color: "var(--ink)" }}>{target?.name}</strong> from this ministry?</p>
                     <button onClick={() => setPeopleRemoveConfirmId(null)} style={{ fontSize: 12, color: "var(--body)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
-                    <button onClick={async () => { setPeopleRemoving(true); await handleRemoveMember(peopleRemoveConfirmId); setPeopleRemoving(false); setPeopleRemoveConfirmId(null) }} disabled={peopleRemoving} style={{ fontSize: 12, fontWeight: 600, color: "var(--danger)", border: "1px solid var(--danger)", background: "transparent", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: peopleRemoving ? 0.6 : 1 }}>
+                    <button onClick={async () => { setPeopleRemoving(true); await handleRemoveMember(peopleRemoveConfirmId); setPeopleRemoving(false); setPeopleRemoveConfirmId(null) }} disabled={peopleRemoving} style={{ fontSize: 12, fontWeight: 500, color: "var(--danger)", border: "1px solid var(--danger)", background: "transparent", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: peopleRemoving ? 0.6 : 1 }}>
                       {peopleRemoving ? "Removing…" : "Remove"}
                     </button>
                   </div>
@@ -1071,7 +1071,7 @@ export function SettingsTab({
                   const menuOpen = peopleRoleMenuOpen === m.id
                   return (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < peopleFiltered.length - 1 ? "1px solid var(--line-3)" : "none", position: "relative" }}>
-                      <MonogramChip initials={getInitials(m.name)} className="w-[38px] h-[38px] text-[13px] font-semibold" />
+                      <MonogramChip initials={getInitials(m.name)} className="w-[38px] h-[38px] text-[13px] font-medium" />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{m.name}</span>
@@ -1097,7 +1097,7 @@ export function SettingsTab({
                               ))}
                               <div style={{ margin: "6px 12px", borderTop: "1px solid var(--line-3)" }} />
                               <button onClick={() => { setPeopleRemoveConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>Remove from ministry</button>
-                              <button onClick={() => { setPeopleExcomConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#7A1010", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box", fontWeight: 600 }}>Excommunicate</button>
+                              <button onClick={() => { setPeopleExcomConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "#7A1010", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box", fontWeight: 500 }}>Excommunicate</button>
                             </div>
                           )}
                         </div>
@@ -1118,7 +1118,7 @@ export function SettingsTab({
                       <p style={{ fontSize: 12, color: "var(--danger)", margin: 0 }}>This is permanent. They will never be able to rejoin this ministry.</p>
                     </div>
                     <button onClick={() => setPeopleExcomConfirmId(null)} style={{ fontSize: 12, color: "var(--body)", background: "none", border: "none", cursor: "pointer", padding: "4px 8px" }}>Cancel</button>
-                    <button onClick={() => handleExcommunicate(peopleExcomConfirmId)} disabled={excomming} style={{ fontSize: 12, fontWeight: 700, color: "var(--cream-panel)", border: "none", background: "#7A1010", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: excomming ? 0.6 : 1 }}>
+                    <button onClick={() => handleExcommunicate(peopleExcomConfirmId)} disabled={excomming} style={{ fontSize: 12, fontWeight: 500, color: "var(--cream-panel)", border: "none", background: "#7A1010", borderRadius: 8, padding: "6px 12px", cursor: "pointer", opacity: excomming ? 0.6 : 1 }}>
                       {excomming ? "Banning…" : "Excommunicate"}
                     </button>
                   </div>
@@ -1132,7 +1132,7 @@ export function SettingsTab({
                   <div style={{ border: "1px solid #F5D0D0", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
                     {bannedMembers.map((b, i) => (
                       <div key={b.user_id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", borderBottom: i < bannedMembers.length - 1 ? "1px solid #F5D0D0" : "none" }}>
-                        <MonogramChip initials={getInitials(b.name ?? "?")} className="w-9 h-9 text-[13px] font-semibold" />
+                        <MonogramChip initials={getInitials(b.name ?? "?")} className="w-9 h-9 text-[13px] font-medium" />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{b.name ?? "Unknown"}</div>
                           <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 1 }}>{b.email ?? ""}</div>
@@ -1184,7 +1184,7 @@ export function SettingsTab({
                         const included = governanceSettings.roster_ids.includes(m.id)
                         return (
                           <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 22px", borderBottom: i < adminMembers.length - 1 ? "1px solid var(--line-3)" : "none" }}>
-                            <MonogramChip initials={getInitials(m.name)} className="w-9 h-9 text-[13px] font-semibold" />
+                            <MonogramChip initials={getInitials(m.name)} className="w-9 h-9 text-[13px] font-medium" />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{m.name}</div>
                               <div style={{ marginTop: 2, fontSize: 13, color: "var(--muted-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
@@ -1307,13 +1307,13 @@ export function SettingsTab({
                   <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                     <AlertTriangle style={{ width: 18, height: 18, color: "var(--danger)", flexShrink: 0, marginTop: 1 }} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", marginBottom: 6 }}>This will archive chats</div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginBottom: 6 }}>This will archive chats</div>
                       <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.55, marginBottom: 14 }}>
                         Turning these off will archive: <strong>{pendingArchiveLabels.join(", ")}</strong>. Members will lose access from their active list.
                       </div>
                       <div style={{ display: "flex", gap: 10 }}>
                         <button onClick={() => setShowArchiveWarning(false)} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
-                        <button onClick={commitSaveAutomations} disabled={savingAutomations} style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--danger)", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
+                        <button onClick={commitSaveAutomations} disabled={savingAutomations} style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--danger)", color: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
                           {savingAutomations ? "Saving…" : "Archive & Save"}
                         </button>
                       </div>
@@ -1326,7 +1326,7 @@ export function SettingsTab({
               {hasAutomationChanges && !showArchiveWarning && (
                 <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
                   <button onClick={() => setPendingAutomationSettings(automationSettings)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Discard</button>
-                  <button onClick={handleSaveAutomations} disabled={savingAutomations} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 600, cursor: savingAutomations ? "not-allowed" : "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
+                  <button onClick={handleSaveAutomations} disabled={savingAutomations} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 500, cursor: savingAutomations ? "not-allowed" : "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
                     {savingAutomations ? "Saving…" : "Save changes"}
                   </button>
                 </div>
@@ -1457,7 +1457,7 @@ export function SettingsTab({
               {hasModerationChanges && (
                 <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
                   <button onClick={() => setPendingModerationSettings(moderationSettings)} disabled={!isAdmin} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: isAdmin ? "pointer" : "not-allowed", opacity: !isAdmin ? 0.5 : 1 }}>Discard</button>
-                  <button onClick={handleSaveModeration} disabled={savingModeration || !isAdmin} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 600, cursor: savingModeration || !isAdmin ? "not-allowed" : "pointer", opacity: savingModeration || !isAdmin ? 0.6 : 1 }}>
+                  <button onClick={handleSaveModeration} disabled={savingModeration || !isAdmin} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 500, cursor: savingModeration || !isAdmin ? "not-allowed" : "pointer", opacity: savingModeration || !isAdmin ? 0.6 : 1 }}>
                     {savingModeration ? "Saving…" : "Save changes"}
                   </button>
                 </div>
@@ -1487,7 +1487,7 @@ export function SettingsTab({
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Invite code</div>
                     <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Share with members to let them join directly.</div>
                     <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "var(--ink)", fontWeight: 600, textAlign: "center", display: "block" }}>{inviteCode ?? "———"}</span>
+                      <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "var(--ink)", fontWeight: 500, textAlign: "center", display: "block" }}>{inviteCode ?? "———"}</span>
                       <button onClick={copyInviteCode} disabled={!inviteCode} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                         {copied ? <Check style={{ width: 13, height: 13, color: "var(--plum)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
                         {copied ? "Copied" : "Copy"}
@@ -1498,7 +1498,7 @@ export function SettingsTab({
                         <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old code will stop working immediately.</p>
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => setShowRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                          <button onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 600, color: "var(--cream-panel)", cursor: "pointer", opacity: regenerating ? 0.6 : 1 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</button>
+                          <button onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 500, color: "var(--cream-panel)", cursor: "pointer", opacity: regenerating ? 0.6 : 1 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</button>
                         </div>
                       </div>
                     ) : (
@@ -1514,7 +1514,7 @@ export function SettingsTab({
                       <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Staff code</div>
                       <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>For pastors, deacons, and elders. Joining with this code assigns an admin-tier role.</div>
                       <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "var(--ink)", fontWeight: 600, textAlign: "center", display: "block" }}>{staffCode}</span>
+                        <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "var(--ink)", fontWeight: 500, textAlign: "center", display: "block" }}>{staffCode}</span>
                         <button onClick={copyStaffCode} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                           {staffCopied ? <Check style={{ width: 13, height: 13, color: "var(--plum)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
                           {staffCopied ? "Copied" : "Copy"}
@@ -1525,7 +1525,7 @@ export function SettingsTab({
                           <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old staff code will stop working immediately.</p>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={() => setShowStaffRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                            <button onClick={handleRegenerateStaff} disabled={regeneratingStaff} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 600, color: "var(--cream-panel)", cursor: "pointer", opacity: regeneratingStaff ? 0.6 : 1 }}>{regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}</button>
+                            <button onClick={handleRegenerateStaff} disabled={regeneratingStaff} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 500, color: "var(--cream-panel)", cursor: "pointer", opacity: regeneratingStaff ? 0.6 : 1 }}>{regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}</button>
                           </div>
                         </div>
                       ) : (
@@ -1592,7 +1592,7 @@ export function SettingsTab({
                               <button
                                 onClick={() => handleSaveLimitEdit(l.id, l.category, l.fund)}
                                 disabled={savingLimitEdit || !editingLimitAmount}
-                                style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--plum)", color: "var(--cream-on-dark)", fontSize: 12, fontWeight: 600, cursor: savingLimitEdit ? "not-allowed" : "pointer", opacity: savingLimitEdit || !editingLimitAmount ? 0.5 : 1, whiteSpace: "nowrap" }}
+                                style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--plum)", color: "var(--cream-on-dark)", fontSize: 12, fontWeight: 500, cursor: savingLimitEdit ? "not-allowed" : "pointer", opacity: savingLimitEdit || !editingLimitAmount ? 0.5 : 1, whiteSpace: "nowrap" }}
                               >{savingLimitEdit ? "…" : "Save"}</button>
                               <button
                                 onClick={() => { setEditingLimitId(null); setEditingLimitAmount("") }}
@@ -1623,7 +1623,7 @@ export function SettingsTab({
                         {limitError && <p style={{ fontSize: 12, color: "var(--danger)", marginBottom: 8 }}>{limitError}</p>}
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => { setAddingLimit(false); setNewLimitAmount(""); setLimitError(null) }} style={{ flex: 1, padding: "7px 0", background: "transparent", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "var(--body)" }}>Cancel</button>
-                          <button onClick={handleAddLimit} disabled={savingLimit || !newLimitAmount} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: savingLimit ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingLimit ? 0.6 : 1 }}>{savingLimit ? "Saving…" : "Add limit"}</button>
+                          <button onClick={handleAddLimit} disabled={savingLimit || !newLimitAmount} style={{ flex: 1, padding: "7px 0", background: "var(--plum)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: savingLimit ? "not-allowed" : "pointer", fontFamily: "inherit", color: "var(--cream-on-dark)", opacity: savingLimit ? 0.6 : 1 }}>{savingLimit ? "Saving…" : "Add limit"}</button>
                         </div>
                       </div>
                     )}

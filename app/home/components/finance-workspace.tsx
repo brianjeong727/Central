@@ -73,7 +73,7 @@ const inputStyle: React.CSSProperties = {
   outline: "none", boxSizing: "border-box",
 }
 const labelStyle: React.CSSProperties = {
-  fontSize: 11, fontWeight: 600, letterSpacing: "0.1em",
+  fontSize: 11, fontWeight: 400, letterSpacing: "0.1em",
   textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 5, display: "block",
 }
 
@@ -155,7 +155,7 @@ export function SubmitReceiptModal({
   return (
     <CentralModal onClose={onClose} title="Submit a receipt" maxWidth={480} sheet
       footer={
-        <button onClick={handleSubmit} disabled={submitting || !amount} style={{ width: "100%", height: 46, background: "var(--plum)", color: "var(--cream)", borderRadius: 12, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: submitting || !amount ? 0.6 : 1 }}>
+        <button onClick={handleSubmit} disabled={submitting || !amount} style={{ width: "100%", height: 46, background: "var(--plum)", color: "var(--cream)", borderRadius: 12, border: "none", fontSize: 15, fontWeight: 500, cursor: "pointer", opacity: submitting || !amount ? 0.6 : 1 }}>
           {submitting ? "Submitting…" : "Submit receipt"}
         </button>
       }
@@ -385,7 +385,7 @@ function InboxDetailOverlay({
 
   const primaryBtn: React.CSSProperties = {
     flex: 1, height: 44, background: "var(--plum)", color: "var(--cream)", borderRadius: 12,
-    border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "var(--sans)",
+    border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)",
   }
   const secondaryBtn: React.CSSProperties = {
     flex: 1, height: 44, background: "var(--ivory)", color: "var(--danger)", borderRadius: 12,
@@ -443,7 +443,7 @@ function InboxDetailOverlay({
         <div style={{ marginBottom: 22 }}>
           <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>Submitted by</p>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <MonogramChip initials={initials} style={{ width: 24, height: 24, fontSize: 9, fontWeight: 600 }} />
+            <MonogramChip initials={initials} style={{ width: 24, height: 24, fontSize: 9, fontWeight: 500 }} />
             <span style={{ fontSize: 14, color: "var(--ink)" }}>{submitterName}</span>
           </div>
         </div>
@@ -732,7 +732,7 @@ export function FinanceWorkspace({
       {section === "budget" && budgetAccess && (
         <div className="px-5 md:px-14 py-7">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-            <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>Expense ledger</p>
+            <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>Expense ledger</p>
             {canManage && (
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={handleExportBudget} disabled={budgetExporting} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "1px solid var(--line)", borderRadius: 9, background: "var(--ivory)", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: budgetExporting ? "default" : "pointer", fontFamily: "var(--sans)", opacity: budgetExporting ? 0.5 : 1 }}>
@@ -747,7 +747,7 @@ export function FinanceWorkspace({
 
           {canManage && showAddEntry && (
             <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, padding: "16px", marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>New manual entry</p>
+              <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>New manual entry</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div><label style={labelStyle}>Date</label><input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} style={inputStyle} /></div>
                 <div><label style={labelStyle}>Category</label><select value={entryCategory} onChange={e => setEntryCategory(e.target.value)} style={inputStyle}>{dynamicCategories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
@@ -758,7 +758,7 @@ export function FinanceWorkspace({
               </div>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                 <button onClick={() => setShowAddEntry(false)} style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--body)", cursor: "pointer" }}>Cancel</button>
-                <button onClick={handleAddBudgetEntry} disabled={addingEntry || !entryAmount} style={{ padding: "8px 18px", background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: addingEntry || !entryAmount ? 0.6 : 1 }}>
+                <button onClick={handleAddBudgetEntry} disabled={addingEntry || !entryAmount} style={{ padding: "8px 18px", background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: addingEntry || !entryAmount ? 0.6 : 1 }}>
                   {addingEntry ? "Adding…" : "Add"}
                 </button>
               </div>
@@ -770,7 +770,7 @@ export function FinanceWorkspace({
               {categorySummary.map(c => (
                 <div key={c.value} style={{ padding: "6px 12px", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 999, display: "flex", gap: 6, alignItems: "center" }}>
                   <span style={{ fontSize: 12, color: "var(--body)" }}>{c.label}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--ink)" }}>${c.total.toFixed(2)}</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--ink)" }}>${c.total.toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -786,7 +786,7 @@ export function FinanceWorkspace({
             <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
               <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 130px 90px 80px", gap: 8, padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "var(--cream)" }}>
                 {["Date", "Description", "Category", "Amount", "Source"].map(h => (
-                  <span key={h} style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{h}</span>
+                  <span key={h} style={{ fontSize: 10, fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{h}</span>
                 ))}
               </div>
               {budgetEntries.map((e, i) => (
@@ -794,8 +794,8 @@ export function FinanceWorkspace({
                   <span style={{ fontSize: 12.5, color: "var(--body)" }}>{new Date(e.entry_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                   <span style={{ fontSize: 13, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.description ?? "—"}</span>
                   <span style={{ fontSize: 12.5, color: "var(--body)" }}>{e.category}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>${Number(e.amount).toFixed(2)}</span>
-                  <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", padding: "3px 7px", borderRadius: 999, textTransform: "uppercase", background: e.source === "reimbursement" ? REIMBURSED_TINT : "var(--ivory)", color: e.source === "reimbursement" ? "var(--plum)" : "var(--body)", display: "inline-block" }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>${Number(e.amount).toFixed(2)}</span>
+                  <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", padding: "3px 7px", borderRadius: 999, textTransform: "uppercase", background: e.source === "reimbursement" ? REIMBURSED_TINT : "var(--ivory)", color: e.source === "reimbursement" ? "var(--plum)" : "var(--body)", display: "inline-block" }}>
                     {e.source === "reimbursement" ? "Auto" : "Manual"}
                   </span>
                 </div>
@@ -1056,7 +1056,7 @@ function AllocationSection({
                                 setDeletingCategory(null)
                               }}
                               disabled={deletingCategory === cat.value}
-                              style={{ fontSize: 11, fontWeight: 600, color: "var(--danger)", background: DELETE_CONFIRM_BG, border: "1px solid #FECACA", borderRadius: 6, padding: "2px 8px", cursor: "pointer", whiteSpace: "nowrap", opacity: deletingCategory === cat.value ? 0.5 : 1 }}
+                              style={{ fontSize: 11, fontWeight: 500, color: "var(--danger)", background: DELETE_CONFIRM_BG, border: "1px solid #FECACA", borderRadius: 6, padding: "2px 8px", cursor: "pointer", whiteSpace: "nowrap", opacity: deletingCategory === cat.value ? 0.5 : 1 }}
                             >
                               {deletingCategory === cat.value ? "Deleting…" : "Delete"}
                             </button>
@@ -1188,13 +1188,13 @@ function AllocationSection({
                   </span>
                 )
               })}
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>
                 {totalAllocated > 0 ? `$${totalAllocated.toFixed(2)}` : "—"}
               </span>
               <span style={{ fontSize: 13, fontWeight: 500, color: totalSpent > 0 ? "var(--ink)" : "var(--faint)" }}>
                 {totalSpent > 0 ? `$${totalSpent.toFixed(2)}` : "—"}
               </span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: overBudget ? "var(--danger)" : totalRemaining > 0 ? BUDGET_GREEN : "var(--faint)" }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: overBudget ? "var(--danger)" : totalRemaining > 0 ? BUDGET_GREEN : "var(--faint)" }}>
                 {totalAllocated > 0 ? (totalRemaining < 0 ? `-$${Math.abs(totalRemaining).toFixed(2)}` : `$${totalRemaining.toFixed(2)}`) : "—"}
               </span>
               <span />
@@ -1235,7 +1235,7 @@ function AllocationSection({
                       setSavingCategory(false)
                     }}
                     disabled={savingCategory || !newCategoryName.trim()}
-                    style={{ padding: "8px 14px", background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: savingCategory || !newCategoryName.trim() ? 0.5 : 1 }}
+                    style={{ padding: "8px 14px", background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: savingCategory || !newCategoryName.trim() ? 0.5 : 1 }}
                   >
                     {savingCategory ? "Adding…" : "Add"}
                   </button>

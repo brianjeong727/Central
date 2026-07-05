@@ -401,7 +401,7 @@ export function MeetingNoteEditor({
                 key={u.userId}
                 title={u.userName}
                 initials={getInitials(u.userName)}
-                style={{ width: 22, height: 22, fontSize: 9, fontWeight: 700, border: "2px solid white", marginLeft: i === 0 ? 0 : -6 }}
+                style={{ width: 22, height: 22, fontSize: 9, fontWeight: 500, border: "2px solid white", marginLeft: i === 0 ? 0 : -6 }}
               />
             ))}
           </div>
