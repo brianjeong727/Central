@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Plus, Image as ImageIcon, Settings } from "lucide-react"
-import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, SubpageShell, CentralModal } from "@/components/central"
-import { HeaderActionButton } from "./shared"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, SubpageShell, CentralModal, ContentActionButton } from "@/components/central"
 import { createClient } from "@/lib/supabase"
 import { SubmitReceiptModal, STATUS_META } from "./finance-workspace"
 import {
@@ -157,7 +156,7 @@ export function ReceiptsWorkspace({
       {teamId && (
         <div className="flex items-center justify-between gap-3 px-5 md:px-14 pt-7 pb-3">
           <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--ink)" }}>Categories</span>
-          <HeaderActionButton label="Add category" onClick={() => setShowAddCategory(true)} />
+          <ContentActionButton label="Add category" variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => setShowAddCategory(true)} />
         </div>
       )}
 
@@ -273,19 +272,7 @@ function CategoryContent({
   useEffect(() => { refresh() }, [refresh])
 
   const submitButton = (
-    <button
-      onClick={() => setShowSubmit(true)}
-      style={{
-        display: "inline-flex", alignItems: "center", gap: 6,
-        height: 36, padding: "0 14px", borderRadius: "var(--r-pill)",
-        background: "var(--plum)", color: "var(--cream)", border: "none",
-        fontSize: 13, fontWeight: 500, fontFamily: "var(--sans)", cursor: "pointer",
-        flexShrink: 0,
-      }}
-    >
-      <Plus size={14} />
-      Submit a receipt
-    </button>
+    <ContentActionButton label="Submit a receipt" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => setShowSubmit(true)} />
   )
 
   const eyebrow = (

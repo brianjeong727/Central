@@ -1,8 +1,6 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Plus } from "lucide-react"
-import { CentralButton } from "@/components/central"
 
 // ── Shared design tokens ──────────────────────────────────────────────────────
 // EYEBROW_STYLE / MONO_STYLE are canonically defined in components/central/typography.ts
@@ -172,34 +170,6 @@ export function sidebarItemStyle(active?: boolean, danger?: boolean): React.CSSP
     borderLeftColor: active ? "var(--plum)" : "transparent",
     transition: "background 100ms ease",
   }
-}
-
-// Canonical header-right CTA button for section pages (e.g. "Start new", "Generate groups").
-// Always lives in the TabPageHeader right slot — never inline in content.
-export function HeaderActionButton({
-  label,
-  onClick,
-  disabled,
-}: {
-  label: string
-  onClick: () => void
-  disabled?: boolean
-}) {
-  // The header "+ create" CTA is the `create` role of the button system (§4.3).
-  // Height is pinned to 28px so it never exceeds the compact PageTitle line box
-  // (25 × 1.05 ≈ 26.25px) and grows TabPageHeader's content-driven row.
-  return (
-    <CentralButton
-      variant="create"
-      size="sm"
-      onClick={onClick}
-      disabled={disabled}
-      style={{ boxSizing: "border-box", height: 28, padding: "0 14px", borderRadius: 9, flexShrink: 0, marginLeft: "auto" }}
-    >
-      <Plus style={{ width: 14, height: 14 }} />
-      {label}
-    </CentralButton>
-  )
 }
 
 export function PlanSectionHeader({ children }: { children: React.ReactNode }) {
