@@ -6,10 +6,10 @@ import useSWR from "swr"
 import { ChevronRight, Bell, Calendar } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { ChatsSection } from "@/components/ui/chats-section"
-import { RingCrossLogo, HeaderActionButton, EYEBROW_STYLE } from "../components/shared"
+import { RingCrossLogo, EYEBROW_STYLE } from "../components/shared"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
-import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton } from "@/components/central"
 import type { HeroSlide } from "@/components/central"
 // Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
 // so keep it out of the initial home-tab bundle every member/visitor downloads.
@@ -549,10 +549,11 @@ export function HomeTab({
 
       {/* ══════════════════════════════════════════════════════ DESKTOP ══ */}
 
-      {/* Desktop: hero header */}
-      <TabPageHeader className="justify-between" style={{ gap: "var(--space-8)" }}>
+      {/* Desktop: hero header — title only. The Curate action lives in the hero
+          section's own body header (HeroSectionLabel row), per Convention #15:
+          create/config buttons never sit in the TabPageHeader. */}
+      <TabPageHeader>
         <PageTitle eyebrow={dateLabel} title={greetingNode} style={{ maxWidth: 640 }} />
-        {canCurateHome && <HeaderActionButton label="Curate hero" onClick={() => setManagerOpen(true)} />}
       </TabPageHeader>
 
       {/* Desktop: main content */}
@@ -568,7 +569,12 @@ export function HomeTab({
         {loading ? (
           <HomeHeroSkeleton />
         ) : (
-          <HeroSectionLabel breathe />
+          <HeroSectionLabel
+            breathe
+            action={canCurateHome
+              ? <ContentActionButton label="Curate" variant="ghost" onClick={() => setManagerOpen(true)} />
+              : undefined}
+          />
         )}
         {!loading && (slides.length > 0 || pulseNodeDesktop ? (
           <HomeHeroCarousel
