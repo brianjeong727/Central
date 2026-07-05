@@ -31,7 +31,7 @@ import { MODERATION_DEFAULTS } from "@/lib/moderation"
 import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@/lib/moderation"
 import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
-import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog } from "@/components/central"
+import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton } from "@/components/central"
 import { useNavState } from "../nav-state"
 
 interface MemberRow {
@@ -84,6 +84,83 @@ const CARD: React.CSSProperties = {
   background: "var(--cream-panel)", borderRadius: "14px", border: "1px solid var(--line)",
 }
 
+// ── Shared edit→stage→confirm→feedback primitives ─────────────────────────────
+// One reusable system for the whole tab. A section header carries SectionEditControls
+// (Edit → Cancel/Save + a transient Saved ✓), Save opens a CentralModal that lists
+// the deltas, and Confirm persists. View mode leaves every input read-only.
+
+// Transient "Saved ✓" tick — plum check + mono "Saved", auto-cleared by the caller.
+function SavedTick({ show }: { show: boolean }) {
+  if (!show) return null
+  return (
+    <span className="animate-fade-up" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--mono)", fontSize: 11, fontWeight: 400, letterSpacing: "0.06em", color: "var(--plum)", whiteSpace: "nowrap" }}>
+      <Check style={{ width: 13, height: 13 }} /> Saved
+    </span>
+  )
+}
+
+// Header-right control cluster. View: ghost Edit + Saved ✓. Edit: Cancel + Save changes.
+function SectionEditControls({ editing, dirty, saving, saved, disabled, onEdit, onCancel, onSave }: {
+  editing: boolean
+  dirty: boolean
+  saving: boolean
+  saved: boolean
+  disabled?: boolean
+  onEdit: () => void
+  onCancel: () => void
+  onSave: () => void
+}) {
+  if (!editing) {
+    if (disabled) return <SavedTick show={saved} />
+    return (
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <SavedTick show={saved} />
+        <ContentActionButton label="Edit" variant="ghost" onClick={onEdit} icon={<Pencil style={{ width: 13, height: 13 }} />} />
+      </div>
+    )
+  }
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+      <CentralButton variant="secondary" size="sm" onClick={onCancel} disabled={saving}>Cancel</CentralButton>
+      <CentralButton variant="primary" size="sm" onClick={onSave} disabled={!dirty || saving}>{saving ? "Saving…" : "Save changes"}</CentralButton>
+    </div>
+  )
+}
+
+// One line in a confirm modal's change summary — "Label: old → new".
+function ChangeRow({ label, from, to }: { label: string; from?: string; to: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 13.5, color: "var(--body)", lineHeight: 1.5 }}>
+      <span style={{ fontWeight: 500, color: "var(--ink)", flexShrink: 0 }}>{label}</span>
+      <span style={{ minWidth: 0 }}>
+        {from !== undefined && <><span style={{ color: "var(--muted-text)" }}>{from}</span> <span style={{ color: "var(--faint)" }}>→</span> </>}
+        <span style={{ color: "var(--ink)" }}>{to}</span>
+      </span>
+    </div>
+  )
+}
+
+// The delta list shown inside every confirm modal.
+function ChangeSummary({ children }: { children: React.ReactNode }) {
+  return <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>{children}</div>
+}
+
+// Shared footer for confirm modals (Cancel + Confirm & save / custom confirm).
+function ConfirmFooter({ onCancel, onConfirm, saving, confirmLabel = "Confirm & save", danger = false }: {
+  onCancel: () => void
+  onConfirm: () => void
+  saving: boolean
+  confirmLabel?: string
+  danger?: boolean
+}) {
+  return (
+    <>
+      <CentralButton variant="secondary" size="sm" onClick={onCancel} disabled={saving}>Cancel</CentralButton>
+      <CentralButton variant={danger ? "danger-solid" : "primary"} size="sm" onClick={onConfirm} disabled={saving}>{saving ? "Saving…" : confirmLabel}</CentralButton>
+    </>
+  )
+}
+
 export function SettingsTab({
   ministryId,
   ministryName,
@@ -134,10 +211,6 @@ export function SettingsTab({
 
   // Ministry info
   const [ministryInfo, setMinistryInfo] = useState<MinistryInfo | null>(null)
-  const [editingName, setEditingName] = useState(false)
-  const [nameDraft, setNameDraft] = useState("")
-  const [editingUniversity, setEditingUniversity] = useState(false)
-  const [universityDraft, setUniversityDraft] = useState("")
   const [savingInfo, setSavingInfo] = useState(false)
   const [infoError, setInfoError] = useState<string | null>(null)
 
@@ -194,8 +267,6 @@ export function SettingsTab({
   const [pendingAutomationSettings, setPendingAutomationSettings] = useState<Record<string, boolean>>(AUTOMATION_DEFAULTS)
   const [savingAutomations, setSavingAutomations] = useState(false)
   const [automationSaveMsg, setAutomationSaveMsg] = useState<string | null>(null)
-  const [showArchiveWarning, setShowArchiveWarning] = useState(false)
-  const [pendingArchiveLabels, setPendingArchiveLabels] = useState<string[]>([])
 
   // Chat moderation
   const [moderationSettings, setModerationSettings] = useState<ModerationSettings>(MODERATION_DEFAULTS)
@@ -268,6 +339,40 @@ export function SettingsTab({
   const [editingGiving, setEditingGiving] = useState(false)
   const [givingError, setGivingError] = useState<string | null>(null)
 
+  // ── Edit → stage → confirm → feedback sessions ─────────────────────────────
+  // Ministry Profile (name + university → updateMinistryInfo)
+  const [profileEditing, setProfileEditing] = useState(false)
+  const [profileDraft, setProfileDraft] = useState<{ name: string; university: string }>({ name: "", university: "" })
+  const [profileConfirmOpen, setProfileConfirmOpen] = useState(false)
+  const [profileSaved, setProfileSaved] = useState(false)
+
+  // Discovery (isPublic → updateMinistryPublic)
+  const [discoveryEditing, setDiscoveryEditing] = useState(false)
+  const [discoveryDraft, setDiscoveryDraft] = useState(false)
+  const [discoveryConfirmOpen, setDiscoveryConfirmOpen] = useState(false)
+  const [discoverySaved, setDiscoverySaved] = useState(false)
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null)
+
+  // Governance (all_admins + roster_ids + per-team access → one confirm)
+  const [govEditing, setGovEditing] = useState(false)
+  const [govDraft, setGovDraft] = useState<{ all_admins: boolean; roster_ids: string[]; teamAccess: Record<string, "none" | "view" | "write"> } | null>(null)
+  const [govConfirmOpen, setGovConfirmOpen] = useState(false)
+  const [govSaving, setGovSaving] = useState(false)
+  const [govSaved, setGovSaved] = useState(false)
+
+  // Automations (reuses pending/base + savingAutomations)
+  const [automationsEditing, setAutomationsEditing] = useState(false)
+  const [automationsConfirmOpen, setAutomationsConfirmOpen] = useState(false)
+  const [automationsSaved, setAutomationsSaved] = useState(false)
+
+  // Moderation (reuses pending/base + savingModeration)
+  const [moderationEditing, setModerationEditing] = useState(false)
+  const [moderationConfirmOpen, setModerationConfirmOpen] = useState(false)
+  const [moderationSaved, setModerationSaved] = useState(false)
+
+  // People — role-change confirm
+  const [roleChangeConfirm, setRoleChangeConfirm] = useState<{ memberId: string; name: string; currentRole: string; newRole: "visitor" | "member" | "leader" | "admin" | "deacon" | "elder" | "pastor" } | null>(null)
+
   useEffect(() => {
     async function load() {
       const [{ data: min }, { data: profiles }, { data: schoolRows }, limitsRes, verses, { data: teamRows }, codesRes, { data: givingRow }] = await Promise.all([
@@ -334,24 +439,48 @@ export function SettingsTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSettingsTab])
 
-  // ── Ministry info edit ──────────────────────────────────────────────────────
-  async function saveMinistryField(field: "name" | "university", val: string) {
-    const trimmed = val.trim()
-    const current = field === "name" ? (ministryInfo?.name ?? "") : (ministryInfo?.university ?? "")
-    if (!trimmed || trimmed === current) {
-      field === "name" ? setEditingName(false) : setEditingUniversity(false)
-      return
-    }
+  // ── Ministry Profile edit session (name + university) ────────────────────────
+  function flashSaved(setter: (v: boolean) => void) {
+    setter(true)
+    setTimeout(() => setter(false), 1800)
+  }
+  function startProfileEdit() {
+    setProfileDraft({ name: ministryInfo?.name ?? ministryName, university: ministryInfo?.university ?? "" })
+    setInfoError(null)
+    setProfileEditing(true)
+  }
+  const profileDirty = !!ministryInfo && (
+    profileDraft.name.trim() !== (ministryInfo.name ?? "") ||
+    profileDraft.university.trim() !== (ministryInfo.university ?? "")
+  )
+  async function confirmProfileSave() {
+    const name = profileDraft.name.trim()
+    const university = profileDraft.university.trim()
+    if (!name) { setInfoError("Ministry name can’t be empty."); setProfileConfirmOpen(false); return }
     setSavingInfo(true)
     setInfoError(null)
-    const { error } = await updateMinistryInfo({
-      name: field === "name" ? trimmed : (ministryInfo?.name ?? ""),
-      university: field === "university" ? trimmed : (ministryInfo?.university ?? ""),
-    })
+    const { error } = await updateMinistryInfo({ name, university })
     setSavingInfo(false)
-    if (error) { setInfoError(error); return }
-    setMinistryInfo(prev => prev ? { ...prev, [field]: trimmed } : prev)
-    field === "name" ? setEditingName(false) : setEditingUniversity(false)
+    if (error) { setInfoError(error); setProfileConfirmOpen(false); return }
+    setMinistryInfo(prev => prev ? { ...prev, name, university } : prev)
+    setProfileConfirmOpen(false)
+    setProfileEditing(false)
+    flashSaved(setProfileSaved)
+  }
+
+  // ── Discovery edit session (public toggle) ───────────────────────────────────
+  function startDiscoveryEdit() { setDiscoveryDraft(isPublic); setDiscoveryError(null); setDiscoveryEditing(true) }
+  const discoveryDirty = discoveryDraft !== isPublic
+  async function confirmDiscoverySave() {
+    setToggling(true)
+    setDiscoveryError(null)
+    const { error } = await updateMinistryPublic(discoveryDraft)
+    setToggling(false)
+    if (error) { setDiscoveryError(error); setDiscoveryConfirmOpen(false); return }
+    setIsPublic(discoveryDraft); onPublicChange(discoveryDraft)
+    setDiscoveryConfirmOpen(false)
+    setDiscoveryEditing(false)
+    flashSaved(setDiscoverySaved)
   }
 
   // ── Giving (offering) info ──────────────────────────────────────────────────
@@ -369,14 +498,22 @@ export function SettingsTab({
     setGivingSaved({ name, info }); setEditingGiving(false); setGivingSaveMsg(true); setTimeout(() => setGivingSaveMsg(false), 2500)
   }
 
-  // ── Role change ─────────────────────────────────────────────────────────────
+  // ── Role change (routed through a confirm modal) ─────────────────────────────
   async function handleRoleChange(memberId: string, newRole: "visitor" | "member" | "leader" | "admin" | "deacon" | "elder" | "pastor") {
     const target = members.find(m => m.id === memberId)
+    setPeopleChangingRole(memberId)
     const { error } = await updateMemberRole(memberId, newRole)
     if (!error) {
       setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m))
       logAudit({ ministryId, actorId: userId, actorName: userName, action: "member.role_change", entityType: "member", entityId: memberId, entityLabel: target?.name ?? null, metadata: { old_role: target?.role ?? null, new_role: newRole } })
     }
+    setPeopleChangingRole(null)
+  }
+  async function confirmRoleChange() {
+    if (!roleChangeConfirm) return
+    const { memberId, newRole } = roleChangeConfirm
+    setRoleChangeConfirm(null)
+    await handleRoleChange(memberId, newRole)
   }
 
   // ── Remove member ───────────────────────────────────────────────────────────
@@ -477,29 +614,42 @@ export function SettingsTab({
   }
 
   function handleAutomationToggle(key: string) {
-    if (!isAdmin) return
+    if (!isAdmin || !automationsEditing) return
     setPendingAutomationSettings(prev => ({ ...prev, [key]: !isToggleOn(key, prev) }))
   }
 
   const hasAutomationChanges = JSON.stringify(pendingAutomationSettings) !== JSON.stringify(automationSettings)
 
-  const hasModerationChanges = JSON.stringify(pendingModerationSettings) !== JSON.stringify(moderationSettings)
-  function setModField<K extends keyof ModerationSettings>(key: K, val: ModerationSettings[K]) {
-    setPendingModerationSettings((prev) => ({ ...prev, [key]: val }))
-    setModerationSaveMsg(null)
+  const AUTOMATION_LABELS: Record<string, string> = {
+    auto_sg_chats: "Auto-create small group chats",
+    auto_grade_chats: "Grade & Young Adult chats",
+    auto_central_chat: `Auto-add to ${ministryInfo?.name ?? ministryName} Chat`,
+    auto_staff_chat: "Staff chat",
   }
-  async function handleSaveModeration() {
-    setSavingModeration(true)
-    const res = await updateModerationSettings(ministryId, pendingModerationSettings)
-    setSavingModeration(false)
-    if (res?.error) { setModerationSaveMsg(`Error: ${res.error}`); return }
-    setModerationSettings(pendingModerationSettings)
-    setModerationSaveMsg("Chat moderation settings saved.")
+  function automationDeltas() {
+    const keys = ["auto_sg_chats", "auto_grade_chats", "auto_central_chat", "auto_staff_chat"]
+    return keys
+      .filter(k => isToggleOn(k, pendingAutomationSettings) !== isToggleOn(k, automationSettings))
+      .map(k => ({ key: k, label: AUTOMATION_LABELS[k] ?? k, from: isToggleOn(k, automationSettings) ? "on" : "off", to: isToggleOn(k, pendingAutomationSettings) ? "on" : "off" }))
   }
+  function automationArchiveLabels() {
+    const labels: string[] = []
+    for (const key of ARCHIVE_ON_OFF_KEYS) {
+      const wasOn = isToggleOn(key, automationSettings)
+      const isNowOn = isToggleOn(key, pendingAutomationSettings)
+      if (!isNowOn && wasOn) {
+        if (key === "auto_staff_chat") labels.push(`${ministryInfo?.name ?? ministryName} Staff chat`)
+        if (key === "auto_grade_chats") labels.push("all Class of {year} chats")
+      }
+    }
+    return labels
+  }
+
+  function startAutomationsEdit() { setPendingAutomationSettings(automationSettings); setAutomationSaveMsg(null); setAutomationsEditing(true) }
+  function cancelAutomationsEdit() { setPendingAutomationSettings(automationSettings); setAutomationsEditing(false); setAutomationSaveMsg(null) }
 
   async function commitSaveAutomations() {
     setSavingAutomations(true)
-    setShowArchiveWarning(false)
     await updateAutomationSettings(ministryId, pendingAutomationSettings)
 
     const allKeys = new Set([...Object.keys(automationSettings), ...Object.keys(pendingAutomationSettings)])
@@ -516,37 +666,42 @@ export function SettingsTab({
 
     setAutomationSettings(pendingAutomationSettings)
     setSavingAutomations(false)
-    setAutomationSaveMsg("Changes saved.")
-    setTimeout(() => setAutomationSaveMsg(null), 4000)
+    setAutomationSaveMsg(null)
+    setAutomationsConfirmOpen(false)
+    setAutomationsEditing(false)
+    flashSaved(setAutomationsSaved)
   }
 
-  async function handleSaveAutomations() {
-    // Collect which destructive toggles are being turned OFF
-    const archiveLabels: string[] = []
-    for (const key of ARCHIVE_ON_OFF_KEYS) {
-      const wasOn = isToggleOn(key, automationSettings)
-      const isNowOn = isToggleOn(key, pendingAutomationSettings)
-      if (!isNowOn && wasOn) {
-        if (key === "auto_staff_chat") archiveLabels.push(`${ministryInfo?.name ?? ministryName} Staff chat`)
-        if (key === "auto_grade_chats") archiveLabels.push("all Class of {year} chats")
-      }
-    }
-    if (archiveLabels.length > 0) {
-      setPendingArchiveLabels(archiveLabels)
-      setShowArchiveWarning(true)
-      return
-    }
-    await commitSaveAutomations()
+  const hasModerationChanges = JSON.stringify(pendingModerationSettings) !== JSON.stringify(moderationSettings)
+  function setModField<K extends keyof ModerationSettings>(key: K, val: ModerationSettings[K]) {
+    if (!moderationEditing) return
+    setPendingModerationSettings((prev) => ({ ...prev, [key]: val }))
+    setModerationSaveMsg(null)
   }
-
-  // ── Discovery toggle ─────────────────────────────────────────────────────────
-  async function handleToggle() {
-    if (toggling) return
-    setToggling(true)
-    const next = !isPublic
-    const { error } = await updateMinistryPublic(next)
-    if (!error) { setIsPublic(next); onPublicChange(next) }
-    setToggling(false)
+  function startModerationEdit() { setPendingModerationSettings(moderationSettings); setModerationSaveMsg(null); setModerationEditing(true) }
+  function cancelModerationEdit() { setPendingModerationSettings(moderationSettings); setModerationEditing(false); setModerationSaveMsg(null) }
+  const CAP = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+  const MOD_BEHAVIOR_LABEL: Record<ModBehavior, string> = { asterisk_first: "Soften (s***)", asterisk_all: "Censor (****)", block: "Block send" }
+  const MOD_SCOPE_LABEL: Record<ModScope, string> = { all: "All chats", church: "Church chats", personal: "Personal chats", ministry: "Ministry chat" }
+  function moderationDeltas(): { label: string; from: string; to: string }[] {
+    const d: { label: string; from: string; to: string }[] = []
+    const p = pendingModerationSettings, b = moderationSettings
+    if (p.enabled !== b.enabled) d.push({ label: "Language filter", from: b.enabled ? "on" : "off", to: p.enabled ? "on" : "off" })
+    if (p.behavior !== b.behavior) d.push({ label: "Behavior", from: MOD_BEHAVIOR_LABEL[b.behavior], to: MOD_BEHAVIOR_LABEL[p.behavior] })
+    if (p.strictness !== b.strictness) d.push({ label: "Strictness", from: CAP(b.strictness), to: CAP(p.strictness) })
+    if (p.scope !== b.scope) d.push({ label: "Scope", from: MOD_SCOPE_LABEL[b.scope], to: MOD_SCOPE_LABEL[p.scope] })
+    if (p.reverent_caps !== b.reverent_caps) d.push({ label: "Reverent capitalization", from: b.reverent_caps ? "on" : "off", to: p.reverent_caps ? "on" : "off" })
+    return d
+  }
+  async function handleSaveModeration() {
+    setSavingModeration(true)
+    const res = await updateModerationSettings(ministryId, pendingModerationSettings)
+    setSavingModeration(false)
+    if (res?.error) { setModerationSaveMsg(`Error: ${res.error}`); setModerationConfirmOpen(false); return }
+    setModerationSettings(pendingModerationSettings)
+    setModerationConfirmOpen(false)
+    setModerationEditing(false)
+    flashSaved(setModerationSaved)
   }
 
   // ── Archive (two-step: request → second-admin confirm) ──────────────────────
@@ -687,39 +842,69 @@ export function SettingsTab({
     await reorderHomeVerses(ministryId, updated.map(v => v.id))
   }
 
-  // ── Governance handlers ──────────────────────────────────────────────────────
+  // ── Governance edit session ──────────────────────────────────────────────────
+  // The all-admins toggle, roster toggles, and per-team access matrix are all
+  // staged into ONE draft and persisted together on confirm.
   const adminMembers = members.filter(m => ["admin", "deacon", "elder", "pastor"].includes(m.role.toLowerCase()))
 
-  async function persistGovernance(next: GovernanceSettings, prev: GovernanceSettings) {
+  function startGovEdit() {
+    setGovDraft({
+      all_admins: governanceSettings.all_admins,
+      roster_ids: [...governanceSettings.roster_ids],
+      teamAccess: Object.fromEntries(govTeams.map(t => [t.id, t.admin_access])),
+    })
     setGovError(null)
-    const { error } = await updateGovernanceSettings(next)
-    if (error) { setGovernanceSettings(prev); setGovError(error) }
+    setGovEditing(true)
+  }
+  function cancelGovEdit() { setGovDraft(null); setGovEditing(false); setGovError(null) }
+
+  function draftToggleAllAdmins() { setGovDraft(d => d ? { ...d, all_admins: !d.all_admins } : d) }
+  function draftToggleRoster(id: string) {
+    setGovDraft(d => d ? { ...d, roster_ids: d.roster_ids.includes(id) ? d.roster_ids.filter(x => x !== id) : [...d.roster_ids, id] } : d)
+  }
+  function draftTeamAccess(teamId: string, access: "none" | "view" | "write") {
+    setGovDraft(d => d ? { ...d, teamAccess: { ...d.teamAccess, [teamId]: access } } : d)
   }
 
-  function handleToggleAllAdmins() {
-    const prev = governanceSettings
-    const next = { ...prev, all_admins: !prev.all_admins }
-    setGovernanceSettings(next)
-    persistGovernance(next, prev)
-  }
+  const govRosterChanged = !!govDraft && JSON.stringify([...govDraft.roster_ids].sort()) !== JSON.stringify([...governanceSettings.roster_ids].sort())
+  const govAllAdminsChanged = !!govDraft && govDraft.all_admins !== governanceSettings.all_admins
+  const govTeamsChanged = !!govDraft && govTeams.filter(t => govDraft.teamAccess[t.id] !== t.admin_access)
+  const govDirty = !!govDraft && (govAllAdminsChanged || govRosterChanged || (Array.isArray(govTeamsChanged) && govTeamsChanged.length > 0))
 
-  function handleToggleRosterMember(memberId: string) {
-    const prev = governanceSettings
-    const inRoster = prev.roster_ids.includes(memberId)
-    const next = {
-      ...prev,
-      roster_ids: inRoster ? prev.roster_ids.filter(id => id !== memberId) : [...prev.roster_ids, memberId],
+  async function confirmGovSave() {
+    if (!govDraft) return
+    setGovSaving(true)
+    setGovError(null)
+    const failures: string[] = []
+    let nextGov = governanceSettings
+    let nextTeams = govTeams
+
+    if (govAllAdminsChanged || govRosterChanged) {
+      const payload: GovernanceSettings = { all_admins: govDraft.all_admins, roster_ids: govDraft.roster_ids }
+      const { error } = await updateGovernanceSettings(payload)
+      if (error) failures.push("governance roster"); else nextGov = payload
     }
-    setGovernanceSettings(next)
-    persistGovernance(next, prev)
-  }
+    const changedTeams = govTeams.filter(t => govDraft.teamAccess[t.id] !== t.admin_access)
+    for (const t of changedTeams) {
+      const { error } = await updateTeamAdminAccess(t.id, govDraft.teamAccess[t.id])
+      if (error) failures.push(t.name)
+      else nextTeams = nextTeams.map(x => x.id === t.id ? { ...x, admin_access: govDraft.teamAccess[t.id] } : x)
+    }
 
-  async function handleTeamAccessChange(teamId: string, access: "none" | "view" | "write") {
-    const prev = govTeams
-    setGovError(null)
-    setGovTeams(t => t.map(x => x.id === teamId ? { ...x, admin_access: access } : x))
-    const { error } = await updateTeamAdminAccess(teamId, access)
-    if (error) { setGovTeams(prev); setGovError(error) }
+    setGovernanceSettings(nextGov)
+    setGovTeams(nextTeams)
+    setGovSaving(false)
+    setGovConfirmOpen(false)
+
+    if (failures.length > 0) {
+      // Partial: what succeeded is committed to real state; the draft is left
+      // intact so only the still-changed (failed) items remain dirty for a retry.
+      setGovError(`Couldn’t save: ${failures.join(", ")}. Other changes were saved — please retry the rest.`)
+      return
+    }
+    setGovEditing(false)
+    setGovDraft(null)
+    flashSaved(setGovSaved)
   }
 
   const now = new Date()
@@ -783,7 +968,10 @@ export function SettingsTab({
               {/* Ministry Profile */}
               <section>
                 <div style={{ marginBottom: 20 }}>
-                  <SectionHeader eyebrow="Ministry Identity" title="Profile" titleSize={20} />
+                  <SectionHeader eyebrow="Ministry Identity" title="Profile" titleSize={20} action={
+                    <SectionEditControls editing={profileEditing} dirty={profileDirty} saving={savingInfo} saved={profileSaved} disabled={!isAdmin}
+                      onEdit={startProfileEdit} onCancel={() => { setProfileEditing(false); setInfoError(null) }} onSave={() => setProfileConfirmOpen(true)} />
+                  } />
                   <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>The name, school, and visual identity members see when they find your ministry.</p>
                 </div>
                 <div style={{ ...CARD, padding: "22px 26px", display: "flex", alignItems: "center", gap: 20 }}>
@@ -793,23 +981,18 @@ export function SettingsTab({
                     style={{ width: 64, height: 64, fontFamily: "var(--font-instrument-serif)", fontSize: 30 }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    {editingName ? (
-                      <input autoFocus value={nameDraft} onChange={e => setNameDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveMinistryField("name", nameDraft); if (e.key === "Escape") setEditingName(false) }} onBlur={() => saveMinistryField("name", nameDraft)} style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", letterSpacing: -0.3, color: "var(--ink)", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", padding: 0, width: "100%" }} />
+                    {profileEditing ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <input autoFocus value={profileDraft.name} onChange={e => setProfileDraft(d => ({ ...d, name: e.target.value }))} placeholder="Ministry name" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", letterSpacing: -0.3, color: "var(--ink)", lineHeight: 1.1, background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 10, outline: "none", padding: "6px 12px", width: "100%", boxSizing: "border-box" }} />
+                        <input value={profileDraft.university} onChange={e => setProfileDraft(d => ({ ...d, university: e.target.value }))} placeholder="School / university" style={{ fontSize: "14px", color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 10, outline: "none", padding: "8px 12px", width: "100%", boxSizing: "border-box", fontFamily: "inherit" }} />
+                      </div>
                     ) : (
-                      <div className="group flex items-center gap-2" style={{ cursor: isAdmin ? "text" : "default" }} onClick={isAdmin ? () => { setNameDraft(ministryInfo?.name ?? ministryName); setEditingName(true) } : undefined}>
+                      <>
                         <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", letterSpacing: -0.3, color: "var(--ink)", lineHeight: 1.1 }}>{ministryInfo?.name ?? ministryName}</p>
-                        {isAdmin && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />}
-                      </div>
+                        <p style={{ fontSize: "14px", color: "var(--body)", marginTop: 4 }}>{ministryInfo?.university ?? "—"}</p>
+                      </>
                     )}
-                    {editingUniversity ? (
-                      <input autoFocus value={universityDraft} onChange={e => setUniversityDraft(e.target.value)} onKeyDown={e => { if (e.key === "Enter") saveMinistryField("university", universityDraft); if (e.key === "Escape") setEditingUniversity(false) }} onBlur={() => saveMinistryField("university", universityDraft)} style={{ fontSize: "14px", color: "var(--body)", marginTop: 4, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", padding: 0, width: "100%" }} />
-                    ) : (
-                      <div className="group flex items-center gap-1" style={{ cursor: isAdmin ? "text" : "default", marginTop: 4 }} onClick={isAdmin ? () => { setUniversityDraft(ministryInfo?.university ?? ""); setEditingUniversity(true) } : undefined}>
-                        <p style={{ fontSize: "14px", color: "var(--body)" }}>{ministryInfo?.university ?? "—"}</p>
-                        {isAdmin && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} />}
-                      </div>
-                    )}
-                    {infoError && <p style={{ fontSize: "12px", color: "var(--danger)", marginTop: 4 }}>{infoError}</p>}
+                    {infoError && <p style={{ fontSize: "12px", color: "var(--danger)", marginTop: 8 }}>{infoError}</p>}
                   </div>
                 </div>
               </section>
@@ -820,17 +1003,27 @@ export function SettingsTab({
                   {/* Discovery */}
                   <div>
                     <div style={{ marginBottom: 16 }}>
-                      <SectionHeader eyebrow="Discovery" title={`Who can find ${ministryInfo?.name ?? ministryName}`} titleSize={20} />
+                      <SectionHeader eyebrow="Discovery" title={`Who can find ${ministryInfo?.name ?? ministryName}`} titleSize={20} action={
+                        <SectionEditControls editing={discoveryEditing} dirty={discoveryDirty} saving={toggling} saved={discoverySaved} disabled={!isAdmin}
+                          onEdit={startDiscoveryEdit} onCancel={() => { setDiscoveryEditing(false); setDiscoveryError(null) }} onSave={() => setDiscoveryConfirmOpen(true)} />
+                      } />
                     </div>
-                    <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
-                      <button onClick={isAdmin ? handleToggle : undefined} disabled={toggling || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: isPublic ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
-                        <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(isPublic ? { right: 2 } : { left: 2 }) }} />
-                      </button>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Public discovery</div>
-                        <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>{isPublic ? "Anyone can find and join without an invite code." : "Invite-only — code required to join."}</div>
-                      </div>
-                    </div>
+                    {(() => {
+                      const shown = discoveryEditing ? discoveryDraft : isPublic
+                      const locked = !discoveryEditing
+                      return (
+                        <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
+                          <button onClick={discoveryEditing ? () => setDiscoveryDraft(v => !v) : undefined} disabled={locked} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: shown ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: locked ? "default" : "pointer", padding: 0, opacity: locked ? 0.6 : 1 }}>
+                            <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(shown ? { right: 2 } : { left: 2 }) }} />
+                          </button>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Public discovery</div>
+                            <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>{shown ? "Anyone can find and join without an invite code." : "Invite-only — code required to join."}</div>
+                            {discoveryError && <div style={{ marginTop: 6, fontSize: 12, color: "var(--danger)" }}>{discoveryError}</div>}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Schools */}
@@ -873,7 +1066,12 @@ export function SettingsTab({
               {isAdmin && (
                 <section>
                   <div style={{ marginBottom: 16 }}>
-                    <SectionHeader eyebrow="Giving" title="Offering info" titleSize={20} action={isAdmin && !editingGiving && (givingSaved.name || givingSaved.info) ? (<button onClick={() => { setGivingName(givingSaved.name); setGivingInfo(givingSaved.info); setGivingError(null); setEditingGiving(true) }} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>Edit</button>) : undefined} />
+                    <SectionHeader eyebrow="Giving" title="Offering info" titleSize={20} action={
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+                        <SavedTick show={givingSaveMsg} />
+                        {isAdmin && !editingGiving && (givingSaved.name || givingSaved.info) ? (<button onClick={() => { setGivingName(givingSaved.name); setGivingInfo(givingSaved.info); setGivingError(null); setEditingGiving(true) }} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>Edit</button>) : null}
+                      </div>
+                    } />
                     <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>The Zelle destination members see on the Give tab. The recipient name lets givers confirm they&apos;re sending to the right place.</p>
                   </div>
                   <div style={{ ...CARD, padding: "20px 22px", maxWidth: 520 }}>
@@ -903,7 +1101,7 @@ export function SettingsTab({
                           <p style={{ fontSize: 12, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase", margin: 0 }}>Zelle email or phone</p>
                           <p style={{ fontSize: 14, color: "var(--ink)", margin: "5px 0 0" }}>{givingSaved.info || <span style={{ color: "var(--muted-text)" }}>Not set</span>}</p>
                         </div>
-                        {givingSaveMsg && <p style={{ fontSize: 13, color: "var(--plum)", margin: 0 }}>Saved ✓</p>}
+                        {givingSaveMsg && <SavedTick show={givingSaveMsg} />}
                       </div>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
@@ -1117,7 +1315,7 @@ export function SettingsTab({
                             <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "var(--cream-panel)", borderRadius: 12, border: "1px solid var(--line)", padding: "6px 0", minWidth: 160 }}>
                               <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "var(--muted-text)", padding: "4px 12px 6px", textTransform: "uppercase", letterSpacing: "1.2px", fontWeight: 400, margin: 0 }}>Set role</p>
                               {(["visitor", "member", "leader", "admin", "deacon", "elder", "pastor"] as const).map(r => (
-                                <button key={r} onClick={async () => { setPeopleChangingRole(m.id); setPeopleRoleMenuOpen(null); await handleRoleChange(m.id, r); setPeopleChangingRole(null) }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "var(--plum)" : "var(--ink)", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
+                                <button key={r} onClick={() => { setPeopleRoleMenuOpen(null); if (m.role.toLowerCase() !== r) setRoleChangeConfirm({ memberId: m.id, name: m.name, currentRole: m.role, newRole: r }) }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "var(--plum)" : "var(--ink)", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
                                   {r.charAt(0).toUpperCase() + r.slice(1)}
                                   {m.role.toLowerCase() === r && <Check style={{ width: 14, height: 14, color: "var(--plum)" }} />}
                                 </button>
@@ -1185,30 +1383,39 @@ export function SettingsTab({
               )}
 
               {/* ── Governance roster ── */}
+              {(() => {
+                const gAllAdmins = govEditing && govDraft ? govDraft.all_admins : governanceSettings.all_admins
+                const rosterIncluded = (id: string) => (govEditing && govDraft ? govDraft.roster_ids : governanceSettings.roster_ids).includes(id)
+                const teamAccessOf = (team: GovTeamRow) => govEditing && govDraft ? govDraft.teamAccess[team.id] : team.admin_access
+                return (
+              <>
               <section>
                 <div style={{ marginBottom: 20 }}>
-                  <SectionHeader eyebrow="Governance" title="Who governs teams" titleSize={20} />
+                  <SectionHeader eyebrow="Governance" title="Who governs teams" titleSize={20} action={
+                    <SectionEditControls editing={govEditing} dirty={govDirty} saving={govSaving} saved={govSaved} disabled={!isAdmin}
+                      onEdit={startGovEdit} onCancel={cancelGovEdit} onSave={() => setGovConfirmOpen(true)} />
+                  } />
                   <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Governance is oversight of teams they aren&apos;t members of — viewing or acting on a team&apos;s roster and work. Church Settings itself stays open to every admin regardless of this list.</p>
                 </div>
 
                 <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
-                  <button onClick={handleToggleAllAdmins} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: governanceSettings.all_admins ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
-                    <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(governanceSettings.all_admins ? { right: 2 } : { left: 2 }) }} />
+                  <button onClick={govEditing ? draftToggleAllAdmins : undefined} disabled={!govEditing} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: gAllAdmins ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: govEditing ? "pointer" : "default", padding: 0, opacity: govEditing ? 1 : 0.6 }}>
+                    <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(gAllAdmins ? { right: 2 } : { left: 2 }) }} />
                   </button>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>All admins can govern teams</div>
-                    <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>{governanceSettings.all_admins ? "Every admin-tier member governs teams per the access matrix below." : "Only the people you select below govern teams."}</div>
+                    <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>{gAllAdmins ? "Every admin-tier member governs teams per the access matrix below." : "Only the people you select below govern teams."}</div>
                   </div>
                 </div>
 
-                {!governanceSettings.all_admins && (
+                {!gAllAdmins && (
                   <div style={{ marginTop: 16 }}>
                     <p style={{ ...SECTION_LABEL, marginBottom: 10 }}>Governing roster</p>
                     <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
                       {adminMembers.length === 0 ? (
                         <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "20px 22px", textAlign: "center" }}>No admin-tier members to choose from.</p>
                       ) : adminMembers.map((m, i) => {
-                        const included = governanceSettings.roster_ids.includes(m.id)
+                        const included = rosterIncluded(m.id)
                         return (
                           <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 22px", borderBottom: i < adminMembers.length - 1 ? "1px solid var(--line-3)" : "none" }}>
                             <MonogramChip initials={getInitials(m.name)} className="w-9 h-9 text-[13px] font-medium" />
@@ -1217,7 +1424,7 @@ export function SettingsTab({
                               <div style={{ marginTop: 2, fontSize: 13, color: "var(--muted-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
                             </div>
                             {roleBadge(m.role)}
-                            <button onClick={() => handleToggleRosterMember(m.id)} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: included ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: "pointer", padding: 0 }}>
+                            <button onClick={govEditing ? () => draftToggleRoster(m.id) : undefined} disabled={!govEditing} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: included ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: govEditing ? "pointer" : "default", padding: 0, opacity: govEditing ? 1 : 0.6 }}>
                               <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(included ? { right: 2 } : { left: 2 }) }} />
                             </button>
                           </div>
@@ -1255,11 +1462,11 @@ export function SettingsTab({
                         <PlanLineIcon iconKey={teamIconKey(team)} bg="transparent" fg="var(--plum)" size={20} radius={0} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{team.name}</div>
-                      <div style={{ display: "inline-flex", border: "1px solid var(--line-2)", borderRadius: 999, padding: 2, background: "var(--ivory)", flexShrink: 0 }}>
+                      <div style={{ display: "inline-flex", border: "1px solid var(--line-2)", borderRadius: 999, padding: 2, background: "var(--ivory)", flexShrink: 0, opacity: govEditing ? 1 : 0.6 }}>
                         {(["none", "view", "write"] as const).map(opt => {
-                          const active = team.admin_access === opt
+                          const active = teamAccessOf(team) === opt
                           return (
-                            <button key={opt} onClick={() => handleTeamAccessChange(team.id, opt)} style={{ padding: "5px 14px", borderRadius: 999, border: "none", background: active ? "var(--plum)" : "transparent", color: active ? "var(--cream-panel)" : "var(--body)", fontSize: 12, fontWeight: active ? 500 : 400, cursor: "pointer", fontFamily: "var(--font-inter)" }}>
+                            <button key={opt} onClick={govEditing ? () => draftTeamAccess(team.id, opt) : undefined} disabled={!govEditing} style={{ padding: "5px 14px", borderRadius: 999, border: "none", background: active ? "var(--plum)" : "transparent", color: active ? "var(--cream-panel)" : "var(--body)", fontSize: 12, fontWeight: active ? 500 : 400, cursor: govEditing ? "pointer" : "default", fontFamily: "var(--font-inter)" }}>
                               {opt.charAt(0).toUpperCase() + opt.slice(1)}
                             </button>
                           )
@@ -1269,6 +1476,9 @@ export function SettingsTab({
                   ))}
                 </div>
               </section>
+              </>
+                )
+              })()}
             </div>
           )}
 
@@ -1276,7 +1486,10 @@ export function SettingsTab({
           {activeSettingsTab === "automations" && (
             <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
               <div>
-                <SectionHeader eyebrow="Automations" title="Chat & membership rules" titleSize={20} />
+                <SectionHeader eyebrow="Automations" title="Chat & membership rules" titleSize={20} action={
+                  <SectionEditControls editing={automationsEditing} dirty={hasAutomationChanges} saving={savingAutomations} saved={automationsSaved} disabled={!isAdmin}
+                    onEdit={startAutomationsEdit} onCancel={cancelAutomationsEdit} onSave={() => setAutomationsConfirmOpen(true)} />
+                } />
                 <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", maxWidth: 640, lineHeight: 1.55 }}>Behind-the-scenes rules that keep chats current and new members in the right rooms. Changes take effect when you save.</p>
               </div>
 
@@ -1289,10 +1502,11 @@ export function SettingsTab({
                   { key: "auto_staff_chat",   label: "Staff chat",                                                                            sub: "Pastors, deacons, and elders are auto-added to a private staff chat when they join. Off by default." },
                 ] as { key: string; label: string; sub: string }[]).map(({ key, label, sub }) => {
                   const on = isToggleOn(key, pendingAutomationSettings)
-                  const changed = isToggleOn(key, pendingAutomationSettings) !== isToggleOn(key, automationSettings)
+                  const changed = automationsEditing && isToggleOn(key, pendingAutomationSettings) !== isToggleOn(key, automationSettings)
+                  const locked = !automationsEditing || !isAdmin
                   return (
                     <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, outline: changed ? "2px solid var(--plum)" : "none", outlineOffset: -2 }}>
-                      <button onClick={() => handleAutomationToggle(key)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                      <button onClick={() => handleAutomationToggle(key)} disabled={locked} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: locked ? "default" : "pointer", padding: 0, opacity: locked ? 0.6 : 1 }}>
                         <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(on ? { right: 2 } : { left: 2 }) }} />
                       </button>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1328,37 +1542,7 @@ export function SettingsTab({
                 </div>
               </div>
 
-              {/* Archive warning */}
-              {showArchiveWarning && (
-                <div style={{ ...CARD, padding: 20, borderColor: "color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 8%, transparent)" }}>
-                  <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                    <AlertTriangle style={{ width: 18, height: 18, color: "var(--danger)", flexShrink: 0, marginTop: 1 }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginBottom: 6 }}>This will archive chats</div>
-                      <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.55, marginBottom: 14 }}>
-                        Turning these off will archive: <strong>{pendingArchiveLabels.join(", ")}</strong>. Members will lose access from their active list.
-                      </div>
-                      <div style={{ display: "flex", gap: 10 }}>
-                        <button onClick={() => setShowArchiveWarning(false)} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Cancel</button>
-                        <button onClick={commitSaveAutomations} disabled={savingAutomations} style={{ padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--danger)", color: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
-                          {savingAutomations ? "Saving…" : "Archive & Save"}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Save / discard bar */}
-              {hasAutomationChanges && !showArchiveWarning && (
-                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
-                  <button onClick={() => setPendingAutomationSettings(automationSettings)} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Discard</button>
-                  <button onClick={handleSaveAutomations} disabled={savingAutomations} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 500, cursor: savingAutomations ? "not-allowed" : "pointer", opacity: savingAutomations ? 0.6 : 1 }}>
-                    {savingAutomations ? "Saving…" : "Save changes"}
-                  </button>
-                </div>
-              )}
-
+              {/* Progress message during a running save (e.g. retroactive member add) */}
               {automationSaveMsg && (
                 <div style={{ padding: "10px 16px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontSize: 13, color: "var(--body)" }}>
                   {automationSaveMsg}
@@ -1399,13 +1583,16 @@ export function SettingsTab({
           {activeSettingsTab === "chat" && (
             <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
               <div>
-                <SectionHeader eyebrow="Chat" title="Chat moderation" titleSize={20} />
+                <SectionHeader eyebrow="Chat" title="Chat moderation" titleSize={20} action={
+                  <SectionEditControls editing={moderationEditing} dirty={hasModerationChanges} saving={savingModeration} saved={moderationSaved} disabled={!isAdmin}
+                    onEdit={startModerationEdit} onCancel={cancelModerationEdit} onSave={() => setModerationConfirmOpen(true)} />
+                } />
                 <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", maxWidth: 640, lineHeight: 1.55 }}>Screen messages for profanity and slurs before they send. Choose how flagged language is handled, how strict the filter is, and which chats it covers.</p>
               </div>
 
               {/* Enable toggle */}
               <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
-                <button onClick={() => setModField("enabled", !pendingModerationSettings.enabled)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.enabled ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                <button onClick={() => setModField("enabled", !pendingModerationSettings.enabled)} disabled={!moderationEditing || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.enabled ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: (!moderationEditing || !isAdmin) ? "default" : "pointer", padding: 0, opacity: (!moderationEditing || !isAdmin) ? 0.6 : 1 }}>
                   <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(pendingModerationSettings.enabled ? { right: 2 } : { left: 2 }) }} />
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1422,7 +1609,7 @@ export function SettingsTab({
                     <p style={{ ...SECTION_LABEL, marginBottom: 10 }}>Behavior</p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       {([{ v: "asterisk_first", l: "Soften (s***)" }, { v: "asterisk_all", l: "Censor (****)" }, { v: "block", l: "Block send" }] as { v: ModBehavior; l: string }[]).map((o) => (
-                        <FilterChip key={o.v} tone="ivory" selected={pendingModerationSettings.behavior === o.v} disabled={!isAdmin} onClick={() => setModField("behavior", o.v)}>{o.l}</FilterChip>
+                        <FilterChip key={o.v} tone="ivory" selected={pendingModerationSettings.behavior === o.v} disabled={!moderationEditing || !isAdmin} onClick={() => setModField("behavior", o.v)}>{o.l}</FilterChip>
                       ))}
                     </div>
                     <p style={{ marginTop: 8, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>How flagged words are handled. Block prevents the message from sending at all.</p>
@@ -1433,7 +1620,7 @@ export function SettingsTab({
                     <p style={{ ...SECTION_LABEL, marginBottom: 10 }}>Strictness</p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       {([{ v: "lenient", l: "Lenient" }, { v: "moderate", l: "Moderate" }, { v: "strict", l: "Strict" }] as { v: ModStrictness; l: string }[]).map((o) => (
-                        <FilterChip key={o.v} tone="ivory" selected={pendingModerationSettings.strictness === o.v} disabled={!isAdmin} onClick={() => setModField("strictness", o.v)}>{o.l}</FilterChip>
+                        <FilterChip key={o.v} tone="ivory" selected={pendingModerationSettings.strictness === o.v} disabled={!moderationEditing || !isAdmin} onClick={() => setModField("strictness", o.v)}>{o.l}</FilterChip>
                       ))}
                     </div>
                     <p style={{ marginTop: 8, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Lenient flags only slurs and hate terms; Moderate adds strong profanity; Strict adds crude and borderline words.</p>
@@ -1444,7 +1631,7 @@ export function SettingsTab({
                     <p style={{ ...SECTION_LABEL, marginBottom: 10 }}>Scope</p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       {([{ v: "all", l: "All chats" }, { v: "church", l: "Church chats" }, { v: "personal", l: "Personal chats" }, { v: "ministry", l: "Ministry chat" }] as { v: ModScope; l: string }[]).map((o) => (
-                        <FilterChip key={o.v} tone="ivory" selected={pendingModerationSettings.scope === o.v} disabled={!isAdmin} onClick={() => setModField("scope", o.v)}>{o.l}</FilterChip>
+                        <FilterChip key={o.v} tone="ivory" selected={pendingModerationSettings.scope === o.v} disabled={!moderationEditing || !isAdmin} onClick={() => setModField("scope", o.v)}>{o.l}</FilterChip>
                       ))}
                     </div>
                     <p style={{ marginTop: 8, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Which conversations the filter covers. Ministry chat = the default chat everyone&apos;s in.</p>
@@ -1454,7 +1641,7 @@ export function SettingsTab({
 
               {/* Reverent capitalization — independent of the language filter */}
               <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
-                <button onClick={() => setModField("reverent_caps", !pendingModerationSettings.reverent_caps)} disabled={!isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.reverent_caps ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: isAdmin ? "pointer" : "not-allowed", padding: 0, opacity: !isAdmin ? 0.5 : 1 }}>
+                <button onClick={() => setModField("reverent_caps", !pendingModerationSettings.reverent_caps)} disabled={!moderationEditing || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.reverent_caps ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: (!moderationEditing || !isAdmin) ? "default" : "pointer", padding: 0, opacity: (!moderationEditing || !isAdmin) ? 0.6 : 1 }}>
                   <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(pendingModerationSettings.reverent_caps ? { right: 2 } : { left: 2 }) }} />
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1479,16 +1666,6 @@ export function SettingsTab({
                   </div>
                 </div>
               </div>
-
-              {/* Save / discard bar */}
-              {hasModerationChanges && (
-                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10 }}>
-                  <button onClick={() => setPendingModerationSettings(moderationSettings)} disabled={!isAdmin} style={{ padding: "9px 18px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: isAdmin ? "pointer" : "not-allowed", opacity: !isAdmin ? 0.5 : 1 }}>Discard</button>
-                  <button onClick={handleSaveModeration} disabled={savingModeration || !isAdmin} style={{ padding: "9px 18px", borderRadius: 10, border: "none", background: "var(--plum-2)", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 500, cursor: savingModeration || !isAdmin ? "not-allowed" : "pointer", opacity: savingModeration || !isAdmin ? 0.6 : 1 }}>
-                    {savingModeration ? "Saving…" : "Save changes"}
-                  </button>
-                </div>
-              )}
 
               {moderationSaveMsg && (
                 <div style={{ padding: "10px 16px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontSize: 13, color: "var(--body)" }}>
@@ -1729,6 +1906,116 @@ export function SettingsTab({
         onConfirm={() => { const l = confirmDeleteLimit; setConfirmDeleteLimit(null); if (l) handleDeleteLimit(l.id) }}
         onClose={() => setConfirmDeleteLimit(null)}
       />
+
+      {/* ── Profile save confirm ── */}
+      {profileConfirmOpen && ministryInfo && (
+        <CentralModal
+          onClose={() => setProfileConfirmOpen(false)}
+          eyebrow="Confirm changes"
+          title="Save profile changes?"
+          maxWidth={440}
+          footer={<ConfirmFooter onCancel={() => setProfileConfirmOpen(false)} onConfirm={confirmProfileSave} saving={savingInfo} />}
+        >
+          <ChangeSummary>
+            {profileDraft.name.trim() !== (ministryInfo.name ?? "") && <ChangeRow label="Ministry name" from={ministryInfo.name || "—"} to={profileDraft.name.trim() || "—"} />}
+            {profileDraft.university.trim() !== (ministryInfo.university ?? "") && <ChangeRow label="School" from={ministryInfo.university || "—"} to={profileDraft.university.trim() || "—"} />}
+          </ChangeSummary>
+        </CentralModal>
+      )}
+
+      {/* ── Discovery save confirm ── */}
+      {discoveryConfirmOpen && (
+        <CentralModal
+          onClose={() => setDiscoveryConfirmOpen(false)}
+          eyebrow="Confirm changes"
+          title="Save discovery changes?"
+          maxWidth={440}
+          footer={<ConfirmFooter onCancel={() => setDiscoveryConfirmOpen(false)} onConfirm={confirmDiscoverySave} saving={toggling} />}
+        >
+          <ChangeSummary>
+            <ChangeRow label="Ministry visibility" from={isPublic ? "public" : "private"} to={discoveryDraft ? "public" : "private"} />
+            <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+              {discoveryDraft ? "Your ministry will appear in Browse — anyone can find and join without an invite code." : "Your ministry will be hidden from Browse — an invite code will be required to join."}
+            </p>
+          </ChangeSummary>
+        </CentralModal>
+      )}
+
+      {/* ── Governance save confirm ── */}
+      {govConfirmOpen && govDraft && (
+        <CentralModal
+          onClose={() => setGovConfirmOpen(false)}
+          eyebrow="Confirm changes"
+          title="Save governance changes?"
+          maxWidth={460}
+          footer={<ConfirmFooter onCancel={() => setGovConfirmOpen(false)} onConfirm={confirmGovSave} saving={govSaving} />}
+        >
+          <ChangeSummary>
+            {govAllAdminsChanged && (
+              <ChangeRow label="Governance roster" from={governanceSettings.all_admins ? "all admins" : `curated (${governanceSettings.roster_ids.length})`} to={govDraft.all_admins ? "all admins" : `curated (${govDraft.roster_ids.length} admin${govDraft.roster_ids.length === 1 ? "" : "s"})`} />
+            )}
+            {!govAllAdminsChanged && govRosterChanged && (
+              <ChangeRow label="Governing roster" from={`${governanceSettings.roster_ids.length} selected`} to={`${govDraft.roster_ids.length} selected`} />
+            )}
+            {govTeams.filter(t => govDraft.teamAccess[t.id] !== t.admin_access).map(t => (
+              <ChangeRow key={t.id} label={`Admin access — ${t.name}`} from={t.admin_access} to={govDraft.teamAccess[t.id]} />
+            ))}
+          </ChangeSummary>
+        </CentralModal>
+      )}
+
+      {/* ── Automations save confirm (archive warning folded in) ── */}
+      {automationsConfirmOpen && (
+        <CentralModal
+          onClose={() => { if (!savingAutomations) setAutomationsConfirmOpen(false) }}
+          eyebrow="Confirm changes"
+          title="Save automation changes?"
+          maxWidth={460}
+          footer={<ConfirmFooter onCancel={() => setAutomationsConfirmOpen(false)} onConfirm={commitSaveAutomations} saving={savingAutomations} confirmLabel={automationArchiveLabels().length > 0 ? "Archive & save" : "Confirm & save"} danger={automationArchiveLabels().length > 0} />}
+        >
+          <ChangeSummary>
+            {automationDeltas().map(d => <ChangeRow key={d.key} label={d.label} from={d.from} to={d.to} />)}
+            {automationArchiveLabels().length > 0 && (
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 4, padding: "12px 14px", borderRadius: 10, border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 8%, transparent)" }}>
+                <AlertTriangle style={{ width: 16, height: 16, color: "var(--danger)", flexShrink: 0, marginTop: 1 }} />
+                <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
+                  This will archive: <strong style={{ color: "var(--ink)" }}>{automationArchiveLabels().join(", ")}</strong>. Members will lose access from their active list.
+                </div>
+              </div>
+            )}
+          </ChangeSummary>
+        </CentralModal>
+      )}
+
+      {/* ── Moderation save confirm ── */}
+      {moderationConfirmOpen && (
+        <CentralModal
+          onClose={() => { if (!savingModeration) setModerationConfirmOpen(false) }}
+          eyebrow="Confirm changes"
+          title="Save chat moderation changes?"
+          maxWidth={460}
+          footer={<ConfirmFooter onCancel={() => setModerationConfirmOpen(false)} onConfirm={handleSaveModeration} saving={savingModeration} />}
+        >
+          <ChangeSummary>
+            {moderationDeltas().map((d, i) => <ChangeRow key={i} label={d.label} from={d.from} to={d.to} />)}
+          </ChangeSummary>
+        </CentralModal>
+      )}
+
+      {/* ── Role change confirm ── */}
+      {roleChangeConfirm && (
+        <CentralModal
+          onClose={() => setRoleChangeConfirm(null)}
+          eyebrow="Confirm role change"
+          title={`Change ${roleChangeConfirm.name}’s role?`}
+          maxWidth={420}
+          footer={<ConfirmFooter onCancel={() => setRoleChangeConfirm(null)} onConfirm={confirmRoleChange} saving={false} confirmLabel="Change role" />}
+        >
+          <ChangeSummary>
+            <ChangeRow label={roleChangeConfirm.name} from={CAP(roleChangeConfirm.currentRole.toLowerCase())} to={CAP(roleChangeConfirm.newRole)} />
+          </ChangeSummary>
+        </CentralModal>
+      )}
     </div>
   )
 }
