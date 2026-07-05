@@ -8,6 +8,7 @@ import { createGroup } from "@/app/actions/create-group"
 import { EmptyState } from "../components/shared"
 import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, SubpageShell } from "@/components/central"
 import { getInitials } from "../utils"
+import { roleLabel } from "@/app/actions/super-constants"
 import type { DirectoryMember, DirectoryMemberDetail } from "../types"
 
 // Shared directory fetcher — both the desktop panel and the mobile list key on
@@ -143,7 +144,7 @@ export function DirectoryMemberListPanel({
                   <p className="text-[11px] truncate leading-tight mt-0.5" style={{ color: "var(--muted-text)" }}>
                     {member.graduation_year ? `'${String(member.graduation_year).slice(2)}` : ""}
                     {member.graduation_year && member.role ? " · " : ""}
-                    {member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : ""}
+                    {roleLabel(member.role, member.id)}
                   </p>
                 </div>
               </button>
@@ -302,7 +303,7 @@ export function DirectoryTab({
                       {member.graduation_year && <span className="text-[11px] font-medium" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
                       {member.role && (
                         <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-[var(--cream)] text-[var(--muted-text)] border-[var(--dashed)]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
-                          {member.role}
+                          {roleLabel(member.role, member.id)}
                         </span>
                       )}
                     </div>
@@ -398,7 +399,7 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
   const infoRows = [
     { label: "EMAIL", value: detail?.email || null },
     { label: "PHONE", value: detail?.phone || null },
-    { label: "ROLE", value: member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : null },
+    { label: "ROLE", value: roleLabel(member.role, member.id) || null },
     { label: "CLASS", value: member.graduation_year ? `Class of ${member.graduation_year}` : null },
   ].filter(r => r.value)
 
@@ -421,7 +422,7 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
       <p style={{ fontSize: 13.5, color: "var(--muted-text)", margin: "0 0 28px", textAlign: "center" }}>
         {[
           member.graduation_year ? `Class of ${member.graduation_year}` : null,
-          member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : null,
+          roleLabel(member.role, member.id) || null,
         ].filter(Boolean).join(" · ")}
       </p>
       <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "-16px 0 28px", textAlign: "center", maxWidth: 360, lineHeight: 1.45 }}>
@@ -583,7 +584,7 @@ export function MemberSheet({
               )}
               {member.role && (
                 <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-[var(--cream)] text-[var(--muted-text)] border-[var(--dashed)]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
-                  {member.role}
+                  {roleLabel(member.role, member.id)}
                 </span>
               )}
               {isOwnProfile && (

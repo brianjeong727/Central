@@ -9,6 +9,7 @@ import { ChatsSection } from "@/components/ui/chats-section"
 import { RingCrossLogo, EYEBROW_STYLE } from "../components/shared"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
+import { roleLabel } from "@/app/actions/super-constants"
 import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton } from "@/components/central"
 import type { HeroSlide } from "@/components/central"
 // Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
@@ -110,7 +111,7 @@ export function HomeTab({
   const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
   const top3 = recentChats.slice(0, 3)
   const totalUnread = top3.reduce((s, c) => s + c.unreadCount, 0)
-  const roleLabel = userRole.charAt(0).toUpperCase() + userRole.slice(1).toLowerCase()
+  const roleLabelText = roleLabel(userRole, profile.id)
   const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
   const firstName = profile.name.split(" ")[0]
   const hour = new Date().getHours()
@@ -121,7 +122,7 @@ export function HomeTab({
   const greetingNode = (
     <>
       <span className="greeting-sheen">{greetingPrefix}</span>
-      <span className="greeting-sheen greeting-sheen-plum">{roleLabel}</span>
+      <span className="greeting-sheen greeting-sheen-plum">{roleLabelText}</span>
       <span className="greeting-sheen">{" " + firstName}</span>
     </>
   )

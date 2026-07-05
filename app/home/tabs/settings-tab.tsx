@@ -31,6 +31,7 @@ import { MODERATION_DEFAULTS } from "@/lib/moderation"
 import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@/lib/moderation"
 import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
+import { roleLabel } from "@/app/actions/super-constants"
 import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton } from "@/components/central"
 import { useNavState } from "../nav-state"
 
@@ -68,12 +69,12 @@ const ROLE_STYLE: Record<string, { bg: string; color: string; border: string; la
   visitor: { bg: "var(--cream)", color: "var(--muted-text)", border: "var(--dashed)",       label: "Visitor" },
 }
 
-function roleBadge(role: string) {
+function roleBadge(role: string, personId?: string | null) {
   const r = role.toLowerCase()
   const s = ROLE_STYLE[r] ?? ROLE_STYLE.member
   return (
     <span style={{ fontSize: "11px", fontWeight: 500, padding: "4px 10px", borderRadius: 999, background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap" }}>
-      {s.label}
+      {roleLabel(role, personId)}
     </span>
   )
 }
@@ -1304,7 +1305,7 @@ export function SettingsTab({
                         </div>
                         <div style={{ marginTop: 2, fontSize: 13, color: "var(--muted-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
                       </div>
-                      {peopleChangingRole === m.id ? <span style={{ fontSize: 11, color: "var(--muted-text)" }}>Saving…</span> : roleBadge(m.role)}
+                      {peopleChangingRole === m.id ? <span style={{ fontSize: 11, color: "var(--muted-text)" }}>Saving…</span> : roleBadge(m.role, m.id)}
                       {isAdmin && !isMe && (
                         <div style={{ position: "relative" }}>
                           {menuOpen && <div className="fixed inset-0 z-[5] md:left-[var(--shell-offset)]" onClick={() => setPeopleRoleMenuOpen(null)} />}
@@ -1423,7 +1424,7 @@ export function SettingsTab({
                               <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{m.name}</div>
                               <div style={{ marginTop: 2, fontSize: 13, color: "var(--muted-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
                             </div>
-                            {roleBadge(m.role)}
+                            {roleBadge(m.role, m.id)}
                             <button onClick={govEditing ? () => draftToggleRoster(m.id) : undefined} disabled={!govEditing} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: included ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: govEditing ? "pointer" : "default", padding: 0, opacity: govEditing ? 1 : 0.6 }}>
                               <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(included ? { right: 2 } : { left: 2 }) }} />
                             </button>
