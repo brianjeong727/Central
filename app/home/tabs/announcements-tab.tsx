@@ -2,28 +2,21 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import useSWR from "swr"
-import { ArrowLeft, ChevronDown, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, ChevronUp, Pin, PinOff, Users, Eye } from "lucide-react"
+import { ArrowLeft, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE, HeaderActionButton } from "../components/shared"
 import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
-import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee, FieldType } from "../types"
+import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee } from "../types"
 
-// ── Form builder types (local) ────────────────────────────────────────────────
-
-interface DraftField {
-  tempId: string
-  existingId?: string
-  label: string
-  type: FieldType
-  options: string[]
-  required: boolean
+// A form that can be attached to this announcement (standalone or already ours).
+interface AttachableForm {
+  id: string
+  title: string
+  field_count: number
 }
-
-let _tempIdCounter = 0
-function newTempId() { return `draft-${++_tempIdCounter}` }
 
 // Convert a stored ISO timestamp to the local `YYYY-MM-DDTHH:mm` value a
 // <input type="datetime-local"> expects (local time, not UTC).
@@ -71,38 +64,42 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Form builder
-  const [hasForm, setHasForm] = useState(false)
-  const [formFields, setFormFields] = useState<DraftField[]>([])
-  const [existingFormId, setExistingFormId] = useState<string | null>(null)
+  // Form attachment (forms are first-class objects now — built in the Forms tab,
+  // attached here). A form belongs to 0-or-1 announcement.
+  const [attachedFormId, setAttachedFormId] = useState<string | null>(null)
+  const [initialFormId, setInitialFormId] = useState<string | null>(null)
+  const [availableForms, setAvailableForms] = useState<AttachableForm[]>([])
 
-  // Load existing form when editing
+  // Load attachable forms: unarchived + (unattached OR already attached to THIS
+  // announcement when editing). Prime the current attachment on the edit path.
   useEffect(() => {
-    if (!isEditing || !existing) return
-    async function loadExistingForm() {
-      const { data: formData } = await supabase
+    async function loadForms() {
+      let q = supabase
         .from("announcement_forms")
-        .select("id")
-        .eq("announcement_id", existing!.id)
-        .maybeSingle()
-      if (!formData) return
-      setExistingFormId(formData.id)
-      setHasForm(true)
-      const { data: fieldData } = await supabase
-        .from("form_fields")
-        .select("*")
-        .eq("form_id", formData.id)
-        .order("order_index")
-      setFormFields((fieldData ?? []).map(f => ({
-        tempId: newTempId(),
-        existingId: f.id,
-        label: f.label,
-        type: f.type as FieldType,
-        options: Array.isArray(f.options) ? f.options : [],
-        required: f.required ?? false,
-      })))
+        .select("id, title, announcement_id")
+        .eq("ministry_id", ministryId)
+        .eq("archived", false)
+      if (isEditing && existing) q = q.or(`announcement_id.is.null,announcement_id.eq.${existing.id}`)
+      else q = q.is("announcement_id", null)
+      const { data: forms } = await q
+      const formList = forms ?? []
+
+      const formIds = formList.map(f => f.id)
+      const fieldCounts: Record<string, number> = {}
+      if (formIds.length > 0) {
+        const { data: fieldRows } = await supabase.from("form_fields").select("form_id").in("form_id", formIds)
+        for (const r of fieldRows ?? []) fieldCounts[r.form_id] = (fieldCounts[r.form_id] ?? 0) + 1
+      }
+
+      setAvailableForms(formList.map(f => ({ id: f.id, title: f.title ?? "Untitled form", field_count: fieldCounts[f.id] ?? 0 })))
+
+      if (isEditing && existing) {
+        const current = formList.find(f => f.announcement_id === existing.id)
+        setAttachedFormId(current?.id ?? null)
+        setInitialFormId(current?.id ?? null)
+      }
     }
-    loadExistingForm()
+    loadForms()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -169,24 +166,28 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
       resultAnn = data as Announcement
     }
 
-    // Sync form attachment
-    if (hasForm && formFields.length > 0) {
-      let formId = existingFormId
-      if (!formId) {
-        const { data: fd } = await supabase
+    // Reconcile the form attachment by flipping announcement_forms.announcement_id.
+    // No form_fields writes here — fields are owned by the Forms-tab builder.
+    if (attachedFormId !== initialFormId) {
+      // Detach the previously-attached form unconditionally.
+      if (initialFormId) {
+        await supabase.from("announcement_forms").update({ announcement_id: null }).eq("id", initialFormId).eq("ministry_id", ministryId)
+      }
+      // Attach the newly-picked form ONLY if it's still unattached (TOCTOU guard):
+      // the `.is("announcement_id", null)` predicate + affected-row check catches a
+      // form that was grabbed by another announcement between load and save.
+      if (attachedFormId) {
+        const { data: attached } = await supabase
           .from("announcement_forms")
-          .insert({ announcement_id: announcementId, ministry_id: ministryId, created_by: userId })
-          .select().single()
-        formId = fd?.id ?? null
+          .update({ announcement_id: announcementId })
+          .eq("id", attachedFormId).eq("ministry_id", ministryId).is("announcement_id", null)
+          .select("id")
+        if (!attached || attached.length === 0) {
+          setError("That form was just attached to another announcement — pick another.")
+          setSubmitting(false)
+          return
+        }
       }
-      if (formId) {
-        if (existingFormId) await supabase.from("form_fields").delete().eq("form_id", formId)
-        await supabase.from("form_fields").insert(
-          formFields.map((f, i) => ({ form_id: formId, label: f.label, type: f.type, options: f.options, required: f.required, order_index: i }))
-        )
-      }
-    } else if (!hasForm && existingFormId) {
-      await supabase.from("announcement_forms").delete().eq("id", existingFormId)
     }
 
     onSuccess(resultAnn)
@@ -464,112 +465,54 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
           <div style={{ borderTop: "1px solid var(--line)", marginLeft: "24px", marginRight: "24px" }} />
 
-          {/* Form builder */}
+          {/* Attach a form — forms are built in the Forms tab and attached here */}
           <div className="px-6 py-6">
             <div className="flex items-center justify-between mb-1">
               <p style={monoStyle}>Form</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setHasForm(v => !v)
-                  if (!hasForm && formFields.length === 0) {
-                    setFormFields([{ tempId: newTempId(), label: '', type: 'text', options: [], required: false }])
-                  }
-                }}
-                style={{ width: 34, height: 20, borderRadius: 999, background: hasForm ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, transition: "background 0.2s" }}
-              >
-                <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "left 0.2s", left: hasForm ? "16px" : "2px" }} />
-              </button>
-            </div>
-            <p className="text-[12px] text-[var(--muted-text)] mb-4">Attach questions to this announcement</p>
-
-            {hasForm && (
-              <div className="flex flex-col gap-4">
-                {formFields.map((field, idx) => (
-                  <div key={field.tempId} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", background: "var(--ivory)" }}>
-                    {/* Field label */}
-                    <input
-                      type="text"
-                      value={field.label}
-                      onChange={e => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, label: e.target.value } : f))}
-                      placeholder="Question label…"
-                      style={{ width: "100%", fontSize: 13, color: "var(--ink)", background: "transparent", border: "none", outline: "none", borderBottom: "1px solid var(--line-2)", paddingBottom: 6, marginBottom: 10 }}
-                    />
-                    {/* Type pills */}
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {([
-                        { value: 'text', label: 'Text' },
-                        { value: 'multiple_choice', label: 'Multiple' },
-                        { value: 'checkbox', label: 'Checkboxes' },
-                        { value: 'dropdown', label: 'Dropdown' },
-                      ] as { value: FieldType; label: string }[]).map(t => (
-                        <button
-                          key={t.value}
-                          type="button"
-                          onClick={() => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, type: t.value, options: t.value !== 'text' && f.options.length === 0 ? ['Option 1'] : f.options } : f))}
-                          style={{
-                            padding: "3px 9px", borderRadius: 999, fontSize: 11, cursor: "pointer",
-                            border: `1px solid ${field.type === t.value ? "var(--plum)" : "var(--line-2)"}`,
-                            background: field.type === t.value ? "var(--plum)" : "transparent",
-                            color: field.type === t.value ? "var(--cream)" : "var(--body)",
-                          }}
-                        >{t.label}</button>
-                      ))}
-                    </div>
-
-                    {/* Options for choice-based types */}
-                    {field.type !== 'text' && (
-                      <div className="flex flex-col gap-1.5 mb-3">
-                        {field.options.map((opt, oi) => (
-                          <div key={oi} className="flex items-center gap-1.5">
-                            <input
-                              type="text"
-                              value={opt}
-                              onChange={e => setFormFields(prev => prev.map(f => {
-                                if (f.tempId !== field.tempId) return f
-                                const opts = [...f.options]; opts[oi] = e.target.value
-                                return { ...f, options: opts }
-                              }))}
-                              style={{ flex: 1, fontSize: 12, color: "var(--ink)", background: "transparent", border: "none", outline: "none", borderBottom: "1px solid var(--line-2)", paddingBottom: 3 }}
-                              placeholder={`Option ${oi + 1}`}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, options: f.options.filter((_, i) => i !== oi) } : f))}
-                              style={{ width: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "var(--dashed)", flexShrink: 0 }}
-                            ><X style={{ width: 10, height: 10 }} /></button>
-                          </div>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, options: [...f.options, `Option ${f.options.length + 1}`] } : f))}
-                          style={{ fontSize: 11, color: "var(--muted-text)", background: "transparent", border: "none", cursor: "pointer", textAlign: "left", padding: "2px 0", marginTop: 2 }}
-                        >+ Add option</button>
-                      </div>
-                    )}
-
-                    {/* Row: required + reorder + delete */}
-                    <div className="flex items-center justify-between">
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" checked={field.required} onChange={e => setFormFields(prev => prev.map(f => f.tempId === field.tempId ? { ...f, required: e.target.checked } : f))} className="w-3 h-3" />
-                        <span style={{ fontSize: 11, color: "var(--muted-text)" }}>Required</span>
-                      </label>
-                      <div className="flex items-center gap-1">
-                        <button type="button" disabled={idx === 0} onClick={() => setFormFields(prev => { const a = [...prev]; [a[idx-1], a[idx]] = [a[idx], a[idx-1]]; return a })} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "var(--dashed)" : "var(--muted-text)" }}><ChevronUp style={{ width: 12, height: 12 }} /></button>
-                        <button type="button" disabled={idx === formFields.length - 1} onClick={() => setFormFields(prev => { const a = [...prev]; [a[idx], a[idx+1]] = [a[idx+1], a[idx]]; return a })} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: idx === formFields.length - 1 ? "default" : "pointer", color: idx === formFields.length - 1 ? "var(--dashed)" : "var(--muted-text)" }}><ChevronDown style={{ width: 12, height: 12 }} /></button>
-                        <button type="button" onClick={() => setFormFields(prev => prev.filter(f => f.tempId !== field.tempId))} style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "var(--dashed)", marginLeft: 2 }}><Trash2 style={{ width: 11, height: 11 }} /></button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
+              {attachedFormId && (
                 <button
                   type="button"
-                  onClick={() => setFormFields(prev => [...prev, { tempId: newTempId(), label: '', type: 'text', options: [], required: false }])}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, border: "1px dashed var(--dashed)", background: "transparent", color: "var(--muted-text)", fontSize: 12, cursor: "pointer" }}
-                >
-                  <Plus style={{ width: 12, height: 12 }} /> Add question
-                </button>
+                  onClick={() => setAttachedFormId(null)}
+                  style={{ fontSize: 12, color: "var(--muted-text)", background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                >Detach</button>
+              )}
+            </div>
+            <p className="text-[12px] text-[var(--muted-text)] mb-4">Attach a form to collect responses</p>
+
+            {availableForms.length === 0 ? (
+              <p className="text-[12px] text-[var(--muted-text)]">No forms yet — create one in the Forms tab.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {availableForms.map(f => {
+                  const selected = attachedFormId === f.id
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setAttachedFormId(selected ? null : f.id)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10,
+                        cursor: "pointer", textAlign: "left", width: "100%",
+                        border: `1px solid ${selected ? "var(--plum)" : "var(--line-2)"}`,
+                        background: selected ? "var(--plum)" : "var(--ivory)",
+                        color: selected ? "var(--cream-on-dark)" : "var(--ink)",
+                        transition: "all 0.12s",
+                      }}
+                    >
+                      <span style={{
+                        width: 16, height: 16, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                        border: `2px solid ${selected ? "var(--cream-on-dark)" : "var(--dashed)"}`,
+                        background: selected ? "rgba(246,244,239,0.25)" : "transparent",
+                      }}>
+                        {selected && <Check style={{ width: 9, height: 9, color: "var(--cream-on-dark)" }} />}
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span className="line-clamp-1" style={{ fontSize: 13, fontWeight: 500 }}>{f.title}</span>
+                        <span style={{ display: "block", fontSize: 11, color: selected ? "rgba(246,244,239,0.7)" : "var(--muted-text)", marginTop: 1 }}>{f.field_count} question{f.field_count !== 1 ? "s" : ""}</span>
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
