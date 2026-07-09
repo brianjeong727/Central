@@ -219,7 +219,9 @@ function SignupContent() {
     const supabase = createClient()
     const { error: signInError } = await supabase.auth.signInWithPassword({ email: memberEmail, password: memberPassword })
     if (signInError) { setMemberError(signInError.message); setMemberLoading(false); return }
-    window.location.replace("/join")
+    // Land on the polished discovery page (browse + invite code + register), not
+    // the plainer /join. Both serve no-ministry users; /ministries is the canonical UI.
+    window.location.replace("/ministries")
   }
 
   async function handleMemberGoogle() {

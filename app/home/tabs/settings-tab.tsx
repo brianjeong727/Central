@@ -2003,20 +2003,38 @@ export function SettingsTab({
         </CentralModal>
       )}
 
-      {/* ── Role change confirm ── */}
-      {roleChangeConfirm && (
+      {/* ── Role change confirm (extra gravity when demoting YOURSELF) ── */}
+      {roleChangeConfirm && (() => {
+        // Rank: all admin-tier roles are equal (3) — a lateral admin change isn't a
+        // "step down"; leaving admin-tier or dropping to member/visitor is.
+        const RANK: Record<string, number> = { visitor: 0, member: 1, leader: 2, admin: 3, deacon: 3, elder: 3, pastor: 3 }
+        const cur = roleChangeConfirm.currentRole.toLowerCase()
+        const nw = roleChangeConfirm.newRole
+        const isAdminTier = (r: string) => ["admin", "deacon", "elder", "pastor"].includes(r)
+        const selfDemote = roleChangeConfirm.memberId === userId && (RANK[nw] ?? 0) < (RANK[cur] ?? 0)
+        const losesAdmin = selfDemote && isAdminTier(cur) && !isAdminTier(nw)
+        return (
         <CentralModal
           onClose={() => setRoleChangeConfirm(null)}
-          eyebrow="Confirm role change"
-          title={`Change ${roleChangeConfirm.name}’s role?`}
+          eyebrow={selfDemote ? "Step down" : "Confirm role change"}
+          title={selfDemote ? `Demote yourself to ${CAP(nw)}?` : `Change ${roleChangeConfirm.name}’s role?`}
           maxWidth={420}
-          footer={<ConfirmFooter onCancel={() => setRoleChangeConfirm(null)} onConfirm={confirmRoleChange} saving={false} confirmLabel="Change role" />}
+          footer={<ConfirmFooter onCancel={() => setRoleChangeConfirm(null)} onConfirm={confirmRoleChange} saving={false} confirmLabel={selfDemote ? "Yes, demote myself" : "Change role"} />}
         >
           <ChangeSummary>
-            <ChangeRow label={roleChangeConfirm.name} from={CAP(roleChangeConfirm.currentRole.toLowerCase())} to={CAP(roleChangeConfirm.newRole)} />
+            <ChangeRow label={roleChangeConfirm.name} from={CAP(cur)} to={CAP(nw)} />
           </ChangeSummary>
+          {selfDemote && (
+            <p style={{ marginTop: 14, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>
+              You&apos;re lowering your <strong style={{ color: "var(--ink)", fontWeight: 500 }}>own</strong> role.
+              {losesAdmin
+                ? " You’ll immediately lose admin access — settings, member management, and governance — and only another admin can restore it."
+                : " Only an admin can change it back afterward."} Make sure this is intended.
+            </p>
+          )}
         </CentralModal>
-      )}
+        )
+      })()}
     </div>
   )
 }

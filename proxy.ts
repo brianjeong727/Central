@@ -89,12 +89,13 @@ export async function proxy(request: NextRequest) {
     .maybeSingle()
 
   // No ministry yet — allow join/onboarding/public paths; everything else goes to
-  // /join (the unified no-ministry destination: code entry + browse — actionable,
-  // unlike the marketing page). Fresh registrants land on /onboarding straight
-  // from signup, so it stays open here.
+  // /ministries (the polished discovery destination: browse + invite code + register —
+  // actionable, unlike the marketing page). /join stays allowed (it's the code-entry
+  // hand-off target from /ministries), but /ministries is the canonical landing.
+  // Fresh registrants land on /onboarding straight from signup, so it stays open here.
   if (!profile?.ministry_id) {
     if (!pathname.startsWith('/join') && !pathname.startsWith('/onboarding') && !isPublicPath) {
-      return NextResponse.redirect(new URL('/join', request.url))
+      return NextResponse.redirect(new URL('/ministries', request.url))
     }
     return supabaseResponse
   }
