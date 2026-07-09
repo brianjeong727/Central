@@ -13,7 +13,7 @@
 // Any role change / reset calls the super-gated server action, then reloads so a
 // fresh profile fetch drives every gate + RLS with the new role.
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { switchMinistryRole, resetToSuper, getSandboxTeams, switchWorkspaceRole, type SandboxTeam } from "@/app/actions/super"
 import { SUPER_UUID, HOME_ROLE, MINISTRY_ROLES, roleLabel } from "@/app/actions/super-constants"
 
@@ -31,6 +31,18 @@ export function SuperSwitcher({ profile }: { profile: { id: string; role: string
   const [teamsLoading, setTeamsLoading] = useState(false)
   const [selTeamId, setSelTeamId] = useState<string>("")
   const [selRoleId, setSelRoleId] = useState<string>("")
+
+  // Top banner appears on load, then dismisses on the FIRST click anywhere on the
+  // page (the bottom chip stays as the persistent acting-as indicator + reset).
+  // Resets on reload / role switch (which reloads), so it shows again next time.
+  const [bannerDismissed, setBannerDismissed] = useState(false)
+  useEffect(() => {
+    if (profile.id !== SUPER_UUID) return
+    if (profile.role.toLowerCase() === HOME_ROLE || bannerDismissed) return
+    const dismiss = () => setBannerDismissed(true)
+    document.addEventListener("click", dismiss, { once: true, capture: true })
+    return () => document.removeEventListener("click", dismiss, { capture: true } as EventListenerOptions)
+  }, [profile.id, profile.role, bannerDismissed])
 
   // Hard gate on identity — never the role. Rendered nowhere for anyone else.
   if (profile.id !== SUPER_UUID) return null
@@ -99,8 +111,8 @@ export function SuperSwitcher({ profile }: { profile: { id: string; role: string
 
   return (
     <>
-      {/* Slim persistent top banner — only while acting-as. */}
-      {isActingAs && (
+      {/* Slim top banner — while acting-as, until the first click anywhere dismisses it. */}
+      {isActingAs && !bannerDismissed && (
         <div
           role="status"
           style={{
