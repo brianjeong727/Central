@@ -1,7 +1,7 @@
 "use server"
 
 // "Getting started" checklist for admins of a freshly-registered ministry.
-// Backed by ministries.setup_checklist (jsonb: { leaders_invited?, dismissed? }).
+// Backed by ministries.setup_checklist (jsonb: { leaders_invited?, dismissed?, active? }).
 // The card itself lives in components/central/getting-started-card.tsx; the
 // shared types are defined there (components/central is a leaf — app/ depends
 // on it, never the reverse) and imported type-only here.
@@ -18,7 +18,7 @@ import type {
 // ministries are long past setup and shouldn't get a retroactive to-do card.
 const FEATURE_LAUNCH = "2026-07-08"
 
-type ChecklistJson = { leaders_invited?: boolean; dismissed?: boolean }
+type ChecklistJson = { leaders_invited?: boolean; dismissed?: boolean; active?: boolean }
 
 export async function getSetupChecklist(): Promise<SetupChecklistData> {
   const ctx = await requireMinistryMember()
@@ -36,10 +36,15 @@ export async function getSetupChecklist(): Promise<SetupChecklistData> {
     .eq("id", ministryId)
     .maybeSingle()
   if (!ministry) return { eligible: false }
-  if (new Date(ministry.created_at) < new Date(FEATURE_LAUNCH)) return { eligible: false }
 
   const checklist = (ministry.setup_checklist ?? {}) as ChecklistJson
+  // Dismissal always wins (until an admin explicitly re-activates the guide).
   if (checklist.dismissed) return { eligible: false }
+  // Eligible when the ministry is new enough OR an admin explicitly turned the
+  // guide on from Church Settings (activateSetupChecklist) — lets old
+  // ministries opt in.
+  const newEnough = new Date(ministry.created_at) >= new Date(FEATURE_LAUNCH)
+  if (!newEnough && checklist.active !== true) return { eligible: false }
 
   // Same-ministry reads through the caller's own client where RLS allows
   // (profiles / announcements / ministry_giving are all readable by ministry
@@ -124,4 +129,10 @@ export async function setLeadersInvited(done: boolean): Promise<{ error: string 
 
 export async function dismissSetupChecklist(): Promise<{ error: string | null }> {
   return mergeChecklist({ dismissed: true })
+}
+
+// Explicit admin opt-in from Church Settings — makes the guide visible on Home
+// for ministries created before FEATURE_LAUNCH (and clears any prior dismissal).
+export async function activateSetupChecklist(): Promise<{ error: string | null }> {
+  return mergeChecklist({ active: true, dismissed: false })
 }
