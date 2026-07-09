@@ -34,6 +34,8 @@ export {
   ProfileTabSkeleton,
 } from "./skeletons"
 export { CentralModal } from "./central-modal"
+export { GettingStartedCard } from "./getting-started-card"
+export type { SetupChecklistData, SetupChecklistEligible, SetupChecklistItem, SetupChecklistItemKey } from "./getting-started-card"
 export { ConfirmDialog } from "./confirm-dialog"
 export { ReadOnlyMat, ReadOnlyPill } from "./read-only-mat"
 export { SuperSwitcher } from "./super-switcher"

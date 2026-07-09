@@ -295,6 +295,9 @@ export interface HomeTabProps {
   onOpenChat: (id: string, name: string, type?: string) => void
   onGoToProfile: () => void
   onOpenAnnouncement: (id: string) => void
+  // Getting-started checklist deep-links (give / plan). Wired to the shell's
+  // handleNavClick so navigation stays one atomic param replace.
+  onGoToTab?: (tab: "give" | "plan") => void
   avatarUrl?: string | null
   activeQuestion?: CongregationQuestion | null
   hasResponded?: boolean
