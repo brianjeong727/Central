@@ -1288,8 +1288,10 @@ export function SettingsTab({
                 )
               })()}
 
-              {/* Member list */}
-              <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
+              {/* Member list — no overflow:hidden so a row's role menu can extend past
+                  the card edge without being clipped (rows have no bg / no last-row
+                  border, so the rounded corners stay clean). */}
+              <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)" }}>
                 {peopleFiltered.length === 0 ? (
                   <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "24px", textAlign: "center" }}>{peopleSearch ? "No members match your search." : "No members found."}</p>
                 ) : peopleFiltered.map((m, i) => {
