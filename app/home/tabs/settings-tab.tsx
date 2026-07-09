@@ -26,6 +26,7 @@ import type { ReceiptLimit } from "@/app/actions/receipts"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
 import type { HomeVerse } from "@/app/actions/home-verses"
 import { updateGovernanceSettings, updateTeamAdminAccess } from "@/app/actions/governance"
+import { activateSetupChecklist } from "@/app/actions/setup-checklist"
 import { updateModerationSettings } from "@/app/actions/moderation"
 import { MODERATION_DEFAULTS } from "@/lib/moderation"
 import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@/lib/moderation"
@@ -340,6 +341,11 @@ export function SettingsTab({
   const [editingGiving, setEditingGiving] = useState(false)
   const [givingError, setGivingError] = useState<string | null>(null)
 
+  // Getting started guide — explicit re-activation for old ministries (setup_checklist.active)
+  const [guideActivating, setGuideActivating] = useState(false)
+  const [guideActivated, setGuideActivated] = useState(false)
+  const [guideError, setGuideError] = useState<string | null>(null)
+
   // ── Edit → stage → confirm → feedback sessions ─────────────────────────────
   // Ministry Profile (name + university → updateMinistryInfo)
   const [profileEditing, setProfileEditing] = useState(false)
@@ -497,6 +503,17 @@ export function SettingsTab({
     setSavingGiving(false)
     if (error) { setGivingError(error.message || "Couldn't save offering info."); return }
     setGivingSaved({ name, info }); setEditingGiving(false); setGivingSaveMsg(true); setTimeout(() => setGivingSaveMsg(false), 2500)
+  }
+
+  // ── Getting started guide (re-activate the Home setup checklist) ─────────────
+  async function handleActivateGuide() {
+    if (!isAdmin) return
+    setGuideActivating(true)
+    setGuideError(null)
+    const { error } = await activateSetupChecklist()
+    setGuideActivating(false)
+    if (error) { setGuideError(error); return }
+    setGuideActivated(true)
   }
 
   // ── Role change (routed through a confirm modal) ─────────────────────────────
@@ -1178,6 +1195,33 @@ export function SettingsTab({
                       <div style={{ padding: "14px 22px", borderTop: homeVerses.length > 0 ? "1px solid var(--line-3)" : undefined }}>
                         <button onClick={() => setAddingVerse(true)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--plum)", fontWeight: 500, fontFamily: "inherit", padding: 0 }}>+ Add verse</button>
                       </div>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {/* Getting started guide */}
+              {isAdmin && (
+                <section>
+                  <div style={{ marginBottom: 16 }}>
+                    <SectionHeader eyebrow="Onboarding" title="Getting started guide" titleSize={20} />
+                    <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Show the setup checklist on Home for all admins — useful when onboarding new leadership.</p>
+                  </div>
+                  <div style={{ ...CARD, padding: "20px 22px", maxWidth: 520, display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {guideActivated ? (
+                        <span className="animate-fade-up" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>
+                          <Check style={{ width: 14, height: 14, color: "var(--plum)" }} /> Visible on Home
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 14, color: "var(--muted-text)" }}>The guide stays on Home until an admin dismisses it.</span>
+                      )}
+                      {guideError && <p style={{ fontSize: 12, color: "var(--danger)", margin: "6px 0 0" }}>{guideError}</p>}
+                    </div>
+                    {guideActivated ? (
+                      <CentralButton variant="secondary" size="sm" disabled style={{ flexShrink: 0 }}>Shown</CentralButton>
+                    ) : (
+                      <CentralButton variant="primary" size="sm" onClick={handleActivateGuide} disabled={guideActivating} style={{ flexShrink: 0 }}>{guideActivating ? "Showing…" : "Show on Home"}</CentralButton>
                     )}
                   </div>
                 </section>

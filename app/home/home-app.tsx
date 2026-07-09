@@ -1037,6 +1037,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 onOpenChat={handleOpenChat}
                 onGoToProfile={() => handleNavClick("profile")}
                 onOpenAnnouncement={handleOpenAnnouncement}
+                onGoToTab={(t) => handleNavClick(t)}
                 avatarUrl={avatarUrl}
                 activeQuestion={activeQuestion}
                 hasResponded={hasResponded}

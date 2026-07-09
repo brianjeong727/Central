@@ -433,6 +433,84 @@ async function createOnboardingWorkspaces(
   }
 }
 
+// Seed a freshly-approved ministry with starter content so the founder's first
+// session isn't an empty shell: a pinned welcome announcement (member-facing
+// tour of what lives here) and a "Leaders" church chat with the founder in it.
+// Idempotent — each seed skips if an equivalent row already exists — and every
+// insert is ministry-scoped (Convention #8). Failures must NOT fail approval:
+// each seed is wrapped, logged, and skipped.
+async function seedStarterContent(
+  admin: ReturnType<typeof createAdminClient>,
+  ministryId: string,
+  ministryName: string,
+  founderId: string,
+): Promise<void> {
+  // 1) Pinned welcome announcement — skip if the ministry already has ANY
+  // announcement (a pending ministry can't post, so >0 means already seeded).
+  try {
+    const { count } = await admin
+      .from("announcements")
+      .select("id", { count: "exact", head: true })
+      .eq("ministry_id", ministryId)
+    if ((count ?? 0) === 0) {
+      const { error } = await admin.from("announcements").insert({
+        ministry_id: ministryId,
+        created_by: founderId,
+        title: `Welcome to ${ministryName} on Central`,
+        body:
+          `${ministryName} now has a home on Central — one calm place for everything happening in our ministry. ` +
+          `Church chats keep the whole congregation connected, and announcements gather events and RSVPs here so nothing gets lost in a group text. ` +
+          `Your profile is yours to fill in, and your journal offers a quiet corner for devotionals, prayers, and verses. ` +
+          `Look around and make yourself at home — we're glad you're here.`,
+        audience: "all",
+        is_event: false,
+        event_date: null,
+        show_attendees: false,
+        is_pinned: true,
+        image_url: null,
+        status: "published",
+      })
+      if (error) console.error("[approveMinistry] welcome announcement seed failed:", error.message)
+    }
+  } catch (e) {
+    console.error("[approveMinistry] welcome announcement seed failed:", e)
+  }
+
+  // 2) "Leaders" church chat — idempotent by (ministry_id, type='church',
+  // name='Leaders'); founder membership upserted either way.
+  try {
+    const { data: existing } = await admin
+      .from("groups")
+      .select("id")
+      .eq("ministry_id", ministryId)
+      .eq("type", "church")
+      .eq("name", "Leaders")
+      .maybeSingle()
+
+    let groupId = existing?.id ?? null
+    if (!groupId) {
+      const { data: group, error: gErr } = await admin
+        .from("groups")
+        .insert({ name: "Leaders", type: "church", ministry_id: ministryId, created_by: founderId })
+        .select("id")
+        .single()
+      if (gErr || !group) {
+        console.error("[approveMinistry] Leaders chat seed failed:", gErr?.message)
+        return
+      }
+      groupId = group.id
+    }
+
+    const { error: mErr } = await admin.from("group_members").upsert(
+      [{ group_id: groupId, user_id: founderId, last_read_at: new Date().toISOString() }],
+      { onConflict: "group_id,user_id" },
+    )
+    if (mErr) console.error("[approveMinistry] Leaders chat membership seed failed:", mErr.message)
+  } catch (e) {
+    console.error("[approveMinistry] Leaders chat seed failed:", e)
+  }
+}
+
 export async function getPendingMinistries(): Promise<{
   data: Array<{
     id: string
@@ -511,7 +589,7 @@ export async function approveMinistry(ministryId: string): Promise<{ error: stri
   // Seed ministry_schools from the universities array collected during onboarding
   const { data: ministry } = await admin
     .from("ministries")
-    .select("universities, onboarding_workspaces, created_by")
+    .select("name, universities, onboarding_workspaces, created_by")
     .eq("id", ministryId)
     .single()
 
@@ -521,6 +599,9 @@ export async function approveMinistry(ministryId: string): Promise<{ error: stri
     : []
   if (ministry?.created_by) {
     await createOnboardingWorkspaces(admin, ministryId, ministry.created_by, onboardingWorkspaces)
+    // Starter content (pinned welcome announcement + "Leaders" chat) — never
+    // fails approval; errors are logged inside and swallowed.
+    await seedStarterContent(admin, ministryId, ministry.name ?? "your ministry", ministry.created_by)
   }
 
   const unis: string[] = Array.isArray(ministry?.universities) ? ministry.universities : []

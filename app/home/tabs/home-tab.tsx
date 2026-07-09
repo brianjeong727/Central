@@ -10,8 +10,9 @@ import { RingCrossLogo, EYEBROW_STYLE } from "../components/shared"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { roleLabel } from "@/app/actions/super-constants"
-import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton } from "@/components/central"
-import type { HeroSlide } from "@/components/central"
+import { getSetupChecklist, setLeadersInvited, dismissSetupChecklist } from "@/app/actions/setup-checklist"
+import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard } from "@/components/central"
+import type { HeroSlide, SetupChecklistData } from "@/components/central"
 // Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
 // so keep it out of the initial home-tab bundle every member/visitor downloads.
 const HomeSlideManager = dynamic(
@@ -60,6 +61,7 @@ export function HomeTab({
   onOpenChat,
   onGoToProfile,
   onOpenAnnouncement,
+  onGoToTab,
   avatarUrl,
   activeQuestion,
   hasResponded,
@@ -80,6 +82,49 @@ export function HomeTab({
   const [slideRsvping, setSlideRsvping] = useState(false)
   const [managerOpen, setManagerOpen] = useState(false)
   const canCurateHome = ["admin", "leader", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
+
+  // ── Getting-started checklist (admin-tier, new ministries only) ──
+  // The server action re-gates eligibility (admin-tier + ministry age +
+  // dismissal); this client check just avoids a pointless fetch for members.
+  const isAdmin = ["admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
+  const { data: checklist, mutate: mutateChecklist } = useSWR(
+    isAdmin ? ["setup-checklist", ministryId] : null,
+    () => getSetupChecklist()
+  )
+  // Card shows only while eligible AND at least one item is open (all done → hidden).
+  const checklistData = checklist?.eligible && checklist.items.some((i) => !i.done) ? checklist : null
+
+  async function handleChecklistToggle(done: boolean) {
+    if (!checklist?.eligible) return
+    const optimistic: SetupChecklistData = {
+      ...checklist,
+      items: checklist.items.map((i) => (i.key === "invite_leaders" ? { ...i, done } : i)),
+    }
+    await mutateChecklist(
+      async () => {
+        await setLeadersInvited(done)
+        return optimistic
+      },
+      { optimisticData: optimistic, rollbackOnError: true, revalidate: false }
+    )
+  }
+
+  async function handleChecklistDismiss() {
+    const optimistic: SetupChecklistData = { eligible: false }
+    await mutateChecklist(
+      async () => {
+        await dismissSetupChecklist()
+        return optimistic
+      },
+      { optimisticData: optimistic, rollbackOnError: true, revalidate: false }
+    )
+  }
+
+  function handleChecklistNavigate(key: "first_announcement" | "offering" | "presidents") {
+    if (key === "first_announcement") onSeeAnnouncements()
+    else if (key === "offering") onGoToTab?.("give")
+    else onGoToTab?.("plan")
+  }
 
   const [pulseInput, setPulseInput] = useState<string>("")
   const [pulseScale, setPulseScale] = useState<number | null>(null)
@@ -563,6 +608,19 @@ export function HomeTab({
         style={{ paddingTop: "var(--space-8)", paddingBottom: "var(--space-9)" }}
       >
 
+        {/* Getting started — admin-tier setup checklist for a fresh ministry.
+            Sits directly under the page header, above the hero (hidden once
+            dismissed or complete). */}
+        {checklistData && (
+          <GettingStartedCard
+            data={checklistData}
+            onToggleLeadersInvited={handleChecklistToggle}
+            onDismiss={handleChecklistDismiss}
+            onNavigate={handleChecklistNavigate}
+            style={{ marginBottom: "var(--space-8)" }}
+          />
+        )}
+
         {/* Up Next — curated carousel, else fall back to pinned-or-latest announcement.
             "Featured" section eyebrow is the constant frame element above every state.
             While the home payload loads, only this region skeletons (same --hero-h
@@ -831,6 +889,16 @@ export function HomeTab({
         </PageTitle>
 
         <div className="flex flex-col" style={{ gap: "var(--space-9)" }}>
+
+          {/* ── Getting started — mobile (above Up Next, mirrors desktop) ── */}
+          {checklistData && (
+            <GettingStartedCard
+              data={checklistData}
+              onToggleLeadersInvited={handleChecklistToggle}
+              onDismiss={handleChecklistDismiss}
+              onNavigate={handleChecklistNavigate}
+            />
+          )}
 
           {/* ── Up Next — mobile ── */}
           <section>

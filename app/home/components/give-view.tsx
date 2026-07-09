@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase"
 import { Pencil, Check, Copy, ExternalLink } from "lucide-react"
-import { TabPageHeader, PageTitle } from "@/components/central"
+import { TabPageHeader, PageTitle, FormField, Input, CentralButton } from "@/components/central"
 import { Spinner, EYEBROW_STYLE } from "./shared"
 
 // Member-facing "Give" surface. This is the donation/Zelle info that used to live as
@@ -131,76 +131,71 @@ export function GiveView({
         <PageTitle title="Give" compact />
       </TabPageHeader>
 
-      <div className="px-5 md:px-14 pt-6 md:pt-5 max-w-[740px] md:max-w-none md:flex-1 md:overflow-y-auto">
-        {loading ? <Spinner /> : (
-          <div className="md:grid md:gap-5" style={{ gridTemplateColumns: !zelleInfo && !isAdmin ? "1fr" : "1.3fr 1fr" }}>
-            <div style={!zelleInfo && !isAdmin
-              ? { border: "1px dashed var(--dashed)", borderRadius: 12, background: "transparent", padding: "20px 24px", marginBottom: 16 }
-              : { background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, padding: "28px 28px 24px", marginBottom: 16 }
-            } className="md:mb-0">
-              <div>
-                {editing ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <label style={{ fontSize: 12, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Recipient name</label>
-                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)} placeholder="The Korean Central Church of Pittsburgh" autoFocus style={{ background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 12, padding: "12px 14px", fontSize: 14, color: "var(--ink)", outline: "none", width: "100%", boxSizing: "border-box" }} />
-                    <label style={{ fontSize: 12, color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Zelle email or phone</label>
-                    <input type="text" value={editValue} onChange={e => setEditValue(e.target.value)} placeholder="giving@yourministry.org" style={{ background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 12, padding: "12px 14px", fontSize: 14, color: "var(--ink)", outline: "none", width: "100%", boxSizing: "border-box" }} />
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={handleSave} disabled={!editValue.trim() || saving} style={{ flex: 1, height: 42, background: "var(--plum-2)", color: "var(--cream)", borderRadius: 10, fontSize: 13, fontWeight: 500, border: "none", cursor: "pointer", opacity: !editValue.trim() || saving ? 0.5 : 1 }}>{saving ? "Saving…" : "Save"}</button>
-                      <button onClick={() => setEditing(false)} style={{ height: 42, padding: "0 16px", background: "transparent", color: "var(--muted-text)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer" }}>Cancel</button>
-                    </div>
-                  </div>
-                ) : !zelleInfo && !isAdmin ? (
-                  <div>
-                    <p style={{ fontSize: 14, color: "var(--body)", fontWeight: 500, marginBottom: 4 }}>Giving info coming soon</p>
-                    <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5 }}>Your ministry hasn&apos;t set up giving info yet — check back later.</p>
-                  </div>
-                ) : !zelleInfo && isAdmin ? (
-                  <div>
-                    <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", marginBottom: 8 }}>Set up giving</p>
-                    <p style={{ fontSize: 13, color: "var(--body)", marginBottom: 20, lineHeight: 1.5 }}>Add your Zelle email or phone number so members can give.</p>
-                    <button onClick={() => { setEditValue(""); setEditName(""); setEditing(true) }} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", background: "var(--plum-2)", color: "var(--cream)", borderRadius: 10, fontSize: 13, fontWeight: 500, border: "none", cursor: "pointer" }}>
-                      <Pencil style={{ width: 13, height: 13 }} /> Add Zelle info
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Your gift</p>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 10 }}>
-                      <span style={{ fontFamily: "var(--serif)", fontSize: 40, color: "var(--body)", lineHeight: 1 }}>$</span>
-                      <input type="text" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ""))} style={{ background: "transparent", border: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 64, color: "var(--ink)", width: "100%", padding: 0, lineHeight: 1 }} />
-                    </div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
-                      {PRESET_AMOUNTS.map(v => (
-                        <button key={v} onClick={() => setAmount(v)} style={{ height: 30, padding: "0 13px", borderRadius: 999, background: amount === v ? "var(--plum-2)" : "transparent", color: amount === v ? "var(--cream)" : "var(--body)", border: "1px solid var(--line)", fontSize: 13, cursor: "pointer", fontWeight: amount === v ? 500 : 400 }}>${v}</button>
-                      ))}
-                    </div>
-                    <button onClick={handleOpenZelle} style={{ width: "100%", height: 48, background: "var(--plum-2)", color: "var(--cream)", borderRadius: 12, fontSize: 15, fontWeight: 500, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
-                      <ExternalLink style={{ width: 16, height: 16 }} />Open Zelle · ${displayAmount}
-                    </button>
-                    {zelleFallback && <p style={{ fontSize: 13, color: "var(--body)", textAlign: "center", lineHeight: 1.5, marginBottom: 10 }}>Open Zelle on your phone and send to <strong style={{ color: "var(--ink)" }}>{zelleName ? `${zelleName} (${zelleInfo})` : zelleInfo}</strong></p>}
-                    <button onClick={handleCopy} style={{ width: "100%", height: 38, background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
-                      {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}
-                      {copied ? "Copied!" : `Copy info · ${zelleInfo}`}
-                    </button>
-                    {isAdmin && <button onClick={() => { setEditValue(zelleInfo ?? ""); setEditName(zelleName ?? ""); setEditing(true) }} style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: "var(--muted-text)", fontSize: 12, cursor: "pointer", padding: 0 }}><Pencil style={{ width: 11, height: 11 }} /> Edit Zelle info</button>}
-                  </>
-                )}
+      <div className="px-5 md:px-14 pt-6 md:pt-5 md:flex-1 md:overflow-y-auto">
+        {loading ? <Spinner /> : editing || (!zelleInfo && isAdmin) ? (
+          /* Admin setup / edit — a deliberate composition: eyebrow → serif heading →
+             one calm sentence → fields → actions. Single readable column anchored to
+             the content's left edge (no floating card). */
+          <div style={{ maxWidth: 480 }}>
+            <p style={EYEBROW_STYLE}>Offering</p>
+            <h2 style={{ fontFamily: "var(--serif)", fontSize: 26, fontWeight: 400, color: "var(--ink)", lineHeight: 1.15, margin: "var(--space-4) 0 0" }}>
+              {zelleInfo ? "Edit offering details" : "Set up offering"}
+            </h2>
+            <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.55, margin: "var(--space-3) 0 0" }}>
+              Members will see these details on the Give page when they send an offering through Zelle.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-7)", marginTop: "var(--space-8)" }}>
+              <FormField label="Recipient name">
+                <Input type="text" value={editName} onChange={e => setEditName(e.target.value)} placeholder="The Korean Central Church of Pittsburgh" autoFocus={editing} />
+              </FormField>
+              <FormField label="Zelle email or phone">
+                <Input type="text" value={editValue} onChange={e => setEditValue(e.target.value)} placeholder="giving@yourministry.org" />
+              </FormField>
+            </div>
+            <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-8)" }}>
+              <CentralButton onClick={handleSave} disabled={!editValue.trim() || saving}>{saving ? "Saving…" : "Save"}</CentralButton>
+              {zelleInfo && <CentralButton variant="secondary" onClick={() => setEditing(false)}>Cancel</CentralButton>}
+            </div>
+          </div>
+        ) : !zelleInfo ? (
+          /* Member-facing empty state (§4.19) — quiet dashed panel, no CTA. */
+          <div style={{ maxWidth: 480, border: "1px dashed var(--dashed)", borderRadius: "var(--r-card)", background: "transparent", padding: "var(--space-7) var(--space-8)" }}>
+            <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>Offering details haven&apos;t been added yet.</p>
+          </div>
+        ) : (
+          <div className="md:grid md:gap-5" style={{ gridTemplateColumns: "1.3fr 1fr" }}>
+            <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, padding: "28px 28px 24px", marginBottom: 16 }} className="md:mb-0">
+              <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Your gift</p>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 10 }}>
+                <span style={{ fontFamily: "var(--serif)", fontSize: 40, color: "var(--body)", lineHeight: 1 }}>$</span>
+                <input type="text" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ""))} style={{ background: "transparent", border: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 64, color: "var(--ink)", width: "100%", padding: 0, lineHeight: 1 }} />
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+                {PRESET_AMOUNTS.map(v => (
+                  <button key={v} onClick={() => setAmount(v)} style={{ height: 30, padding: "0 13px", borderRadius: 999, background: amount === v ? "var(--plum-2)" : "transparent", color: amount === v ? "var(--cream)" : "var(--body)", border: "1px solid var(--line)", fontSize: 13, cursor: "pointer", fontWeight: amount === v ? 500 : 400 }}>${v}</button>
+                ))}
+              </div>
+              <button onClick={handleOpenZelle} style={{ width: "100%", height: 48, background: "var(--plum-2)", color: "var(--cream)", borderRadius: 12, fontSize: 15, fontWeight: 500, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
+                <ExternalLink style={{ width: 16, height: 16 }} />Open Zelle · ${displayAmount}
+              </button>
+              {zelleFallback && <p style={{ fontSize: 13, color: "var(--body)", textAlign: "center", lineHeight: 1.5, marginBottom: 10 }}>Open Zelle on your phone and send to <strong style={{ color: "var(--ink)" }}>{zelleName ? `${zelleName} (${zelleInfo})` : zelleInfo}</strong></p>}
+              <button onClick={handleCopy} style={{ width: "100%", height: 38, background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+                {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}
+                {copied ? "Copied!" : `Copy info · ${zelleInfo}`}
+              </button>
+              {isAdmin && <button onClick={() => { setEditValue(zelleInfo ?? ""); setEditName(zelleName ?? ""); setEditing(true) }} style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "none", color: "var(--muted-text)", fontSize: 12, cursor: "pointer", padding: 0 }}><Pencil style={{ width: 11, height: 11 }} /> Edit Zelle info</button>}
+            </div>
+            <div className="flex flex-col gap-4 mt-4 md:mt-0">
+              <GivingTrustPanel zelleName={zelleName} zelleInfo={zelleInfo} onCopy={handleCopy} copied={copied} />
+              {/* In-app card / Apple Pay giving — coming soon (Zelle above stays the live path). */}
+              <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, padding: "18px 20px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+                  <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)" }}>Card &amp; Apple Pay</p>
+                  <span style={{ fontSize: 10, letterSpacing: "0.08em", padding: "2px 8px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line-2)", textTransform: "uppercase", fontWeight: 500, color: "var(--muted-text)" }}>Coming soon</span>
+                </div>
+                <p style={{ fontSize: 12.5, color: "var(--body)", lineHeight: 1.55 }}>Giving in-app with a card or Apple Pay is coming soon. For now, give through Zelle above.</p>
               </div>
             </div>
-            {zelleInfo && !editing && (
-              <div className="flex flex-col gap-4 mt-4 md:mt-0">
-                <GivingTrustPanel zelleName={zelleName} zelleInfo={zelleInfo} onCopy={handleCopy} copied={copied} />
-                {/* In-app card / Apple Pay giving — coming soon (Zelle above stays the live path). */}
-                <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, padding: "18px 20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
-                    <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)" }}>Card &amp; Apple Pay</p>
-                    <span style={{ fontSize: 10, letterSpacing: "0.08em", padding: "2px 8px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line-2)", textTransform: "uppercase", fontWeight: 500, color: "var(--muted-text)" }}>Coming soon</span>
-                  </div>
-                  <p style={{ fontSize: 12.5, color: "var(--body)", lineHeight: 1.55 }}>Giving in-app with a card or Apple Pay is coming soon. For now, give through Zelle above.</p>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
