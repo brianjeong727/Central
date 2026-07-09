@@ -48,19 +48,21 @@ const FUNDS = [
   { value: "pitt", label: "Pitt" },
 ]
 
-// Semantic colors not in Central's design token palette — amber warning, danger tints, budget green
-const WARN_BG = "#FFF8E1"
-const WARN_TEXT = "#B45309"
-const DANGER_TINT_BG = "#FDF1F1"
-const DANGER_TINT_BORDER = "#E8C5C5"
+// Status-layer tints — derived from Central's semantic accents via the R10 formula
+// (bg = accent 13% on cream, text = accent 65% on ink), never invented traffic-light hexes.
+const WARN_BG = "color-mix(in srgb, var(--gold) 13%, var(--cream))"
+const WARN_TEXT = "color-mix(in srgb, var(--gold) 65%, var(--ink))"
+const WARN_BORDER = "color-mix(in srgb, var(--gold) 30%, var(--cream))"
+const DANGER_TINT_BG = "color-mix(in srgb, var(--danger) 13%, var(--cream))"
+const DANGER_TINT_BORDER = "color-mix(in srgb, var(--danger) 30%, var(--cream))"
 const DANGER_ROW_BG = "var(--cream)"
 const DELETE_CONFIRM_BG = "color-mix(in srgb, var(--danger) 8%, transparent)"
-const BUDGET_GREEN = "#2D5445"
+const BUDGET_GREEN = "color-mix(in srgb, var(--success) 65%, var(--ink))"
 const REIMBURSED_TINT = "#EDE5F0"
 
 export const STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
   pending:    { label: "Pending",    bg: "var(--ivory)",  text: "var(--body)" },
-  approved:   { label: "Approved",  bg: "#E6F4EA",       text: "#1E6B3C" },
+  approved:   { label: "Approved",  bg: "color-mix(in srgb, var(--success) 13%, var(--cream))", text: "color-mix(in srgb, var(--success) 65%, var(--ink))" },
   rejected:   { label: "Rejected",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
   declined:   { label: "Declined",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
   reimbursed: { label: "Reimbursed",bg: REIMBURSED_TINT, text: "var(--plum)" },
@@ -176,7 +178,7 @@ export function SubmitReceiptModal({
             <div><label style={labelStyle}>Purchase date</label><input type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} style={inputStyle} /></div>
           </div>
           {overLimit && (
-            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: WARN_BG, border: "1px solid #FDE68A", borderRadius: 10, padding: "10px 12px" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: WARN_BG, border: `1px solid ${WARN_BORDER}`, borderRadius: 10, padding: "10px 12px" }}>
               <AlertTriangle size={14} color={WARN_TEXT} style={{ flexShrink: 0, marginTop: 1 }} />
               <p style={{ fontSize: 12.5, color: WARN_TEXT, lineHeight: 1.5 }}>This exceeds the ${limit!.max_amount} limit for {categories.find(c => c.value === category)?.label ?? category}. You can still submit.</p>
             </div>

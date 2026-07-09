@@ -2673,7 +2673,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                       <span className="text-[14px] font-medium text-[var(--ink)]">{g.name}</span>
                     </div>
                     {forwardSentTo === g.id ? (
-                      <Check className="w-4 h-4 text-green-500" />
+                      <Check className="w-4 h-4" style={{ color: "var(--success)" }} />
                     ) : (
                       <Forward className="w-4 h-4 text-[var(--faint)]" />
                     )}

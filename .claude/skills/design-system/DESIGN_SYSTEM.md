@@ -31,7 +31,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--plum-2`      | `#2D0F2E` | Active breadcrumb text, identity hero gradient base (rare) — NOT a button fill (primary CTA fill is `--plum`, see §4.3) |
 | `--plum-deep`   | `#1B0A1E` | Hero gradient dark stop |
 | `--plum-light`  | `#4A1B4D` | Hero gradient light stop |
-| `--plum-tint`   | `#EDE3EE` | Soft plum-tinted pill/badge/panel background — the ONLY sanctioned light-plum surface |
+| `--plum-tint`   | `color-mix(in srgb, var(--plum) 12%, var(--cream))` | Selection/wayfinding surface — the ONLY sanctioned light-plum surface. Was raw `#EDE3EE` (read cool); ratified R4 |
 | `--ink`         | `#13101A` | Primary text |
 | `--body`        | `#5A5466` | Body text, sub-labels |
 | `--muted`       | `#8A8497` | Tertiary text, eyebrow mono, labels |
@@ -49,11 +49,13 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--line-2`      | `#E2DDCF` | Card border, input border |
 | `--line-3`      | `#EFE9DA` | Faint row divider |
 | `--dashed`      | `#C4C0B0` | Dashed placeholder borders |
-| `--success`     | `#7FA67F` | Auto-save dot, "on track" indicator |
+| `--success`     | `#7FA67F` | Auto-save dot, "on track" indicator; also the ok/on-track status-pill accent (§4.7) |
 | `--warm-tan`    | `#9D7B4F` | Calendar "social" category |
 | `--sage`        | `#5B7A6C` | Calendar "outreach" category |
-| `--gold`        | `#D4A45C` | Avatar accent only — never as button color |
-| `--danger`      | `#9F3030` | Destructive text/border only — never as filled button bg |
+| `--gold`        | `#D4A45C` | Avatar accent; and the pending/warn status-pill accent (§4.7). Never a filled button bg. |
+| `--danger`      | `#9F3030` | Destructive text/border only; also the soft status-pill tint accent (§4.7) — still never a filled button bg (danger-solid confirm exempted per §4.3) |
+| `--veil`        | `color-mix(in srgb, var(--ink) 55%, transparent)` | Modal/overlay ink backdrop scrim (≡ `rgba(19,16,26,.55)`) — R11 |
+| `--veil-soft`   | `color-mix(in srgb, var(--ink) 40%, transparent)` | Lighter non-modal scrim (≡ `rgba(19,16,26,.40)`) |
 
 **Do not:** invent new neutrals. Do not use pure white (`#fff`) — always cream. Do not use saturated red, blue, or green for status. Do not use gradients except in the rare full-identity hero (§4.1). Do not use plum as a repeated surface, card background, or decorative fill — it is a surgical accent appearing in at most one or two intentional moments per view.
 
@@ -282,6 +284,7 @@ Buttons are assigned by **semantic role**, never ad-hoc color. **Exactly one pri
 | **Icon-only** | gear / kebab / edit / close | transparent → `--ivory` hover | `--muted` | none |
 
 - **Sizes:** `sm` (8×14, 13px — list rows, headers) and `md` (11×20, 14px — forms, CTAs). Radius `--r-input` (10).
+- **Disabled:** the enabled role's exact style at `opacity: 0.5` + `cursor: not-allowed`. Never a separate gray/mauve disabled fill — CentralButton/IconButton own this; delete call-site overrides. *Scoped exception:* the §4.1c pulse-card on-dark primary dims to opacity 0.35 staying cream.
 - **Hero-invert:** a primary inside a plum hero flips to cream bg / plum text.
 - **Verb→icon map (one icon per verb, everywhere):** Edit = `Pencil`, Delete = `Trash2`, Add/Create = `Plus`, Close/Cancel = `X`, Confirm = `Check`, Settings = `Settings`, Search = `Search`.
 
@@ -315,6 +318,7 @@ background: #FDFCF8
 - **Category pill** (event category, post type): radius 999, padding 5×12, `#F1ECDE` bg, `#3E1540` text, 11–12px, weight 500, letter-spacing 0.4–0.6, uppercase for small variants.
 - **Role badge:** Admin = `#2D0F2E` bg / cream text; Leader = `#F1ECDE` bg / plum text; Member = `#F1ECDE` bg / muted text. All radius 999, 4×10, 11px weight 500.
 - **Soft pill** (assigned-to chip): radius 999, padding 5×12, `#F1ECDE` bg, 1px `#E8E2D2`, plum-2 text 12–13px. Avatar circle 24px on the left when used for people.
+- **Status pill:** derived from a semantic accent, never an invented hex. bg `color-mix(in srgb, <accent> 13%, var(--cream))`; text `color-mix(in srgb, <accent> 65%, var(--ink))`. Accents: `--success` (ok/on-track), `--gold` (pending/warn), `--danger` (error/overdue). Radius 999. Replaces all traffic-light hexes (`#FDE68A`, `#22C55E`, `#92400E`, …).
 
 ### 4.8 Avatars
 
@@ -573,7 +577,7 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 2. **No tabbed kitchen-sink under "Plan".** Each event is a destination; the workflow tabs (Overview/Checklist/Roles/Notes) belong to that destination, not to a global Plan tab.
 3. **No white cards on white bg.** Always cream surface; differentiate with hairlines and inset shades.
 4. **Headlines are Bricolage Grotesque at weight 600, body/UI text at weight 400.** Do not use weight 600 for body copy, labels, or metadata — reserve it for heading hierarchy (H1, H2, display).
-5. **No emoji-led status pills, no traffic-light colors.** Use the limited semantic palette (success sage, warm-tan social, sage outreach, plum ministry).
+5. **No emoji-led status pills, no traffic-light colors, no invented hexes.** Status pills derive from the semantic accents via the §4.7 formula. Traffic-light hexes (`#FDE68A` / `#22C55E` / `#92400E` style) are banned.
 6. **No red filled "Delete" buttons.** Destructive actions are outline-only in `#9F3030`.
 7. **No left-border-accent rounded callout cards.** The only left-rule pattern allowed is the editorial quote (§4.13), the timeline rail (§4.12), and — as a **single authorized exception (July 2026)** — the **Events "Up Next" card** (§4.21): a `cream-3` rounded callout with a `border-left: 3px solid var(--plum)` marking the closest upcoming event in the team Events agenda. This is the one sanctioned left-border rounded callout; do not generalize it to any other card.
 8. **No gradient backgrounds outside the hero banner.** Cream surfaces never have gradients. **Scoped exception (July 2026): the checklist high-priority row highlight.** A `priority === 'high'` task row in the event Checklist carries a solid light-plum tint across the whole row — `background: color-mix(in srgb, var(--plum) 7%, transparent)` (a flat highlight, NOT a gradient and NOT a left-border rail). This is the one place a light-plum row highlight marks state; it reads as a subtle "flagged" wash, not a plum surface. Scoped to this list — do not reuse it elsewhere. (Priority is a binary high/not-high flag, toggled in the row editor.)

@@ -431,15 +431,15 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
       : title.trim() !== "" || fields.some(f => f.label.trim() !== "")
 
   const SaveButton = (
-    <button
+    <CentralButton
       type="button"
+      variant="primary"
       disabled={saving}
       onClick={handleSave}
-      className="flex items-center justify-center transition-colors disabled:opacity-50"
-      style={{ height: 28, padding: "0 16px", borderRadius: 9, background: "var(--plum-2)", color: "var(--cream)", fontSize: 13, fontWeight: 500, border: "none", cursor: saving ? "default" : "pointer", flexShrink: 0 }}
+      style={{ height: 28, padding: "0 16px", borderRadius: 9, fontSize: 13, flexShrink: 0 }}
     >
       {saving ? "Saving…" : isEditing ? "Save changes" : "Create form"}
-    </button>
+    </CentralButton>
   )
 
   return (

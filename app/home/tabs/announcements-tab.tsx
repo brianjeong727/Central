@@ -102,6 +102,15 @@ const AUDIENCE_OPTIONS = [
   { value: "group", label: "Specific Group" },
 ]
 
+// Draft status pill — derived from the --gold semantic accent (R10 status layer),
+// never an invented traffic-light hex. borderRadius is applied inline per call site.
+const DRAFT_PILL_STYLE: React.CSSProperties = {
+  fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", textTransform: "uppercase", fontWeight: 500,
+  background: "color-mix(in srgb, var(--gold) 13%, var(--cream))",
+  border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--cream))",
+  color: "color-mix(in srgb, var(--gold) 65%, var(--ink))",
+}
+
 type FilterType = "all" | "events" | "forms" | "pinned"
 
 const FILTERS: { id: FilterType; label: string }[] = [
@@ -264,17 +273,15 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
   // Primary + secondary action buttons (shared by mobile + desktop headers).
   const PublishButton = (
-    <button
+    <CentralButton
       type="button"
+      variant="primary"
       disabled={submitting}
       onClick={e => handleSubmit(e as unknown as React.FormEvent, false)}
-      className="flex items-center justify-center transition-colors disabled:opacity-50"
-      style={{ height: 28, padding: "0 16px", borderRadius: 9, background: "var(--plum-2)", color: "var(--cream)", fontSize: 13, fontWeight: 500, border: "none", cursor: submitting ? "default" : "pointer", flexShrink: 0 }}
-      onMouseEnter={e => { if (!submitting) e.currentTarget.style.background = "var(--plum-2)" }}
-      onMouseLeave={e => (e.currentTarget.style.background = "var(--plum-2)")}
+      style={{ height: 28, padding: "0 16px", borderRadius: 9, fontSize: 13, flexShrink: 0 }}
     >
       {submitting ? "Saving…" : isEditing ? "Save changes" : "Publish"}
-    </button>
+    </CentralButton>
   )
   const DraftButton = !isEditing ? (
     <button
@@ -1138,13 +1145,13 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                     <p style={{ margin: 0, fontSize: "13px", color: "var(--body)", lineHeight: 1.55 }} className="line-clamp-2">{previewBody(pinnedAnn.body)}</p>
                     {/* Actions row */}
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <button onClick={() => onOpenAnnouncement(pinnedAnn.id)} style={{ background: "var(--plum)", color: "var(--cream)", border: 0, padding: "9px 20px", borderRadius: "9px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
+                      <CentralButton variant="secondary" onClick={() => onOpenAnnouncement(pinnedAnn.id)} style={{ padding: "9px 20px", borderRadius: "9px", fontSize: "13px" }}>
                         {pinnedAnn.is_event ? "See details" : "See announcement"}
-                      </button>
+                      </CentralButton>
                       {pinnedAnn.is_event && (
-                        <button onClick={() => handleRsvpToggle(pinnedAnn.id)} style={{ background: pinnedAnn.user_has_rsvped ? "var(--line-3)" : "transparent", color: "var(--ink)", border: "1px solid var(--line)", padding: "9px 20px", borderRadius: "9px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
+                        <CentralButton variant={pinnedAnn.user_has_rsvped ? "plum-outline" : "primary"} onClick={() => handleRsvpToggle(pinnedAnn.id)} style={{ padding: "9px 20px", borderRadius: "9px", fontSize: "13px" }}>
                           {pinnedAnn.user_has_rsvped ? "Going ✓" : "RSVP"}
-                        </button>
+                        </CentralButton>
                       )}
                       {pinnedAnn.rsvp_count > 0 && (
                         <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{pinnedAnn.rsvp_count} going</span>
@@ -1185,7 +1192,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                     <div className="grid px-5 py-3.5 items-center" style={{ gridTemplateColumns: "100px 1.5fr 1fr 100px", gap: "12px" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                         <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "var(--ivory)", border: "1px solid var(--line)", textTransform: "uppercase", fontWeight: 500, width: "fit-content" }}>{ann.is_event ? "Event" : "Post"}</span>
-                        {ann.status === "draft" && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#FFF8E1", border: "1px solid #FDE68A", textTransform: "uppercase", fontWeight: 500, color: "#B45309", width: "fit-content" }}>Draft</span>}
+                        {ann.status === "draft" && <span style={{ ...DRAFT_PILL_STYLE, borderRadius: "6px", width: "fit-content" }}>Draft</span>}
                       </div>
                       <div
                         onClick={() => onOpenAnnouncement(ann.id)}
@@ -1199,9 +1206,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                       <div className="flex justify-end items-center gap-1.5">
                         <button onClick={() => onOpenAnnouncement(ann.id)} style={{ fontSize: "11px", color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "4px 6px", whiteSpace: "nowrap" }} className="hover:text-[var(--plum)] transition-colors">See →</button>
                         {ann.is_event && (
-                          <button onClick={() => handleRsvpToggle(ann.id)} style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", border: "1px solid var(--line)", cursor: "pointer", background: ann.user_has_rsvped ? "var(--line-3)" : "transparent" }}>
+                          <CentralButton variant={ann.user_has_rsvped ? "plum-outline" : "primary"} onClick={() => handleRsvpToggle(ann.id)} style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px" }}>
                             {ann.user_has_rsvped ? "Going" : "RSVP"}
-                          </button>
+                          </CentralButton>
                         )}
                         {isLeaderOrAdmin && (
                           <DesktopActionMenu
@@ -1232,7 +1239,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                       <div className="flex justify-between items-center mb-4">
                         <span style={MONO_STYLE}>{formatDate(ann.created_at)}</span>
                         <div style={{ display: "flex", gap: 4 }}>
-                          {ann.status === "draft" && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#FFF8E1", border: "1px solid #FDE68A", textTransform: "uppercase", fontWeight: 500, color: "#B45309" }}>Draft</span>}
+                          {ann.status === "draft" && <span style={{ ...DRAFT_PILL_STYLE, borderRadius: 999 }}>Draft</span>}
                           {ann.is_pinned && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "var(--plum)", textTransform: "uppercase", fontWeight: 500, color: "var(--cream)" }}>📌 Pinned</span>}
                           {ann.is_sub_pinned && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#F1ECFF", border: "1px solid #D8CAFF", textTransform: "uppercase", fontWeight: 500, color: "var(--plum)" }}>For You</span>}
                           <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "var(--line-3)", textTransform: "uppercase", fontWeight: 500, color: "var(--ink)" }}>{ann.is_event ? "Event" : "Post"}</span>
@@ -1251,9 +1258,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                                 : <button onClick={() => setFormFillState({ formId: ann.form_id!, announcementId: ann.id, title: ann.title })} style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}><FileText style={{ width: 11, height: 11 }} />Fill out form</button>
                             )}
                             {ann.is_event && (
-                              <button onClick={() => handleRsvpToggle(ann.id)} style={{ background: ann.user_has_rsvped ? "var(--line-3)" : "transparent", color: "var(--ink)", border: "1px solid var(--ink)", padding: "8px 16px", borderRadius: 999, fontSize: "12px", fontWeight: 500, cursor: "pointer" }}>
+                              <CentralButton variant={ann.user_has_rsvped ? "plum-outline" : "primary"} onClick={() => handleRsvpToggle(ann.id)} style={{ padding: "8px 16px", borderRadius: 999, fontSize: "12px" }}>
                                 {ann.user_has_rsvped ? "Going ✓" : "RSVP"}
-                              </button>
+                              </CentralButton>
                             )}
                             {isLeaderOrAdmin && (
                               <DesktopActionMenu

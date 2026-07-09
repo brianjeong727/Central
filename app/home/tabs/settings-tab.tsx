@@ -1749,7 +1749,7 @@ export function SettingsTab({
                         <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old code will stop working immediately.</p>
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => setShowRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                          <button onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 500, color: "var(--cream-panel)", cursor: "pointer", opacity: regenerating ? 0.6 : 1 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</button>
+                          <CentralButton variant="danger-solid" onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, fontSize: 12 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</CentralButton>
                         </div>
                       </div>
                     ) : (
@@ -1776,7 +1776,7 @@ export function SettingsTab({
                           <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old staff code will stop working immediately.</p>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={() => setShowStaffRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                            <button onClick={handleRegenerateStaff} disabled={regeneratingStaff} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 500, color: "var(--cream-panel)", cursor: "pointer", opacity: regeneratingStaff ? 0.6 : 1 }}>{regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}</button>
+                            <CentralButton variant="danger-solid" onClick={handleRegenerateStaff} disabled={regeneratingStaff} style={{ padding: "5px 10px", borderRadius: 8, fontSize: 12 }}>{regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}</CentralButton>
                           </div>
                         </div>
                       ) : (
@@ -1802,9 +1802,9 @@ export function SettingsTab({
                       {calCopied ? <Check style={{ width: 13, height: 13, color: "var(--plum)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
                       {calCopied ? "Copied" : "Copy"}
                     </button>
-                    <button onClick={openGoogleCalendar} style={{ padding: "9px 14px", borderRadius: 10, background: "var(--plum-2)", border: "none", color: "var(--cream-panel)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, fontWeight: 500 }}>
+                    <CentralButton variant="primary" onClick={openGoogleCalendar} style={{ padding: "9px 14px", borderRadius: 10, fontSize: 13, flexShrink: 0 }}>
                       <Calendar style={{ width: 13, height: 13 }} /> Add to Google Calendar
-                    </button>
+                    </CentralButton>
                   </div>
                   <p style={{ marginTop: 14, fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5 }}>Clicking the button copies the URL and opens Google Calendar — paste it in the &quot;From URL&quot; field. For Apple Calendar or Outlook, use the Copy button.</p>
                 </div>

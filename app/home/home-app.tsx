@@ -30,7 +30,7 @@ import { BreadcrumbProvider, useBreadcrumbExtra } from "./breadcrumb-context"
 // the matching Item-2 skeleton where one exists, otherwise the shared Spinner.
 import { HomeTab } from "./tabs/home-tab"
 import { Spinner } from "./components/shared"
-import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, ProfileTabSkeleton, CentralModal, SuperSwitcher } from "@/components/central"
+import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, ProfileTabSkeleton, CentralModal, SuperSwitcher, CentralButton } from "@/components/central"
 import type { CalendarEvent } from "./types"
 import type { DirectoryMember } from "./types"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
@@ -1290,15 +1290,16 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
               You&apos;ve reached your graduation year. Would you like to stay in {ministryName} or remove yourself from the ministry?
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button
+              <CentralButton
+                variant="primary"
                 onClick={() => {
                   supabase.from("profiles").update({ grad_prompt_dismissed: true }).eq("id", userId).eq("ministry_id", ministryId).then(() => {})
                   setShowGradPrompt(false)
                 }}
-                style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "var(--plum-2)", color: "var(--cream-panel)", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                style={{ width: "100%", padding: "14px", borderRadius: 12, fontSize: 15 }}
               >
                 Stay in {ministryName}
-              </button>
+              </CentralButton>
               <button
                 disabled={gradPromptLoading}
                 onClick={async () => {

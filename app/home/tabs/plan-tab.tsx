@@ -12312,9 +12312,9 @@ function SmallGroupLeadersTab({
 
           {/* June 1 renewal banner (president only) */}
           {isPresident && rosterStatus?.needs_roster_renewal && (
-            <div style={{ background: "#FFF8F0", border: "1.5px solid #F59E0B", borderRadius: 14, padding: "16px 18px" }}>
-              <p className="text-[14px] font-medium text-[#92400E] mb-1">New semester — update your DGL roster?</p>
-              <p className="text-[13px] text-[#92400E] mb-4">
+            <div style={{ background: "color-mix(in srgb, var(--gold) 13%, var(--cream))", border: "1.5px solid color-mix(in srgb, var(--gold) 30%, var(--cream))", borderRadius: 14, padding: "16px 18px" }}>
+              <p className="text-[14px] font-medium mb-1" style={{ color: "color-mix(in srgb, var(--gold) 65%, var(--ink))" }}>New semester — update your DGL roster?</p>
+              <p className="text-[13px] mb-4" style={{ color: "color-mix(in srgb, var(--gold) 65%, var(--ink))" }}>
                 It&apos;s June 1. Do you want to carry over last semester&apos;s DGL roster for the fall, or start fresh?
               </p>
               <div className="flex gap-2">
@@ -12329,7 +12329,7 @@ function SmallGroupLeadersTab({
                 <button
                   onClick={() => handleRosterRenewal("fresh")}
                   disabled={renewalLoading}
-                  style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#92400E", border: "1.5px solid #F59E0B", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
+                  style={{ flex: 1, padding: "8px 0", background: "transparent", color: "color-mix(in srgb, var(--gold) 65%, var(--ink))", border: "1.5px solid color-mix(in srgb, var(--gold) 30%, var(--cream))", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
                 >
                   Start fresh
                 </button>
@@ -12942,12 +12942,12 @@ function SmallGroupLeadersTab({
                   {rotationPhase === "generated" && (
                     <div className="mt-4">
                       {flagged.length > 0 && (
-                        <div className="mb-3 px-3 py-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl">
-                          <p style={{ fontSize: 12, fontWeight: 500, color: "#92400E", marginBottom: 4 }}>
+                        <div className="mb-3 px-3 py-2.5 rounded-xl" style={{ background: "color-mix(in srgb, var(--gold) 13%, var(--cream))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--cream))" }}>
+                          <p style={{ fontSize: 12, fontWeight: 500, color: "color-mix(in srgb, var(--gold) 65%, var(--ink))", marginBottom: 4 }}>
                             {flagged.length} week{flagged.length !== 1 ? "s" : ""} need review
                           </p>
                           {flagged.map((f, fi) => (
-                            <p key={fi} style={{ fontSize: 12, color: "#92400E" }}>
+                            <p key={fi} style={{ fontSize: 12, color: "color-mix(in srgb, var(--gold) 65%, var(--ink))" }}>
                               {new Date(f.week_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {DGL_SLOT_LABELS[f.slot]} — {f.reason}
                             </p>
                           ))}
@@ -13794,11 +13794,11 @@ function DGLAssignmentTable({
         const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
         const hasFlagged = SLOTS.some(s => flaggedKeys.has(`${wd}::${s}`))
         return (
-          <div key={wd} className={`rounded-[12px] border overflow-hidden ${hasFlagged ? "border-[#FDE68A]" : "border-[var(--line)]"}`} style={{ background: "var(--cream-panel)" }}>
-            <div className={`px-4 py-2.5 border-b flex items-center justify-between ${hasFlagged ? "border-[#FDE68A] bg-[#FFFBEB]" : "border-[var(--line-3)]"}`} style={hasFlagged ? {} : { background: "var(--cream-3)" }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: hasFlagged ? "#92400E" : "var(--body)" }}>{dateStr}</span>
+          <div key={wd} className="rounded-[12px] border overflow-hidden" style={{ background: "var(--cream-panel)", borderColor: hasFlagged ? "color-mix(in srgb, var(--gold) 30%, var(--cream))" : "var(--line)" }}>
+            <div className="px-4 py-2.5 border-b flex items-center justify-between" style={{ borderBottomColor: hasFlagged ? "color-mix(in srgb, var(--gold) 30%, var(--cream))" : "var(--line-3)", background: hasFlagged ? "color-mix(in srgb, var(--gold) 13%, var(--cream))" : "var(--cream-3)" }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: hasFlagged ? "color-mix(in srgb, var(--gold) 65%, var(--ink))" : "var(--body)" }}>{dateStr}</span>
               {hasFlagged && (
-                <span style={{ fontSize: 10, fontWeight: 500, color: "#92400E", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+                <span style={{ fontSize: 10, fontWeight: 500, color: "color-mix(in srgb, var(--gold) 65%, var(--ink))", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                   Needs Review
                 </span>
               )}
@@ -13811,8 +13811,8 @@ function DGLAssignmentTable({
               const isEditing = !isFriday && editingCell?.weekDate === wd && editingCell?.slot === slot
               const isHovered = !isFriday && hoveredCell?.weekDate === wd && hoveredCell?.slot === slot
               return (
-                <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[var(--line-3)]" : ""} ${isFlagged ? "bg-[#FFFBEB]" : ""}`}>
-                  <span style={{ fontSize: 11, fontWeight: 500, color: isFlagged ? "#B45309" : "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+                <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[var(--line-3)]" : ""}`} style={isFlagged ? { background: "color-mix(in srgb, var(--gold) 13%, var(--cream))" } : undefined}>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: isFlagged ? "color-mix(in srgb, var(--gold) 65%, var(--ink))" : "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                     {DGL_SLOT_LABELS[slot]}
                   </span>
                   {isFriday ? (

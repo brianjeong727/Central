@@ -175,9 +175,9 @@ export function GiveView({
                   <button key={v} onClick={() => setAmount(v)} style={{ height: 30, padding: "0 13px", borderRadius: 999, background: amount === v ? "var(--plum-2)" : "transparent", color: amount === v ? "var(--cream)" : "var(--body)", border: "1px solid var(--line)", fontSize: 13, cursor: "pointer", fontWeight: amount === v ? 500 : 400 }}>${v}</button>
                 ))}
               </div>
-              <button onClick={handleOpenZelle} style={{ width: "100%", height: 48, background: "var(--plum-2)", color: "var(--cream)", borderRadius: 12, fontSize: 15, fontWeight: 500, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
+              <CentralButton variant="primary" onClick={handleOpenZelle} style={{ width: "100%", height: 48, borderRadius: 12, fontSize: 15, marginBottom: 10 }}>
                 <ExternalLink style={{ width: 16, height: 16 }} />Open Zelle · ${displayAmount}
-              </button>
+              </CentralButton>
               {zelleFallback && <p style={{ fontSize: 13, color: "var(--body)", textAlign: "center", lineHeight: 1.5, marginBottom: 10 }}>Open Zelle on your phone and send to <strong style={{ color: "var(--ink)" }}>{zelleName ? `${zelleName} (${zelleInfo})` : zelleInfo}</strong></p>}
               <button onClick={handleCopy} style={{ width: "100%", height: 38, background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
                 {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}

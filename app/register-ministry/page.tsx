@@ -77,7 +77,7 @@ export default async function RegisterMinistryPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <Link href="/home" style={{
             display: "block", padding: "13px 20px", borderRadius: 10,
-            background: "var(--plum-2)", color: "#FDFCF8",
+            background: "var(--plum)", color: "var(--cream)",
             fontSize: 15, fontWeight: 500, textDecoration: "none",
             textAlign: "center",
           }}>

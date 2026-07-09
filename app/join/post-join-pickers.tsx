@@ -15,7 +15,7 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase"
-import { CentralModal } from "@/components/central"
+import { CentralModal, CentralButton } from "@/components/central"
 
 const SANS = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
@@ -37,14 +37,9 @@ export function ModalAction({ children, onClick, disabled }: {
   children: React.ReactNode; onClick?: () => void; disabled?: boolean
 }) {
   return (
-    <button type="button" onClick={disabled ? undefined : onClick} disabled={disabled} style={{
-      width: "100%", padding: "14px 0", borderRadius: 12, border: "none",
-      background: disabled ? "var(--line-2)" : "var(--plum-2)",
-      color: disabled ? "var(--faint)" : "var(--cream-panel)",
-      fontSize: 15, fontWeight: 500, fontFamily: SANS,
-      cursor: disabled ? "not-allowed" : "pointer",
-      transition: "background .15s ease",
-    }}>{children}</button>
+    <CentralButton type="button" variant="primary" onClick={disabled ? undefined : onClick} disabled={disabled} style={{
+      width: "100%", padding: "14px 0", borderRadius: 12, fontSize: 15,
+    }}>{children}</CentralButton>
   )
 }
 

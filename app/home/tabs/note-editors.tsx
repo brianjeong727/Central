@@ -411,7 +411,7 @@ export function MeetingNoteEditor({
               : `${activeUsers.length} others are editing`}
           </span>
           {/* Live pulse dot */}
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", marginLeft: 2, flexShrink: 0 }} />
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--success)", marginLeft: 2, flexShrink: 0 }} />
         </div>
       )}
       <div style={{ padding: "20px 32px 44px" }}>
