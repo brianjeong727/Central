@@ -206,6 +206,11 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/home/workspace-presets.ts` | Fixed workspace/team presets — single source of truth for onboarding, approval, and in-app "Add workspace". **Worship-team family is BACKLOGGED (indefinite):** Praise Team, Tech Team, DG Praise, One-Time Event are `comingSoon: true` (shown disabled in Add-workspace + onboarding). Their code (`PraiseTeamTab`/`DgPraiseTeamTab`/`OneTimeTeamTab`/`TechTeamTab` in plan-tab.tsx) is FROZEN — do not refactor or invest there (the audit's worship dedup + worship field/chip migrations were deliberately deferred) until the family is actively resumed. |
 | `app/actions/finance-auth.ts` | Finance authorization (single source of truth): `getFinanceCapability`/`computeFinanceCapability` — treasurer approve / president sign-off / budget write. |
 | `app/actions/receipt-categories.ts` | Per-team receipt category CRUD (team-membership RLS). |
+| `app/actions/super.ts` (+ `super-constants.ts`) | Super-account POV switching: `switchMinistryRole` / `switchWorkspaceRole` / `resetToSuper` / `getSandboxTeams` — every action verifies the caller is the ONE super account (`SUPER_UUID` = brianjeong727) before using the service-role client; write-as is confined to sandbox ministries (`ministries.is_sandbox`; Central = true). `roleLabel(role, userId)` (in super-constants) aliases the super's home role to "Super" at display sites only — never in gates. |
+| `components/central/super-switcher.tsx` | Super-only floating chip + "Acting as …" banner — gated on the account UUID, never the role (stays reachable while acting as visitor). Ministry-role list + workspace-role picker + Reset to super. |
+| `app/actions/setup-checklist.ts` | Getting-started checklist: `getSetupChecklist` (progress fully DERIVED from live tables), `setLeadersInvited` / `dismissSetupChecklist` / `activateSetupChecklist` (merge-update `ministries.setup_checklist` jsonb). Eligible = admin-tier AND not dismissed AND (`created_at >= 2026-07-08` OR `active: true` via Church Settings → "Show on Home"). |
+| `components/central/getting-started-card.tsx` | The Home checklist card (LEAF — HomeTab fetches via SWR and passes data/handlers down). |
+| `components/central/confirm-dialog.tsx` | `ConfirmDialog` — the standard modal delete-confirm (portaled CentralModal + danger-solid), per DESIGN_SYSTEM §14. Inline two-step stays for dense rows; never fire a delete directly. |
 | `app/home/tabs/profile-tab.tsx` | Profile tab — spiritual profile fields, journal (devotionals/prayers/verses sub-tabs), sign out |
 | `app/home/tabs/settings-tab.tsx` | Settings tab — admin-only; ministry settings, member management, roles |
 | `app/home/tabs/forms-tab.tsx` | Forms tab — announcement-linked forms, form fill overlay (FormFillView), admin responses view (FormResponsesView) |
@@ -365,7 +370,7 @@ HomeApp (root — owns all global state)
 
 | Table | Key Columns |
 |-------|-------------|
-| `ministries` | `id`, `name`, `university`, `universities` (jsonb), `invite_code`, `staff_invite_code` (both **column-revoked** from `authenticated`/`anon` — read only via the admin-scoped `getMinistryCodes` action), `status` (`active`/`pending`/`rejected`/`archived`), `is_public`, `location`, `automation_settings` (jsonb), `governance_settings` (jsonb `{all_admins, roster_ids}`), `moderation_settings` (jsonb `{enabled, behavior, strictness, scope, photo_enabled}` — chat filter config), `archive_requested_by`/`archive_requested_at` (two-step archive), `created_by` |
+| `ministries` | `id`, `name`, `university`, `universities` (jsonb), `invite_code`, `staff_invite_code` (both **column-revoked** from `authenticated`/`anon` — read only via the admin-scoped `getMinistryCodes` action), `status` (`active`/`pending`/`rejected`/`archived`), `is_public`, `location`, `automation_settings` (jsonb), `governance_settings` (jsonb `{all_admins, roster_ids}`), `moderation_settings` (jsonb `{enabled, behavior, strictness, scope, photo_enabled}` — chat filter config), `archive_requested_by`/`archive_requested_at` (two-step archive), `is_sandbox` (super write-as allowed; Central = true), `setup_checklist` (jsonb `{leaders_invited, dismissed, active}` — getting-started state; progress itself is derived), `created_by` |
 | `profiles` | `id`, `ministry_id`, `name`, `email`, `role`, `graduation_year`, `grade`, `needs_grad_check`, `gender`, `avatar_url`, `about_me`, `bible_verse`, `prayer_request`, `pray_for_me`, `phone`, `bio`, `testimony`, `favorite_worship_song`, `favorite_verse`, `favorite_book_of_bible`, `show_journal_entries`, `show_journal_streak`, `school_id`, `saved_signature`, `sidebar_note` |
 | `groups` | `id`, `ministry_id`, `name`, `type` (`church`/`my`/`dm`), `created_by`, `archived`, `pinned_message_id` |
 | `group_members` | `group_id`, `user_id`, `last_read_at` |
@@ -375,7 +380,7 @@ HomeApp (root — owns all global state)
 | `rsvps` | `announcement_id`, `user_id` — UNIQUE(announcement_id, user_id) |
 | `teams` | `id`, `ministry_id`, `name`, `icon`, `description`, `team_type` (`standard`/`dg_praise`/`one_time`/`finance`), `allow_co_presidency`, `allow_admin_members`, `admin_access` (`none`/`view`/`write`), `created_by` |
 | `team_roles` | `id`, `team_id`, `name`, `permissions` (jsonb array of strings), `is_president` |
-| `team_members` | `id`, `team_id`, `user_id`, `role_id`, `added_by` — UNIQUE(team_id, user_id) |
+| `team_members` | `id`, `team_id`, `user_id`, `role_id`, `added_by`, `via_super_switch` (switcher-added; stripped by resetToSuper) — UNIQUE(team_id, user_id) |
 | `home_slides` | `id`, `ministry_id`, `slide_type` (`announcement`/`event`/`photo`), `announcement_id` FK→`announcements`, `calendar_event_id` FK→`calendar_events`, `image_url`, `caption`, `eyebrow`, `panel_color` (stored clamped dark hex, computed once at upload), `order_index`, `is_active`, `created_by`. Curated home hero slides. CHECK: `announcement` → announcement_id set, image_url null; `event` → calendar_event_id set (image_url optional, its own uploaded photo); `photo` → image_url set, no refs. RLS: select = ministry members; insert/update/delete via `auth_is_admin_or_leader()`. Photo images live in the `announcement-images` bucket under `home-slides/{ministryId}/`. |
 
 ### Feature-area index (names only — query MCP for columns)
@@ -417,6 +422,10 @@ HomeApp (root — owns all global state)
 `user_ministries`, `ministry_schools`, `ministry_bans`, `ministry_departures`, `audit_logs`
 
 **Profile trigger:** `handle_new_user()` fires `AFTER INSERT ON auth.users` and auto-creates a `profiles` row. `ministry_id` is NULL until the user completes `/join`.
+
+**Ministry approval:** `approveMinistry` (founder-email-gated, in `app/actions/ministry.ts`) activates the ministry, creates the onboarding workspaces, seeds `ministry_schools`, and seeds starter content — a pinned welcome announcement + a "Leaders" church chat with the founder (idempotent; seeding failure never blocks approval).
+
+**Super-account DB gate:** `is_super()` (SECURITY DEFINER) returns true only for the super account's UUID — used by super-only carve-outs; never role-based.
 
 ## Roles & Permissions
 
