@@ -446,7 +446,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       case "forms":         return formsView === "detail"
         ? [root, { label: "Forms", onClick: () => { setNavResetKey(k => k + 1); setParams({ fresp: null }) } }, { label: formsDetailTitle }]
         : [root, { label: "Forms" }]
-      case "settings":      return [root, { label: "Settings" }]
+      case "settings":      return [root, { label: "Church Settings" }]
       case "chats":         return [root, { label: "Chats" }]
       case "plan": {
         if (activeTeamId === "receipts") return [root, planningCrumb, { label: "Receipts" }]
@@ -978,6 +978,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         onLogoClick={handleLogoClick}
         showWorkspaceNavHint={showWorkspaceNavHint}
         onDismissNavHint={() => setHintDismissed(true)}
+        superSwitcherSlot={<SuperSwitcher variant="rail" profile={{ id: initialProfile.id, role: initialProfile.role }} />}
       />
 
       {/* Content + bottom nav wrapper — BreadcrumbProvider wraps both the topbar
@@ -1315,8 +1316,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         </CentralModal>
       )}
 
-      {/* Super-account POV switcher — renders only for the super (gated on id). */}
-      <SuperSwitcher profile={{ id: initialProfile.id, role: initialProfile.role }} />
+      {/* Super-account POV switcher — renders only for the super (gated on id).
+          Root instance owns the top banner (both viewports) + the mobile floating
+          chip; the desktop trigger is docked in the rail (superSwitcherSlot). */}
+      <SuperSwitcher variant="floating" profile={{ id: initialProfile.id, role: initialProfile.role }} />
     </div>
   )
 }

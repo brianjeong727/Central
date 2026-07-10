@@ -21,7 +21,15 @@ function cap(role: string): string {
   return role.charAt(0).toUpperCase() + role.slice(1)
 }
 
-export function SuperSwitcher({ profile }: { profile: { id: string; role: string } }) {
+export function SuperSwitcher({
+  profile,
+  variant = "floating",
+}: {
+  profile: { id: string; role: string }
+  // "floating": bottom-left fixed chip (mobile) + the top acting-as banner.
+  // "rail": compact in-flow pill docked in the desktop icon rail; popover opens right.
+  variant?: "floating" | "rail"
+}) {
   const [open, setOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -109,10 +117,36 @@ export function SuperSwitcher({ profile }: { profile: { id: string; role: string
     cursor: "pointer",
   }
 
+  // Shared popover card; positioning differs by variant. Floating (mobile) opens
+  // UP from the bottom-left chip; rail (desktop) opens to the RIGHT of the rail pill.
+  const cardBase: React.CSSProperties = {
+    width: 220,
+    background: "var(--cream-panel)",
+    border: "1px solid var(--line-2)",
+    borderRadius: "var(--r-card)",
+    overflow: "hidden",
+    padding: 6,
+  }
+  const popoverStyle: React.CSSProperties = variant === "rail"
+    ? { position: "absolute", bottom: 0, left: "calc(100% + 10px)", zIndex: 200, ...cardBase }
+    : { position: "absolute", bottom: "calc(100% + 8px)", left: 0, ...cardBase }
+
+  // Rail wrapper is in-flow (relative) so the pill sits inside the rail column and the
+  // popover anchors to it. Floating wrapper stays the fixed bottom-left chip.
+  const railWrapper: React.CSSProperties = {
+    position: "relative",
+    display: "flex",
+    justifyContent: "center",
+    width: "100%",
+    fontFamily: "var(--font-inter), system-ui, sans-serif",
+  }
+
   return (
     <>
-      {/* Slim top banner — while acting-as, until the first click anywhere dismisses it. */}
-      {isActingAs && !bannerDismissed && (
+      {/* Slim top banner — while acting-as, until the first click anywhere dismisses it.
+          Owned by the floating (root) instance only so it renders once across both
+          viewports; the rail instance never draws it. */}
+      {variant === "floating" && isActingAs && !bannerDismissed && (
         <div
           role="status"
           style={{
@@ -157,23 +191,14 @@ export function SuperSwitcher({ profile }: { profile: { id: string; role: string
         </div>
       )}
 
-      {/* Floating chip + popover. */}
-      <div style={chip}>
+      {/* Chip/pill + popover. Floating chip is mobile-only (md:hidden) — the desktop
+          trigger is the rail pill. */}
+      <div
+        style={variant === "rail" ? railWrapper : chip}
+        className={variant === "floating" ? "md:hidden" : undefined}
+      >
         {open && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "calc(100% + 8px)",
-              left: 0,
-              width: 220,
-              background: "var(--cream-panel)",
-              border: "1px solid var(--line-2)",
-              borderRadius: "var(--r-card)",
-              boxShadow: "0 12px 32px -8px color-mix(in srgb, var(--plum-deep) 28%, transparent)",
-              overflow: "hidden",
-              padding: 6,
-            }}
-          >
+          <div style={popoverStyle}>
             {error && (
               <div style={{ padding: "6px 10px", fontSize: 11.5, color: "var(--danger)", lineHeight: 1.4 }}>
                 {error}
@@ -306,31 +331,69 @@ export function SuperSwitcher({ profile }: { profile: { id: string; role: string
           </div>
         )}
 
-        <button
-          onClick={toggleOpen}
-          disabled={pending}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            padding: "7px 12px",
-            borderRadius: "var(--r-pill-lg)",
-            border: "1px solid var(--plum-light)",
-            background: "var(--plum-2)",
-            color: "var(--cream-on-dark)",
-            fontFamily: "inherit",
-            fontSize: 12.5,
-            fontWeight: 500,
-            cursor: pending ? "wait" : "pointer",
-            boxShadow: "0 6px 18px -6px color-mix(in srgb, var(--plum-deep) 40%, transparent)",
-          }}
-        >
-          <span
-            aria-hidden
-            style={{ width: 6, height: 6, borderRadius: "50%", background: isActingAs ? "var(--cream-on-dark)" : "color-mix(in srgb, var(--cream-on-dark) 55%, transparent)" }}
-          />
-          {pending ? "Switching…" : `Acting as: ${roleLabel(currentRole, SUPER_UUID)}`}
-        </button>
+        {variant === "rail" ? (
+          // Compact rail pill — cream-tint-on-dark, mono 9px, fits the 72px rail.
+          <button
+            onClick={toggleOpen}
+            disabled={pending}
+            title={pending ? "Switching…" : `Acting as ${roleLabel(currentRole, SUPER_UUID)}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+              maxWidth: 60,
+              padding: "4px 6px",
+              borderRadius: "var(--r-pill)",
+              border: "1px solid color-mix(in srgb, var(--cream-on-dark) 22%, transparent)",
+              background: "color-mix(in srgb, var(--cream-on-dark) 12%, transparent)",
+              color: "var(--cream-on-dark)",
+              fontFamily: "var(--mono)",
+              fontSize: 9,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              lineHeight: 1,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              cursor: pending ? "wait" : "pointer",
+            }}
+          >
+            <span
+              aria-hidden
+              style={{ width: 5, height: 5, flexShrink: 0, borderRadius: "50%", background: isActingAs ? "var(--cream-on-dark)" : "color-mix(in srgb, var(--cream-on-dark) 55%, transparent)" }}
+            />
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+              {pending ? "…" : roleLabel(currentRole, SUPER_UUID)}
+            </span>
+          </button>
+        ) : (
+          <button
+            onClick={toggleOpen}
+            disabled={pending}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "7px 12px",
+              borderRadius: "var(--r-pill-lg)",
+              border: "1px solid var(--plum-light)",
+              background: "var(--plum-2)",
+              color: "var(--cream-on-dark)",
+              fontFamily: "inherit",
+              fontSize: 12.5,
+              fontWeight: 500,
+              cursor: pending ? "wait" : "pointer",
+              boxShadow: "0 6px 18px -6px color-mix(in srgb, var(--plum-deep) 40%, transparent)",
+            }}
+          >
+            <span
+              aria-hidden
+              style={{ width: 6, height: 6, borderRadius: "50%", background: isActingAs ? "var(--cream-on-dark)" : "color-mix(in srgb, var(--cream-on-dark) 55%, transparent)" }}
+            />
+            {pending ? "Switching…" : `Acting as: ${roleLabel(currentRole, SUPER_UUID)}`}
+          </button>
+        )}
       </div>
     </>
   )

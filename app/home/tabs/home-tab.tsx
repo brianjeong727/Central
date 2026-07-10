@@ -156,19 +156,25 @@ export function HomeTab({
   const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
   const top3 = recentChats.slice(0, 3)
   const totalUnread = top3.reduce((s, c) => s + c.unreadCount, 0)
-  const roleLabelText = roleLabel(userRole, profile.id)
   const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
   const firstName = profile.name.split(" ")[0]
   const hour = new Date().getHours()
   const greetingPrefix = hour < 12 ? "Good morning, " : hour < 17 ? "Good afternoon, " : hour < 21 ? "Good evening, " : "Good night, "
+  // R8 honorific allowlist — only these roles greet with an honorific word before the
+  // first name; all others (admin, member, visitor) get the name alone. The real role
+  // is used (roleLabel with a null id bypasses the "Super" alias) so "Super" never
+  // surfaces in the greeting — that stays impersonation chrome.
+  const honorific = ["pastor", "deacon", "elder", "leader"].includes(userRole.toLowerCase())
+    ? roleLabel(userRole, null)
+    : null
   // Living-accent greeting (Dir 3): each segment is its own sheen span so the slow
-  // light-sheen drifts per-word; the plum role keeps its plum gradient. Static fill
-  // under prefers-reduced-motion (see .greeting-sheen in globals.css).
+  // light-sheen drifts per-word; the plum honorific keeps its plum gradient + italic.
+  // Static fill under prefers-reduced-motion (see .greeting-sheen in globals.css).
   const greetingNode = (
     <>
       <span className="greeting-sheen">{greetingPrefix}</span>
-      <span className="greeting-sheen greeting-sheen-plum">{roleLabelText}</span>
-      <span className="greeting-sheen">{" " + firstName}</span>
+      {honorific && <span className="greeting-sheen greeting-sheen-plum">{honorific}</span>}
+      <span className="greeting-sheen">{(honorific ? " " : "") + firstName}</span>
     </>
   )
 

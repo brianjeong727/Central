@@ -41,10 +41,10 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--cream-on-dark` | `#F6F4EF` | Cream text / fill **on** plum or dark surfaces — slightly muted from `--cream` for legibility |
 | `--cream-2`     | `#F8F4EA` | Inset surface (composer, dashed cells) |
 | `--cream-3`     | `#F6F2E8` | Accent surface (verse callout, today cell) |
-| `--body-bg`     | `#F4F1E8` | Desktop context sidebar panel — middle tier of three-tone desktop surface. **Exception:** the Messages (chat) panel uses `--cream` instead — see note below. |
+| `--body-bg`     | `#F4F1E8` | Desktop context sidebar panel — the context-panel cream step (one step darker than content cream; the dark rail sits outside the cream gradation — §2.1). **Exception:** the Messages (chat) panel uses `--cream` instead — see note below. |
 | `--ivory`       | `#F1ECDE` | Soft-pill background; also the **B · Emphasis** surface for the single most prominent inset card (Up Next). (Active sidebar item is now `--plum-tint` + a 3px `--plum` left bar — R4; no longer `--ivory`.) |
 | `--canvas`      | `#F1ECDE` | Design-canvas page bg outside artboards |
-| `--rail`        | `#ECE6D6` | Desktop icon rail — darkest step of three-tone desktop surface |
+| `--rail`        | `#13101A` | Desktop icon rail — dark ink step (R9, ratified); was the light `#ECE6D6` three-tone drift |
 | `--line`        | `#E8E2D2` | Primary hairline |
 | `--line-2`      | `#E2DDCF` | Card border, input border |
 | `--line-3`      | `#EFE9DA` | Faint row divider |
@@ -118,11 +118,13 @@ Central is a daily-driver tool that an entire church community lives in for comm
 [ 76px dark icon rail ] [ 220px cream sidebar ] [ flexible main ]
 ```
 
-- **Icon rail** — `#13101A` background, plum primary "+" button at top, six section icons (Home, Chat, People, Profile, Pray, Plan). Active icon: `rgba(251,248,242,0.08)` background + 2px cream stripe on the left edge.
+- **Icon rail** — `#13101A` background, plum primary "+" button at top, six section icons (Home, Messages, Workspace, People, Network — admin-only, You). Active treatment (R9): a `color-mix(in srgb, var(--cream-on-dark) 12%, transparent)` box behind the icon + a full-opacity 9px mono label + the cream left stripe. Icon and label go cream (`--cream-on-dark`) when active, muted when inactive — never plum on the dark rail (fails contrast). Rail labels are **9px mono uppercase** (`RAIL_LABEL_STYLE` in `components/central/typography.ts`); the old 7–8px labels are retired.
 - **Sidebar** — cream `#FDFCF8`, 220px wide, 1px right border `#E8E2D2`. Header block (32 top / 28 side / 24 bottom) has mono eyebrow "WORKSPACE" + serif "Central" 32px.
 - **Main column** — cream `#FDFCF8`. Top header strip is breadcrumbs left, search/header-actions right, then content.
 
-**Three-tone surface system:** The three shell zones use three tonal steps that recede left-to-right, making the content area feel forward and primary: icon rail (`--rail`, darkest) → context panel (`--body-bg`, middle) → content area (`--cream`, lightest). Each zone is one step lighter than the one to its left. **Chat exception:** the Messages context panel uses `--cream` to match its content area — the conversation list and thread are one continuous master/detail activity, so they share a surface rather than stepping tonally (see §1.2 note).
+The **SECTION label** (context-panel header), the **rail active highlight**, and the **bottom-nav highlight** all derive tab→section membership from the single nav-section config (`components/central/nav-sections.ts`, R7) — never a parallel switch.
+
+**Surface system:** The shell steps left-to-right, making the content area feel forward and primary: a **dark icon rail** (`--rail`, `#13101A`) → **cream context panel** (`--body-bg`) → **cream content area** (`--cream`, lightest). The rail is a hard dark step, not part of a gradation; the "one step lighter than the zone to its left" framing applies only to the two cream zones (context panel → content). **Chat exception:** the Messages context panel uses `--cream` to match its content area — the conversation list and thread are one continuous master/detail activity, so they share a surface rather than stepping tonally (see §1.2 note).
 
 ### 2.2 Sidebar variants
 
@@ -497,6 +499,7 @@ Mandatory elements above the fold:
 - **Numerals:** spell out one through nine in prose; use digits in stats, lists, and metadata.
 - **Date format:** `Saturday, May 16` (no year unless it disambiguates). Time: `5:00 AM – 6:00 AM` with en-dash and en-space.
 - **Possessives over second person where natural:** "Your teams · 2", not "Teams you're on (2)".
+- **Greeting honorific (R8):** Pastor / Deacon / Elder / Leader render as an italic plum serif word before the first name ("Good evening, _Pastor_ Grace"); all other roles greet with the name alone ("Good evening, Grace"). "Super" is impersonation chrome (rail chip + top banner) and never appears in greeting or profile copy — those show the account's real role.
 
 ---
 

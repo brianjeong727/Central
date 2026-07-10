@@ -1,6 +1,7 @@
 "use client"
 
 import { Home, MessageCircle, User, ClipboardList, BookOpen } from "lucide-react"
+import { sectionForTab } from "@/components/central/nav-sections"
 
 // "network" is included so activeTab can carry it (admin-only, desktop-nav-only);
 // it is intentionally NOT added to TABS_BASE so it never renders in the mobile nav.
@@ -34,7 +35,9 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = 
     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-[var(--cream-panel)] border-t border-[#F0EEF8] h-16 z-50 md:hidden">
       <div className="flex items-center justify-around h-full">
         {tabs.map((tab) => {
-          const isActive = tab.id === activeTab || (tab.id === "profile" && activeTab === "congregation")
+          // Highlight derives tab→section membership from the single nav-section
+          // config (R7) — congregation now lights Home, not You.
+          const isActive = sectionForTab(activeTab)?.id === tab.id
           const Icon = tab.icon
           const showBadge = tab.id === "chats" && chatsUnread > 0
 

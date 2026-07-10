@@ -74,7 +74,7 @@
   --body-bg:     #F4F1E8;  /* desktop body/sidebar surface — between cream-3 and ivory */
   --ivory:       #F1ECDE;
   --canvas:      #F1ECDE;
-  --rail:        #ECE6D6;  /* dedicated icon-rail surface — darker than ivory */
+  --rail:        #13101A;  /* dark icon-rail surface (R9, ratified) — was the light #ECE6D6 three-tone drift */
 
   /* Hairline family */
   --line:        #E8E2D2;
@@ -351,6 +351,7 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  font-style: italic; /* R8: honorific reads as an editorial serif word */
 }
 @keyframes greeting-dot-breathe {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--plum) 32%, transparent); }
@@ -366,7 +367,7 @@
     color: var(--ink);
     -webkit-text-fill-color: var(--ink);
   }
-  .greeting-sheen-plum { color: var(--plum); -webkit-text-fill-color: var(--plum); }
+  .greeting-sheen-plum { color: var(--plum); -webkit-text-fill-color: var(--plum); font-style: italic; }
   .greeting-dot-breathe { animation: none; }
 }
 
