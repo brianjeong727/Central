@@ -11,7 +11,7 @@ import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getSetupChecklist, setLeadersInvited, dismissSetupChecklist } from "@/app/actions/setup-checklist"
-import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard } from "@/components/central"
 import type { HeroSlide, SetupChecklistData } from "@/components/central"
 // Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
 // so keep it out of the initial home-tab bundle every member/visitor downloads.
@@ -655,16 +655,13 @@ export function HomeTab({
             onDetails={handleSlideDetails}
           />
         ) : heroAnn ? (
-          <HeroFrame>
-            <UpNextCard
+          <HeroFrame bare>
+            <FeaturedHeroCard
               fill
-              label="Up next"
-              labelAccent
+              eyebrowLabel="Up next"
               title={heroAnn.title}
               body={heroAnn.body}
               isEvent={heroAnn.is_event}
-              imageUrl={heroAnn.image_url}
-              postedDate={heroAnn.created_at}
               eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
               userHasRsvped={userHasRsvped}
               rsvping={rsvping}
@@ -676,16 +673,13 @@ export function HomeTab({
             />
           </HeroFrame>
         ) : latestAnn ? (
-          <HeroFrame>
-            <UpNextCard
+          <HeroFrame bare>
+            <FeaturedHeroCard
               fill
-              label="Latest"
-              labelAccent={false}
+              eyebrowLabel="Latest"
               title={latestAnn.title}
               body={latestAnn.body}
               isEvent={false}
-              imageUrl={latestAnn.image_url}
-              postedDate={latestAnn.created_at}
               onDetails={() => onOpenAnnouncement(latestAnn.id)}
             />
           </HeroFrame>
@@ -939,14 +933,12 @@ export function HomeTab({
                 onDetails={handleSlideDetails}
               />
             ) : heroAnn ? (
-              <UpNextCard
-                label="Up next"
-                labelAccent
+              <FeaturedHeroCard
+                mobile
+                eyebrowLabel="Up next"
                 title={heroAnn.title}
                 body={heroAnn.body}
                 isEvent={heroAnn.is_event}
-                imageUrl={heroAnn.image_url}
-                postedDate={heroAnn.created_at}
                 eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
                 userHasRsvped={userHasRsvped}
                 rsvping={rsvping}
@@ -955,19 +947,15 @@ export function HomeTab({
                 showAttendees={showAttendeeList}
                 onRsvp={handleHomeRsvp}
                 onDetails={() => onOpenAnnouncement(heroAnn.id)}
-                mobile
               />
             ) : latestAnn ? (
-              <UpNextCard
-                label="Latest"
-                labelAccent={false}
+              <FeaturedHeroCard
+                mobile
+                eyebrowLabel="Latest"
                 title={latestAnn.title}
                 body={latestAnn.body}
                 isEvent={false}
-                imageUrl={latestAnn.image_url}
-                postedDate={latestAnn.created_at}
                 onDetails={() => onOpenAnnouncement(latestAnn.id)}
-                mobile
               />
             ) : (
               <CentralCard

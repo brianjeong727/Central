@@ -1365,13 +1365,13 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
     onDelete(announcement.id)
   }
 
-  // ── Featured (plum) card ──
+  // ── Featured (ivory emphasis) card — de-plummed Phase 7. Mirrors the desktop
+  // pinned hero strip (ivory bg, line-2 border, plum accents); plum is reserved for
+  // the ONE Home featured hero, never a repeated announcement-card surface. ──
   if (featured) {
     return (
       <>
-        <div className="relative rounded-[22px] bg-[var(--plum)] overflow-hidden">
-          <div className="absolute -top-[70px] -right-[70px] w-[220px] h-[220px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.18)_0%,transparent_70%)] pointer-events-none" />
-
+        <div className="relative rounded-[22px] bg-[var(--ivory)] border border-[var(--line-2)] overflow-hidden">
           {announcement.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={announcement.image_url} alt={announcement.title} className="w-full h-44 object-cover" />
@@ -1380,22 +1380,32 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
           <div className="p-6 relative">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2 flex-wrap">
-                {isPinned && <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>Pinned ·</span>}
-                {!isPinned && announcement.is_sub_pinned && <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>For You ·</span>}
-                <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>{announcement.is_event ? "Event" : formatDate(announcement.created_at)}</span>
+                {isPinned && (
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)", display: "inline-block", flexShrink: 0 }} />
+                    <span style={{ ...MONO_STYLE, color: "var(--plum)" }}>Pinned ·</span>
+                  </span>
+                )}
+                {!isPinned && announcement.is_sub_pinned && (
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)", display: "inline-block", flexShrink: 0 }} />
+                    <span style={{ ...MONO_STYLE, color: "var(--plum)" }}>For You ·</span>
+                  </span>
+                )}
+                <span style={MONO_STYLE}>{announcement.is_event ? "Event" : formatDate(announcement.created_at)}</span>
                 {announcement.audience && announcement.audience !== "all" && (
-                  <span style={{ fontSize: "9px", letterSpacing: "0.1em", padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.15)", color: "var(--cream-on-dark)", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
+                  <span style={{ fontSize: "9px", letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "var(--line-3)", color: "var(--body)", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 {announcement.view_count > 0 && (
-                  <span className="flex items-center gap-1" style={{ fontSize: "10px", color: "rgba(246,244,239,0.5)", fontWeight: 500 }}><Users className="w-3 h-3" />{announcement.view_count}</span>
+                  <span className="flex items-center gap-1" style={{ fontSize: "10px", color: "var(--muted-text)", fontWeight: 500 }}><Users className="w-3 h-3" />{announcement.view_count}</span>
                 )}
                 {isAdminOrLeader && (
                   <div className="relative">
                     {showMenu && <div className="fixed inset-0 z-[5]" onClick={() => setShowMenu(false)} />}
-                    <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[color-mix(in_srgb,var(--cream-on-dark)_10%,transparent)] transition-colors">
-                      <MoreHorizontal className="w-4 h-4 text-[rgba(246,244,239,0.6)]" />
+                    <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[var(--cream-2)] transition-colors">
+                      <MoreHorizontal className="w-4 h-4 text-[var(--muted-text)]" />
                     </button>
                     {showMenu && (
                       <div className="absolute top-8 right-0 z-[10] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] py-1 min-w-[140px]">
@@ -1416,25 +1426,25 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
               </div>
             </div>
 
-            <h3 className="line-clamp-2" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", lineHeight: 1.05, letterSpacing: "-0.02em", color: "var(--cream-on-dark)", margin: "0 0 8px" }}>{announcement.title}</h3>
-            <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "rgba(246,244,239,0.72)" }}>{previewBody(announcement.body)}</p>
-            <button onClick={() => onOpenDetail(announcement.id)} className="text-[12px] font-medium mb-4 transition-colors" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "rgba(246,244,239,0.5)" }}>See announcement →</button>
+            <h3 className="line-clamp-2" style={{ fontFamily: "var(--serif)", fontSize: "30px", fontWeight: 400, lineHeight: 1.05, letterSpacing: "-0.02em", color: "var(--ink)", margin: "0 0 8px" }}>{announcement.title}</h3>
+            <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "var(--body)" }}>{previewBody(announcement.body)}</p>
+            <button onClick={() => onOpenDetail(announcement.id)} className="text-[12px] font-medium mb-4 transition-colors hover:text-[var(--plum)]" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--muted-text)" }}>See announcement →</button>
 
             {announcement.is_event && (
               <>
                 <div className="flex items-center gap-4">
-                  <button onClick={handleRsvp} className={`font-medium py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-[color-mix(in_srgb,var(--cream-on-dark)_20%,transparent)] text-[var(--cream-on-dark)] hover:bg-[color-mix(in_srgb,var(--cream-on-dark)_30%,transparent)] active:scale-[0.97]" : "bg-[var(--cream-on-dark)] text-[var(--plum)] hover:bg-[var(--cream-on-dark)] active:scale-[0.97]"}`}>
+                  <button onClick={handleRsvp} className={`font-medium py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-[var(--line-3)] text-[var(--body)] hover:bg-[var(--line)] active:scale-[0.97]" : "bg-[var(--plum)] text-[var(--cream)] hover:bg-[var(--plum-2)] active:scale-[0.97]"}`}>
                     {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
                   </button>
-                  {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "rgba(246,244,239,0.5)" }}>{announcement.rsvp_count} going</span>}
+                  {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "var(--muted-text)" }}>{announcement.rsvp_count} going</span>}
                 </div>
                 {announcement.rsvp_attendees.length > 0 && (isAdminOrLeader || announcement.show_attendees) && (
                   <div className="mt-4 flex flex-wrap gap-1.5">
                     {announcement.rsvp_attendees.slice(0, 8).map(a => (
-                      <span key={a.user_id} style={{ fontSize: "11px", color: "rgba(246,244,239,0.75)", background: "rgba(246,244,239,0.12)", border: "1px solid rgba(246,244,239,0.2)", padding: "2px 9px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                      <span key={a.user_id} style={{ fontSize: "11px", color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line)", padding: "2px 9px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
                     ))}
                     {announcement.rsvp_attendees.length > 8 && (
-                      <span style={{ fontSize: "11px", color: "rgba(246,244,239,0.45)", padding: "2px 4px" }}>+{announcement.rsvp_attendees.length - 8} more</span>
+                      <span style={{ fontSize: "11px", color: "var(--muted-text)", padding: "2px 4px" }}>+{announcement.rsvp_attendees.length - 8} more</span>
                     )}
                   </div>
                 )}
@@ -1443,8 +1453,8 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
             {announcement.has_form && (
               <div className="mt-3">
                 {announcement.user_has_responded
-                  ? <span style={{ fontSize: 12, color: "rgba(246,244,239,0.6)", display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
-                  : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid rgba(246,244,239,0.4)", background: "transparent", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
+                  ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
+                  : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
                 }
               </div>
             )}

@@ -20,9 +20,12 @@ import type { DesktopTopbarProps, DesktopSidebarProps, UserTeam, Tab } from "../
 
 // ── Shared design tokens (all CSS vars, never hardcoded hex) ─────────────────
 
-// R9: the icon rail is a dark surface (--rail ≡ #13101A), per DESIGN_SYSTEM §2.1.
+// R9: the icon rail is a deep-plum surface (--rail ≡ var(--plum-2)), per DESIGN_SYSTEM §2.1.
 // Nav items use the on-dark treatment (cream-on-dark active, muted inactive).
-const RAIL_BG    = "var(--rail)"          // ← dark icon-rail surface (#13101A)
+const RAIL_BG    = "var(--rail)"          // ← deep-plum icon-rail surface (var(--plum-2), Phase 7)
+// Inactive rail item icon+label on the plum-2 rail — matches the frames' `.ri`
+// inactive color (cream-on-dark at 55%), legible on deep plum where --muted-text drifts.
+const RAIL_INACTIVE = "color-mix(in srgb, var(--cream-on-dark) 55%, transparent)"
 const PANEL_BG   = "var(--body-bg)"       // ← sidebar panel: middle tier (var(--body-bg))
 const LINE       = "var(--line)"
 const PLUM       = "var(--plum)"
@@ -355,8 +358,8 @@ export function DesktopSidebar({
               className="relative flex flex-col items-center gap-1 w-full px-1 py-2.5 rounded-none transition-colors"
               style={{
                 background: "transparent",
-                // On the dark rail: cream-on-dark active, muted inactive (icon inherits currentColor).
-                color: isActive ? "var(--cream-on-dark)" : MUTED,
+                // On the plum-2 rail: cream-on-dark active, cream-on-dark-55% inactive (icon inherits currentColor).
+                color: isActive ? "var(--cream-on-dark)" : RAIL_INACTIVE,
                 border: "none",
                 cursor: "pointer",
               }}
@@ -397,7 +400,7 @@ export function DesktopSidebar({
               <span
                 style={{
                   ...RAIL_LABEL_STYLE,
-                  color: isActive ? "var(--cream-on-dark)" : MUTED,
+                  color: isActive ? "var(--cream-on-dark)" : RAIL_INACTIVE,
                 }}
               >
                 {label}

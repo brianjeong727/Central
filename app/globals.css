@@ -74,7 +74,7 @@
   --body-bg:     #F4F1E8;  /* desktop body/sidebar surface — between cream-3 and ivory */
   --ivory:       #F1ECDE;
   --canvas:      #F1ECDE;
-  --rail:        #13101A;  /* dark icon-rail surface (R9, ratified) — was the light #ECE6D6 three-tone drift */
+  --rail:        var(--plum-2);  /* frames' .rail — deep plum chrome; ratified Phase 7 (was #13101A) */
 
   /* Hairline family */
   --line:        #E8E2D2;
