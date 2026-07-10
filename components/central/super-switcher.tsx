@@ -86,11 +86,12 @@ export function SuperSwitcher({
 
   function toggleOpen() {
     setError(null)
-    setOpen((v) => {
-      const next = !v
-      if (next) void loadTeams()
-      return next
-    })
+    // Fire the lazy team load from the click handler — never inside the setOpen
+    // updater (updaters run during React's render phase; a server action there
+    // triggers a Router setState mid-render). `open` here is the committed value,
+    // so `!open` tells us we're opening. loadTeams self-guards against re-fetch.
+    if (!open) void loadTeams()
+    setOpen((v) => !v)
   }
 
   const selTeam = teams?.find((t) => t.id === selTeamId) ?? null
