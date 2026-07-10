@@ -42,7 +42,7 @@ export async function ensureMinistryChats(
   } else {
     const { data } = await admin
       .from("groups")
-      .insert({ name: centralName, type: "church", ministry_id: ministryId, created_by: createdBy })
+      .insert({ name: centralName, type: "church", category: "general", ministry_id: ministryId, created_by: createdBy })
       .select("id, name")
       .single()
     if (data) chatMap.set(data.name, data.id)
@@ -99,6 +99,7 @@ export async function autoAddUserToChats(
       await admin.from("groups").insert({
         name: className,
         type: "church",
+        category: "general",
         ministry_id: ministryId,
         created_by: ministry.created_by,
       })
@@ -119,6 +120,7 @@ export async function autoAddUserToChats(
       await admin.from("groups").insert({
         name: staffChatName,
         type: "church",
+        category: "general",
         ministry_id: ministryId,
         created_by: ministry.created_by,
       })
@@ -204,7 +206,7 @@ export async function retroactivelyApplyToggle(
       if (!chat) {
         const { data: newChat } = await admin
           .from("groups")
-          .insert({ name: className, type: "church", ministry_id: ministryId, created_by: ministry.created_by })
+          .insert({ name: className, type: "church", category: "general", ministry_id: ministryId, created_by: ministry.created_by })
           .select("id").single()
         chat = newChat
       }
@@ -230,7 +232,7 @@ export async function retroactivelyApplyToggle(
     if (!chat) {
       const { data: newChat } = await admin
         .from("groups")
-        .insert({ name: staffChatName, type: "church", ministry_id: ministryId, created_by: ministry.created_by })
+        .insert({ name: staffChatName, type: "church", category: "general", ministry_id: ministryId, created_by: ministry.created_by })
         .select("id").single()
       chat = newChat
     }
@@ -285,7 +287,7 @@ export async function runAnnualClassMaintenance(ministryId: string): Promise<{
       .from("groups").select("id").eq("ministry_id", ministryId).eq("name", incomingName).maybeSingle()
     if (!existingIncoming) {
       await admin.from("groups").insert({
-        name: incomingName, type: "church",
+        name: incomingName, type: "church", category: "general",
         ministry_id: ministryId, created_by: ministry.created_by,
       })
       created = incomingName
@@ -379,7 +381,7 @@ export async function createPraiseTeamChatAction(
   } else {
     const { data: group, error: groupErr } = await admin
       .from("groups")
-      .insert({ name: chatName, type: "church", ministry_id: ministryId, created_by: week.leader_id })
+      .insert({ name: chatName, type: "church", category: "team", ministry_id: ministryId, created_by: week.leader_id })
       .select("id")
       .single()
     if (groupErr || !group) return { groupId: null, error: "Failed to create praise team chat." }
@@ -510,7 +512,7 @@ export async function confirmSmallGroupChatsAction(
     } else {
       const { data: group, error } = await admin
         .from("groups")
-        .insert({ name: chatName, type: "church", ministry_id: ministryId, created_by: createdBy })
+        .insert({ name: chatName, type: "church", category: "group", ministry_id: ministryId, created_by: createdBy })
         .select("id")
         .single()
       if (error || !group) return { result: "error", groupId: null }
@@ -917,22 +919,40 @@ export async function createTeamChatAction(
 
   const chatName = `${teamName}`
 
-  // Dedup: find existing group by name + ministry
-  const { data: existing } = await admin
+  // Dedup by the team link first (the canonical key for a team chat), then fall
+  // back to name — so a manual create converges on any auto-created team chat.
+  const { data: linked } = await admin
     .from("groups")
     .select("id")
     .eq("ministry_id", ministryId)
-    .eq("name", chatName)
-    .maybeSingle()
+    .eq("linked_team_id", teamId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+  let existing = linked?.[0] ?? null
+  if (!existing) {
+    const { data: byName } = await admin
+      .from("groups")
+      .select("id")
+      .eq("ministry_id", ministryId)
+      .eq("name", chatName)
+      .maybeSingle()
+    existing = byName ?? null
+  }
 
   let groupId: string
 
   if (existing) {
     groupId = existing.id
+    // Backfill the section + team link onto a pre-existing name-matched chat.
+    await admin
+      .from("groups")
+      .update({ category: "team", linked_team_id: teamId })
+      .eq("id", groupId)
+      .eq("ministry_id", ministryId)
   } else {
     const { data: group, error: gErr } = await admin
       .from("groups")
-      .insert({ name: chatName, type: "church", ministry_id: ministryId, created_by: createdBy })
+      .insert({ name: chatName, type: "church", category: "team", linked_team_id: teamId, ministry_id: ministryId, created_by: createdBy })
       .select("id")
       .single()
     if (gErr || !group) return { groupId: null, error: "Failed to create group chat." }
@@ -999,7 +1019,7 @@ export async function createEventPlanningChatAction(
   const { data: group, error: gErr } = await admin
     .from("groups")
     // created_by comes from the verified session, never the caller-supplied param.
-    .insert({ name: chatName, type: "church", ministry_id: ministryId, created_by: authz.userId })
+    .insert({ name: chatName, type: "church", category: "team", ministry_id: ministryId, created_by: authz.userId })
     .select("id")
     .single()
   if (gErr || !group) return { groupId: null, created: false, error: "Failed to create group chat." }
@@ -1011,4 +1031,135 @@ export async function createEventPlanningChatAction(
   await admin.from("event_plans").update({ planning_group_id: group.id }).eq("id", eventPlanId).eq("ministry_id", ministryId)
 
   return { groupId: group.id as string, created: true }
+}
+
+// ── syncTeamChat ──────────────────────────────────────────────────────────────
+// Team chats MIRROR team_members (roster is the source of truth). This reconciles
+// a single team's linked chat:
+//   • If no linked chat exists, one is created ONLY when the ministry's
+//     `auto_team_chats` automation is ON (missing key = OFF — no surprise creation).
+//   • If a linked chat exists (created here or via createTeamChatAction), its
+//     membership is reconciled to EXACTLY match team_members: missing members are
+//     added, members no longer on the roster are removed. Removing a member only
+//     deletes their group_members row — their messages persist.
+// Called on team create and after every team-roster mutation. Idempotent.
+const TEAM_CHAT_TOGGLE = "auto_team_chats"
+
+async function findLinkedTeamChat(
+  admin: ReturnType<typeof createAdminClient>,
+  ministryId: string,
+  teamId: string,
+): Promise<string | null> {
+  const { data } = await admin
+    .from("groups")
+    .select("id")
+    .eq("ministry_id", ministryId)
+    .eq("linked_team_id", teamId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+  return data?.[0]?.id ?? null
+}
+
+export async function syncTeamChat(
+  teamId: string,
+  ministryId: string,
+): Promise<{ groupId: string | null; created?: boolean; skipped?: boolean; error?: string }> {
+  // Caller must be admin-tier or a member of this team, in this ministry.
+  const authz = await requireTeamMemberOrAdmin(teamId)
+  if (authz.error !== null) return { groupId: null, error: authz.error }
+  if (authz.ministryId !== ministryId) return { groupId: null, error: "Not authorized." }
+
+  const admin = createAdminClient()
+
+  // Team must exist in this ministry (defense-in-depth beyond the authz check).
+  const { data: team } = await admin
+    .from("teams")
+    .select("id, name")
+    .eq("id", teamId)
+    .eq("ministry_id", ministryId)
+    .maybeSingle()
+  if (!team) return { groupId: null, error: "Team not found." }
+
+  let groupId = await findLinkedTeamChat(admin, ministryId, teamId)
+  let created = false
+
+  if (!groupId) {
+    // No linked chat — create one only if the automation is enabled.
+    const { data: ministry } = await admin
+      .from("ministries")
+      .select("automation_settings")
+      .eq("id", ministryId)
+      .single()
+    const settings = ((ministry?.automation_settings ?? {}) as Record<string, boolean>)
+    if (settings[TEAM_CHAT_TOGGLE] !== true) return { groupId: null, skipped: true }
+
+    const { data: group, error: gErr } = await admin
+      .from("groups")
+      .insert({
+        name: team.name,
+        type: "church",
+        category: "team",
+        linked_team_id: teamId,
+        ministry_id: ministryId,
+        created_by: authz.userId,
+      })
+      .select("id")
+      .single()
+    if (gErr || !group) return { groupId: null, error: gErr?.message ?? "Failed to create team chat." }
+    groupId = group.id
+    created = true
+  }
+
+  // Reconcile group_members to exactly match team_members.
+  const { data: teamMembers } = await admin
+    .from("team_members")
+    .select("user_id")
+    .eq("team_id", teamId)
+  const wanted = new Set((teamMembers ?? []).map((r: { user_id: string }) => r.user_id))
+
+  const { data: chatMembers } = await admin
+    .from("group_members")
+    .select("user_id")
+    .eq("group_id", groupId)
+  const have = new Set((chatMembers ?? []).map((r: { user_id: string }) => r.user_id))
+
+  const toAdd = [...wanted].filter((id) => !have.has(id))
+  const toRemove = [...have].filter((id) => !wanted.has(id))
+
+  const now = new Date().toISOString()
+  if (toAdd.length > 0) {
+    await admin.from("group_members").upsert(
+      toAdd.map((uid) => ({ group_id: groupId, user_id: uid, last_read_at: now })),
+      { onConflict: "group_id,user_id", ignoreDuplicates: true },
+    )
+  }
+  if (toRemove.length > 0) {
+    // group_members has no ministry_id column; the group is already ministry-scoped.
+    await admin.from("group_members").delete().eq("group_id", groupId).in("user_id", toRemove)
+  }
+
+  return { groupId, created }
+}
+
+// ── backfillTeamChats ─────────────────────────────────────────────────────────
+// Runs when the `auto_team_chats` automation is turned ON: creates + populates a
+// linked chat for every team that doesn't already have one. Idempotent — teams
+// with an existing linked chat are only re-synced, not duplicated.
+export async function backfillTeamChats(ministryId: string): Promise<{ created: number; error?: string }> {
+  // Admin-tier ministry configuration.
+  const authz = await requireMinistryAdmin(ministryId)
+  if (authz.error !== null) return { created: 0, error: authz.error }
+
+  const admin = createAdminClient()
+  const { data: teams } = await admin
+    .from("teams")
+    .select("id")
+    .eq("ministry_id", ministryId)
+
+  let created = 0
+  for (const t of (teams ?? []) as { id: string }[]) {
+    const res = await syncTeamChat(t.id, ministryId)
+    if (res.created) created++
+  }
+  return { created }
 }

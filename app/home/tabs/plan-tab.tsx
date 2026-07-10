@@ -30,7 +30,7 @@ import {
 import { confirmSmallGroupsAction, deleteSmallGroupAssignmentsAction } from "@/app/actions/generate-groups"
 import { SLOTS, type DGLSlot, type ProposedAssignment } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks, getSemesterDates, getSemesterOptions, type DGLAvailSlot } from "@/app/actions/dgl-utils"
-import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamChatAction, createEventPlanningChatAction } from "@/app/actions/auto-chats"
+import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamChatAction, createEventPlanningChatAction, syncTeamChat } from "@/app/actions/auto-chats"
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
@@ -10410,6 +10410,11 @@ export function AddWorkspaceModal({ ministryId, userId, ownedKeys, onClose, onCr
         })))
       if (rolesErr) throw rolesErr
 
+      // If the ministry has team chats enabled, auto-create this team's linked
+      // chat now (empty — the president/members are assigned next; each add
+      // re-syncs the roster). No-op when the automation is off.
+      await syncTeamChat(team.id, ministryId)
+
       onCreated({ id: team.id, name: preset.name, icon: preset.emoji, team_type: preset.teamType })
       onClose()
     } catch (e) {
@@ -10719,6 +10724,10 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
       await elevateToLeader(rows.map(r => r.user_id), ministryId)
     }
 
+    // Mirror the roster into the team's linked chat (adds the new members). No-op
+    // if this team has no linked chat / team chats are off.
+    await syncTeamChat(team.id, ministryId)
+
     // Revalidate the cached settings (re-populates members via the SWR effect) and return to
     // settings — do NOT call onChanged() which closes settings.
     await mutateTeamSettings()
@@ -10732,6 +10741,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
 
   async function handleRemoveMember(memberId: string) {
     await supabase.from("team_members").delete().eq("team_id", team.id).eq("user_id", memberId)
+    // Mirror the removal into the team's linked chat (their messages persist).
+    await syncTeamChat(team.id, ministryId)
     setMembers((prev) => prev.filter((m) => m.user_id !== memberId))
     // Keep the ["team-settings", team.id] SWR cache fresh so the removed member can't
     // briefly reappear via the populate effect on reopen. Optimistically drop them from

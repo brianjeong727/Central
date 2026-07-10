@@ -964,6 +964,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
           <ChatListPanel
             userId={userId}
             ministryId={ministryId}
+            ministryName={ministryName}
             activeGroupId={globalOpenChat?.id}
             onOpenChat={handleOpenChat}
             refreshKey={chatRefreshKey}
