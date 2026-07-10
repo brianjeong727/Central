@@ -5,16 +5,17 @@ interface PageTitleProps {
   // Omit to suppress the eyebrow entirely — title top-spacing tightens automatically.
   eyebrow?: string
   title: ReactNode
-  // Explicit size override; defaults to 36 (identity) or 25 (compact).
+  // Explicit size override; defaults to 44 (landing) or 25 (compact). Only two
+  // title tiers exist (R1, ratified 2026-07-09) — the former 36px tier is retired.
   titleSize?: number
-  // Planning/work pages: no eyebrow + 25px title. Independent from eyebrow.
+  // Planning/work/detail pages: no eyebrow + 25px title. Independent from eyebrow.
   compact?: boolean
   children?: ReactNode
   style?: CSSProperties
 }
 
 export function PageTitle({ eyebrow, title, titleSize, compact = false, children, style }: PageTitleProps) {
-  const resolvedSize = titleSize ?? (compact ? 25 : 36)
+  const resolvedSize = titleSize ?? (compact ? 25 : 44)
   const showEyebrow = !!eyebrow
 
   return (

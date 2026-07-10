@@ -72,7 +72,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | Role | Family | Size | Weight | Letter-spacing | Use |
 |---|---|---|---|---|---|
 | Display    | serif | 56–64 | 600 | -0.02em      | Hero banner names ("SSO", "Student Org Board") |
-| H1         | serif | 36–52 | 600 | -0.02em      | Page titles (PageTitle component default: 36px) |
+| H1 | serif | 44 | 600 | -0.02em | Page titles — **landing tier** (PageTitle default 44px). Workspace/detail pages use the compact **25px** tier (§3.1). These are the only two title tiers (R1, ratified 2026-07-09); the former 36px tier is retired. |
 | H2         | serif | 28–36 | 600 | -0.02em      | Section titles inside a page |
 | H3         | sans  | 16–18 | 500 | 0            | UI-chrome card titles, role names, list headings. Serif H3 only for genuine editorial section heads within long-form content. |
 | Body L     | serif | 19    | 400 | 0.1          | Long-form quotes, editorial body, transition notes, chat reading-room |
@@ -80,7 +80,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | Body S     | sans  | 12–13 | 400 | 0            | Secondary metadata |
 | Eyebrow / Mono | mono | 11 | 400 | 1.4 | All-caps labels above any title or section. **Always required above page H1 and section H2.** |
 | Numeric    | serif | 28–40 | 400 | -0.4 to -0.6 | Stat card numbers, invite codes — weight 400 is intentional; editorial numbers read differently from heading text |
-| Date anchor | serif | 36–42 | **600** | -0.02em | **Exception (approved 2026-06-30):** the single date/posted numeral that anchors the **featured announcement card's 40% slot** (36px — tuned to match the Home page H1 so the page header stays the size ceiling; the card title sits one step below at 30/600) and the **announcement detail aside** (42px) may be serif weight **600** — it acts as a display focal point, not a stat readout. Scoped to those two surfaces only; ordinary stat numbers stay weight 400. |
+| Date anchor | serif | 36–42 | **600** | -0.02em | **Exception (approved 2026-06-30):** the single date/posted numeral that anchors the **featured announcement card's 40% slot** (36px — kept one step below the 44px page-H1 ceiling per R1, so the page header stays the size ceiling; the card title sits one step below the anchor at 30/600) and the **announcement detail aside** (42px) may be serif weight **600** — it acts as a display focal point, not a stat readout. Scoped to those two surfaces only; ordinary stat numbers stay weight 400. |
 
 **Pattern rules:**
 - Every page title is preceded by an eyebrow mono label (`DATE`, `SECTION · CONTEXT`, `WORKSPACE`, etc.).
@@ -161,20 +161,24 @@ Every primary content page follows this structure, top-to-bottom:
 3. **Underline tab strip** — always immediately under the hero, separated by 22px.
 4. **Section eyebrow + section H2** — first content block.
 
-For pages without a hero banner:
-- Mono eyebrow ("MINISTRY ADMIN", "NEW ANNOUNCEMENT · DRAFT", etc.)
-- Serif H1 (44–52px)
-- Optional 15px body sentence describing the page
+For pages without a hero banner (R1 header anatomy, ratified 2026-07-09):
+- Breadcrumb (Zone A wayfinding)
+- Mono eyebrow — **required** ("MINISTRY ADMIN", "NEW ANNOUNCEMENT · DRAFT", etc.)
+- Serif H1 — **44px landing tier** / **25px compact tier** (these are the only two title tiers; the former 36px tier is retired)
+- Optional 15px sentence describing the page
+- **ONE terminating hairline.** If the page has a tab strip, the strip's own rule IS the terminator — never both; suppress `TabPageHeader`'s bottom `InsetHairline` (via `noBottomHairline`) when a strip follows.
+
+**No buttons in the page-title header** — sole exception: the Zone-B Settings gear. Every create/add/generate lives in the collection's content header (§3.2 Zone C).
 
 ### 3.1 Workspace headers are compact
 
-**Rule:** Every Plan-tab workspace uses a **compact** header — `<TabPageHeader><PageTitle title={…} compact /></TabPageHeader>`: a **25px** serif title (vs the 36px default) and **no eyebrow**. This applies to ALL workspaces with no exceptions — Finance, Receipts, Praise, DG Praise, One-Time, Tech, the standard calendar team, Student Org Board, and Small Group Leaders. Right-slot actions (the settings gear, `HeaderActionButton`) sit in the same `TabPageHeader` row; `HeaderActionButton` is pinned to 28px to match the compact line box.
+**Rule:** Every Plan-tab workspace uses a **compact** header — `<TabPageHeader><PageTitle title={…} compact /></TabPageHeader>`: a **25px** serif title (vs the 36px default) and **no eyebrow**. This applies to ALL workspaces with no exceptions — Finance, Receipts, Praise, DG Praise, One-Time, Tech, the standard calendar team, Student Org Board, and Small Group Leaders. The only right-slot action is the Zone-B settings **gear** (icon button), sized to match the compact line box; creates never sit in this row (§3.2).
 
 The workspace's identity (which ministry, which team) is already carried by the sidebar and breadcrumb, so the header stays tight and title-only — do **not** add a `PLANNING · MINISTRY` / `RECEIPTS · TEAM` eyebrow back.
 
 The title-row right slot holds only the Zone-B manage action (the settings gear) — the create/add CTA lives in the content header per §3.2, not the title row.
 
-**Carve-out:** event/identity drill-down headers are NOT workspace nav headers and keep the full 36px `PageTitle` + eyebrow — e.g. the Student Org and Small Group **event-detail** headers (eyebrow = `{EVENT_TYPE} · {DATE}`, title = the event name). Compact is for the workspace's own top-level header, not these earned identity moments.
+**Event/identity drill-down headers (carve-out retired, ratified 2026-07-09):** event/identity drill-down headers — e.g. the Student Org and Small Group **event-detail** headers — now use the **compact 25px** tier like all detail pages (in practice rendered by `SubpageShell`, which is already 25px). The former 36px `PageTitle` + eyebrow carve-out is retired; there are only two title tiers (44 landing / 25 compact).
 
 ### 3.2 Action placement — one home per button type
 
@@ -185,11 +189,11 @@ Every action button has exactly one zone it's allowed to live in; its **scope** 
 - **Zone C — Content header (by the collection).** The page's single **plum primary** create action ("Add entry", "Add category", "New question") sits right of the header for the collection it fills. List-level helpers (Export, Filter, a view toggle) are **ghost buttons to its left**.
 - **Kebab (⋯).** Only for low-frequency, destructive, or per-row actions (Duplicate, Move, Delete, Leave; per-row table actions). Never primary navigation or the main create.
 
-> **The one-line rule (read this first):** the top / object header carries **only object-config** — the Settings **gear** (→ kebab at 3+). It **never** holds a create / add / generate button. Every add / create / generate action is a **plum primary in the body content header** of the collection it fills (Zone C). On a **multi-section workspace** (a team/workspace home with General / Events / Groups / … sidebar sections), the top header shows the **workspace name + gear**, and each section's create lives in **that section's own body header** — not the page header. The header-hosted create primitive (`HeaderActionButton` in a `TabPageHeader`) is therefore **retired for multi-section workspaces**; use `SectionHeader`/`ContentHeader` + `ContentActionButton`/`CentralButton` in the body instead. (The only exception is the single-feed case below.)
+> **The one-line rule (read this first):** the top / object header carries **only object-config** — the Settings **gear** (→ kebab at 3+). It **never** holds a create / add / generate button. Every add / create / generate action is a **plum primary in the body content header** of the collection it fills (Zone C). On a **multi-section workspace** (a team/workspace home with General / Events / Groups / … sidebar sections), the top header shows the **workspace name + gear**, and each section's create lives in **that section's own body header** — not the page header. The header-hosted create pattern (a create button in a `TabPageHeader`) is therefore **retired**; use `SectionHeader`/`ContentHeader` + `ContentActionButton`/`CentralButton` in the body instead. (There is no single-feed exception — see below.)
 
 **Scale:** 1 action → direct button; 2 → side by side in the zone; 3+ → collapse to a kebab, keeping the single most-used action visible beside it.
 
-**Single-feed exception:** when the page title directly heads its one collection (the Announcements feed, the Congregation questions list), the create primary may sit in the title row's right slot — that slot *is* the content header. On **object + sub-collection** pages (Receipts → its *Categories*; Finance Team → its *Expense ledger*) the create moves off the title row down to the collection's own header, while the Zone-B gear stays by the title.
+**No single-feed exception (R1/R2, ratified 2026-07-09):** the create primary is never beside the page title — not even when the page title directly heads its one collection (Announcements feed, Congregation questions). Every create lives in that collection's own content header (Zone C) below the title block. On object + sub-collection pages the create sits in the sub-collection's header while the Zone-B gear stays by the title. View toggles and list helpers (Cards | Compact, Export, Filter) are ghost/secondary buttons to the LEFT of the create in that same content header — never in the title row.
 
 ---
 
@@ -472,7 +476,7 @@ Mandatory elements above the fold:
 1. Mono eyebrow
 2. Serif title
 3. One descriptive sentence in body color (max ~120 chars)
-4. Either a hero stat row (3 stat cards) OR a clear primary action button right-aligned at the same baseline as the title — never both at full strength.
+4. Optionally a hero stat row (3 stat cards). **No primary/create button sits at the title baseline** (R1) — the page's create lives in its collection content header (§3.2 Zone C); only the Zone-B Settings gear may share the title row.
 
 ---
 

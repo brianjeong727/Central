@@ -1068,38 +1068,41 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         )}
       </div>
 
-      {/* Desktop Editorial Header */}
+      {/* Desktop Editorial Header — title only; view toggle + create live in the
+          body toolbar row below (R1: no occupants in the title row). */}
       <TabPageHeader>
         <PageTitle
           eyebrow={`${announcements.length} total · ${announcements.filter(a => !a.user_has_rsvped && a.is_event).length} unread`}
           title="Announcements"
         />
-        {/* Header right slot now holds only the Cards/Compact view toggle; the
-            create CTA moved into the body toolbar row (Filter ↔ New). */}
-        <div className="flex items-center gap-2 pb-1.5 ml-auto">
-          <div className="flex border border-[var(--line)] rounded-lg overflow-hidden">
-            <button onClick={() => setCompact(false)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: !compact ? "var(--line-3)" : "transparent", fontWeight: !compact ? 500 : 400, border: "none", cursor: "pointer" }}>Cards</button>
-            <button onClick={() => setCompact(true)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: compact ? "var(--line-3)" : "transparent", fontWeight: compact ? 500 : 400, border: "none", cursor: "pointer" }}>Compact</button>
-          </div>
-        </div>
       </TabPageHeader>
 
       <div className="md:flex-1 md:overflow-y-auto">
       {loading ? (
         <AnnouncementsListSkeleton />
-      ) : announcements.length === 0 ? (
-        <div className="px-5 md:px-14">
-          <EmptyState icon={<Bell className="w-7 h-7" />} title="No announcements yet" subtitle={isLeaderOrAdmin ? "Post the first announcement." : "Check back soon for updates"} />
-          {/* Desktop create for the empty feed (mobile keeps the header + button);
-              the toolbar's New button only renders once items exist. */}
-          {isLeaderOrAdmin && (
-            <div className="hidden md:flex justify-center mt-6">
-              <ContentActionButton label="New announcement" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={openCreate} />
-            </div>
-          )}
-        </div>
       ) : (
         <>
+          {/* Desktop toolbar — always-visible content header (R2): filter + view
+              toggle (ghost left group) · create (right). No occupants in the title row. */}
+          <div className="hidden md:flex items-center justify-between px-14 pt-7 mb-6">
+            <div className="flex items-center gap-2">
+              <FilterDropdown options={FILTERS} value={filter} onSelect={(id) => setFilter(id as FilterType)} />
+              <div className="flex border border-[var(--line)] rounded-lg overflow-hidden">
+                <button onClick={() => setCompact(false)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: !compact ? "var(--line-3)" : "transparent", fontWeight: !compact ? 500 : 400, border: "none", cursor: "pointer" }}>Cards</button>
+                <button onClick={() => setCompact(true)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: compact ? "var(--line-3)" : "transparent", fontWeight: compact ? 500 : 400, border: "none", cursor: "pointer" }}>Compact</button>
+              </div>
+            </div>
+            {isLeaderOrAdmin && (
+              <ContentActionButton label="New announcement" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={openCreate} />
+            )}
+          </div>
+
+          {announcements.length === 0 ? (
+            <div className="px-5 md:px-14">
+              <EmptyState icon={<Bell className="w-7 h-7" />} title="No announcements yet" subtitle={isLeaderOrAdmin ? "Post the first announcement with New announcement above." : "Check back soon for updates"} />
+            </div>
+          ) : (
+            <>
           {/* Mobile card list */}
           <div className="md:hidden px-5 pb-4 flex flex-col gap-4">
             {announcements.map((ann) => (
@@ -1122,15 +1125,8 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
             ))}
           </div>
 
-          {/* Desktop layout */}
-          <div className="hidden md:block px-14 py-7">
-            {/* Toolbar row: filter dropdown (left) · create CTA (right) */}
-            <div className="flex items-center justify-between mb-6">
-              <FilterDropdown options={FILTERS} value={filter} onSelect={(id) => setFilter(id as FilterType)} />
-              {isLeaderOrAdmin && (
-                <ContentActionButton label="New announcement" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={openCreate} />
-              )}
-            </div>
+          {/* Desktop layout — the toolbar (filter · toggle · create) lives above as an always-visible content header */}
+          <div className="hidden md:block px-14 pb-7">
 
             {/* Pinned hero strip — UpNextCard emphasis treatment */}
             {pinnedAnn && filter === "all" && (
@@ -1298,6 +1294,8 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
               </div>
             )}
           </div>
+            </>
+          )}
         </>
       )}
       </div>

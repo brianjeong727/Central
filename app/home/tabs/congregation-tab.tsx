@@ -5,7 +5,7 @@ import { useNavState } from "../nav-state"
 import { Plus, X, BarChart2, ChevronLeft } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, MONO_STYLE, EmptyState } from "../components/shared"
-import { TabPageHeader, PageTitle, CentralButton, ContentActionButton } from "@/components/central"
+import { TabPageHeader, PageTitle, CentralButton, ContentActionButton, ContentHeader } from "@/components/central"
 import type { CongregationTabProps, CongregationQuestion } from "../types"
 
 interface Response {
@@ -252,26 +252,22 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
 
   return (
     <div className="pb-28 md:pb-0">
-      {/* Mobile header — full title + create in list view only */}
+      {/* Mobile header — title only; the create lives in the Questions content header below */}
       {view === "list" && (
-        <div className="md:hidden px-5 pt-14 pb-3 flex items-start justify-between gap-3">
-          <div>
-            <p style={{ ...MONO_STYLE, margin: 0 }}>Congregation</p>
-            <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>
-              Congregation
-            </h1>
-            <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>
-              Ask your congregation — responses are anonymous.
-            </p>
-          </div>
-          <ContentActionButton label="New question" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => goTo("create")} />
+        <div className="md:hidden px-5 pt-14 pb-3">
+          <p style={{ ...MONO_STYLE, margin: 0 }}>Congregation Pulse</p>
+          <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>
+            Congregation
+          </h1>
+          <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>
+            Ask your congregation — responses are anonymous.
+          </p>
         </div>
       )}
 
-      {/* Desktop header */}
-      <TabPageHeader className="justify-between">
-        <PageTitle title="Congregation" compact />
-        {view === "list" && <ContentActionButton label="New question" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => goTo("create")} />}
+      {/* Desktop header — landing tier (R1); no create in the title row */}
+      <TabPageHeader>
+        <PageTitle eyebrow="Congregation Pulse" title="Congregation" />
       </TabPageHeader>
 
       <div
@@ -280,21 +276,21 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
         {/* ── LIST VIEW ── */}
         {view === "list" && (
           <>
+            {/* Content header — the create CTA lives here (Zone C, R2), never in the title row */}
+            <div style={{ marginBottom: 20 }}>
+              <ContentHeader
+                label="Questions"
+                action={<ContentActionButton label="New question" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => goTo("create")} />}
+              />
+            </div>
             {loadingList ? (
               <Spinner />
             ) : questions.length === 0 ? (
-              <div>
-                <EmptyState
-                  icon={<BarChart2 className="w-5 h-5" />}
-                  title="No questions yet"
-                  subtitle="Ask your congregation something to get started."
-                />
-                <div style={{ display: "flex", justifyContent: "center" }}>
-                  <CentralButton onClick={() => goTo("create")}>
-                    <Plus className="w-3.5 h-3.5" /> New question
-                  </CentralButton>
-                </div>
-              </div>
+              <EmptyState
+                icon={<BarChart2 className="w-5 h-5" />}
+                title="No questions yet"
+                subtitle="Ask your first question with New question above."
+              />
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {questions.map((q) => (

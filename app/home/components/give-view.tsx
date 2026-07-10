@@ -126,9 +126,9 @@ export function GiveView({
         <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>Give directly to your ministry through Zelle.</p>
       </div>
 
-      {/* Desktop header */}
+      {/* Desktop header — landing tier (R1) */}
       <TabPageHeader>
-        <PageTitle title="Give" compact />
+        <PageTitle eyebrow="Offering" title="Give" />
       </TabPageHeader>
 
       <div className="px-5 md:px-14 pt-6 md:pt-5 md:flex-1 md:overflow-y-auto">

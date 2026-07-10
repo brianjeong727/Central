@@ -958,8 +958,8 @@ export function SettingsTab({
         <h1 style={{ fontFamily: "var(--serif)", fontSize: 32, color: "var(--ink)", fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.05, margin: "12px 0 0" }}>Church Settings</h1>
       </div>
 
-      {/* Desktop header */}
-      <TabPageHeader>
+      {/* Desktop header — settings tab strip below is the single terminating hairline (R1) */}
+      <TabPageHeader noBottomHairline>
         <PageTitle eyebrow={isAdmin ? "Ministry Admin" : "Ministry Workspace"} title="Church Settings" />
       </TabPageHeader>
 
@@ -1047,7 +1047,7 @@ export function SettingsTab({
                   {/* Schools */}
                   <div>
                     <div style={{ marginBottom: 16 }}>
-                      <SectionHeader eyebrow="Schools" title="Linked campuses" titleSize={20} action={isAdmin && !addingSchool ? (<button onClick={() => setAddingSchool(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add school</button>) : undefined} />
+                      <SectionHeader eyebrow="Schools" title="Linked campuses" titleSize={20} action={isAdmin && !addingSchool ? (<CentralButton variant="create" size="sm" onClick={() => setAddingSchool(true)} style={{ flexShrink: 0 }}>+ Add school</CentralButton>) : undefined} />
                     </div>
                     <div style={{ ...CARD, overflow: "hidden" }}>
                       {schools.length === 0 && !addingSchool && <div style={{ padding: "16px 20px" }}><p style={{ fontSize: 13, color: "var(--muted-text)" }}>No schools added yet.</p></div>}
@@ -1135,7 +1135,7 @@ export function SettingsTab({
               {isAdmin && (
                 <section>
                   <div style={{ marginBottom: 20 }}>
-                    <SectionHeader eyebrow="Daily Verse Rotation" title="Verses on the sidebar" titleSize={20} action={!addingVerse ? <button onClick={() => setAddingVerse(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add verse</button> : undefined} />
+                    <SectionHeader eyebrow="Daily Verse Rotation" title="Verses on the sidebar" titleSize={20} action={!addingVerse ? <CentralButton variant="create" size="sm" onClick={() => setAddingVerse(true)} style={{ flexShrink: 0 }}>+ Add verse</CentralButton> : undefined} />
                     <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Verses rotate daily in the order below. Drag to reorder. Today&apos;s verse is highlighted.</p>
                   </div>
                   <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
@@ -1814,7 +1814,7 @@ export function SettingsTab({
               {isAdmin && (
                 <section>
                   <div style={{ marginBottom: 20 }}>
-                    <SectionHeader eyebrow="Receipt Limits" title="Per-event reimbursement caps" titleSize={20} action={!addingLimit ? <button onClick={() => setAddingLimit(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add limit</button> : undefined} />
+                    <SectionHeader eyebrow="Receipt Limits" title="Per-event reimbursement caps" titleSize={20} action={!addingLimit ? <CentralButton variant="create" size="sm" onClick={() => setAddingLimit(true)} style={{ flexShrink: 0 }}>+ Add limit</CentralButton> : undefined} />
                     <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Define a maximum reimbursement that members can submit against an event before it requires admin approval.</p>
                   </div>
                   <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>

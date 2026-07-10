@@ -681,8 +681,9 @@ export function FormResponsesView({ formId, title, onClose }: {
         </h1>
       </div>
 
-      {/* Desktop header — back is the shell breadcrumb (§3.2 Zone A); no in-header back */}
-      <TabPageHeader>
+      {/* Desktop header — back is the shell breadcrumb (§3.2 Zone A); no in-header
+          back. Sub-tab strip below is the single terminating hairline (R1). */}
+      <TabPageHeader noBottomHairline>
         <PageTitle eyebrow={`Responses · ${loading ? '…' : respondents.length}`} title={title} compact />
       </TabPageHeader>
 
@@ -1011,7 +1012,10 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
       </div>
 
       <TabPageHeader>
-        <PageTitle title="Forms" compact />
+        <PageTitle
+          eyebrow={items.length ? `${items.length} forms · ${items.reduce((s, i) => s + i.response_count, 0)} responses` : "Forms"}
+          title="Forms"
+        />
       </TabPageHeader>
 
       <div className="md:flex-1 md:overflow-y-auto">

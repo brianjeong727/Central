@@ -11,7 +11,7 @@ import { getInitials } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
-import { CentralButton, IconButton, InsetHairline, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog } from "@/components/central"
+import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog } from "@/components/central"
 import { useNavState } from "../nav-state"
 import type { Profile, Devotional, Prayer, Verse } from "../types"
 
@@ -1031,6 +1031,12 @@ export function ProfileTab({
     )
   }
 
+  // Journal desktop header: suppress its terminating hairline ONLY when the
+  // sub-tab strip follows immediately. When stats are on, JournalSection renders
+  // a Stats bar BETWEEN the header and the strip, so the header must keep its
+  // hairline (otherwise nothing terminates the header above the stats bar).
+  const journalShowStats = (profile.show_journal_entries ?? false) || (profile.show_journal_streak ?? false)
+
   return (
     <div className="pb-6 md:pb-0 md:flex md:flex-col md:min-h-full">
 
@@ -1044,9 +1050,10 @@ export function ProfileTab({
             <JournalSettingsMenu showEntries={profile.show_journal_entries ?? false} showStreak={profile.show_journal_streak ?? false} onToggleEntries={handleToggleEntries} onToggleStreak={handleToggleStreak} />
           </div>
 
-          {/* Desktop header — compact, gear in the right slot */}
-          <TabPageHeader>
-            <PageTitle title="Journal" compact />
+          {/* Desktop header — landing tier (R1), gear in the right slot; the
+              Journal sub-tab strip below is the single terminating hairline. */}
+          <TabPageHeader noBottomHairline={!journalShowStats}>
+            <PageTitle eyebrow="Personal · Only you can see this" title="Journal" />
             <div style={{ marginLeft: "auto" }}>
               <JournalSettingsMenu showEntries={profile.show_journal_entries ?? false} showStreak={profile.show_journal_streak ?? false} onToggleEntries={handleToggleEntries} onToggleStreak={handleToggleStreak} />
             </div>
@@ -1110,38 +1117,48 @@ export function ProfileTab({
           )}
         </div>
 
-        {/* ── Desktop: cream identity header ── */}
-        <TabPageHeader style={{ gap: 24 }}>
-          <label className="group relative flex-shrink-0" style={{ width: 64, height: 64, borderRadius: "999px", background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
-            <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
-            {profile.avatar_url
-              ? <img src={profile.avatar_url} alt="Profile" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : <span style={{ fontFamily: "var(--serif)", fontSize: 26, color: "var(--cream)" }}>{getInitials(profile.name)}</span>
-            }
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "rgba(19,16,26,0.35)" }}>
-              <Camera style={{ width: 16, height: 16, color: "white" }} />
-            </div>
-            {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(19,16,26,0.4)" }}><div className="animate-spin" style={{ width: 20, height: 20, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
-          </label>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>Your Profile · {roleLabel(profile.role, profile.id)}</p>
-            <h1 style={{ fontFamily: "var(--serif)", fontSize: 44, fontWeight: 400, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 10px", lineHeight: 1.05 }}>{profile.name}</h1>
-            <div style={{ display: "flex", gap: 20, fontSize: 14, color: "var(--body)", flexWrap: "wrap", alignItems: "center" }}>
-              {profile.graduation_year && <span>Class of {profile.graduation_year}</span>}
-              {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation && <span>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
-              <span style={{ color: "var(--muted-text)" }}>{profile.email}</span>
-            </div>
-            {avatarError && <p style={{ fontSize: 11, color: "var(--danger)", margin: "6px 0 0" }}>{avatarError}</p>}
-          </div>
-          {editing ? (
-            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-              <CentralButton variant="secondary" onClick={cancelEdit}><X size={13} />Cancel</CentralButton>
-              <CentralButton onClick={saveEdit} disabled={saving}><Check size={13} />{saving ? "Saving…" : "Save"}</CentralButton>
-            </div>
-          ) : (
-            <CentralButton variant="secondary" onClick={startEdit} style={{ flexShrink: 0 }}><Pencil size={13} />Edit profile</CentralButton>
-          )}
+        {/* ── Desktop: page-title header (R1 — mono eyebrow + serif H1) ──
+            Title / gear only; no buttons. Edit / Save / Cancel live in the
+            identity card below (R1/R2, ratified 2026-07-09). */}
+        <TabPageHeader>
+          <PageTitle eyebrow="Your profile" title="Profile" />
         </TabPageHeader>
+
+        {/* ── Desktop: identity card — avatar + name + email; Edit / Save / Cancel
+            right-aligned inside the card. */}
+        <div className="hidden md:block px-14 pt-8">
+          <div style={{ display: "flex", alignItems: "center", gap: 24, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: "var(--r-card)", padding: "24px 28px" }}>
+            <label className="group relative flex-shrink-0" style={{ width: 64, height: 64, borderRadius: "999px", background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
+              <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+              {profile.avatar_url
+                ? <img src={profile.avatar_url} alt="Profile" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : <span style={{ fontFamily: "var(--serif)", fontSize: 26, color: "var(--cream)" }}>{getInitials(profile.name)}</span>
+              }
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "rgba(19,16,26,0.35)" }}>
+                <Camera style={{ width: 16, height: 16, color: "white" }} />
+              </div>
+              {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(19,16,26,0.4)" }}><div className="animate-spin" style={{ width: 20, height: 20, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
+            </label>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>{roleLabel(profile.role, profile.id)}</p>
+              <h1 style={{ fontFamily: "var(--serif)", fontSize: 32, fontWeight: 400, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 8px", lineHeight: 1.05 }}>{profile.name}</h1>
+              <div style={{ display: "flex", gap: 20, fontSize: 14, color: "var(--body)", flexWrap: "wrap", alignItems: "center" }}>
+                {profile.graduation_year && <span>Class of {profile.graduation_year}</span>}
+                {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation && <span>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
+                <span style={{ color: "var(--muted-text)" }}>{profile.email}</span>
+              </div>
+              {avatarError && <p style={{ fontSize: 11, color: "var(--danger)", margin: "6px 0 0" }}>{avatarError}</p>}
+            </div>
+            {editing ? (
+              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <CentralButton variant="secondary" onClick={cancelEdit}><X size={13} />Cancel</CentralButton>
+                <CentralButton onClick={saveEdit} disabled={saving}><Check size={13} />{saving ? "Saving…" : "Save"}</CentralButton>
+              </div>
+            ) : (
+              <CentralButton variant="secondary" onClick={startEdit} style={{ flexShrink: 0 }}><Pencil size={13} />Edit profile</CentralButton>
+            )}
+          </div>
+        </div>
 
         {/* ── Desktop: profile sections ── */}
         <div className="hidden md:flex md:flex-col md:flex-1 px-14 pt-6 pb-10">

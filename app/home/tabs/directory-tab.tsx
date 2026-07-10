@@ -209,9 +209,9 @@ export function DirectoryTab({
       {/* ── Desktop: TabPageHeader + detail pane only ── */}
       <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
 
-        {/* Page header — matches Finance/Profile exactly */}
+        {/* Page header — landing tier (R1) */}
         <TabPageHeader>
-          <PageTitle title="Directory" compact />
+          <PageTitle eyebrow={mobileMembers.length ? `People · ${mobileMembers.length} members` : "People"} title="Directory" />
         </TabPageHeader>
 
         {/* Detail area */}
