@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, CSSProperties, ReactNode, TransitionEvent } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, ClipboardList } from "lucide-react"
 import { UpNextEventDetail } from "./up-next-card"
 
 // A curated hero slide resolves to LIVE data from the entity it references
@@ -128,6 +128,18 @@ export function HeroSectionLabel({ breathe = false, action }: { breathe?: boolea
   )
 }
 
+// Structured date parts for the BIG serif §1.3 date-anchor in the 40% detail slot
+// (restored from the retired UpNextCard's information architecture, now on plum).
+function heroDateParts(iso: string) {
+  const d = new Date(iso)
+  return {
+    weekday: d.toLocaleDateString("en-US", { weekday: "long" }),
+    monthDay: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    year: d.toLocaleDateString("en-US", { year: "numeric" }),
+    time: d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+  }
+}
+
 // Compact date range for the event glass chip (e.g. "Oct 24–26").
 function chipDate(detail: UpNextEventDetail): string {
   const s = new Date(detail.startDate)
@@ -153,6 +165,10 @@ interface FeaturedHeroCardProps {
   title: string
   body?: string | null
   isEvent?: boolean
+  // §1.3 date-anchor inputs for the 40% detail panel: event start wins; else the
+  // announcement's posted date. `hasForm` surfaces a form indicator beneath the date.
+  hasForm?: boolean
+  postedDate?: string
   userHasRsvped?: boolean
   rsvping?: boolean
   rsvpCount?: number
@@ -172,6 +188,8 @@ export function FeaturedHeroCard({
   title,
   body,
   isEvent,
+  hasForm,
+  postedDate,
   userHasRsvped,
   rsvping,
   rsvpCount = 0,
@@ -184,7 +202,9 @@ export function FeaturedHeroCard({
   style,
 }: FeaturedHeroCardProps) {
   const bodyText = body ? body.replace(/\n+/g, " ") : null
-  const eyebrowText = eventDetail ? `${eyebrowLabel} · ${chipDate(eventDetail)}` : eyebrowLabel
+  // Desktop: the 40% date-anchor panel is the sole date carrier, so the eyebrow reads
+  // just the slide label. Mobile has no anchor — it keeps the date in the eyebrow.
+  const eyebrowText = mobile && eventDetail ? `${eyebrowLabel} · ${chipDate(eventDetail)}` : eyebrowLabel
   const maxAttendees = mobile ? 6 : 8
 
   // Actions — RSVP as the hero-invert primary (cream fill / plum text), the details
@@ -262,6 +282,176 @@ export function FeaturedHeroCard({
       </div>
     ) : null
 
+  // ── On-plum §1.3 date-anchor detail panel (the restored 40% right slot) ───────
+  // Serif 36/600 cream-on-dark is the documented §1.3 exception, here transposed
+  // onto the plum surface. Event start date wins; otherwise the posted date.
+  const monoMicro = "color-mix(in srgb, var(--cream-on-dark) 55%, transparent)"
+  const secondaryText = "color-mix(in srgb, var(--cream-on-dark) 74%, transparent)"
+  const bigDateStyle: CSSProperties = {
+    fontFamily: "var(--serif)",
+    fontSize: 36,
+    fontWeight: 600,
+    letterSpacing: "-0.02em",
+    lineHeight: 1,
+    color: "var(--cream-on-dark)",
+  }
+  const monoLabelStyle: CSSProperties = {
+    fontFamily: "var(--mono)",
+    fontSize: 11,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    color: monoMicro,
+  }
+
+  const formIndicator = hasForm ? (
+    <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: "var(--space-5)" }}>
+      <ClipboardList style={{ width: 15, height: 15, color: secondaryText, flexShrink: 0 }} />
+      <span style={{ fontSize: 12, color: secondaryText }}>Includes a form</span>
+    </div>
+  ) : null
+
+  const detailPanel = (): ReactNode => {
+    if (eventDetail) {
+      const p = heroDateParts(eventDetail.startDate)
+      return (
+        <>
+          <div style={monoLabelStyle}>Starts</div>
+          <div style={{ fontFamily: "var(--sans)", fontSize: 15, fontWeight: 600, color: "var(--cream-on-dark)", marginTop: "var(--space-6)" }}>
+            {p.weekday}
+          </div>
+          <div style={{ ...bigDateStyle, marginTop: "var(--space-2)" }}>{p.monthDay}</div>
+          <div style={{ fontSize: 13, color: secondaryText, marginTop: "var(--space-4)" }}>
+            {eventDetail.allDay ? "All day" : p.time}
+            {eventDetail.location ? ` · ${eventDetail.location}` : ""}
+          </div>
+          {formIndicator}
+        </>
+      )
+    }
+    // Fallback: posted date.
+    const p = postedDate ? heroDateParts(postedDate) : null
+    return (
+      <>
+        <div style={monoLabelStyle}>Posted</div>
+        {p ? (
+          <>
+            <div style={{ ...bigDateStyle, marginTop: "var(--space-6)" }}>{p.monthDay}</div>
+            <div style={{ fontSize: 15, color: secondaryText, marginTop: "var(--space-3)" }}>{p.year}</div>
+          </>
+        ) : (
+          <div style={{ ...bigDateStyle, marginTop: "var(--space-6)", color: monoMicro }}>—</div>
+        )}
+        {formIndicator}
+      </>
+    )
+  }
+
+  // ── Left editorial column: eyebrow / title / body / buttons / attendees ───────
+  const editorial = (
+    <>
+      <div
+        style={{
+          fontFamily: "var(--mono)",
+          fontSize: 10,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: monoMicro,
+        }}
+      >
+        {eyebrowText}
+      </div>
+      <div
+        className="line-clamp-2"
+        style={{
+          fontFamily: "var(--serif)",
+          fontSize: mobile ? 30 : 38,
+          fontWeight: 600,
+          letterSpacing: "-0.02em",
+          lineHeight: 1.05,
+          color: "var(--cream-on-dark)",
+          marginTop: "var(--space-3)",
+        }}
+      >
+        {title}
+      </div>
+      {bodyText && (
+        <p
+          className="line-clamp-2"
+          style={{
+            fontSize: 14,
+            color: "color-mix(in srgb, var(--cream-on-dark) 78%, transparent)",
+            marginTop: "var(--space-3)",
+            lineHeight: 1.5,
+            maxWidth: 520,
+          }}
+        >
+          {bodyText}
+        </p>
+      )}
+      {/* Mobile-only compact date line — desktop carries the full date anchor in the 40% panel */}
+      {mobile && (eventDetail || postedDate) && (
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: "var(--space-5)", flexWrap: "wrap" }}>
+          <span style={{ ...monoLabelStyle, fontSize: 10, letterSpacing: "0.14em" }}>{eventDetail ? "Starts" : "Posted"}</span>
+          <span style={{ fontSize: 13, color: secondaryText }}>
+            {eventDetail
+              ? (() => {
+                  const p = heroDateParts(eventDetail.startDate)
+                  return `${p.weekday}, ${p.monthDay}${eventDetail.allDay ? " · All day" : ` · ${p.time}`}${eventDetail.location ? ` · ${eventDetail.location}` : ""}`
+                })()
+              : (() => {
+                  const p = heroDateParts(postedDate!)
+                  return `${p.monthDay}, ${p.year}`
+                })()}
+          </span>
+        </div>
+      )}
+      {(rsvpBtn || detailsBtn) && (
+        <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-8)", flexWrap: "wrap", alignItems: "center" }}>
+          {rsvpBtn}
+          {detailsBtn}
+          {isEvent && rsvpCount > 0 && (
+            <span style={{ fontSize: 12, fontWeight: 500, color: monoMicro }}>
+              {rsvpCount} going
+            </span>
+          )}
+        </div>
+      )}
+      {attendeeChips}
+    </>
+  )
+
+  // ── Decorative ornament — a single corner ring peeking behind content ─────────
+  // (The lower ring was dropped: it landed squarely in the new 40% date-anchor
+  // panel and fought the serif date. One calm top-right peek is enough.)
+  const ornament = (
+    <div style={{ position: "absolute", right: -40, top: -40, width: 220, height: 220, borderRadius: 999, border: "1px solid color-mix(in srgb, var(--cream-on-dark) 14%, transparent)", pointerEvents: "none", zIndex: 0 }} />
+  )
+
+  // ── Mobile: single stacked editorial column (date line folded in above) ───────
+  if (mobile) {
+    return (
+      <div
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          background: "var(--plum)",
+          borderRadius: "var(--r-hero)",
+          boxSizing: "border-box",
+          width: "100%",
+          padding: "var(--space-8)",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          ...style,
+        }}
+      >
+        {ornament}
+        <div style={{ position: "relative", zIndex: 1 }}>{editorial}</div>
+      </div>
+    )
+  }
+
+  // ── Desktop: 60/40 split — editorial left, restored §1.3 date-anchor panel right ─
   return (
     <div
       style={{
@@ -272,69 +462,40 @@ export function FeaturedHeroCard({
         boxSizing: "border-box",
         width: "100%",
         height: fill ? "100%" : undefined,
-        padding: mobile ? "var(--space-8)" : "var(--space-10) var(--space-11)",
         display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
         ...style,
       }}
     >
-      {/* Decorative ornaments — frame-exact geometry, one component's internal detail */}
-      <div style={{ position: "absolute", right: -40, top: -40, width: 220, height: 220, borderRadius: 999, border: "1px solid color-mix(in srgb, var(--cream-on-dark) 14%, transparent)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", right: 30, bottom: -70, width: 160, height: 160, borderRadius: 999, border: "1px solid color-mix(in srgb, var(--cream-on-dark) 10%, transparent)", pointerEvents: "none" }} />
-
-      <div style={{ position: "relative", zIndex: 1 }}>
-        <div
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 10,
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-            color: "color-mix(in srgb, var(--cream-on-dark) 55%, transparent)",
-          }}
-        >
-          {eyebrowText}
-        </div>
-        <div
-          className="line-clamp-2"
-          style={{
-            fontFamily: "var(--serif)",
-            fontSize: mobile ? 30 : 38,
-            fontWeight: 600,
-            letterSpacing: "-0.02em",
-            lineHeight: 1.05,
-            color: "var(--cream-on-dark)",
-            marginTop: "var(--space-3)",
-          }}
-        >
-          {title}
-        </div>
-        {bodyText && (
-          <p
-            className="line-clamp-2"
-            style={{
-              fontSize: 14,
-              color: "color-mix(in srgb, var(--cream-on-dark) 78%, transparent)",
-              marginTop: "var(--space-3)",
-              lineHeight: 1.5,
-              maxWidth: 520,
-            }}
-          >
-            {bodyText}
-          </p>
-        )}
-        {(rsvpBtn || detailsBtn) && (
-          <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-8)", flexWrap: "wrap", alignItems: "center" }}>
-            {rsvpBtn}
-            {detailsBtn}
-            {isEvent && rsvpCount > 0 && (
-              <span style={{ fontSize: 12, fontWeight: 500, color: "color-mix(in srgb, var(--cream-on-dark) 55%, transparent)" }}>
-                {rsvpCount} going
-              </span>
-            )}
-          </div>
-        )}
-        {attendeeChips}
+      {ornament}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          flex: "0 0 60%",
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "var(--space-10) var(--space-11)",
+        }}
+      >
+        {editorial}
+      </div>
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "flex-start",
+          padding: "var(--space-10)",
+          borderLeft: "1px solid color-mix(in srgb, var(--cream-on-dark) 16%, transparent)",
+        }}
+      >
+        {detailPanel()}
       </div>
     </div>
   )
@@ -804,6 +965,8 @@ export function HomeHeroCarousel({
           title={s.title}
           body={s.body}
           isEvent={isEvent}
+          hasForm={s.kind === "announcement" ? s.hasForm : undefined}
+          postedDate={s.kind === "announcement" ? s.createdAt : undefined}
           eventDetail={s.kind === "event" ? s.eventDetail : s.kind === "announcement" ? s.eventDetail : undefined}
           userHasRsvped={annId ? rsvpedIds.has(annId) : false}
           rsvping={rsvping}

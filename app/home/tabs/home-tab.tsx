@@ -662,6 +662,7 @@ export function HomeTab({
               title={heroAnn.title}
               body={heroAnn.body}
               isEvent={heroAnn.is_event}
+              postedDate={heroAnn.created_at}
               eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
               userHasRsvped={userHasRsvped}
               rsvping={rsvping}
@@ -680,6 +681,7 @@ export function HomeTab({
               title={latestAnn.title}
               body={latestAnn.body}
               isEvent={false}
+              postedDate={latestAnn.created_at}
               onDetails={() => onOpenAnnouncement(latestAnn.id)}
             />
           </HeroFrame>
@@ -939,6 +941,7 @@ export function HomeTab({
                 title={heroAnn.title}
                 body={heroAnn.body}
                 isEvent={heroAnn.is_event}
+                postedDate={heroAnn.created_at}
                 eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
                 userHasRsvped={userHasRsvped}
                 rsvping={rsvping}
@@ -955,6 +958,7 @@ export function HomeTab({
                 title={latestAnn.title}
                 body={latestAnn.body}
                 isEvent={false}
+                postedDate={latestAnn.created_at}
                 onDetails={() => onOpenAnnouncement(latestAnn.id)}
               />
             ) : (
