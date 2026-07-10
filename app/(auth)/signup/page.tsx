@@ -8,6 +8,7 @@ import { Spinner } from "@/app/home/components/shared"
 import { signUpWithAutoConfirm } from "@/app/actions/auth"
 import { SplitShell, GoogleButton, OrDivider, EyeButton } from "@/app/(auth)/shared"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
+import { CentralButton } from "@/components/central"
 
 const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
@@ -62,18 +63,13 @@ function Primary({ children, disabled, loading, onClick }: {
   children: React.ReactNode; disabled?: boolean; loading?: boolean; onClick?: () => void
 }) {
   return (
-    <button type={onClick ? "button" : "submit"} disabled={disabled} onClick={onClick} style={{
-      width: "100%", padding: "14px 22px", borderRadius: 12, border: "none",
-      background: disabled ? "var(--line-2)" : "var(--plum-2)",
-      color: disabled ? "var(--faint)" : "var(--cream-panel)",
-      fontSize: 15, fontWeight: 500, fontFamily: SANS,
-      cursor: disabled ? "not-allowed" : "pointer", letterSpacing: "0.01em",
-      transition: "background .15s",
-      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+    <CentralButton type={onClick ? "button" : "submit"} variant="primary" disabled={disabled} onClick={onClick} style={{
+      width: "100%", padding: "14px 22px", borderRadius: 12,
+      fontSize: 15, letterSpacing: "0.01em",
     }}>
       {loading && <Spinner/>}
       {children}
-    </button>
+    </CentralButton>
   )
 }
 

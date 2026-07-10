@@ -7,7 +7,7 @@ import { ArrowLeft, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal,
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE } from "../components/shared"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee } from "../types"
@@ -101,6 +101,15 @@ const AUDIENCE_OPTIONS = [
   { value: "2028", label: "Class of 2028" },
   { value: "group", label: "Specific Group" },
 ]
+
+// Draft status pill — derived from the --gold semantic accent (R10 status layer),
+// never an invented traffic-light hex. borderRadius is applied inline per call site.
+const DRAFT_PILL_STYLE: React.CSSProperties = {
+  fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", textTransform: "uppercase", fontWeight: 500,
+  background: "color-mix(in srgb, var(--gold) 13%, var(--cream))",
+  border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--cream))",
+  color: "color-mix(in srgb, var(--gold) 65%, var(--ink))",
+}
 
 type FilterType = "all" | "events" | "forms" | "pinned"
 
@@ -264,17 +273,15 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
   // Primary + secondary action buttons (shared by mobile + desktop headers).
   const PublishButton = (
-    <button
+    <CentralButton
       type="button"
+      variant="primary"
       disabled={submitting}
       onClick={e => handleSubmit(e as unknown as React.FormEvent, false)}
-      className="flex items-center justify-center transition-colors disabled:opacity-50"
-      style={{ height: 28, padding: "0 16px", borderRadius: 9, background: "var(--plum-2)", color: "var(--cream)", fontSize: 13, fontWeight: 500, border: "none", cursor: submitting ? "default" : "pointer", flexShrink: 0 }}
-      onMouseEnter={e => { if (!submitting) e.currentTarget.style.background = "var(--plum-2)" }}
-      onMouseLeave={e => (e.currentTarget.style.background = "var(--plum-2)")}
+      style={{ height: 28, padding: "0 16px", borderRadius: 9, fontSize: 13, flexShrink: 0 }}
     >
       {submitting ? "Saving…" : isEditing ? "Save changes" : "Publish"}
-    </button>
+    </CentralButton>
   )
   const DraftButton = !isEditing ? (
     <button
@@ -1061,38 +1068,45 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         )}
       </div>
 
-      {/* Desktop Editorial Header */}
+      {/* Desktop Editorial Header — title only; view toggle + create live in the
+          body toolbar row below (R1: no occupants in the title row). */}
       <TabPageHeader>
         <PageTitle
           eyebrow={`${announcements.length} total · ${announcements.filter(a => !a.user_has_rsvped && a.is_event).length} unread`}
           title="Announcements"
         />
-        {/* Header right slot now holds only the Cards/Compact view toggle; the
-            create CTA moved into the body toolbar row (Filter ↔ New). */}
-        <div className="flex items-center gap-2 pb-1.5 ml-auto">
-          <div className="flex border border-[var(--line)] rounded-lg overflow-hidden">
-            <button onClick={() => setCompact(false)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: !compact ? "var(--line-3)" : "transparent", fontWeight: !compact ? 500 : 400, border: "none", cursor: "pointer" }}>Cards</button>
-            <button onClick={() => setCompact(true)} className="px-3 py-1.5 text-[12px] transition-colors" style={{ background: compact ? "var(--line-3)" : "transparent", fontWeight: compact ? 500 : 400, border: "none", cursor: "pointer" }}>Compact</button>
-          </div>
-        </div>
       </TabPageHeader>
 
       <div className="md:flex-1 md:overflow-y-auto">
       {loading ? (
         <AnnouncementsListSkeleton />
-      ) : announcements.length === 0 ? (
-        <div className="px-5 md:px-14">
-          <EmptyState icon={<Bell className="w-7 h-7" />} title="No announcements yet" subtitle={isLeaderOrAdmin ? "Post the first announcement." : "Check back soon for updates"} />
-          {/* Desktop create for the empty feed (mobile keeps the header + button);
-              the toolbar's New button only renders once items exist. */}
-          {isLeaderOrAdmin && (
-            <div className="hidden md:flex justify-center mt-6">
-              <ContentActionButton label="New announcement" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={openCreate} />
-            </div>
-          )}
-        </div>
       ) : (
         <>
+          {/* Desktop toolbar — always-visible content header (R2): filter + view
+              toggle (ghost left group) · create (right). No occupants in the title row. */}
+          <div className="hidden md:flex items-center justify-between px-14 pt-7 mb-6">
+            <div className="flex items-center gap-2">
+              <FilterDropdown options={FILTERS} value={filter} onSelect={(id) => setFilter(id as FilterType)} />
+              {announcements.length >= 2 && (
+                <SegmentedControl
+                  aria-label="Announcement layout"
+                  options={[{ id: "cards", label: "Cards" }, { id: "compact", label: "Compact" }]}
+                  value={compact ? "compact" : "cards"}
+                  onChange={(id) => setCompact(id === "compact")}
+                />
+              )}
+            </div>
+            {isLeaderOrAdmin && (
+              <ContentActionButton label="New announcement" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={openCreate} />
+            )}
+          </div>
+
+          {announcements.length === 0 ? (
+            <div className="px-5 md:px-14">
+              <EmptyState icon={<Bell className="w-7 h-7" />} title="No announcements yet" subtitle={isLeaderOrAdmin ? "Post the first announcement with New announcement above." : "Check back soon for updates"} />
+            </div>
+          ) : (
+            <>
           {/* Mobile card list */}
           <div className="md:hidden px-5 pb-4 flex flex-col gap-4">
             {announcements.map((ann) => (
@@ -1115,15 +1129,8 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
             ))}
           </div>
 
-          {/* Desktop layout */}
-          <div className="hidden md:block px-14 py-7">
-            {/* Toolbar row: filter dropdown (left) · create CTA (right) */}
-            <div className="flex items-center justify-between mb-6">
-              <FilterDropdown options={FILTERS} value={filter} onSelect={(id) => setFilter(id as FilterType)} />
-              {isLeaderOrAdmin && (
-                <ContentActionButton label="New announcement" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={openCreate} />
-              )}
-            </div>
+          {/* Desktop layout — the toolbar (filter · toggle · create) lives above as an always-visible content header */}
+          <div className="hidden md:block px-14 pb-7">
 
             {/* Pinned hero strip — UpNextCard emphasis treatment */}
             {pinnedAnn && filter === "all" && (
@@ -1138,13 +1145,13 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                     <p style={{ margin: 0, fontSize: "13px", color: "var(--body)", lineHeight: 1.55 }} className="line-clamp-2">{previewBody(pinnedAnn.body)}</p>
                     {/* Actions row */}
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <button onClick={() => onOpenAnnouncement(pinnedAnn.id)} style={{ background: "var(--plum)", color: "var(--cream)", border: 0, padding: "9px 20px", borderRadius: "9px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
+                      <CentralButton variant="secondary" onClick={() => onOpenAnnouncement(pinnedAnn.id)} style={{ padding: "9px 20px", borderRadius: "9px", fontSize: "13px" }}>
                         {pinnedAnn.is_event ? "See details" : "See announcement"}
-                      </button>
+                      </CentralButton>
                       {pinnedAnn.is_event && (
-                        <button onClick={() => handleRsvpToggle(pinnedAnn.id)} style={{ background: pinnedAnn.user_has_rsvped ? "var(--line-3)" : "transparent", color: "var(--ink)", border: "1px solid var(--line)", padding: "9px 20px", borderRadius: "9px", fontWeight: 500, fontSize: "13px", cursor: "pointer" }}>
+                        <CentralButton variant={pinnedAnn.user_has_rsvped ? "plum-outline" : "primary"} onClick={() => handleRsvpToggle(pinnedAnn.id)} style={{ padding: "9px 20px", borderRadius: "9px", fontSize: "13px" }}>
                           {pinnedAnn.user_has_rsvped ? "Going ✓" : "RSVP"}
-                        </button>
+                        </CentralButton>
                       )}
                       {pinnedAnn.rsvp_count > 0 && (
                         <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{pinnedAnn.rsvp_count} going</span>
@@ -1185,7 +1192,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                     <div className="grid px-5 py-3.5 items-center" style={{ gridTemplateColumns: "100px 1.5fr 1fr 100px", gap: "12px" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                         <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "var(--ivory)", border: "1px solid var(--line)", textTransform: "uppercase", fontWeight: 500, width: "fit-content" }}>{ann.is_event ? "Event" : "Post"}</span>
-                        {ann.status === "draft" && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: "6px", background: "#FFF8E1", border: "1px solid #FDE68A", textTransform: "uppercase", fontWeight: 500, color: "#B45309", width: "fit-content" }}>Draft</span>}
+                        {ann.status === "draft" && <span style={{ ...DRAFT_PILL_STYLE, borderRadius: "6px", width: "fit-content" }}>Draft</span>}
                       </div>
                       <div
                         onClick={() => onOpenAnnouncement(ann.id)}
@@ -1199,9 +1206,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                       <div className="flex justify-end items-center gap-1.5">
                         <button onClick={() => onOpenAnnouncement(ann.id)} style={{ fontSize: "11px", color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "4px 6px", whiteSpace: "nowrap" }} className="hover:text-[var(--plum)] transition-colors">See →</button>
                         {ann.is_event && (
-                          <button onClick={() => handleRsvpToggle(ann.id)} style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", border: "1px solid var(--line)", cursor: "pointer", background: ann.user_has_rsvped ? "var(--line-3)" : "transparent" }}>
+                          <CentralButton variant={ann.user_has_rsvped ? "plum-outline" : "primary"} onClick={() => handleRsvpToggle(ann.id)} style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px" }}>
                             {ann.user_has_rsvped ? "Going" : "RSVP"}
-                          </button>
+                          </CentralButton>
                         )}
                         {isLeaderOrAdmin && (
                           <DesktopActionMenu
@@ -1232,9 +1239,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                       <div className="flex justify-between items-center mb-4">
                         <span style={MONO_STYLE}>{formatDate(ann.created_at)}</span>
                         <div style={{ display: "flex", gap: 4 }}>
-                          {ann.status === "draft" && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#FFF8E1", border: "1px solid #FDE68A", textTransform: "uppercase", fontWeight: 500, color: "#B45309" }}>Draft</span>}
+                          {ann.status === "draft" && <span style={{ ...DRAFT_PILL_STYLE, borderRadius: 999 }}>Draft</span>}
                           {ann.is_pinned && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "var(--plum)", textTransform: "uppercase", fontWeight: 500, color: "var(--cream)" }}>📌 Pinned</span>}
-                          {ann.is_sub_pinned && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "#F1ECFF", border: "1px solid #D8CAFF", textTransform: "uppercase", fontWeight: 500, color: "var(--plum)" }}>For You</span>}
+                          {ann.is_sub_pinned && <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "var(--plum-tint)", border: "1px solid color-mix(in srgb, var(--plum) 25%, var(--cream))", textTransform: "uppercase", fontWeight: 500, color: "var(--plum)" }}>For You</span>}
                           <span style={{ fontSize: "10px", letterSpacing: "0.8px", padding: "3px 9px", borderRadius: 999, background: "var(--line-3)", textTransform: "uppercase", fontWeight: 500, color: "var(--ink)" }}>{ann.is_event ? "Event" : "Post"}</span>
                         </div>
                       </div>
@@ -1251,9 +1258,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                                 : <button onClick={() => setFormFillState({ formId: ann.form_id!, announcementId: ann.id, title: ann.title })} style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}><FileText style={{ width: 11, height: 11 }} />Fill out form</button>
                             )}
                             {ann.is_event && (
-                              <button onClick={() => handleRsvpToggle(ann.id)} style={{ background: ann.user_has_rsvped ? "var(--line-3)" : "transparent", color: "var(--ink)", border: "1px solid var(--ink)", padding: "8px 16px", borderRadius: 999, fontSize: "12px", fontWeight: 500, cursor: "pointer" }}>
+                              <CentralButton variant={ann.user_has_rsvped ? "plum-outline" : "primary"} onClick={() => handleRsvpToggle(ann.id)} style={{ padding: "8px 16px", borderRadius: 999, fontSize: "12px" }}>
                                 {ann.user_has_rsvped ? "Going ✓" : "RSVP"}
-                              </button>
+                              </CentralButton>
                             )}
                             {isLeaderOrAdmin && (
                               <DesktopActionMenu
@@ -1291,6 +1298,8 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
               </div>
             )}
           </div>
+            </>
+          )}
         </>
       )}
       </div>
@@ -1356,13 +1365,13 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
     onDelete(announcement.id)
   }
 
-  // ── Featured (plum) card ──
+  // ── Featured (ivory emphasis) card — de-plummed Phase 7. Mirrors the desktop
+  // pinned hero strip (ivory bg, line-2 border, plum accents); plum is reserved for
+  // the ONE Home featured hero, never a repeated announcement-card surface. ──
   if (featured) {
     return (
       <>
-        <div className="relative rounded-[22px] bg-[var(--plum)] overflow-hidden">
-          <div className="absolute -top-[70px] -right-[70px] w-[220px] h-[220px] rounded-full bg-[radial-gradient(circle,rgba(246,244,239,0.18)_0%,transparent_70%)] pointer-events-none" />
-
+        <div className="relative rounded-[22px] bg-[var(--ivory)] border border-[var(--line-2)] overflow-hidden">
           {announcement.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={announcement.image_url} alt={announcement.title} className="w-full h-44 object-cover" />
@@ -1371,22 +1380,32 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
           <div className="p-6 relative">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2 flex-wrap">
-                {isPinned && <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>Pinned ·</span>}
-                {!isPinned && announcement.is_sub_pinned && <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>For You ·</span>}
-                <span style={{ ...MONO_STYLE, color: "rgba(246,244,239,0.7)" }}>{announcement.is_event ? "Event" : formatDate(announcement.created_at)}</span>
+                {isPinned && (
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)", display: "inline-block", flexShrink: 0 }} />
+                    <span style={{ ...MONO_STYLE, color: "var(--plum)" }}>Pinned ·</span>
+                  </span>
+                )}
+                {!isPinned && announcement.is_sub_pinned && (
+                  <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)", display: "inline-block", flexShrink: 0 }} />
+                    <span style={{ ...MONO_STYLE, color: "var(--plum)" }}>For You ·</span>
+                  </span>
+                )}
+                <span style={MONO_STYLE}>{announcement.is_event ? "Event" : formatDate(announcement.created_at)}</span>
                 {announcement.audience && announcement.audience !== "all" && (
-                  <span style={{ fontSize: "9px", letterSpacing: "0.1em", padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.15)", color: "var(--cream-on-dark)", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
+                  <span style={{ fontSize: "9px", letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "var(--line-3)", color: "var(--body)", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
                 )}
               </div>
               <div className="flex items-center gap-2">
                 {announcement.view_count > 0 && (
-                  <span className="flex items-center gap-1" style={{ fontSize: "10px", color: "rgba(246,244,239,0.5)", fontWeight: 500 }}><Users className="w-3 h-3" />{announcement.view_count}</span>
+                  <span className="flex items-center gap-1" style={{ fontSize: "10px", color: "var(--muted-text)", fontWeight: 500 }}><Users className="w-3 h-3" />{announcement.view_count}</span>
                 )}
                 {isAdminOrLeader && (
                   <div className="relative">
                     {showMenu && <div className="fixed inset-0 z-[5]" onClick={() => setShowMenu(false)} />}
-                    <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/10 transition-colors">
-                      <MoreHorizontal className="w-4 h-4 text-[rgba(246,244,239,0.6)]" />
+                    <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[var(--cream-2)] transition-colors">
+                      <MoreHorizontal className="w-4 h-4 text-[var(--muted-text)]" />
                     </button>
                     {showMenu && (
                       <div className="absolute top-8 right-0 z-[10] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] py-1 min-w-[140px]">
@@ -1407,25 +1426,25 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
               </div>
             </div>
 
-            <h3 className="line-clamp-2" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "30px", lineHeight: 1.05, letterSpacing: "-0.02em", color: "var(--cream-on-dark)", margin: "0 0 8px" }}>{announcement.title}</h3>
-            <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "rgba(246,244,239,0.72)" }}>{previewBody(announcement.body)}</p>
-            <button onClick={() => onOpenDetail(announcement.id)} className="text-[12px] font-medium mb-4 transition-colors" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "rgba(246,244,239,0.5)" }}>See announcement →</button>
+            <h3 className="line-clamp-2" style={{ fontFamily: "var(--serif)", fontSize: "30px", fontWeight: 400, lineHeight: 1.05, letterSpacing: "-0.02em", color: "var(--ink)", margin: "0 0 8px" }}>{announcement.title}</h3>
+            <p className="text-[13px] leading-relaxed line-clamp-3 mb-1" style={{ color: "var(--body)" }}>{previewBody(announcement.body)}</p>
+            <button onClick={() => onOpenDetail(announcement.id)} className="text-[12px] font-medium mb-4 transition-colors hover:text-[var(--plum)]" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "var(--muted-text)" }}>See announcement →</button>
 
             {announcement.is_event && (
               <>
                 <div className="flex items-center gap-4">
-                  <button onClick={handleRsvp} className={`font-medium py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-white/20 text-[var(--cream-on-dark)] hover:bg-white/30 active:scale-[0.97]" : "bg-[var(--cream-on-dark)] text-[var(--plum)] hover:bg-white active:scale-[0.97]"}`}>
+                  <button onClick={handleRsvp} className={`font-medium py-3 px-7 rounded-full transition-all text-[14px] ${announcement.user_has_rsvped ? "bg-[var(--line-3)] text-[var(--body)] hover:bg-[var(--line)] active:scale-[0.97]" : "bg-[var(--plum)] text-[var(--cream)] hover:bg-[var(--plum-2)] active:scale-[0.97]"}`}>
                     {announcement.user_has_rsvped ? <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />Going</span> : "RSVP"}
                   </button>
-                  {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "rgba(246,244,239,0.5)" }}>{announcement.rsvp_count} going</span>}
+                  {announcement.rsvp_count > 0 && <span className="text-[12px] font-medium" style={{ color: "var(--muted-text)" }}>{announcement.rsvp_count} going</span>}
                 </div>
                 {announcement.rsvp_attendees.length > 0 && (isAdminOrLeader || announcement.show_attendees) && (
                   <div className="mt-4 flex flex-wrap gap-1.5">
                     {announcement.rsvp_attendees.slice(0, 8).map(a => (
-                      <span key={a.user_id} style={{ fontSize: "11px", color: "rgba(246,244,239,0.75)", background: "rgba(246,244,239,0.12)", border: "1px solid rgba(246,244,239,0.2)", padding: "2px 9px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                      <span key={a.user_id} style={{ fontSize: "11px", color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line)", padding: "2px 9px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
                     ))}
                     {announcement.rsvp_attendees.length > 8 && (
-                      <span style={{ fontSize: "11px", color: "rgba(246,244,239,0.45)", padding: "2px 4px" }}>+{announcement.rsvp_attendees.length - 8} more</span>
+                      <span style={{ fontSize: "11px", color: "var(--muted-text)", padding: "2px 4px" }}>+{announcement.rsvp_attendees.length - 8} more</span>
                     )}
                   </div>
                 )}
@@ -1434,26 +1453,24 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
             {announcement.has_form && (
               <div className="mt-3">
                 {announcement.user_has_responded
-                  ? <span style={{ fontSize: 12, color: "rgba(246,244,239,0.6)", display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
-                  : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid rgba(246,244,239,0.4)", background: "transparent", color: "var(--cream-on-dark)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
+                  ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
+                  : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
                 }
               </div>
             )}
           </div>
 
-          {showDeleteConfirm && (
-            <div className="absolute inset-0 z-[20] bg-[#3E1540]/95 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-center gap-3 p-7">
-              <div className="w-11 h-11 rounded-full bg-white/10 flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-[var(--cream-on-dark)]" /></div>
-              <p className="text-[15px] font-medium text-[var(--cream-on-dark)] text-center">Delete this announcement?</p>
-              <p className="text-[12px] text-center -mt-1" style={{ color: "rgba(246,244,239,0.5)" }}>This can&apos;t be undone.</p>
-              <div className="flex gap-3 w-full mt-1">
-                <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-white/20 text-[13px] font-medium text-[var(--cream-on-dark)] hover:bg-white/10 transition-colors disabled:opacity-50">Cancel</button>
-                <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-medium transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
-              </div>
-            </div>
-          )}
         </div>
 
+        <ConfirmDialog
+          open={showDeleteConfirm}
+          title="Delete this announcement?"
+          message="This can't be undone."
+          confirmLabel="Delete"
+          loading={deleting}
+          onConfirm={handleDelete}
+          onClose={() => setShowDeleteConfirm(false)}
+        />
       </>
     )
   }
@@ -1529,19 +1546,17 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
           )}
         </div>
 
-        {showDeleteConfirm && (
-          <div className="absolute inset-0 z-[20] bg-[var(--cream)]/95 backdrop-blur-sm rounded-[22px] flex flex-col items-center justify-center gap-3 p-7">
-            <div className="w-11 h-11 rounded-full bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] flex items-center justify-center mb-1"><Trash2 className="w-5 h-5 text-[var(--danger)]" /></div>
-            <p className="text-[15px] font-medium text-[var(--ink)] text-center">Delete this announcement?</p>
-            <p className="text-[12px] text-[var(--muted-text)] text-center -mt-1">This can&apos;t be undone.</p>
-            <div className="flex gap-3 w-full mt-1">
-              <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} className="flex-1 py-2.5 rounded-full border border-[var(--line)] text-[13px] font-medium text-[var(--body)] hover:bg-[var(--ivory)] transition-colors disabled:opacity-50">Cancel</button>
-              <button onClick={handleDelete} disabled={deleting} className="flex-1 py-2.5 rounded-full text-[13px] font-medium transition-colors disabled:opacity-50 hover:brightness-95" style={{ background: "var(--danger)", color: "var(--cream)" }}>{deleting ? "Deleting…" : "Delete"}</button>
-            </div>
-          </div>
-        )}
       </div>
 
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Delete this announcement?"
+        message="This can't be undone."
+        confirmLabel="Delete"
+        loading={deleting}
+        onConfirm={handleDelete}
+        onClose={() => setShowDeleteConfirm(false)}
+      />
     </>
   )
 }

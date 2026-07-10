@@ -24,3 +24,14 @@ export const EYEBROW_STYLE: React.CSSProperties = {
   textTransform: "uppercase",
   color: "var(--muted-text)",
 }
+
+// Desktop icon-rail nav label (R9): 9px mono uppercase. Color is applied per state
+// by the consumer (active = full-opacity var(--cream-on-dark); inactive = muted) —
+// this const carries only the type treatment. The old 7–8px rail labels are retired.
+export const RAIL_LABEL_STYLE: React.CSSProperties = {
+  fontFamily: "var(--mono)",
+  fontSize: "9px",
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  lineHeight: 1,
+}

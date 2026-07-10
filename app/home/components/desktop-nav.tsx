@@ -5,6 +5,8 @@ import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Receipt, Wayp
 import { createClient } from "@/lib/supabase"
 import { PlanLineIcon, sidebarItemStyle } from "./shared"
 import { DirectoryListSkeleton } from "@/components/central"
+import { RAIL_LABEL_STYLE } from "@/components/central/typography"
+import { sectionForTab } from "@/components/central/nav-sections"
 import { useBreadcrumbExtra } from "../breadcrumb-context"
 
 // Lazy — pulls the 631-line directory-tab module into its own async chunk instead
@@ -18,7 +20,12 @@ import type { DesktopTopbarProps, DesktopSidebarProps, UserTeam, Tab } from "../
 
 // ── Shared design tokens (all CSS vars, never hardcoded hex) ─────────────────
 
-const RAIL_BG    = "var(--rail)"          // ← dedicated rail token (#ECE6D6, darkest tier)
+// R9: the icon rail is a deep-plum surface (--rail ≡ var(--plum-2)), per DESIGN_SYSTEM §2.1.
+// Nav items use the on-dark treatment (cream-on-dark active, muted inactive).
+const RAIL_BG    = "var(--rail)"          // ← deep-plum icon-rail surface (var(--plum-2), Phase 7)
+// Inactive rail item icon+label on the plum-2 rail — matches the frames' `.ri`
+// inactive color (cream-on-dark at 55%), legible on deep plum where --muted-text drifts.
+const RAIL_INACTIVE = "color-mix(in srgb, var(--cream-on-dark) 55%, transparent)"
 const PANEL_BG   = "var(--body-bg)"       // ← sidebar panel: middle tier (var(--body-bg))
 const LINE       = "var(--line)"
 const PLUM       = "var(--plum)"
@@ -104,6 +111,7 @@ export function DesktopSidebar({
   onLogoClick,
   showWorkspaceNavHint,
   onDismissNavHint,
+  superSwitcherSlot,
 }: DesktopSidebarProps) {
   const supabase = createClient()
 
@@ -119,19 +127,19 @@ export function DesktopSidebar({
   const subItemStyle = sidebarItemStyle
 
   function getSectionName(): string {
-    switch (activeTab) {
-      case "chats":        return "Messages"
-      case "plan": {
-        // Prefer the shell-resolved name (covers gov-view teams the user isn't a member of),
-        // then membership, then the generic fallback.
-        return activeTeamName ?? userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? "Workspace"
-      }
-      case "directory":    return "People"
-      case "network":      return "Network"
-      case "congregation": return "Congregation"
-      case "profile":      return profileSection === "journal" ? "Journal" : "Profile"
-      default:             return "Home"
+    // Labels that differ from their section's default label, or are dynamic:
+    //  · settings lives in the Home section but carries its own "Church Settings" label
+    //  · plan is dynamic (active team name; gov-view teams resolve via activeTeamName)
+    //  · profile toggles Profile / Journal
+    // Everything else (home/announcements/give/forms/congregation → "Home", chats →
+    // "Messages", directory → "People", network → "Network") derives from the single
+    // nav-section config (R7).
+    if (activeTab === "settings") return "Church Settings"
+    if (activeTab === "plan") {
+      return activeTeamName ?? userTeams.find(t => t.teamId === activeTeamId)?.teamName ?? "Workspace"
     }
+    if (activeTab === "profile") return profileSection === "journal" ? "Journal" : "Profile"
+    return sectionForTab(activeTab)?.label ?? "Home"
   }
 
   function renderPanelBody() {
@@ -207,12 +215,12 @@ export function DesktopSidebar({
       )
     }
 
-    // ── Profile / Congregation ───────────────────────────────────────────────
-    if (activeTab === "profile" || activeTab === "congregation") {
+    // ── Profile (You) ────────────────────────────────────────────────────────
+    // Congregation moved to the Home section (R7); it no longer lives here.
+    if (activeTab === "profile") {
       const items: { label: string; section?: "spiritual-profile" | "journal"; tab?: Tab; danger?: boolean; onClick?: () => void }[] = [
         { label: "Profile",  section: "spiritual-profile" },
         { label: "Journal",  section: "journal" },
-        ...(isPastor ? [{ label: "Congregation", tab: "congregation" as Tab }] : []),
         { label: "Sign out", danger: true, onClick: onLogout },
       ]
       return (
@@ -239,17 +247,19 @@ export function DesktopSidebar({
       )
     }
 
-    // ── Home section: Home, Announcements, Give, Forms, Settings ────────────
-    const homeItems: { label: string; tab: "home" | "announcements" | "give" | "forms" | "settings" }[] = [
+    // ── Home section: Home, Announcements, Give, Forms, Settings, Congregation ──
+    const homeItems: { label: string; tab: "home" | "announcements" | "give" | "forms" | "settings" | "congregation" }[] = [
       { label: "Overview",          tab: "home" },
       { label: "Announcements",   tab: "announcements" },
       { label: "Give",            tab: "give" },
       // Forms is a leader-only insights hub — members/visitors fill forms via Announcements.
       ...(isLeaderOrAdmin ? [{ label: "Forms", tab: "forms" as const }] : []),
       ...(isAdmin ? [{ label: "Church Settings", tab: "settings" as const }] : []),
+      // Congregation moved out of the You section (R7); pastor-only.
+      ...(isPastor ? [{ label: "Congregation", tab: "congregation" as const }] : []),
     ]
     const generalTabs  = ["home", "announcements", "give"] as const
-    const restrictedTabs = ["forms", "settings"]   as const
+    const restrictedTabs = ["forms", "settings", "congregation"] as const
     const generalItems   = homeItems.filter(i => (generalTabs   as readonly string[]).includes(i.tab))
     const restrictedItems = homeItems.filter(i => (restrictedTabs as readonly string[]).includes(i.tab))
 
@@ -338,10 +348,9 @@ export function DesktopSidebar({
         </div>
 
         {navItems.map(({ id, label, icon: Icon }) => {
-          const isActive =
-            activeTab === id ||
-            (id === "home" && ["settings", "announcements", "forms", "give"].includes(activeTab)) ||
-            (id === "profile" && activeTab === "congregation")
+          // Active-highlight derives tab→section membership from the single nav-section
+          // config (R7) — settings/announcements/forms/give/congregation all light Home.
+          const isActive = sectionForTab(activeTab)?.id === id
           return (
             <button
               key={id}
@@ -349,19 +358,20 @@ export function DesktopSidebar({
               className="relative flex flex-col items-center gap-1 w-full px-1 py-2.5 rounded-none transition-colors"
               style={{
                 background: "transparent",
-                color: isActive ? PLUM : MUTED,
+                // On the plum-2 rail: cream-on-dark active, cream-on-dark-55% inactive (icon inherits currentColor).
+                color: isActive ? "var(--cream-on-dark)" : RAIL_INACTIVE,
                 border: "none",
                 cursor: "pointer",
               }}
             >
-              {/* Active pill indicator */}
+              {/* Active pill indicator — cream stripe on the dark rail (§2.1) */}
               {isActive && (
                 <span
                   style={{
                     position: "absolute",
                     left: 6, top: "50%", transform: "translateY(-50%)",
                     width: 3, height: 24,
-                    background: PLUM,
+                    background: "var(--cream-on-dark)",
                     borderRadius: 99,
                   }}
                 />
@@ -369,7 +379,8 @@ export function DesktopSidebar({
               <div
                 style={{
                   width: 36, height: 32, borderRadius: "var(--r-chip)",
-                  background: isActive ? "var(--cream-3)" : "transparent",
+                  // R9 on-dark active tint (ratified) — replaces the light cream-3 box.
+                  background: isActive ? "color-mix(in srgb, var(--cream-on-dark) 12%, transparent)" : "transparent",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "background 100ms ease",
                   position: "relative",
@@ -388,12 +399,8 @@ export function DesktopSidebar({
               </div>
               <span
                 style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 8,
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
-                  color: isActive ? PLUM : MUTED,
-                  lineHeight: 1,
+                  ...RAIL_LABEL_STYLE,
+                  color: isActive ? "var(--cream-on-dark)" : RAIL_INACTIVE,
                 }}
               >
                 {label}
@@ -403,6 +410,13 @@ export function DesktopSidebar({
         })}
 
         <div className="flex-1" />
+
+        {/* Super-account impersonation chip — in-flow, docked above the avatar (R9). */}
+        {superSwitcherSlot && (
+          <div className="w-full flex justify-center px-1 mb-2 flex-shrink-0">
+            {superSwitcherSlot}
+          </div>
+        )}
 
         {/* User avatar */}
         <div

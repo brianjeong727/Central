@@ -107,7 +107,7 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
   return (
     <div
       className="fixed inset-0 z-[200] flex items-start justify-center pt-[10vh]"
-      style={{ background: "rgba(19,16,26,0.45)" }}
+      style={{ background: "var(--veil-soft)" }}
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
@@ -146,11 +146,11 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
                     onMouseEnter={() => setSelectedIdx(idx)}
                     onMouseDown={() => selectItem(item)}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
-                    style={{ background: active ? "#EDE5F0" : "transparent" }}
+                    style={{ background: active ? "var(--plum-tint)" : "transparent" }}
                   >
                     <span style={{ color: active ? "var(--plum)" : "var(--muted-text)" }}>{typeIcon[item.type]}</span>
                     <span className="flex-1 min-w-0">
-                      <span className="block text-[13px] font-medium text-[var(--ink)] truncate">{item.label}</span>
+                      <span className="block text-[13px] font-medium truncate" style={{ color: active ? "var(--plum)" : "var(--ink)" }}>{item.label}</span>
                       {item.sublabel && <span className="block text-[11px] text-[var(--muted-text)] truncate">{item.sublabel}</span>}
                     </span>
                     {active && <ChevronRight className="w-3.5 h-3.5 text-[var(--plum)] flex-shrink-0" />}

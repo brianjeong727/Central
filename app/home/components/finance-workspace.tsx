@@ -5,9 +5,9 @@ import { createClient } from "@/lib/supabase"
 import {
   Plus, X,
   Upload, Download, DollarSign, AlertTriangle,
-  ImageIcon,
+  ImageIcon, Inbox,
 } from "lucide-react"
-import { Spinner, EYEBROW_STYLE } from "./shared"
+import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
 import { MonogramChip, FilterDropdown, SubpageShell, CentralModal } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
@@ -48,22 +48,29 @@ const FUNDS = [
   { value: "pitt", label: "Pitt" },
 ]
 
-// Semantic colors not in Central's design token palette — amber warning, danger tints, budget green
-const WARN_BG = "#FFF8E1"
-const WARN_TEXT = "#B45309"
-const DANGER_TINT_BG = "#FDF1F1"
-const DANGER_TINT_BORDER = "#E8C5C5"
+// Status-layer tints — derived from Central's semantic accents via the R10 formula
+// (bg = accent 13% on cream, text = accent 65% on ink), never invented traffic-light hexes.
+const WARN_BG = "color-mix(in srgb, var(--gold) 13%, var(--cream))"
+const WARN_TEXT = "color-mix(in srgb, var(--gold) 65%, var(--ink))"
+const WARN_BORDER = "color-mix(in srgb, var(--gold) 30%, var(--cream))"
+const DANGER_TINT_BG = "color-mix(in srgb, var(--danger) 13%, var(--cream))"
+const DANGER_TINT_BORDER = "color-mix(in srgb, var(--danger) 30%, var(--cream))"
 const DANGER_ROW_BG = "var(--cream)"
 const DELETE_CONFIRM_BG = "color-mix(in srgb, var(--danger) 8%, transparent)"
-const BUDGET_GREEN = "#2D5445"
-const REIMBURSED_TINT = "#EDE5F0"
+const BUDGET_GREEN = "color-mix(in srgb, var(--success) 65%, var(--ink))"
+// Reimbursed is a terminal SUCCESS status, not selection/identity — same success-family
+// formula as `approved` (R10: bg = accent 13% on cream, text = accent 65% on ink).
+const SUCCESS_STATUS_BG = "color-mix(in srgb, var(--success) 13%, var(--cream))"
+const SUCCESS_STATUS_TEXT = "color-mix(in srgb, var(--success) 65%, var(--ink))"
+// Plum-tint remains the identity/source marker for reimbursement-sourced budget entries.
+const REIMBURSED_TINT = "var(--plum-tint)"
 
 export const STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
   pending:    { label: "Pending",    bg: "var(--ivory)",  text: "var(--body)" },
-  approved:   { label: "Approved",  bg: "#E6F4EA",       text: "#1E6B3C" },
+  approved:   { label: "Approved",  bg: SUCCESS_STATUS_BG, text: SUCCESS_STATUS_TEXT },
   rejected:   { label: "Rejected",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
   declined:   { label: "Declined",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
-  reimbursed: { label: "Reimbursed",bg: REIMBURSED_TINT, text: "var(--plum)" },
+  reimbursed: { label: "Reimbursed",bg: SUCCESS_STATUS_BG, text: SUCCESS_STATUS_TEXT },
   flagged:    { label: "Flagged",   bg: WARN_BG,         text: WARN_TEXT },
 }
 
@@ -176,7 +183,7 @@ export function SubmitReceiptModal({
             <div><label style={labelStyle}>Purchase date</label><input type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} style={inputStyle} /></div>
           </div>
           {overLimit && (
-            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: WARN_BG, border: "1px solid #FDE68A", borderRadius: 10, padding: "10px 12px" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: WARN_BG, border: `1px solid ${WARN_BORDER}`, borderRadius: 10, padding: "10px 12px" }}>
               <AlertTriangle size={14} color={WARN_TEXT} style={{ flexShrink: 0, marginTop: 1 }} />
               <p style={{ fontSize: 12.5, color: WARN_TEXT, lineHeight: 1.5 }}>This exceeds the ${limit!.max_amount} limit for {categories.find(c => c.value === category)?.label ?? category}. You can still submit.</p>
             </div>
@@ -257,12 +264,8 @@ function InboxRow({ receipt: r, first, onClick }: { receipt: InboxReceipt; first
   )
 }
 
-function InboxEmpty({ title }: { title: string }) {
-  return (
-    <div style={{ padding: "40px 24px", borderRadius: 14, border: "1px dashed var(--dashed)", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
-      <div style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)", letterSpacing: -0.2 }}>{title}</div>
-    </div>
-  )
+function InboxEmpty({ title, subtitle }: { title: string; subtitle: string }) {
+  return <EmptyState variant="bordered" icon={<Inbox className="w-7 h-7" />} title={title} subtitle={subtitle} />
 }
 
 type InboxFilter = "needs" | "all"
@@ -325,7 +328,10 @@ function ReimbursementInbox({
       </div>
 
       {loading ? <Spinner /> : shown.length === 0 ? (
-        <InboxEmpty title={filter === "needs" ? "Nothing needs your action" : "No receipts yet"} />
+        <InboxEmpty
+          title={filter === "needs" ? "Nothing needs your action" : "No receipts yet"}
+          subtitle={filter === "needs" ? "You're all caught up." : "Submitted receipts will appear here."}
+        />
       ) : (
         <div style={{ borderRadius: 12, border: "1px solid var(--line)", overflow: "hidden", background: "var(--cream)" }}>
           {shown.map((r, i) => (
@@ -790,7 +796,7 @@ export function FinanceWorkspace({
                 ))}
               </div>
               {budgetEntries.map((e, i) => (
-                <div key={e.id} style={{ display: "grid", gridTemplateColumns: "90px 1fr 130px 90px 80px", gap: 8, padding: "12px 16px", borderTop: i > 0 ? "1px solid var(--ivory)" : "none", alignItems: "center" }}>
+                <div key={e.id} style={{ display: "grid", gridTemplateColumns: "90px 1fr 130px 90px 80px", gap: 8, padding: "12px 16px", borderTop: i > 0 ? "1px solid var(--line-3)" : "none", alignItems: "center" }}>
                   <span style={{ fontSize: 12.5, color: "var(--body)" }}>{new Date(e.entry_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                   <span style={{ fontSize: 13, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.description ?? "—"}</span>
                   <span style={{ fontSize: 12.5, color: "var(--body)" }}>{e.category}</span>

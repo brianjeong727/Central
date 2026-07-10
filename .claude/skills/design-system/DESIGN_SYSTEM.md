@@ -31,7 +31,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--plum-2`      | `#2D0F2E` | Active breadcrumb text, identity hero gradient base (rare) — NOT a button fill (primary CTA fill is `--plum`, see §4.3) |
 | `--plum-deep`   | `#1B0A1E` | Hero gradient dark stop |
 | `--plum-light`  | `#4A1B4D` | Hero gradient light stop |
-| `--plum-tint`   | `#EDE3EE` | Soft plum-tinted pill/badge/panel background — the ONLY sanctioned light-plum surface |
+| `--plum-tint`   | `color-mix(in srgb, var(--plum) 12%, var(--cream))` | Selection/wayfinding surface — the ONLY sanctioned light-plum surface; the universal selected-state surface (chips, segments, selected cards, active nav rows — §4.4) and identity-emphasis badges (your role, President, For You). NOT for status pills — statuses derive from the semantic accents (§4.7). Was raw `#EDE3EE` (read cool); ratified R4 |
 | `--ink`         | `#13101A` | Primary text |
 | `--body`        | `#5A5466` | Body text, sub-labels |
 | `--muted`       | `#8A8497` | Tertiary text, eyebrow mono, labels |
@@ -41,19 +41,21 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--cream-on-dark` | `#F6F4EF` | Cream text / fill **on** plum or dark surfaces — slightly muted from `--cream` for legibility |
 | `--cream-2`     | `#F8F4EA` | Inset surface (composer, dashed cells) |
 | `--cream-3`     | `#F6F2E8` | Accent surface (verse callout, today cell) |
-| `--body-bg`     | `#F4F1E8` | Desktop context sidebar panel — middle tier of three-tone desktop surface. **Exception:** the Messages (chat) panel uses `--cream` instead — see note below. |
-| `--ivory`       | `#F1ECDE` | Active sidebar item, soft-pill background; also the **B · Emphasis** surface for the single most prominent inset card (Up Next) |
+| `--body-bg`     | `#F4F1E8` | Desktop context sidebar panel — the context-panel cream step (one step darker than content cream; the dark rail sits outside the cream gradation — §2.1). **Exception:** the Messages (chat) panel uses `--cream` instead — see note below. |
+| `--ivory`       | `#F1ECDE` | Soft-pill background; also the **B · Emphasis** surface for the single most prominent inset card (Up Next). (Active sidebar item is now `--plum-tint` + a 3px `--plum` left bar — R4; no longer `--ivory`.) |
 | `--canvas`      | `#F1ECDE` | Design-canvas page bg outside artboards |
-| `--rail`        | `#ECE6D6` | Desktop icon rail — darkest step of three-tone desktop surface |
+| `--rail`        | `var(--plum-2)` | Desktop icon rail — deep plum chrome (the frames' `.rail`; R9 / Phase 7, ratified; was `#13101A` dark ink, earlier the light `#ECE6D6` three-tone drift). **Shell chrome does NOT count against the one-plum-surface rule** (§4.1b) — it is a rail, not a content surface. Inactive rail items are `color-mix(in srgb, var(--cream-on-dark) 55%, transparent)`; active is full `--cream-on-dark` + cream stripe. |
 | `--line`        | `#E8E2D2` | Primary hairline |
 | `--line-2`      | `#E2DDCF` | Card border, input border |
 | `--line-3`      | `#EFE9DA` | Faint row divider |
 | `--dashed`      | `#C4C0B0` | Dashed placeholder borders |
-| `--success`     | `#7FA67F` | Auto-save dot, "on track" indicator |
+| `--success`     | `#7FA67F` | Auto-save dot, "on track" indicator; also the ok/on-track status-pill accent (§4.7) |
 | `--warm-tan`    | `#9D7B4F` | Calendar "social" category |
 | `--sage`        | `#5B7A6C` | Calendar "outreach" category |
-| `--gold`        | `#D4A45C` | Avatar accent only — never as button color |
-| `--danger`      | `#9F3030` | Destructive text/border only — never as filled button bg |
+| `--gold`        | `#D4A45C` | Avatar accent; and the pending/warn status-pill accent (§4.7). Never a filled button bg. |
+| `--danger`      | `#9F3030` | Destructive text/border only; also the soft status-pill tint accent (§4.7) — still never a filled button bg (danger-solid confirm exempted per §4.3) |
+| `--veil`        | `color-mix(in srgb, var(--ink) 55%, transparent)` | Modal/overlay ink backdrop scrim (≡ `rgba(19,16,26,.55)`) — R11 |
+| `--veil-soft`   | `color-mix(in srgb, var(--ink) 40%, transparent)` | Lighter non-modal scrim (≡ `rgba(19,16,26,.40)`) |
 
 **Do not:** invent new neutrals. Do not use pure white (`#fff`) — always cream. Do not use saturated red, blue, or green for status. Do not use gradients except in the rare full-identity hero (§4.1). Do not use plum as a repeated surface, card background, or decorative fill — it is a surgical accent appearing in at most one or two intentional moments per view.
 
@@ -70,7 +72,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | Role | Family | Size | Weight | Letter-spacing | Use |
 |---|---|---|---|---|---|
 | Display    | serif | 56–64 | 600 | -0.02em      | Hero banner names ("SSO", "Student Org Board") |
-| H1         | serif | 36–52 | 600 | -0.02em      | Page titles (PageTitle component default: 36px) |
+| H1 | serif | 44 | 600 | -0.02em | Page titles — **landing tier** (PageTitle default 44px). Workspace/detail pages use the compact **25px** tier (§3.1). These are the only two title tiers (R1, ratified 2026-07-09); the former 36px tier is retired. |
 | H2         | serif | 28–36 | 600 | -0.02em      | Section titles inside a page |
 | H3         | sans  | 16–18 | 500 | 0            | UI-chrome card titles, role names, list headings. Serif H3 only for genuine editorial section heads within long-form content. |
 | Body L     | serif | 19    | 400 | 0.1          | Long-form quotes, editorial body, transition notes, chat reading-room |
@@ -78,7 +80,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | Body S     | sans  | 12–13 | 400 | 0            | Secondary metadata |
 | Eyebrow / Mono | mono | 11 | 400 | 1.4 | All-caps labels above any title or section. **Always required above page H1 and section H2.** |
 | Numeric    | serif | 28–40 | 400 | -0.4 to -0.6 | Stat card numbers, invite codes — weight 400 is intentional; editorial numbers read differently from heading text |
-| Date anchor | serif | 36–42 | **600** | -0.02em | **Exception (approved 2026-06-30):** the single date/posted numeral that anchors the **featured announcement card's 40% slot** (36px — tuned to match the Home page H1 so the page header stays the size ceiling; the card title sits one step below at 30/600) and the **announcement detail aside** (42px) may be serif weight **600** — it acts as a display focal point, not a stat readout. Scoped to those two surfaces only; ordinary stat numbers stay weight 400. |
+| Date anchor | serif | 36–42 | **600** | -0.02em | **Exception (approved 2026-06-30):** the single date/posted numeral that anchors the **featured announcement card's 40% slot** (36px — kept one step below the 44px page-H1 ceiling per R1, so the page header stays the size ceiling; the card title sits one step below the anchor at 30/600) and the **announcement detail aside** (42px) may be serif weight **600** — it acts as a display focal point, not a stat readout. Scoped to those two surfaces only; ordinary stat numbers stay weight 400. |
 
 **Pattern rules:**
 - Every page title is preceded by an eyebrow mono label (`DATE`, `SECTION · CONTEXT`, `WORKSPACE`, etc.).
@@ -90,13 +92,15 @@ Central is a daily-driver tool that an entire church community lives in for comm
 
 **Do not:** mix typefaces — Central uses Bricolage Grotesque exclusively; never import additional font families. Do not use weight 600 for body copy, UI labels, or metadata — reserve it for heading hierarchy (H1, H2, display). Do not all-caps anything except mono eyebrows.
 
+**Integer font sizes only; floor 10px** (10px = mono micro). No fractional `fontSize` (e.g. `12.5`, `13.5`) — round to the nearest sensible integer while keeping hierarchy. Scoped exception: the 9px rail label (`RAIL_LABEL_STYLE`, R9).
+
 ### 1.4 Spacing & radius
 - **Scale:** 4, 6, 8, 10, 12, 14, 18, 22, 28, 36, 40, 56. Do not invent in-between values.
 - **Page padding:** `0 40px 40px` on the main column; `22px 40px 0` on the breadcrumb header.
 - **Section gap:** 28–36 vertical between major sections; 56 between calendar and meeting-notes feed.
 - **Card padding:** 18 (small), 22 (default), 22×28 (wide stat row).
 - **Radii:** 6 (tiny pills, icon buttons), 8 (chips), 10 (inputs, secondary buttons), 12 (most cards), 14 (sidebar callouts, prominent cards), 16 (composer pill), 18 (hero banner, full-bleed modal).
-- **Hairlines:** always 1px, never 2px. Active tab underline is the only 2px rule.
+- **Hairlines:** always 1px, never 2px. Active tab underline is the only 2px rule. The 3px plum left bar on active nav rows/chat rows (§2.2, R4) is the only sanctioned >1px border accent besides the 2px tab underline.
 
 ### 1.5 Iconography
 - Lucide-style stroked icons via the local `<Icon d={...}/>` component. Stroke 1.6, linecaps round.
@@ -116,11 +120,13 @@ Central is a daily-driver tool that an entire church community lives in for comm
 [ 76px dark icon rail ] [ 220px cream sidebar ] [ flexible main ]
 ```
 
-- **Icon rail** — `#13101A` background, plum primary "+" button at top, six section icons (Home, Chat, People, Profile, Pray, Plan). Active icon: `rgba(251,248,242,0.08)` background + 2px cream stripe on the left edge.
+- **Icon rail** — `#13101A` background, plum primary "+" button at top, six section icons (Home, Messages, Workspace, People, Network — admin-only, You). Active treatment (R9): a `color-mix(in srgb, var(--cream-on-dark) 12%, transparent)` box behind the icon + a full-opacity 9px mono label + the cream left stripe. Icon and label go cream (`--cream-on-dark`) when active, muted when inactive — never plum on the dark rail (fails contrast). Rail labels are **9px mono uppercase** (`RAIL_LABEL_STYLE` in `components/central/typography.ts`); the old 7–8px labels are retired.
 - **Sidebar** — cream `#FDFCF8`, 220px wide, 1px right border `#E8E2D2`. Header block (32 top / 28 side / 24 bottom) has mono eyebrow "WORKSPACE" + serif "Central" 32px.
 - **Main column** — cream `#FDFCF8`. Top header strip is breadcrumbs left, search/header-actions right, then content.
 
-**Three-tone surface system:** The three shell zones use three tonal steps that recede left-to-right, making the content area feel forward and primary: icon rail (`--rail`, darkest) → context panel (`--body-bg`, middle) → content area (`--cream`, lightest). Each zone is one step lighter than the one to its left. **Chat exception:** the Messages context panel uses `--cream` to match its content area — the conversation list and thread are one continuous master/detail activity, so they share a surface rather than stepping tonally (see §1.2 note).
+The **SECTION label** (context-panel header), the **rail active highlight**, and the **bottom-nav highlight** all derive tab→section membership from the single nav-section config (`components/central/nav-sections.ts`, R7) — never a parallel switch.
+
+**Surface system:** The shell steps left-to-right, making the content area feel forward and primary: a **deep-plum icon rail** (`--rail` ≡ `var(--plum-2)`, Phase 7) → **cream context panel** (`--body-bg`) → **cream content area** (`--cream`, lightest). The rail is a hard dark step (shell chrome, not a content surface — it does not count against the one-plum-surface rule, §4.1b), not part of a gradation; the "one step lighter than the zone to its left" framing applies only to the two cream zones (context panel → content). **Chat exception:** the Messages context panel uses `--cream` to match its content area — the conversation list and thread are one continuous master/detail activity, so they share a surface rather than stepping tonally (see §1.2 note).
 
 ### 2.2 Sidebar variants
 
@@ -128,11 +134,11 @@ Two modes, controlled by a `navMode` prop:
 
 **`navMode="teams"`** (default, for team-scoped surfaces: Plan, Roster, Resources)
 - "YOUR TEAMS · n" mono eyebrow with `+` icon button on the right.
-- Team rows: icon chip (36×36) + name + role. Active row uses `#F1ECDE` bg + 1px `#E2DDCF` border + plum-filled icon chip.
+- Team rows: icon chip (36×36) + name + role. Active row uses `--plum-tint` bg + `--plum` text + a 3px `--plum` left bar (R4) + plum-filled icon chip.
 
 **`navMode="home"`** (for workspace-scoped surfaces: Home, Announcements, Church Settings)
 - "HOME" mono eyebrow.
-- Simple text rows. Active row uses `#F1ECDE` bg + 1px `#E2DDCF` border.
+- Simple text rows. Active row uses `--plum-tint` bg + `--plum` text + a 3px `--plum` left bar (R4).
 
 Both modes share:
 - **Verse callout** at the bottom of the sidebar — `#F6F2E8` bg, 1px `#E8E2D2` border, radius 14, padding 18. Mono eyebrow ("VERSE · PSALM 46:10") + italic serif quote 17px in `#2D0F2E`. Always present on every screen.
@@ -159,20 +165,24 @@ Every primary content page follows this structure, top-to-bottom:
 3. **Underline tab strip** — always immediately under the hero, separated by 22px.
 4. **Section eyebrow + section H2** — first content block.
 
-For pages without a hero banner:
-- Mono eyebrow ("MINISTRY ADMIN", "NEW ANNOUNCEMENT · DRAFT", etc.)
-- Serif H1 (44–52px)
-- Optional 15px body sentence describing the page
+For pages without a hero banner (R1 header anatomy, ratified 2026-07-09):
+- Breadcrumb (Zone A wayfinding)
+- Mono eyebrow — **required** ("MINISTRY ADMIN", "NEW ANNOUNCEMENT · DRAFT", etc.)
+- Serif H1 — **44px landing tier** / **25px compact tier** (these are the only two title tiers; the former 36px tier is retired)
+- Optional 15px sentence describing the page
+- **ONE terminating hairline.** If the page has a tab strip, the strip's own rule IS the terminator — never both; suppress `TabPageHeader`'s bottom `InsetHairline` (via `noBottomHairline`) when a strip follows.
+
+**No buttons in the page-title header** — sole exception: the Zone-B Settings gear. Every create/add/generate lives in the collection's content header (§3.2 Zone C).
 
 ### 3.1 Workspace headers are compact
 
-**Rule:** Every Plan-tab workspace uses a **compact** header — `<TabPageHeader><PageTitle title={…} compact /></TabPageHeader>`: a **25px** serif title (vs the 36px default) and **no eyebrow**. This applies to ALL workspaces with no exceptions — Finance, Receipts, Praise, DG Praise, One-Time, Tech, the standard calendar team, Student Org Board, and Small Group Leaders. Right-slot actions (the settings gear, `HeaderActionButton`) sit in the same `TabPageHeader` row; `HeaderActionButton` is pinned to 28px to match the compact line box.
+**Rule:** Every Plan-tab workspace uses a **compact** header — `<TabPageHeader><PageTitle title={…} compact /></TabPageHeader>`: a **25px** serif title (vs the 36px default) and **no eyebrow**. This applies to ALL workspaces with no exceptions — Finance, Receipts, Praise, DG Praise, One-Time, Tech, the standard calendar team, Student Org Board, and Small Group Leaders. The only right-slot action is the Zone-B settings **gear** (icon button), sized to match the compact line box; creates never sit in this row (§3.2).
 
 The workspace's identity (which ministry, which team) is already carried by the sidebar and breadcrumb, so the header stays tight and title-only — do **not** add a `PLANNING · MINISTRY` / `RECEIPTS · TEAM` eyebrow back.
 
 The title-row right slot holds only the Zone-B manage action (the settings gear) — the create/add CTA lives in the content header per §3.2, not the title row.
 
-**Carve-out:** event/identity drill-down headers are NOT workspace nav headers and keep the full 36px `PageTitle` + eyebrow — e.g. the Student Org and Small Group **event-detail** headers (eyebrow = `{EVENT_TYPE} · {DATE}`, title = the event name). Compact is for the workspace's own top-level header, not these earned identity moments.
+**Event/identity drill-down headers (carve-out retired, ratified 2026-07-09):** event/identity drill-down headers — e.g. the Student Org and Small Group **event-detail** headers — now use the **compact 25px** tier like all detail pages (in practice rendered by `SubpageShell`, which is already 25px). The former 36px `PageTitle` + eyebrow carve-out is retired; there are only two title tiers (44 landing / 25 compact).
 
 ### 3.2 Action placement — one home per button type
 
@@ -183,11 +193,11 @@ Every action button has exactly one zone it's allowed to live in; its **scope** 
 - **Zone C — Content header (by the collection).** The page's single **plum primary** create action ("Add entry", "Add category", "New question") sits right of the header for the collection it fills. List-level helpers (Export, Filter, a view toggle) are **ghost buttons to its left**.
 - **Kebab (⋯).** Only for low-frequency, destructive, or per-row actions (Duplicate, Move, Delete, Leave; per-row table actions). Never primary navigation or the main create.
 
-> **The one-line rule (read this first):** the top / object header carries **only object-config** — the Settings **gear** (→ kebab at 3+). It **never** holds a create / add / generate button. Every add / create / generate action is a **plum primary in the body content header** of the collection it fills (Zone C). On a **multi-section workspace** (a team/workspace home with General / Events / Groups / … sidebar sections), the top header shows the **workspace name + gear**, and each section's create lives in **that section's own body header** — not the page header. The header-hosted create primitive (`HeaderActionButton` in a `TabPageHeader`) is therefore **retired for multi-section workspaces**; use `SectionHeader`/`ContentHeader` + `ContentActionButton`/`CentralButton` in the body instead. (The only exception is the single-feed case below.)
+> **The one-line rule (read this first):** the top / object header carries **only object-config** — the Settings **gear** (→ kebab at 3+). It **never** holds a create / add / generate button. Every add / create / generate action is a **plum primary in the body content header** of the collection it fills (Zone C). On a **multi-section workspace** (a team/workspace home with General / Events / Groups / … sidebar sections), the top header shows the **workspace name + gear**, and each section's create lives in **that section's own body header** — not the page header. The header-hosted create pattern (a create button in a `TabPageHeader`) is therefore **retired**; use `SectionHeader`/`ContentHeader` + `ContentActionButton`/`CentralButton` in the body instead. (There is no single-feed exception — see below.)
 
 **Scale:** 1 action → direct button; 2 → side by side in the zone; 3+ → collapse to a kebab, keeping the single most-used action visible beside it.
 
-**Single-feed exception:** when the page title directly heads its one collection (the Announcements feed, the Congregation questions list), the create primary may sit in the title row's right slot — that slot *is* the content header. On **object + sub-collection** pages (Receipts → its *Categories*; Finance Team → its *Expense ledger*) the create moves off the title row down to the collection's own header, while the Zone-B gear stays by the title.
+**No single-feed exception (R1/R2, ratified 2026-07-09):** the create primary is never beside the page title — not even when the page title directly heads its one collection (Announcements feed, Congregation questions). Every create lives in that collection's own content header (Zone C) below the title block. On object + sub-collection pages the create sits in the sub-collection's header while the Zone-B gear stays by the title. View toggles and list helpers (Cards | Compact, Export, Filter) are ghost/secondary buttons to the LEFT of the create in that same content header — never in the title row.
 
 ---
 
@@ -217,7 +227,11 @@ padding: 30px 36px 32px
 
 **Status (June 2026):** The plum gradient hero has been retired from all app shell surfaces — team home headers, section headers, event sub-headers, tab headers, and identity cards inside the shell are now cream. Plum remains a surgical accent (CTA button fills, active tab underlines, icon chip backgrounds) but is never a card background, section header, or surface gradient anywhere in the shell. The §4.1 gradient spec is preserved only for rare standalone full-identity moments where the surface genuinely needs to own the room (e.g., a dedicated profile identity card or give-page hero) — never as a default treatment for a section or team.
 
-**Exception — Pastor Pulse slide (June 2026):** exactly ONE scoped plum *surface* is authorized inside the shell: the Pastor Pulse question card when it rides as the lead slide of the home hero carousel (§4.1c). It is a **flat** `--plum-2` fill (never the retired gradient, no dot texture), scoped to that single card, and never repeats. This is the sole sanctioned plum surface in the shell — do not generalize it to any other card, header, or slide.
+**Sanctioned plum content surfaces (Phase 7) — both scoped to the home hero frame, never shown simultaneously, never generalized elsewhere:**
+1. **The home FEATURED hero (`FeaturedHeroCard`, §4.1b)** — the prime-directive **one** plum-filled *content* surface. Flat `--plum` fill on the reference/fallback slide. This is the plum "hero" that earns its place.
+2. **Pastor Pulse slide (June 2026, §4.1c)** — a **flat** `--plum-2` fill (never the retired gradient, no dot texture) when the pulse question rides as the carousel lead slide; scoped to that single card, distinct from the `--plum` featured surface, and drops out once answered.
+
+Both are confined to the home hero carousel frame. Do not generalize either to any other card, header, section, or slide. *(The deep-plum icon **rail** — `--rail` ≡ `--plum-2`, §2.1 — is shell chrome, not a content surface, and is exempt from this rule.)* *(Primary-button fills (§4.3), chat own-bubbles (§4.15), and small identity chips are roles/accents governed by their own sections — they are not "surfaces" and don't count against this rule.)*
 
 ### 4.1b Home hero carousel (Phase 2)
 
@@ -229,8 +243,8 @@ The home "Up Next" slot is a manually-advanced carousel of curated slides sharin
 
 **Three slide types, one frame** (only the interior differs):
 - **Photo:** full-bleed image; the stored clamped `panel_color` makes a **light mood ramp** — a horizontal clamped-color gradient that fades to transparent by ~70% (**Option A — no solid panel; the photo reads through nearly everywhere**), with a **separate soft radial near-black scrim** anchored to the text for legibility (a true over-photo floor under cream text — never plum/colored, never a dark slab). Static CSS only — no live blur, no per-render image work, SSR-safe. The near-black backdrop/scrim values are kept as inline component constants (one component's internal curve), not global tokens. `panel_color` is computed **once at upload** by a hue-preserving HSL clamp (chroma-weighted dominant hue, near-white/near-black pixels discarded → fixed dark L≈0.13, saturation clamped to a floor/cap; `--plum-deep` fallback only when the image is colorless). Cream caption (with a legibility text-shadow) + cream eyebrow dot.
-- **Event:** real `calendar_events` date/location; if the slide has its own photo → photo treatment + a glass date/RSVP chip; otherwise the ivory reference layout with real detail. RSVP via the linked announcement when present.
-- **Announcement:** ivory editorial reference layout (`UpNextCard`).
+- **Event:** real `calendar_events` date/location; if the slide has its own photo → photo treatment + a glass date/RSVP chip; otherwise the **flat-plum FEATURED treatment** (`FeaturedHeroCard`, below). RSVP via the linked announcement when present.
+- **Announcement / event-without-photo (the FEATURED treatment — `FeaturedHeroCard`):** the flat-plum reference card. This is **the ONE sanctioned plum content surface in the app (the prime directive)** — background `--plum`, radius `--r-hero`, no HeroFrame hairline (the light border fights the deep plum, dropped on the plum interior). Interior: a mono eyebrow (`{slide label} · {date range}` for events — 10px mono uppercase, `letterSpacing 0.14em`, `color-mix(in srgb, var(--cream-on-dark) 55%, transparent)`; **"Featured" is NOT repeated** — the section label above the frame already carries it) → serif title 38/600 (30 mobile), `-0.02em`, `--cream-on-dark` → 14px body at `color-mix(cream-on-dark 78%)`, `maxWidth 520` → actions: **RSVP as the §4.3 hero-invert primary** (cream fill / plum text) + a **secondary on-dark ghost** (transparent, `1px color-mix(cream-on-dark 25%)` border, cream text) carrying the detail click-through ("See details" / "See announcement"). A single decorative corner ring ornament (`1px color-mix(cream-on-dark 14%)`, clipped, behind content; the lower ring was dropped where it collided with the detail panel). On desktop the card is a **60/40 split**: the editorial column (eyebrow/title/body/actions) on the left, and on the right a restored **§1.3 date-anchor 40% slot** — a mono micro-label ("Starts" / "Posted") over a **serif 36/600 `--cream-on-dark`** date (event start date; falls back to the posted date), with the event time/location or posted year and a form indicator beneath in `color-mix(cream-on-dark ~74%)` — restoring the retired ivory `UpNextCard`'s information architecture on the plum surface (mobile stays a single stacked column with the date folded in as a compact line). The §4.1c pulse slide (flat `--plum-2`) rides the same frame and is visually distinct; the two never show simultaneously. The **home-tab pinned/latest fallback** (no curated slides) renders this same `FeaturedHeroCard`; the truly-empty state (no announcement to feature) stays the ivory "No upcoming events" card. *(Retired here: the ivory `UpNextCard` 60/40 detail layout as the reference slide — `UpNextCard` remains the ivory component but is no longer used by the hero. The inline form affordance moved to the announcement detail.)*
 
 **Retired here:**
 - The hollow **"No date, time, or location set yet" placeholder is retired** from the hero. Non-event references fill the frame editorially; events show only the fields that exist (omit unset fields) — never a "nothing set" box.
@@ -258,7 +272,10 @@ The Pastor Pulse question rides **inside** the home hero carousel as a hosted **
 - Inactive: color `#8A8497`, weight 400, `border-bottom: 2px solid transparent`
 - Active: color `#2D0F2E`, weight 600, `border-bottom: 2px solid #3E1540`, `margin-bottom: -1px`
 
-**Do not:** use pill tabs, segmented background tabs, or boxed tabs. Always underline.
+**Underline tabs switch VIEWS.** For mutually-exclusive FILTERS/modes, use the sanctioned `SegmentedControl` (R4, ratified 2026-07-09) — radius-999 pills carrying the one selected-state grammar (§4.4). Never boxed/pill TABS for view navigation; never underline tabs for filters.
+
+#### SegmentedControl (exclusive filters/modes)
+`SegmentedControl` in `components/central/segmented-control.tsx` (barrel-exported from `@/components/central`). The sanctioned control for exclusive FILTER/mode selection — **not** view navigation (views use underline tabs above). Props: `options: {id, label}[]` (label accepts `ReactNode`), `value`, `onChange`, optional `size` (`'sm'` default). Renders a row of radius-999 pills (composed from `FilterChip`) carrying **the one selected-state grammar** (§4.4): selected = `--plum-tint` bg + `--plum` text + 1px `--plum` border; unselected = `--cream` bg + `--body` text + 1px `--line-2` border. Radiogroup semantics (`role="radiogroup"` on the row, `role="radio"` + `aria-checked` on each pill). Examples in use: **Church | My Chats** (chats), **Cards | Compact** (announcements layout).
 
 #### Critical implementation rule
 There is exactly **one** tab strip component in this codebase: `PlanSubTabStrip` in `components/central/plan-sub-tab-strip.tsx` (barrel-exported from `@/components/central`). Every tab strip — team pages, event plan pages, profile pages, anywhere — must use this same component. Never inline tab styles or create a new tab implementation. If you need a tab strip, import and use the existing shared component.
@@ -282,6 +299,7 @@ Buttons are assigned by **semantic role**, never ad-hoc color. **Exactly one pri
 | **Icon-only** | gear / kebab / edit / close | transparent → `--ivory` hover | `--muted` | none |
 
 - **Sizes:** `sm` (8×14, 13px — list rows, headers) and `md` (11×20, 14px — forms, CTAs). Radius `--r-input` (10).
+- **Disabled:** the enabled role's exact style at `opacity: 0.5` + `cursor: not-allowed`. Never a separate gray/mauve disabled fill — CentralButton/IconButton own this; delete call-site overrides. *Scoped exception:* the §4.1c pulse-card on-dark primary dims to opacity 0.35 staying cream.
 - **Hero-invert:** a primary inside a plum hero flips to cream bg / plum text.
 - **Verb→icon map (one icon per verb, everywhere):** Edit = `Pencil`, Delete = `Trash2`, Add/Create = `Plus`, Close/Cancel = `X`, Confirm = `Check`, Settings = `Settings`, Search = `Search`.
 
@@ -291,7 +309,7 @@ Buttons are assigned by **semantic role**, never ad-hoc color. **Exactly one pri
 - **Standard input:** 12×14 padding, 1px `#E2DDCF`, radius 10, `#FDFCF8` bg, 15px sans.
 - **Inline serif input** (announcement title, journal entries): 8×0 padding, no border, `border-bottom: 1px solid #E2DDCF`, transparent bg, 36px serif weight 600, letter-spacing -0.02em. Placeholder uses helper-text `--faint` (quiet guidance), not label `--muted-text`.
 - **Textarea body** (announcement, transition note): 19px serif, line-height 1.65, no border, transparent bg, vertical resize, min-height 540 for full-page editors.
-- **Pill picker row** (audience, options): horizontal flex wrap gap 6–8. Off state: 1px `#E2DDCF`, cream bg, body color. On state: 1px `#3E1540`, `#3E1540` bg, cream text. (The selected pill is a `--plum` accent fill — an active-state indicator per §1.2 — not the `--plum-2` primary-CTA fill. The shared `FilterChip` primitive is the canonical implementation.)
+- **Pill picker row** (audience, options): horizontal flex wrap gap 6–8. **The one selected-state grammar (R4):** On state = 1px `--plum` border, `--plum-tint` bg, `--plum` text. Off state = 1px `--line-2` border, `--cream` bg, `--body` text. The previous solid-plum on-state (cream text on a `--plum` fill) is **retired (R4)**. The shared `FilterChip` primitive is the canonical implementation and now renders this ONE grammar — the `plum`/`ivory` tone fork is retired (the `tone` prop is still accepted for backward compat but is a no-op). This same grammar is the universal selected-state surface across chips, `SegmentedControl` segments, selected cards, and active nav rows (§1.2 `--plum-tint`).
 
 ### 4.5 Cards
 - **Standard card:** `#FDFCF8` bg, 1px `#E8E2D2` border, radius 12–14, padding 18–22. Shares the same tone as the page body — separation from the background is by hairline border alone, not by tone contrast.
@@ -315,6 +333,7 @@ background: #FDFCF8
 - **Category pill** (event category, post type): radius 999, padding 5×12, `#F1ECDE` bg, `#3E1540` text, 11–12px, weight 500, letter-spacing 0.4–0.6, uppercase for small variants.
 - **Role badge:** Admin = `#2D0F2E` bg / cream text; Leader = `#F1ECDE` bg / plum text; Member = `#F1ECDE` bg / muted text. All radius 999, 4×10, 11px weight 500.
 - **Soft pill** (assigned-to chip): radius 999, padding 5×12, `#F1ECDE` bg, 1px `#E8E2D2`, plum-2 text 12–13px. Avatar circle 24px on the left when used for people.
+- **Status pill:** derived from a semantic accent, never an invented hex. bg `color-mix(in srgb, <accent> 13%, var(--cream))`; text `color-mix(in srgb, <accent> 65%, var(--ink))`. Accents: `--success` (ok/on-track), `--gold` (pending/warn), `--danger` (error/overdue). Radius 999. Replaces all traffic-light hexes (`#FDE68A`, `#22C55E`, `#92400E`, …).
 
 ### 4.8 Avatars
 
@@ -377,7 +396,7 @@ Modals are reserved for *new-X* and configure-X flows where context needs to be 
 
 **Every modal renders through `CentralModal`** (`components/central/central-modal.tsx`) — hand-rolled fixed-overlay panels are design debt. The canonical anatomy (ratified 2026-07-04, from the curate-hero manager):
 
-- **Backdrop:** `rgba(19,16,26,0.55)` ink veil, no blur, `animate-backdrop-in`. Click-away closes.
+- **Backdrop:** `var(--veil)` ink veil (the token — never a raw `rgba()`), no blur, `animate-backdrop-in`. Click-away closes. The nested dirty-guard scrim uses `var(--veil-soft)`.
 - **Panel:** `var(--cream-2)` surface, radius `var(--r-callout)`, **no border, no shadow** — separation comes from the dark veil, not elevation. `maxWidth` per content (360 pickers · 420–480 forms · 520–560 wide forms · **~720 hefty/multi-question forms** — the form builder & fill-out), `maxHeight 85vh`, `animate-dialog-in`.
 - **Header:** optional mono eyebrow (10px, 1.2px tracking, uppercase, `--muted-text`) over a serif 22/400 `--ink` title; hairline (`--line`) below; 32px circular X top-right (`--ivory` fill, 1px `--line`).
 - **Body:** scrollable, `20px 24px` padding. Section labels inside use the mono eyebrow style.
@@ -385,6 +404,8 @@ Modals are reserved for *new-X* and configure-X flows where context needs to be 
 - **Closes three ways, always:** X · backdrop click · Escape (built into the component).
 - **Z-index:** 200 default; override (e.g. 210) only when a modal must stack above another overlay.
 - **Sheet variant** (`sheet` prop): bottom-pinned with rounded top corners on mobile, centered panel on md+ — for thumb-reach flows (polls, receipt submit).
+
+**Modals are for creation / config / confirmation only — never navigation.** Every destructive action (delete / remove / reject / leave) routes through the shared **`ConfirmDialog`** (§9's danger, two-step wrapper over `CentralModal`) — never a hand-rolled in-card scrim, and **`window.confirm` is banned** (it breaks the veil-token surface and the cream-on-dark type). Bespoke confirm overlays with `backdrop-blur` / `bg-white/…` / raw `#hex` panels are retired; wire the existing delete state to `ConfirmDialog` instead.
 
 Exceptions (not CentralModal): the command palette (top-anchored nav chrome), the image lightbox, and full-screen page-like overlays (§4.18 subpages, ChatScreen).
 
@@ -407,9 +428,15 @@ A **subpage** is a body button opening a temporary view or action surface (a not
 - **Canonical implementation:** `components/central/SubpageShell` (use its `title` prop — see the Student Org event page as the reference).
 
 ### 4.19 Empty / placeholder state
-- Use a dashed-border card (`1px dashed #C4C0B0`, radius 10–14, transparent bg) with body color text and a single `+` icon.
-- Voice: **descriptive, not chirpy.** "+ Assign someone", "+ Add image, file, or link". Never "Nothing here yet!" or emoji-led empty copy.
-- For full-section empty states, follow with one neutral guiding sentence in 13px `#8A8497`.
+
+Canonical component: `EmptyState` (`app/home/components/shared.tsx`) — two variants, both centered, both with the same interior anatomy: a **52px icon chip** (`--ivory` bg + 1px `--line` border, radius `--r-callout` = 14) over a **15px `--ink` title** and a **13px `--muted-text` sentence**. Never hand-roll a bare icon + serif empty; use the component.
+
+- **`quiet`** (default) — for **whole-page / whole-tab empties** (an empty chat list, an empty announcements feed, an empty forms list, a not-on-a-team state). No border, no surface; just the centered interior with `py-16` breathing room.
+- **`bordered`** — for **in-page zones** (inboxes, ledgers, sub-sections, a section inside a populated workspace). Same interior wrapped in a **1.5px dashed `--line-2`** card, radius `--r-callout`, transparent bg, ~28 padding.
+
+- **CTA never lives inside an empty state.** The create/generate action already lives in the collection's content header (§3.2 Zone C). If the empty needs to point at that action, the **copy may NAME the header action** ("Tap + above to create your first team.", "Post the first announcement with New announcement above.") — but the button itself stays in the header. When an empty genuinely needs a co-located action (e.g. a first-run "Generate group set"), render a **separate sibling `CentralButton` underneath** the `EmptyState`, never a button inside the dashed card.
+- **Skeletons render only while fetching, then swap to `EmptyState`** — never leave a skeleton (or a dashed placeholder) as a permanent empty; once the fetch resolves to zero rows, show the real empty state.
+- Voice: **descriptive, not chirpy** — and non-CTA (the copy states the situation; it may NAME the header action but is never itself a button label). "No receipts in Ops yet — submit one with Submit a receipt above.", "Nothing shared yet." Never "Nothing here yet!" or emoji-led empty copy. Follow the title with one neutral guiding sentence.
 
 ### 4.20 Danger zone
 Editorial inline rule, **not a red boxed callout**:
@@ -468,7 +495,7 @@ Mandatory elements above the fold:
 1. Mono eyebrow
 2. Serif title
 3. One descriptive sentence in body color (max ~120 chars)
-4. Either a hero stat row (3 stat cards) OR a clear primary action button right-aligned at the same baseline as the title — never both at full strength.
+4. Optionally a hero stat row (3 stat cards). **No primary/create button sits at the title baseline** (R1) — the page's create lives in its collection content header (§3.2 Zone C); only the Zone-B Settings gear may share the title row.
 
 ---
 
@@ -480,6 +507,7 @@ Mandatory elements above the fold:
 - **Numerals:** spell out one through nine in prose; use digits in stats, lists, and metadata.
 - **Date format:** `Saturday, May 16` (no year unless it disambiguates). Time: `5:00 AM – 6:00 AM` with en-dash and en-space.
 - **Possessives over second person where natural:** "Your teams · 2", not "Teams you're on (2)".
+- **Greeting honorific (R8):** Pastor / Deacon / Elder / Leader render as an italic plum serif word before the first name ("Good evening, _Pastor_ Grace"); all other roles greet with the name alone ("Good evening, Grace"). "Super" is impersonation chrome (rail chip + top banner) and never appears in greeting or profile copy — those show the account's real role.
 
 ---
 
@@ -503,7 +531,7 @@ Test before shipping: at desktop width, is there a large band of unused space wi
 ### 7.2 List page (announcements list, directory)
 - No hero — plain title block
 - Filter rail / segmented control above the table
-- Rows use 1px `#EFE9DA` dividers, never zebra striping
+- Rows: 1px `--line-3` dividers (none on last), never zebra striping, `--cream-2` hover — `ListRow` is canonical (§4.11); day-grouped mono headers for chronological admin lists (audit log)
 
 ### 7.3 Form page (new announcement, new event when standalone)
 - Full-page surface, never a modal when work is long-form
@@ -573,12 +601,12 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 2. **No tabbed kitchen-sink under "Plan".** Each event is a destination; the workflow tabs (Overview/Checklist/Roles/Notes) belong to that destination, not to a global Plan tab.
 3. **No white cards on white bg.** Always cream surface; differentiate with hairlines and inset shades.
 4. **Headlines are Bricolage Grotesque at weight 600, body/UI text at weight 400.** Do not use weight 600 for body copy, labels, or metadata — reserve it for heading hierarchy (H1, H2, display).
-5. **No emoji-led status pills, no traffic-light colors.** Use the limited semantic palette (success sage, warm-tan social, sage outreach, plum ministry).
+5. **No emoji-led status pills, no traffic-light colors, no invented hexes.** Status pills derive from the semantic accents via the §4.7 formula. Traffic-light hexes (`#FDE68A` / `#22C55E` / `#92400E` style) are banned.
 6. **No red filled "Delete" buttons.** Destructive actions are outline-only in `#9F3030`.
 7. **No left-border-accent rounded callout cards.** The only left-rule pattern allowed is the editorial quote (§4.13), the timeline rail (§4.12), and — as a **single authorized exception (July 2026)** — the **Events "Up Next" card** (§4.21): a `cream-3` rounded callout with a `border-left: 3px solid var(--plum)` marking the closest upcoming event in the team Events agenda. This is the one sanctioned left-border rounded callout; do not generalize it to any other card.
 8. **No gradient backgrounds outside the hero banner.** Cream surfaces never have gradients. **Scoped exception (July 2026): the checklist high-priority row highlight.** A `priority === 'high'` task row in the event Checklist carries a solid light-plum tint across the whole row — `background: color-mix(in srgb, var(--plum) 7%, transparent)` (a flat highlight, NOT a gradient and NOT a left-border rail). This is the one place a light-plum row highlight marks state; it reads as a subtle "flagged" wash, not a plum surface. Scoped to this list — do not reuse it elsewhere. (Priority is a binary high/not-high flag, toggled in the row editor.)
 9. **No iconography invented for "fun" decoration.** Icons are functional. If a slot would otherwise be empty, prefer a dashed placeholder over decorative icons.
-10. **No drop shadows anywhere.** Cards separate by border and surface tone; modals separate via the §4.17 ink veil, not elevation (ratified 2026-07-04 — the modal-shadow carve-out is retired).
+10. **No drop shadows anywhere.** Cards separate by border and surface tone; modals separate via the §4.17 ink veil, not elevation (ratified 2026-07-04 — the modal-shadow carve-out is retired). **Sanctioned carve-outs (the only `box-shadow` allowed, both `inset`):** (a) the **read-only-mat inset texture** — the double-mat ring on the read-only detail frame (§4.22); (b) **functional inset selection rings** — an `inset box-shadow` used as a focus / selected / drag ring (e.g. plan-tab's selection rings). Nothing else — no floating-pill, badge, marker, or panel elevation shadow.
 
 **Ratified exception — Home greeting sheen (2026-07-05):** the Home page greeting's animated text sheen (`.greeting-sheen` / `.greeting-sheen-plum`, globals.css) is an approved living-accent: a slow gradient text-fill shimmer on the greeting line only, static under `prefers-reduced-motion`. Scoped to the Home greeting — not a license for gradient text or ambient animation elsewhere.
 11. **No `Inter` for big numbers.** Stat numbers are serif.
@@ -589,9 +617,22 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 16. **Long-form creation is full-page, not modal.** Announcements use the full-page editor; modal is forbidden for this flow.
 17. **Pages never start without a mono eyebrow.** Every H1 is preceded by mono context.
 18. **Verse callout is permanent.** Don't drop it to save space.
-19. **Underline tabs only.** Never pill tabs, never boxed tabs.
+19. **Underline tabs for views; `SegmentedControl` (§4.2) for exclusive filters — never mix the two roles.** Never boxed/pill tabs for view navigation; never underline tabs for filters/modes.
 20. **Cream bg `#FDFCF8`, page bg `#F1ECDE`** — never invert.
 21. **No fixed-width column stranded in a wide content area.** Cap width only for reading measure (and center or pair it); let lists, grids, tables, and stat content fill the content area (§7.0). A page with content hugging one edge and a dead band of unused space on the other is a layout bug.
+
+### 8.1 Lint-worthy invariants
+
+Mechanical rules a linter could enforce — each is a hard "never," each has a token/pattern replacement:
+
+- **No raw hex** outside the `globals.css` token table — consume a `var(--token)`.
+- **No `rgba()`** — use `color-mix(in srgb, var(--token) N%, transparent)` over the equivalent token (veil scrims use `--veil` / `--veil-soft`).
+- **No `fontWeight: 700` / `font-bold`** — heading emphasis tops out at 600 (§1.3).
+- **No fractional font sizes** — integers only, floor 10px (§1.3).
+- **No `boxShadow`** outside the two §8.10 carve-outs (read-only-mat inset texture; functional inset selection rings).
+- **No `window.confirm`** — destructive actions go through `ConfirmDialog` (§4.17 / §9).
+
+**Known open debt (two DEFERRED sweeps, not yet done):** (1) the ~190 font-alias call sites still using literal `fontWeight`/`fontFamily` rather than a shared token; (2) the plan-tab hex / `rgba()` triage (the large block of raw colors inside plan-tab, including the frozen worship regions). *(The announcements-tab featured-card `rgba()` block — ~27 literals — was **resolved in Phase 7**: that mobile card was de-plummed to the ivory emphasis treatment, deleting every `rgba(246,244,239,*)` / `rgba(255,255,255,*)` literal and the radial cream glow.)* All remaining items are tracked, out of scope until scheduled.
 
 ---
 
@@ -838,11 +879,12 @@ const btnDestructive = {
 </div>
 ```
 
-### 11.13 Dashed placeholder
+### 11.13 Inline add affordance
+A clickable dashed control for **adding content** in place — an upload slot, an "+ Add image, file, or link" row. This is an **action**, not an empty state: empties never contain CTAs (§4.19). Use it only where a tap directly adds/attaches something.
 ```jsx
 <button style={{
-  padding: "14px 16px", borderRadius: 10,
-  border: "1px dashed #C4C0B0", background: "transparent",
+  padding: "14px 16px", borderRadius: "var(--r-callout)",
+  border: "1.5px dashed var(--dashed)", background: "transparent",
   color: "#5A5466", fontSize: 13, fontFamily: "var(--sans)", cursor: "pointer",
   display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%",
 }}>

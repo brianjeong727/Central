@@ -169,7 +169,7 @@ export function FormFillView({ formId, userId, ministryId, announcementId, title
   } else if (done) {
     body = (
       <AnimateIn className="flex flex-col items-center justify-center gap-4" style={{ minHeight: 320 }}>
-        <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "rgba(62,21,64,0.1)" }}>
+        <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--plum) 10%, transparent)" }}>
           <Check className="w-8 h-8 text-[var(--plum)]" />
         </div>
         <div className="text-center">
@@ -181,7 +181,7 @@ export function FormFillView({ formId, userId, ministryId, announcementId, title
   } else if (fields.length === 0) {
     body = (
       <div className="flex items-center justify-center" style={{ minHeight: 240 }}>
-        <EmptyState icon={<FileText className="w-7 h-7" />} title="No questions" subtitle="This form has no questions yet." />
+        <EmptyState variant="bordered" icon={<FileText className="w-7 h-7" />} title="No questions" subtitle="This form has no questions yet." />
       </div>
     )
   } else {
@@ -431,15 +431,15 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
       : title.trim() !== "" || fields.some(f => f.label.trim() !== "")
 
   const SaveButton = (
-    <button
+    <CentralButton
       type="button"
+      variant="primary"
       disabled={saving}
       onClick={handleSave}
-      className="flex items-center justify-center transition-colors disabled:opacity-50"
-      style={{ height: 28, padding: "0 16px", borderRadius: 9, background: "var(--plum-2)", color: "var(--cream)", fontSize: 13, fontWeight: 500, border: "none", cursor: saving ? "default" : "pointer", flexShrink: 0 }}
+      style={{ height: 28, padding: "0 16px", borderRadius: 9, fontSize: 13, flexShrink: 0 }}
     >
       {saving ? "Saving…" : isEditing ? "Save changes" : "Create form"}
-    </button>
+    </CentralButton>
   )
 
   return (
@@ -449,7 +449,7 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
       ) : (
         <div className="flex flex-col gap-6">
             {error && (
-              <div style={{ background: "rgba(62,21,64,0.08)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>{error}</div>
+              <div style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>{error}</div>
             )}
 
             {locked && (
@@ -681,8 +681,9 @@ export function FormResponsesView({ formId, title, onClose }: {
         </h1>
       </div>
 
-      {/* Desktop header — back is the shell breadcrumb (§3.2 Zone A); no in-header back */}
-      <TabPageHeader>
+      {/* Desktop header — back is the shell breadcrumb (§3.2 Zone A); no in-header
+          back. Sub-tab strip below is the single terminating hairline (R1). */}
+      <TabPageHeader noBottomHairline>
         <PageTitle eyebrow={`Responses · ${loading ? '…' : respondents.length}`} title={title} compact />
       </TabPageHeader>
 
@@ -710,7 +711,7 @@ export function FormResponsesView({ formId, title, onClose }: {
         ) : subTab === 'responses' ? (
           <div className="px-5 md:px-14 py-6">
             {respondents.length === 0 ? (
-              <EmptyState icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="Responses will appear here once people submit." />
+              <EmptyState variant="bordered" icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="Responses will appear here once people submit." />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {respondents.map(resp => {
@@ -755,7 +756,7 @@ export function FormResponsesView({ formId, title, onClose }: {
         ) : (
           <div className="px-5 md:px-14 py-6" style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
             {respondents.length === 0 ? (
-              <EmptyState icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="The summary will appear once people submit." />
+              <EmptyState variant="bordered" icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="The summary will appear once people submit." />
             ) : summaryByField.map(({ field, counts, textAnswers }) => (
               <div key={field.id}>
                 <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 14 }}>{field.label}</p>
@@ -1011,7 +1012,10 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
       </div>
 
       <TabPageHeader>
-        <PageTitle title="Forms" compact />
+        <PageTitle
+          eyebrow={items.length ? `${items.length} forms · ${items.reduce((s, i) => s + i.response_count, 0)} responses` : "Forms"}
+          title="Forms"
+        />
       </TabPageHeader>
 
       <div className="md:flex-1 md:overflow-y-auto">

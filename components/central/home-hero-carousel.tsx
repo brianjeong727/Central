@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect, CSSProperties, ReactNode, TransitionEvent } from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
-import { UpNextCard, UpNextEventDetail } from "./up-next-card"
+import { ChevronLeft, ChevronRight, ClipboardList } from "lucide-react"
+import { UpNextEventDetail } from "./up-next-card"
 
 // A curated hero slide resolves to LIVE data from the entity it references
 // (an announcement, a calendar_event), or is a standalone uploaded photo.
@@ -128,6 +128,18 @@ export function HeroSectionLabel({ breathe = false, action }: { breathe?: boolea
   )
 }
 
+// Structured date parts for the BIG serif §1.3 date-anchor in the 40% detail slot
+// (restored from the retired UpNextCard's information architecture, now on plum).
+function heroDateParts(iso: string) {
+  const d = new Date(iso)
+  return {
+    weekday: d.toLocaleDateString("en-US", { weekday: "long" }),
+    monthDay: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    year: d.toLocaleDateString("en-US", { year: "numeric" }),
+    time: d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+  }
+}
+
 // Compact date range for the event glass chip (e.g. "Oct 24–26").
 function chipDate(detail: UpNextEventDetail): string {
   const s = new Date(detail.startDate)
@@ -137,6 +149,356 @@ function chipDate(detail: UpNextEventDetail): string {
   if (sameDay) return `${mo(s)} ${s.getDate()}`
   if (s.getMonth() === e.getMonth()) return `${mo(s)} ${s.getDate()}–${e.getDate()}`
   return `${mo(s)} ${s.getDate()} – ${mo(e)} ${e.getDate()}`
+}
+
+// ── Featured reference card — THE one plum content surface (prime directive) ──
+// Ratified Plum Revival frame 4a: the flat-plum "Featured" treatment that fills the
+// HeroFrame for announcement / event-without-photo reference slides and the home-tab
+// pinned/latest fallback. Owns its own radius/overflow/plum fill (no HeroFrame border
+// on the plum interior — the light hairline fights the deep plum, dropped per spec).
+// Photo slides and the §4.1c pulse slide keep their own distinct treatments.
+interface FeaturedHeroCardProps {
+  // Slide's contextual label (e.g. "Up next" / "Latest"). "Featured" is NOT repeated
+  // here — the HeroSectionLabel above the frame already carries the constant accent.
+  eyebrowLabel: string
+  eventDetail?: UpNextEventDetail | null
+  title: string
+  body?: string | null
+  isEvent?: boolean
+  // §1.3 date-anchor inputs for the 40% detail panel: event start wins; else the
+  // announcement's posted date. `hasForm` surfaces a form indicator beneath the date.
+  hasForm?: boolean
+  postedDate?: string
+  userHasRsvped?: boolean
+  rsvping?: boolean
+  rsvpCount?: number
+  attendees?: { user_id: string; name: string }[]
+  showAttendees?: boolean
+  onRsvp?: () => void
+  onDetails?: () => void
+  mobile?: boolean
+  // fill: desktop carousel/fallback — fills the shared --hero-h HeroFrame (height 100%).
+  fill?: boolean
+  style?: CSSProperties
+}
+
+export function FeaturedHeroCard({
+  eyebrowLabel,
+  eventDetail,
+  title,
+  body,
+  isEvent,
+  hasForm,
+  postedDate,
+  userHasRsvped,
+  rsvping,
+  rsvpCount = 0,
+  attendees = [],
+  showAttendees,
+  onRsvp,
+  onDetails,
+  mobile = false,
+  fill = false,
+  style,
+}: FeaturedHeroCardProps) {
+  const bodyText = body ? body.replace(/\n+/g, " ") : null
+  // Desktop: the 40% date-anchor panel is the sole date carrier, so the eyebrow reads
+  // just the slide label. Mobile has no anchor — it keeps the date in the eyebrow.
+  const eyebrowText = mobile && eventDetail ? `${eyebrowLabel} · ${chipDate(eventDetail)}` : eyebrowLabel
+  const maxAttendees = mobile ? 6 : 8
+
+  // Actions — RSVP as the hero-invert primary (cream fill / plum text), the details
+  // click-through as an on-dark ghost. Built at the call site (CentralButton has no
+  // on-dark variant; the frame's .btn.invert / .btn.on-dark-ghost equivalents).
+  const rsvpBtn =
+    isEvent && onRsvp ? (
+      <button
+        type="button"
+        onClick={onRsvp}
+        disabled={rsvping}
+        style={{
+          background: userHasRsvped ? "color-mix(in srgb, var(--cream-on-dark) 18%, transparent)" : "var(--cream)",
+          color: "var(--cream-on-dark)",
+          border: "none",
+          borderRadius: "var(--r-input)",
+          padding: "var(--space-4) var(--space-7)",
+          fontSize: 14,
+          fontWeight: 500,
+          fontFamily: "var(--sans)",
+          cursor: rsvping ? "default" : "pointer",
+          opacity: rsvping ? 0.5 : 1,
+          whiteSpace: "nowrap",
+          ...(userHasRsvped ? {} : { color: "var(--plum)" }),
+        }}
+      >
+        {userHasRsvped ? "Going ✓" : "RSVP"}
+      </button>
+    ) : null
+
+  const detailsBtn = onDetails ? (
+    <button
+      type="button"
+      onClick={onDetails}
+      style={{
+        background: "transparent",
+        color: "var(--cream-on-dark)",
+        border: "1px solid color-mix(in srgb, var(--cream-on-dark) 25%, transparent)",
+        borderRadius: "var(--r-input)",
+        padding: "var(--space-4) var(--space-7)",
+        fontSize: 14,
+        fontWeight: 500,
+        fontFamily: "var(--sans)",
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {isEvent ? "See details" : "See announcement"}
+    </button>
+  ) : null
+
+  const attendeeChips =
+    showAttendees && attendees.length > 0 ? (
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: "var(--space-6)" }}>
+        {attendees.slice(0, maxAttendees).map((a) => (
+          <span
+            key={a.user_id}
+            style={{
+              fontSize: 11,
+              color: "color-mix(in srgb, var(--cream-on-dark) 78%, transparent)",
+              background: "color-mix(in srgb, var(--cream-on-dark) 12%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--cream-on-dark) 20%, transparent)",
+              padding: "2px 9px",
+              borderRadius: 999,
+            }}
+          >
+            {a.name.split(" ")[0]}
+          </span>
+        ))}
+        {attendees.length > maxAttendees && (
+          <span style={{ fontSize: 11, color: "color-mix(in srgb, var(--cream-on-dark) 50%, transparent)", padding: "2px 4px" }}>
+            +{attendees.length - maxAttendees} more
+          </span>
+        )}
+      </div>
+    ) : null
+
+  // ── On-plum §1.3 date-anchor detail panel (the restored 40% right slot) ───────
+  // Serif 36/600 cream-on-dark is the documented §1.3 exception, here transposed
+  // onto the plum surface. Event start date wins; otherwise the posted date.
+  const monoMicro = "color-mix(in srgb, var(--cream-on-dark) 55%, transparent)"
+  const secondaryText = "color-mix(in srgb, var(--cream-on-dark) 74%, transparent)"
+  const bigDateStyle: CSSProperties = {
+    fontFamily: "var(--serif)",
+    fontSize: 36,
+    fontWeight: 600,
+    letterSpacing: "-0.02em",
+    lineHeight: 1,
+    color: "var(--cream-on-dark)",
+  }
+  const monoLabelStyle: CSSProperties = {
+    fontFamily: "var(--mono)",
+    fontSize: 11,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    color: monoMicro,
+  }
+
+  const formIndicator = hasForm ? (
+    <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: "var(--space-5)" }}>
+      <ClipboardList style={{ width: 15, height: 15, color: secondaryText, flexShrink: 0 }} />
+      <span style={{ fontSize: 12, color: secondaryText }}>Includes a form</span>
+    </div>
+  ) : null
+
+  const detailPanel = (): ReactNode => {
+    if (eventDetail) {
+      const p = heroDateParts(eventDetail.startDate)
+      return (
+        <>
+          <div style={monoLabelStyle}>Starts</div>
+          <div style={{ fontFamily: "var(--sans)", fontSize: 15, fontWeight: 600, color: "var(--cream-on-dark)", marginTop: "var(--space-6)" }}>
+            {p.weekday}
+          </div>
+          <div style={{ ...bigDateStyle, marginTop: "var(--space-2)" }}>{p.monthDay}</div>
+          <div style={{ fontSize: 13, color: secondaryText, marginTop: "var(--space-4)" }}>
+            {eventDetail.allDay ? "All day" : p.time}
+            {eventDetail.location ? ` · ${eventDetail.location}` : ""}
+          </div>
+          {formIndicator}
+        </>
+      )
+    }
+    // Fallback: posted date.
+    const p = postedDate ? heroDateParts(postedDate) : null
+    return (
+      <>
+        <div style={monoLabelStyle}>Posted</div>
+        {p ? (
+          <>
+            <div style={{ ...bigDateStyle, marginTop: "var(--space-6)" }}>{p.monthDay}</div>
+            <div style={{ fontSize: 15, color: secondaryText, marginTop: "var(--space-3)" }}>{p.year}</div>
+          </>
+        ) : (
+          <div style={{ ...bigDateStyle, marginTop: "var(--space-6)", color: monoMicro }}>—</div>
+        )}
+        {formIndicator}
+      </>
+    )
+  }
+
+  // ── Left editorial column: eyebrow / title / body / buttons / attendees ───────
+  const editorial = (
+    <>
+      <div
+        style={{
+          fontFamily: "var(--mono)",
+          fontSize: 10,
+          letterSpacing: "0.14em",
+          textTransform: "uppercase",
+          color: monoMicro,
+        }}
+      >
+        {eyebrowText}
+      </div>
+      <div
+        className="line-clamp-2"
+        style={{
+          fontFamily: "var(--serif)",
+          fontSize: mobile ? 30 : 38,
+          fontWeight: 600,
+          letterSpacing: "-0.02em",
+          lineHeight: 1.05,
+          color: "var(--cream-on-dark)",
+          marginTop: "var(--space-3)",
+        }}
+      >
+        {title}
+      </div>
+      {bodyText && (
+        <p
+          className="line-clamp-2"
+          style={{
+            fontSize: 14,
+            color: "color-mix(in srgb, var(--cream-on-dark) 78%, transparent)",
+            marginTop: "var(--space-3)",
+            lineHeight: 1.5,
+            maxWidth: 520,
+          }}
+        >
+          {bodyText}
+        </p>
+      )}
+      {/* Mobile-only compact date line — desktop carries the full date anchor in the 40% panel */}
+      {mobile && (eventDetail || postedDate) && (
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: "var(--space-5)", flexWrap: "wrap" }}>
+          <span style={{ ...monoLabelStyle, fontSize: 10, letterSpacing: "0.14em" }}>{eventDetail ? "Starts" : "Posted"}</span>
+          <span style={{ fontSize: 13, color: secondaryText }}>
+            {eventDetail
+              ? (() => {
+                  const p = heroDateParts(eventDetail.startDate)
+                  return `${p.weekday}, ${p.monthDay}${eventDetail.allDay ? " · All day" : ` · ${p.time}`}${eventDetail.location ? ` · ${eventDetail.location}` : ""}`
+                })()
+              : (() => {
+                  const p = heroDateParts(postedDate!)
+                  return `${p.monthDay}, ${p.year}`
+                })()}
+          </span>
+        </div>
+      )}
+      {(rsvpBtn || detailsBtn) && (
+        <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-8)", flexWrap: "wrap", alignItems: "center" }}>
+          {rsvpBtn}
+          {detailsBtn}
+          {isEvent && rsvpCount > 0 && (
+            <span style={{ fontSize: 12, fontWeight: 500, color: monoMicro }}>
+              {rsvpCount} going
+            </span>
+          )}
+        </div>
+      )}
+      {attendeeChips}
+    </>
+  )
+
+  // ── Decorative ornament — a single corner ring peeking behind content ─────────
+  // (The lower ring was dropped: it landed squarely in the new 40% date-anchor
+  // panel and fought the serif date. One calm top-right peek is enough.)
+  const ornament = (
+    <div style={{ position: "absolute", right: -40, top: -40, width: 220, height: 220, borderRadius: 999, border: "1px solid color-mix(in srgb, var(--cream-on-dark) 14%, transparent)", pointerEvents: "none", zIndex: 0 }} />
+  )
+
+  // ── Mobile: single stacked editorial column (date line folded in above) ───────
+  if (mobile) {
+    return (
+      <div
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          background: "var(--plum)",
+          borderRadius: "var(--r-hero)",
+          boxSizing: "border-box",
+          width: "100%",
+          padding: "var(--space-8)",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          ...style,
+        }}
+      >
+        {ornament}
+        <div style={{ position: "relative", zIndex: 1 }}>{editorial}</div>
+      </div>
+    )
+  }
+
+  // ── Desktop: 60/40 split — editorial left, restored §1.3 date-anchor panel right ─
+  return (
+    <div
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        background: "var(--plum)",
+        borderRadius: "var(--r-hero)",
+        boxSizing: "border-box",
+        width: "100%",
+        height: fill ? "100%" : undefined,
+        display: "flex",
+        ...style,
+      }}
+    >
+      {ornament}
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          flex: "0 0 60%",
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "var(--space-10) var(--space-11)",
+        }}
+      >
+        {editorial}
+      </div>
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "flex-start",
+          padding: "var(--space-10)",
+          borderLeft: "1px solid color-mix(in srgb, var(--cream-on-dark) 16%, transparent)",
+        }}
+      >
+        {detailPanel()}
+      </div>
+    </div>
+  )
 }
 
 interface PhotoSlideProps {
@@ -590,22 +952,22 @@ export function HomeHeroCarousel({
         />
       )
     } else {
-      // Reference interior (ivory) — announcement, or event without a photo.
+      // Reference interior — announcement, or event without a photo — renders the
+      // flat-plum FEATURED treatment (the one sanctioned plum content surface).
       const isEvent = s.kind === "event" || (s.kind === "announcement" && s.isEvent)
       const attendees = annId ? rsvpAttendees[annId] ?? [] : []
       const showAttendees = !!annId && attendees.length > 0 && (isLeaderOrAdmin || showAttendeesIds.has(annId))
       interior = (
-        <UpNextCard
-          fill
-          label={s.kind === "announcement" ? s.eyebrowLabel ?? "Up next" : "Up next"}
-          labelAccent={s.kind === "announcement" ? s.eyebrowAccent ?? true : true}
+        <FeaturedHeroCard
+          fill={!mobile}
+          mobile={mobile}
+          eyebrowLabel={s.kind === "announcement" ? s.eyebrowLabel ?? "Up next" : "Up next"}
           title={s.title}
           body={s.body}
           isEvent={isEvent}
-          eventDetail={s.kind === "event" ? s.eventDetail : s.kind === "announcement" ? s.eventDetail : undefined}
-          imageUrl={s.kind === "announcement" ? s.imageUrl : undefined}
           hasForm={s.kind === "announcement" ? s.hasForm : undefined}
           postedDate={s.kind === "announcement" ? s.createdAt : undefined}
+          eventDetail={s.kind === "event" ? s.eventDetail : s.kind === "announcement" ? s.eventDetail : undefined}
           userHasRsvped={annId ? rsvpedIds.has(annId) : false}
           rsvping={rsvping}
           rsvpCount={annId ? rsvpCounts[annId] ?? 0 : 0}
@@ -613,7 +975,6 @@ export function HomeHeroCarousel({
           showAttendees={showAttendees}
           onRsvp={annId ? () => onRsvp(annId) : undefined}
           onDetails={hasDetailTarget ? () => onDetails(s) : undefined}
-          mobile={mobile}
         />
       )
     }
@@ -631,9 +992,11 @@ export function HomeHeroCarousel({
     if (lead && i === 0) {
       return mobile ? pulseNode : <HeroFrame bare style={{ height: "100%" }}>{pulseNode}</HeroFrame>
     }
-    const { interior, usePhoto } = renderSlide(slides[i - lead])
+    const { interior } = renderSlide(slides[i - lead])
+    // Both data-slide interiors (photo + featured) own their own border/radius/clip,
+    // so the frame is always `bare` here (no HeroFrame hairline over the plum fill).
     return mobile ? interior : (
-      <HeroFrame bare={usePhoto} style={{ height: "100%" }}>{interior}</HeroFrame>
+      <HeroFrame bare style={{ height: "100%" }}>{interior}</HeroFrame>
     )
   }
 

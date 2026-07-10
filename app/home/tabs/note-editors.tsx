@@ -94,7 +94,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
         padding: "4px 5px",
         borderRadius: 5,
         border: "none",
-        background: active ? "rgba(62,21,64,0.10)" : "transparent",
+        background: active ? "color-mix(in srgb, var(--plum) 10%, transparent)" : "transparent",
         color: active ? "var(--plum)" : "var(--body)",
         cursor: "pointer",
         display: "flex",
@@ -118,9 +118,9 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
       {btn(editor.isActive("strike"),    () => editor.chain().focus().toggleStrike().run(), "Strikethrough", <Strikethrough size={12} />)}
       {div}
       {btn(editor.isActive("heading", { level: 1 }), () => editor.chain().focus().toggleHeading({ level: 1 }).run(), "Heading 1",
-        <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1 }}>H1</span>)}
+        <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1 }}>H1</span>)}
       {btn(editor.isActive("heading", { level: 2 }), () => editor.chain().focus().toggleHeading({ level: 2 }).run(), "Heading 2",
-        <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1 }}>H2</span>)}
+        <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1 }}>H2</span>)}
       {div}
       {btn(editor.isActive("bulletList"),  () => editor.chain().focus().toggleBulletList().run(),  "Bullet List",   <List size={12} />)}
       {btn(editor.isActive("orderedList"), () => editor.chain().focus().toggleOrderedList().run(), "Ordered List",  <ListOrdered size={12} />)}
@@ -141,7 +141,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
             padding: "3px 5px",
             borderRadius: 5,
             border: "none",
-            background: showColors ? "rgba(62,21,64,0.10)" : "transparent",
+            background: showColors ? "color-mix(in srgb, var(--plum) 10%, transparent)" : "transparent",
             cursor: "pointer",
             display: "flex",
             flexDirection: "column",
@@ -149,7 +149,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
             gap: 2,
           }}
         >
-          <span style={{ fontSize: 12, fontWeight: 700, color: "var(--body)", lineHeight: 1 }}>A</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--body)", lineHeight: 1 }}>A</span>
           <div style={{ width: 14, height: 2.5, borderRadius: 2, background: currentColor ?? "#374151" }} />
         </button>
         {showColors && (
@@ -411,7 +411,7 @@ export function MeetingNoteEditor({
               : `${activeUsers.length} others are editing`}
           </span>
           {/* Live pulse dot */}
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", marginLeft: 2, flexShrink: 0 }} />
+          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--success)", marginLeft: 2, flexShrink: 0 }} />
         </div>
       )}
       <div style={{ padding: "20px 32px 44px" }}>

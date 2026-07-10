@@ -813,6 +813,9 @@ export interface DesktopSidebarProps {
   // reaches the plan picker.
   showWorkspaceNavHint?: boolean
   onDismissNavHint?: () => void
+  // Super-account impersonation chip, docked in the rail's bottom zone above the
+  // avatar (R9). Renders nothing for non-super accounts.
+  superSwitcherSlot?: ReactNode
 }
 
 export interface HomeAppProps {

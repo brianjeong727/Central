@@ -114,7 +114,7 @@ export function IconButton({ children, dim = 28, active = false, style, disabled
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        cursor: disabled ? "default" : "pointer",
+        cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.5 : 1,
         flexShrink: 0,
         ...style,

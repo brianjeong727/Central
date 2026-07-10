@@ -8,6 +8,7 @@ import { getUserMinistries, getPublicMinistries, joinMinistryById, joinMinistryB
 import { Spinner, RingCrossLogo } from "@/app/home/components/shared"
 import { MonogramChip } from "@/components/central/MonogramChip"
 import { PlanSubTabStrip } from "@/components/central/plan-sub-tab-strip"
+import { CentralButton } from "@/components/central/button"
 import { usePostJoinPickers, PostJoinPickerModals, SIZE_LABELS } from "@/app/join/post-join-pickers"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 
@@ -344,16 +345,9 @@ function MinistriesContent() {
                     </div>
                     <div style={{ marginLeft: "auto", flexShrink: 0 }}>
                       {m.is_public ? (
-                        <button onClick={() => handleJoin(m)} disabled={joiningId === m.id} style={{
-                          padding: "10px 22px", border: "none", borderRadius: 10,
-                          background: joiningId === m.id ? "var(--line-2)" : "var(--plum-2)",
-                          color: joiningId === m.id ? "var(--faint)" : "var(--cream-on-dark)",
-                          fontFamily: SANS, fontSize: 14, fontWeight: 500,
-                          cursor: joiningId === m.id ? "not-allowed" : "pointer",
-                          transition: "opacity .12s ease",
-                        }}>
+                        <CentralButton variant="primary" onClick={() => handleJoin(m)} disabled={joiningId === m.id} style={{ padding: "10px 22px" }}>
                           {joiningId === m.id ? "Joining…" : "Join"}
-                        </button>
+                        </CentralButton>
                       ) : (
                         /* Private ministry — discoverable, but code is the only door. */
                         <button onClick={() => changeTab("code")} title="This ministry is private — joining requires an invite code" style={{
@@ -425,15 +419,9 @@ function MinistriesContent() {
                 }}
               />
               <div>
-                <button type="submit" disabled={joiningCode || inviteCode.trim().length < 4} style={{
-                  marginTop: 20, padding: "14px 28px", border: "none", borderRadius: 10,
-                  background: (joiningCode || inviteCode.trim().length < 4) ? "var(--line-2)" : "var(--plum-2)",
-                  color: (joiningCode || inviteCode.trim().length < 4) ? "var(--faint)" : "var(--cream-on-dark)",
-                  fontFamily: SANS, fontSize: 15, fontWeight: 500,
-                  cursor: (joiningCode || inviteCode.trim().length < 4) ? "not-allowed" : "pointer",
-                }}>
+                <CentralButton type="submit" variant="primary" disabled={joiningCode || inviteCode.trim().length < 4} style={{ marginTop: 20, padding: "14px 28px", fontSize: 15 }}>
                   {joiningCode ? "Joining…" : "Join ministry"}
-                </button>
+                </CentralButton>
               </div>
               <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 14 }}>
                 Codes are case-insensitive. Ask your ministry&apos;s admin or leader if you don&apos;t have one.

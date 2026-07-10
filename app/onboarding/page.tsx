@@ -6,6 +6,7 @@ import { submitMinistryApplication } from "@/app/actions/ministry"
 import { RingCrossLogo, PlanLineIcon } from "@/app/home/components/shared"
 import { WORKSPACE_PRESETS } from "@/app/home/workspace-presets"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
+import { CentralButton } from "@/components/central"
 
 const SANS  = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
@@ -222,16 +223,11 @@ function NavRow({ onBack, onNext, nextLabel, disabled }: {
           <Icon d="M19 12H5M12 19l-7-7 7-7" size={16}/> Back
         </button>
       ) : <span/>}
-      <button type="button" onClick={onNext} disabled={disabled} style={{
-        padding: "14px 32px", border: "none", borderRadius: 10,
-        background: disabled ? "var(--line-2)" : "var(--plum-2)",
-        color: disabled ? "var(--faint)" : "var(--cream)",
-        fontFamily: SANS, fontSize: 15, fontWeight: 500,
-        cursor: disabled ? "not-allowed" : "pointer",
-        transition: "opacity .12s ease",
+      <CentralButton type="button" variant="primary" onClick={onNext} disabled={disabled} style={{
+        padding: "14px 32px", borderRadius: 10, fontSize: 15,
       }}>
         {nextLabel}
-      </button>
+      </CentralButton>
     </div>
   )
 }

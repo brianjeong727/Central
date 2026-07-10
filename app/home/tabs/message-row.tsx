@@ -497,8 +497,8 @@ function MessageRowBase({
         {/* Pinned indicator */}
         {isPinned && (
           <div className={`flex items-center gap-1 mb-0.5 ${isOwn ? "justify-end pr-1" : "justify-start ml-9"}`}>
-            <Pin className="w-3 h-3 text-[#C9A34B]" />
-            <span className="text-[11px] text-[#C9A34B] font-medium">Pinned</span>
+            <Pin className="w-3 h-3 text-[var(--gold)]" />
+            <span className="text-[11px] text-[var(--gold)] font-medium">Pinned</span>
           </div>
         )}
         {/* Forwarded indicator */}
@@ -539,7 +539,7 @@ function MessageRowBase({
             className={`max-w-[75%] text-[14px] leading-[1.4] select-none overflow-hidden ${
               msg.deleted
                 ? isOwn
-                  ? `bg-[var(--plum-2)]/30 text-white/50 ${outgoingRadius} px-4 py-2`
+                  ? `bg-[var(--plum-2)]/30 text-[color-mix(in_srgb,var(--cream-on-dark)_50%,transparent)] ${outgoingRadius} px-4 py-2`
                   : `bg-[var(--cream-panel)] border border-[var(--line)] text-[var(--muted-text)] ${incomingRadius} px-4 py-2`
                 : isOwn
                   ? `bg-[var(--plum-2)] text-[var(--cream-on-dark)] ${outgoingRadius}`
@@ -561,11 +561,11 @@ function MessageRowBase({
                           : "bg-[var(--ivory)] border-l-[2px] border-[var(--plum)]"
                       }`}
                     >
-                      <span className={`text-[11px] font-medium flex items-center gap-1 ${isOwn ? "text-white/90" : "text-[var(--plum)]"}`}>
+                      <span className={`text-[11px] font-medium flex items-center gap-1 ${isOwn ? "text-[color-mix(in_srgb,var(--cream-on-dark)_90%,transparent)]" : "text-[var(--plum)]"}`}>
                         <CornerUpLeft className="w-3 h-3" />
                         {msg.reply_to_sender}
                       </span>
-                      <span className={`text-[12px] truncate ${isOwn ? "text-white/70" : "text-[var(--muted-text)]"}`}>
+                      <span className={`text-[12px] truncate ${isOwn ? "text-[color-mix(in_srgb,var(--cream-on-dark)_70%,transparent)]" : "text-[var(--muted-text)]"}`}>
                         {msg.reply_to_content.slice(0, 80)}
                       </span>
                     </button>
@@ -595,8 +595,8 @@ function MessageRowBase({
                       />
                     </div>
                     <div className="flex gap-2 justify-end mt-1.5">
-                      <button onClick={() => setEditingId(null)} className={`text-[12px] transition-opacity ${isOwn ? "text-white/50 hover:text-white/80" : "text-[var(--muted-text)] hover:text-[var(--body)]"}`}>Cancel</button>
-                      <button onClick={onSaveEdit} className={`text-[12px] font-medium px-2.5 py-0.5 rounded-md transition-colors ${isOwn ? "bg-[var(--cream-panel)]/20 hover:bg-[var(--cream-panel)]/30 text-white" : "bg-[var(--plum)]/10 hover:bg-[var(--plum)]/20 text-[var(--plum)]"}`}>Save</button>
+                      <button onClick={() => setEditingId(null)} className={`text-[12px] transition-opacity ${isOwn ? "text-[color-mix(in_srgb,var(--cream-on-dark)_50%,transparent)] hover:text-[color-mix(in_srgb,var(--cream-on-dark)_80%,transparent)]" : "text-[var(--muted-text)] hover:text-[var(--body)]"}`}>Cancel</button>
+                      <button onClick={onSaveEdit} className={`text-[12px] font-medium px-2.5 py-0.5 rounded-md transition-colors ${isOwn ? "bg-[var(--cream-panel)]/20 hover:bg-[var(--cream-panel)]/30 text-[var(--cream-on-dark)]" : "bg-[var(--plum)]/10 hover:bg-[var(--plum)]/20 text-[var(--plum)]"}`}>Save</button>
                     </div>
                   </div>
                 ) : (
@@ -624,10 +624,10 @@ function MessageRowBase({
                         <div className="min-w-0 flex-1">
                           <p className="text-[13px] font-medium truncate">{msg.attachment_name ?? "File"}</p>
                           {msg.attachment_size != null && (
-                            <p className={`text-[11px] ${isOwn ? "text-white/50" : "text-[var(--muted-text)]"}`}>{formatFileSize(msg.attachment_size)}</p>
+                            <p className={`text-[11px] ${isOwn ? "text-[color-mix(in_srgb,var(--cream-on-dark)_50%,transparent)]" : "text-[var(--muted-text)]"}`}>{formatFileSize(msg.attachment_size)}</p>
                           )}
                         </div>
-                        <FileDown className={`w-4 h-4 flex-shrink-0 ${isOwn ? "text-white/40" : "text-[var(--faint)]"}`} />
+                        <FileDown className={`w-4 h-4 flex-shrink-0 ${isOwn ? "text-[color-mix(in_srgb,var(--cream-on-dark)_40%,transparent)]" : "text-[var(--faint)]"}`} />
                       </div>
                     )}
                     {/* Text content */}
@@ -648,16 +648,16 @@ function MessageRowBase({
                             rel="noopener noreferrer"
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => e.stopPropagation()}
-                            className={`block mx-3 mb-2 rounded-xl overflow-hidden border text-left transition-opacity hover:opacity-90 ${isOwn ? "border-white/20 bg-[var(--cream-panel)]/10" : "border-[var(--line)] bg-[var(--body-bg)]"}`}
+                            className={`block mx-3 mb-2 rounded-xl overflow-hidden border text-left transition-opacity hover:opacity-90 ${isOwn ? "border-[color-mix(in_srgb,var(--cream-on-dark)_20%,transparent)] bg-[var(--cream-panel)]/10" : "border-[var(--line)] bg-[var(--body-bg)]"}`}
                             style={{ textDecoration: "none" }}
                           >
                             {linkPreview.image && (
                               <img src={linkPreview.image} alt="" className="w-full max-h-[120px] object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none" }} />
                             )}
                             <div className="px-3 py-2">
-                              <p className={`text-[10px] font-medium uppercase tracking-wide mb-0.5 ${isOwn ? "text-white/50" : "text-[var(--muted-text)]"}`}>{linkPreview.hostname}</p>
-                              {linkPreview.title && <p className={`text-[13px] font-medium leading-snug ${isOwn ? "text-white" : "text-[var(--ink)]"}`}>{linkPreview.title.slice(0, 80)}</p>}
-                              {linkPreview.description && <p className={`text-[11px] mt-0.5 line-clamp-2 ${isOwn ? "text-white/60" : "text-[var(--body)]"}`}>{linkPreview.description.slice(0, 120)}</p>}
+                              <p className={`text-[10px] font-medium uppercase tracking-wide mb-0.5 ${isOwn ? "text-[color-mix(in_srgb,var(--cream-on-dark)_50%,transparent)]" : "text-[var(--muted-text)]"}`}>{linkPreview.hostname}</p>
+                              {linkPreview.title && <p className={`text-[13px] font-medium leading-snug ${isOwn ? "text-[var(--cream-on-dark)]" : "text-[var(--ink)]"}`}>{linkPreview.title.slice(0, 80)}</p>}
+                              {linkPreview.description && <p className={`text-[11px] mt-0.5 line-clamp-2 ${isOwn ? "text-[color-mix(in_srgb,var(--cream-on-dark)_60%,transparent)]" : "text-[var(--body)]"}`}>{linkPreview.description.slice(0, 120)}</p>}
                             </div>
                           </a>
                         )}

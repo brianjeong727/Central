@@ -6,6 +6,7 @@ import { AlertCircle, CheckCircle2 } from "lucide-react"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { SplitShell } from "@/app/(auth)/shared"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
+import { CentralButton } from "@/components/central"
 
 const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
@@ -86,20 +87,13 @@ export default function ForgotPasswordPage() {
               />
             </div>
           </label>
-          <button
-            type="submit" disabled={loading}
-            style={{
-              width: "100%", padding: "15px", border: "none", borderRadius: 10,
-              background: "var(--plum-2)", color: "var(--cream-panel)",
-              fontFamily: SANS, fontSize: 15, fontWeight: 500,
-              cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.75 : 1,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              transition: "opacity .12s", marginTop: 6,
-            }}
+          <CentralButton
+            type="submit" variant="primary" disabled={loading}
+            style={{ width: "100%", padding: "15px", borderRadius: 10, fontSize: 15, marginTop: 6 }}
           >
-            {loading && <div style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid rgba(251,248,242,0.3)", borderTopColor: "var(--cream-panel)", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />}
+            {loading && <div style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid color-mix(in srgb, var(--cream) 30%, transparent)", borderTopColor: "var(--cream-panel)", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />}
             {loading ? "Sending…" : "Send reset link"}
-          </button>
+          </CentralButton>
           <p style={{ textAlign: "center", fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>
             Remember your password?{" "}
             <Link href="/login" style={{ fontWeight: 500, color: "var(--plum-2)", textDecoration: "none" }} className="hover:underline underline-offset-2">

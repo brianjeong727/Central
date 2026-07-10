@@ -6,12 +6,12 @@ import useSWR from "swr"
 import { useRouter } from "next/navigation"
 import { ChevronRight, ChevronDown, X, Check, Camera, Pencil, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { MONO_STYLE, RingCrossLogo } from "../components/shared"
+import { MONO_STYLE, RingCrossLogo, EmptyState } from "../components/shared"
 import { getInitials } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
-import { CentralButton, IconButton, InsetHairline, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog } from "@/components/central"
+import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog } from "@/components/central"
 import { useNavState } from "../nav-state"
 import type { Profile, Devotional, Prayer, Verse } from "../types"
 
@@ -148,7 +148,7 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
           {draft.image_url ? (
             <div style={{ position: "relative", display: "inline-block" }}>
               <img src={draft.image_url} alt="" style={{ maxHeight: 220, maxWidth: "100%", borderRadius: 8 }} />
-              <button onClick={() => setDraft(d => ({ ...d, image_url: null }))} style={{ position: "absolute", top: 5, right: 5, background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={10} color="white" /></button>
+              <button onClick={() => setDraft(d => ({ ...d, image_url: null }))} style={{ position: "absolute", top: 5, right: 5, background: "color-mix(in srgb, var(--ink) 50%, transparent)", border: "none", borderRadius: "50%", width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={10} color="var(--cream-on-dark)" /></button>
             </div>
           ) : (
             <button onClick={() => imageInputRef.current?.click()} disabled={uploadingImage} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--muted-text)", background: "transparent", border: "1px dashed var(--line)", borderRadius: 8, padding: "7px 11px", cursor: "pointer" }}>
@@ -175,12 +175,11 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
       {loading ? (
         <JournalListSkeleton />
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", paddingTop: 48 }}>
-          <BookOpen size={28} style={{ color: "var(--faint)", margin: "0 auto 12px", display: "block" }} />
-          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No entries match &ldquo;{searchQuery}&rdquo;</p> : (
-            <><p style={{ fontFamily: "var(--serif)", fontSize: 17, color: "var(--ink)", marginBottom: 4 }}>No devotionals yet</p><p style={{ fontSize: 13, color: "var(--muted-text)" }}>Write your first entry to get started.</p></>
-          )}
-        </div>
+        searchQuery.trim() ? (
+          <EmptyState icon={<Search className="w-7 h-7" />} title="No matches" subtitle={`No entries match “${searchQuery}”`} />
+        ) : (
+          <EmptyState icon={<BookOpen className="w-7 h-7" />} title="No devotionals yet" subtitle="Write your first entry to get started." />
+        )
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.map((entry, idx) => {
@@ -330,12 +329,11 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
       {loading ? (
         <JournalListSkeleton />
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", paddingTop: 48 }}>
-          <BookOpen size={28} style={{ color: "var(--faint)", margin: "0 auto 12px", display: "block" }} />
-          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No prayers match &ldquo;{searchQuery}&rdquo;</p> : (
-            <><p style={{ fontFamily: "var(--serif)", fontSize: 17, color: "var(--ink)", marginBottom: 4 }}>No prayers yet</p><p style={{ fontSize: 13, color: "var(--muted-text)" }}>Record your first prayer request.</p></>
-          )}
-        </div>
+        searchQuery.trim() ? (
+          <EmptyState icon={<Search className="w-7 h-7" />} title="No matches" subtitle={`No prayers match “${searchQuery}”`} />
+        ) : (
+          <EmptyState icon={<BookOpen className="w-7 h-7" />} title="No prayers yet" subtitle="Record your first prayer request." />
+        )
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.map((entry, idx) => {
@@ -467,12 +465,11 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
       {loading ? (
         <JournalListSkeleton />
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", paddingTop: 48 }}>
-          <BookOpen size={28} style={{ color: "var(--faint)", margin: "0 auto 12px", display: "block" }} />
-          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No verses match &ldquo;{searchQuery}&rdquo;</p> : (
-            <><p style={{ fontFamily: "var(--serif)", fontSize: 17, color: "var(--ink)", marginBottom: 4 }}>No verses saved yet</p><p style={{ fontSize: 13, color: "var(--muted-text)" }}>Save a verse that has spoken to you.</p></>
-          )}
-        </div>
+        searchQuery.trim() ? (
+          <EmptyState icon={<Search className="w-7 h-7" />} title="No matches" subtitle={`No verses match “${searchQuery}”`} />
+        ) : (
+          <EmptyState icon={<BookOpen className="w-7 h-7" />} title="No verses saved yet" subtitle="Save a verse that has spoken to you." />
+        )
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.map((entry, idx) => {
@@ -1031,6 +1028,12 @@ export function ProfileTab({
     )
   }
 
+  // Journal desktop header: suppress its terminating hairline ONLY when the
+  // sub-tab strip follows immediately. When stats are on, JournalSection renders
+  // a Stats bar BETWEEN the header and the strip, so the header must keep its
+  // hairline (otherwise nothing terminates the header above the stats bar).
+  const journalShowStats = (profile.show_journal_entries ?? false) || (profile.show_journal_streak ?? false)
+
   return (
     <div className="pb-6 md:pb-0 md:flex md:flex-col md:min-h-full">
 
@@ -1044,9 +1047,10 @@ export function ProfileTab({
             <JournalSettingsMenu showEntries={profile.show_journal_entries ?? false} showStreak={profile.show_journal_streak ?? false} onToggleEntries={handleToggleEntries} onToggleStreak={handleToggleStreak} />
           </div>
 
-          {/* Desktop header — compact, gear in the right slot */}
-          <TabPageHeader>
-            <PageTitle title="Journal" compact />
+          {/* Desktop header — landing tier (R1), gear in the right slot; the
+              Journal sub-tab strip below is the single terminating hairline. */}
+          <TabPageHeader noBottomHairline={!journalShowStats}>
+            <PageTitle eyebrow="Personal · Only you can see this" title="Journal" />
             <div style={{ marginLeft: "auto" }}>
               <JournalSettingsMenu showEntries={profile.show_journal_entries ?? false} showStreak={profile.show_journal_streak ?? false} onToggleEntries={handleToggleEntries} onToggleStreak={handleToggleStreak} />
             </div>
@@ -1084,15 +1088,15 @@ export function ProfileTab({
                 ? <img src={profile.avatar_url} alt="Profile" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 : <span style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--cream)" }}>{getInitials(profile.name)}</span>
               }
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "rgba(19,16,26,0.35)" }}>
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 35%, transparent)" }}>
                 <Camera style={{ width: 14, height: 14, color: "white" }} />
               </div>
-              {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(19,16,26,0.4)" }}><div className="animate-spin" style={{ width: 18, height: 18, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
+              {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 40%, transparent)" }}><div className="animate-spin" style={{ width: 18, height: 18, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
             </label>
             <div style={{ flex: 1, minWidth: 0 }}>
               <h1 style={{ fontFamily: "var(--serif)", fontSize: 26, fontWeight: 400, letterSpacing: "-0.02em", color: "var(--ink)", margin: 0, lineHeight: 1.1 }}>{profile.name}</h1>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "2px 8px", textTransform: "capitalize" as const }}>{roleLabel(profile.role, profile.id)}</span>
+                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "2px 8px", textTransform: "capitalize" as const }}>{roleLabel(profile.role, null)}</span>
                 {profile.graduation_year && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Class of {profile.graduation_year}</span>}
                 {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
               </div>
@@ -1110,38 +1114,48 @@ export function ProfileTab({
           )}
         </div>
 
-        {/* ── Desktop: cream identity header ── */}
-        <TabPageHeader style={{ gap: 24 }}>
-          <label className="group relative flex-shrink-0" style={{ width: 64, height: 64, borderRadius: "999px", background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
-            <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
-            {profile.avatar_url
-              ? <img src={profile.avatar_url} alt="Profile" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              : <span style={{ fontFamily: "var(--serif)", fontSize: 26, color: "var(--cream)" }}>{getInitials(profile.name)}</span>
-            }
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "rgba(19,16,26,0.35)" }}>
-              <Camera style={{ width: 16, height: 16, color: "white" }} />
-            </div>
-            {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(19,16,26,0.4)" }}><div className="animate-spin" style={{ width: 20, height: 20, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
-          </label>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>Your Profile · {roleLabel(profile.role, profile.id)}</p>
-            <h1 style={{ fontFamily: "var(--serif)", fontSize: 44, fontWeight: 400, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 10px", lineHeight: 1.05 }}>{profile.name}</h1>
-            <div style={{ display: "flex", gap: 20, fontSize: 14, color: "var(--body)", flexWrap: "wrap", alignItems: "center" }}>
-              {profile.graduation_year && <span>Class of {profile.graduation_year}</span>}
-              {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation && <span>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
-              <span style={{ color: "var(--muted-text)" }}>{profile.email}</span>
-            </div>
-            {avatarError && <p style={{ fontSize: 11, color: "var(--danger)", margin: "6px 0 0" }}>{avatarError}</p>}
-          </div>
-          {editing ? (
-            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-              <CentralButton variant="secondary" onClick={cancelEdit}><X size={13} />Cancel</CentralButton>
-              <CentralButton onClick={saveEdit} disabled={saving}><Check size={13} />{saving ? "Saving…" : "Save"}</CentralButton>
-            </div>
-          ) : (
-            <CentralButton variant="secondary" onClick={startEdit} style={{ flexShrink: 0 }}><Pencil size={13} />Edit profile</CentralButton>
-          )}
+        {/* ── Desktop: page-title header (R1 — mono eyebrow + serif H1) ──
+            Title / gear only; no buttons. Edit / Save / Cancel live in the
+            identity card below (R1/R2, ratified 2026-07-09). */}
+        <TabPageHeader>
+          <PageTitle eyebrow="Your profile" title="Profile" />
         </TabPageHeader>
+
+        {/* ── Desktop: identity card — avatar + name + email; Edit / Save / Cancel
+            right-aligned inside the card. */}
+        <div className="hidden md:block px-14 pt-8">
+          <div style={{ display: "flex", alignItems: "center", gap: 24, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: "var(--r-card)", padding: "24px 28px" }}>
+            <label className="group relative flex-shrink-0" style={{ width: 64, height: 64, borderRadius: "999px", background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
+              <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+              {profile.avatar_url
+                ? <img src={profile.avatar_url} alt="Profile" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : <span style={{ fontFamily: "var(--serif)", fontSize: 26, color: "var(--cream)" }}>{getInitials(profile.name)}</span>
+              }
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 35%, transparent)" }}>
+                <Camera style={{ width: 16, height: 16, color: "white" }} />
+              </div>
+              {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 40%, transparent)" }}><div className="animate-spin" style={{ width: 20, height: 20, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
+            </label>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>{roleLabel(profile.role, null)}</p>
+              <h1 style={{ fontFamily: "var(--serif)", fontSize: 32, fontWeight: 400, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 8px", lineHeight: 1.05 }}>{profile.name}</h1>
+              <div style={{ display: "flex", gap: 20, fontSize: 14, color: "var(--body)", flexWrap: "wrap", alignItems: "center" }}>
+                {profile.graduation_year && <span>Class of {profile.graduation_year}</span>}
+                {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation && <span>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
+                <span style={{ color: "var(--muted-text)" }}>{profile.email}</span>
+              </div>
+              {avatarError && <p style={{ fontSize: 11, color: "var(--danger)", margin: "6px 0 0" }}>{avatarError}</p>}
+            </div>
+            {editing ? (
+              <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                <CentralButton variant="secondary" onClick={cancelEdit}><X size={13} />Cancel</CentralButton>
+                <CentralButton onClick={saveEdit} disabled={saving}><Check size={13} />{saving ? "Saving…" : "Save"}</CentralButton>
+              </div>
+            ) : (
+              <CentralButton variant="secondary" onClick={startEdit} style={{ flexShrink: 0 }}><Pencil size={13} />Edit profile</CentralButton>
+            )}
+          </div>
+        </div>
 
         {/* ── Desktop: profile sections ── */}
         <div className="hidden md:flex md:flex-col md:flex-1 px-14 pt-6 pb-10">

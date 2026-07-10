@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
-import { EYEBROW_STYLE, PlanLineIcon } from "../components/shared"
+import { EYEBROW_STYLE, PlanLineIcon, EmptyState } from "../components/shared"
 import { teamIconKey } from "../workspace-presets"
 import {
   updateMinistryPublic,
@@ -65,7 +65,7 @@ const ROLE_STYLE: Record<string, { bg: string; color: string; border: string; la
   deacon:  { bg: "var(--plum-2)",  color: "var(--cream-panel)", border: "var(--plum-2)",              label: "Deacon"  },
   elder:   { bg: "var(--plum-2)",  color: "var(--cream-panel)", border: "var(--plum-2)",              label: "Elder"   },
   pastor:  { bg: "var(--plum-2)",  color: "var(--cream-panel)", border: "var(--plum-2)",              label: "Pastor"  },
-  leader:  { bg: "var(--ivory)",  color: "var(--plum)", border: "rgba(62,21,64,0.2)",   label: "Leader"  },
+  leader:  { bg: "var(--ivory)",  color: "var(--plum)", border: "color-mix(in srgb, var(--plum) 20%, transparent)",   label: "Leader"  },
   member:  { bg: "var(--ivory)",  color: "var(--muted-text)", border: "var(--line-2)",              label: "Member"  },
   visitor: { bg: "var(--cream)", color: "var(--muted-text)", border: "var(--dashed)",       label: "Visitor" },
 }
@@ -958,8 +958,8 @@ export function SettingsTab({
         <h1 style={{ fontFamily: "var(--serif)", fontSize: 32, color: "var(--ink)", fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.05, margin: "12px 0 0" }}>Church Settings</h1>
       </div>
 
-      {/* Desktop header */}
-      <TabPageHeader>
+      {/* Desktop header — settings tab strip below is the single terminating hairline (R1) */}
+      <TabPageHeader noBottomHairline>
         <PageTitle eyebrow={isAdmin ? "Ministry Admin" : "Ministry Workspace"} title="Church Settings" />
       </TabPageHeader>
 
@@ -1047,7 +1047,7 @@ export function SettingsTab({
                   {/* Schools */}
                   <div>
                     <div style={{ marginBottom: 16 }}>
-                      <SectionHeader eyebrow="Schools" title="Linked campuses" titleSize={20} action={isAdmin && !addingSchool ? (<button onClick={() => setAddingSchool(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add school</button>) : undefined} />
+                      <SectionHeader eyebrow="Schools" title="Linked campuses" titleSize={20} action={isAdmin && !addingSchool ? (<CentralButton variant="create" size="sm" onClick={() => setAddingSchool(true)} style={{ flexShrink: 0 }}>+ Add school</CentralButton>) : undefined} />
                     </div>
                     <div style={{ ...CARD, overflow: "hidden" }}>
                       {schools.length === 0 && !addingSchool && <div style={{ padding: "16px 20px" }}><p style={{ fontSize: 13, color: "var(--muted-text)" }}>No schools added yet.</p></div>}
@@ -1135,7 +1135,7 @@ export function SettingsTab({
               {isAdmin && (
                 <section>
                   <div style={{ marginBottom: 20 }}>
-                    <SectionHeader eyebrow="Daily Verse Rotation" title="Verses on the sidebar" titleSize={20} action={!addingVerse ? <button onClick={() => setAddingVerse(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add verse</button> : undefined} />
+                    <SectionHeader eyebrow="Daily Verse Rotation" title="Verses on the sidebar" titleSize={20} action={!addingVerse ? <CentralButton variant="create" size="sm" onClick={() => setAddingVerse(true)} style={{ flexShrink: 0 }}>+ Add verse</CentralButton> : undefined} />
                     <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Verses rotate daily in the order below. Drag to reorder. Today&apos;s verse is highlighted.</p>
                   </div>
                   <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
@@ -1295,7 +1295,7 @@ export function SettingsTab({
                   { label: "Regular",  value: totalMembers - totalLeaders - totalAdmins - totalVisitors, filter: "member" as RoleFilter },
                   { label: "Visitors", value: totalVisitors,                                             filter: "visitor" as RoleFilter },
                 ] as { label: string; value: number; filter: RoleFilter }[]).map(({ value, label, filter }) => (
-                  <button key={label} onClick={() => setPeopleFilter(filter)} style={{ ...CARD, padding: "18px", cursor: "pointer", textAlign: "left", borderColor: peopleFilter === filter ? "var(--plum)" : "var(--line)" }}>
+                  <button key={label} onClick={() => setPeopleFilter(filter)} style={{ ...CARD, padding: "18px", cursor: "pointer", textAlign: "left", background: peopleFilter === filter ? "var(--plum-tint)" : (CARD.background as string | undefined), borderColor: peopleFilter === filter ? "var(--plum)" : "var(--line)" }}>
                     <p style={{ ...SECTION_LABEL, marginBottom: 8 }}>{label}</p>
                     <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", color: "var(--ink)", fontWeight: 400, lineHeight: 1 }}>{value}</p>
                   </button>
@@ -1749,7 +1749,7 @@ export function SettingsTab({
                         <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old code will stop working immediately.</p>
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => setShowRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                          <button onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 500, color: "var(--cream-panel)", cursor: "pointer", opacity: regenerating ? 0.6 : 1 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</button>
+                          <CentralButton variant="danger-solid" onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, fontSize: 12 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</CentralButton>
                         </div>
                       </div>
                     ) : (
@@ -1776,7 +1776,7 @@ export function SettingsTab({
                           <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old staff code will stop working immediately.</p>
                           <div style={{ display: "flex", gap: 8 }}>
                             <button onClick={() => setShowStaffRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
-                            <button onClick={handleRegenerateStaff} disabled={regeneratingStaff} style={{ padding: "5px 10px", borderRadius: 8, background: "var(--plum-2)", border: "none", fontSize: 12, fontWeight: 500, color: "var(--cream-panel)", cursor: "pointer", opacity: regeneratingStaff ? 0.6 : 1 }}>{regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}</button>
+                            <CentralButton variant="danger-solid" onClick={handleRegenerateStaff} disabled={regeneratingStaff} style={{ padding: "5px 10px", borderRadius: 8, fontSize: 12 }}>{regeneratingStaff ? "Regenerating…" : "Yes, regenerate"}</CentralButton>
                           </div>
                         </div>
                       ) : (
@@ -1802,9 +1802,9 @@ export function SettingsTab({
                       {calCopied ? <Check style={{ width: 13, height: 13, color: "var(--plum)" }} /> : <Copy style={{ width: 13, height: 13 }} />}
                       {calCopied ? "Copied" : "Copy"}
                     </button>
-                    <button onClick={openGoogleCalendar} style={{ padding: "9px 14px", borderRadius: 10, background: "var(--plum-2)", border: "none", color: "var(--cream-panel)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, fontWeight: 500 }}>
+                    <CentralButton variant="primary" onClick={openGoogleCalendar} style={{ padding: "9px 14px", borderRadius: 10, fontSize: 13, flexShrink: 0 }}>
                       <Calendar style={{ width: 13, height: 13 }} /> Add to Google Calendar
-                    </button>
+                    </CentralButton>
                   </div>
                   <p style={{ marginTop: 14, fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5 }}>Clicking the button copies the URL and opens Google Calendar — paste it in the &quot;From URL&quot; field. For Apple Calendar or Outlook, use the Copy button.</p>
                 </div>
@@ -1814,7 +1814,7 @@ export function SettingsTab({
               {isAdmin && (
                 <section>
                   <div style={{ marginBottom: 20 }}>
-                    <SectionHeader eyebrow="Receipt Limits" title="Per-event reimbursement caps" titleSize={20} action={!addingLimit ? <button onClick={() => setAddingLimit(true)} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>+ Add limit</button> : undefined} />
+                    <SectionHeader eyebrow="Receipt Limits" title="Per-event reimbursement caps" titleSize={20} action={!addingLimit ? <CentralButton variant="create" size="sm" onClick={() => setAddingLimit(true)} style={{ flexShrink: 0 }}>+ Add limit</CentralButton> : undefined} />
                     <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Define a maximum reimbursement that members can submit against an event before it requires admin approval.</p>
                   </div>
                   <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
@@ -1893,12 +1893,10 @@ export function SettingsTab({
               {auditLoading ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
               ) : auditLogs.length === 0 ? (
-                <div style={{ border: "1px dashed var(--dashed)", borderRadius: 14, background: "transparent", padding: "28px 22px", textAlign: "center" }}>
-                  <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No admin actions have been recorded yet.</p>
-                </div>
+                <EmptyState variant="bordered" icon={<Shield className="w-7 h-7" />} title="No activity yet" subtitle="No admin actions have been recorded yet." />
               ) : (
                 <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
-                  {auditLogs.map((log, i) => {
+                  {(() => {
                     const actionLabel: Record<string, string> = {
                       "announcement.create": "Created announcement",
                       "announcement.edit": "Edited announcement",
@@ -1914,21 +1912,38 @@ export function SettingsTab({
                       "team.member_remove": "Removed team member",
                       "team.member_role_change": "Changed team role",
                     }
-                    const label = actionLabel[log.action] ?? log.action
-                    const meta = log.metadata
-                    const roleChange = meta?.old_role && meta?.new_role ? ` (${meta.old_role} → ${meta.new_role})` : ""
-                    const ts = new Date(log.created_at)
-                    const timeStr = ts.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " at " + ts.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-                    return (
-                      <div key={log.id} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", gap: 16, padding: "14px 20px", borderBottom: i < auditLogs.length - 1 ? "1px solid var(--line-3)" : "none" }}>
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{label}{log.entity_label ? ` "${log.entity_label}"` : ""}{roleChange}</div>
-                          <div style={{ marginTop: 2, fontSize: 12, color: "var(--muted-text)" }}>by {log.actor_name}</div>
-                        </div>
-                        <div style={{ fontSize: 12, color: "var(--faint)", whiteSpace: "nowrap", paddingTop: 2 }}>{timeStr}</div>
+                    // Group rows by calendar day (logs arrive newest-first).
+                    const groups: { key: string; label: string; logs: typeof auditLogs }[] = []
+                    for (const log of auditLogs) {
+                      const ts = new Date(log.created_at)
+                      const key = ts.toDateString()
+                      const dayLabel = ts.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase()
+                      const last = groups[groups.length - 1]
+                      if (last && last.key === key) last.logs.push(log)
+                      else groups.push({ key, label: dayLabel, logs: [log] })
+                    }
+                    return groups.map((group) => (
+                      <div key={group.key}>
+                        <div style={{ ...EYEBROW_STYLE, padding: "10px 20px 8px", borderBottom: "1px solid var(--line-3)" }}>{group.label}</div>
+                        {group.logs.map((log, i) => {
+                          const label = actionLabel[log.action] ?? log.action
+                          const meta = log.metadata
+                          const roleChange = meta?.old_role && meta?.new_role ? ` (${meta.old_role} → ${meta.new_role})` : ""
+                          const ts = new Date(log.created_at)
+                          const timeStr = ts.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+                          return (
+                            <div key={log.id} className="central-list-row" style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", gap: 16, padding: "14px 20px", borderBottom: i < group.logs.length - 1 ? "1px solid var(--line-3)" : "none" }}>
+                              <div>
+                                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{label}{log.entity_label ? ` "${log.entity_label}"` : ""}{roleChange}</div>
+                                <div style={{ marginTop: 2, fontSize: 12, color: "var(--muted-text)" }}>by {log.actor_name}</div>
+                              </div>
+                              <div style={{ fontSize: 12, color: "var(--faint)", whiteSpace: "nowrap", paddingTop: 2 }}>{timeStr}</div>
+                            </div>
+                          )
+                        })}
                       </div>
-                    )
-                  })}
+                    ))
+                  })()}
                 </div>
               )}
             </div>

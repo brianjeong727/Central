@@ -1904,11 +1904,9 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
                   key={sem.id}
                   selected={active}
                   onClick={() => setActiveSemesterId(sem.id)}
-                  tone="ivory"
                   style={{
                     display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
                     padding: "8px 14px", borderRadius: 12, whiteSpace: "normal", textAlign: "left",
-                    ...(active ? {} : { background: "transparent" }),
                   }}
                 >
                   <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: active ? "var(--plum)" : "var(--body)" }}>{sem.name}</span>
@@ -2969,10 +2967,7 @@ export function PlanTab({
               <div className="mb-8">
                 <PlanSectionHeader>Teams</PlanSectionHeader>
                 {allTeams.length === 0 ? (
-                  <div className="bg-[var(--cream)] rounded-2xl border border-dashed border-[var(--line)] p-6 text-center">
-                    <p className="text-[14px] font-medium text-[var(--ink)]/60 mb-1">No teams yet.</p>
-                    <p className="text-[13px] text-[var(--muted-text)]">Tap + above to create your first team.</p>
-                  </div>
+                  <EmptyState variant="bordered" icon={<Users className="w-6 h-6" />} title="No teams yet." subtitle="Tap + above to create your first team." />
                 ) : (
                   <div className="flex flex-col gap-2">
                     {allTeams.map((team) => (
@@ -3008,7 +3003,7 @@ export function PlanTab({
               </div>
             </div>
             {!isAdmin && !hasAnyPlanning && userTeams.length === 0 && (
-              <EmptyState icon={<ClipboardList className="w-6 h-6" />} title="You're not on a team yet." subtitle="Ask a leader to add you." />
+              <EmptyState icon={<ClipboardList className="w-6 h-6" />} title="You're not on a team yet" subtitle="Ask a leader to add you." />
             )}
           </>
         )}
@@ -9168,24 +9163,19 @@ function GroupsTab({
           <Loader2 style={{ width: 24, height: 24, color: "var(--muted-text)" }} className="animate-spin" />
         </div>
       ) : sessions.length === 0 ? (
-        <button
-          onClick={canEdit ? () => setShowWizard(true) : undefined}
-          disabled={!canEdit}
-          style={{
-            width: "100%", padding: "48px 24px", border: "1px dashed var(--dashed)",
-            borderRadius: 14, background: "transparent",
-            cursor: canEdit ? "pointer" : "default",
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
-          }}
-        >
-          <div style={{ width: 44, height: 44, borderRadius: 12, border: "1px dashed var(--dashed)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted-text)" }}>
-            <Plus style={{ width: 20, height: 20 }} />
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <p style={{ fontSize: 15, color: "var(--body)", fontWeight: 500, margin: 0 }}>Generate your first group set</p>
-            <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "4px 0 0" }}>Split your ministry into balanced small groups.</p>
-          </div>
-        </button>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+          <EmptyState
+            variant="bordered"
+            icon={<Users className="w-6 h-6" />}
+            title="Generate your first group set"
+            subtitle="Split your ministry into balanced small groups."
+          />
+          {canEdit && (
+            <CentralButton variant="primary" size="md" onClick={() => setShowWizard(true)}>
+              <Plus className="w-4 h-4" /> Generate group set
+            </CentralButton>
+          )}
+        </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {sessions.map(session => (
@@ -10481,31 +10471,15 @@ export function AddWorkspaceModal({ ministryId, userId, ownedKeys, onClose, onCr
           </div>
         )}
 
-        {/* Coming-soon presets (disabled) */}
+        {/* Coming-soon presets — collapsed to a single muted, non-interactive line
+            (ratified frame 5i): mono eyebrow + preset names joined by " · ". */}
         {comingSoon.length > 0 && (
-          <>
-            <p className="text-[11px] tracking-[0.12em] uppercase text-[var(--muted-text)] mb-3">More coming soon</p>
-            <div className="flex flex-col gap-3 md:grid md:gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-              {comingSoon.map((preset) => (
-                <div
-                  key={preset.id}
-                  className="w-full rounded-2xl border border-[var(--line)] p-4 text-left md:p-5"
-                  style={{ background: "var(--cream-2)", opacity: 0.6, cursor: "not-allowed" }}
-                >
-                  <div className="flex items-start gap-3">
-                    <PlanLineIcon iconKey={preset.iconKey} size={40} bg="var(--line)" fg="var(--muted-text)" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20 }} className="text-[var(--muted-text)] leading-tight">{preset.name}</p>
-                        <span className="text-[10px] font-normal tracking-wide uppercase bg-[var(--line)] text-[var(--muted-text)] px-2 py-0.5 rounded-full">Coming soon</span>
-                      </div>
-                      <p className="text-[12px] text-[var(--muted-text)] mt-1">{preset.description}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
+          <div style={{ userSelect: "none" }}>
+            <p style={{ ...MONO_STYLE, fontSize: 10, letterSpacing: "0.12em", color: "var(--muted-text)", margin: "0 0 6px" }}>Coming soon</p>
+            <p className="text-[13px] text-[var(--muted-text)] leading-relaxed">
+              {comingSoon.map((p) => p.name).join(" · ")}
+            </p>
+          </div>
         )}
       </div>
     </SubpageShell>
@@ -12312,9 +12286,9 @@ function SmallGroupLeadersTab({
 
           {/* June 1 renewal banner (president only) */}
           {isPresident && rosterStatus?.needs_roster_renewal && (
-            <div style={{ background: "#FFF8F0", border: "1.5px solid #F59E0B", borderRadius: 14, padding: "16px 18px" }}>
-              <p className="text-[14px] font-medium text-[#92400E] mb-1">New semester — update your DGL roster?</p>
-              <p className="text-[13px] text-[#92400E] mb-4">
+            <div style={{ background: "color-mix(in srgb, var(--gold) 13%, var(--cream))", border: "1.5px solid color-mix(in srgb, var(--gold) 30%, var(--cream))", borderRadius: 14, padding: "16px 18px" }}>
+              <p className="text-[14px] font-medium mb-1" style={{ color: "color-mix(in srgb, var(--gold) 65%, var(--ink))" }}>New semester — update your DGL roster?</p>
+              <p className="text-[13px] mb-4" style={{ color: "color-mix(in srgb, var(--gold) 65%, var(--ink))" }}>
                 It&apos;s June 1. Do you want to carry over last semester&apos;s DGL roster for the fall, or start fresh?
               </p>
               <div className="flex gap-2">
@@ -12329,7 +12303,7 @@ function SmallGroupLeadersTab({
                 <button
                   onClick={() => handleRosterRenewal("fresh")}
                   disabled={renewalLoading}
-                  style={{ flex: 1, padding: "8px 0", background: "transparent", color: "#92400E", border: "1.5px solid #F59E0B", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
+                  style={{ flex: 1, padding: "8px 0", background: "transparent", color: "color-mix(in srgb, var(--gold) 65%, var(--ink))", border: "1.5px solid color-mix(in srgb, var(--gold) 30%, var(--cream))", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
                 >
                   Start fresh
                 </button>
@@ -12341,8 +12315,8 @@ function SmallGroupLeadersTab({
           <section>
             <SglSH eyebrow="MY ASSIGNMENTS" title="What&apos;s on your plate" />
             {myUpcoming.length === 0 ? (
-              <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
-                <p className="text-[13px] text-[var(--muted-text)]">Your schedule hasn&apos;t been published yet.</p>
+              <div className="mt-4">
+                <EmptyState variant="bordered" icon={<Calendar className="w-6 h-6" />} title="Nothing scheduled yet" subtitle="Your schedule hasn't been published yet." />
               </div>
             ) : (() => {
               const todayStr = new Date().toISOString().split("T")[0]
@@ -12673,11 +12647,8 @@ function SmallGroupLeadersTab({
             <SglSH eyebrow={`MY AVAILABILITY · ${semesterLabel}`} title="Mark when you&apos;re not available" sub="Changes save automatically." />
 
             {!rosterConfirmedForSchedule ? (
-              <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
-                <p className="text-[14px] font-medium text-[var(--ink)] mb-1">Roster not confirmed</p>
-                <p className="text-[13px] text-[var(--muted-text)]">
-                  The president needs to confirm the DGL roster before availability can be set.
-                </p>
+              <div className="mt-4">
+                <EmptyState variant="bordered" icon={<Users className="w-6 h-6" />} title="Roster not confirmed" subtitle="The president needs to confirm the DGL roster before availability can be set." />
               </div>
             ) : (() => {
               const today = new Date().toISOString().split("T")[0]
@@ -12799,8 +12770,8 @@ function SmallGroupLeadersTab({
             <div>
               <SglSH eyebrow="ROTATION" title={`Published — ${semesterLabel}`} />
               {existingAssignments.filter(a => a.published).length === 0 ? (
-                <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
-                  <p className="text-[13px] text-[var(--muted-text)]">The rotation hasn&apos;t been published yet.</p>
+                <div className="mt-4">
+                  <EmptyState variant="bordered" icon={<Calendar className="w-6 h-6" />} title="Not published yet" subtitle="The rotation hasn't been published yet." />
                 </div>
               ) : (
                 <div className="mt-4">
@@ -12862,11 +12833,8 @@ function SmallGroupLeadersTab({
               )}
 
               {!rosterConfirmedForSchedule ? (
-                <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
-                  <p className="text-[14px] font-medium text-[var(--ink)] mb-1">Roster required</p>
-                  <p className="text-[13px] text-[var(--muted-text)]">
-                    Confirm the DGL roster on the Home tab first to generate a rotation.
-                  </p>
+                <div className="mt-4">
+                  <EmptyState variant="bordered" icon={<Users className="w-6 h-6" />} title="Roster required" subtitle="Confirm the DGL roster on the Home tab first to generate a rotation." />
                 </div>
               ) : (
                 <>
@@ -12877,11 +12845,8 @@ function SmallGroupLeadersTab({
                   )}
 
                   {rotationPhase === "idle" && (
-                    <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
-                      <p className="text-[14px] font-medium text-[var(--ink)] mb-1">No rotation yet</p>
-                      <p className="text-[13px] text-[var(--muted-text)] mb-5">
-                        Generate a fair rotation from DGL availability for {semesterLabel}.
-                      </p>
+                    <div className="mt-4" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+                      <EmptyState variant="bordered" icon={<Shuffle className="w-6 h-6" />} title="No rotation yet" subtitle={`Generate a fair rotation from DGL availability for ${semesterLabel}.`} />
                       <CentralButton variant="primary" size="md" onClick={handleGenerate} disabled={isGenerating}>
                         {isGenerating ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Generating…</> : <><Shuffle style={{ width: 14, height: 14 }} /> Generate Rotation</>}
                       </CentralButton>
@@ -12942,12 +12907,12 @@ function SmallGroupLeadersTab({
                   {rotationPhase === "generated" && (
                     <div className="mt-4">
                       {flagged.length > 0 && (
-                        <div className="mb-3 px-3 py-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl">
-                          <p style={{ fontSize: 12, fontWeight: 500, color: "#92400E", marginBottom: 4 }}>
+                        <div className="mb-3 px-3 py-2.5 rounded-xl" style={{ background: "color-mix(in srgb, var(--gold) 13%, var(--cream))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--cream))" }}>
+                          <p style={{ fontSize: 12, fontWeight: 500, color: "color-mix(in srgb, var(--gold) 65%, var(--ink))", marginBottom: 4 }}>
                             {flagged.length} week{flagged.length !== 1 ? "s" : ""} need review
                           </p>
                           {flagged.map((f, fi) => (
-                            <p key={fi} style={{ fontSize: 12, color: "#92400E" }}>
+                            <p key={fi} style={{ fontSize: 12, color: "color-mix(in srgb, var(--gold) 65%, var(--ink))" }}>
                               {new Date(f.week_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {DGL_SLOT_LABELS[f.slot]} — {f.reason}
                             </p>
                           ))}
@@ -13530,13 +13495,12 @@ function BibleStudySubTab({
 
       {/* Empty state (no chapters yet) */}
       {sheets.length === 0 && !creating && (
-        <div style={{ background: "var(--cream)", borderRadius: 16, border: "1.5px dashed var(--line)", padding: "32px 24px", textAlign: "center" as const }}>
-          <FileText style={{ width: 32, height: 32, color: "var(--dashed)", margin: "0 auto 12px" }} />
-          <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginBottom: 4 }}>No chapters yet</p>
-          <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: isPastor ? 16 : 0 }}>
-            {isPastor ? "Create the first chapter to get started." : "Check back when the pastor has added the first chapter."}
-          </p>
-        </div>
+        <EmptyState
+          variant="bordered"
+          icon={<FileText className="w-6 h-6" />}
+          title="No chapters yet"
+          subtitle={isPastor ? "Create the first chapter to get started." : "Check back when the pastor has added the first chapter."}
+        />
       )}
 
       {/* Sheet content */}
@@ -13623,8 +13587,7 @@ function BibleStudySubTab({
                           transform: "translate(-50%, -50%)", width: 22, height: 22, borderRadius: "50%",
                           background: "var(--plum)", border: "2px solid var(--cream-on-dark)", cursor: "pointer", zIndex: 10,
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 10, fontWeight: 700, color: "var(--cream-on-dark)",
-                          boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                          fontSize: 10, fontWeight: 600, color: "var(--cream-on-dark)",
                         }}
                         onMouseEnter={() => setHoveredAnnotation(gIdx)}
                         onMouseLeave={() => setHoveredAnnotation(null)}
@@ -13794,11 +13757,11 @@ function DGLAssignmentTable({
         const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
         const hasFlagged = SLOTS.some(s => flaggedKeys.has(`${wd}::${s}`))
         return (
-          <div key={wd} className={`rounded-[12px] border overflow-hidden ${hasFlagged ? "border-[#FDE68A]" : "border-[var(--line)]"}`} style={{ background: "var(--cream-panel)" }}>
-            <div className={`px-4 py-2.5 border-b flex items-center justify-between ${hasFlagged ? "border-[#FDE68A] bg-[#FFFBEB]" : "border-[var(--line-3)]"}`} style={hasFlagged ? {} : { background: "var(--cream-3)" }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: hasFlagged ? "#92400E" : "var(--body)" }}>{dateStr}</span>
+          <div key={wd} className="rounded-[12px] border overflow-hidden" style={{ background: "var(--cream-panel)", borderColor: hasFlagged ? "color-mix(in srgb, var(--gold) 30%, var(--cream))" : "var(--line)" }}>
+            <div className="px-4 py-2.5 border-b flex items-center justify-between" style={{ borderBottomColor: hasFlagged ? "color-mix(in srgb, var(--gold) 30%, var(--cream))" : "var(--line-3)", background: hasFlagged ? "color-mix(in srgb, var(--gold) 13%, var(--cream))" : "var(--cream-3)" }}>
+              <span style={{ fontSize: 12, fontWeight: 500, color: hasFlagged ? "color-mix(in srgb, var(--gold) 65%, var(--ink))" : "var(--body)" }}>{dateStr}</span>
               {hasFlagged && (
-                <span style={{ fontSize: 10, fontWeight: 500, color: "#92400E", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+                <span style={{ fontSize: 10, fontWeight: 500, color: "color-mix(in srgb, var(--gold) 65%, var(--ink))", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                   Needs Review
                 </span>
               )}
@@ -13811,8 +13774,8 @@ function DGLAssignmentTable({
               const isEditing = !isFriday && editingCell?.weekDate === wd && editingCell?.slot === slot
               const isHovered = !isFriday && hoveredCell?.weekDate === wd && hoveredCell?.slot === slot
               return (
-                <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[var(--line-3)]" : ""} ${isFlagged ? "bg-[#FFFBEB]" : ""}`}>
-                  <span style={{ fontSize: 11, fontWeight: 500, color: isFlagged ? "#B45309" : "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
+                <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[var(--line-3)]" : ""}`} style={isFlagged ? { background: "color-mix(in srgb, var(--gold) 13%, var(--cream))" } : undefined}>
+                  <span style={{ fontSize: 11, fontWeight: 500, color: isFlagged ? "color-mix(in srgb, var(--gold) 65%, var(--ink))" : "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                     {DGL_SLOT_LABELS[slot]}
                   </span>
                   {isFriday ? (

@@ -11,7 +11,7 @@ import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getSetupChecklist, setLeadersInvited, dismissSetupChecklist } from "@/app/actions/setup-checklist"
-import { CentralCard, SectionHeader, CentralButton, UpNextCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard } from "@/components/central"
 import type { HeroSlide, SetupChecklistData } from "@/components/central"
 // Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
 // so keep it out of the initial home-tab bundle every member/visitor downloads.
@@ -156,19 +156,25 @@ export function HomeTab({
   const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
   const top3 = recentChats.slice(0, 3)
   const totalUnread = top3.reduce((s, c) => s + c.unreadCount, 0)
-  const roleLabelText = roleLabel(userRole, profile.id)
   const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
   const firstName = profile.name.split(" ")[0]
   const hour = new Date().getHours()
   const greetingPrefix = hour < 12 ? "Good morning, " : hour < 17 ? "Good afternoon, " : hour < 21 ? "Good evening, " : "Good night, "
+  // R8 honorific allowlist — only these roles greet with an honorific word before the
+  // first name; all others (admin, member, visitor) get the name alone. The real role
+  // is used (roleLabel with a null id bypasses the "Super" alias) so "Super" never
+  // surfaces in the greeting — that stays impersonation chrome.
+  const honorific = ["pastor", "deacon", "elder", "leader"].includes(userRole.toLowerCase())
+    ? roleLabel(userRole, null)
+    : null
   // Living-accent greeting (Dir 3): each segment is its own sheen span so the slow
-  // light-sheen drifts per-word; the plum role keeps its plum gradient. Static fill
-  // under prefers-reduced-motion (see .greeting-sheen in globals.css).
+  // light-sheen drifts per-word; the plum honorific keeps its plum gradient + italic.
+  // Static fill under prefers-reduced-motion (see .greeting-sheen in globals.css).
   const greetingNode = (
     <>
       <span className="greeting-sheen">{greetingPrefix}</span>
-      <span className="greeting-sheen greeting-sheen-plum">{roleLabelText}</span>
-      <span className="greeting-sheen">{" " + firstName}</span>
+      {honorific && <span className="greeting-sheen greeting-sheen-plum">{honorific}</span>}
+      <span className="greeting-sheen">{(honorific ? " " : "") + firstName}</span>
     </>
   )
 
@@ -559,7 +565,7 @@ export function HomeTab({
           {avatarUrl ? (
             <img src={avatarUrl} alt="Profile" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
-            <span style={{ color: "var(--cream)", fontWeight: 700, fontSize: 11, fontFamily: "var(--sans)" }}>
+            <span style={{ color: "var(--cream)", fontWeight: 600, fontSize: 11, fontFamily: "var(--sans)" }}>
               {getInitials(profile.name)}
             </span>
           )}
@@ -649,15 +655,13 @@ export function HomeTab({
             onDetails={handleSlideDetails}
           />
         ) : heroAnn ? (
-          <HeroFrame>
-            <UpNextCard
+          <HeroFrame bare>
+            <FeaturedHeroCard
               fill
-              label="Up next"
-              labelAccent
+              eyebrowLabel="Up next"
               title={heroAnn.title}
               body={heroAnn.body}
               isEvent={heroAnn.is_event}
-              imageUrl={heroAnn.image_url}
               postedDate={heroAnn.created_at}
               eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
               userHasRsvped={userHasRsvped}
@@ -670,15 +674,13 @@ export function HomeTab({
             />
           </HeroFrame>
         ) : latestAnn ? (
-          <HeroFrame>
-            <UpNextCard
+          <HeroFrame bare>
+            <FeaturedHeroCard
               fill
-              label="Latest"
-              labelAccent={false}
+              eyebrowLabel="Latest"
               title={latestAnn.title}
               body={latestAnn.body}
               isEvent={false}
-              imageUrl={latestAnn.image_url}
               postedDate={latestAnn.created_at}
               onDetails={() => onOpenAnnouncement(latestAnn.id)}
             />
@@ -933,13 +935,12 @@ export function HomeTab({
                 onDetails={handleSlideDetails}
               />
             ) : heroAnn ? (
-              <UpNextCard
-                label="Up next"
-                labelAccent
+              <FeaturedHeroCard
+                mobile
+                eyebrowLabel="Up next"
                 title={heroAnn.title}
                 body={heroAnn.body}
                 isEvent={heroAnn.is_event}
-                imageUrl={heroAnn.image_url}
                 postedDate={heroAnn.created_at}
                 eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
                 userHasRsvped={userHasRsvped}
@@ -949,19 +950,16 @@ export function HomeTab({
                 showAttendees={showAttendeeList}
                 onRsvp={handleHomeRsvp}
                 onDetails={() => onOpenAnnouncement(heroAnn.id)}
-                mobile
               />
             ) : latestAnn ? (
-              <UpNextCard
-                label="Latest"
-                labelAccent={false}
+              <FeaturedHeroCard
+                mobile
+                eyebrowLabel="Latest"
                 title={latestAnn.title}
                 body={latestAnn.body}
                 isEvent={false}
-                imageUrl={latestAnn.image_url}
                 postedDate={latestAnn.created_at}
                 onDetails={() => onOpenAnnouncement(latestAnn.id)}
-                mobile
               />
             ) : (
               <CentralCard

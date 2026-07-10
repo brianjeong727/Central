@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase"
-import { Pencil, Check, Copy, ExternalLink } from "lucide-react"
+import { Pencil, Check, Copy, ExternalLink, Wallet } from "lucide-react"
 import { TabPageHeader, PageTitle, FormField, Input, CentralButton } from "@/components/central"
-import { Spinner, EYEBROW_STYLE } from "./shared"
+import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
 
 // Member-facing "Give" surface. This is the donation/Zelle info that used to live as
 // the `give` section of the Finance (giving) tab. It now stands on its own as a
@@ -126,9 +126,9 @@ export function GiveView({
         <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>Give directly to your ministry through Zelle.</p>
       </div>
 
-      {/* Desktop header */}
+      {/* Desktop header — landing tier (R1) */}
       <TabPageHeader>
-        <PageTitle title="Give" compact />
+        <PageTitle eyebrow="Offering" title="Give" />
       </TabPageHeader>
 
       <div className="px-5 md:px-14 pt-6 md:pt-5 md:flex-1 md:overflow-y-auto">
@@ -158,9 +158,9 @@ export function GiveView({
             </div>
           </div>
         ) : !zelleInfo ? (
-          /* Member-facing empty state (§4.19) — quiet dashed panel, no CTA. */
-          <div style={{ maxWidth: 480, border: "1px dashed var(--dashed)", borderRadius: "var(--r-card)", background: "transparent", padding: "var(--space-7) var(--space-8)" }}>
-            <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>Offering details haven&apos;t been added yet.</p>
+          /* Member-facing empty state (§4.19) — quiet whole-tab empty, no CTA. */
+          <div style={{ maxWidth: 480 }}>
+            <EmptyState icon={<Wallet className="w-7 h-7" />} title="No giving details yet" subtitle="Offering details haven't been added yet." />
           </div>
         ) : (
           <div className="md:grid md:gap-5" style={{ gridTemplateColumns: "1.3fr 1fr" }}>
@@ -175,9 +175,9 @@ export function GiveView({
                   <button key={v} onClick={() => setAmount(v)} style={{ height: 30, padding: "0 13px", borderRadius: 999, background: amount === v ? "var(--plum-2)" : "transparent", color: amount === v ? "var(--cream)" : "var(--body)", border: "1px solid var(--line)", fontSize: 13, cursor: "pointer", fontWeight: amount === v ? 500 : 400 }}>${v}</button>
                 ))}
               </div>
-              <button onClick={handleOpenZelle} style={{ width: "100%", height: 48, background: "var(--plum-2)", color: "var(--cream)", borderRadius: 12, fontSize: 15, fontWeight: 500, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10 }}>
+              <CentralButton variant="primary" onClick={handleOpenZelle} style={{ width: "100%", height: 48, borderRadius: 12, fontSize: 15, marginBottom: 10 }}>
                 <ExternalLink style={{ width: 16, height: 16 }} />Open Zelle · ${displayAmount}
-              </button>
+              </CentralButton>
               {zelleFallback && <p style={{ fontSize: 13, color: "var(--body)", textAlign: "center", lineHeight: 1.5, marginBottom: 10 }}>Open Zelle on your phone and send to <strong style={{ color: "var(--ink)" }}>{zelleName ? `${zelleName} (${zelleInfo})` : zelleInfo}</strong></p>}
               <button onClick={handleCopy} style={{ width: "100%", height: 38, background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
                 {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}

@@ -110,25 +110,25 @@ export function DirectoryMemberListPanel({
         ) : filtered.length === 0 ? (
           <div className="p-4">
             <EmptyState
+              variant="bordered"
               icon={<Users size={20} strokeWidth={1.5} />}
               title="No members found"
               subtitle={search ? "Try a different name" : "No members in the directory yet"}
             />
           </div>
         ) : (
-          filtered.map((member) => {
+          filtered.map((member, i) => {
             const isActive = selectedId === member.id
             return (
               <button
                 key={member.id}
                 onClick={() => onSelect(member)}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors duration-100"
+                className="central-list-row w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors duration-100"
                 style={{
-                  borderLeft: isActive ? "2px solid var(--plum)" : "2px solid transparent",
-                  background: isActive ? "rgba(62,21,64,0.06)" : undefined,
+                  borderLeft: isActive ? "3px solid var(--plum)" : "3px solid transparent",
+                  borderBottom: i < filtered.length - 1 ? "1px solid var(--line-3)" : "none",
+                  background: isActive ? "var(--plum-tint)" : undefined,
                 }}
-                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "var(--cream-3)" }}
-                onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "" }}
               >
                 <MonogramChip
                   initials={getInitials(member.name)}
@@ -137,7 +137,7 @@ export function DirectoryMemberListPanel({
                   style={{ fontFamily: "var(--serif)", fontSize: 12, fontWeight: 400 }}
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-medium truncate leading-tight" style={{ color: "var(--ink)" }}>
+                  <p className="text-[13px] font-medium truncate leading-tight" style={{ color: isActive ? "var(--plum)" : "var(--ink)" }}>
                     {member.name}
                     {member.id === currentUserId && <span className="ml-1.5 text-[10px] font-normal" style={{ color: "var(--muted-text)" }}>you</span>}
                   </p>
@@ -209,9 +209,9 @@ export function DirectoryTab({
       {/* ── Desktop: TabPageHeader + detail pane only ── */}
       <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
 
-        {/* Page header — matches Finance/Profile exactly */}
+        {/* Page header — landing tier (R1) */}
         <TabPageHeader>
-          <PageTitle title="Directory" compact />
+          <PageTitle eyebrow={mobileMembers.length ? `People · ${mobileMembers.length} members` : "People"} title="Directory" />
         </TabPageHeader>
 
         {/* Detail area */}
