@@ -6,7 +6,7 @@ import useSWR from "swr"
 import { useRouter } from "next/navigation"
 import { ChevronRight, ChevronDown, X, Check, Camera, Pencil, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { MONO_STYLE, RingCrossLogo } from "../components/shared"
+import { MONO_STYLE, RingCrossLogo, EmptyState } from "../components/shared"
 import { getInitials } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getHomeVerses } from "@/app/actions/home-verses"
@@ -175,12 +175,11 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
       {loading ? (
         <JournalListSkeleton />
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", paddingTop: 48 }}>
-          <BookOpen size={28} style={{ color: "var(--faint)", margin: "0 auto 12px", display: "block" }} />
-          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No entries match &ldquo;{searchQuery}&rdquo;</p> : (
-            <><p style={{ fontFamily: "var(--serif)", fontSize: 17, color: "var(--ink)", marginBottom: 4 }}>No devotionals yet</p><p style={{ fontSize: 13, color: "var(--muted-text)" }}>Write your first entry to get started.</p></>
-          )}
-        </div>
+        searchQuery.trim() ? (
+          <EmptyState icon={<Search className="w-7 h-7" />} title="No matches" subtitle={`No entries match “${searchQuery}”`} />
+        ) : (
+          <EmptyState icon={<BookOpen className="w-7 h-7" />} title="No devotionals yet" subtitle="Write your first entry to get started." />
+        )
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.map((entry, idx) => {
@@ -330,12 +329,11 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
       {loading ? (
         <JournalListSkeleton />
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", paddingTop: 48 }}>
-          <BookOpen size={28} style={{ color: "var(--faint)", margin: "0 auto 12px", display: "block" }} />
-          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No prayers match &ldquo;{searchQuery}&rdquo;</p> : (
-            <><p style={{ fontFamily: "var(--serif)", fontSize: 17, color: "var(--ink)", marginBottom: 4 }}>No prayers yet</p><p style={{ fontSize: 13, color: "var(--muted-text)" }}>Record your first prayer request.</p></>
-          )}
-        </div>
+        searchQuery.trim() ? (
+          <EmptyState icon={<Search className="w-7 h-7" />} title="No matches" subtitle={`No prayers match “${searchQuery}”`} />
+        ) : (
+          <EmptyState icon={<BookOpen className="w-7 h-7" />} title="No prayers yet" subtitle="Record your first prayer request." />
+        )
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.map((entry, idx) => {
@@ -467,12 +465,11 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
       {loading ? (
         <JournalListSkeleton />
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", paddingTop: 48 }}>
-          <BookOpen size={28} style={{ color: "var(--faint)", margin: "0 auto 12px", display: "block" }} />
-          {searchQuery.trim() ? <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No verses match &ldquo;{searchQuery}&rdquo;</p> : (
-            <><p style={{ fontFamily: "var(--serif)", fontSize: 17, color: "var(--ink)", marginBottom: 4 }}>No verses saved yet</p><p style={{ fontSize: 13, color: "var(--muted-text)" }}>Save a verse that has spoken to you.</p></>
-          )}
-        </div>
+        searchQuery.trim() ? (
+          <EmptyState icon={<Search className="w-7 h-7" />} title="No matches" subtitle={`No verses match “${searchQuery}”`} />
+        ) : (
+          <EmptyState icon={<BookOpen className="w-7 h-7" />} title="No verses saved yet" subtitle="Save a verse that has spoken to you." />
+        )
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.map((entry, idx) => {

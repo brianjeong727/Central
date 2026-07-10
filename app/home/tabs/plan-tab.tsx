@@ -2967,10 +2967,7 @@ export function PlanTab({
               <div className="mb-8">
                 <PlanSectionHeader>Teams</PlanSectionHeader>
                 {allTeams.length === 0 ? (
-                  <div className="bg-[var(--cream)] rounded-2xl border border-dashed border-[var(--line)] p-6 text-center">
-                    <p className="text-[14px] font-medium text-[var(--ink)]/60 mb-1">No teams yet.</p>
-                    <p className="text-[13px] text-[var(--muted-text)]">Tap + above to create your first team.</p>
-                  </div>
+                  <EmptyState variant="bordered" icon={<Users className="w-6 h-6" />} title="No teams yet." subtitle="Tap + above to create your first team." />
                 ) : (
                   <div className="flex flex-col gap-2">
                     {allTeams.map((team) => (
@@ -3006,7 +3003,7 @@ export function PlanTab({
               </div>
             </div>
             {!isAdmin && !hasAnyPlanning && userTeams.length === 0 && (
-              <EmptyState icon={<ClipboardList className="w-6 h-6" />} title="You're not on a team yet." subtitle="Ask a leader to add you." />
+              <EmptyState icon={<ClipboardList className="w-6 h-6" />} title="You're not on a team yet" subtitle="Ask a leader to add you." />
             )}
           </>
         )}
@@ -9166,24 +9163,19 @@ function GroupsTab({
           <Loader2 style={{ width: 24, height: 24, color: "var(--muted-text)" }} className="animate-spin" />
         </div>
       ) : sessions.length === 0 ? (
-        <button
-          onClick={canEdit ? () => setShowWizard(true) : undefined}
-          disabled={!canEdit}
-          style={{
-            width: "100%", padding: "48px 24px", border: "1px dashed var(--dashed)",
-            borderRadius: 14, background: "transparent",
-            cursor: canEdit ? "pointer" : "default",
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
-          }}
-        >
-          <div style={{ width: 44, height: 44, borderRadius: 12, border: "1px dashed var(--dashed)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted-text)" }}>
-            <Plus style={{ width: 20, height: 20 }} />
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <p style={{ fontSize: 15, color: "var(--body)", fontWeight: 500, margin: 0 }}>Generate your first group set</p>
-            <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "4px 0 0" }}>Split your ministry into balanced small groups.</p>
-          </div>
-        </button>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+          <EmptyState
+            variant="bordered"
+            icon={<Users className="w-6 h-6" />}
+            title="Generate your first group set"
+            subtitle="Split your ministry into balanced small groups."
+          />
+          {canEdit && (
+            <CentralButton variant="primary" size="md" onClick={() => setShowWizard(true)}>
+              <Plus className="w-4 h-4" /> Generate group set
+            </CentralButton>
+          )}
+        </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {sessions.map(session => (
@@ -12339,8 +12331,8 @@ function SmallGroupLeadersTab({
           <section>
             <SglSH eyebrow="MY ASSIGNMENTS" title="What&apos;s on your plate" />
             {myUpcoming.length === 0 ? (
-              <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
-                <p className="text-[13px] text-[var(--muted-text)]">Your schedule hasn&apos;t been published yet.</p>
+              <div className="mt-4">
+                <EmptyState variant="bordered" icon={<Calendar className="w-6 h-6" />} title="Nothing scheduled yet" subtitle="Your schedule hasn't been published yet." />
               </div>
             ) : (() => {
               const todayStr = new Date().toISOString().split("T")[0]
@@ -12671,11 +12663,8 @@ function SmallGroupLeadersTab({
             <SglSH eyebrow={`MY AVAILABILITY · ${semesterLabel}`} title="Mark when you&apos;re not available" sub="Changes save automatically." />
 
             {!rosterConfirmedForSchedule ? (
-              <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
-                <p className="text-[14px] font-medium text-[var(--ink)] mb-1">Roster not confirmed</p>
-                <p className="text-[13px] text-[var(--muted-text)]">
-                  The president needs to confirm the DGL roster before availability can be set.
-                </p>
+              <div className="mt-4">
+                <EmptyState variant="bordered" icon={<Users className="w-6 h-6" />} title="Roster not confirmed" subtitle="The president needs to confirm the DGL roster before availability can be set." />
               </div>
             ) : (() => {
               const today = new Date().toISOString().split("T")[0]
@@ -12797,8 +12786,8 @@ function SmallGroupLeadersTab({
             <div>
               <SglSH eyebrow="ROTATION" title={`Published — ${semesterLabel}`} />
               {existingAssignments.filter(a => a.published).length === 0 ? (
-                <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
-                  <p className="text-[13px] text-[var(--muted-text)]">The rotation hasn&apos;t been published yet.</p>
+                <div className="mt-4">
+                  <EmptyState variant="bordered" icon={<Calendar className="w-6 h-6" />} title="Not published yet" subtitle="The rotation hasn't been published yet." />
                 </div>
               ) : (
                 <div className="mt-4">
@@ -12860,11 +12849,8 @@ function SmallGroupLeadersTab({
               )}
 
               {!rosterConfirmedForSchedule ? (
-                <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
-                  <p className="text-[14px] font-medium text-[var(--ink)] mb-1">Roster required</p>
-                  <p className="text-[13px] text-[var(--muted-text)]">
-                    Confirm the DGL roster on the Home tab first to generate a rotation.
-                  </p>
+                <div className="mt-4">
+                  <EmptyState variant="bordered" icon={<Users className="w-6 h-6" />} title="Roster required" subtitle="Confirm the DGL roster on the Home tab first to generate a rotation." />
                 </div>
               ) : (
                 <>
@@ -12875,11 +12861,8 @@ function SmallGroupLeadersTab({
                   )}
 
                   {rotationPhase === "idle" && (
-                    <div className="mt-4 rounded-[14px] border border-dashed border-[var(--line)] p-6 text-center" style={{ background: "var(--cream-panel)" }}>
-                      <p className="text-[14px] font-medium text-[var(--ink)] mb-1">No rotation yet</p>
-                      <p className="text-[13px] text-[var(--muted-text)] mb-5">
-                        Generate a fair rotation from DGL availability for {semesterLabel}.
-                      </p>
+                    <div className="mt-4" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+                      <EmptyState variant="bordered" icon={<Shuffle className="w-6 h-6" />} title="No rotation yet" subtitle={`Generate a fair rotation from DGL availability for ${semesterLabel}.`} />
                       <CentralButton variant="primary" size="md" onClick={handleGenerate} disabled={isGenerating}>
                         {isGenerating ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Generating…</> : <><Shuffle style={{ width: 14, height: 14 }} /> Generate Rotation</>}
                       </CentralButton>
@@ -13528,13 +13511,12 @@ function BibleStudySubTab({
 
       {/* Empty state (no chapters yet) */}
       {sheets.length === 0 && !creating && (
-        <div style={{ background: "var(--cream)", borderRadius: 16, border: "1.5px dashed var(--line)", padding: "32px 24px", textAlign: "center" as const }}>
-          <FileText style={{ width: 32, height: 32, color: "var(--dashed)", margin: "0 auto 12px" }} />
-          <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", marginBottom: 4 }}>No chapters yet</p>
-          <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: isPastor ? 16 : 0 }}>
-            {isPastor ? "Create the first chapter to get started." : "Check back when the pastor has added the first chapter."}
-          </p>
-        </div>
+        <EmptyState
+          variant="bordered"
+          icon={<FileText className="w-6 h-6" />}
+          title="No chapters yet"
+          subtitle={isPastor ? "Create the first chapter to get started." : "Check back when the pastor has added the first chapter."}
+        />
       )}
 
       {/* Sheet content */}

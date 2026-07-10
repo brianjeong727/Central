@@ -5,9 +5,9 @@ import { createClient } from "@/lib/supabase"
 import {
   Plus, X,
   Upload, Download, DollarSign, AlertTriangle,
-  ImageIcon,
+  ImageIcon, Inbox,
 } from "lucide-react"
-import { Spinner, EYEBROW_STYLE } from "./shared"
+import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
 import { MonogramChip, FilterDropdown, SubpageShell, CentralModal } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
@@ -264,12 +264,8 @@ function InboxRow({ receipt: r, first, onClick }: { receipt: InboxReceipt; first
   )
 }
 
-function InboxEmpty({ title }: { title: string }) {
-  return (
-    <div style={{ padding: "40px 24px", borderRadius: 14, border: "1px dashed var(--dashed)", background: "transparent", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 6 }}>
-      <div style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--ink)", letterSpacing: -0.2 }}>{title}</div>
-    </div>
-  )
+function InboxEmpty({ title, subtitle }: { title: string; subtitle: string }) {
+  return <EmptyState variant="bordered" icon={<Inbox className="w-7 h-7" />} title={title} subtitle={subtitle} />
 }
 
 type InboxFilter = "needs" | "all"
@@ -332,7 +328,10 @@ function ReimbursementInbox({
       </div>
 
       {loading ? <Spinner /> : shown.length === 0 ? (
-        <InboxEmpty title={filter === "needs" ? "Nothing needs your action" : "No receipts yet"} />
+        <InboxEmpty
+          title={filter === "needs" ? "Nothing needs your action" : "No receipts yet"}
+          subtitle={filter === "needs" ? "You're all caught up." : "Submitted receipts will appear here."}
+        />
       ) : (
         <div style={{ borderRadius: 12, border: "1px solid var(--line)", overflow: "hidden", background: "var(--cream)" }}>
           {shown.map((r, i) => (
@@ -797,7 +796,7 @@ export function FinanceWorkspace({
                 ))}
               </div>
               {budgetEntries.map((e, i) => (
-                <div key={e.id} style={{ display: "grid", gridTemplateColumns: "90px 1fr 130px 90px 80px", gap: 8, padding: "12px 16px", borderTop: i > 0 ? "1px solid var(--ivory)" : "none", alignItems: "center" }}>
+                <div key={e.id} style={{ display: "grid", gridTemplateColumns: "90px 1fr 130px 90px 80px", gap: 8, padding: "12px 16px", borderTop: i > 0 ? "1px solid var(--line-3)" : "none", alignItems: "center" }}>
                   <span style={{ fontSize: 12.5, color: "var(--body)" }}>{new Date(e.entry_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                   <span style={{ fontSize: 13, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.description ?? "—"}</span>
                   <span style={{ fontSize: 12.5, color: "var(--body)" }}>{e.category}</span>

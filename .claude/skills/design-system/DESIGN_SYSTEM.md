@@ -418,9 +418,15 @@ A **subpage** is a body button opening a temporary view or action surface (a not
 - **Canonical implementation:** `components/central/SubpageShell` (use its `title` prop — see the Student Org event page as the reference).
 
 ### 4.19 Empty / placeholder state
-- Use a dashed-border card (`1px dashed #C4C0B0`, radius 10–14, transparent bg) with body color text and a single `+` icon.
-- Voice: **descriptive, not chirpy.** "+ Assign someone", "+ Add image, file, or link". Never "Nothing here yet!" or emoji-led empty copy.
-- For full-section empty states, follow with one neutral guiding sentence in 13px `#8A8497`.
+
+Canonical component: `EmptyState` (`app/home/components/shared.tsx`) — two variants, both centered, both with the same interior anatomy: a **52px icon chip** (`--ivory` bg + 1px `--line` border, radius `--r-callout` = 14) over a **15px `--ink` title** and a **13px `--muted-text` sentence**. Never hand-roll a bare icon + serif empty; use the component.
+
+- **`quiet`** (default) — for **whole-page / whole-tab empties** (an empty chat list, an empty announcements feed, an empty forms list, a not-on-a-team state). No border, no surface; just the centered interior with `py-16` breathing room.
+- **`bordered`** — for **in-page zones** (inboxes, ledgers, sub-sections, a section inside a populated workspace). Same interior wrapped in a **1.5px dashed `--line-2`** card, radius `--r-callout`, transparent bg, ~28 padding.
+
+- **CTA never lives inside an empty state.** The create/generate action already lives in the collection's content header (§3.2 Zone C). If the empty needs to point at that action, the **copy may NAME the header action** ("Tap + above to create your first team.", "Post the first announcement with New announcement above.") — but the button itself stays in the header. When an empty genuinely needs a co-located action (e.g. a first-run "Generate group set"), render a **separate sibling `CentralButton` underneath** the `EmptyState`, never a button inside the dashed card.
+- **Skeletons render only while fetching, then swap to `EmptyState`** — never leave a skeleton (or a dashed placeholder) as a permanent empty; once the fetch resolves to zero rows, show the real empty state.
+- Voice: **descriptive, not chirpy** — and non-CTA (the copy states the situation; it may NAME the header action but is never itself a button label). "No receipts in Ops yet — submit one with Submit a receipt above.", "Nothing shared yet." Never "Nothing here yet!" or emoji-led empty copy. Follow the title with one neutral guiding sentence.
 
 ### 4.20 Danger zone
 Editorial inline rule, **not a red boxed callout**:
@@ -514,7 +520,7 @@ Test before shipping: at desktop width, is there a large band of unused space wi
 ### 7.2 List page (announcements list, directory)
 - No hero — plain title block
 - Filter rail / segmented control above the table
-- Rows use 1px `#EFE9DA` dividers, never zebra striping
+- Rows: 1px `--line-3` dividers (none on last), never zebra striping, `--cream-2` hover — `ListRow` is canonical (§4.11); day-grouped mono headers for chronological admin lists (audit log)
 
 ### 7.3 Form page (new announcement, new event when standalone)
 - Full-page surface, never a modal when work is long-form
@@ -849,11 +855,12 @@ const btnDestructive = {
 </div>
 ```
 
-### 11.13 Dashed placeholder
+### 11.13 Inline add affordance
+A clickable dashed control for **adding content** in place — an upload slot, an "+ Add image, file, or link" row. This is an **action**, not an empty state: empties never contain CTAs (§4.19). Use it only where a tap directly adds/attaches something.
 ```jsx
 <button style={{
-  padding: "14px 16px", borderRadius: 10,
-  border: "1px dashed #C4C0B0", background: "transparent",
+  padding: "14px 16px", borderRadius: "var(--r-callout)",
+  border: "1.5px dashed var(--dashed)", background: "transparent",
   color: "#5A5466", fontSize: 13, fontFamily: "var(--sans)", cursor: "pointer",
   display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%",
 }}>

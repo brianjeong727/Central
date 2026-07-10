@@ -93,20 +93,52 @@ export function EmptyState({
   icon,
   title,
   subtitle,
+  variant = "quiet",
 }: {
   icon: React.ReactNode
   title: string
   subtitle: string
+  variant?: "quiet" | "bordered"
 }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 gap-3 text-center animate-fade-up">
-      <div className="w-14 h-14 rounded-2xl bg-[var(--cream-panel)] border border-[var(--line)] flex items-center justify-center text-[var(--muted-text)]">
+  const interior = (
+    <div className="flex flex-col items-center justify-center gap-3 text-center">
+      <div
+        className="flex items-center justify-center text-[var(--muted-text)] border border-[var(--line)]"
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: "var(--r-callout)",
+          background: "var(--ivory)",
+        }}
+      >
         {icon}
       </div>
       <div>
-        <p className="text-[14px] font-semibold text-[var(--ink)]/60">{title}</p>
-        <p className="text-[13px] text-[var(--body)]/50 mt-0.5">{subtitle}</p>
+        <p className="text-[15px] font-medium text-[var(--ink)]">{title}</p>
+        <p className="text-[13px] text-[var(--muted-text)] mt-0.5">{subtitle}</p>
       </div>
+    </div>
+  )
+
+  if (variant === "bordered") {
+    return (
+      <div
+        className="animate-fade-up"
+        style={{
+          border: "1.5px dashed var(--line-2)",
+          borderRadius: "var(--r-callout)",
+          background: "transparent",
+          padding: 28,
+        }}
+      >
+        {interior}
+      </div>
+    )
+  }
+
+  return (
+    <div className="py-16 animate-fade-up">
+      {interior}
     </div>
   )
 }

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase"
-import { Pencil, Check, Copy, ExternalLink } from "lucide-react"
+import { Pencil, Check, Copy, ExternalLink, Wallet } from "lucide-react"
 import { TabPageHeader, PageTitle, FormField, Input, CentralButton } from "@/components/central"
-import { Spinner, EYEBROW_STYLE } from "./shared"
+import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
 
 // Member-facing "Give" surface. This is the donation/Zelle info that used to live as
 // the `give` section of the Finance (giving) tab. It now stands on its own as a
@@ -158,9 +158,9 @@ export function GiveView({
             </div>
           </div>
         ) : !zelleInfo ? (
-          /* Member-facing empty state (§4.19) — quiet dashed panel, no CTA. */
-          <div style={{ maxWidth: 480, border: "1px dashed var(--dashed)", borderRadius: "var(--r-card)", background: "transparent", padding: "var(--space-7) var(--space-8)" }}>
-            <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>Offering details haven&apos;t been added yet.</p>
+          /* Member-facing empty state (§4.19) — quiet whole-tab empty, no CTA. */
+          <div style={{ maxWidth: 480 }}>
+            <EmptyState icon={<Wallet className="w-7 h-7" />} title="No giving details yet" subtitle="Offering details haven't been added yet." />
           </div>
         ) : (
           <div className="md:grid md:gap-5" style={{ gridTemplateColumns: "1.3fr 1fr" }}>

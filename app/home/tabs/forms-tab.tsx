@@ -181,7 +181,7 @@ export function FormFillView({ formId, userId, ministryId, announcementId, title
   } else if (fields.length === 0) {
     body = (
       <div className="flex items-center justify-center" style={{ minHeight: 240 }}>
-        <EmptyState icon={<FileText className="w-7 h-7" />} title="No questions" subtitle="This form has no questions yet." />
+        <EmptyState variant="bordered" icon={<FileText className="w-7 h-7" />} title="No questions" subtitle="This form has no questions yet." />
       </div>
     )
   } else {
@@ -711,7 +711,7 @@ export function FormResponsesView({ formId, title, onClose }: {
         ) : subTab === 'responses' ? (
           <div className="px-5 md:px-14 py-6">
             {respondents.length === 0 ? (
-              <EmptyState icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="Responses will appear here once people submit." />
+              <EmptyState variant="bordered" icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="Responses will appear here once people submit." />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {respondents.map(resp => {
@@ -756,7 +756,7 @@ export function FormResponsesView({ formId, title, onClose }: {
         ) : (
           <div className="px-5 md:px-14 py-6" style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
             {respondents.length === 0 ? (
-              <EmptyState icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="The summary will appear once people submit." />
+              <EmptyState variant="bordered" icon={<FileText className="w-7 h-7" />} title="No responses yet" subtitle="The summary will appear once people submit." />
             ) : summaryByField.map(({ field, counts, textAnswers }) => (
               <div key={field.id}>
                 <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 14 }}>{field.label}</p>

@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Plus, Image as ImageIcon, Settings } from "lucide-react"
+import { Plus, Image as ImageIcon, Settings, Receipt } from "lucide-react"
 import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, SubpageShell, CentralModal, ContentActionButton } from "@/components/central"
+import { EmptyState } from "./shared"
 import { createClient } from "@/lib/supabase"
 import { SubmitReceiptModal, STATUS_META } from "./finance-workspace"
 import {
@@ -283,33 +284,30 @@ function CategoryContent({
 
   return (
     <div>
+      {/* Content header — submit always lives here, per the receipts workspace's
+          canonical header-action pattern (CTA never inside the empty state). */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
+        {eyebrow}
+        {submitButton}
+      </div>
       {loading ? null : receipts.length === 0 ? (
-        /* Empty category — centered, guided submit CTA */
-        <div className="flex flex-col items-center justify-center text-center" style={{ padding: "48px 24px" }}>
-          {eyebrow}
-          <p style={{ fontSize: 15, color: "var(--body)", margin: "10px 0 20px" }}>
-            No receipts in {category.name} yet.
-          </p>
-          {submitButton}
-        </div>
+        <EmptyState
+          variant="bordered"
+          icon={<Receipt style={{ width: 22, height: 22 }} />}
+          title={`No receipts in ${category.name} yet`}
+          subtitle="Submit your first receipt with Submit a receipt above."
+        />
       ) : (
-        /* Populated — submit at the top-right, above the list */
-        <>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
-            {eyebrow}
-            {submitButton}
-          </div>
-          <div style={{ border: "1px solid var(--line)", borderRadius: 14, overflow: "hidden", background: "var(--ivory)" }}>
-            {receipts.map((r, i) => (
-              <ReceiptOneLine
-                key={r.id}
-                receipt={r}
-                first={i === 0}
-                onClick={() => onOpenDetail(r)}
-              />
-            ))}
-          </div>
-        </>
+        <div style={{ border: "1px solid var(--line)", borderRadius: 14, overflow: "hidden", background: "var(--ivory)" }}>
+          {receipts.map((r, i) => (
+            <ReceiptOneLine
+              key={r.id}
+              receipt={r}
+              last={i === receipts.length - 1}
+              onClick={() => onOpenDetail(r)}
+            />
+          ))}
+        </div>
       )}
 
       {showSubmit && (
@@ -341,20 +339,20 @@ function StatusPill({ status }: { status: string }) {
 }
 
 function ReceiptOneLine({
-  receipt, first, onClick,
+  receipt, last, onClick,
 }: {
   receipt: ReceiptRow
-  first: boolean
+  last: boolean
   onClick: () => void
 }) {
   return (
     <button
       onClick={onClick}
-      className="hover:bg-[#F4F1E8] transition-colors"
+      className="central-list-row"
       style={{
         display: "flex", alignItems: "center", gap: 12, width: "100%",
         padding: "11px 16px", background: "transparent", border: "none",
-        borderTop: first ? "none" : "1px solid var(--line)",
+        borderBottom: last ? "none" : "1px solid var(--line-3)",
         cursor: "pointer", textAlign: "left",
       }}
     >

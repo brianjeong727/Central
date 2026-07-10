@@ -719,7 +719,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     key={member.user_id}
                     onMouseEnter={() => setHoveredMemberId(member.user_id)}
                     onMouseLeave={() => setHoveredMemberId(null)}
-                    style={{ display: "grid", gridTemplateColumns: "40px 1fr auto auto", alignItems: "center", gap: 14, padding: "15px 20px", borderBottom: i < members.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "#FDF0F0" : "transparent", transition: "background 0.1s" }}
+                    style={{ display: "grid", gridTemplateColumns: "40px 1fr auto auto", alignItems: "center", gap: 14, padding: "15px 20px", borderBottom: i < members.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "#FDF0F0" : isHovered ? "var(--cream-2)" : "transparent", transition: "background 0.1s" }}
                   >
                     <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-medium text-[11px]" />
                     <div>
