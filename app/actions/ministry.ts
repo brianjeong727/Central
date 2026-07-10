@@ -491,7 +491,7 @@ async function seedStarterContent(
     if (!groupId) {
       const { data: group, error: gErr } = await admin
         .from("groups")
-        .insert({ name: "Leaders", type: "church", ministry_id: ministryId, created_by: founderId })
+        .insert({ name: "Leaders", type: "church", category: "general", ministry_id: ministryId, created_by: founderId })
         .select("id")
         .single()
       if (gErr || !group) {
@@ -746,6 +746,92 @@ export async function regenerateStaffCode(): Promise<{ code: string | null; erro
 const ADMIN_TIER_ROLES = ["admin", "deacon", "elder", "pastor"]
 const LAST_ADMIN_ERROR = "This is the last admin — a ministry must keep at least one admin. Promote someone else first."
 
+// Leaders chat membership tracks leader-tier-and-above (leader + admin-tier).
+const LEADER_TIER_OR_ABOVE = ["leader", "admin", "deacon", "elder", "pastor"]
+
+// Locate a ministry's "Leaders" general church chat (the starter-content seed).
+// Tolerates absence — returns null so callers can no-op.
+async function findLeadersChatId(
+  admin: ReturnType<typeof createAdminClient>,
+  ministryId: string,
+): Promise<string | null> {
+  const { data } = await admin
+    .from("groups")
+    .select("id")
+    .eq("ministry_id", ministryId)
+    .eq("type", "church")
+    .eq("category", "general")
+    .eq("name", "Leaders")
+    .order("created_at", { ascending: true })
+    .limit(1)
+  return data?.[0]?.id ?? null
+}
+
+// Targeted Leaders-chat membership sync for a single role change. Promotion into
+// leader-tier-or-above upserts the row; demotion out of it deletes the row.
+// Fire-and-forget: never throws — a sync failure must not fail the role update.
+async function syncLeadersChatMembership(
+  admin: ReturnType<typeof createAdminClient>,
+  ministryId: string,
+  userId: string,
+  newRole: string,
+): Promise<void> {
+  try {
+    const chatId = await findLeadersChatId(admin, ministryId)
+    if (!chatId) return
+    if (LEADER_TIER_OR_ABOVE.includes(newRole.toLowerCase())) {
+      await admin.from("group_members").upsert(
+        [{ group_id: chatId, user_id: userId, last_read_at: new Date().toISOString() }],
+        { onConflict: "group_id,user_id", ignoreDuplicates: true },
+      )
+    } else {
+      await admin.from("group_members").delete().eq("group_id", chatId).eq("user_id", userId)
+    }
+  } catch (e) {
+    console.error("[updateMemberRole] Leaders chat sync failed:", e)
+  }
+}
+
+// One-shot full reconcile of the Leaders chat: adds every current leader-tier+
+// member, removes everyone else. Admin-gated; exported for the settings
+// automations panel / drift repair.
+export async function healLeadersChat(ministryId: string): Promise<{ added: number; removed: number; error?: string }> {
+  const authz = await requireMinistryAdmin(ministryId)
+  if (authz.error !== null) return { added: 0, removed: 0, error: authz.error }
+
+  const admin = createAdminClient()
+  const chatId = await findLeadersChatId(admin, ministryId)
+  if (!chatId) return { added: 0, removed: 0 }
+
+  const { data: leaders } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("ministry_id", ministryId)
+    .in("role", LEADER_TIER_OR_ABOVE)
+  const wanted = new Set((leaders ?? []).map((p: { id: string }) => p.id))
+
+  const { data: current } = await admin
+    .from("group_members")
+    .select("user_id")
+    .eq("group_id", chatId)
+  const have = new Set((current ?? []).map((r: { user_id: string }) => r.user_id))
+
+  const toAdd = [...wanted].filter((id) => !have.has(id))
+  const toRemove = [...have].filter((id) => !wanted.has(id))
+
+  const now = new Date().toISOString()
+  if (toAdd.length > 0) {
+    await admin.from("group_members").upsert(
+      toAdd.map((uid) => ({ group_id: chatId, user_id: uid, last_read_at: now })),
+      { onConflict: "group_id,user_id", ignoreDuplicates: true },
+    )
+  }
+  if (toRemove.length > 0) {
+    await admin.from("group_members").delete().eq("group_id", chatId).in("user_id", toRemove)
+  }
+  return { added: toAdd.length, removed: toRemove.length }
+}
+
 async function lastAdminBlockError(
   admin: ReturnType<typeof createAdminClient>,
   ministryId: string,
@@ -795,7 +881,13 @@ export async function updateMemberRole(targetUserId: string, newRole: "visitor" 
   }
 
   const { error } = await admin.from("profiles").update({ role: newRole }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
-  return { error: error?.message ?? null }
+  if (error) return { error: error.message }
+
+  // Keep the Leaders chat roster in step with the new role (fire-and-forget —
+  // never fails the role change).
+  await syncLeadersChatMembership(admin, profile.ministry_id, targetUserId, newRole)
+
+  return { error: null }
 }
 
 // ─── Admin: remove a member from the ministry ────────────────────────────────

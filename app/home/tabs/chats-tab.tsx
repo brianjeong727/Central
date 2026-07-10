@@ -3,13 +3,13 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Settings, Trash2, Plus, Users, Pencil, User, Forward, Pin } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Settings, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, FilterChip } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
@@ -22,7 +22,37 @@ import { MODERATION_DEFAULTS, moderateText, scopeApplies, reverentCapitalize } f
 import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
 
-export function CreateChatScreen({ userId, userName, ministryId, groupType, onClose, onCreated }: CreateChatScreenProps) {
+// ── Church-chat sectioning ─────────────────────────────────────────────────
+// Church chats split into three sections (General / Groups / Teams) by the
+// `category` column. Null/unknown category falls back to "general". Recency
+// sort within each section is inherited from the already-sorted input list.
+type ChurchSection = "general" | "group" | "team"
+const CHURCH_SECTION_DEFS: { key: ChurchSection; label: string }[] = [
+  { key: "general", label: "General" },
+  { key: "group", label: "Groups" },
+  { key: "team", label: "Teams" },
+]
+function sectionChurchChats(chats: ChatGroup[]): Record<ChurchSection, ChatGroup[]> {
+  const out: Record<ChurchSection, ChatGroup[]> = { general: [], group: [], team: [] }
+  for (const c of chats) {
+    if (c.category === "team") out.team.push(c)
+    else if (c.category === "group") out.group.push(c)
+    else out.general.push(c)
+  }
+  return out
+}
+
+// A gated church chat shows a small lock glyph — only on rooms the member is IN
+// but whose membership is restricted: any team chat, plus the two role-synced
+// general chats ("Leaders" and "<Ministry> Staff", mirrored from auto-chats.ts).
+function isLockedChat(group: ChatGroup, ministryName: string): boolean {
+  if (group.category === "team") return true
+  if (group.name === "Leaders") return true
+  if (ministryName && group.name === `${ministryName} Staff`) return true
+  return false
+}
+
+export function CreateChatScreen({ userId, userName, ministryId, groupType, initialCategory, onClose, onCreated }: CreateChatScreenProps) {
   const supabase = createClient()
   const [customName, setCustomName] = useState("")
   const [showNameEdit, setShowNameEdit] = useState(false)
@@ -31,6 +61,9 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Section for church chats only (General / Groups / Teams). Seeded from
+  // initialCategory when opened from a section's + button; defaults General.
+  const [category, setCategory] = useState<ChurchSection>(initialCategory ?? "general")
 
   useEffect(() => {
     async function loadMembers() {
@@ -83,6 +116,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
       type: groupType,
       memberIds: Array.from(selectedIds),
       createdBy: userId,
+      ...(groupType === "church" ? { category } : {}),
     })
 
     if (createErr || !group) {
@@ -94,7 +128,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
     // System message — first thing anyone sees in the chat
     await supabase.from("messages").insert({ group_id: group.id, sender_id: userId, content: `${userName.split(" ")[0]} created this chat`, message_type: "system" })
 
-    onCreated({ id: group.id, name: group.name })
+    onCreated({ id: group.id, name: group.name, category: groupType === "church" ? category : null })
   }
 
   const isDM = selectedIds.size === 1
@@ -133,6 +167,20 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, onCl
           {error && (
             <div className="rounded-xl bg-[var(--plum)]/8 px-4 py-3 text-[13px] text-[var(--plum)] font-medium">
               {error}
+            </div>
+          )}
+
+          {/* Section — church chats only. General / Groups / Teams. */}
+          {groupType === "church" && (
+            <div className="flex flex-col gap-2.5">
+              <label style={{ fontSize: "10px", fontWeight: 400, letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }}>Section</label>
+              <div className="flex flex-wrap gap-2">
+                {CHURCH_SECTION_DEFS.map(({ key, label }) => (
+                  <FilterChip key={key} selected={category === key} onClick={() => setCategory(key)}>
+                    {label}
+                  </FilterChip>
+                ))}
+              </div>
             </div>
           )}
 
@@ -2795,6 +2843,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   const active = search.trim()
     ? rawActive.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
     : rawActive
+  const churchSections = subTab === "church" ? sectionChurchChats(active) : null
   const showPlusButton = subTab === "my" || (subTab === "church" && canCreateChurchChat)
 
   const monoStyle = MONO_STYLE
@@ -2914,9 +2963,24 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         />
       ) : (
         <div className="flex flex-col gap-2.5 md:gap-0">
-          {active.map((group, i) => (
-            <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} />
-          ))}
+          {churchSections ? (
+            CHURCH_SECTION_DEFS.flatMap(({ key, label }) => {
+              const rooms = churchSections[key]
+              if (rooms.length === 0) return []
+              return [
+                <div key={`sec-${key}`} className="pt-3 pb-2 px-1 md:px-4">
+                  <span className="text-[11px] font-normal text-[var(--muted-text)]/40 uppercase tracking-wider">{label}</span>
+                </div>,
+                ...rooms.map((group) => (
+                  <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} locked={isLockedChat(group, ministryName)} />
+                )),
+              ]
+            })
+          ) : (
+            active.map((group) => (
+              <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} />
+            ))
+          )}
 
           {/* Archived section (Church Chats only) */}
           {subTab === "church" && archivedChurchChats.length > 0 && (
@@ -2956,6 +3020,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
               id: group.id,
               name: group.name,
               type: showCreateChat!,
+              category: group.category ?? null,
               last_message: null,
               last_sender: null,
               last_message_time: null,
@@ -2974,7 +3039,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   )
 }
 
-export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; onClick: () => void; isActive?: boolean }) {
+export function ChatGroupCard({ group, onClick, isActive, locked }: { group: ChatGroup; onClick: () => void; isActive?: boolean; locked?: boolean }) {
   const firstInitial = group.name.charAt(0)
 
   return (
@@ -2989,7 +3054,10 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="text-[15px] font-medium text-[var(--ink)] truncate pr-2">{group.name}</h3>
+              <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                <h3 className="text-[15px] font-medium text-[var(--ink)] truncate">{group.name}</h3>
+                {locked && <Lock className="w-3 h-3 flex-shrink-0" style={{ color: "var(--muted-text)" }} aria-label="Members only" />}
+              </div>
               {group.last_message_time && <span className="text-[11px] text-[var(--muted-text)] flex-shrink-0">{formatRelativeTime(group.last_message_time)}</span>}
             </div>
             <div className="flex items-center justify-between gap-2">
@@ -3028,6 +3096,7 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
             <p className="text-[13px] truncate leading-tight" style={{ color: "var(--ink)", fontWeight: group.unread_count ? 600 : 500, flex: 1, minWidth: 0 }}>
               {group.name}
             </p>
+            {locked && <Lock style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0, alignSelf: "center" }} aria-label="Members only" />}
             {group.last_message_time && (
               <span style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.04em", color: "var(--faint)", flexShrink: 0 }}>
                 {formatRelativeTime(group.last_message_time)}
@@ -3055,6 +3124,7 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
 export interface ChatListPanelProps {
   userId: string
   ministryId: string
+  ministryName: string
   activeGroupId?: string | null
   onOpenChat: (id: string, name: string, type?: string) => void
   refreshKey: number
@@ -3064,13 +3134,16 @@ export interface ChatListPanelProps {
   fallbackChats?: ChatGroup[]
 }
 
-export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole, fallbackChats }: ChatListPanelProps) {
+export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole, fallbackChats }: ChatListPanelProps) {
   const { setParam } = useNavState()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
     return (p === "church" || p === "my") ? p : "church"
   })
   const [showCreateChat, setShowCreateChat] = useState<"my" | "church" | null>(null)
+  // Section to pre-select when the create sheet opens from a church section's +
+  // button. Ignored for "my" chats.
+  const [pendingCategory, setPendingCategory] = useState<ChurchSection | undefined>(undefined)
   const [showArchived, setShowArchived] = useState(false)
   const [search, setSearch] = useState("")
 
@@ -3134,6 +3207,7 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
   const active = search.trim()
     ? rawActive.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
     : rawActive
+  const churchSections = subTab === "church" ? sectionChurchChats(active) : null
   const showPlusButton = subTab === "my" || (subTab === "church" && canCreateChurchChat)
 
   return (
@@ -3167,24 +3241,27 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
         />
       </div>
 
-      {/* Count + plus button */}
-      <div className="flex items-center justify-between px-3 pt-4 pb-2 flex-shrink-0">
-        <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)" }}>
-          {subTab === "church" ? `Church · ${churchChats.length}` : `Direct · ${myChats.length}`}
-        </p>
-        {showPlusButton && (
-          <button
-            onClick={() => setShowCreateChat(subTab)}
-            style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "var(--muted-text)", borderRadius: "var(--r-pill)", padding: 0 }}
-            title="New chat"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
+      {/* Count + plus button — My Chats only. On the Church subtab the count/+
+          row is dropped; each section header carries its own + instead. */}
+      {subTab === "my" && (
+        <div className="flex items-center justify-between px-3 pt-4 pb-2 flex-shrink-0">
+          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)" }}>
+            {`Direct · ${myChats.length}`}
+          </p>
+          {showPlusButton && (
+            <button
+              onClick={() => setShowCreateChat("my")}
+              style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "var(--muted-text)", borderRadius: "var(--r-pill)", padding: 0 }}
+              title="New chat"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className={`flex-1 overflow-y-auto ${subTab === "church" ? "pt-3" : ""}`}>
         {loading ? (
           <div className="px-2 pt-2"><Spinner /></div>
         ) : active.length === 0 && !(subTab === "church" && archivedChurchChats.length > 0) ? (
@@ -3194,9 +3271,33 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
         ) : (
           <>
             <div className="flex flex-col gap-2 pt-1">
-              {active.map((group) => (
-                <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChatPanel(group.id, group.name)} isActive={activeGroupId === group.id} />
-              ))}
+              {churchSections ? (
+                CHURCH_SECTION_DEFS.flatMap(({ key, label }) => {
+                  const rooms = churchSections[key]
+                  if (rooms.length === 0) return []
+                  return [
+                    <div key={`sec-${key}`} className="flex items-center justify-between px-4 pt-3 pb-1">
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)" }}>{label}</span>
+                      {canCreateChurchChat && (
+                        <button
+                          onClick={() => { setPendingCategory(key); setShowCreateChat("church") }}
+                          style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: "none", cursor: "pointer", color: "var(--muted-text)", borderRadius: "var(--r-pill)", padding: 0 }}
+                          title={`New ${label.toLowerCase()} chat`}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>,
+                    ...rooms.map((group) => (
+                      <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChatPanel(group.id, group.name)} isActive={activeGroupId === group.id} locked={isLockedChat(group, ministryName)} />
+                    )),
+                  ]
+                })
+              ) : (
+                active.map((group) => (
+                  <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChatPanel(group.id, group.name)} isActive={activeGroupId === group.id} />
+                ))
+              )}
             </div>
             {subTab === "church" && archivedChurchChats.length > 0 && (
               <div>
@@ -3250,12 +3351,14 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
           userName={userProfile.name}
           ministryId={ministryId}
           groupType={showCreateChat}
-          onClose={() => setShowCreateChat(null)}
+          initialCategory={showCreateChat === "church" ? pendingCategory : undefined}
+          onClose={() => { setShowCreateChat(null); setPendingCategory(undefined) }}
           onCreated={(group) => {
             const newGroup: ChatGroup = {
               id: group.id,
               name: group.name,
               type: showCreateChat!,
+              category: group.category ?? null,
               last_message: null,
               last_sender: null,
               last_message_time: null,

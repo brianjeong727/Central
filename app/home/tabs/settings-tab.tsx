@@ -20,7 +20,7 @@ import {
   getMinistryCodes,
   runDepartedMemberCleanup,
 } from "@/app/actions/ministry"
-import { updateAutomationSettings, runAnnualClassMaintenance, retroactivelyApplyToggle, archiveToggleChats } from "@/app/actions/auto-chats"
+import { updateAutomationSettings, runAnnualClassMaintenance, retroactivelyApplyToggle, archiveToggleChats, backfillTeamChats } from "@/app/actions/auto-chats"
 import { getReceiptLimits, upsertReceiptLimit, deleteReceiptLimit } from "@/app/actions/receipts"
 import type { ReceiptLimit } from "@/app/actions/receipts"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
@@ -262,6 +262,7 @@ export function SettingsTab({
     auto_grade_chats: false,
     auto_central_chat: true,
     auto_staff_chat: false,
+    auto_team_chats: false,
     auto_praise_chat: true,
     auto_archive_praise: true,
   }
@@ -624,7 +625,7 @@ export function SettingsTab({
 
   // ── Automation toggle ────────────────────────────────────────────────────────
   const CHAT_TOGGLES = ["auto_central_chat", "auto_grade_chats", "auto_staff_chat", "auto_sg_chats"]
-  const OPT_IN_KEYS = ["auto_grade_chats", "auto_staff_chat"]
+  const OPT_IN_KEYS = ["auto_grade_chats", "auto_staff_chat", "auto_team_chats"]
   const ARCHIVE_ON_OFF_KEYS = ["auto_staff_chat", "auto_grade_chats"]
 
   function isToggleOn(key: string, settings: Record<string, boolean>) {
@@ -643,9 +644,10 @@ export function SettingsTab({
     auto_grade_chats: "Grade & Young Adult chats",
     auto_central_chat: `Auto-add to ${ministryInfo?.name ?? ministryName} Chat`,
     auto_staff_chat: "Staff chat",
+    auto_team_chats: "Team chats",
   }
   function automationDeltas() {
-    const keys = ["auto_sg_chats", "auto_grade_chats", "auto_central_chat", "auto_staff_chat"]
+    const keys = ["auto_sg_chats", "auto_grade_chats", "auto_central_chat", "auto_staff_chat", "auto_team_chats"]
     return keys
       .filter(k => isToggleOn(k, pendingAutomationSettings) !== isToggleOn(k, automationSettings))
       .map(k => ({ key: k, label: AUTOMATION_LABELS[k] ?? k, from: isToggleOn(k, automationSettings) ? "on" : "off", to: isToggleOn(k, pendingAutomationSettings) ? "on" : "off" }))
@@ -679,6 +681,11 @@ export function SettingsTab({
       } else if (isNowOn && !wasOn && CHAT_TOGGLES.includes(key)) {
         setAutomationSaveMsg("Adding existing members…")
         await retroactivelyApplyToggle(ministryId, key)
+      } else if (isNowOn && !wasOn && key === "auto_team_chats") {
+        // Turning team chats ON backfills a linked chat per team (existing team
+        // chats stay on OFF — nothing is archived).
+        setAutomationSaveMsg("Adding team members…")
+        await backfillTeamChats(ministryId)
       }
     }
 
@@ -1547,6 +1554,7 @@ export function SettingsTab({
                   { key: "auto_grade_chats",  label: "Grade & Young Adult chats",                                                             sub: "New members are auto-added to their class-year chat (Freshman – Senior, Young Adult) when they join. Off by default." },
                   { key: "auto_central_chat", label: `Auto-add new members to ${ministryInfo?.name ?? ministryName} Chat`,                    sub: "Joining the workspace adds the member to the main ministry chat." },
                   { key: "auto_staff_chat",   label: "Staff chat",                                                                            sub: "Pastors, deacons, and elders are auto-added to a private staff chat when they join. Off by default." },
+                  { key: "auto_team_chats",   label: "Team chats",                                                                            sub: "Members of a Plan workspace are auto-added to that team's chat and kept in sync with the roster. Off by default." },
                 ] as { key: string; label: string; sub: string }[]).map(({ key, label, sub }) => {
                   const on = isToggleOn(key, pendingAutomationSettings)
                   const changed = automationsEditing && isToggleOn(key, pendingAutomationSettings) !== isToggleOn(key, automationSettings)

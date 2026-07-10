@@ -132,6 +132,7 @@ export interface ChatGroup {
   last_message_time: string | null
   unread_count: number
   archived?: boolean
+  category?: "general" | "group" | "team" | null
 }
 
 export interface GroupMember {
@@ -345,8 +346,11 @@ export interface CreateChatScreenProps {
   userName: string
   ministryId: string
   groupType: "my" | "church"
+  // Church chats only: seed the section picker's initial selection (picker stays
+  // interactive). Ignored for "my" chats. Defaults to "general".
+  initialCategory?: "general" | "group" | "team"
   onClose: () => void
-  onCreated: (group: { id: string; name: string }) => void
+  onCreated: (group: { id: string; name: string; category?: "general" | "group" | "team" | null }) => void
 }
 
 export interface ChatSettingsProps {
