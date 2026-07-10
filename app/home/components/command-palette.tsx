@@ -107,7 +107,7 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
   return (
     <div
       className="fixed inset-0 z-[200] flex items-start justify-center pt-[10vh]"
-      style={{ background: "rgba(19,16,26,0.45)" }}
+      style={{ background: "var(--veil-soft)" }}
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div

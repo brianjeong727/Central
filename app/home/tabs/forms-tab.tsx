@@ -169,7 +169,7 @@ export function FormFillView({ formId, userId, ministryId, announcementId, title
   } else if (done) {
     body = (
       <AnimateIn className="flex flex-col items-center justify-center gap-4" style={{ minHeight: 320 }}>
-        <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "rgba(62,21,64,0.1)" }}>
+        <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--plum) 10%, transparent)" }}>
           <Check className="w-8 h-8 text-[var(--plum)]" />
         </div>
         <div className="text-center">
@@ -449,7 +449,7 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
       ) : (
         <div className="flex flex-col gap-6">
             {error && (
-              <div style={{ background: "rgba(62,21,64,0.08)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>{error}</div>
+              <div style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>{error}</div>
             )}
 
             {locked && (

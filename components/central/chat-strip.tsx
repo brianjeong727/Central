@@ -137,7 +137,7 @@ function StripCard({ chat, index, onOpen }: {
           background: "var(--plum)",
           color: "var(--cream)",
           fontSize: 10,
-          fontWeight: 700,
+          fontWeight: 600,
           padding: "2px 7px",
           borderRadius: 999,
           fontFamily: "var(--sans)",

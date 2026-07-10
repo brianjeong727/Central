@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase"
 import { SIZE_LABELS } from "@/app/join/post-join-pickers"
 import { PlanLineIcon } from "@/app/home/components/shared"
 import { teamIconKey } from "@/app/home/workspace-presets"
+import { ConfirmDialog } from "@/components/central/confirm-dialog"
 
 type Ministry = {
   id: string
@@ -31,6 +32,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [acting, setActing] = useState<string | null>(null)
+  const [rejectConfirmId, setRejectConfirmId] = useState<string | null>(null)
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -55,7 +57,7 @@ export default function AdminPage() {
   }
 
   async function handleReject(id: string) {
-    if (!confirm("Reject this application? This cannot be undone.")) return
+    setRejectConfirmId(null)
     setActing(id)
     const { error: err } = await rejectMinistry(id)
     if (err) { alert(err); setActing(null); return }
@@ -184,7 +186,7 @@ export default function AdminPage() {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleReject(m.id)}
+                    onClick={() => setRejectConfirmId(m.id)}
                     disabled={acting === m.id}
                     className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-[var(--line-2)] text-[13px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_6%,transparent)] hover:border-[color-mix(in_srgb,var(--danger)_30%,transparent)] disabled:opacity-50 transition-colors"
                   >
@@ -205,6 +207,16 @@ export default function AdminPage() {
           ))}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={rejectConfirmId !== null}
+        title="Reject this application?"
+        message="This cannot be undone."
+        confirmLabel="Reject application"
+        loading={acting !== null && acting === rejectConfirmId}
+        onConfirm={() => { if (rejectConfirmId) handleReject(rejectConfirmId) }}
+        onClose={() => setRejectConfirmId(null)}
+      />
     </div>
   )
 }

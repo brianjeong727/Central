@@ -27,7 +27,7 @@ export function ChatsSection({ chats, totalUnread, onSeeAll, onOpenChat }: Chats
         <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "var(--ink)", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}>
           Your chats
           {totalUnread > 0 && (
-            <span className="ml-2 inline-flex items-center justify-center w-6 h-6 bg-[#C9A34B] text-[var(--ink)] rounded-full text-[11px] font-bold align-middle" style={{ verticalAlign: "middle", marginBottom: 2 }}>
+            <span className="ml-2 inline-flex items-center justify-center w-6 h-6 bg-[var(--plum)] text-[var(--cream)] rounded-full text-[11px] font-semibold align-middle" style={{ verticalAlign: "middle", marginBottom: 2 }}>
               {totalUnread}
             </span>
           )}
@@ -85,7 +85,7 @@ function ChatCard({ chat, index, onClick }: { chat: ChatPreview; index: number; 
               )}
             </p>
             {chat.unreadCount > 0 && (
-              <span className="w-6 h-6 bg-[#C9A34B] rounded-full text-[11px] font-bold text-[var(--ink)] flex items-center justify-center flex-shrink-0">
+              <span className="w-6 h-6 bg-[var(--plum)] rounded-full text-[11px] font-semibold text-[var(--cream)] flex items-center justify-center flex-shrink-0">
                 {chat.unreadCount}
               </span>
             )}

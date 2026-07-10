@@ -115,7 +115,7 @@ function ScaleSlider({ value, onChange }: { value: number | null; onChange: (n: 
               background: "var(--cream)",
               color: "var(--plum-2)",
               fontFamily: "var(--sans)",
-              fontSize: 12.5,
+              fontSize: 12,
               fontWeight: 500,
               lineHeight: 1,
               padding: "5px 9px",
@@ -156,7 +156,6 @@ function ScaleSlider({ value, onChange }: { value: number | null; onChange: (n: 
               height: 26,
               borderRadius: 999,
               background: "var(--cream)",
-              boxShadow: "0 1px 4px color-mix(in srgb, var(--plum-deep) 45%, transparent)",
               pointerEvents: "none",
             }}
           />
@@ -284,7 +283,7 @@ export function PulseSlideCard({
           <div style={{ fontFamily: "var(--serif)", fontSize: 23, fontWeight: 600, color: "var(--cream)" }}>
             Thanks for sharing.
           </div>
-          <div style={{ fontSize: 13.5, color: cream(65) }}>
+          <div style={{ fontSize: 13, color: cream(65) }}>
             Your response was received anonymously.
           </div>
         </div>
@@ -332,7 +331,7 @@ export function PulseSlideCard({
                       background: sel ? "var(--cream)" : cream(9),
                       border: `1px solid ${sel ? "var(--cream)" : cream(26)}`,
                       color: sel ? "var(--plum-2)" : "var(--cream)",
-                      fontSize: 13.5,
+                      fontSize: 13,
                       fontWeight: sel ? 500 : 400,
                       fontFamily: "var(--sans)",
                       cursor: "pointer",
@@ -413,7 +412,7 @@ export function PulseSlideCard({
             {type === "prayer" && (
               <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginTop: "calc(var(--space-3) * -1)" }}>
                 <Lock style={{ width: 13, height: 13, color: cream(55), flexShrink: 0 }} />
-                <span style={{ fontSize: 11.5, color: cream(55), fontFamily: "var(--sans)" }}>
+                <span style={{ fontSize: 11, color: cream(55), fontFamily: "var(--sans)" }}>
                   Shared privately with the prayer team
                 </span>
               </div>

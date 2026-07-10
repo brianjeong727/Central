@@ -92,6 +92,8 @@ Central is a daily-driver tool that an entire church community lives in for comm
 
 **Do not:** mix typefaces — Central uses Bricolage Grotesque exclusively; never import additional font families. Do not use weight 600 for body copy, UI labels, or metadata — reserve it for heading hierarchy (H1, H2, display). Do not all-caps anything except mono eyebrows.
 
+**Integer font sizes only; floor 10px** (10px = mono micro). No fractional `fontSize` (e.g. `12.5`, `13.5`) — round to the nearest sensible integer while keeping hierarchy. Scoped exception: the 9px rail label (`RAIL_LABEL_STYLE`, R9).
+
 ### 1.4 Spacing & radius
 - **Scale:** 4, 6, 8, 10, 12, 14, 18, 22, 28, 36, 40, 56. Do not invent in-between values.
 - **Page padding:** `0 40px 40px` on the main column; `22px 40px 0` on the breadcrumb header.
@@ -390,7 +392,7 @@ Modals are reserved for *new-X* and configure-X flows where context needs to be 
 
 **Every modal renders through `CentralModal`** (`components/central/central-modal.tsx`) — hand-rolled fixed-overlay panels are design debt. The canonical anatomy (ratified 2026-07-04, from the curate-hero manager):
 
-- **Backdrop:** `rgba(19,16,26,0.55)` ink veil, no blur, `animate-backdrop-in`. Click-away closes.
+- **Backdrop:** `var(--veil)` ink veil (the token — never a raw `rgba()`), no blur, `animate-backdrop-in`. Click-away closes. The nested dirty-guard scrim uses `var(--veil-soft)`.
 - **Panel:** `var(--cream-2)` surface, radius `var(--r-callout)`, **no border, no shadow** — separation comes from the dark veil, not elevation. `maxWidth` per content (360 pickers · 420–480 forms · 520–560 wide forms · **~720 hefty/multi-question forms** — the form builder & fill-out), `maxHeight 85vh`, `animate-dialog-in`.
 - **Header:** optional mono eyebrow (10px, 1.2px tracking, uppercase, `--muted-text`) over a serif 22/400 `--ink` title; hairline (`--line`) below; 32px circular X top-right (`--ivory` fill, 1px `--line`).
 - **Body:** scrollable, `20px 24px` padding. Section labels inside use the mono eyebrow style.
@@ -398,6 +400,8 @@ Modals are reserved for *new-X* and configure-X flows where context needs to be 
 - **Closes three ways, always:** X · backdrop click · Escape (built into the component).
 - **Z-index:** 200 default; override (e.g. 210) only when a modal must stack above another overlay.
 - **Sheet variant** (`sheet` prop): bottom-pinned with rounded top corners on mobile, centered panel on md+ — for thumb-reach flows (polls, receipt submit).
+
+**Modals are for creation / config / confirmation only — never navigation.** Every destructive action (delete / remove / reject / leave) routes through the shared **`ConfirmDialog`** (§9's danger, two-step wrapper over `CentralModal`) — never a hand-rolled in-card scrim, and **`window.confirm` is banned** (it breaks the veil-token surface and the cream-on-dark type). Bespoke confirm overlays with `backdrop-blur` / `bg-white/…` / raw `#hex` panels are retired; wire the existing delete state to `ConfirmDialog` instead.
 
 Exceptions (not CentralModal): the command palette (top-anchored nav chrome), the image lightbox, and full-screen page-like overlays (§4.18 subpages, ChatScreen).
 
@@ -598,7 +602,7 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 7. **No left-border-accent rounded callout cards.** The only left-rule pattern allowed is the editorial quote (§4.13), the timeline rail (§4.12), and — as a **single authorized exception (July 2026)** — the **Events "Up Next" card** (§4.21): a `cream-3` rounded callout with a `border-left: 3px solid var(--plum)` marking the closest upcoming event in the team Events agenda. This is the one sanctioned left-border rounded callout; do not generalize it to any other card.
 8. **No gradient backgrounds outside the hero banner.** Cream surfaces never have gradients. **Scoped exception (July 2026): the checklist high-priority row highlight.** A `priority === 'high'` task row in the event Checklist carries a solid light-plum tint across the whole row — `background: color-mix(in srgb, var(--plum) 7%, transparent)` (a flat highlight, NOT a gradient and NOT a left-border rail). This is the one place a light-plum row highlight marks state; it reads as a subtle "flagged" wash, not a plum surface. Scoped to this list — do not reuse it elsewhere. (Priority is a binary high/not-high flag, toggled in the row editor.)
 9. **No iconography invented for "fun" decoration.** Icons are functional. If a slot would otherwise be empty, prefer a dashed placeholder over decorative icons.
-10. **No drop shadows anywhere.** Cards separate by border and surface tone; modals separate via the §4.17 ink veil, not elevation (ratified 2026-07-04 — the modal-shadow carve-out is retired).
+10. **No drop shadows anywhere.** Cards separate by border and surface tone; modals separate via the §4.17 ink veil, not elevation (ratified 2026-07-04 — the modal-shadow carve-out is retired). **Sanctioned carve-outs (the only `box-shadow` allowed, both `inset`):** (a) the **read-only-mat inset texture** — the double-mat ring on the read-only detail frame (§4.22); (b) **functional inset selection rings** — an `inset box-shadow` used as a focus / selected / drag ring (e.g. plan-tab's selection rings). Nothing else — no floating-pill, badge, marker, or panel elevation shadow.
 
 **Ratified exception — Home greeting sheen (2026-07-05):** the Home page greeting's animated text sheen (`.greeting-sheen` / `.greeting-sheen-plum`, globals.css) is an approved living-accent: a slow gradient text-fill shimmer on the greeting line only, static under `prefers-reduced-motion`. Scoped to the Home greeting — not a license for gradient text or ambient animation elsewhere.
 11. **No `Inter` for big numbers.** Stat numbers are serif.
@@ -612,6 +616,19 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 19. **Underline tabs for views; `SegmentedControl` (§4.2) for exclusive filters — never mix the two roles.** Never boxed/pill tabs for view navigation; never underline tabs for filters/modes.
 20. **Cream bg `#FDFCF8`, page bg `#F1ECDE`** — never invert.
 21. **No fixed-width column stranded in a wide content area.** Cap width only for reading measure (and center or pair it); let lists, grids, tables, and stat content fill the content area (§7.0). A page with content hugging one edge and a dead band of unused space on the other is a layout bug.
+
+### 8.1 Lint-worthy invariants
+
+Mechanical rules a linter could enforce — each is a hard "never," each has a token/pattern replacement:
+
+- **No raw hex** outside the `globals.css` token table — consume a `var(--token)`.
+- **No `rgba()`** — use `color-mix(in srgb, var(--token) N%, transparent)` over the equivalent token (veil scrims use `--veil` / `--veil-soft`).
+- **No `fontWeight: 700` / `font-bold`** — heading emphasis tops out at 600 (§1.3).
+- **No fractional font sizes** — integers only, floor 10px (§1.3).
+- **No `boxShadow`** outside the two §8.10 carve-outs (read-only-mat inset texture; functional inset selection rings).
+- **No `window.confirm`** — destructive actions go through `ConfirmDialog` (§4.17 / §9).
+
+**Known open debt (two DEFERRED sweeps, not yet done):** (1) the ~190 font-alias call sites still using literal `fontWeight`/`fontFamily` rather than a shared token; (2) the plan-tab hex / `rgba()` triage (the large block of raw colors inside plan-tab, including the frozen worship regions), and the announcements-tab featured-card `rgba()` block (~27 rgba literals, comparable to plan-tab). All are tracked, out of scope until scheduled.
 
 ---
 

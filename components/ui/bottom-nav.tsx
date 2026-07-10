@@ -59,7 +59,7 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = 
                   }`}
                 />
                 {showBadge && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[var(--plum)] rounded-full text-[9px] font-bold text-white flex items-center justify-center px-1">
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[var(--plum)] rounded-full text-[9px] font-semibold text-[var(--cream)] flex items-center justify-center px-1">
                     {chatsUnread > 99 ? "99+" : chatsUnread}
                   </span>
                 )}

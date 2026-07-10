@@ -112,7 +112,7 @@ export function SuperSwitcher({
     background: "var(--cream)",
     color: "var(--ink)",
     fontFamily: "inherit",
-    fontSize: 12.5,
+    fontSize: 12,
     fontWeight: 500,
     cursor: "pointer",
   }
@@ -163,7 +163,7 @@ export function SuperSwitcher({
             background: "var(--plum-2)",
             color: "var(--cream-on-dark)",
             fontFamily: "var(--font-inter), system-ui, sans-serif",
-            fontSize: 12.5,
+            fontSize: 12,
             fontWeight: 500,
             letterSpacing: "0.01em",
             borderBottom: "1px solid var(--plum-deep)",
@@ -200,7 +200,7 @@ export function SuperSwitcher({
         {open && (
           <div style={popoverStyle}>
             {error && (
-              <div style={{ padding: "6px 10px", fontSize: 11.5, color: "var(--danger)", lineHeight: 1.4 }}>
+              <div style={{ padding: "6px 10px", fontSize: 11, color: "var(--danger)", lineHeight: 1.4 }}>
                 {error}
               </div>
             )}
@@ -239,7 +239,7 @@ export function SuperSwitcher({
             <div
               style={{
                 padding: "2px 10px 6px",
-                fontSize: 10.5,
+                fontSize: 10,
                 fontWeight: 600,
                 letterSpacing: "0.04em",
                 textTransform: "uppercase",
@@ -294,7 +294,7 @@ export function SuperSwitcher({
                     background: "var(--plum-2)",
                     color: "var(--cream-on-dark)",
                     fontFamily: "inherit",
-                    fontSize: 12.5,
+                    fontSize: 12,
                     fontWeight: 600,
                     cursor: pending || !selTeamId || !selRoleId ? "not-allowed" : "pointer",
                     opacity: pending || !selTeamId || !selRoleId ? 0.5 : 1,
@@ -381,10 +381,9 @@ export function SuperSwitcher({
               background: "var(--plum-2)",
               color: "var(--cream-on-dark)",
               fontFamily: "inherit",
-              fontSize: 12.5,
+              fontSize: 12,
               fontWeight: 500,
               cursor: pending ? "wait" : "pointer",
-              boxShadow: "0 6px 18px -6px color-mix(in srgb, var(--plum-deep) 40%, transparent)",
             }}
           >
             <span

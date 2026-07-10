@@ -565,7 +565,7 @@ export function HomeTab({
           {avatarUrl ? (
             <img src={avatarUrl} alt="Profile" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
-            <span style={{ color: "var(--cream)", fontWeight: 700, fontSize: 11, fontFamily: "var(--sans)" }}>
+            <span style={{ color: "var(--cream)", fontWeight: 600, fontSize: 11, fontFamily: "var(--sans)" }}>
               {getInitials(profile.name)}
             </span>
           )}

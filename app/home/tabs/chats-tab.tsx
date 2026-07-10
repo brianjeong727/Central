@@ -2499,7 +2499,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                             }
                           }}
                           className="w-full text-left px-4 py-3.5 rounded-xl border transition-all active:scale-[0.98]"
-                          style={{ borderColor: isSelected ? "var(--plum)" : "var(--line)", background: isSelected ? "rgba(62,21,64,0.05)" : "var(--cream-panel)" }}
+                          style={{ borderColor: isSelected ? "var(--plum)" : "var(--line)", background: isSelected ? "color-mix(in srgb, var(--plum) 5%, transparent)" : "var(--cream-panel)" }}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2.5 flex-1 min-w-0">
@@ -2999,7 +2999,7 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
                   : <span className="italic text-[var(--muted-text)]">No messages yet</span>}
               </p>
               {group.unread_count > 0 && (
-                <span className="w-6 h-6 bg-[#C9A34B] rounded-full text-[11px] font-medium text-[var(--ink)] flex items-center justify-center flex-shrink-0">{group.unread_count}</span>
+                <span className="w-6 h-6 bg-[var(--plum)] rounded-full text-[11px] font-medium text-[var(--cream)] flex items-center justify-center flex-shrink-0">{group.unread_count}</span>
               )}
             </div>
           </div>

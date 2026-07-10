@@ -10471,31 +10471,15 @@ export function AddWorkspaceModal({ ministryId, userId, ownedKeys, onClose, onCr
           </div>
         )}
 
-        {/* Coming-soon presets (disabled) */}
+        {/* Coming-soon presets — collapsed to a single muted, non-interactive line
+            (ratified frame 5i): mono eyebrow + preset names joined by " · ". */}
         {comingSoon.length > 0 && (
-          <>
-            <p className="text-[11px] tracking-[0.12em] uppercase text-[var(--muted-text)] mb-3">More coming soon</p>
-            <div className="flex flex-col gap-3 md:grid md:gap-4" style={{ gridTemplateColumns: "1fr 1fr" }}>
-              {comingSoon.map((preset) => (
-                <div
-                  key={preset.id}
-                  className="w-full rounded-2xl border border-[var(--line)] p-4 text-left md:p-5"
-                  style={{ background: "var(--cream-2)", opacity: 0.6, cursor: "not-allowed" }}
-                >
-                  <div className="flex items-start gap-3">
-                    <PlanLineIcon iconKey={preset.iconKey} size={40} bg="var(--line)" fg="var(--muted-text)" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20 }} className="text-[var(--muted-text)] leading-tight">{preset.name}</p>
-                        <span className="text-[10px] font-normal tracking-wide uppercase bg-[var(--line)] text-[var(--muted-text)] px-2 py-0.5 rounded-full">Coming soon</span>
-                      </div>
-                      <p className="text-[12px] text-[var(--muted-text)] mt-1">{preset.description}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
+          <div style={{ userSelect: "none" }}>
+            <p style={{ ...MONO_STYLE, fontSize: 10, letterSpacing: "0.12em", color: "var(--muted-text)", margin: "0 0 6px" }}>Coming soon</p>
+            <p className="text-[13px] text-[var(--muted-text)] leading-relaxed">
+              {comingSoon.map((p) => p.name).join(" · ")}
+            </p>
+          </div>
         )}
       </div>
     </SubpageShell>
@@ -13603,8 +13587,7 @@ function BibleStudySubTab({
                           transform: "translate(-50%, -50%)", width: 22, height: 22, borderRadius: "50%",
                           background: "var(--plum)", border: "2px solid var(--cream-on-dark)", cursor: "pointer", zIndex: 10,
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 10, fontWeight: 700, color: "var(--cream-on-dark)",
-                          boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                          fontSize: 10, fontWeight: 600, color: "var(--cream-on-dark)",
                         }}
                         onMouseEnter={() => setHoveredAnnotation(gIdx)}
                         onMouseLeave={() => setHoveredAnnotation(null)}

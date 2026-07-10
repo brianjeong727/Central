@@ -65,7 +65,7 @@ const ROLE_STYLE: Record<string, { bg: string; color: string; border: string; la
   deacon:  { bg: "var(--plum-2)",  color: "var(--cream-panel)", border: "var(--plum-2)",              label: "Deacon"  },
   elder:   { bg: "var(--plum-2)",  color: "var(--cream-panel)", border: "var(--plum-2)",              label: "Elder"   },
   pastor:  { bg: "var(--plum-2)",  color: "var(--cream-panel)", border: "var(--plum-2)",              label: "Pastor"  },
-  leader:  { bg: "var(--ivory)",  color: "var(--plum)", border: "rgba(62,21,64,0.2)",   label: "Leader"  },
+  leader:  { bg: "var(--ivory)",  color: "var(--plum)", border: "color-mix(in srgb, var(--plum) 20%, transparent)",   label: "Leader"  },
   member:  { bg: "var(--ivory)",  color: "var(--muted-text)", border: "var(--line-2)",              label: "Member"  },
   visitor: { bg: "var(--cream)", color: "var(--muted-text)", border: "var(--dashed)",       label: "Visitor" },
 }

@@ -5,7 +5,7 @@
 // design debt. The anatomy is the curate-hero (HomeSlideManager) pattern,
 // ratified 2026-07-04:
 //
-//   backdrop  rgba(19,16,26,0.55) ink veil, no blur, fade-in
+//   backdrop  var(--veil) ink veil, no blur, fade-in
 //   panel     var(--cream-2) surface, radius var(--r-callout), NO border,
 //             NO shadow — separation comes from the dark veil, not elevation
 //   header    mono eyebrow (optional) over a serif 22/400 title, hairline below,
@@ -76,7 +76,7 @@ export function CentralModal({
         position: "fixed",
         inset: 0,
         zIndex: z,
-        background: "rgba(19,16,26,0.55)",
+        background: "var(--veil)",
         padding: sheet ? 0 : "0 20px",
       }}
       onClick={requestClose}
@@ -177,7 +177,7 @@ export function CentralModal({
               alignItems: "center",
               justifyContent: "center",
               padding: 20,
-              background: "rgba(19,16,26,0.4)",
+              background: "var(--veil-soft)",
             }}
             onClick={(e) => { e.stopPropagation(); setConfirmingClose(false) }}
           >
@@ -185,7 +185,6 @@ export function CentralModal({
               className="animate-dialog-in"
               style={{
                 background: "var(--cream-2)",
-                border: "1px solid var(--line)",
                 borderRadius: "var(--r-callout)",
                 padding: "20px 22px",
                 width: "100%",
@@ -196,7 +195,7 @@ export function CentralModal({
               <h3 style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 400, color: "var(--ink)", margin: 0 }}>
                 Discard changes?
               </h3>
-              <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.5, margin: "8px 0 0" }}>
+              <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5, margin: "8px 0 0" }}>
                 Your changes haven&apos;t been saved. If you leave now, they&apos;ll be lost.
               </p>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
