@@ -9,7 +9,7 @@ import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
@@ -2819,27 +2819,18 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         />
       </div>
 
-      {/* Desktop full-width tab bar */}
-      <div className="hidden md:flex flex-shrink-0">
-        {(["church", "my"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => {
-              setSubTab(t)
-              setSearch("")
-              setParam("chats", t === "church" ? null : t)
-            }}
-            style={{
-              flex: 1, padding: "14px 0", fontSize: "14px", fontWeight: 500,
-              color: subTab === t ? "var(--ink)" : "var(--muted-text)",
-              background: "transparent", border: "none",
-              borderBottom: `2px solid ${subTab === t ? "var(--plum)" : "transparent"}`,
-              cursor: "pointer", transition: "color 0.15s",
-            }}
-          >
-            {t === "church" ? "Church Chats" : "My Chats"}
-          </button>
-        ))}
+      {/* Desktop mode switcher — exclusive filter (Church | My Chats), SegmentedControl (R4/R12) */}
+      <div className="hidden md:flex flex-shrink-0 px-4 py-3">
+        <SegmentedControl
+          aria-label="Chat scope"
+          options={[{ id: "church", label: "Church Chats" }, { id: "my", label: "My Chats" }]}
+          value={subTab}
+          onChange={(t) => {
+            setSubTab(t)
+            setSearch("")
+            setParam("chats", t === "church" ? null : t)
+          }}
+        />
       </div>
 
       <div className="px-5 pt-14 pb-2 md:pt-2 md:px-0 md:flex-1 md:overflow-y-auto">
@@ -2861,28 +2852,18 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         </button>
       </div>
 
-      {/* Sub-tab switcher — mobile only (underline tabs per DESIGN_SYSTEM §4.2; matches the desktop tab bar above) */}
-      <div className="flex mb-5 md:hidden" style={{ borderBottom: "1px solid var(--line)" }}>
-        {(["church", "my"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => {
-              setSubTab(t)
-              setSearch("")
-              setParam("chats", t === "church" ? null : t)
-            }}
-            style={{
-              flex: 1, padding: "12px 0", fontSize: "13px",
-              fontWeight: subTab === t ? 600 : 400,
-              color: subTab === t ? "var(--ink)" : "var(--muted-text)",
-              background: "transparent", border: "none",
-              borderBottom: `2px solid ${subTab === t ? "var(--plum)" : "transparent"}`,
-              marginBottom: -1, cursor: "pointer", transition: "color 0.15s",
-            }}
-          >
-            {t === "church" ? "Church Chats" : "My Chats"}
-          </button>
-        ))}
+      {/* Mode switcher — mobile only. Exclusive filter (Church | My Chats), SegmentedControl (R4/R12) */}
+      <div className="flex mb-5 md:hidden">
+        <SegmentedControl
+          aria-label="Chat scope"
+          options={[{ id: "church", label: "Church Chats" }, { id: "my", label: "My Chats" }]}
+          value={subTab}
+          onChange={(t) => {
+            setSubTab(t)
+            setSearch("")
+            setParam("chats", t === "church" ? null : t)
+          }}
+        />
       </div>
 
       {/* Search bar — mobile only (desktop has one in the panel header above) */}
@@ -3029,8 +3010,8 @@ export function ChatGroupCard({ group, onClick, isActive }: { group: ChatGroup; 
       <div
         className="hidden md:flex items-center gap-2.5 px-2.5 py-2 transition-colors duration-100"
         style={{
-          borderLeft: isActive ? "2px solid var(--plum)" : "2px solid transparent",
-          background: isActive ? "var(--ivory)" : undefined,
+          borderLeft: isActive ? "3px solid var(--plum)" : "3px solid transparent",
+          background: isActive ? "var(--plum-tint)" : undefined,
           borderRadius: isActive ? "var(--r-callout)" : undefined,
           margin: "0 4px",
         }}
@@ -3172,35 +3153,18 @@ export function ChatListPanel({ userId, ministryId, activeGroupId, onOpenChat, r
         </div>
       </div>
 
-      {/* Church / My tab strip */}
+      {/* Church / My mode switcher — exclusive filter, SegmentedControl (R4/R12) */}
       <div className="px-3 flex-shrink-0">
-        <div className="flex" style={{ borderBottom: "1px solid var(--line)" }}>
-          {(["church", "my"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => {
-                setSubTab(t)
-                setSearch("")
-                setParam("chats", t === "church" ? null : t)
-              }}
-              style={{
-                flex: 1,
-                padding: "9px 0",
-                fontSize: "11px",
-                fontWeight: 500,
-                color: subTab === t ? "var(--ink)" : "var(--muted-text)",
-                background: "transparent",
-                border: "none",
-                borderBottom: `2px solid ${subTab === t ? "var(--plum)" : "transparent"}`,
-                marginBottom: -1,
-                cursor: "pointer",
-                fontFamily: "var(--sans)",
-              }}
-            >
-              {t === "church" ? "Church" : "My Chats"}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          aria-label="Chat scope"
+          options={[{ id: "church", label: "Church" }, { id: "my", label: "My Chats" }]}
+          value={subTab}
+          onChange={(t) => {
+            setSubTab(t)
+            setSearch("")
+            setParam("chats", t === "church" ? null : t)
+          }}
+        />
       </div>
 
       {/* Count + plus button */}

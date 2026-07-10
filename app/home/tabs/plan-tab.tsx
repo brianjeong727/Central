@@ -1904,11 +1904,9 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
                   key={sem.id}
                   selected={active}
                   onClick={() => setActiveSemesterId(sem.id)}
-                  tone="ivory"
                   style={{
                     display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
                     padding: "8px 14px", borderRadius: 12, whiteSpace: "normal", textAlign: "left",
-                    ...(active ? {} : { background: "transparent" }),
                   }}
                 >
                   <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: active ? "var(--plum)" : "var(--body)" }}>{sem.name}</span>

@@ -375,7 +375,7 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
                           padding: "10px 12px",
                           borderRadius: "var(--r-input)",
                           border: `1px solid ${selected ? "var(--plum)" : "var(--line-2)"}`,
-                          background: selected ? "var(--ivory)" : "var(--cream)",
+                          background: selected ? "var(--plum-tint)" : "var(--cream)",
                           cursor: "pointer",
                           textAlign: "left",
                           transition: "border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out)",

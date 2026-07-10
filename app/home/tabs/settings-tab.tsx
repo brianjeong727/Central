@@ -1295,7 +1295,7 @@ export function SettingsTab({
                   { label: "Regular",  value: totalMembers - totalLeaders - totalAdmins - totalVisitors, filter: "member" as RoleFilter },
                   { label: "Visitors", value: totalVisitors,                                             filter: "visitor" as RoleFilter },
                 ] as { label: string; value: number; filter: RoleFilter }[]).map(({ value, label, filter }) => (
-                  <button key={label} onClick={() => setPeopleFilter(filter)} style={{ ...CARD, padding: "18px", cursor: "pointer", textAlign: "left", borderColor: peopleFilter === filter ? "var(--plum)" : "var(--line)" }}>
+                  <button key={label} onClick={() => setPeopleFilter(filter)} style={{ ...CARD, padding: "18px", cursor: "pointer", textAlign: "left", background: peopleFilter === filter ? "var(--plum-tint)" : (CARD.background as string | undefined), borderColor: peopleFilter === filter ? "var(--plum)" : "var(--line)" }}>
                     <p style={{ ...SECTION_LABEL, marginBottom: 8 }}>{label}</p>
                     <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", color: "var(--ink)", fontWeight: 400, lineHeight: 1 }}>{value}</p>
                   </button>

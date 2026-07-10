@@ -58,14 +58,19 @@ const DANGER_TINT_BORDER = "color-mix(in srgb, var(--danger) 30%, var(--cream))"
 const DANGER_ROW_BG = "var(--cream)"
 const DELETE_CONFIRM_BG = "color-mix(in srgb, var(--danger) 8%, transparent)"
 const BUDGET_GREEN = "color-mix(in srgb, var(--success) 65%, var(--ink))"
-const REIMBURSED_TINT = "#EDE5F0"
+// Reimbursed is a terminal SUCCESS status, not selection/identity — same success-family
+// formula as `approved` (R10: bg = accent 13% on cream, text = accent 65% on ink).
+const SUCCESS_STATUS_BG = "color-mix(in srgb, var(--success) 13%, var(--cream))"
+const SUCCESS_STATUS_TEXT = "color-mix(in srgb, var(--success) 65%, var(--ink))"
+// Plum-tint remains the identity/source marker for reimbursement-sourced budget entries.
+const REIMBURSED_TINT = "var(--plum-tint)"
 
 export const STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
   pending:    { label: "Pending",    bg: "var(--ivory)",  text: "var(--body)" },
-  approved:   { label: "Approved",  bg: "color-mix(in srgb, var(--success) 13%, var(--cream))", text: "color-mix(in srgb, var(--success) 65%, var(--ink))" },
+  approved:   { label: "Approved",  bg: SUCCESS_STATUS_BG, text: SUCCESS_STATUS_TEXT },
   rejected:   { label: "Rejected",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
   declined:   { label: "Declined",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
-  reimbursed: { label: "Reimbursed",bg: REIMBURSED_TINT, text: "var(--plum)" },
+  reimbursed: { label: "Reimbursed",bg: SUCCESS_STATUS_BG, text: SUCCESS_STATUS_TEXT },
   flagged:    { label: "Flagged",   bg: WARN_BG,         text: WARN_TEXT },
 }
 

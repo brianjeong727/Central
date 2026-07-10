@@ -31,7 +31,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--plum-2`      | `#2D0F2E` | Active breadcrumb text, identity hero gradient base (rare) — NOT a button fill (primary CTA fill is `--plum`, see §4.3) |
 | `--plum-deep`   | `#1B0A1E` | Hero gradient dark stop |
 | `--plum-light`  | `#4A1B4D` | Hero gradient light stop |
-| `--plum-tint`   | `color-mix(in srgb, var(--plum) 12%, var(--cream))` | Selection/wayfinding surface — the ONLY sanctioned light-plum surface. Was raw `#EDE3EE` (read cool); ratified R4 |
+| `--plum-tint`   | `color-mix(in srgb, var(--plum) 12%, var(--cream))` | Selection/wayfinding surface — the ONLY sanctioned light-plum surface; the universal selected-state surface (chips, segments, selected cards, active nav rows — §4.4) and identity-emphasis badges (your role, President, For You). NOT for status pills — statuses derive from the semantic accents (§4.7). Was raw `#EDE3EE` (read cool); ratified R4 |
 | `--ink`         | `#13101A` | Primary text |
 | `--body`        | `#5A5466` | Body text, sub-labels |
 | `--muted`       | `#8A8497` | Tertiary text, eyebrow mono, labels |
@@ -42,7 +42,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--cream-2`     | `#F8F4EA` | Inset surface (composer, dashed cells) |
 | `--cream-3`     | `#F6F2E8` | Accent surface (verse callout, today cell) |
 | `--body-bg`     | `#F4F1E8` | Desktop context sidebar panel — middle tier of three-tone desktop surface. **Exception:** the Messages (chat) panel uses `--cream` instead — see note below. |
-| `--ivory`       | `#F1ECDE` | Active sidebar item, soft-pill background; also the **B · Emphasis** surface for the single most prominent inset card (Up Next) |
+| `--ivory`       | `#F1ECDE` | Soft-pill background; also the **B · Emphasis** surface for the single most prominent inset card (Up Next). (Active sidebar item is now `--plum-tint` + a 3px `--plum` left bar — R4; no longer `--ivory`.) |
 | `--canvas`      | `#F1ECDE` | Design-canvas page bg outside artboards |
 | `--rail`        | `#ECE6D6` | Desktop icon rail — darkest step of three-tone desktop surface |
 | `--line`        | `#E8E2D2` | Primary hairline |
@@ -98,7 +98,7 @@ Central is a daily-driver tool that an entire church community lives in for comm
 - **Section gap:** 28–36 vertical between major sections; 56 between calendar and meeting-notes feed.
 - **Card padding:** 18 (small), 22 (default), 22×28 (wide stat row).
 - **Radii:** 6 (tiny pills, icon buttons), 8 (chips), 10 (inputs, secondary buttons), 12 (most cards), 14 (sidebar callouts, prominent cards), 16 (composer pill), 18 (hero banner, full-bleed modal).
-- **Hairlines:** always 1px, never 2px. Active tab underline is the only 2px rule.
+- **Hairlines:** always 1px, never 2px. Active tab underline is the only 2px rule. The 3px plum left bar on active nav rows/chat rows (§2.2, R4) is the only sanctioned >1px border accent besides the 2px tab underline.
 
 ### 1.5 Iconography
 - Lucide-style stroked icons via the local `<Icon d={...}/>` component. Stroke 1.6, linecaps round.
@@ -130,11 +130,11 @@ Two modes, controlled by a `navMode` prop:
 
 **`navMode="teams"`** (default, for team-scoped surfaces: Plan, Roster, Resources)
 - "YOUR TEAMS · n" mono eyebrow with `+` icon button on the right.
-- Team rows: icon chip (36×36) + name + role. Active row uses `#F1ECDE` bg + 1px `#E2DDCF` border + plum-filled icon chip.
+- Team rows: icon chip (36×36) + name + role. Active row uses `--plum-tint` bg + `--plum` text + a 3px `--plum` left bar (R4) + plum-filled icon chip.
 
 **`navMode="home"`** (for workspace-scoped surfaces: Home, Announcements, Church Settings)
 - "HOME" mono eyebrow.
-- Simple text rows. Active row uses `#F1ECDE` bg + 1px `#E2DDCF` border.
+- Simple text rows. Active row uses `--plum-tint` bg + `--plum` text + a 3px `--plum` left bar (R4).
 
 Both modes share:
 - **Verse callout** at the bottom of the sidebar — `#F6F2E8` bg, 1px `#E8E2D2` border, radius 14, padding 18. Mono eyebrow ("VERSE · PSALM 46:10") + italic serif quote 17px in `#2D0F2E`. Always present on every screen.
@@ -264,7 +264,10 @@ The Pastor Pulse question rides **inside** the home hero carousel as a hosted **
 - Inactive: color `#8A8497`, weight 400, `border-bottom: 2px solid transparent`
 - Active: color `#2D0F2E`, weight 600, `border-bottom: 2px solid #3E1540`, `margin-bottom: -1px`
 
-**Do not:** use pill tabs, segmented background tabs, or boxed tabs. Always underline.
+**Underline tabs switch VIEWS.** For mutually-exclusive FILTERS/modes, use the sanctioned `SegmentedControl` (R4, ratified 2026-07-09) — radius-999 pills carrying the one selected-state grammar (§4.4). Never boxed/pill TABS for view navigation; never underline tabs for filters.
+
+#### SegmentedControl (exclusive filters/modes)
+`SegmentedControl` in `components/central/segmented-control.tsx` (barrel-exported from `@/components/central`). The sanctioned control for exclusive FILTER/mode selection — **not** view navigation (views use underline tabs above). Props: `options: {id, label}[]` (label accepts `ReactNode`), `value`, `onChange`, optional `size` (`'sm'` default). Renders a row of radius-999 pills (composed from `FilterChip`) carrying **the one selected-state grammar** (§4.4): selected = `--plum-tint` bg + `--plum` text + 1px `--plum` border; unselected = `--cream` bg + `--body` text + 1px `--line-2` border. Radiogroup semantics (`role="radiogroup"` on the row, `role="radio"` + `aria-checked` on each pill). Examples in use: **Church | My Chats** (chats), **Cards | Compact** (announcements layout).
 
 #### Critical implementation rule
 There is exactly **one** tab strip component in this codebase: `PlanSubTabStrip` in `components/central/plan-sub-tab-strip.tsx` (barrel-exported from `@/components/central`). Every tab strip — team pages, event plan pages, profile pages, anywhere — must use this same component. Never inline tab styles or create a new tab implementation. If you need a tab strip, import and use the existing shared component.
@@ -298,7 +301,7 @@ Buttons are assigned by **semantic role**, never ad-hoc color. **Exactly one pri
 - **Standard input:** 12×14 padding, 1px `#E2DDCF`, radius 10, `#FDFCF8` bg, 15px sans.
 - **Inline serif input** (announcement title, journal entries): 8×0 padding, no border, `border-bottom: 1px solid #E2DDCF`, transparent bg, 36px serif weight 600, letter-spacing -0.02em. Placeholder uses helper-text `--faint` (quiet guidance), not label `--muted-text`.
 - **Textarea body** (announcement, transition note): 19px serif, line-height 1.65, no border, transparent bg, vertical resize, min-height 540 for full-page editors.
-- **Pill picker row** (audience, options): horizontal flex wrap gap 6–8. Off state: 1px `#E2DDCF`, cream bg, body color. On state: 1px `#3E1540`, `#3E1540` bg, cream text. (The selected pill is a `--plum` accent fill — an active-state indicator per §1.2 — not the `--plum-2` primary-CTA fill. The shared `FilterChip` primitive is the canonical implementation.)
+- **Pill picker row** (audience, options): horizontal flex wrap gap 6–8. **The one selected-state grammar (R4):** On state = 1px `--plum` border, `--plum-tint` bg, `--plum` text. Off state = 1px `--line-2` border, `--cream` bg, `--body` text. The previous solid-plum on-state (cream text on a `--plum` fill) is **retired (R4)**. The shared `FilterChip` primitive is the canonical implementation and now renders this ONE grammar — the `plum`/`ivory` tone fork is retired (the `tone` prop is still accepted for backward compat but is a no-op). This same grammar is the universal selected-state surface across chips, `SegmentedControl` segments, selected cards, and active nav rows (§1.2 `--plum-tint`).
 
 ### 4.5 Cards
 - **Standard card:** `#FDFCF8` bg, 1px `#E8E2D2` border, radius 12–14, padding 18–22. Shares the same tone as the page body — separation from the background is by hairline border alone, not by tone contrast.
@@ -597,7 +600,7 @@ These bullet-pointed pitfalls were the recurring failures in the original screen
 16. **Long-form creation is full-page, not modal.** Announcements use the full-page editor; modal is forbidden for this flow.
 17. **Pages never start without a mono eyebrow.** Every H1 is preceded by mono context.
 18. **Verse callout is permanent.** Don't drop it to save space.
-19. **Underline tabs only.** Never pill tabs, never boxed tabs.
+19. **Underline tabs for views; `SegmentedControl` (§4.2) for exclusive filters — never mix the two roles.** Never boxed/pill tabs for view navigation; never underline tabs for filters/modes.
 20. **Cream bg `#FDFCF8`, page bg `#F1ECDE`** — never invert.
 21. **No fixed-width column stranded in a wide content area.** Cap width only for reading measure (and center or pair it); let lists, grids, tables, and stat content fill the content area (§7.0). A page with content hugging one edge and a dead band of unused space on the other is a layout bug.
 
