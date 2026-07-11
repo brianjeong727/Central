@@ -113,8 +113,7 @@ directory, not the session. Full guide: `scripts/SESSIONS.md`.
 
 19. **Nav sections — one source (R7, 2026-07-09):** tab→section membership (the context-panel SECTION label, rail highlight, and bottom-nav highlight) derives from `components/central/nav-sections.ts` (`NAV_SECTIONS` + `sectionForTab()`) — never hand-code `activeTab === "x"` section couplings. Settings is labeled "Church Settings" everywhere (crumb included); Congregation is a Home-section item (pastor-gated).
 
-Drop it right after Critical Convention #16. If you'd rather it read as a Workflow item than a numbered convention, say so
-and I'll reformat — but as a hard "always do X" rule it belongs with the conventions.
+20. **Action menus — always `ActionMenu`, never hand-rolled:** every dropdown/kebab/context action menu must use the shared `ActionMenu` (`components/central/action-menu.tsx`) — it portals to `document.body`, flips above the trigger when there's no room below, and clamps horizontally, so it can never clip at the viewport bottom or inside an `overflow-hidden` ancestor. Never position a menu `absolute`/`fixed` below a trigger without collision handling (this bug recurred 3×). Sole exception: the chat message context menu in `message-row.tsx` (its own frozen flip logic).
 
 ## Database Migrations
 Never create migration files in the `supabase/` folder and ask the user to run them manually. The Supabase MCP is connected — always run migrations directly against the database using the MCP. When a schema change is needed, execute it immediately as part of the task. After running, verify the tables and policies were created correctly by querying the database before moving on.
@@ -262,7 +261,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `lib/group-algorithm.ts` | Small group generation algorithm |
 | `components/ui/bottom-nav.tsx` | Bottom tab navigation (mobile only) |
 | `components/ui/chats-section.tsx` | Recent chats list used on Home tab |
-| `components/central/` | Shared design-system components: `CentralButton`/`IconButton` (button.tsx), `CentralCard`, `ListRow`, `FilterChip`, `Input`/`Select`/`Textarea`/`SerifInput`/`AddInlineSelect`/`FormField` (field.tsx), `PageTitle`, `SectionHeader`, `ContentHeader`, `EventSectionHeader`, `PlanSubTabStrip`, `MonogramChip`, `SegmentedControl` (exclusive filters — R4), `FeaturedHeroCard` (the one plum content surface), `UpNextCard` (retired from the hero; unused), `ChatStrip`, `InsetHairline`, `nav-sections.ts` (`NAV_SECTIONS`/`sectionForTab` — the single tab→section source), and `EYEBROW_STYLE`/`MONO_STYLE`/`RAIL_LABEL_STYLE` (typography.ts — the canonical mono-label constants; shared.tsx re-exports them; `components/central` is a LEAF and must not import from `app/`). |
+| `components/central/` | Shared design-system components: `CentralButton`/`IconButton` (button.tsx), `CentralCard`, `ListRow`, `FilterChip`, `ActionMenu` (action-menu.tsx — flip-aware portal kebab/dropdown; Convention #20), `Input`/`Select`/`Textarea`/`SerifInput`/`AddInlineSelect`/`FormField` (field.tsx), `PageTitle`, `SectionHeader`, `ContentHeader`, `EventSectionHeader`, `PlanSubTabStrip`, `MonogramChip`, `SegmentedControl` (exclusive filters — R4), `FeaturedHeroCard` (the one plum content surface), `UpNextCard` (retired from the hero; unused), `ChatStrip`, `InsetHairline`, `nav-sections.ts` (`NAV_SECTIONS`/`sectionForTab` — the single tab→section source), and `EYEBROW_STYLE`/`MONO_STYLE`/`RAIL_LABEL_STYLE` (typography.ts — the canonical mono-label constants; shared.tsx re-exports them; `components/central` is a LEAF and must not import from `app/`). |
 | `components/central/home-hero-carousel.tsx` | Curated home hero carousel — one shared `--hero-h` frame (`HeroFrame`, radius `--r-hero`) with a constant "Featured" eyebrow (`HeroSectionLabel`) and tall flanking side-pill arrows + dot row. Renders three slide types: `photo` (full-bleed image; stored `panel_color` fades solid→transparent across the seam via `--hero-panel-fade`, over a left-anchored `--ink` legibility scrim; cream caption), event-with-photo (same + glass date/RSVP chip), and flat-plum featured reference slides (announcement / event-without-photo) via `FeaturedHeroCard` — 60/40 split with the §1.3 date anchor (serif 36/600 cream-on-dark; falls back to date-posted); `UpNextCard` is retired from the hero. Static CSS panel — no live blur, SSR-safe. Manual prev/next only (no auto-rotation/motion/swipe). Exports `HeroFrame`/`HeroSectionLabel`/`FeaturedHeroCard` reused by the home-tab fallback. |
 | `permissions.md` | **Canonical source of truth** for role-based access — who can do what across every feature |
 
@@ -454,6 +453,7 @@ Permission tiers:
 | Chat settings | 110 |
 | Emoji dismiss overlay | 155 |
 | Emoji picker | 160 |
+| Action menus (`ActionMenu` portal) | 200 |
 | Modals (`CentralModal`) | 200 (override e.g. 210 only to stack above another overlay) |
 
 ## Layout Rules

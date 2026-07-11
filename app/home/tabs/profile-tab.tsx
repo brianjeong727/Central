@@ -11,7 +11,7 @@ import { getInitials } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
-import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog } from "@/components/central"
+import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu } from "@/components/central"
 import { useNavState } from "../nav-state"
 import type { Profile, Devotional, Prayer, Verse } from "../types"
 
@@ -72,7 +72,6 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
   const [saving, setSaving] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   // Report count + entry dates to the parent whenever the cached list changes.
@@ -87,8 +86,8 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
     return entries.filter(e => e.title.toLowerCase().includes(q) || e.passage.toLowerCase().includes(q) || e.content.toLowerCase().includes(q))
   }, [entries, searchQuery])
 
-  function openNew() { setEditingEntry(null); setDraft({ title: "", passage: "", content: "", image_url: null }); setShowEditor(true); setOpenMenuId(null) }
-  function openEdit(entry: Devotional) { setEditingEntry(entry); setDraft({ title: entry.title, passage: entry.passage, content: entry.content, image_url: entry.image_url }); setShowEditor(true); setOpenMenuId(null) }
+  function openNew() { setEditingEntry(null); setDraft({ title: "", passage: "", content: "", image_url: null }); setShowEditor(true) }
+  function openEdit(entry: Devotional) { setEditingEntry(entry); setDraft({ title: entry.title, passage: entry.passage, content: entry.content, image_url: entry.image_url }); setShowEditor(true) }
 
   async function handleSave() {
     if (!draft.title.trim()) return
@@ -106,7 +105,6 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
   async function handleDelete(id: string) {
     const { error } = await supabase.from("devotionals").delete().eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId)
     if (!error) mutate(curr => (curr ?? []).filter(e => e.id !== id), { revalidate: false })
-    setOpenMenuId(null)
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -185,10 +183,9 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
           {filtered.map((entry, idx) => {
             const isFirst = idx === 0 && !searchQuery.trim()
             const isExpanded = isFirst || expandedIds.has(entry.id) || searchQuery.trim().length > 0
-            const menuOpen = openMenuId === entry.id
             return (
               <div key={entry.id} style={{ background: "var(--cream)", borderRadius: "var(--r-card)", border: "1px solid var(--line)" }}>
-                <div style={{ padding: isExpanded ? "20px 20px 0" : "14px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null) } }}>
+                <div style={{ padding: isExpanded ? "20px 20px 0" : "14px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id) } }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <h3 style={{ fontFamily: "var(--serif)", fontSize: isExpanded ? 19 : 15, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.25, margin: 0, marginBottom: entry.passage ? 3 : 0 }}>{entry.title}</h3>
@@ -196,16 +193,17 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
-                      <div style={{ position: "relative" }}>
-                        <IconButton dim={26} active={menuOpen} onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }}><MoreHorizontal size={15} /></IconButton>
-                        {menuOpen && (
-                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 9, zIndex: 20, minWidth: 130, overflow: "hidden" }}>
-                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
-                            <div style={{ height: 1, background: "var(--line)" }} />
-                            <button onClick={e => { e.stopPropagation(); setOpenMenuId(null); setConfirmDeleteId(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
-                          </div>
+                      <ActionMenu
+                        align="right"
+                        minWidth={130}
+                        renderTrigger={({ open, toggle }) => (
+                          <IconButton dim={26} active={open} onClick={toggle}><MoreHorizontal size={15} /></IconButton>
                         )}
-                      </div>
+                        items={[
+                          { key: "edit", label: "Edit", icon: <Pencil size={13} />, onSelect: () => openEdit(entry) },
+                          { key: "delete", label: "Delete", tone: "danger", icon: <Trash2 size={13} />, onSelect: () => setConfirmDeleteId(entry.id) },
+                        ]}
+                      />
                       {!isFirst && <span style={{ color: "var(--muted-text)", display: "flex" }}>{isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>}
                     </div>
                   </div>
@@ -247,7 +245,6 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
   const [draft, setDraft] = useState({ title: "", content: "" })
   const [saving, setSaving] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   // Report count to the parent whenever the cached list changes.
@@ -262,8 +259,8 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
     return entries.filter(e => e.title.toLowerCase().includes(q) || e.content.toLowerCase().includes(q))
   }, [entries, searchQuery])
 
-  function openNew() { setEditingEntry(null); setDraft({ title: "", content: "" }); setShowEditor(true); setOpenMenuId(null) }
-  function openEdit(entry: Prayer) { setEditingEntry(entry); setDraft({ title: entry.title, content: entry.content }); setShowEditor(true); setOpenMenuId(null) }
+  function openNew() { setEditingEntry(null); setDraft({ title: "", content: "" }); setShowEditor(true) }
+  function openEdit(entry: Prayer) { setEditingEntry(entry); setDraft({ title: entry.title, content: entry.content }); setShowEditor(true) }
 
   async function handleSave() {
     if (!draft.title.trim()) return
@@ -281,7 +278,6 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
   async function handleDelete(id: string) {
     const { error } = await supabase.from("prayers").delete().eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId)
     if (!error) mutate(curr => (curr ?? []).filter(e => e.id !== id), { revalidate: false })
-    setOpenMenuId(null)
   }
 
   function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
@@ -339,27 +335,27 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
           {filtered.map((entry, idx) => {
             const isFirst = idx === 0 && !searchQuery.trim()
             const isExpanded = isFirst || expandedIds.has(entry.id) || searchQuery.trim().length > 0
-            const menuOpen = openMenuId === entry.id
             const hasBody = !!(entry.content && entry.content.replace(/<[^>]*>/g, "").trim())
             return (
               <div key={entry.id} style={{ background: "var(--cream)", borderRadius: "var(--r-card)", border: "1px solid var(--line)" }}>
-                <div style={{ padding: isExpanded ? (hasBody ? "18px 20px 0" : "18px 20px 16px") : "13px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null) } }}>
+                <div style={{ padding: isExpanded ? (hasBody ? "18px 20px 0" : "18px 20px 16px") : "13px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id) } }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <h3 style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.3, margin: 0 }}>{entry.title}</h3>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
-                      <div style={{ position: "relative" }}>
-                        <IconButton dim={26} active={menuOpen} onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }}><MoreHorizontal size={15} /></IconButton>
-                        {menuOpen && (
-                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 9, zIndex: 20, minWidth: 130, overflow: "hidden" }}>
-                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
-                            <div style={{ height: 1, background: "var(--line)" }} />
-                            <button onClick={e => { e.stopPropagation(); setOpenMenuId(null); setConfirmDeleteId(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
-                          </div>
+                      <ActionMenu
+                        align="right"
+                        minWidth={130}
+                        renderTrigger={({ open, toggle }) => (
+                          <IconButton dim={26} active={open} onClick={toggle}><MoreHorizontal size={15} /></IconButton>
                         )}
-                      </div>
+                        items={[
+                          { key: "edit", label: "Edit", icon: <Pencil size={13} />, onSelect: () => openEdit(entry) },
+                          { key: "delete", label: "Delete", tone: "danger", icon: <Trash2 size={13} />, onSelect: () => setConfirmDeleteId(entry.id) },
+                        ]}
+                      />
                       {!isFirst && <span style={{ color: "var(--muted-text)", display: "flex" }}>{isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>}
                     </div>
                   </div>
@@ -400,7 +396,6 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
   const [draft, setDraft] = useState({ reference: "", verse_text: "", note: "" })
   const [saving, setSaving] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
@@ -409,8 +404,8 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
     return entries.filter(e => e.reference.toLowerCase().includes(q) || e.verse_text.toLowerCase().includes(q) || e.note.toLowerCase().includes(q))
   }, [entries, searchQuery])
 
-  function openNew() { setEditingEntry(null); setDraft({ reference: "", verse_text: "", note: "" }); setShowEditor(true); setOpenMenuId(null) }
-  function openEdit(entry: Verse) { setEditingEntry(entry); setDraft({ reference: entry.reference, verse_text: entry.verse_text, note: entry.note }); setShowEditor(true); setOpenMenuId(null) }
+  function openNew() { setEditingEntry(null); setDraft({ reference: "", verse_text: "", note: "" }); setShowEditor(true) }
+  function openEdit(entry: Verse) { setEditingEntry(entry); setDraft({ reference: entry.reference, verse_text: entry.verse_text, note: entry.note }); setShowEditor(true) }
 
   async function handleSave() {
     if (!draft.reference.trim() || !draft.verse_text.trim()) return
@@ -428,7 +423,6 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
   async function handleDelete(id: string) {
     const { error } = await supabase.from("verses").delete().eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId)
     if (!error) mutate(curr => (curr ?? []).filter(e => e.id !== id), { revalidate: false })
-    setOpenMenuId(null)
   }
   function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
@@ -475,11 +469,10 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
           {filtered.map((entry, idx) => {
             const isFirst = idx === 0 && !searchQuery.trim()
             const isExpanded = isFirst || expandedIds.has(entry.id) || searchQuery.trim().length > 0
-            const menuOpen = openMenuId === entry.id
             const preview = entry.verse_text.length > 90 ? entry.verse_text.slice(0, 90) + "…" : entry.verse_text
             return (
               <div key={entry.id} style={{ background: "var(--cream)", borderRadius: "var(--r-card)", border: "1px solid var(--line)" }}>
-                <div style={{ padding: isExpanded ? "20px 20px 0" : "14px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id); setOpenMenuId(null) } }}>
+                <div style={{ padding: isExpanded ? "20px 20px 0" : "14px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id) } }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontFamily: "var(--serif)", fontSize: isExpanded ? 18 : 15, fontWeight: 400, color: "var(--plum)", letterSpacing: "-0.01em", margin: 0, marginBottom: !isExpanded ? 3 : 0 }}>{entry.reference}</p>
@@ -487,16 +480,17 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
-                      <div style={{ position: "relative" }}>
-                        <IconButton dim={26} active={menuOpen} onClick={e => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : entry.id) }}><MoreHorizontal size={15} /></IconButton>
-                        {menuOpen && (
-                          <div style={{ position: "absolute", right: 0, top: "calc(100% + 4px)", background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 9, zIndex: 20, minWidth: 130, overflow: "hidden" }}>
-                            <button onClick={e => { e.stopPropagation(); openEdit(entry) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--ink)", cursor: "pointer" }}><Pencil size={13} />Edit</button>
-                            <div style={{ height: 1, background: "var(--line)" }} />
-                            <button onClick={e => { e.stopPropagation(); setOpenMenuId(null); setConfirmDeleteId(entry.id) }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 13px", width: "100%", background: "transparent", border: "none", fontSize: 13, color: "var(--danger)", cursor: "pointer" }}><Trash2 size={13} />Delete</button>
-                          </div>
+                      <ActionMenu
+                        align="right"
+                        minWidth={130}
+                        renderTrigger={({ open, toggle }) => (
+                          <IconButton dim={26} active={open} onClick={toggle}><MoreHorizontal size={15} /></IconButton>
                         )}
-                      </div>
+                        items={[
+                          { key: "edit", label: "Edit", icon: <Pencil size={13} />, onSelect: () => openEdit(entry) },
+                          { key: "delete", label: "Delete", tone: "danger", icon: <Trash2 size={13} />, onSelect: () => setConfirmDeleteId(entry.id) },
+                        ]}
+                      />
                       {!isFirst && <span style={{ color: "var(--muted-text)", display: "flex" }}>{isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>}
                     </div>
                   </div>
