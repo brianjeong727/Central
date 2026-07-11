@@ -1,86 +1,155 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Menu, X } from "lucide-react"
+import { Menu, X, Lock, Plus, MessageCircle } from "lucide-react"
 import { getUserMinistries } from "@/app/actions/ministry"
 import { RingCrossLogo } from "@/app/home/components/shared"
 import { createClient } from "@/lib/supabase"
 
+/* ── §0 Token constants ── */
 const INK    = "var(--ink)"
 const BODY   = "var(--body)"
 const MUTED  = "var(--muted-text)"
-const CREAM  = "#FDFCF8"
-const CREAM3 = "#F6F2E8"
+const FAINT  = "var(--faint)"
+const CREAM  = "var(--cream)"
+const CREAMP = "var(--cream-panel)"
+const CREAM2 = "var(--cream-2)"
+const CREAM3 = "var(--cream-3)"
+const COD    = "var(--cream-on-dark)"
 const IVORY  = "var(--ivory)"
 const LINE   = "var(--line)"
 const LINE2  = "var(--line-2)"
-const LINE3  = "#EFE9DA"
+const LINE3  = "var(--line-3)"
 const PLUM   = "var(--plum)"
 const PLUM2  = "var(--plum-2)"
+const PLUM_TINT = "var(--plum-tint)"
+const TOGGLE_OFF = "#D6D0C0" // §4.9 toggle-off track (no token exists — value fixed by spec)
 
 const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
 const MONO  = "ui-monospace, SFMono-Regular, Menlo, monospace"
 
-const HERO_IMAGES = [
-  { src: "/landingImage1.JPG",  origin: "40% 44%" },
-  { src: "/landingImage2.JPG",  origin: "60% 60%" },
-  { src: "/landingImage3.JPG",  origin: "50% 40%" },
-  { src: "/landingImage4.jpeg", origin: "44% 56%" },
-  { src: "/landingImage5.png",  origin: "56% 48%" },
-]
+/* on-dark translucency helper (§0 — never raw rgba) */
+const cod = (n: number) => `color-mix(in srgb, var(--cream-on-dark) ${n}%, transparent)`
 
-const FEATURES = [
-  {
-    num: "i",
-    title: "Chats that match ministry life.",
-    body: "Church-wide rooms, small groups, direct messages, and threaded replies — the way students actually talk during the week, not a generic inbox.",
-    img: "/landingImage1.JPG",
-    alt: "Students in prayer by candlelight",
-    rev: false,
-  },
-  {
-    num: "ii",
-    title: "Announcements with follow-through.",
-    body: "Pinned updates, event context, and RSVP tracking, so the right people see the right thing without another spreadsheet.",
-    img: "/landingImage4.jpeg",
-    alt: "The ministry gathered on the church steps",
-    rev: true,
-  },
-  {
-    num: "iii",
-    title: "A living directory of your people.",
-    body: "Names, roles, prayer requests, and spiritual profiles — so leaders and students can genuinely care for one another.",
-    img: "/landingImage5.png",
-    alt: "The retreat team together",
-    rev: false,
-  },
-  {
-    num: "iv",
-    title: "Planning, beside the conversation.",
-    body: "Team roles, worship rosters, and event tasks live next to the chats that move them forward — never in a second app.",
-    img: "/landingImage3.JPG",
-    alt: "A prayer huddle, hands on shoulders",
-    rev: true,
-  },
-]
+/* eyebrow base style */
+const ey = (opts?: { plum?: boolean; size?: number; ls?: number; color?: string }) => ({
+  fontFamily: MONO,
+  fontSize: opts?.size ?? 11,
+  letterSpacing: `${opts?.ls ?? 1.4}px`,
+  textTransform: "uppercase" as const,
+  color: opts?.color ?? (opts?.plum ? PLUM : MUTED),
+})
 
-const GALLERY = [
-  { src: "/landingImage1.JPG",  cap: "Friday night — prayer by candlelight" },
-  { src: "/landingImage4.jpeg", cap: "Sunday — gathered on the steps" },
-  { src: "/landingImage3.JPG",  cap: "Retreat — praying over one another" },
-  { src: "/landingImage5.png",  cap: "Field night — the whole team" },
-  { src: "/landingImage2.JPG",  cap: "The quiet of the chapel at dusk" },
-]
+/* §0 landing primary button base */
+const btnPrimary = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: PLUM2,
+  color: COD,
+  borderRadius: 999,
+  padding: "15px 30px",
+  fontSize: 15,
+  fontWeight: 500,
+  border: "none",
+  cursor: "pointer",
+  fontFamily: SANS,
+  textDecoration: "none",
+} as const
 
-const RHYTHM = [
-  { day: "Sun · service",   what: "Welcome new students.",    who: "— the welcome team", hl: false },
-  { day: "Mon · planning",  what: "Publish the week ahead.",  who: "— campus leads",      hl: false },
-  { day: "Wed · rehearsal", what: "Coordinate worship.",       who: "— praise team",       hl: true  },
-  { day: "Fri · cells",     what: "Keep small groups close.",  who: "— cell leaders",      hl: false },
-]
+const mockStyle = {
+  background: CREAMP,
+  border: `1px solid ${LINE2}`,
+  borderRadius: 14, // var(--r-callout)
+  overflow: "hidden",
+  textAlign: "left" as const,
+}
+
+/* ── small local components ── */
+function Avatar({ label, size, font }: { label: string; size: number; font: number }) {
+  return (
+    <span style={{
+      width: size, height: size, borderRadius: 999, background: PLUM, color: COD,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: font, fontWeight: 600, flexShrink: 0,
+    }}>
+      {label}
+    </span>
+  )
+}
+
+function Toggle({ on }: { on: boolean }) {
+  return (
+    <span style={{
+      position: "relative", width: 34, height: 20, borderRadius: 999,
+      background: on ? PLUM : TOGGLE_OFF, flexShrink: 0, display: "inline-block",
+    }}>
+      <span style={{
+        position: "absolute", top: 2, [on ? "right" : "left"]: 2,
+        width: 16, height: 16, borderRadius: 999, background: CREAM,
+      }}/>
+    </span>
+  )
+}
+
+type BadgeKind = "leader" | "admin" | "member"
+function RoleBadge({ kind, children }: { kind: BadgeKind; children: React.ReactNode }) {
+  const base = { borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 500 } as const
+  const styles: Record<BadgeKind, React.CSSProperties> = {
+    leader: { ...base, background: IVORY, color: PLUM },
+    admin:  { ...base, background: PLUM2, color: COD },
+    member: { ...base, background: IVORY, color: MUTED },
+  }
+  return <span style={{ marginLeft: "auto", ...styles[kind] }}>{children}</span>
+}
+
+/* section label row in the Sunday chat mock */
+function SectionLabel({ text, pad }: { text: string; pad: string }) {
+  return (
+    <div style={{ ...ey({ size: 10, ls: 2 }), display: "flex", alignItems: "center", padding: pad }}>
+      {text}
+      <Plus size={13} color={MUTED} style={{ marginLeft: "auto" }}/>
+    </div>
+  )
+}
+
+function ChatRow({
+  initial, name, preview, previewItalic, locked, selected, meta,
+}: {
+  initial: string; name: string; preview: string; previewItalic?: boolean
+  locked?: boolean; selected?: boolean; meta?: boolean
+}) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 11, padding: "9px 12px", borderRadius: 12,
+      ...(selected ? { background: IVORY, border: `1px solid ${LINE2}` } : {}),
+    }}>
+      <Avatar label={initial} size={34} font={13}/>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.25, display: "flex", alignItems: "center", gap: 5 }}>
+          {name}
+          {locked && <Lock size={11} color={MUTED}/>}
+        </div>
+        <div style={{
+          fontSize: 12, color: MUTED, marginTop: 1, maxWidth: 165,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          ...(previewItalic ? { fontStyle: "italic" } : {}),
+        }}>
+          {preview}
+        </div>
+      </div>
+      {meta && (
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontFamily: MONO, fontSize: 10, color: FAINT }}>5m</span>
+          <span style={{ width: 7, height: 7, borderRadius: 999, background: PLUM }}/>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function LandingPage() {
   const router = useRouter()
@@ -90,21 +159,7 @@ export default function LandingPage() {
   const [ministryCount, setMinistryCount] = useState<number | null>(null)
   const [menuOpen, setMenuOpen]           = useState(false)
 
-  // Hero rotation
-  const [heroIdx, setHeroIdx] = useState(0)
-
-  // Gallery
-  const [galIdx, setGalIdx]             = useState(0)
-  const galTrackRef                     = useRef<HTMLDivElement>(null)
-  const galStageRef                     = useRef<HTMLDivElement>(null)
-  const galAutoRef                      = useRef<ReturnType<typeof setInterval> | null>(null)
-  const [galOffset, setGalOffset]       = useState(0)
-  const [galCardWidth, setGalCardWidth] = useState(0)
-
-  // Reveal refs
-  const featRefs = useRef<(HTMLDivElement | null)[]>([])
-
-  // ── Scroll
+  // ── Scroll (nav border)
   useEffect(() => {
     function onScroll() { setScrolled(window.scrollY > 40) }
     onScroll()
@@ -127,62 +182,6 @@ export default function LandingPage() {
 
   useEffect(() => { if (scrolled) setMenuOpen(false) }, [scrolled])
 
-  // ── Hero rotation (7s, crossfade)
-  useEffect(() => {
-    const id = setInterval(() => setHeroIdx(i => (i + 1) % HERO_IMAGES.length), 7000)
-    return () => clearInterval(id)
-  }, [])
-
-  // ── Gallery layout
-  const galLayout = useCallback(() => {
-    const stage = galStageRef.current
-    if (!stage) return
-    const W = stage.clientWidth
-    const cw = Math.round(W * 0.6)
-    const gap = 24
-    const off = (W - cw) / 2
-    setGalCardWidth(cw)
-    setGalOffset(off)
-  }, [])
-
-  useEffect(() => {
-    galLayout()
-    window.addEventListener("resize", galLayout)
-    return () => window.removeEventListener("resize", galLayout)
-  }, [galLayout])
-
-  // ── Gallery auto-advance
-  const armGalAuto = useCallback(() => {
-    if (galAutoRef.current) clearInterval(galAutoRef.current)
-    galAutoRef.current = setInterval(() => setGalIdx(i => (i + 1) % GALLERY.length), 5000)
-  }, [])
-
-  useEffect(() => {
-    armGalAuto()
-    return () => { if (galAutoRef.current) clearInterval(galAutoRef.current) }
-  }, [armGalAuto])
-
-  function goGal(n: number) {
-    setGalIdx(((n % GALLERY.length) + GALLERY.length) % GALLERY.length)
-    armGalAuto()
-  }
-
-  // ── Reveal on scroll
-  useEffect(() => {
-    const io = new IntersectionObserver(
-      entries => entries.forEach(e => {
-        if (e.isIntersecting) {
-          (e.target as HTMLElement).style.opacity = "1"
-          ;(e.target as HTMLElement).style.transform = "none"
-          io.unobserve(e.target)
-        }
-      }),
-      { threshold: 0.15 }
-    )
-    featRefs.current.forEach(el => { if (el) io.observe(el) })
-    return () => io.disconnect()
-  }, [])
-
   async function handleSignOut() {
     const supabase = createClient()
     await supabase.auth.signOut()
@@ -190,61 +189,55 @@ export default function LandingPage() {
   }
 
   function handleOpenApp() {
-    // No ministry → /join (code entry + browse — the unified no-ministry destination)
     if (ministryCount === 0) router.push("/join")
     else if (ministryCount !== null && ministryCount > 1) router.push("/pick-ministry")
     else router.push("/home")
   }
-
-  // Gallery transform
-  const galTransform = galCardWidth > 0
-    ? `translateX(${galOffset - galIdx * (galCardWidth + 24)}px)`
-    : "translateX(0)"
 
   return (
     <main style={{ minHeight: "100vh", background: CREAM, color: INK, fontFamily: SANS }}>
 
       {/* ── NAV ── */}
       <nav className="cl-nav" style={{
-        position: "sticky", top: 0, zIndex: 50, height: 84,
-        background: "rgba(253,252,248,0.92)",
+        position: "sticky", top: 0, zIndex: 50, height: 76,
+        background: "color-mix(in srgb, var(--cream) 92%, transparent)",
         backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
         borderBottom: scrolled ? `1px solid ${LINE}` : "1px solid transparent",
         transition: "border-color 180ms ease",
       }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 56px", height: 84, display: "flex", alignItems: "center" }}>
+        <div className="cl-wrap" style={{ height: 76, display: "flex", alignItems: "center" }}>
           <Link href="/" className="cl-brand-link" style={{
-            display: "flex", alignItems: "center", gap: 11,
+            display: "flex", alignItems: "center", gap: 10,
             textDecoration: "none", color: INK,
-            fontFamily: SERIF, fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em",
+            fontFamily: SERIF, fontSize: 21, fontWeight: 600, letterSpacing: "-0.01em",
           }}>
-            <RingCrossLogo size={26} color={PLUM2}/>
+            <RingCrossLogo size={24} color={PLUM2}/>
             Central
           </Link>
 
-          <div className="cl-nav-links" style={{ flex: 1, display: "flex", justifyContent: "center", gap: 30 }}>
-            {([["Platform", "#platform"], ["Rhythm", "#rhythm"], ["Ministries", "/ministries"]] as const).map(([label, href]) => (
+          <div className="cl-nav-links" style={{ flex: 1, display: "flex", justifyContent: "center", gap: 22 }}>
+            {([["Why", "#why"], ["The week", "#week"], ["Ministries", "/ministries"]] as const).map(([label, href]) => (
               <a key={label} href={href} className="cl-nav-link" style={{ fontSize: 15, color: BODY, textDecoration: "none" }}>
                 {label}
               </a>
             ))}
           </div>
 
-          <div className="cl-nav-right" style={{ display: "flex", gap: 20, alignItems: "center" }}>
+          <div className="cl-nav-right" style={{ display: "flex", gap: 22, alignItems: "center" }}>
             {authChecked && authUser ? (
               <>
                 <button onClick={handleSignOut} className="cl-desktop-only cl-nav-text-btn" style={{ background: "transparent", border: 0, color: BODY, cursor: "pointer", fontFamily: SANS, fontSize: 15 }}>
                   Sign out
                 </button>
-                <button onClick={handleOpenApp} className="cl-desktop-only cl-btn-outline" style={{ height: 42, padding: "0 20px", borderRadius: 999, fontSize: 14.5, fontWeight: 500, border: `1px solid ${LINE2}`, background: CREAM, color: INK, cursor: "pointer", fontFamily: SANS, whiteSpace: "nowrap" }}>
+                <button onClick={handleOpenApp} className="cl-desktop-only cl-btn-primary" style={{ ...btnPrimary, padding: "10px 20px", fontSize: 14 }}>
                   Open app
                 </button>
               </>
             ) : (
               <>
                 <a href="/login" className="cl-desktop-only cl-signin" style={{ fontSize: 15, color: BODY, textDecoration: "none" }}>Sign in</a>
-                <button onClick={() => router.push("/signup")} className="cl-desktop-only cl-btn-pill" style={{ height: 42, padding: "0 20px", borderRadius: 999, fontSize: 14.5, fontWeight: 500, background: PLUM2, color: CREAM, border: "none", cursor: "pointer", fontFamily: SANS }}>
-                  Get started
+                <button onClick={() => router.push("/login")} className="cl-desktop-only cl-btn-primary" style={{ ...btnPrimary, padding: "10px 20px", fontSize: 14 }}>
+                  Open app
                 </button>
               </>
             )}
@@ -258,14 +251,14 @@ export default function LandingPage() {
 
       {/* ── Mobile drawer ── */}
       <div className="cl-mobile-drawer" style={{
-        display: "none", position: "fixed", top: 84, left: 0, right: 0, zIndex: 49,
-        background: "rgba(253,252,248,0.97)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+        display: "none", position: "fixed", top: 76, left: 0, right: 0, zIndex: 49,
+        background: "color-mix(in srgb, var(--cream) 97%, transparent)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
         borderBottom: `1px solid ${LINE}`, flexDirection: "column", padding: "16px 24px 24px", gap: 4,
         opacity: menuOpen ? 1 : 0, pointerEvents: menuOpen ? "all" : "none",
         transform: menuOpen ? "translateY(0)" : "translateY(-8px)",
         transition: "opacity 200ms ease, transform 200ms ease",
       }}>
-        {([["Platform", "#platform"], ["Rhythm", "#rhythm"], ["Ministries", "/ministries"]] as const).map(([label, href]) => (
+        {([["Why", "#why"], ["The week", "#week"], ["Ministries", "/ministries"]] as const).map(([label, href]) => (
           <a key={label} href={href} onClick={() => setMenuOpen(false)}
             style={{ fontSize: 16, color: INK, textDecoration: "none", padding: "12px 0", borderBottom: `1px solid ${LINE}`, fontWeight: 500 }}>
             {label}
@@ -273,305 +266,333 @@ export default function LandingPage() {
         ))}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 16 }}>
           {authChecked && authUser ? (
-            <button onClick={() => { setMenuOpen(false); handleOpenApp() }} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: PLUM2, color: CREAM, borderRadius: 12, fontSize: 14, fontWeight: 600, border: "none", cursor: "pointer", fontFamily: SANS }}>
+            <button onClick={() => { setMenuOpen(false); handleOpenApp() }} style={{ ...btnPrimary, height: 46, borderRadius: 12, fontSize: 14, fontWeight: 600, width: "100%" }}>
               Open app
             </button>
           ) : (
-            <>
-              <a href="/ministries" onClick={() => setMenuOpen(false)} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: PLUM2, color: CREAM, borderRadius: 12, fontSize: 14, fontWeight: 600, textDecoration: "none" }}>
-                Find my ministry
-              </a>
-              <a href="/login" onClick={() => setMenuOpen(false)} style={{ height: 46, display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", color: INK, borderRadius: 12, fontSize: 14, fontWeight: 500, textDecoration: "none", border: `1px solid ${LINE}` }}>
-                Sign in
-              </a>
-            </>
+            <a href="/login" onClick={() => setMenuOpen(false)} style={{ ...btnPrimary, height: 46, borderRadius: 12, fontSize: 14, fontWeight: 600, width: "100%" }}>
+              Sign in
+            </a>
           )}
         </div>
       </div>
 
-      {/* ── HERO ── */}
-      <section className="cl-hero-wrap" style={{ maxWidth: 1100, margin: "0 auto", padding: "84px 56px 92px" }}>
-        <div className="cl-hero-grid" style={{ display: "grid", gridTemplateColumns: "1.04fr 0.96fr", gap: 56, alignItems: "center", ["--fade-step" as string]: "80ms" }}>
-
-          {/* Left — type + verse */}
-          <div>
-            <p className="fade-in-up" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: MUTED, margin: 0, ["--fade-index" as string]: 0 }}>
-              For college ministries
-            </p>
-            <h1 className="cl-hero-title fade-in-up" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 58, lineHeight: 1.0, letterSpacing: "-0.025em", margin: "18px 0 0", color: INK, ["--fade-index" as string]: 1 }}>
-              One calm place,<br/>
-              <em style={{ fontStyle: "italic", color: PLUM2 }}>between Sundays.</em>
-            </h1>
-            <p className="cl-hero-sub fade-in-up" style={{ fontSize: 17, lineHeight: 1.6, color: BODY, marginTop: 22, maxWidth: 420, ["--fade-index" as string]: 2 }}>
-              Central replaces scattered chats, announcement threads, RSVP lists, and planning docs with a single weekly workspace your whole ministry lives in.
-            </p>
-            <div className="cl-hero-ctas fade-in-up" style={{ display: "flex", gap: 18, marginTop: 34, alignItems: "center", flexWrap: "wrap", ["--fade-index" as string]: 3 }}>
-              {authChecked && authUser ? (
-                <>
-                  <button onClick={handleOpenApp} className="cl-btn-primary" style={{ height: 54, padding: "0 30px", borderRadius: 999, fontSize: 15, fontWeight: 500, background: PLUM2, color: CREAM, border: "none", cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}>
-                    Open app
-                  </button>
-                  <a href="/ministries" className="cl-ghost" style={{ fontSize: 15, fontWeight: 500, color: PLUM2, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 7 }}>
-                    Find a ministry <span>→</span>
-                  </a>
-                </>
-              ) : (
-                <>
-                  <button onClick={() => router.push("/register-ministry")} className="cl-btn-primary" style={{ height: 54, padding: "0 30px", borderRadius: 999, fontSize: 15, fontWeight: 500, background: PLUM2, color: CREAM, border: "none", cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}>
-                    Register your ministry
-                  </button>
-                  <a href="/ministries" className="cl-ghost" style={{ fontSize: 15, fontWeight: 500, color: PLUM2, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 7 }}>
-                    Find a ministry <span>→</span>
-                  </a>
-                </>
-              )}
-            </div>
-
-            {/* Verse — in text column, below CTAs */}
-            <div className="fade-in-up" style={{ marginTop: 38, paddingTop: 24, borderTop: `1px solid ${LINE}`, maxWidth: 430, ["--fade-index" as string]: 4 }}>
-              <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 17, lineHeight: 1.5, color: BODY, margin: 0 }}>
-                &ldquo;For where two or three gather in my name, there am I with them.&rdquo;
-              </p>
-              <p style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: MUTED, margin: "12px 0 0" }}>
-                Matthew 18 : 20
-              </p>
-            </div>
-          </div>
-
-          {/* Right — rotating image stage */}
-          <div className="cl-hero-stage fade-in-up" style={{
-            position: "relative", width: "100%", aspectRatio: "1 / 1",
-            borderRadius: 18, overflow: "hidden",
-            border: `1px solid ${LINE2}`, background: CREAM,
-            ["--fade-index" as string]: 1,
+      {/* ── §3 HERO ── */}
+      <section className="cl-hero" style={{ padding: "110px 0 90px", textAlign: "center", borderBottom: `1px solid ${LINE}` }}>
+        <div className="cl-wrap">
+          <p style={{ ...ey({ plum: true }), margin: 0 }}>Ephesians 4 : 12</p>
+          <h1 style={{
+            fontFamily: SERIF, fontSize: "clamp(44px, 5vw, 68px)", fontWeight: 600,
+            letterSpacing: "-0.02em", lineHeight: 1.06, maxWidth: 860, margin: "20px auto 0", color: INK,
           }}>
-            {HERO_IMAGES.map((img, k) => (
-              <div key={img.src} style={{
-                position: "absolute", inset: 0,
-                opacity: k === heroIdx ? 1 : 0,
-                transition: "opacity 1600ms cubic-bezier(0.77, 0, 0.175, 1)",
-              }}>
-                <img
-                  src={img.src}
-                  alt=""
-                  style={{
-                    width: "100%", height: "100%", objectFit: "cover", display: "block",
-                    transformOrigin: img.origin,
-                    animation: k === heroIdx ? "cl-kb-zoom 9000ms linear forwards" : "none",
-                    transform: k === heroIdx ? undefined : "scale(1.001)",
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── FEATURES ── */}
-      <section id="platform" className="cl-features" style={{ maxWidth: 1100, margin: "0 auto", padding: "96px 56px 56px", borderTop: `1px solid ${LINE}` }}>
-        <p style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: PLUM, margin: 0 }}>
-          One calm system
-        </p>
-        <h2 className="cl-feat-h" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 46, lineHeight: 1.04, letterSpacing: "-0.02em", margin: "16px 0 0", color: INK, maxWidth: 760 }}>
-          Less drift between Sunday and the next gathering.
-        </h2>
-
-        {FEATURES.map(({ num, title, body, img, alt, rev }, i) => (
-          <div
-            key={num}
-            ref={el => { featRefs.current[i] = el }}
-            className={`cl-feat-row${rev ? " cl-feat-row-rev" : ""}`}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 64,
-              alignItems: "center",
-              padding: "56px 0",
-              borderTop: `1px solid ${LINE3}`,
-              marginTop: i === 0 ? 44 : 0,
-              opacity: 0,
-              transform: "translateY(20px)",
-              transition: "opacity 950ms cubic-bezier(0.23, 1, 0.32, 1), transform 950ms cubic-bezier(0.23, 1, 0.32, 1)",
-            }}
-          >
-            <div className={rev ? "cl-feat-text-rev" : ""} style={{ order: rev ? 2 : 1 }}>
-              <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 19, color: MUTED, margin: "0 0 12px" }}>{num}</p>
-              <h3 style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 30, lineHeight: 1.12, letterSpacing: "-0.01em", margin: 0, color: INK }}>{title}</h3>
-              <p style={{ fontSize: 16, color: BODY, lineHeight: 1.65, margin: "16px 0 0", maxWidth: 420 }}>{body}</p>
-            </div>
-            <div style={{ order: rev ? 1 : 2, aspectRatio: "5 / 4", borderRadius: 14, overflow: "hidden", border: `1px solid ${LINE2}` }}>
-              <img src={img} alt={alt} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}/>
-            </div>
-          </div>
-        ))}
-      </section>
-
-      {/* ── RHYTHM ── */}
-      <section id="rhythm" style={{ background: CREAM3, padding: "92px 0 96px" }}>
-        <div className="cl-rhythm-inner" style={{ maxWidth: 1100, margin: "0 auto", padding: "0 56px" }}>
-          <p style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: PLUM, margin: 0 }}>
-            A week with Central
+            &ldquo;To equip the saints for the work of ministry.&rdquo;
+          </h1>
+          <p style={{ fontSize: 18, color: BODY, lineHeight: 1.7, maxWidth: 620, margin: "26px auto 0" }}>
+            That&rsquo;s the whole job description. Central is the church OS for college ministry — messaging, planning, and roles built so that nothing administrative gets between your people and the work God gave them.
           </p>
-          <h2 className="cl-rhythm-h" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 44, lineHeight: 1.02, letterSpacing: "-0.02em", margin: "16px 0 40px", color: INK, maxWidth: 720 }}>
-            Built for the rhythms you repeat every week.
-          </h2>
-          <div style={{ borderTop: `1px solid ${LINE}` }}>
-            {RHYTHM.map(({ day, what, who, hl }) => (
-              <div key={day} className="cl-rli" style={{
-                display: "grid", gridTemplateColumns: "220px 1fr auto",
-                alignItems: "baseline", gap: 28, padding: "26px 18px",
-                borderBottom: `1px solid ${LINE}`,
-                background: hl ? "rgba(62,21,64,0.04)" : "transparent",
-              }}>
-                <span style={{ fontFamily: MONO, fontSize: 12, letterSpacing: "1.2px", textTransform: "uppercase", color: MUTED }}>{day}</span>
-                <span className="cl-rli-what" style={{ fontFamily: SERIF, fontSize: 28, color: INK, letterSpacing: "-0.01em" }}>{what}</span>
-                <span style={{ fontSize: 13.5, color: MUTED }}>{who}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── MOMENTS GALLERY ── */}
-      <section style={{ padding: "92px 0 96px" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 56px" }}>
-          <p style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: PLUM, margin: 0 }}>
-            Moments
-          </p>
-          <h2 className="cl-gal-h" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 44, lineHeight: 1.02, letterSpacing: "-0.02em", margin: "16px 0 0", color: INK, maxWidth: 720 }}>
-            A year in the life of one ministry.
-          </h2>
-        </div>
-
-        {/* Full-width carousel */}
-        <div ref={galStageRef} style={{ position: "relative", marginTop: 36, overflow: "hidden" }}>
-          <div
-            ref={galTrackRef}
-            style={{
-              display: "flex",
-              gap: 24,
-              willChange: "transform",
-              transition: "transform 1100ms cubic-bezier(0.77, 0, 0.175, 1)",
-              transform: galTransform,
-            }}
-          >
-            {GALLERY.map(({ src, cap }, k) => (
-              <div
-                key={src}
-                style={{
-                  flexShrink: 0,
-                  width: galCardWidth > 0 ? galCardWidth : "60%",
-                  borderRadius: 12,
-                  overflow: "hidden",
-                  border: `1px solid ${LINE2}`,
-                  aspectRatio: "16 / 9",
-                  opacity: k === galIdx ? 1 : 0.45,
-                  transform: k === galIdx ? "scale(1)" : "scale(0.96)",
-                  transition: "opacity 1100ms cubic-bezier(0.77, 0, 0.175, 1), transform 1100ms cubic-bezier(0.77, 0, 0.175, 1)",
-                  background: CREAM,
-                }}
-              >
-                <img src={src} alt={cap} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}/>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Gallery footer: caption + dots + arrows */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "26px 56px 0", maxWidth: 1100, margin: "0 auto" }}>
-          <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 16, color: BODY, margin: 0 }}>
-            {GALLERY[galIdx].cap}
-          </p>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            {/* Dots */}
-            <div style={{ display: "flex", gap: 7 }}>
-              {GALLERY.map((_, k) => (
-                <span key={k} style={{
-                  display: "block",
-                  width: k === galIdx ? 18 : 6,
-                  height: 6,
-                  borderRadius: 999,
-                  background: k === galIdx ? PLUM : "#C4C0B0",
-                  transition: "background 240ms, width 240ms",
-                }}/>
-              ))}
-            </div>
-            {/* Arrows */}
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={() => goGal(galIdx - 1)}
-                aria-label="Previous"
-                className="cl-gal-btn"
-                style={{ width: 36, height: 36, borderRadius: 999, border: `1px solid ${LINE2}`, background: CREAM, color: INK, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}
-              >
-                ←
-              </button>
-              <button
-                onClick={() => goGal(galIdx + 1)}
-                aria-label="Next"
-                className="cl-gal-btn"
-                style={{ width: 36, height: 36, borderRadius: 999, border: `1px solid ${LINE2}`, background: CREAM, color: INK, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}
-              >
-                →
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── CTA ── */}
-      <section className="cl-cta" style={{ padding: "40px 0 96px", textAlign: "center", borderTop: `1px solid ${LINE}`, marginTop: 8 }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "80px 56px 0" }}>
-          <p style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: MUTED, margin: 0 }}>
-            Begin
-          </p>
-          <h3 className="cl-cta-h" style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 60, lineHeight: 1.0, letterSpacing: "-0.025em", margin: "18px 0 0", color: INK }}>
-            Give your ministry<br/>one place to gather.
-          </h3>
-          <p style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 20, color: BODY, margin: "24px auto 0", maxWidth: 520, lineHeight: 1.5 }}>
-            Register a ministry, invite your students, and keep the week moving with a little less friction.
-          </p>
-          <div style={{ marginTop: 40, display: "flex", gap: 20, justifyContent: "center", alignItems: "center", flexWrap: "wrap" }}>
-            <button onClick={() => router.push("/register-ministry")} className="cl-btn-primary" style={{ height: 54, padding: "0 30px", borderRadius: 999, fontSize: 15, fontWeight: 500, background: PLUM2, color: CREAM, border: "none", cursor: "pointer", fontFamily: SANS, display: "inline-flex", alignItems: "center" }}>
+          <div style={{ display: "flex", justifyContent: "center", gap: 18, marginTop: 34, flexWrap: "wrap" }}>
+            <button onClick={() => router.push("/register-ministry")} className="cl-btn-primary" style={btnPrimary}>
               Register your ministry
             </button>
-            <a href="/ministries" className="cl-ghost" style={{ fontSize: 15, fontWeight: 500, color: PLUM2, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 7 }}>
-              Find an existing ministry <span>→</span>
+            <a href="#why" className="cl-ghost" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: INK, fontSize: 15, fontWeight: 500, padding: "15px 10px", textDecoration: "none" }}>
+              Why we build <span>↓</span>
             </a>
           </div>
         </div>
       </section>
 
-      {/* ── FOOTER ── */}
-      <footer style={{ padding: "44px 0", borderTop: `1px solid ${LINE}` }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 56px", display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 11, fontFamily: SERIF, fontSize: 20, fontWeight: 600, color: INK }}>
+      {/* ── §4 WHY ── */}
+      <section id="why" className="cl-why" style={{ padding: "100px 0" }}>
+        <div className="cl-wrap" style={{ maxWidth: 760 }}>
+          <p style={{ ...ey(), margin: 0 }}>Why we build</p>
+          <p style={{
+            fontFamily: SERIF, fontSize: "clamp(24px, 2.6vw, 32px)", fontWeight: 500,
+            letterSpacing: "-0.01em", lineHeight: 1.4, color: INK, margin: "22px 0 0",
+          }}>
+            None of this is the point. The roster isn&rsquo;t the point. The RSVP count isn&rsquo;t the point. They&rsquo;re scaffolding — so that the freshman who walked in three Sundays ago gets known, gets fed on Friday, and gets kept. We build software so the admin never becomes the ministry.
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 28 }}>
+            <span style={{ width: 34, height: 1, background: PLUM }}/>
+            <span style={ey({ plum: true })}>The Central team</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── §5 THE WEEK AS LITURGY ── */}
+      <section id="week" className="cl-week" style={{ borderTop: `1px solid ${LINE}`, background: CREAMP, padding: "96px 0" }}>
+        <div className="cl-wrap">
+          <div style={{ textAlign: "center", maxWidth: 640, margin: "0 auto 72px" }}>
+            <p style={{ ...ey(), margin: 0 }}>The week, kept</p>
+            <h2 style={{
+              fontFamily: SERIF, fontSize: "clamp(34px, 4vw, 46px)", fontWeight: 600,
+              letterSpacing: "-0.02em", lineHeight: 1.08, margin: "10px 0 0", color: INK,
+            }}>
+              Ministry has a liturgy. Central carries it.
+            </h2>
+          </div>
+
+          {/* 5a. Sunday · Church chats — text L / mock R */}
+          <div className="cl-week-row" style={{ padding: "48px 0" }}>
+            <div className="cl-week-text">
+              <p style={{ ...ey({ plum: true }), margin: 0 }}>Sunday · Church chats</p>
+              <h3 className="cl-day-head" style={{ fontFamily: SERIF, fontSize: "clamp(28px, 3vw, 36px)", fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.12, margin: "6px 0 0", color: INK }}>
+                Every room they need. Not one more.
+              </h3>
+              <p style={{ fontSize: 16, color: BODY, lineHeight: 1.7, margin: "14px 0 0" }}>
+                A student&rsquo;s chats are grouped by relationship — the whole church, their groups, their teams. Rooms appear when a leader adds you; there&rsquo;s nothing to join, mute, or browse. Team rooms stay locked to the people serving in them.
+              </p>
+            </div>
+            <div className="cl-week-mock">
+              <div style={{ ...mockStyle, maxWidth: 340, justifySelf: "center", width: "100%", margin: "0 auto" }}>
+                <div style={{ padding: "14px 12px 16px" }}>
+                  <SectionLabel text="General" pad="0 12px 6px"/>
+                  <ChatRow initial="C" name="Class of 2027" preview="No messages yet" previewItalic selected/>
+                  <ChatRow initial="C" name="Central Chat" preview="No messages yet" previewItalic/>
+                  <SectionLabel text="Groups" pad="12px 12px 6px"/>
+                  <ChatRow initial="F" name="Fall Retreat 2026" preview="Alex Kang: Deposit deadline i…" meta/>
+                  <ChatRow initial="S" name="Sister Pairing '26" preview="Alex Kang: Coffee pairs for O…" meta/>
+                  <ChatRow initial="J" name="Jun's Cell" preview="Alex Kang: See everyone Frid…" meta/>
+                  <SectionLabel text="Teams" pad="12px 12px 6px"/>
+                  <ChatRow initial="W" name="Welcome Team" preview="Alex Kang: Two new folks visi…" locked meta/>
+                  <ChatRow initial="D" name="DGL" preview="Alex Kang: Rotation sheet up…" locked meta/>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 5b. Monday · Announcements — mock L / text R */}
+          <div className="cl-week-row" style={{ padding: "48px 0", borderTop: `1px solid ${LINE2}` }}>
+            <div className="cl-week-mock">
+              <div style={mockStyle}>
+                <div style={{ padding: "18px 20px 6px" }}>
+                  <div style={ey({ size: 10 })}>3 total · 1 unread</div>
+                  <div style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 600, marginTop: 4, paddingBottom: 12, borderBottom: `1px solid ${LINE}` }}>Announcements</div>
+                </div>
+                <div style={{ padding: "14px 20px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
+                  {/* pinned */}
+                  <div style={{ background: IVORY, borderRadius: 12, padding: "16px 18px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: 999, background: PLUM }}/>
+                      <span style={ey({ size: 10 })}>Pinned</span>
+                    </div>
+                    <div style={{ fontFamily: SERIF, fontSize: 19, fontWeight: 600, marginTop: 8 }}>Welcome Week schedule</div>
+                    <div style={{ fontSize: 13, color: BODY, marginTop: 3 }}>Everything from move-in to Sunday lunch — share with your freshmen.</div>
+                  </div>
+                  {/* event */}
+                  <div style={{ border: `1px solid ${LINE2}`, borderRadius: 12, padding: "14px 18px" }}>
+                    <div style={{ display: "flex", alignItems: "center" }}>
+                      <span style={ey({ size: 10 })}>Fri, Aug 21</span>
+                      <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", background: IVORY, border: `1px solid ${LINE2}`, borderRadius: 999, padding: "3px 9px", color: PLUM }}>Event</span>
+                    </div>
+                    <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 400, marginTop: 7 }}>Fall Retreat 2026 — registration open</div>
+                    <div style={{ display: "flex", alignItems: "center", marginTop: 10, paddingTop: 10, borderTop: `1px solid ${LINE3}` }}>
+                      <span style={{ fontSize: 12, color: MUTED }}>61 going · 148 views</span>
+                      <span style={{ marginLeft: "auto", background: PLUM, color: COD, borderRadius: 999, padding: "6px 16px", fontSize: 12, fontWeight: 600 }}>RSVP</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="cl-week-text">
+              <p style={{ ...ey({ plum: true }), margin: 0 }}>Monday · Announcements</p>
+              <h3 className="cl-day-head" style={{ fontFamily: SERIF, fontSize: "clamp(28px, 3vw, 36px)", fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.12, margin: "6px 0 0", color: INK }}>
+                Posted once. Actually seen.
+              </h3>
+              <p style={{ fontSize: 16, color: BODY, lineHeight: 1.7, margin: "14px 0 0" }}>
+                Announcements are a page, not a scroll — pinned posts stay pinned, events carry their own RSVP, and leaders can see who&rsquo;s coming and who hasn&rsquo;t looked. No re-posting across three apps.
+              </p>
+            </div>
+          </div>
+
+          {/* 5c. Wednesday · Teams — text L / mock R */}
+          <div className="cl-week-row" style={{ padding: "48px 0", borderTop: `1px solid ${LINE2}` }}>
+            <div className="cl-week-text">
+              <p style={{ ...ey({ plum: true }), margin: 0 }}>Wednesday · Teams</p>
+              <h3 className="cl-day-head" style={{ fontFamily: SERIF, fontSize: "clamp(28px, 3vw, 36px)", fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.12, margin: "6px 0 0", color: INK }}>
+                Give a team exactly the keys it needs.
+              </h3>
+              <p style={{ fontSize: 16, color: BODY, lineHeight: 1.7, margin: "14px 0 0" }}>
+                Every team is a workspace with its own permissions — the finance team sees finances, the welcome team tracks visitors, nobody carries keys they don&rsquo;t need. And every team is <b style={{ color: INK, fontWeight: 600 }}>one click from its own group chat.</b>
+              </p>
+            </div>
+            <div className="cl-week-mock">
+              <div style={mockStyle}>
+                <div style={{ padding: "16px 20px 8px" }}>
+                  <div style={ey({ size: 10 })}>Central / Workspace / Finance</div>
+                  <div style={{ display: "flex", alignItems: "center", marginTop: 6, paddingBottom: 10, borderBottom: `1px solid ${LINE}` }}>
+                    <span style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 600 }}>Settings</span>
+                    <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7, border: `1px solid ${LINE2}`, borderRadius: 10, padding: "7px 14px", fontSize: 12, color: INK, background: CREAM, fontWeight: 500 }}>
+                      <MessageCircle size={14}/> Group chat
+                    </span>
+                  </div>
+                </div>
+                <div style={{ padding: "6px 20px 18px" }}>
+                  {([
+                    ["Generate Bible studies", false, true],
+                    ["Track attendance", false, true],
+                    ["View finances", true, true],
+                    ["Manage schedule", false, false],
+                  ] as const).map(([label, on, border]) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", fontSize: 13, ...(border ? { borderBottom: `1px solid ${LINE3}` } : {}) }}>
+                      <span>{label}</span>
+                      <Toggle on={on}/>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, background: CREAM2, border: `1px solid ${LINE2}`, borderRadius: 10, padding: "10px 14px" }}>
+                    <Avatar label="BJ" size={26} font={10}/>
+                    <span style={{ fontSize: 13 }}>Brian Jeong</span>
+                    <span style={{ marginLeft: "auto", fontSize: 12, color: MUTED }}>President</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 5d. Friday · Roles & access — mock L / text R */}
+          <div className="cl-week-row" style={{ padding: "48px 0 8px", borderTop: `1px solid ${LINE2}` }}>
+            <div className="cl-week-mock">
+              <div style={mockStyle}>
+                <div style={{ padding: "16px 20px 10px" }}>
+                  <div style={ey({ size: 10 })}>Ministry admin</div>
+                  <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 600, marginTop: 4, paddingBottom: 10, borderBottom: `1px solid ${LINE}` }}>Members and roles</div>
+                </div>
+                <div style={{ padding: "4px 20px 18px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 12 }}>
+                    <div style={{ border: `1px solid ${PLUM}`, background: PLUM_TINT, borderRadius: 12, padding: "9px 12px" }}>
+                      <div style={ey({ size: 10 })}>Members</div>
+                      <div style={{ fontFamily: SERIF, fontSize: 19, fontWeight: 400 }}>124</div>
+                    </div>
+                    <div style={{ border: `1px solid ${LINE2}`, borderRadius: 12, padding: "9px 12px" }}>
+                      <div style={ey({ size: 10 })}>Leaders</div>
+                      <div style={{ fontFamily: SERIF, fontSize: 19, fontWeight: 400 }}>14</div>
+                    </div>
+                    <div style={{ border: `1px solid ${LINE2}`, borderRadius: 12, padding: "9px 12px" }}>
+                      <div style={ey({ size: 10 })}>Admins</div>
+                      <div style={{ fontFamily: SERIF, fontSize: 19, fontWeight: 400 }}>2</div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `1px solid ${LINE3}` }}>
+                    <Avatar label="AK" size={28} font={10}/>
+                    <span style={{ fontSize: 13 }}>Alex Kang</span>
+                    <RoleBadge kind="leader">Leader</RoleBadge>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `1px solid ${LINE3}` }}>
+                    <Avatar label="BJ" size={28} font={10}/>
+                    <span style={{ fontSize: 13 }}>Brian Jeong</span>
+                    <RoleBadge kind="admin">Admin</RoleBadge>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0" }}>
+                    <Avatar label="CS" size={28} font={10}/>
+                    <span style={{ fontSize: 13 }}>Caleb Song</span>
+                    <RoleBadge kind="member">Member</RoleBadge>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="cl-week-text">
+              <p style={{ ...ey({ plum: true }), margin: 0 }}>Friday · Roles &amp; access</p>
+              <h3 className="cl-day-head" style={{ fontFamily: SERIF, fontSize: "clamp(28px, 3vw, 36px)", fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.12, margin: "6px 0 0", color: INK }}>
+                Every role in its place.
+              </h3>
+              <p style={{ fontSize: 16, color: BODY, lineHeight: 1.7, margin: "14px 0 0" }}>
+                Members, leaders, admins — one roster, one place to grant a role, and everything else follows: which chats appear, which teams unlock, who can announce. Students see a simple week; leaders see their people; staff see the whole flock.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── §6 UP NEXT ── */}
+      <section className="cl-upnext-sec" style={{ padding: "96px 0" }}>
+        <div className="cl-wrap">
+          <div style={{ textAlign: "center", marginBottom: 36 }}>
+            <p style={{ ...ey(), margin: 0 }}>And on the home screen</p>
+            <h2 style={{ fontFamily: SERIF, fontSize: "clamp(28px, 3.2vw, 38px)", fontWeight: 600, letterSpacing: "-0.02em", margin: "10px 0 0", color: INK }}>
+              The week ahead greets everyone who opens the app.
+            </h2>
+          </div>
+          <div className="cl-upnext-card" style={{ background: PLUM, borderRadius: 18, overflow: "hidden", display: "grid", gridTemplateColumns: "1.6fr 1fr", position: "relative" }}>
+            <div style={{ position: "absolute", top: -70, right: -40, width: 260, height: 260, borderRadius: 999, border: `1px solid ${cod(18)}` }}/>
+            <div className="cl-upnext-edit" style={{ padding: "72px 56px", borderRight: `1px solid ${cod(14)}` }}>
+              <div style={ey({ color: cod(60) })}>Up next</div>
+              <div style={{ fontFamily: SERIF, fontSize: "clamp(30px, 3.4vw, 42px)", fontWeight: 600, letterSpacing: "-0.02em", color: COD, marginTop: 10 }}>Welcome Week</div>
+            </div>
+            <div className="cl-upnext-date" style={{ padding: "72px 56px" }}>
+              <div style={ey({ color: cod(60) })}>Starts</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: COD, marginTop: 10 }}>Sunday</div>
+              <div style={{ fontFamily: SERIF, fontSize: "clamp(28px, 3vw, 38px)", fontWeight: 600, color: COD, marginTop: 2 }}>Aug 23</div>
+              <div style={{ fontSize: 13, color: cod(60), marginTop: 6 }}>10:00 AM</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── §7 QUOTE BEAT ── */}
+      <section className="cl-quote" style={{ borderTop: `1px solid ${LINE}`, padding: "100px 0" }}>
+        <div className="cl-wrap" style={{ maxWidth: 760 }}>
+          <p style={{ ...ey(), margin: 0 }}>What we&rsquo;re building toward</p>
+          <p style={{
+            fontFamily: SERIF, fontSize: "clamp(22px, 2.4vw, 29px)", fontWeight: 500,
+            lineHeight: 1.45, letterSpacing: "-0.01em", color: INK, margin: "18px 0 0",
+          }}>
+            We&rsquo;re building Central so no leader spends Saturday night chasing sign-ups across four apps — and so the time that frees up gets spent praying over the names that matter: the ones we haven&rsquo;t seen in a while. That&rsquo;s the trade we&rsquo;re after.
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 24 }}>
+            <span style={{ width: 34, height: 1, background: PLUM }}/>
+            <span style={{ fontSize: 14, color: BODY }}>The Central team</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── §8 SEND-OFF ── */}
+      <section className="cl-sendoff" style={{ borderTop: `1px solid ${LINE}`, background: CREAM3, padding: "120px 0", textAlign: "center" }}>
+        <div className="cl-wrap">
+          <p style={{ ...ey({ plum: true }), margin: 0 }}>Sunday is coming</p>
+          <h2 style={{
+            fontFamily: SERIF, fontSize: "clamp(38px, 4.6vw, 54px)", fontWeight: 600,
+            letterSpacing: "-0.02em", lineHeight: 1.08, maxWidth: 720, margin: "16px auto 0", color: INK,
+          }}>
+            Set the tools in order. Then go do the ministry.
+          </h2>
+          <p style={{ fontSize: 18, color: BODY, lineHeight: 1.7, maxWidth: 500, margin: "18px auto 0" }}>
+            Register your ministry, invite your students, and let the scaffolding disappear behind the work.
+          </p>
+          <div style={{ display: "flex", justifyContent: "center", gap: 18, marginTop: 32, flexWrap: "wrap" }}>
+            <button onClick={() => router.push("/register-ministry")} className="cl-btn-primary" style={btnPrimary}>
+              Register your ministry
+            </button>
+            <a href="/ministries" className="cl-ghost" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: INK, fontSize: 15, fontWeight: 500, padding: "15px 10px", textDecoration: "none" }}>
+              Find an existing ministry <span>→</span>
+            </a>
+          </div>
+          <p style={{ fontSize: 13, color: FAINT, fontStyle: "italic", marginTop: 44 }}>Soli Deo gloria.</p>
+        </div>
+      </section>
+
+      {/* ── §9 FOOTER ── */}
+      <footer style={{ borderTop: `1px solid ${LINE}` }}>
+        <div className="cl-footer-inner cl-wrap" style={{ padding: "32px 48px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, fontFamily: SERIF, fontSize: 18, fontWeight: 600, color: INK }}>
             <RingCrossLogo size={22} color={PLUM2}/>
             Central
           </div>
-          <div style={{ fontSize: 13, color: MUTED }}>
-            <em style={{ fontFamily: SERIF, fontStyle: "italic", color: INK }}>Built for the rhythms you repeat every week.</em>
-            {" "}·{" "}© Central
-          </div>
+          <span style={{ fontSize: 13, color: MUTED, fontStyle: "italic" }}>
+            Equipping the saints, administratively. · © Central
+          </span>
         </div>
       </footer>
 
       <style>{`
-        @keyframes cl-kb-zoom {
-          from { transform: scale(1.0); }
-          to   { transform: scale(1.04); }
-        }
+        .cl-wrap { max-width: 1080px; margin: 0 auto; padding: 0 48px; }
 
-        .cl-btn-primary { transition: transform 140ms ease, opacity 140ms ease; }
-        .cl-btn-primary:hover { transform: scale(1.03); opacity: 0.9; }
+        .cl-week-row { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+        .cl-upnext-card { }
+
+        .cl-btn-primary { transition: transform 140ms ease, opacity 140ms ease, background 140ms ease; }
+        .cl-btn-primary:hover { background: ${PLUM} !important; opacity: 0.94; }
         .cl-btn-primary:active { transform: scale(0.97); }
         .cl-ghost { transition: opacity 140ms ease; }
         .cl-ghost:hover { opacity: 0.65; }
-        .cl-btn-pill { transition: transform 140ms ease, box-shadow 140ms ease; }
-        .cl-btn-pill:hover { transform: scale(1.03); box-shadow: 0 4px 14px rgba(45,15,46,0.25); }
-        .cl-btn-pill:active { transform: scale(0.97); }
-        .cl-btn-outline { transition: background 140ms ease, border-color 140ms ease; }
-        .cl-btn-outline:hover { border-color: ${PLUM} !important; }
         .cl-brand-link { transition: opacity 140ms ease; }
         .cl-brand-link:hover { opacity: 0.7; }
         .cl-nav-link { transition: color 140ms ease; }
@@ -580,53 +601,36 @@ export default function LandingPage() {
         .cl-signin:hover { opacity: 0.6; }
         .cl-nav-text-btn { transition: opacity 140ms ease; }
         .cl-nav-text-btn:hover { opacity: 0.6; }
-        .cl-gal-btn { transition: border-color 140ms ease; }
-        .cl-gal-btn:hover { border-color: ${PLUM} !important; }
 
         @media (prefers-reduced-motion: reduce) {
-          .cl-hero-stage img { animation: none !important; transform: none !important; }
-          .cl-hero-stage > div { transition: none !important; }
+          .cl-btn-primary, .cl-ghost, .cl-mobile-drawer, .cl-nav { transition: none !important; }
         }
 
         /* ── Responsive ── */
         @media (max-width: 960px) {
+          .cl-wrap { padding: 0 24px !important; }
+
           .cl-nav-links { display: none !important; }
           .cl-desktop-only { display: none !important; }
           .cl-hamburger { display: flex !important; }
           .cl-mobile-drawer { display: flex !important; }
 
-          .cl-hero-wrap { padding: 64px 24px 48px !important; }
-          .cl-hero-grid { grid-template-columns: 1fr !important; gap: 36px !important; }
-          .cl-hero-title { font-size: 40px !important; }
-          .cl-hero-sub { font-size: 16px !important; max-width: 100% !important; }
-          .cl-hero-stage { display: none !important; }
+          .cl-hero { padding: 72px 0 64px !important; }
+          .cl-why { padding: 64px 0 !important; }
+          .cl-week { padding: 64px 0 !important; }
+          .cl-upnext-sec { padding: 64px 0 !important; }
+          .cl-quote { padding: 64px 0 !important; }
+          .cl-sendoff { padding: 80px 0 !important; }
 
-          .cl-features { padding: 64px 24px 40px !important; border-top-width: 1px; }
-          .cl-feat-h { font-size: 32px !important; }
-          .cl-feat-row { grid-template-columns: 1fr !important; gap: 28px !important; }
-          .cl-feat-row > div:first-child { order: 1 !important; }
-          .cl-feat-row > div:last-child { order: 2 !important; }
-          .cl-feat-row-rev > div:first-child { order: 1 !important; }
-          .cl-feat-row-rev > div:last-child { order: 2 !important; }
+          .cl-week-row { grid-template-columns: 1fr !important; gap: 28px !important; padding: 40px 0 !important; }
+          .cl-week-text { order: 1 !important; }
+          .cl-week-mock { order: 2 !important; }
 
-          .cl-rhythm-inner { padding: 0 24px !important; }
-          .cl-rhythm-h { font-size: 28px !important; }
-          .cl-rli { grid-template-columns: 1fr auto !important; gap: 8px !important; }
-          .cl-rli > span:first-child { grid-column: 1 / -1 !important; }
-          .cl-rli-what { font-size: 22px !important; }
+          .cl-upnext-card { grid-template-columns: 1fr !important; }
+          .cl-upnext-edit { border-right: none !important; padding: 40px 28px !important; }
+          .cl-upnext-date { border-top: 1px solid ${cod(14)} !important; padding: 40px 28px !important; }
 
-          .cl-gal-h { font-size: 32px !important; }
-
-          .cl-cta { padding: 32px 0 72px !important; }
-          .cl-cta-h { font-size: 40px !important; }
-
-          footer > div { padding: 0 24px !important; flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
-        }
-
-        @media (max-width: 560px) {
-          .cl-hero-title { font-size: 32px !important; }
-          .cl-cta-h { font-size: 32px !important; }
-          .cl-feat-h { font-size: 26px !important; }
+          .cl-footer-inner { padding: 32px 24px !important; flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
         }
       `}</style>
     </main>
