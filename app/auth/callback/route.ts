@@ -6,9 +6,10 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get("code")
   const intent = searchParams.get("intent")
+  const flow = searchParams.get("flow")
   const base = origin
 
-  console.log("[auth/callback] invoked", { code: !!code, intent, url: request.url })
+  console.log("[auth/callback] invoked", { code: !!code, intent, flow, url: request.url })
 
   if (!code) {
     console.error("[auth/callback] no code in URL")
@@ -31,10 +32,25 @@ export async function GET(request: NextRequest) {
 
     console.log("[auth/callback] user authenticated:", data.user.email)
 
+    const admin = createAdminClient()
+
+    // Google "Sign in" must never CREATE an account. signInWithOAuth mints a
+    // brand-new Supabase user for an unknown Google identity; the /login entry
+    // tags itself flow=signin, so if we just created this user (< 60s old) we
+    // tear it down and bounce back with a "no account" error. Only flow=signin
+    // ever deletes — signup + email-confirmation links (flow=signup) never hit this.
+    if (flow === "signin") {
+      const isBrandNew = new Date(data.user.created_at).getTime() > Date.now() - 60_000
+      if (isBrandNew) {
+        console.warn("[auth/callback] flow=signin for brand-new user → deleting & rejecting:", data.user.email)
+        await admin.auth.admin.deleteUser(data.user.id)
+        await supabase.auth.signOut()
+        return NextResponse.redirect(new URL("/login?error=no-account", base))
+      }
+    }
+
     if (intent === "register") return NextResponse.redirect(new URL("/onboarding", base))
     if (intent === "join") return NextResponse.redirect(new URL("/join", base))
-
-    const admin = createAdminClient()
 
     // Only ACTIVE ministries count toward the picker — a pending registration
     // application is in user_ministries but isn't openable (mirrors getUserMinistries).

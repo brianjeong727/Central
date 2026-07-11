@@ -2,10 +2,10 @@
 
 import { Suspense, useState } from "react"
 import Link from "next/link"
+import { AlertCircle } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { Spinner } from "@/app/home/components/shared"
-import { signUpWithAutoConfirm } from "@/app/actions/auth"
 import { SplitShell, GoogleButton, OrDivider, EyeButton } from "@/app/(auth)/shared"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
@@ -14,7 +14,7 @@ const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
 const serif: React.CSSProperties = { fontFamily: SERIF, fontWeight: 400, color: "var(--ink)", margin: 0 }
 
-type View = "role-choice" | "admin" | "member"
+type View = "role-choice" | "admin" | "member" | "check-email"
 
 // ─── tiny icon helper ──────────────────────────────────────────
 function Icon({ d, size = 16, stroke = 1.8, style }: {
@@ -149,7 +149,7 @@ function PathRow({ icon, iconBg, iconFg, title, body, onClick }: {
 function ErrorBanner({ msg }: { msg: string }) {
   return (
     <div style={{ borderRadius: 10, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 18%, transparent)", padding: "10px 14px", fontSize: 13, color: "var(--danger)", fontWeight: 500, display: "flex", gap: 8 }} role="alert">
-      <span style={{ flexShrink: 0 }}>⚠</span> {msg}
+      <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} /> {msg}
     </div>
   )
 }
@@ -179,24 +179,41 @@ function SignupContent() {
   const [memberError,      setMemberError]      = useState<string|null>(null)
   const [memberLoading,    setMemberLoading]    = useState(false)
 
+  // check-email state — which email was used, its confirmation redirect, and
+  // which form to return to via "Go back". Field state is preserved on return.
+  const [pendingEmail,    setPendingEmail]    = useState("")
+  const [pendingRedirect, setPendingRedirect] = useState("")
+  const [pendingView,     setPendingView]     = useState<"admin"|"member">("admin")
+  const [resendLoading,   setResendLoading]   = useState(false)
+  const [resendStatus,    setResendStatus]    = useState<{ ok: boolean; msg: string }|null>(null)
+
+  const rateLimitCopy = (msg: string) =>
+    msg.toLowerCase().includes("rate limit")
+      ? "Too many attempts with this email. Please wait a few minutes or use a different address."
+      : msg
+
   async function handleAdminSignup(e: React.FormEvent) {
     e.preventDefault()
     if (!founderRole) return
     setAdminLoading(true); setAdminError(null)
-    const { error: signUpError } = await signUpWithAutoConfirm({ email: adminEmail, password: adminPassword, metadata: { name: adminName, role: founderRole } })
+    const supabase = createClient()
+    const redirect = siteOrigin() + "/auth/callback?intent=register&flow=signup"
+    const { error: signUpError } = await supabase.auth.signUp({
+      email: adminEmail,
+      password: adminPassword,
+      options: { data: { name: adminName, role: founderRole }, emailRedirectTo: redirect },
+    })
     if (signUpError) {
-      setAdminError(signUpError.toLowerCase().includes("rate limit") ? "Too many attempts with this email. Please wait a few minutes or use a different address." : signUpError)
+      setAdminError(rateLimitCopy(signUpError.message))
       setAdminLoading(false); return
     }
-    const supabase = createClient()
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email: adminEmail, password: adminPassword })
-    if (signInError) { setAdminError(signInError.message); setAdminLoading(false); return }
-    window.location.replace("/onboarding")
+    setPendingEmail(adminEmail); setPendingRedirect(redirect); setPendingView("admin")
+    setResendStatus(null); setAdminLoading(false); setView("check-email")
   }
 
   async function handleAdminGoogle() {
     const supabase = createClient()
-    await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback?intent=register" } })
+    await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback?intent=register&flow=signup" } })
   }
 
   const currentYear = new Date().getFullYear()
@@ -207,22 +224,38 @@ function SignupContent() {
     e.preventDefault()
     if (!gradYearValid) { setMemberError("Please enter a valid graduation year."); return }
     setMemberLoading(true); setMemberError(null)
-    const { error: signUpError } = await signUpWithAutoConfirm({ email: memberEmail, password: memberPassword, metadata: { name: memberName, graduation_year: String(gradYearNum), gender } })
+    const supabase = createClient()
+    const redirect = siteOrigin() + "/auth/callback?flow=signup"
+    const { error: signUpError } = await supabase.auth.signUp({
+      email: memberEmail,
+      password: memberPassword,
+      options: { data: { name: memberName, graduation_year: String(gradYearNum), gender }, emailRedirectTo: redirect },
+    })
     if (signUpError) {
-      setMemberError(signUpError.toLowerCase().includes("rate limit") ? "Too many attempts with this email. Please wait a few minutes or use a different address." : signUpError)
+      setMemberError(rateLimitCopy(signUpError.message))
       setMemberLoading(false); return
     }
-    const supabase = createClient()
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email: memberEmail, password: memberPassword })
-    if (signInError) { setMemberError(signInError.message); setMemberLoading(false); return }
-    // Land on the polished discovery page (browse + invite code + register), not
-    // the plainer /join. Both serve no-ministry users; /ministries is the canonical UI.
-    window.location.replace("/ministries")
+    setPendingEmail(memberEmail); setPendingRedirect(redirect); setPendingView("member")
+    setResendStatus(null); setMemberLoading(false); setView("check-email")
   }
 
   async function handleMemberGoogle() {
     const supabase = createClient()
-    await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback" } })
+    await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback?flow=signup" } })
+  }
+
+  async function handleResend() {
+    setResendLoading(true); setResendStatus(null)
+    const supabase = createClient()
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: pendingEmail,
+      options: { emailRedirectTo: pendingRedirect },
+    })
+    setResendLoading(false)
+    setResendStatus(error
+      ? { ok: false, msg: rateLimitCopy(error.message) }
+      : { ok: true, msg: "Confirmation email sent again." })
   }
 
   const ROLES = [
@@ -238,6 +271,48 @@ function SignupContent() {
         Sign in
       </Link>
     </span>
+  )
+
+  // ── CHECK EMAIL (confirmation sent) ────────────────────────────
+  if (view === "check-email") return (
+    <SplitShell topBar={<>{alreadyHaveAccount}</>}>
+      <div style={mono}>CHECK YOUR INBOX · CENTRAL</div>
+      <h1 style={{ ...serif, fontWeight: 600, fontSize: 44, lineHeight: 1.03, letterSpacing: "-0.02em", margin: "14px 0 0" }}>
+        Check your email.
+      </h1>
+      <p style={{ fontSize: 16, color: "var(--body)", lineHeight: 1.6, margin: "16px 0 0" }}>
+        We sent a confirmation link to{" "}
+        <span style={{ color: "var(--ink)", fontWeight: 500 }}>{pendingEmail}</span>.
+        Open it to finish setting up your account — the link signs you in and takes you to the next step.
+      </p>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 30 }}>
+        <button type="button" onClick={handleResend} disabled={resendLoading} style={{
+          width: "100%", padding: "13px 18px", borderRadius: 12,
+          background: "var(--cream-panel)", border: "1px solid var(--line-2)", color: "var(--ink)",
+          fontSize: 15, fontWeight: 500, fontFamily: SANS, cursor: resendLoading ? "default" : "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+          opacity: resendLoading ? 0.7 : 1, transition: "background .15s",
+        }} className="hover:bg-[var(--ivory)]">
+          {resendLoading && <Spinner/>}
+          {resendLoading ? "Sending…" : "Resend email"}
+        </button>
+        {resendStatus && (
+          <div style={{ fontSize: 13, color: resendStatus.ok ? "var(--body)" : "var(--danger)" }} role="status">
+            {resendStatus.msg}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 26, paddingTop: 22, borderTop: "1px solid var(--line)", fontSize: 13, color: "var(--body)" }}>
+        Wrong address?{" "}
+        <button type="button" onClick={() => { setResendStatus(null); setView(pendingView) }}
+          style={{ color: "var(--plum-2)", fontWeight: 500, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: SANS, fontSize: 13 }}
+          className="hover:underline underline-offset-2">
+          Go back
+        </button>
+      </div>
+    </SplitShell>
   )
 
   // ── ROLE CHOICE ────────────────────────────────────────────────

@@ -19,7 +19,11 @@ function LoginContent() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPw, setShowPw] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(
+    searchParams.get("error") === "no-account"
+      ? "No Central account exists for that Google email yet — create an account first."
+      : null
+  )
   const [loading, setLoading] = useState(false)
 
   async function handleLogin(e: React.FormEvent) {
@@ -32,7 +36,7 @@ function LoginContent() {
 
     if (error) {
       if (error.message.toLowerCase().includes("email not confirmed")) {
-        setError("This account's email isn't confirmed. Please sign up again to create a new account.")
+        setError("This account's email isn't confirmed yet — check your inbox for the confirmation link.")
       } else {
         setError(error.message)
       }
@@ -67,7 +71,7 @@ function LoginContent() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: siteOrigin() + "/auth/callback" + (intent ? `?intent=${intent}` : "") },
+      options: { redirectTo: siteOrigin() + "/auth/callback?flow=signin" + (intent ? `&intent=${intent}` : "") },
     })
   }
 
