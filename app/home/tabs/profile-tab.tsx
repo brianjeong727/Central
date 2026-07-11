@@ -647,16 +647,16 @@ export function JournalSection({
     ...(showStreak ? [{ label: "Streak", value: streak }] : []),
   ]
 
-  function VerseCard() {
-    if (!homeVerse) return null
-    return (
-      <div style={{ marginTop: 32, padding: "20px 24px", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: "var(--r-card)" }}>
-        <p style={{ ...MONO_STYLE, margin: "0 0 10px" }}>Today&apos;s Verse</p>
-        <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 16, color: "var(--ink)", lineHeight: 1.75, margin: "0 0 8px" }}>&ldquo;{homeVerse.text}&rdquo;</p>
-        <p style={{ fontFamily: "var(--serif)", fontSize: 13, color: "var(--plum)", margin: 0 }}>— {homeVerse.reference}</p>
-      </div>
-    )
-  }
+  // A computed node (not a nested component) so it isn't re-created during
+  // render — avoids react-hooks/static-components. Rendered in both the mobile
+  // and desktop branches (only one is visible at a time).
+  const verseCard = homeVerse ? (
+    <div style={{ marginTop: 32, padding: "20px 24px", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: "var(--r-card)" }}>
+      <p style={{ ...MONO_STYLE, margin: "0 0 10px" }}>Today&apos;s Verse</p>
+      <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 16, color: "var(--ink)", lineHeight: 1.75, margin: "0 0 8px" }}>&ldquo;{homeVerse.text}&rdquo;</p>
+      <p style={{ fontFamily: "var(--serif)", fontSize: 13, color: "var(--plum)", margin: 0 }}>— {homeVerse.reference}</p>
+    </div>
+  ) : null
 
   return (
     <>
@@ -684,7 +684,7 @@ export function JournalSection({
         {journalTab === "devotionals" && <JournalDevotionalsTab userId={userId} ministryId={ministryId} onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />}
         {journalTab === "prayers" && <JournalPrayersTab userId={userId} ministryId={ministryId} onCountChange={n => setPrayerCount(n)} />}
         {journalTab === "verses" && <JournalVersesTab userId={userId} ministryId={ministryId} />}
-        <VerseCard />
+        {verseCard}
       </div>
 
       {/* Desktop: tab strip + single full-width column. The strip breaks out of the
@@ -697,7 +697,7 @@ export function JournalSection({
         {journalTab === "devotionals" && <JournalDevotionalsTab userId={userId} ministryId={ministryId} onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />}
         {journalTab === "prayers" && <JournalPrayersTab userId={userId} ministryId={ministryId} onCountChange={n => setPrayerCount(n)} />}
         {journalTab === "verses" && <JournalVersesTab userId={userId} ministryId={ministryId} />}
-        <VerseCard />
+        {verseCard}
       </div>
     </>
   )

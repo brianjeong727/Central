@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase"
 import { Pencil, Check, Copy, ExternalLink, Wallet } from "lucide-react"
 import { TabPageHeader, PageTitle, FormField, Input, CentralButton } from "@/components/central"
 import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
+import { isAdminRole } from "@/lib/roles"
 
 // Member-facing "Give" surface. This is the donation/Zelle info that used to live as
 // the `give` section of the Finance (giving) tab. It now stands on its own as a
@@ -12,10 +13,6 @@ import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
 // "Give" = member donation; "Finance" = back-office (reimbursements / budget / allocation).
 
 const PRESET_AMOUNTS = ["10", "25", "50", "100", "250"]
-
-function isAdminRole(role: string): boolean {
-  return ["admin", "deacon", "elder", "pastor"].includes(role.toLowerCase())
-}
 
 // Opens the Zelle app on mobile (with a graceful web fallback), or zellepay.com on desktop.
 function openZelle(onFallback: () => void) {

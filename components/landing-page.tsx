@@ -159,9 +159,15 @@ export default function LandingPage() {
   const [ministryCount, setMinistryCount] = useState<number | null>(null)
   const [menuOpen, setMenuOpen]           = useState(false)
 
-  // ── Scroll (nav border)
+  // ── Scroll (nav border). Closing the mobile menu on scroll happens HERE, in
+  // the scroll handler, rather than in a separate scrolled→setMenuOpen effect
+  // (which tripped set-state-in-effect). setMenuOpen(false) is idempotent.
   useEffect(() => {
-    function onScroll() { setScrolled(window.scrollY > 40) }
+    function onScroll() {
+      const past = window.scrollY > 40
+      setScrolled(past)
+      if (past) setMenuOpen(false)
+    }
     onScroll()
     window.addEventListener("scroll", onScroll, { passive: true })
     return () => window.removeEventListener("scroll", onScroll)
@@ -180,7 +186,6 @@ export default function LandingPage() {
     })
   }, [])
 
-  useEffect(() => { if (scrolled) setMenuOpen(false) }, [scrolled])
 
   async function handleSignOut() {
     const supabase = createClient()

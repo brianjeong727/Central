@@ -11,6 +11,7 @@ import type { ActionMenuItem } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee } from "../types"
+import { isLeaderRole } from "@/lib/roles"
 
 // A form that can be attached to this announcement (standalone or already ours).
 interface AttachableForm {
@@ -783,7 +784,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     setEditingAnnouncement(null)
   }
 
-  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
+  const isLeaderOrAdmin = isLeaderRole(userRole)
 
   const loadAnnouncements = useCallback(async (): Promise<EnrichedAnnouncement[]> => {
     let annQuery = supabase
@@ -1300,7 +1301,7 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  const isAdminOrLeader = ["admin", "leader", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
+  const isAdminOrLeader = isLeaderRole(userRole)
 
   // Persistence is owned by the parent's handleRsvpToggle (single source of truth);
   // this only triggers the optimistic toggle, which reads back via the prop.
@@ -1648,7 +1649,7 @@ export function AnnouncementDetailView({
     setRsvping(false)
   }
 
-  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
+  const isLeaderOrAdmin = isLeaderRole(userRole)
   const showAttendees = ann?.is_event && ann.rsvp_attendees.length > 0 && (isLeaderOrAdmin || ann.show_attendees)
 
   const monoStyle = EYEBROW_STYLE

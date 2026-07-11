@@ -9,6 +9,7 @@ import {
   requireTeamMemberOrAdmin,
   isAdminTier,
 } from "@/app/actions/authz"
+import { STAFF_ROLES, isStaffRole } from "@/lib/roles"
 
 // ── ensureMinistryChats ───────────────────────────────────────────────────────
 // Creates only the central church chat (e.g. "Central Chat").
@@ -55,7 +56,6 @@ export async function ensureMinistryChats(
 // Adds a user to their ministry's central chat and (if grade is set) grade chat.
 // Respects automation_settings flags.
 
-const STAFF_ROLES = ["pastor", "deacon", "elder"]
 
 export async function autoAddUserToChats(
   userId: string,
@@ -107,7 +107,7 @@ export async function autoAddUserToChats(
     namesToJoin.push(className)
   }
 
-  if (settings.auto_staff_chat === true && userRole && STAFF_ROLES.includes(userRole.toLowerCase())) {
+  if (settings.auto_staff_chat === true && isStaffRole(userRole)) {
     const staffChatName = `${ministry.name} Staff`
     const { data: existingStaff } = await admin
       .from("groups")
@@ -224,7 +224,7 @@ export async function retroactivelyApplyToggle(
     const { data: profiles } = await admin
       .from("profiles").select("id")
       .eq("ministry_id", ministryId)
-      .in("role", STAFF_ROLES)
+      .in("role", [...STAFF_ROLES])
 
     const staffChatName = `${ministry.name} Staff`
     let { data: chat } = await admin

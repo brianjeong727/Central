@@ -50,7 +50,13 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // ─── Main content ────────────────────────────────────────────────
 function MinistriesContent() {
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>("browse")
+  // Lazy-init from URL (Convention #12) rather than setting tab in a mount
+  // effect — avoids the setState-in-effect cascade and the initial flash.
+  const [tab, setTab] = useState<Tab>(() => {
+    if (typeof window === "undefined") return "browse"
+    const urlTab = new URLSearchParams(window.location.search).get("tab")
+    return urlTab === "browse" || urlTab === "code" ? urlTab : "browse"
+  })
   const [authChecked, setAuthChecked] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
@@ -102,8 +108,6 @@ function MinistriesContent() {
       }
       setAuthChecked(true)
     })
-    const urlTab = new URLSearchParams(window.location.search).get("tab") as Tab | null
-    if (urlTab && ["browse", "code"].includes(urlTab)) setTab(urlTab)
   }, [])
 
   async function copyMemberCode(id: string, code: string) {

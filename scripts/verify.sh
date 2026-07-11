@@ -35,6 +35,7 @@ cd "$ROOT" || exit 2
 
 BUILD_STATUS="skipped"
 LINT_STATUS="n/a"
+HEX_STATUS="n/a"
 SERVER_STATUS="fail"
 E2E_STATUS="n/a"
 
@@ -61,16 +62,38 @@ if [[ $SKIP_BUILD -eq 0 ]]; then
   fi
 fi
 
-# ── (c) lint (reported, non-fatal) ───────────────────────────────────────────
+# ── (c) lint (errors BLOCK; warnings reported, non-fatal) ────────────────────
 echo "▶ npm run lint"
 LINT_LOG="$(mktemp)"
 if npm run lint >"$LINT_LOG" 2>&1; then
-  LINT_STATUS="pass"
+  # eslint exits 0 when only warnings remain — surface a count but don't fail.
+  if grep -qiE '[0-9]+ warning' "$LINT_LOG"; then
+    LINT_STATUS="pass ($(grep -oiE '[0-9]+ warning' "$LINT_LOG" | tail -n1))"
+  else
+    LINT_STATUS="pass"
+  fi
 else
-  LINT_STATUS="warn"
-  echo "── lint issues (tail, non-fatal) ────────────────────"
-  tail -n 30 "$LINT_LOG"
+  LINT_STATUS="fail"
+  echo "── lint ERRORS (BLOCKING) ───────────────────────────"
+  tail -n 40 "$LINT_LOG"
   echo "─────────────────────────────────────────────────────"
+  echo "════════ VERIFY RESULT: FAIL (lint) ════════"
+  exit 1
+fi
+
+# ── (c2) hex ratchet (BLOCKING) ──────────────────────────────────────────────
+echo "▶ scripts/check-hex.sh"
+HEX_LOG="$(mktemp)"
+if bash scripts/check-hex.sh >"$HEX_LOG" 2>&1; then
+  HEX_STATUS="pass"
+  tail -n 2 "$HEX_LOG"
+else
+  HEX_STATUS="fail"
+  echo "── hex ratchet FAILED (BLOCKING) ────────────────────"
+  cat "$HEX_LOG"
+  echo "─────────────────────────────────────────────────────"
+  echo "════════ VERIFY RESULT: FAIL (hex) ════════"
+  exit 1
 fi
 
 # ── (d) restart dev server ───────────────────────────────────────────────────
@@ -128,12 +151,16 @@ echo ""
 echo "════════════ VERIFY SUMMARY ════════════"
 printf '  %-8s %s\n' "build"  "$BUILD_STATUS"
 printf '  %-8s %s\n' "lint"   "$LINT_STATUS"
+printf '  %-8s %s\n' "hex"    "$HEX_STATUS"
 printf '  %-8s %s (:%s)\n' "server" "$SERVER_STATUS" "$PORT"
 printf '  %-8s %s\n' "e2e"    "$E2E_STATUS"
 echo "════════════════════════════════════════"
 
+# build / lint / hex already hard-exit above; these are belt-and-suspenders.
 FAIL=0
 [[ "$BUILD_STATUS" == "fail" ]] && FAIL=1
+[[ "$LINT_STATUS" == "fail" ]] && FAIL=1
+[[ "$HEX_STATUS" == "fail" ]] && FAIL=1
 [[ "$SERVER_STATUS" != "pass" ]] && FAIL=1
 [[ "$E2E_STATUS" == "fail" ]] && FAIL=1
 

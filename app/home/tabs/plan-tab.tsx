@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Fragment, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 import { createPortal } from "react-dom"
+import { isAdminRole } from "@/lib/roles"
 import useSWR from "swr"
 import {
   ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2, MapPin,
@@ -1798,6 +1799,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
   const [showNewSemester, setShowNewSemester] = useState(false)
 
   // Open the New-semester modal from the section ContentHeader create button.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- parent trigger-counter opens the modal (Convention #15 pattern); behavior-preserving, restructure deferred
   useEffect(() => { if (newSemesterTrigger) setShowNewSemester(true) }, [newSemesterTrigger])
 
   const loadSemesters = useCallback(async () => {
@@ -1833,7 +1835,9 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
     setSlotsLoading(false)
   }, [supabase])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- data-load-on-mount; SWR migration deferred
   useEffect(() => { loadSemesters() }, [loadSemesters])
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- data-load on semester change; SWR migration deferred
   useEffect(() => { loadSlots(activeSemesterId) }, [activeSemesterId, loadSlots])
 
   // Claim an open slot or drop your own — mutates only assigned_to.
@@ -9083,6 +9087,7 @@ function GroupsTab({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- parent trigger-counter opens the wizard (Convention #15 pattern); behavior-preserving, restructure deferred
   useEffect(() => { if (generateTrigger) setShowWizard(true) }, [generateTrigger])
 
   const mono: React.CSSProperties = EYEBROW_STYLE
@@ -9097,7 +9102,7 @@ function GroupsTab({
       .order("created_at", { ascending: false })
 
     const ids = (rawSessions ?? []).map((s: Record<string, unknown>) => s.id as string)
-    let statsMap: Record<string, { num_groups: number; num_people: number }> = {}
+    const statsMap: Record<string, { num_groups: number; num_people: number }> = {}
 
     if (ids.length > 0) {
       const { data: gData } = await supabase
@@ -9133,7 +9138,7 @@ function GroupsTab({
     setLoading(false)
   }
 
-  useEffect(() => { loadSessions() }, [teamId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadSessions() }, [teamId]) // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect -- data-load-on-mount; SWR migration deferred
 
   async function handleDelete(session: GroupSessionRecord) {
     setConfirmDeleteId(null)
@@ -10315,10 +10320,7 @@ function GroupGeneratorWizard({
 // Shared toggle component for GroupGeneratorWizard
 // Admin-tier roles (CLAUDE.md convention #2 — admin-tier). Governance separation:
 // these users can't be team members unless the team's allow_admin_members is on.
-const ADMIN_TIER_ROLES = ["admin", "deacon", "elder", "pastor"]
-function isAdminTierRole(role: string | null | undefined): boolean {
-  return !!role && ADMIN_TIER_ROLES.includes(role.toLowerCase())
-}
+const isAdminTierRole = isAdminRole
 
 function GgToggle({ checked, onChange, label, desc, disabled, tooltip }: {
   checked: boolean

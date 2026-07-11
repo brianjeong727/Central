@@ -13,7 +13,9 @@ import { ReactNode } from "react"
 import { ArrowLeft } from "lucide-react"
 import { InsetHairline } from "./hairline"
 import { PageTitle } from "./page-title"
+// eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ context hook); flagged Phase 2, refactor pending
 import { useSubpageCrumbs } from "@/app/home/breadcrumb-context"
+// eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ type import); flagged Phase 2, refactor pending
 import type { Crumb } from "@/app/home/types"
 
 export function SubpageShell({ crumbs, title, width = "full", maxWidth = 820, children }: {

@@ -26,12 +26,17 @@ export function FilterDropdown({
   const wrapRef = useRef<HTMLDivElement>(null)
   const activeLabel = options.find((o) => o.id === value)?.label ?? options[0]?.label ?? ""
 
+  // Reset the enter-animation flag in the CLOSE handlers (not synchronously in
+  // the effect) so the effect body sets no state — mirrors the ActionMenu
+  // close()/toggle() pattern. Exit was instant before; still is.
+  const close = () => { setOpen(false); setShown(false) }
+
   useEffect(() => {
-    if (!open) { setShown(false); return }
+    if (!open) return
     const raf = requestAnimationFrame(() => setShown(true))
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close() }
     const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) close()
     }
     document.addEventListener("keydown", onKey)
     document.addEventListener("mousedown", onDown)
@@ -46,7 +51,7 @@ export function FilterDropdown({
     <div className="relative" ref={wrapRef}>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => { if (open) close(); else setOpen(true) }}
         aria-haspopup="menu"
         aria-expanded={open}
         className="flex items-center gap-2"

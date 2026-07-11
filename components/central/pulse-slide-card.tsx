@@ -3,6 +3,7 @@
 import { useRef, useState, CSSProperties, KeyboardEvent, PointerEvent } from "react"
 import { Check, Lock } from "lucide-react"
 import { CentralButton } from "./button"
+// eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ type import); flagged Phase 2, refactor pending
 import type { CongregationQuestion } from "@/app/home/types"
 
 // ── Pastor Pulse hero slide ────────────────────────────────────────────────────

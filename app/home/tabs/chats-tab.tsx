@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
 import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Settings, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
@@ -21,6 +21,14 @@ import { Composer } from "./composer"
 import { MODERATION_DEFAULTS, moderateText, scopeApplies, reverentCapitalize } from "@/lib/moderation"
 import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
+import { isChatManageRole } from "@/lib/roles"
+
+// Hydration-safe "are we mounted on the client yet?" flag with no set-state-in-
+// effect. useSyncExternalStore returns the server snapshot (false) during SSR
+// and the first hydration render, then the client snapshot (true) — matching the
+// old useState+useEffect(setMounted(true)) exactly. Value never changes → no-op subscribe.
+const subscribeNoop = () => () => {}
+const useMountedFlag = () => useSyncExternalStore(subscribeNoop, () => true, () => false)
 
 // ── Church-chat sectioning ─────────────────────────────────────────────────
 // Church chats split into three sections (General / Groups / Teams) by the
@@ -391,10 +399,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const [mobileRevealMemberId, setMobileRevealMemberId] = useState<string | null>(null)
   // Portal-safe mount flag for the destructive-action confirm dialog (rendered to
   // document.body so a transformed content-enter ancestor can't trap position:fixed).
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
+  const mounted = useMountedFlag()
 
-  const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
+  const isAdminOrLeader = isChatManageRole(userRole)
   const isDM = groupType === "dm"
   const isMy = groupType === "my"
   const isChurch = groupType === "church"
@@ -604,7 +611,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
   function roleBadge(role: string, size: "sm" | "md", personId?: string | null) {
     const r = role.toLowerCase()
-    const isAdminTier = ["admin", "leader", "deacon", "elder"].includes(r)
+    const isAdminTier = isChatManageRole(r)
     const isVisitor = r === "visitor"
     return (
       <span style={{
@@ -1139,7 +1146,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       .map(m => m.id)
   }, [messages, searchQuery])
 
-  const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
+  const isAdminOrLeader = isChatManageRole(userRole)
   const canPin = !groupArchived && (isAdminOrLeader || groupType !== "church")
 
   // @mention member list is loaded via useSWR above (see rosterData/mentionMembers).
@@ -2869,7 +2876,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   const [showArchived, setShowArchived] = useState(false)
   const [search, setSearch] = useState("")
 
-  const isAdminOrLeader = ["admin", "leader", "deacon", "elder"].includes(userRole.toLowerCase())
+  const isAdminOrLeader = isChatManageRole(userRole)
 
   // Stable key (no refreshKey) so revisits dedupe to one cache entry and paint instantly.
   const { data, error, isLoading, mutate } = useSWR<ChatGroup[]>(

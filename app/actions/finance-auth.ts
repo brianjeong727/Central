@@ -2,12 +2,11 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
+import { isAdminRole } from "@/lib/roles"
 
 // Single source of truth for finance capability across budget + receipt actions.
 // Status chain consumers (receipts.ts) and budget writes (budget-planning.ts) both
 // gate on these. canApprove == "can edit finances / budget".
-
-const ADMIN_TIER = ["admin", "deacon", "elder", "pastor"]
 
 export interface FinanceCapability {
   canApprove: boolean
@@ -23,7 +22,7 @@ export async function computeFinanceCapability(
   userId: string,
   role: string,
 ): Promise<FinanceCapability> {
-  if (ADMIN_TIER.includes((role ?? "").toLowerCase())) {
+  if (isAdminRole(role)) {
     return { canApprove: true, canSignOff: true }
   }
 

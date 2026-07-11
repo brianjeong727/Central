@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
 import { computeFinanceCapability } from "./finance-auth"
 import { requireTeamMemberOrAdmin, requireSameMinistry } from "./authz"
+import { isAdminRole } from "@/lib/roles"
 
 export interface ReceiptLimit {
   id: string
@@ -324,7 +325,7 @@ export async function getSubmittedReceipts(
   const admin = createAdminClient()
 
   // Admin-tier (and thus any governance admin) is always authorized.
-  let canViewFinances = ["admin", "deacon", "elder", "pastor"].includes((profile.role ?? "").toLowerCase())
+  let canViewFinances = isAdminRole(profile.role)
 
   // Otherwise the caller must be a member of a team whose role grants can_view_finances.
   if (!canViewFinances) {
@@ -431,7 +432,7 @@ export async function upsertReceiptLimit(params: {
     .maybeSingle()
 
   if (!profile?.ministry_id) return { error: "No ministry found." }
-  if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { error: "Only admins can manage receipt limits." }
+  if (!isAdminRole(profile.role)) return { error: "Only admins can manage receipt limits." }
   if (profile.ministry_id !== params.ministryId) return { error: "Ministry mismatch." }
 
   const { error } = await supabase
@@ -455,7 +456,7 @@ export async function deleteReceiptLimit(id: string): Promise<{ error: string | 
     .maybeSingle()
 
   if (!profile?.ministry_id) return { error: "No ministry found." }
-  if (!["admin", "deacon", "elder", "pastor"].includes(profile.role.toLowerCase())) return { error: "Only admins can manage receipt limits." }
+  if (!isAdminRole(profile.role)) return { error: "Only admins can manage receipt limits." }
 
   const { error } = await supabase
     .from("receipt_limits")

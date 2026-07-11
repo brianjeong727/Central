@@ -2,8 +2,7 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
-
-const ADMIN_ROLES = ["admin", "deacon", "elder", "pastor"]
+import { isAdminRole } from "@/lib/roles"
 
 // ─── Governance roster (ministries.governance_settings) ──────────────────────
 // WHO governs teams: all admin-tier users (all_admins=true) or a curated subset
@@ -18,7 +17,7 @@ export async function updateGovernanceSettings(settings: {
 
   const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
   if (!profile?.ministry_id) return { error: "No ministry found." }
-  if (!ADMIN_ROLES.includes(profile.role.toLowerCase())) return { error: "Only admins can update governance settings." }
+  if (!isAdminRole(profile.role)) return { error: "Only admins can update governance settings." }
 
   const all_admins = !!settings.all_admins
   const roster_ids = Array.isArray(settings.roster_ids)
@@ -46,7 +45,7 @@ export async function updateTeamAdminAccess(
 
   const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
   if (!profile?.ministry_id) return { error: "No ministry found." }
-  if (!ADMIN_ROLES.includes(profile.role.toLowerCase())) return { error: "Only admins can update team access." }
+  if (!isAdminRole(profile.role)) return { error: "Only admins can update team access." }
   if (!["none", "view", "write"].includes(access)) return { error: "Invalid access level." }
 
   const admin = createAdminClient()

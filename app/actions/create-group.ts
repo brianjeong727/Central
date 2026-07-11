@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase-server"
+import { isLeaderRole } from "@/lib/roles"
 
 type ChurchChatCategory = "general" | "group" | "team"
 
@@ -34,7 +35,7 @@ export async function createGroup(input: CreateGroupInput): Promise<CreateGroupR
   if (profileErr || !profile?.ministry_id) {
     return { group: null, error: "You must be part of a ministry to create a chat." }
   }
-  if (input.type === "church" && !["admin", "deacon", "elder", "pastor", "leader"].includes(profile.role.toLowerCase())) {
+  if (input.type === "church" && !isLeaderRole(profile.role)) {
     return { group: null, error: "Only admins and leaders can create church chats." }
   }
 

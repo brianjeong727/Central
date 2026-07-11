@@ -168,6 +168,7 @@ function MessageRowBase({
   const [confirmDeletePoll, setConfirmDeletePoll] = useState(false)
   const anyMenuOpen = isEmojiPickerOpen || isFullPickerOpen || isContextMenuOpen
   useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- measured-placement reset; behavior-frozen (Convention #7), fix deferred
     if (!anyMenuOpen) { setPlaceBelow(false); return }
     const menuEl = menuRef.current
     const wrapper = menuEl?.parentElement            // the `flex flex-col relative` message wrapper
