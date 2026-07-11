@@ -146,6 +146,7 @@ export function ActionMenu({
         createPortal(
           <div
             ref={menuRef}
+            data-testid="action-menu"
             className="bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] py-1 z-[200]"
             style={{
               position: "fixed",
