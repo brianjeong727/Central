@@ -155,7 +155,7 @@ export function HomeTab({
 
   const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
   const top3 = recentChats.slice(0, 3)
-  const totalUnread = top3.reduce((s, c) => s + c.unreadCount, 0)
+  const totalUnread = top3.reduce((s, c) => s + (c.muted ? 0 : c.unreadCount), 0)
   const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
   const firstName = profile.name.split(" ")[0]
   const hour = new Date().getHours()

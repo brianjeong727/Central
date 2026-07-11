@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Settings, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Settings, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -40,6 +40,16 @@ function sectionChurchChats(chats: ChatGroup[]): Record<ChurchSection, ChatGroup
     else out.general.push(c)
   }
   return out
+}
+
+// Stable partition: pinned rooms float to the top, preserving the existing
+// recency order within the pinned and unpinned subsets (no re-sort by anything
+// else). Applied per rendered group — each church section + the flat My Chats list.
+function partitionPinned(chats: ChatGroup[]): ChatGroup[] {
+  const pinned: ChatGroup[] = []
+  const rest: ChatGroup[] = []
+  for (const c of chats) (c.pinned ? pinned : rest).push(c)
+  return [...pinned, ...rest]
 }
 
 // A gated church chat shows a small lock glyph — only on rooms the member is IN
@@ -323,8 +333,39 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
   )
 }
 
+// Staged mute/pin toggle card — one shared render for the desktop + mobile
+// ChatSettings bodies (identical card markup; the Save affordance differs per
+// path and stays in-place). Toggles reflect the PENDING values; nothing writes.
+function ChatPrefsCard({ pendingMuted, pendingPinned, onToggleMuted, onTogglePinned }: {
+  pendingMuted: boolean; pendingPinned: boolean; onToggleMuted: () => void; onTogglePinned: () => void
+}) {
+  return (
+    <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--line-3)" }}>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Mute notifications</p>
+          <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Stay in the chat. Just stop the buzz.</p>
+        </div>
+        <button type="button" onClick={onToggleMuted} style={{ width: 38, height: 22, borderRadius: 999, border: "none", padding: 0, background: pendingMuted ? "var(--plum)" : "var(--dashed)", position: "relative", cursor: "pointer", flexShrink: 0, transition: "background 0.15s" }}>
+          <span style={{ position: "absolute", top: 2, ...(pendingMuted ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "var(--cream)" }} />
+        </button>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", padding: "16px 20px" }}>
+        <div style={{ flex: 1 }}>
+          <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Pin to top of chats</p>
+          <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Keeps it above the fold.</p>
+        </div>
+        <button type="button" onClick={onTogglePinned} style={{ width: 38, height: 22, borderRadius: 999, border: "none", padding: 0, background: pendingPinned ? "var(--plum)" : "var(--dashed)", position: "relative", cursor: "pointer", flexShrink: 0, transition: "background 0.15s" }}>
+          <span style={{ position: "absolute", top: 2, ...(pendingPinned ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "var(--cream)" }} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, userId, userName, ministryId, ministryName, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
   const supabase = createClient()
+  const { mutate: mutateGlobal } = useSWRConfig()
   const [members, setMembers] = useState<GroupMember[]>([])
   const [displayGroupName, setDisplayGroupName] = useState(groupName)
   const [renaming, setRenaming] = useState(false)
@@ -333,8 +374,15 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const [allProfiles, setAllProfiles] = useState<Profile[]>([])
   const [searchAdd, setSearchAdd] = useState("")
   const [selectedToAdd, setSelectedToAdd] = useState<string[]>([])
+  // Saved baseline (mirrors the DB) + staged pending values. Toggling only edits
+  // pending; nothing writes until Save (settings never apply immediately).
   const [muted, setMuted] = useState(false)
   const [pinned, setPinned] = useState(false)
+  const [pendingMuted, setPendingMuted] = useState(false)
+  const [pendingPinned, setPendingPinned] = useState(false)
+  const [savingPrefs, setSavingPrefs] = useState(false)
+  const [prefError, setPrefError] = useState<string | null>(null)
+  const prefsSeeded = useRef(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmAction, setConfirmAction] = useState<"archive" | "unarchive" | "delete" | "leave" | null>(null)
@@ -397,12 +445,18 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
   useEffect(() => {
     if (!settingsData) return
-    // Seed locally-editable state from the SWR cache. Autosave keeps DB and local
-    // state in lockstep, so there is no separate "saved" snapshot to track.
+    // Track the saved baseline from the SWR cache on every load/revalidation.
+    // Pending is seeded ONCE (first load) so a later revalidation — e.g. after a
+    // member add — can't clobber staged, unsaved pref toggles.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMembers(settingsData.members)
     setMuted(settingsData.pref?.muted ?? false)
     setPinned(settingsData.pref?.pinned ?? false)
+    if (!prefsSeeded.current) {
+      prefsSeeded.current = true
+      setPendingMuted(settingsData.pref?.muted ?? false)
+      setPendingPinned(settingsData.pref?.pinned ?? false)
+    }
   }, [settingsData])
 
   async function loadAllProfiles() {
@@ -430,22 +484,52 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     setRenaming(false)
   }
 
-  // ── Autosave: every pref toggle / member change persists immediately
-  //    (optimistic update + rollback on failure). No Save/Discard step. ──
-  async function handleToggleMuted() {
-    const next = !muted
-    setMuted(next)
-    const { error: err } = await supabase.from("group_members").update({ muted: next }).eq("group_id", groupId).eq("user_id", userId)
-    if (err) { setMuted(!next); return }
-    mutateSettings((cur) => cur ? { ...cur, pref: { muted: next, pinned: cur.pref?.pinned ?? pinned } } : cur, { revalidate: false })
+  // ── Chat prefs (mute/pin): stage locally, commit on Save. Member changes still
+  //    persist immediately (optimistic + rollback); only prefs are staged. ──
+  const prefsDirty = pendingMuted !== muted || pendingPinned !== pinned
+
+  // Patch the shared chat-list SWR cache so the list's muted/pinned indicators +
+  // pinned-float + muted-badge-suppression react instantly (Convention #4), the
+  // same shared key ChatScreen/ChatListPanel mutate.
+  function patchChatListPref(patch: Partial<ChatGroup>) {
+    mutateGlobal(
+      ["chat-list", userId, ministryId],
+      (cur: ChatGroup[] | undefined) => cur?.map((g) => (g.id === groupId ? { ...g, ...patch } : g)),
+      { revalidate: false },
+    )
   }
 
-  async function handleTogglePinned() {
-    const next = !pinned
-    setPinned(next)
-    const { error: err } = await supabase.from("group_members").update({ pinned: next }).eq("group_id", groupId).eq("user_id", userId)
-    if (err) { setPinned(!next); return }
-    mutateSettings((cur) => cur ? { ...cur, pref: { muted: cur.pref?.muted ?? muted, pinned: next } } : cur, { revalidate: false })
+  function handleCancelPrefs() {
+    setPendingMuted(muted)
+    setPendingPinned(pinned)
+    setPrefError(null)
+  }
+
+  async function handleSavePrefs() {
+    const mutedChanged = pendingMuted !== muted
+    const pinnedChanged = pendingPinned !== pinned
+    if (!mutedChanged && !pinnedChanged) return
+    setSavingPrefs(true)
+    setPrefError(null)
+    const update: { muted?: boolean; pinned?: boolean } = {}
+    if (mutedChanged) update.muted = pendingMuted
+    if (pinnedChanged) update.pinned = pendingPinned
+    // Optimistic global patch, then commit only the changed values.
+    patchChatListPref(update)
+    const { error: err } = await supabase.from("group_members").update(update).eq("group_id", groupId).eq("user_id", userId)
+    if (err) {
+      // Roll the cache + pending back to the saved baseline.
+      patchChatListPref({ muted, pinned })
+      setPendingMuted(muted)
+      setPendingPinned(pinned)
+      setPrefError("Couldn't save. Please try again.")
+      setSavingPrefs(false)
+      return
+    }
+    setMuted(pendingMuted)
+    setPinned(pendingPinned)
+    mutateSettings((cur) => cur ? { ...cur, pref: { muted: pendingMuted, pinned: pendingPinned } } : cur, { revalidate: false })
+    setSavingPrefs(false)
   }
 
   async function handleRemoveMember(memberId: string) {
@@ -686,6 +770,24 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           {isCentralChat && (
             <p className="text-[12px] mb-6" style={{ color: "var(--muted-text)", lineHeight: 1.5 }}>Your ministry&apos;s main chat. Everyone is automatically a member — it can&apos;t be renamed, archived, or deleted.</p>
           )}
+
+          {/* Preferences — mobile (staged; commits on Save, never on toggle) */}
+          {!loading && (
+            <div className="mb-6">
+              <div className="mb-3">
+                <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Preferences</span>
+              </div>
+              <ChatPrefsCard pendingMuted={pendingMuted} pendingPinned={pendingPinned} onToggleMuted={() => setPendingMuted((v) => !v)} onTogglePinned={() => setPendingPinned((v) => !v)} />
+              {prefsDirty && (
+                <div className="flex flex-col gap-2 mt-3">
+                  {prefError && <p className="text-[12px]" style={{ color: "var(--danger)" }}>{prefError}</p>}
+                  <button onClick={handleSavePrefs} disabled={savingPrefs} className="w-full py-3.5 rounded-xl font-medium text-[13px]" style={{ background: "var(--plum)", color: "var(--cream)", opacity: savingPrefs ? 0.6 : 1 }}>{savingPrefs ? "Saving…" : "Save changes"}</button>
+                  <button onClick={handleCancelPrefs} disabled={savingPrefs} className="w-full py-3.5 rounded-xl font-medium text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Cancel</button>
+                </div>
+              )}
+            </div>
+          )}
+
           {(canArchive || canUnarchive || canLeave || canDelete) && (
             <div className="flex flex-col gap-3 pb-4">
               <p style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--danger)", margin: 0 }}>Danger zone</p>
@@ -726,28 +828,22 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               </div>
             </div>
 
-            {/* Preferences — autosaved on toggle */}
+            {/* Preferences — staged; toggles edit pending state, committed on Save */}
             <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Preferences</p>
-            <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden", marginBottom: 28 }}>
-              <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--line-3)" }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Mute notifications</p>
-                  <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Stay in the chat. Just stop the buzz.</p>
-                </div>
-                <div onClick={handleToggleMuted} style={{ width: 38, height: 22, borderRadius: 999, background: muted ? "var(--plum)" : "var(--line)", position: "relative", cursor: "pointer", flexShrink: 0, transition: "background 0.15s" }}>
-                  <div style={{ position: "absolute", top: 2, ...(muted ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "var(--cream)" }} />
-                </div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", padding: "16px 20px" }}>
-                <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Pin to top of chats</p>
-                  <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Keeps it above the fold.</p>
-                </div>
-                <div onClick={handleTogglePinned} style={{ width: 38, height: 22, borderRadius: 999, background: pinned ? "var(--plum)" : "var(--line)", position: "relative", cursor: "pointer", flexShrink: 0, transition: "background 0.15s" }}>
-                  <div style={{ position: "absolute", top: 2, ...(pinned ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "var(--cream)" }} />
-                </div>
-              </div>
+            <div style={{ marginBottom: prefsDirty ? 14 : 28 }}>
+              <ChatPrefsCard pendingMuted={pendingMuted} pendingPinned={pendingPinned} onToggleMuted={() => setPendingMuted((v) => !v)} onTogglePinned={() => setPendingPinned((v) => !v)} />
             </div>
+
+            {/* Staged-save affordance — settings commit on Save, never on toggle */}
+            {prefsDirty && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+                {prefError && <span style={{ fontSize: 12, color: "var(--danger)", marginRight: "auto" }}>{prefError}</span>}
+                <div style={{ display: "flex", gap: 10, marginLeft: prefError ? 0 : "auto" }}>
+                  <CentralButton variant="secondary" size="sm" onClick={handleCancelPrefs} disabled={savingPrefs}>Cancel</CentralButton>
+                  <CentralButton variant="primary" size="sm" onClick={handleSavePrefs} disabled={savingPrefs}>{savingPrefs ? "Saving…" : "Save changes"}</CentralButton>
+                </div>
+              </div>
+            )}
 
             {/* Members — Add lives in the ContentHeader action slot (§3.2) */}
             <div style={{ marginBottom: 12 }}>
@@ -1455,10 +1551,15 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         (payload) => {
           const updated = payload.new as { user_id: string; last_read_at: string | null }
           if (updated.user_id === userId) return
-          setMemberReadMap((prev) => ({
-            ...prev,
-            [updated.user_id]: { ...prev[updated.user_id], lastReadAt: updated.last_read_at },
-          }))
+          setMemberReadMap((prev) => {
+            // Mute/pin toggles also UPDATE group_members rows — skip when last_read_at
+            // is unchanged so those writes don't trigger spurious re-renders.
+            if (prev[updated.user_id]?.lastReadAt === updated.last_read_at) return prev
+            return {
+              ...prev,
+              [updated.user_id]: { ...prev[updated.user_id], lastReadAt: updated.last_read_at },
+            }
+          })
         }
       )
       .subscribe()
@@ -2833,7 +2934,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   // Drive the bottom-nav unread badge off SWR data (side effect out of the fetcher).
   useEffect(() => {
     if (data) {
-      const total = data.filter((g) => !g.archived).reduce((s, g) => s + g.unread_count, 0)
+      const total = data.filter((g) => !g.archived && !g.muted).reduce((s, g) => s + g.unread_count, 0)
       onTotalUnreadChange(total)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2965,7 +3066,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         <div className="flex flex-col gap-2.5 md:gap-0">
           {churchSections ? (
             CHURCH_SECTION_DEFS.flatMap(({ key, label }) => {
-              const rooms = churchSections[key]
+              const rooms = partitionPinned(churchSections[key])
               if (rooms.length === 0) return []
               return [
                 <div key={`sec-${key}`} className="pt-3 pb-2 px-1 md:px-4">
@@ -2977,7 +3078,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
               ]
             })
           ) : (
-            active.map((group) => (
+            partitionPinned(active).map((group) => (
               <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} />
             ))
           )}
@@ -3041,6 +3142,12 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
 
 export function ChatGroupCard({ group, onClick, isActive, locked }: { group: ChatGroup; onClick: () => void; isActive?: boolean; locked?: boolean }) {
   const firstInitial = group.name.charAt(0)
+  // Glyph precedence: pinned + muted take the two available slots; lock drops when
+  // both are set (a locked room is already implied by its section). With ≤1 of
+  // pin/mute set, lock may render alongside. Order: pin, mute, lock.
+  const showLock = locked && !(group.pinned && group.muted)
+  // Muted silences the unread badge/dot regardless of unread_count.
+  const showUnread = group.unread_count > 0 && !group.muted
 
   return (
     <button onClick={onClick} className="w-full text-left group">
@@ -3056,7 +3163,9 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1.5 min-w-0 pr-2">
                 <h3 className="text-[15px] font-medium text-[var(--ink)] truncate">{group.name}</h3>
-                {locked && <Lock className="w-3 h-3 flex-shrink-0" style={{ color: "var(--muted-text)" }} aria-label="Members only" />}
+                {group.pinned && <Pin className="w-3 h-3 flex-shrink-0" style={{ color: "var(--muted-text)" }} aria-label="Pinned" />}
+                {group.muted && <BellOff className="w-3 h-3 flex-shrink-0" style={{ color: "var(--muted-text)" }} aria-label="Muted" />}
+                {showLock && <Lock className="w-3 h-3 flex-shrink-0" style={{ color: "var(--muted-text)" }} aria-label="Members only" />}
               </div>
               {group.last_message_time && <span className="text-[11px] text-[var(--muted-text)] flex-shrink-0">{formatRelativeTime(group.last_message_time)}</span>}
             </div>
@@ -3066,7 +3175,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
                   ? group.last_sender ? <><span className="font-medium text-[var(--body)]">{group.last_sender}:</span> {group.last_message}</> : group.last_message
                   : <span className="italic text-[var(--muted-text)]">No messages yet</span>}
               </p>
-              {group.unread_count > 0 && (
+              {showUnread && (
                 <span className="w-6 h-6 bg-[var(--plum)] rounded-full text-[11px] font-medium text-[var(--cream)] flex items-center justify-center flex-shrink-0">{group.unread_count}</span>
               )}
             </div>
@@ -3096,7 +3205,9 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
             <p className="text-[13px] truncate leading-tight" style={{ color: "var(--ink)", fontWeight: group.unread_count ? 600 : 500, flex: 1, minWidth: 0 }}>
               {group.name}
             </p>
-            {locked && <Lock style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0, alignSelf: "center" }} aria-label="Members only" />}
+            {group.pinned && <Pin style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0, alignSelf: "center" }} aria-label="Pinned" />}
+            {group.muted && <BellOff style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0, alignSelf: "center" }} aria-label="Muted" />}
+            {showLock && <Lock style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0, alignSelf: "center" }} aria-label="Members only" />}
             {group.last_message_time && (
               <span style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.04em", color: "var(--faint)", flexShrink: 0 }}>
                 {formatRelativeTime(group.last_message_time)}
@@ -3109,7 +3220,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
               : <span style={{ fontStyle: "italic" }}>No messages yet</span>}
           </p>
         </div>
-        {group.unread_count > 0 && (
+        {showUnread && (
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)", flexShrink: 0 }} />
         )}
       </div>
@@ -3273,7 +3384,7 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
             <div className="flex flex-col gap-2 pt-1">
               {churchSections ? (
                 CHURCH_SECTION_DEFS.flatMap(({ key, label }) => {
-                  const rooms = churchSections[key]
+                  const rooms = partitionPinned(churchSections[key])
                   if (rooms.length === 0) return []
                   return [
                     <div key={`sec-${key}`} className="flex items-center justify-between px-4 pt-3 pb-1">
@@ -3294,7 +3405,7 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
                   ]
                 })
               ) : (
-                active.map((group) => (
+                partitionPinned(active).map((group) => (
                   <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChatPanel(group.id, group.name)} isActive={activeGroupId === group.id} />
                 ))
               )}

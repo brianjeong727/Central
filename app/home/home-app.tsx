@@ -135,7 +135,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     searchParams.get("ann")
   )
   const [totalChatsUnread, setTotalChatsUnread] = useState(() =>
-    (initialRecentChats ?? []).reduce((sum, c) => sum + c.unreadCount, 0)
+    (initialRecentChats ?? []).reduce((sum, c) => sum + (c.muted ? 0 : c.unreadCount), 0)
   )
   const [chatRefreshKey, setChatRefreshKey] = useState(0)
   const [recentChats, setRecentChats] = useState<ChatPreview[]>(initialRecentChats ?? [])
@@ -473,6 +473,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     last_msg_sender_name: string | null; last_msg_at: string | null
     last_msg_type: string | null; unread_count: number
     last_msg_attachment_type: string | null; last_msg_has_poll: boolean | null
+    muted: boolean | null; pinned: boolean | null
   }
 
   // Single DB round-trip via get_chat_previews function (replaces unbounded messages fetch)
@@ -493,6 +494,8 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         unreadCount: Number(row.unread_count),
         initials: getInitials(row.group_name),
         time: row.last_msg_at ? formatRelativeTime(row.last_msg_at) : "",
+        muted: row.muted ?? false,
+        pinned: row.pinned ?? false,
         _ts: row.last_msg_at ?? "",
       }))
       .sort((a, b) => {
@@ -790,7 +793,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       p_ministry_id: ministryId,
     })
     const total = (data ?? []).reduce(
-      (sum: number, row: { unread_count: number }) => sum + Number(row.unread_count),
+      (sum: number, row: { unread_count: number; muted: boolean | null }) => sum + (row.muted ? 0 : Number(row.unread_count)),
       0
     )
     setTotalChatsUnread(total)

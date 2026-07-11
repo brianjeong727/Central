@@ -13,6 +13,7 @@ type PreviewRow = {
   last_msg_sender_name: string | null; last_msg_at: string | null
   last_msg_type: string | null; unread_count: number
   last_msg_attachment_type: string | null; last_msg_has_poll: boolean | null
+  muted: boolean | null; pinned: boolean | null
 }
 
 type RawTeamRef = { id: string; name: string; icon: string | null; description: string | null; team_type: string; allow_co_presidency: boolean | null; allow_admin_members: boolean | null }
@@ -67,6 +68,8 @@ export default async function HomePage() {
     unreadCount: Number(row.unread_count),
     initials: getInitials(row.group_name),
     time: row.last_msg_at ? formatRelativeTime(row.last_msg_at) : "",
+    muted: row.muted ?? false,
+    pinned: row.pinned ?? false,
     _ts: row.last_msg_at ?? "",
   }))
   rawPreviews.sort((a, b) => {

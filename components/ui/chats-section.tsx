@@ -11,6 +11,11 @@ export interface ChatPreview {
   time: string
   // Group category — drives the Messages church/my subtab when opening from here.
   type?: string
+  // Per-user chat prefs. `muted` suppresses the unread badge (same rule as the
+  // chat list). `pinned` is carried for symmetry but unused here — the Home strip
+  // is a recency feed and never reorders by pinned.
+  muted?: boolean
+  pinned?: boolean
 }
 
 interface ChatsSectionProps {
@@ -84,7 +89,7 @@ function ChatCard({ chat, index, onClick }: { chat: ChatPreview; index: number; 
                 chat.lastMessage || <span className="italic text-[var(--muted-text)]">No messages yet</span>
               )}
             </p>
-            {chat.unreadCount > 0 && (
+            {chat.unreadCount > 0 && !chat.muted && (
               <span className="w-6 h-6 bg-[var(--plum)] rounded-full text-[11px] font-semibold text-[var(--cream)] flex items-center justify-center flex-shrink-0">
                 {chat.unreadCount}
               </span>
