@@ -52,10 +52,10 @@ Inter-agent data (a reconciler manifest, an explorer finding, a designer spec) r
 Claude Code does not loop on its own. YOU drive the cycle:
 
 1. Dispatch `engineer` with the expanded intent + any spec from designer/reconciler.
-2. Dispatch `tester`. Default tier: build verification + type-check + lint + smoke. Full E2E / browser MCP ONLY when the task genuinely warrants it and you request it explicitly (lessons.md documents how fragile the Playwright harness is — do not let the loop become a selector-debugging machine).
+2. Dispatch `tester`. Default tier: `scripts/verify.sh` (build + lint + dev-server-ready) THEN a mandatory functional click-through of the changed flow(s) via the e2e harness (`e2e/`) — run the covering spec, or have the tester write one that exercises the change as a user would. A user-facing change without a click-through comes back UNVERIFIED, not passing. Visual-taste sign-off remains Brian's.
 3. Dispatch `enforcer` on the produced work.
 4. On any failure that is self-healing — a build/type/lint break, a drift the engineer can simply correct — kick it back and re-dispatch. Do NOT surface these to Brian. This is the "duh, that's the point" category; the loop fixes it silently.
-5. Repeat until: functionally green, spec-conformant, no unresolved enforcer `block`. That is the EXIT CONDITION — "ready for visual sign-off", never "complete".
+5. Repeat until: behaviorally verified (click-through passed), spec-conformant, no unresolved enforcer `block`. That is the EXIT CONDITION — "ready for visual sign-off", never "complete".
 
 **Screenshots are cost-gated to the FINAL pass.** Intermediate rebuild cycles get cheap functional checks only — no screenshots. Only on the final green pass, and only when the change is visual, does the Tester capture the before/after screenshots for the handoff (see Step 6). Image tokens are expensive; never screenshot every cycle.
 
@@ -90,7 +90,7 @@ Note: the `protect-docs` hook hard-blocks direct edits to CLAUDE.md / permission
 
 ## Commit and push: commit is automatic, push is Brian's gate
 
-- **Commit once, automatically, at the END of the loop** — only after the full exit condition is met (functional checks pass, spec-conformant, no unresolved Enforcer block). NOT on intermediate cycles. If the loop rebuilds several times, there is exactly ONE commit, for the final passing state. Write a clear, scoped commit message describing the task. If unrelated workstreams were touched, make separate commits per workstream.
+- **Commit the engineer's completed work BEFORE dispatching tester/enforcer, then AMEND that commit with any loop fixes** — so there is exactly ONE commit at handoff, but the verifiers never run against an uncommitted tree (a tester/enforcer git accident has clobbered uncommitted rebuilds before — see lessons.md stash-clobber). Commit once the engineer reports done; each loop fix amends the same commit; the final amended commit is the passing state. Write a clear, scoped commit message describing the task. If unrelated workstreams were touched, make separate commits per workstream.
 - **Do NOT push.** The commit stays local on the current feature branch. Pushing requires Brian's explicit green light at the task-close push decision (Step 7).
 - **If Brian rejects at sign-off:** reset the commit cleanly (`git reset --soft HEAD~1`, keeps the changes for rework) rather than stacking a revert commit. Then re-enter the loop with his clarification.
 - **Never commit or push to main** — the main-branch-guard hook backstops this, but the loop should target the current feature branch by default and never switch to main.
@@ -121,7 +121,7 @@ When the exit condition is met, lead with ONE human sentence (what got done, in 
 
 1. **localhost** to review with his own eyes — visual sign-off is HIS. Never self-certify visual/layout correctness; browser-MCP measurements have repeatedly reported "fixed" on visually wrong results.
 2. **The committed diff** — "committed locally on <branch>, awaiting your push approval." He reviews via `git show` / `/diff`.
-3. **Before/after screenshots** (visual changes only) — at desktop (1440) and mobile (390) viewports, plus the Tester's delta list and any unrequested-change flags. These are FOR BRIAN'S EYES to speed his review — never a self-certification that it "looks right."
+3. **Before/after screenshots** (visual changes only) — from the harness run's artifacts (`test-results/`), at desktop (1440) and mobile (390) viewports, plus the Tester's delta list and any unrequested-change flags. These are FOR BRIAN'S EYES to speed his review — never a self-certification that it "looks right."
 4. **Interpretation calls** — a short list of anything you had to interpret.
 5. **Proposed doc edits** — exact text for any CLAUDE.md / permissions.md / MINISTRY_CONTEXT.md change (he pastes them), and a note of any lessons.md entries auto-written.
 
