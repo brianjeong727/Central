@@ -17,6 +17,7 @@ export type ChatListRow = {
   last_msg_type: string | null; unread_count: number
   last_msg_attachment_type: string | null; last_msg_has_poll: boolean | null
   group_category: string | null
+  muted: boolean | null; pinned: boolean | null
 }
 
 export async function fetchChatList([, userId, ministryId]: [string, string, string]): Promise<ChatGroup[]> {
@@ -40,6 +41,8 @@ export async function fetchChatList([, userId, ministryId]: [string, string, str
     last_message_time: row.last_msg_at ?? null,
     unread_count: Number(row.unread_count),
     category: (row.group_category ?? null) as ChatGroup["category"],
+    muted: row.muted ?? false,
+    pinned: row.pinned ?? false,
   })) as ChatGroup[]
 
   // Sort by most recent message first (nulls last)

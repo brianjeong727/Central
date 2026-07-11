@@ -133,6 +133,8 @@ export interface ChatGroup {
   unread_count: number
   archived?: boolean
   category?: "general" | "group" | "team" | null
+  muted?: boolean
+  pinned?: boolean
 }
 
 export interface GroupMember {
