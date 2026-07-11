@@ -1,13 +1,13 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { createPortal } from "react-dom"
 import useSWR from "swr"
 import { ArrowLeft, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, Pin, PinOff, Users, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, RingCrossLogo, MONO_STYLE, EYEBROW_STYLE } from "../components/shared"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu } from "@/components/central"
+import type { ActionMenuItem } from "@/components/central"
 import { getInitials, formatRelativeTime, audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee } from "../types"
@@ -704,15 +704,13 @@ function InlineEditFields({
 // ── Announcements Tab ────────────────────────────────────────────────────────
 
 // Desktop ⋯ overflow menu — one helper reused by all three desktop layouts
-// (pinned hero, compact table, editorial cards). Matches the hand-rolled
-// absolute-dropdown + fixed-backdrop shape used by the mobile AnnouncementCard.
+// (pinned hero, compact table, editorial cards). Delegates positioning/flip to
+// the shared portal-based ActionMenu so it can never clip at the viewport bottom
+// or inside an overflow-hidden card ancestor.
 function DesktopActionMenu({
-  open, onToggle, onClose, isPinned, isSubPinned, showPin, showSubPin,
+  isPinned, isSubPinned, showPin, showSubPin,
   onPin, onSubPin, onEdit, onDelete,
 }: {
-  open: boolean
-  onToggle: () => void
-  onClose: () => void
   isPinned: boolean
   isSubPinned: boolean
   showPin: boolean
@@ -722,73 +720,36 @@ function DesktopActionMenu({
   onEdit: () => void
   onDelete: () => void
 }) {
-  const item = "w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium hover:bg-[var(--cream-2)] transition-colors text-left"
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  // Fixed-position anchor measured from the trigger so the portaled panel hugs
-  // the trigger's right edge and escapes every overflow-hidden ancestor.
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
-
-  const measure = useCallback(() => {
-    const r = triggerRef.current?.getBoundingClientRect()
-    if (r) setPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
-  }, [])
-
-  // While open, keep the panel anchored and dismiss on scroll/resize so a stale
-  // fixed menu never floats away from its trigger as the list scrolls.
-  useEffect(() => {
-    if (!open) return
-    measure()
-    const onScroll = () => onClose()
-    const onResize = () => onClose()
-    window.addEventListener("scroll", onScroll, true)
-    window.addEventListener("resize", onResize)
-    return () => {
-      window.removeEventListener("scroll", onScroll, true)
-      window.removeEventListener("resize", onResize)
-    }
-  }, [open, measure, onClose])
+  const items: ActionMenuItem[] = []
+  if (showPin) items.push({
+    key: "pin",
+    label: isPinned ? "Unpin hero" : "Pin as hero",
+    icon: isPinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />,
+    onSelect: onPin,
+  })
+  if (showSubPin) items.push({
+    key: "subpin",
+    label: isSubPinned ? "Remove from For You" : "Pin to For You",
+    icon: <Pin className="w-3.5 h-3.5 text-[var(--plum)]" style={{ transform: "rotate(-45deg)" }} />,
+    onSelect: onSubPin,
+  })
+  items.push({ key: "edit", label: "Edit", icon: <Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />, onSelect: onEdit })
+  items.push({ key: "delete", label: "Delete", tone: "danger", icon: <Trash2 className="w-3.5 h-3.5" />, onSelect: onDelete })
 
   return (
-    <>
-      <button
-        ref={triggerRef}
-        onClick={(e) => { e.stopPropagation(); onToggle() }}
-        className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[var(--line-3)] transition-colors"
-        title="More actions"
-      >
-        <MoreHorizontal className="w-4 h-4 text-[var(--muted-text)]" />
-      </button>
-      {open && pos && typeof document !== "undefined" && createPortal(
-        <>
-          <div className="fixed inset-0 z-[200]" onClick={onClose} />
-          <div
-            className="fixed z-[201] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] py-1 min-w-[176px]"
-            style={{ top: pos.top, right: pos.right }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {showPin && (
-              <button onClick={() => { onClose(); onPin() }} className={`${item} text-[var(--ink)]`}>
-                {isPinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />}
-                {isPinned ? "Unpin hero" : "Pin as hero"}
-              </button>
-            )}
-            {showSubPin && (
-              <button onClick={() => { onClose(); onSubPin() }} className={`${item} text-[var(--ink)]`}>
-                <Pin className="w-3.5 h-3.5 text-[var(--plum)]" style={{ transform: "rotate(-45deg)" }} />
-                {isSubPinned ? "Remove from For You" : "Pin to For You"}
-              </button>
-            )}
-            <button onClick={() => { onClose(); onEdit() }} className={`${item} text-[var(--ink)]`}>
-              <Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit
-            </button>
-            <button onClick={() => { onClose(); onDelete() }} className={`${item} text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)]`}>
-              <Trash2 className="w-3.5 h-3.5" />Delete
-            </button>
-          </div>
-        </>,
-        document.body
+    <ActionMenu
+      items={items}
+      align="right"
+      renderTrigger={({ toggle }) => (
+        <button
+          onClick={toggle}
+          className="w-8 h-8 flex items-center justify-center rounded-lg border border-[var(--line)] hover:bg-[var(--line-3)] transition-colors"
+          title="More actions"
+        >
+          <MoreHorizontal className="w-4 h-4 text-[var(--muted-text)]" />
+        </button>
       )}
-    </>
+    />
   )
 }
 
@@ -806,8 +767,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   const [formFillState, setFormFillState] = useState<{ formId: string; announcementId: string; title: string } | null>(null)
   // Desktop delete confirmation — routes handleDesktopDelete through ConfirmDialog.
   const [deleteConfirmAnn, setDeleteConfirmAnn] = useState<EnrichedAnnouncement | null>(null)
-  // Which desktop row's ⋯ overflow menu is open (announcement id).
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
   function openCreate() {
     setEditingAnnouncement(null)
@@ -1161,9 +1120,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                   {isLeaderOrAdmin && (
                     <div className="flex gap-2 items-center self-start">
                       <DesktopActionMenu
-                        open={openMenuId === pinnedAnn.id}
-                        onToggle={() => setOpenMenuId((id) => (id === pinnedAnn.id ? null : pinnedAnn.id))}
-                        onClose={() => setOpenMenuId(null)}
                         isPinned={pinnedAnn.is_pinned}
                         isSubPinned={pinnedAnn.is_sub_pinned}
                         showPin
@@ -1212,9 +1168,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         )}
                         {isLeaderOrAdmin && (
                           <DesktopActionMenu
-                            open={openMenuId === ann.id}
-                            onToggle={() => setOpenMenuId((id) => (id === ann.id ? null : ann.id))}
-                            onClose={() => setOpenMenuId(null)}
                             isPinned={ann.is_pinned}
                             isSubPinned={ann.is_sub_pinned}
                             showPin
@@ -1264,9 +1217,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                             )}
                             {isLeaderOrAdmin && (
                               <DesktopActionMenu
-                                open={openMenuId === ann.id}
-                                onToggle={() => setOpenMenuId((id) => (id === ann.id ? null : ann.id))}
-                                onClose={() => setOpenMenuId(null)}
                                 isPinned={ann.is_pinned}
                                 isSubPinned={ann.is_sub_pinned}
                                 showPin
@@ -1347,7 +1297,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
 export function AnnouncementCard({ announcement, isPinned, featured = false, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onPinToggle, onSubPinToggle, onOpenForm, onOpenDetail }: AnnouncementCardProps) {
   const supabase = createClient()
-  const [showMenu, setShowMenu] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -1402,26 +1351,31 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
                   <span className="flex items-center gap-1" style={{ fontSize: "10px", color: "var(--muted-text)", fontWeight: 500 }}><Users className="w-3 h-3" />{announcement.view_count}</span>
                 )}
                 {isAdminOrLeader && (
-                  <div className="relative">
-                    {showMenu && <div className="fixed inset-0 z-[5]" onClick={() => setShowMenu(false)} />}
-                    <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[var(--cream-2)] transition-colors">
-                      <MoreHorizontal className="w-4 h-4 text-[var(--muted-text)]" />
-                    </button>
-                    {showMenu && (
-                      <div className="absolute top-8 right-0 z-[10] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] py-1 min-w-[140px]">
-                        <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left">
-                          {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />}
-                          {announcement.is_pinned ? "Unpin hero" : "Pin as hero"}
-                        </button>
-                        <button onClick={() => { setShowMenu(false); onSubPinToggle?.(announcement.id, announcement.is_sub_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left">
-                          <Pin className="w-3.5 h-3.5 text-[var(--plum)]" style={{ transform: "rotate(-45deg)" }} />
-                          {announcement.is_sub_pinned ? "Remove from For You" : "Pin to For You"}
-                        </button>
-                        <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit</button>
-                        <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
-                      </div>
+                  <ActionMenu
+                    align="right"
+                    minWidth={140}
+                    renderTrigger={({ toggle }) => (
+                      <button onClick={toggle} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[var(--cream-2)] transition-colors">
+                        <MoreHorizontal className="w-4 h-4 text-[var(--muted-text)]" />
+                      </button>
                     )}
-                  </div>
+                    items={[
+                      {
+                        key: "pin",
+                        label: announcement.is_pinned ? "Unpin hero" : "Pin as hero",
+                        icon: announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />,
+                        onSelect: () => onPinToggle?.(announcement.id, announcement.is_pinned),
+                      },
+                      {
+                        key: "subpin",
+                        label: announcement.is_sub_pinned ? "Remove from For You" : "Pin to For You",
+                        icon: <Pin className="w-3.5 h-3.5 text-[var(--plum)]" style={{ transform: "rotate(-45deg)" }} />,
+                        onSelect: () => onSubPinToggle?.(announcement.id, announcement.is_sub_pinned),
+                      },
+                      { key: "edit", label: "Edit", icon: <Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />, onSelect: () => onEdit(announcement) },
+                      { key: "delete", label: "Delete", tone: "danger", icon: <Trash2 className="w-3.5 h-3.5" />, onSelect: () => setShowDeleteConfirm(true) },
+                    ]}
+                  />
                 )}
               </div>
             </div>
@@ -1493,22 +1447,25 @@ export function AnnouncementCard({ announcement, isPinned, featured = false, min
               )}
             </div>
             {isAdminOrLeader && (
-              <div className="relative">
-                {showMenu && <div className="fixed inset-0 z-[5]" onClick={() => setShowMenu(false)} />}
-                <button onClick={(e) => { e.stopPropagation(); setShowMenu((v) => !v) }} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[var(--ivory)] transition-colors">
-                  <MoreHorizontal className="w-4 h-4 text-[var(--muted-text)]" />
-                </button>
-                {showMenu && (
-                  <div className="absolute top-8 right-0 z-[10] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] py-1 min-w-[140px]">
-                    <button onClick={() => { setShowMenu(false); onPinToggle?.(announcement.id, announcement.is_pinned) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left">
-                      {announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />}
-                      {announcement.is_pinned ? "Unpin" : "Pin"}
-                    </button>
-                    <button onClick={() => { setShowMenu(false); onEdit(announcement) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--ink)] hover:bg-[var(--cream-2)] transition-colors text-left"><Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />Edit</button>
-                    <button onClick={() => { setShowMenu(false); setShowDeleteConfirm(true) }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] transition-colors text-left"><Trash2 className="w-3.5 h-3.5" />Delete</button>
-                  </div>
+              <ActionMenu
+                align="right"
+                minWidth={140}
+                renderTrigger={({ toggle }) => (
+                  <button onClick={toggle} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-[var(--ivory)] transition-colors">
+                    <MoreHorizontal className="w-4 h-4 text-[var(--muted-text)]" />
+                  </button>
                 )}
-              </div>
+                items={[
+                  {
+                    key: "pin",
+                    label: announcement.is_pinned ? "Unpin" : "Pin",
+                    icon: announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />,
+                    onSelect: () => onPinToggle?.(announcement.id, announcement.is_pinned),
+                  },
+                  { key: "edit", label: "Edit", icon: <Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />, onSelect: () => onEdit(announcement) },
+                  { key: "delete", label: "Delete", tone: "danger", icon: <Trash2 className="w-3.5 h-3.5" />, onSelect: () => setShowDeleteConfirm(true) },
+                ]}
+              />
             )}
           </div>
 

@@ -33,7 +33,7 @@ import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@
 import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
-import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton } from "@/components/central"
+import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu } from "@/components/central"
 import { useNavState } from "../nav-state"
 
 interface MemberRow {
@@ -197,7 +197,6 @@ export function SettingsTab({
   // People tab state
   const [peopleSearch, setPeopleSearch] = useState("")
   const [peopleFilter, setPeopleFilter] = useState<RoleFilter>("all")
-  const [peopleRoleMenuOpen, setPeopleRoleMenuOpen] = useState<string | null>(null)
   const [peopleChangingRole, setPeopleChangingRole] = useState<string | null>(null)
   const [peopleRemoveConfirmId, setPeopleRemoveConfirmId] = useState<string | null>(null)
   const [peopleRemoving, setPeopleRemoving] = useState(false)
@@ -1347,7 +1346,6 @@ export function SettingsTab({
                   <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "24px", textAlign: "center" }}>{peopleSearch ? "No members match your search." : "No members found."}</p>
                 ) : peopleFiltered.map((m, i) => {
                   const isMe = m.id === userId
-                  const menuOpen = peopleRoleMenuOpen === m.id
                   return (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < peopleFiltered.length - 1 ? "1px solid var(--line-3)" : "none", position: "relative" }}>
                       <MonogramChip initials={getInitials(m.name)} className="w-[38px] h-[38px] text-[13px] font-medium" />
@@ -1360,26 +1358,30 @@ export function SettingsTab({
                       </div>
                       {peopleChangingRole === m.id ? <span style={{ fontSize: 11, color: "var(--muted-text)" }}>Saving…</span> : roleBadge(m.role, m.id)}
                       {isAdmin && !isMe && (
-                        <div style={{ position: "relative" }}>
-                          {menuOpen && <div className="fixed inset-0 z-[5] md:left-[var(--shell-offset)]" onClick={() => setPeopleRoleMenuOpen(null)} />}
-                          <button onClick={() => setPeopleRoleMenuOpen(menuOpen ? null : m.id)} style={{ width: 28, height: 28, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer" }}>
-                            <MoreHorizontal style={{ width: 16, height: 16, color: "var(--faint)" }} />
-                          </button>
-                          {menuOpen && (
-                            <div style={{ position: "absolute", top: 32, right: 0, zIndex: 20, background: "var(--cream-panel)", borderRadius: 12, border: "1px solid var(--line)", padding: "6px 0", minWidth: 160 }}>
+                        <ActionMenu
+                          align="right"
+                          minWidth={160}
+                          renderTrigger={({ toggle }) => (
+                            <button onClick={toggle} style={{ width: 28, height: 28, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer" }}>
+                              <MoreHorizontal style={{ width: 16, height: 16, color: "var(--faint)" }} />
+                            </button>
+                          )}
+                        >
+                          {(close) => (
+                            <>
                               <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "var(--muted-text)", padding: "4px 12px 6px", textTransform: "uppercase", letterSpacing: "1.2px", fontWeight: 400, margin: 0 }}>Set role</p>
                               {(["visitor", "member", "leader", "admin", "deacon", "elder", "pastor"] as const).map(r => (
-                                <button key={r} onClick={() => { setPeopleRoleMenuOpen(null); if (m.role.toLowerCase() !== r) setRoleChangeConfirm({ memberId: m.id, name: m.name, currentRole: m.role, newRole: r }) }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "var(--plum)" : "var(--ink)", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
+                                <button key={r} onClick={() => { close(); if (m.role.toLowerCase() !== r) setRoleChangeConfirm({ memberId: m.id, name: m.name, currentRole: m.role, newRole: r }) }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "var(--plum)" : "var(--ink)", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
                                   {r.charAt(0).toUpperCase() + r.slice(1)}
                                   {m.role.toLowerCase() === r && <Check style={{ width: 14, height: 14, color: "var(--plum)" }} />}
                                 </button>
                               ))}
                               <div style={{ margin: "6px 12px", borderTop: "1px solid var(--line-3)" }} />
-                              <button onClick={() => { setPeopleRemoveConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>Remove from ministry</button>
-                              <button onClick={() => { setPeopleExcomConfirmId(m.id); setPeopleRoleMenuOpen(null) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "color-mix(in srgb, var(--danger) 80%, var(--ink))", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box", fontWeight: 500 }}>Excommunicate</button>
-                            </div>
+                              <button onClick={() => { close(); setPeopleRemoveConfirmId(m.id) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "var(--danger)", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>Remove from ministry</button>
+                              <button onClick={() => { close(); setPeopleExcomConfirmId(m.id) }} style={{ width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", fontSize: 13, color: "color-mix(in srgb, var(--danger) 80%, var(--ink))", background: "none", border: "none", cursor: "pointer", textAlign: "left", boxSizing: "border-box", fontWeight: 500 }}>Excommunicate</button>
+                            </>
                           )}
-                        </div>
+                        </ActionMenu>
                       )}
                     </div>
                   )
