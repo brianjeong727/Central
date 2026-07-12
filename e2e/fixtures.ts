@@ -80,6 +80,9 @@ export interface CreateAnnouncementInput {
   body: string
   is_event?: boolean
   is_pinned?: boolean
+  /** Event start time (timestamptz ISO). Only meaningful with is_event=true; used by
+   *  the v2b event-reminder sender. */
+  event_date?: string | null
   /** Override the author. Pass `null` for an unattributed announcement (e.g. to
    *  test recipient resolution without the "exclude the creator" rule kicking in).
    *  Defaults to the sandbox admin, matching prior behavior. */
@@ -107,7 +110,7 @@ export function sandbox() {
     /** Insert a published announcement into the sandbox ministry. The title is
      *  force-prefixed with "E2E::" if the caller didn't already, so nothing this
      *  helper writes can escape prefix-based cleanup. */
-    async createAnnouncement({ title, body, is_event = false, is_pinned = false, created_by }: CreateAnnouncementInput) {
+    async createAnnouncement({ title, body, is_event = false, is_pinned = false, event_date = null, created_by }: CreateAnnouncementInput) {
       const author = created_by === undefined ? await adminUserId(db) : created_by
       const fullTitle = title.startsWith(E2E_PREFIX) ? title : `${E2E_PREFIX}${title}`
       const { data, error } = await db
@@ -117,6 +120,7 @@ export function sandbox() {
           body,
           is_event,
           is_pinned,
+          event_date,
           audience: "all",
           status: "published",
           ministry_id: ministryId,
@@ -126,6 +130,23 @@ export function sandbox() {
         .single()
       if (error) throw error
       return data
+    },
+
+    /** RSVP a user to an announcement (idempotent upsert, matching the app's toggle
+     *  upsert). Used by the v2b event-reminder sender tests. */
+    async insertRsvp({ announcementId, userId }: { announcementId: string; userId: string }) {
+      const { error } = await db
+        .from("rsvps")
+        .upsert({ announcement_id: announcementId, user_id: userId }, { onConflict: "announcement_id,user_id" })
+      if (error) throw error
+    },
+
+    /** Remove all RSVPs for the given announcement ids (rsvps cascade off announcements,
+     *  but the digest/reminder tests delete rsvps explicitly to stay surgical). */
+    async deleteRsvpsForAnnouncements(announcementIds: string[]) {
+      if (announcementIds.length === 0) return
+      const { error } = await db.from("rsvps").delete().in("announcement_id", announcementIds)
+      if (error) throw error
     },
 
     /** Delete every sandbox announcement whose title starts with `prefix`
