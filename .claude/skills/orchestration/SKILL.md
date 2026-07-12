@@ -1,6 +1,6 @@
 ---
 name: orchestration
-description: The conductor for Central's multi-agent build system. Load this at the start of ANY build, fix, design, or implementation task before dispatching to subagents. Governs prompt expansion, when to spawn the explorer/reconciler, the build loop, the per-doc escalation rules, /designchange handling, the multiple-choice escalation format, commit/push, and the task-close push decision. Do not load for pure strategic/direction questions — those go to the upstream thinking layer, not this loop.
+description: The conductor for Central's build system. Load this at the start of ANY build, fix, design, or implementation task — it decides the LANE first (solo by default; orchestrated only on triggers), then governs prompt expansion, when to spawn the explorer/reconciler/rls-reviewer, the build loop, artifact handoffs, the per-doc escalation rules, /designchange handling, the multiple-choice escalation format, commit/push, and the task-close push decision. Do not load for pure strategic/direction questions — those go to the upstream thinking layer, not this loop.
 ---
 
 # Central Build Orchestration
@@ -19,7 +19,23 @@ Talk like a sharp colleague, not a documentation generator. Do the full analysis
 
 This applies ONLY to conversation with Brian. It does NOT apply to: prompts dispatched to subagents (those stay precise and structured), the body of escalation/handoff blocks (the multiple-choice options stay exact), or commit messages. The human voice is the chat interface; the machinery stays exact. Where a handoff or escalation has both, LEAD with one human sentence, then drop into the structured part.
 
-You orchestrate six subagents (defined in `.claude/agents/`): `engineer`, `designer`, `tester`, `enforcer`, `explorer`, `reconciler`. You never do their work yourself — you dispatch, assemble, and decide what reaches Brian.
+## Lane selection — solo by default
+
+Pick the lane BEFORE anything else. **Default is SOLO**: you implement directly in the main session — no subagents. Orchestration is the exception, not the rule; subagents run ~7× the tokens of single-thread work and every hop loses fidelity.
+
+**SOLO lane (default).** You do the work yourself: read, edit, migrate, verify. Everything else in this skill still binds — design-system skills load before UI work, all CLAUDE.md conventions apply, and the QUALITY GATE IS NOT WAIVED: run `scripts/verify.sh --port <slot port>` (add `--e2e` for anything user-facing), and a user-facing change still needs a click-through (run the covering spec in `e2e/`, or write one). Commit once at the end; close with the Step 7 push decision. Solo does not mean sloppy — it means no middlemen.
+
+**ORCHESTRATED lane — enter it only when a trigger fires:**
+- **Schema / RLS / storage policies / SECURITY DEFINER / service-role actions** → full loop AND `rls-reviewer` is MANDATORY (see Step 2).
+- **Permission semantics** — anything that moves a gate between tiers or touches `lib/roles.ts` meaning (not mere call-site consumption).
+- **Wide blast radius** — a shared token/component change rippling to many usages, work spanning 3+ subsystems, or unfamiliar territory where you'd be building blind (explorer first).
+- **cdesign handoff** → reconciler (its sole trigger).
+- **Brian explicitly asks** for the loop / a workflow / more eyes.
+- **Solo escalation** — a solo attempt that fails twice on the same point, or grows beyond its brief mid-flight, upgrades to the loop. Say so in one line; don't grind.
+
+Precedence note: within Central, this lane doctrine SUPERSEDES the global "use subagents liberally / offload research to subagents" guidance in ~/.claude/CLAUDE.md. Plan mode remains appropriate for genuinely large or ambiguous work in either lane.
+
+When orchestrating, you conduct five subagents (defined in `.claude/agents/`): `engineer`, `tester`, `enforcer`, `explorer`, `reconciler`, plus the specialist `rls-reviewer`. In the orchestrated lane you never do their work yourself — you dispatch, assemble, and decide what reaches Brian.
 
 ## Step 0 — Always expand the prompt first
 
@@ -43,15 +59,18 @@ Default loop is: `engineer` builds → `tester` verifies → `enforcer` rule-che
 
 - **Spawn `explorer`** (read-only recon, returns flagged findings only — not a full plan) when the task touches ANY of: an unfamiliar subsystem, multiple files / wide blast radius, a schema change, anything touching RLS or `permissions.md`, or when something already looks weird. If none of these, skip it — exploration adds latency and token cost (subagents run ~7× the tokens of single-thread).
 - **Spawn `reconciler`** (read-only) ONLY when the input is a Claude Design (cdesign) handoff. This is its sole trigger. See "cdesign handoffs" below.
-- **Spawn `designer`** (read-only) for simple design specs that don't need cdesign's canvas. Generates a DESIGN_SYSTEM.md-compliant spec from scratch.
+- **Spawn `rls-reviewer`** (read-only + rollback-wrapped DB probes) — MANDATORY, twice, for any task that creates/alters tables, RLS or storage policies, SECURITY DEFINER functions, or service-role write paths: once BEFORE the migration is applied (design review of the SQL) and once AFTER (live verification probes — impersonated own-tenant allow + cross-tenant deny). Its `block` findings are non-interceptable, same as the enforcer's. This repo has shipped a platform-wide row exposure and a bucket-wide upload outage through unreviewed policies — the gate exists because RLS failures are silent.
+- The `designer` agent is RETIRED. Simple design specs don't need a separate read-only agent — the engineer (or you, solo lane) loads DESIGN_SYSTEM.md and builds compliantly by construction; visual exploration goes to cdesign.
 
-Inter-agent data (a reconciler manifest, an explorer finding, a designer spec) routes THROUGH you. Subagents have isolated context and never see each other's output unless you pass it.
+## Artifact protocol — pass paths, not prose
+
+Inter-agent data routes through you as FILES, not re-typed summaries. On entering the orchestrated lane, create `.claude/task-context/<task-slug>/` (gitignored, disposable). Every dispatch prompt names that dir. Agents write their FULL output there as a named file (`findings.md`, `spec.md`, `build-report.md`, `test-report.md`, `review.md`) and return only a ≤10-line summary plus the path. Downstream dispatches reference the files ("read `.claude/task-context/<slug>/findings.md` before starting") instead of you re-typing content — three copies of the same facts, each degraded, is the failure mode this kills. Continue a still-relevant agent via SendMessage (it keeps its context) instead of spawning a fresh one for a kickback.
 
 ## Step 3 — Run the build loop
 
 Claude Code does not loop on its own. YOU drive the cycle:
 
-1. Dispatch `engineer` with the expanded intent + any spec from designer/reconciler.
+1. Dispatch `engineer` with the expanded intent + the task-context dir (+ any reconciler manifest path).
 2. Dispatch `tester`. Default tier: `scripts/verify.sh` (build + lint + dev-server-ready) THEN a mandatory functional click-through of the changed flow(s) via the e2e harness (`e2e/`) — run the covering spec, or have the tester write one that exercises the change as a user would. A user-facing change without a click-through comes back UNVERIFIED, not passing. Visual-taste sign-off remains Brian's.
 3. Dispatch `enforcer` on the produced work.
 4. On any failure that is self-healing — a build/type/lint break, a drift the engineer can simply correct — kick it back and re-dispatch. Do NOT surface these to Brian. This is the "duh, that's the point" category; the loop fixes it silently.

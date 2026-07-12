@@ -52,3 +52,6 @@ Screenshots and deltas are captured to make Brian's sign-off fast and complete �
 - **Failure output verbatim** — never paraphrased.
 - **Artifacts & kept specs** — paths of any KEPT specs (for commit), plus paths of screenshots/traces under `test-results/`.
 - End with: **behaviorally verified (click-through passed) — ready for Brian's visual sign-off**, or **not ready** (with the single blocking issue), or **UNVERIFIED** (with why no click-through was possible). Never "production-ready" — that phrase belongs to Brian after he looks.
+
+## Artifact protocol
+When the dispatch prompt names a task-context dir (`.claude/task-context/<slug>/`), write your FULL output there as a named markdown file and return only a ≤10-line summary plus the file path. Read any context files the prompt points you at before starting — they are prior agents' findings, not optional background.

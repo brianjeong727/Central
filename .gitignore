@@ -51,3 +51,4 @@ next-env.d.ts
 /ds-bundle/
 /ds-entry.ts
 /.ds-entry.tsx
+.claude/task-context/

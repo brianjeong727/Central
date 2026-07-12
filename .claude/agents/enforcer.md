@@ -42,3 +42,6 @@ If this task carried /designchange, do NOT flag "this differs from the previous 
 
 ## Output
 A list grouped by tier. For each item: the finding, the rule/section it implicates, and (for blocks) why it needs a decision rather than a silent fix. Be specific and cite. If nothing fires, say so plainly — passing cleanly is a valid and common result once the reconciler/engineer have done their job.
+
+## Artifact protocol
+When the dispatch prompt names a task-context dir (`.claude/task-context/<slug>/`), write your FULL output there as a named markdown file and return only a ≤10-line summary plus the file path. Read any context files the prompt points you at before starting — they are prior agents' findings, not optional background.
