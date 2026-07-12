@@ -200,6 +200,7 @@ function normalize(s?: NotificationSettings): Required<Omit<NotificationSettings
     mentions: s?.mentions ?? true,
     replies: s?.replies ?? true,
     announcements: s?.announcements ?? true,
+    activity: s?.activity ?? true,
     group_mode: s?.group_mode ?? "smart",
     desk_web: s?.desk_web ?? true,
     desk_digest: s?.desk_digest ?? true,
@@ -342,6 +343,7 @@ export function NotificationsSection({
         <ToggleRow title="Mentions" sub="Someone @mentions you in a chat." on={pending.mentions} onToggle={() => set("mentions", !pending.mentions)} />
         <ToggleRow title="Replies" sub="Someone replies to one of your messages." on={pending.replies} onToggle={() => set("replies", !pending.replies)} />
         <ToggleRow title="Announcements" sub="Your church posts a new announcement." on={pending.announcements} onToggle={() => set("announcements", !pending.announcements)} />
+        <ToggleRow title="Activity & assignments" sub="You're given a task, role, or DGL week, a receipt is decided, your role changes, or your pastor asks a question." on={pending.activity} onToggle={() => set("activity", !pending.activity)} />
 
         {/* Group chat mode */}
         <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 18px", borderTop: "1px solid var(--line)" }}>

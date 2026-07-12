@@ -45,6 +45,10 @@ export interface NotificationSettings {
   replies?: boolean
   /** Tier 1 — published announcements (official channel). Default on. */
   announcements?: boolean
+  /** Tier 1 — personal activity directed AT you: task/role/DGL assignments, receipt
+   *  decisions, role changes, pulse questions. One toggle for these rare, weighty,
+   *  personal events. Default on. */
+  activity?: boolean
   /** Tier 2 — group-chat firehose control. Default 'smart' (all <30 members, mentions-only ≥30). */
   group_mode?: GroupNotifyMode
   /** Tier 3 — desk-work push on web. Default on. */
