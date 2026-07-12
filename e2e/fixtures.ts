@@ -239,5 +239,96 @@ export function sandbox() {
       const { error } = await db.from("push_subscriptions").delete().eq("user_id", userId)
       if (error) throw error
     },
+
+    // ── Web Push v2 sender fixtures ─────────────────────────────────────────
+    /** Insert a receipt into the sandbox ministry. event_name is E2E::-prefixed for
+     *  cleanup. Defaults to status 'pending' (the fresh-submission state). */
+    async createReceipt({
+      submittedBy, amount = 12.5, eventName = "coffee", status = "pending",
+    }: { submittedBy: string; amount?: number; eventName?: string; status?: string }) {
+      const name = eventName.startsWith(E2E_PREFIX) ? eventName : `${E2E_PREFIX}${eventName}`
+      const { data, error } = await db
+        .from("receipts")
+        .insert({
+          ministry_id: ministryId,
+          submitted_by: submittedBy,
+          submitted_by_name: "E2E Submitter",
+          event_name: name,
+          category: "Supplies",
+          fund: "General",
+          amount,
+          purchase_date: "2026-07-01",
+          status,
+        })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async updateReceiptStatus(id: string, status: string) {
+      const { error } = await db.from("receipts").update({ status }).eq("id", id).eq("ministry_id", ministryId)
+      if (error) throw error
+    },
+
+    async deleteReceiptsByPrefix(prefix: string = E2E_PREFIX) {
+      const { error } = await db.from("receipts").delete().eq("ministry_id", ministryId).like("event_name", `${prefix}%`)
+      if (error) throw error
+    },
+
+    /** Insert an active congregation pulse question authored by `createdBy`. */
+    async createPulseQuestion({ createdBy, questionText = "How are you today?" }: { createdBy: string; questionText?: string }) {
+      const text = questionText.startsWith(E2E_PREFIX) ? questionText : `${E2E_PREFIX}${questionText}`
+      const { data, error } = await db
+        .from("congregation_questions")
+        .insert({ ministry_id: ministryId, created_by: createdBy, question_text: text, question_type: "open", options: null, is_active: true })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async deletePulseQuestionsByPrefix(prefix: string = E2E_PREFIX) {
+      const { error } = await db.from("congregation_questions").delete().eq("ministry_id", ministryId).like("question_text", `${prefix}%`)
+      if (error) throw error
+    },
+
+    /** Create an announcement_forms row (optionally attached to an announcement). */
+    async createForm({ createdBy, title = "signup", announcementId = null }: { createdBy: string; title?: string; announcementId?: string | null }) {
+      const t = title.startsWith(E2E_PREFIX) ? title : `${E2E_PREFIX}${title}`
+      const { data, error } = await db
+        .from("announcement_forms")
+        .insert({ ministry_id: ministryId, title: t, announcement_id: announcementId, created_by: createdBy })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    async insertFormResponse({ formId, announcementId = null, userId }: { formId: string; announcementId?: string | null; userId: string }) {
+      const { data, error } = await db
+        .from("form_responses")
+        .insert({ form_id: formId, announcement_id: announcementId, ministry_id: ministryId, user_id: userId })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    /** Delete E2E form_responses + announcement_forms (responses first — FK). */
+    async deleteFormsByPrefix(prefix: string = E2E_PREFIX) {
+      const { data: forms } = await db.from("announcement_forms").select("id").eq("ministry_id", ministryId).like("title", `${prefix}%`)
+      const ids = ((forms ?? []) as { id: string }[]).map((f) => f.id)
+      if (ids.length > 0) {
+        await db.from("form_responses").delete().in("form_id", ids)
+        await db.from("announcement_forms").delete().in("id", ids)
+      }
+    },
+
+    /** Set a sandbox user's notification_settings to an explicit object. */
+    async setNotificationSettings(userId: string, settings: Record<string, unknown>) {
+      const { error } = await db.from("profiles").update({ notification_settings: settings }).eq("id", userId).eq("ministry_id", ministryId)
+      if (error) throw error
+    },
   }
 }
