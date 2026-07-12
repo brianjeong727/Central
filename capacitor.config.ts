@@ -1,7 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli"
 
 // Remote-URL shell: the native iOS app is a thin WebView that loads the deployed
-// web app at https://joincentral.app. There is NO code fork — capacitor-shell/ holds
+// web app at https://www.joincentral.app (the CANONICAL origin — the apex 307s to www,
+// and Capacitor's bridge self-disables on origin mismatch, killing native detection). There is NO code fork — capacitor-shell/ holds
 // only a fallback index.html that the remote shell never serves. The shell owns just
 // two pixels of surface: the splash background and the status-bar style (cream, per
 // DESIGN_SYSTEM). Everything else is the live web app.
@@ -14,7 +15,7 @@ const config: CapacitorConfig = {
   // Fallback web assets only — the remote server URL below supersedes these at runtime.
   webDir: "capacitor-shell",
   server: {
-    url: "https://joincentral.app",
+    url: "https://www.joincentral.app",
     // In-WebView navigations to these hosts stay in the app; anything else opens in
     // the system browser. Covers the app, its subdomains, and Supabase (auth/storage/realtime).
     allowNavigation: ["joincentral.app", "*.joincentral.app", "*.supabase.co"],
