@@ -11,7 +11,8 @@ import { getInitials } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
-import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu } from "@/components/central"
+import { deleteMyAccount } from "@/app/actions/delete-account"
+import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input } from "@/components/central"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
 import type { Profile, Devotional, Prayer, Verse, NotificationSettings } from "../types"
@@ -757,6 +758,8 @@ function DangerZone({
   onShowConfirm,
   onCancel,
   onConfirm,
+  email,
+  onAccountDeleted,
 }: {
   ministryName: string
   leaveConfirm: boolean
@@ -765,6 +768,8 @@ function DangerZone({
   onShowConfirm: () => void
   onCancel: () => void
   onConfirm: () => void
+  email: string
+  onAccountDeleted: () => void
 }) {
   return (
     <div style={{ paddingTop: 48 }}>
@@ -789,6 +794,76 @@ function DangerZone({
             <CentralButton variant="secondary" onClick={onCancel} disabled={leaving}>Cancel</CentralButton>
           </div>
         )}
+      </div>
+      <DeleteAccountSection email={email} onDeleted={onAccountDeleted} />
+    </div>
+  )
+}
+
+// ── Delete Account (§4.20 danger zone; navigate-to-confirm, no modal) ─────────
+// Self-contained: manages its own idle → confirm → deleting flow, calls the
+// self-delete server action, then signs the user out and lands them on "/".
+// The confirm step is a full in-place surface swap (not a modal), gated on the
+// user retyping their exact email — the client-side match only enables the
+// button; the SERVER re-verifies the email before doing anything.
+
+function DeleteAccountSection({ email, onDeleted }: { email: string; onDeleted: () => void }) {
+  const [phase, setPhase] = useState<"idle" | "confirm">("idle")
+  const [typed, setTyped] = useState("")
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const emailMatches = typed.trim().toLowerCase() === (email ?? "").trim().toLowerCase() && typed.length > 0
+
+  async function handleDelete() {
+    if (!emailMatches) return
+    setDeleting(true)
+    setError(null)
+    const { error: err, deleted } = await deleteMyAccount(typed)
+    if (err || !deleted) {
+      setError(err ?? "Something went wrong. Please try again.")
+      setDeleting(false)
+      return
+    }
+    // Success: sign out + leave the app entirely.
+    onDeleted()
+  }
+
+  if (phase === "idle") {
+    return (
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap", marginTop: 28 }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 20, fontWeight: 400, color: "var(--ink)", margin: "0 0 6px" }}>Delete your account</p>
+          <p style={{ fontSize: 13, color: "var(--body)", margin: 0, lineHeight: 1.55 }}>
+            Permanently deletes your login and personal data — profile, journal, RSVPs, and form responses. Messages you sent stay in their chats, shown as “Former member.” This can’t be undone.
+          </p>
+        </div>
+        <CentralButton variant="destructive" onClick={() => setPhase("confirm")} style={{ flexShrink: 0 }}>Delete account</CentralButton>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ marginTop: 28, border: "1px solid var(--danger)", borderRadius: 12, padding: "20px 22px", background: "var(--cream)" }}>
+      <p style={{ fontFamily: "var(--serif)", fontSize: 20, fontWeight: 400, color: "var(--ink)", margin: "0 0 6px" }}>Delete your account?</p>
+      <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 16px", lineHeight: 1.55 }}>
+        This permanently deletes your login and personal data. It can’t be undone. Type your email <strong style={{ color: "var(--ink)" }}>{email}</strong> to confirm.
+      </p>
+      <Input
+        type="email"
+        autoComplete="off"
+        placeholder="you@university.edu"
+        value={typed}
+        onChange={(e) => setTyped(e.target.value)}
+        disabled={deleting}
+        style={{ width: "100%", maxWidth: 320, marginBottom: 14 }}
+      />
+      {error && <p style={{ fontSize: 12, color: "var(--danger)", margin: "0 0 12px" }}>{error}</p>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <CentralButton variant="danger-solid" onClick={handleDelete} disabled={deleting || !emailMatches}>
+          {deleting ? "Deleting…" : "Permanently delete"}
+        </CentralButton>
+        <CentralButton variant="secondary" onClick={() => { setPhase("idle"); setTyped(""); setError(null) }} disabled={deleting}>Cancel</CentralButton>
       </div>
     </div>
   )
@@ -907,6 +982,13 @@ export function ProfileTab({
     const { error } = await selfLeaveMinistry()
     if (error) { setLeaveError(error); setLeaving(false); return }
     router.push("/join")
+  }
+
+  async function handleAccountDeleted() {
+    // The auth identity is already gone; clear any local session and leave the
+    // app entirely (full reload resets all in-memory state).
+    await supabase.auth.signOut()
+    window.location.assign("/")
   }
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1172,6 +1254,8 @@ export function ProfileTab({
               onShowConfirm={() => setLeaveConfirm(true)}
               onCancel={() => { setLeaveConfirm(false); setLeaveError(null) }}
               onConfirm={handleLeaveMinistry}
+              email={profile.email ?? ""}
+              onAccountDeleted={handleAccountDeleted}
             />
           </div>
         </div>
@@ -1195,6 +1279,8 @@ export function ProfileTab({
             onShowConfirm={() => setLeaveConfirm(true)}
             onCancel={() => { setLeaveConfirm(false); setLeaveError(null) }}
             onConfirm={handleLeaveMinistry}
+            email={profile.email ?? ""}
+            onAccountDeleted={handleAccountDeleted}
           />
         </div>
       </div>}

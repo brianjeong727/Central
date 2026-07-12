@@ -43,7 +43,7 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
       setLoading(true)
       const q = query.toLowerCase()
       const [profilesRes, groupsRes, announcementsRes] = await Promise.all([
-        supabase.from("profiles").select("id, name, email, role").eq("ministry_id", ministryId).ilike("name", `%${q}%`).limit(5),
+        supabase.from("profiles").select("id, name, email, role").eq("ministry_id", ministryId).is("deleted_at", null).ilike("name", `%${q}%`).limit(5),
         supabase.from("groups").select("id, name, type").eq("ministry_id", ministryId).eq("archived", false).ilike("name", `%${q}%`).limit(5),
         supabase.from("announcements").select("id, title").eq("ministry_id", ministryId).ilike("title", `%${q}%`).limit(5),
       ])
