@@ -9,6 +9,10 @@ import { ADMIN_ROLES, LEADER_ROLES, MEMBER_TIER, isAdminRole, isStaffRole } from
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
 
+// Archived chats are stash — never resurrected by lookups (see auto-chats.ts).
+// `archived` is nullable (NULL = active), so admit NULL as well as false.
+const NOT_ARCHIVED = "archived.is.null,archived.eq.false"
+
 function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase()
 }
@@ -484,6 +488,7 @@ async function seedStarterContent(
       .eq("ministry_id", ministryId)
       .eq("type", "church")
       .eq("name", "Leaders")
+      .or(NOT_ARCHIVED)
       .maybeSingle()
 
     let groupId = existing?.id ?? null
@@ -761,6 +766,7 @@ async function findLeadersChatId(
     .eq("type", "church")
     .eq("category", "general")
     .eq("name", "Leaders")
+    .or(NOT_ARCHIVED)
     .order("created_at", { ascending: true })
     .limit(1)
   return data?.[0]?.id ?? null

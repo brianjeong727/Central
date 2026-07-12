@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Settings, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, ChevronRight, X, Check, ArrowLeft, Settings, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -2874,7 +2874,10 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
     return (p === "church" || p === "my") ? p : "church"
   })
   const [showCreateChat, setShowCreateChat] = useState<"my" | "church" | null>(null)
-  const [showArchived, setShowArchived] = useState(false)
+  // Archived stash view — swaps the church list for the read-only archived rooms.
+  // Browse state → URL-synced as ?chats=archived (reload restores it).
+  const [archivedView, setArchivedView] = useState<boolean>(() =>
+    (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null) === "archived")
   const [search, setSearch] = useState("")
 
   const isAdminOrLeader = isChatManageRole(userRole)
@@ -2952,6 +2955,9 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   const active = search.trim()
     ? rawActive.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
     : rawActive
+  const archivedFiltered = search.trim()
+    ? archivedChurchChats.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : archivedChurchChats
   const churchSections = subTab === "church" ? sectionChurchChats(active) : null
   const showPlusButton = subTab === "my" || (subTab === "church" && canCreateChurchChat)
 
@@ -2985,6 +2991,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           value={subTab}
           onChange={(t) => {
             setSubTab(t)
+            setArchivedView(false)
             setSearch("")
             setParam("chats", t === "church" ? null : t)
           }}
@@ -3018,6 +3025,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           value={subTab}
           onChange={(t) => {
             setSubTab(t)
+            setArchivedView(false)
             setSearch("")
             setParam("chats", t === "church" ? null : t)
           }}
@@ -3041,28 +3049,63 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         <PushSubscribeCard userId={userId} ministryId={ministryId} notificationSettings={userProfile.notification_settings} style={{ marginBottom: 16 }} />
       </div>
 
-      {/* Section header with + button */}
+      {/* Section header with + button (archived view swaps in a back header) */}
       <div className="flex items-center justify-between mb-3 md:px-4">
-        <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "var(--ink)", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}
-          className="md:hidden">
-          {subTab === "church" ? "Church chats" : "My chats"}
-        </h3>
-        {/* Desktop mono section label */}
-        <p className="hidden md:block mb-1" style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "11px", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)" }}>
-          {subTab === "church" ? `Church · ${churchChats.length}` : `Direct · ${myChats.length}`}
-        </p>
-        {showPlusButton && (
+        {archivedView ? (
           <button
-            onClick={() => setShowCreateChat(subTab)}
-            className="size-8 rounded-xl bg-[var(--cream-panel)] border border-[var(--line)] flex items-center justify-center hover:bg-[var(--cream-2)] active:scale-95 transition-all md:size-7 md:rounded-lg"
+            onClick={() => { setArchivedView(false); setSearch(""); setParam("chats", null) }}
+            className="flex items-center gap-2.5"
+            aria-label="Back to church chats"
           >
-            <Plus className="w-4 h-4 text-[var(--plum)] md:w-3.5 md:h-3.5" />
+            <ArrowLeft className="w-4 h-4 text-[var(--muted-text)]" />
+            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "var(--ink)", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}
+              className="md:hidden">
+              Archived
+            </h3>
+            <span className="hidden md:block" style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "11px", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)" }}>
+              Archived · {archivedChurchChats.length}
+            </span>
           </button>
+        ) : (
+          <>
+            <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "var(--ink)", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}
+              className="md:hidden">
+              {subTab === "church" ? "Church chats" : "My chats"}
+            </h3>
+            {/* Desktop mono section label */}
+            <p className="hidden md:block mb-1" style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "11px", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)" }}>
+              {subTab === "church" ? `Church · ${churchChats.length}` : `Direct · ${myChats.length}`}
+            </p>
+            {showPlusButton && (
+              <button
+                onClick={() => setShowCreateChat(subTab)}
+                className="size-8 rounded-xl bg-[var(--cream-panel)] border border-[var(--line)] flex items-center justify-center hover:bg-[var(--cream-2)] active:scale-95 transition-all md:size-7 md:rounded-lg"
+              >
+                <Plus className="w-4 h-4 text-[var(--plum)] md:w-3.5 md:h-3.5" />
+              </button>
+            )}
+          </>
         )}
       </div>
 
       {loading ? (
         <Spinner />
+      ) : archivedView ? (
+        archivedFiltered.length === 0 ? (
+          <EmptyState
+            icon={<Users className="w-7 h-7" />}
+            title={search.trim() ? "No chats found" : "No archived chats"}
+            subtitle={search.trim() ? `No archived chats match "${search.trim()}"` : "Chats an admin archives are stored here, read-only"}
+          />
+        ) : (
+          <div className="flex flex-col gap-2.5 md:gap-0">
+            {archivedFiltered.map((group) => (
+              <div key={group.id} className="opacity-50">
+                <ChatGroupCard group={group} onClick={() => handleOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} />
+              </div>
+            ))}
+          </div>
+        )
       ) : active.length === 0 && !(subTab === "church" && archivedChurchChats.length > 0) ? (
         <EmptyState
           icon={<Users className="w-7 h-7" />}
@@ -3096,28 +3139,17 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             ))
           )}
 
-          {/* Archived section (Church Chats only) */}
+          {/* Archived stash — quiet bottom row, swaps the list to the archived view */}
           {subTab === "church" && archivedChurchChats.length > 0 && (
-            <div className="mt-2">
-              <button
-                onClick={() => setShowArchived((s) => !s)}
-                className="w-full flex items-center justify-between py-3 px-1 md:px-4"
-              >
-                <span className="text-[11px] font-normal text-[var(--muted-text)]/40 uppercase tracking-wider">
-                  Archived · {archivedChurchChats.length}
-                </span>
-                <ChevronDown className={`w-4 h-4 text-[var(--muted-text)]/30 transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />
-              </button>
-              {showArchived && (
-                <div className="flex flex-col gap-2.5">
-                  {archivedChurchChats.map((group) => (
-                    <div key={group.id} className="opacity-50">
-                      <ChatGroupCard group={group} onClick={() => handleOpenChat(group.id, group.name)} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button
+              onClick={() => { setArchivedView(true); setSearch(""); setParam("chats", "archived") }}
+              className="w-full flex items-center justify-between py-3 px-1 mt-2 md:px-4"
+            >
+              <span className="text-[11px] font-normal text-[var(--muted-text)]/40 uppercase tracking-wider">
+                Archived · {archivedChurchChats.length}
+              </span>
+              <ChevronRight className="w-4 h-4 text-[var(--muted-text)]/30" />
+            </button>
           )}
         </div>
       )}
@@ -3268,7 +3300,10 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
   // Section to pre-select when the create sheet opens from a church section's +
   // button. Ignored for "my" chats.
   const [pendingCategory, setPendingCategory] = useState<ChurchSection | undefined>(undefined)
-  const [showArchived, setShowArchived] = useState(false)
+  // Archived stash view — swaps the church list for the read-only archived rooms.
+  // Browse state → URL-synced as ?chats=archived (reload restores it).
+  const [archivedView, setArchivedView] = useState<boolean>(() =>
+    (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null) === "archived")
   const [search, setSearch] = useState("")
 
   // Same stable key + fetcher as mobile ChatsTab → SWR dedupes both to one cache
@@ -3331,6 +3366,9 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
   const active = search.trim()
     ? rawActive.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
     : rawActive
+  const archivedFiltered = search.trim()
+    ? archivedChurchChats.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : archivedChurchChats
   const churchSections = subTab === "church" ? sectionChurchChats(active) : null
   const showPlusButton = subTab === "my" || (subTab === "church" && canCreateChurchChat)
 
@@ -3359,6 +3397,7 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
           value={subTab}
           onChange={(t) => {
             setSubTab(t)
+            setArchivedView(false)
             setSearch("")
             setParam("chats", t === "church" ? null : t)
           }}
@@ -3389,6 +3428,32 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
         <PushSubscribeCard userId={userId} ministryId={ministryId} notificationSettings={userProfile?.notification_settings} style={{ margin: "4px 12px 12px", padding: 16 }} />
         {loading ? (
           <div className="px-2 pt-2"><Spinner /></div>
+        ) : archivedView ? (
+          <>
+            <button
+              onClick={() => { setArchivedView(false); setSearch(""); setParam("chats", null) }}
+              className="w-full flex items-center gap-2 px-4 pt-1 pb-2"
+              aria-label="Back to church chats"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-[var(--muted-text)]" />
+              <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)" }}>
+                Archived · {archivedChurchChats.length}
+              </span>
+            </button>
+            {archivedFiltered.length === 0 ? (
+              <p style={{ fontSize: 12, color: "var(--muted-text)", padding: "8px 12px", fontFamily: "var(--sans)" }}>
+                {search.trim() ? "No results" : "No archived chats"}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {archivedFiltered.map((group) => (
+                  <div key={group.id} className="opacity-50">
+                    <ChatGroupCard group={group} onClick={() => handleOpenChatPanel(group.id, group.name)} isActive={activeGroupId === group.id} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         ) : active.length === 0 && !(subTab === "church" && archivedChurchChats.length > 0) ? (
           <p style={{ fontSize: 12, color: "var(--muted-text)", padding: "8px 12px", fontFamily: "var(--sans)" }}>
             {search.trim() ? "No results" : subTab === "church" ? "No church chats" : "No personal chats"}
@@ -3424,27 +3489,17 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
                 ))
               )}
             </div>
+            {/* Archived stash — quiet bottom row, swaps the panel to the archived view */}
             {subTab === "church" && archivedChurchChats.length > 0 && (
-              <div>
-                <button
-                  onClick={() => setShowArchived(s => !s)}
-                  className="w-full flex items-center justify-between px-4 py-2"
-                >
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)" }}>
-                    Archived · {archivedChurchChats.length}
-                  </span>
-                  <ChevronDown className={`w-3.5 h-3.5 text-[var(--faint)] transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />
-                </button>
-                {showArchived && (
-                  <div className="flex flex-col gap-2">
-                    {archivedChurchChats.map((group) => (
-                      <div key={group.id} className="opacity-50">
-                        <ChatGroupCard group={group} onClick={() => handleOpenChatPanel(group.id, group.name)} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() => { setArchivedView(true); setSearch(""); setParam("chats", "archived") }}
+                className="w-full flex items-center justify-between px-4 py-2"
+              >
+                <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)" }}>
+                  Archived · {archivedChurchChats.length}
+                </span>
+                <ChevronRight className="w-3.5 h-3.5 text-[var(--faint)]" />
+              </button>
             )}
           </>
         )}
