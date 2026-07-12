@@ -41,7 +41,7 @@ export default async function HomePage() {
     .eq("id", user.id)
     .single()
 
-  if (!profile?.ministry_id) redirect("/join")
+  if (!profile?.ministry_id) redirect("/ministries")
 
   // Parallel fetch: ministry name + chat previews + user teams + active question
   const [ministryResult, chatResult, teamResult, questionResult] = await Promise.all([

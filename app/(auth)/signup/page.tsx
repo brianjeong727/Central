@@ -201,7 +201,7 @@ function SignupContent() {
     const { error: signUpError } = await supabase.auth.signUp({
       email: adminEmail,
       password: adminPassword,
-      options: { data: { name: adminName, role: founderRole }, emailRedirectTo: redirect },
+      options: { data: { name: adminName, role: founderRole, central_signup: true }, emailRedirectTo: redirect },
     })
     if (signUpError) {
       setAdminError(rateLimitCopy(signUpError.message))
@@ -229,7 +229,7 @@ function SignupContent() {
     const { error: signUpError } = await supabase.auth.signUp({
       email: memberEmail,
       password: memberPassword,
-      options: { data: { name: memberName, graduation_year: String(gradYearNum), gender }, emailRedirectTo: redirect },
+      options: { data: { name: memberName, graduation_year: String(gradYearNum), gender, central_signup: true }, emailRedirectTo: redirect },
     })
     if (signUpError) {
       setMemberError(rateLimitCopy(signUpError.message))

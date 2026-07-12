@@ -1311,7 +1311,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 onClick={async () => {
                   setGradPromptLoading(true)
                   await selfLeaveMinistry()
-                  window.location.replace("/join")
+                  window.location.replace("/ministries")
                 }}
                 style={{ width: "100%", padding: "14px", borderRadius: 12, border: "1px solid var(--line-2)", background: "transparent", color: "#9F3030", fontSize: 15, fontWeight: 500, fontFamily: "var(--font-inter)", cursor: gradPromptLoading ? "not-allowed" : "pointer", opacity: gradPromptLoading ? 0.6 : 1 }}
               >

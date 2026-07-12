@@ -4,7 +4,7 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
-      allow: ["/", "/landing", "/login", "/signup", "/join"],
+      allow: ["/", "/landing", "/login", "/signup", "/ministries"],
       disallow: ["/home", "/api/"],
     },
     sitemap: "https://joincentral.app/sitemap.xml",
