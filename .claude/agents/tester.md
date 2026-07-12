@@ -53,5 +53,8 @@ Screenshots and deltas are captured to make Brian's sign-off fast and complete �
 - **Artifacts & kept specs** — paths of any KEPT specs (for commit), plus paths of screenshots/traces under `test-results/`.
 - End with: **behaviorally verified (click-through passed) — ready for Brian's visual sign-off**, or **not ready** (with the single blocking issue), or **UNVERIFIED** (with why no click-through was possible). Never "production-ready" — that phrase belongs to Brian after he looks.
 
+## Visual-surface screenshots (mandatory when UI changed)
+For ANY change that renders (new component, layout edit, style change): capture element/region screenshots of the changed surface via a throwaway Playwright spec (mock whatever state gates rendering; delete the spec after) and save them under the task-context dir (or test-results/). List the PNG paths prominently in your report — the orchestrator LOOKS at them before handing off and kicks back anything that looks even slightly off (iterate-capture-iterate until clean — Brian is never the first eyes on a layout problem), and they ride the handoff for Brian. This is layout-sanity evidence (clipping, wrapping, cramped margins, wrong scale in the mount), NOT taste certification — the "never self-certify looks-right" rule stands.
+
 ## Artifact protocol
 When the dispatch prompt names a task-context dir (`.claude/task-context/<slug>/`), write your FULL output there as a named markdown file and return only a ≤10-line summary plus the file path. Read any context files the prompt points you at before starting — they are prior agents' findings, not optional background.

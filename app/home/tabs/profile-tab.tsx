@@ -13,7 +13,8 @@ import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu } from "@/components/central"
 import { useNavState } from "../nav-state"
-import type { Profile, Devotional, Prayer, Verse } from "../types"
+import { NotificationsSection } from "../components/notifications"
+import type { Profile, Devotional, Prayer, Verse, NotificationSettings } from "../types"
 
 // Lazy — RoleDescriptionEditor pulls in @tiptap + yjs; keep that bundle off the
 // Profile tab's chunk until the user actually opens a journal editor.
@@ -1154,6 +1155,14 @@ export function ProfileTab({
         {/* ── Desktop: profile sections ── */}
         <div className="hidden md:flex md:flex-col md:flex-1 px-14 pt-6 pb-10">
           {renderProfileSections()}
+          <div style={{ marginTop: 24 }}>
+            <NotificationsSection
+              userId={userId}
+              ministryId={initialProfile.ministry_id ?? ""}
+              notificationSettings={profile.notification_settings}
+              onSettingsChange={(s: NotificationSettings) => setProfile(p => ({ ...p, notification_settings: s }))}
+            />
+          </div>
           <div style={{ marginTop: "auto" }}>
             <DangerZone
               ministryName={ministryName}
@@ -1170,6 +1179,14 @@ export function ProfileTab({
         {/* ── Mobile: profile sections ── */}
         <div className="md:hidden px-5 pb-6">
           {renderProfileSections()}
+          <div style={{ marginTop: 24, marginBottom: 24 }}>
+            <NotificationsSection
+              userId={userId}
+              ministryId={initialProfile.ministry_id ?? ""}
+              notificationSettings={profile.notification_settings}
+              onSettingsChange={(s: NotificationSettings) => setProfile(p => ({ ...p, notification_settings: s }))}
+            />
+          </div>
           <DangerZone
             ministryName={ministryName}
             leaveConfirm={leaveConfirm}
