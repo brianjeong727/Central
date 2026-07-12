@@ -47,12 +47,15 @@ async function ensureNativeListeners(): Promise<void> {
   await PushNotifications.addListener("registration", async (token) => {
     try {
       const supabase = createClient()
-      await supabase.rpc("claim_native_push_token", {
+      const { error } = await supabase.rpc("claim_native_push_token", {
         p_token: token.value,
         p_user_agent: navigator.userAgent,
       })
-    } catch {
-      // fire-and-forget — a failed token write must never break the app
+      // Loud on failure (inspector-visible) — a silently swallowed claim error cost
+      // a device-debugging session on 2026-07-12. Still never throws into the app.
+      if (error) console.error("[push] native token claim failed:", error.message)
+    } catch (e) {
+      console.error("[push] native token claim threw:", e)
     }
   })
 
@@ -109,6 +112,10 @@ async function getNativePushState(): Promise<PushState> {
     await ensureNativeListeners()
     const perm = await PushNotifications.checkPermissions()
     if (perm.receive === "granted") {
+      // Re-register on EVERY state check while granted (≈ every app launch — Apple's
+      // guidance: tokens rotate). Idempotent + cheap; also the retry path for a failed
+      // or raced first registration, which otherwise had none.
+      PushNotifications.register().catch(() => {})
       return { supported: true, permission: "granted", subscribed: true }
     }
     if (perm.receive === "denied") {
