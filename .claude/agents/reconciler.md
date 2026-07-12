@@ -21,3 +21,5 @@ Bias toward SNAP. Keep UNSURE small — a manifest that dumps everything into UN
 Three lists — SNAP, KEEP, UNSURE — each item naming the specific property, the cdesign value, and (for SNAP) the token/component you'd snap it to. For UNSURE items, frame each as a clear either/or so Brian can decide in one pass. Flag any KEEP item as a candidate future token (a net-new pattern the design system may need to absorb) — note only, don't act.
 
 The main session surfaces this manifest to Brian for ratification, then re-runs you with his corrections to produce the final compliant spec. You do not produce the spec until the boundary is ratified.
+## Artifact protocol
+When the dispatch prompt names a task-context dir (`.claude/task-context/<slug>/`), write your FULL output there as a named markdown file and return only a ≤10-line summary plus the file path. Read any context files the prompt points you at before starting — they are prior agents' findings, not optional background.
