@@ -35,6 +35,7 @@ import { getInitials, formatRelativeTime } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu } from "@/components/central"
 import { useNavState } from "../nav-state"
+import { isAdminRole } from "@/lib/roles"
 
 interface MemberRow {
   id: string
@@ -182,7 +183,7 @@ export function SettingsTab({
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
-  const isAdmin = ["admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
+  const isAdmin = isAdminRole(userRole)
 
   const [activeSettingsTab, setActiveSettingsTab] = useState<ActiveSettingsTab>(() => {
     if (typeof window === "undefined") return "general"
@@ -220,7 +221,7 @@ export function SettingsTab({
 
   const totalMembers = members.length
   const totalLeaders = members.filter(m => m.role.toLowerCase() === "leader").length
-  const totalAdmins = members.filter(m => ["admin", "deacon", "elder", "pastor"].includes(m.role.toLowerCase())).length
+  const totalAdmins = members.filter(m => isAdminRole(m.role)).length
   const totalVisitors = members.filter(m => m.role.toLowerCase() === "visitor").length
 
   // Invite code
@@ -869,7 +870,7 @@ export function SettingsTab({
   // ── Governance edit session ──────────────────────────────────────────────────
   // The all-admins toggle, roster toggles, and per-team access matrix are all
   // staged into ONE draft and persisted together on confirm.
-  const adminMembers = members.filter(m => ["admin", "deacon", "elder", "pastor"].includes(m.role.toLowerCase()))
+  const adminMembers = members.filter(m => isAdminRole(m.role))
 
   function startGovEdit() {
     setGovDraft({
@@ -938,7 +939,7 @@ export function SettingsTab({
   const peopleFiltered = members.filter(m => {
     const role = m.role.toLowerCase()
     const roleMatch = peopleFilter === "all"
-      || (peopleFilter === "admin" && ["admin", "deacon", "elder", "pastor"].includes(role))
+      || (peopleFilter === "admin" && isAdminRole(role))
       || (peopleFilter !== "admin" && role === peopleFilter)
     const s = peopleSearch.toLowerCase().trim()
     return roleMatch && (!s || m.name.toLowerCase().includes(s) || m.email.toLowerCase().includes(s))
@@ -1625,7 +1626,7 @@ export function SettingsTab({
                 <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 18 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Departed member cleanup</div>
-                    <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Permanently anonymizes messages from members who left more than 30 days ago. Their messages remain but show as "Former Member."</div>
+                    <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Permanently anonymizes messages from members who left more than 30 days ago. Their messages remain but show as &ldquo;Former Member.&rdquo;</div>
                     {cleanupResult && <div style={{ marginTop: 8, fontSize: 12, color: cleanupResult.startsWith("Error") ? "var(--danger)" : "#3E7A40" }}>{cleanupResult}</div>}
                   </div>
                   <button onClick={handleRunDepartedCleanup} disabled={cleanupRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: cleanupRunning ? "var(--line-2)" : "var(--cream-panel)", color: cleanupRunning ? "var(--muted-text)" : "var(--ink)", fontSize: 13, fontWeight: 500, cursor: cleanupRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
@@ -2081,7 +2082,7 @@ export function SettingsTab({
         const RANK: Record<string, number> = { visitor: 0, member: 1, leader: 2, admin: 3, deacon: 3, elder: 3, pastor: 3 }
         const cur = roleChangeConfirm.currentRole.toLowerCase()
         const nw = roleChangeConfirm.newRole
-        const isAdminTier = (r: string) => ["admin", "deacon", "elder", "pastor"].includes(r)
+        const isAdminTier = (r: string) => isAdminRole(r)
         const selfDemote = roleChangeConfirm.memberId === userId && (RANK[nw] ?? 0) < (RANK[cur] ?? 0)
         const losesAdmin = selfDemote && isAdminTier(cur) && !isAdminTier(nw)
         return (

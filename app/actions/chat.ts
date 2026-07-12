@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
+import { isChatManageRole } from "@/lib/roles"
 
 export async function deleteGroup(groupId: string): Promise<{ error: string | null }> {
   const supabase = await createClient()
@@ -14,7 +15,7 @@ export async function deleteGroup(groupId: string): Promise<{ error: string | nu
     .select("ministry_id, role")
     .eq("id", user.id)
     .single()
-  if (!profile?.ministry_id || !["admin", "deacon", "elder", "leader"].includes(profile.role.toLowerCase())) {
+  if (!profile?.ministry_id || !isChatManageRole(profile.role)) {
     return { error: "Insufficient permissions." }
   }
 

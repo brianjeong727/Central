@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase-server"
 import { RingCrossLogo } from "@/app/home/components/shared"
+import { isAdminRole } from "@/lib/roles"
 
 export default async function RegisterMinistryPage() {
   const supabase = await createClient()
@@ -19,7 +20,7 @@ export default async function RegisterMinistryPage() {
     .maybeSingle()
 
   const role = (profile?.role ?? "member").toLowerCase()
-  const isAdminTier = ["admin", "deacon", "elder", "pastor"].includes(role)
+  const isAdminTier = isAdminRole(role)
 
   // Admin-tier → registration wizard
   if (isAdminTier) {

@@ -34,6 +34,7 @@ import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, Profi
 import type { CalendarEvent } from "./types"
 import type { DirectoryMember } from "./types"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
+import { isAdminRole, isLeaderRole } from "@/lib/roles"
 
 const AnnouncementsTab = dynamic(() => import("./tabs/announcements-tab").then(m => m.AnnouncementsTab), { loading: () => <AnnouncementsTabSkeleton />, ssr: false })
 const AnnouncementDetailView = dynamic(() => import("./tabs/announcements-tab").then(m => m.AnnouncementDetailView), { loading: () => <Spinner />, ssr: false })
@@ -157,7 +158,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     // single-team auto-enter effect below re-enters them once allTeams loads.
     if ((initialUserTeams?.length ?? 0) !== 1) return null
     const govSettings = initialGovernanceSettings ?? { all_admins: true, roster_ids: [] }
-    const adminTier = ["admin", "deacon", "elder", "pastor"].includes(initialProfile.role.toLowerCase())
+    const adminTier = isAdminRole(initialProfile.role)
     return computeIsGovernanceAdmin(userId, adminTier, govSettings) ? null : initialUserTeams![0].teamId
   })
   const [activeMemberId, setActiveMemberId] = useState<string | null>(searchParams.get("member"))
@@ -216,7 +217,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   const [showGradPrompt, setShowGradPrompt] = useState(false)
   const [gradPromptLoading, setGradPromptLoading] = useState(false)
 
-  const isAdmin = ["admin", "deacon", "elder", "pastor"].includes(initialProfile.role.toLowerCase())
+  const isAdmin = isAdminRole(initialProfile.role)
   // WHO governs teams: by default every admin-tier user; if the roster narrows it,
   // only listed admins. Behavior-preserving while governance is all_admins.
   const governanceSettings: GovernanceSettings = initialGovernanceSettings ?? { all_admins: true, roster_ids: [] }
@@ -313,7 +314,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   const isPastor = initialProfile.role.toLowerCase() === "pastor"
   // Leader-tier (Convention #2): gates the Forms insights tab — leaders + all admin-tier
   // (pastor INCLUDED). Members/visitors are excluded entirely; they fill forms via Announcements.
-  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(initialProfile.role.toLowerCase())
+  const isLeaderOrAdmin = isLeaderRole(initialProfile.role)
   const isTreasurer = userTeams.some(t => t.permissions.includes("can_view_finances"))
   const isDGL = userTeams.some(t => t.permissions.some(p => ["can_create_dgs", "can_view_dgs"].includes(p)))
   const canCreateTeam = isAdmin

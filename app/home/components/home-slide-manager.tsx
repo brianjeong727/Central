@@ -106,6 +106,7 @@ export function HomeSlideManager({
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null))
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- data-load-on-mount (refresh setStates after await); SWR migration deferred
     refresh()
   }, [refresh, supabase])
 

@@ -10,8 +10,7 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
-
-const ADMIN_TIER = ["admin", "deacon", "elder", "pastor"]
+import { isAdminRole } from "@/lib/roles"
 
 export type AuthzContext = { userId: string; ministryId: string; role: string; error: null }
 export type AuthzFailure = { userId: null; ministryId: null; role: null; error: string }
@@ -22,7 +21,7 @@ function deny(error: string): AuthzFailure {
 }
 
 export function isAdminTier(role: string | null | undefined): boolean {
-  return ADMIN_TIER.includes((role ?? "").toLowerCase())
+  return isAdminRole(role)
 }
 
 // Caller must be authenticated and belong to a ministry.

@@ -20,6 +20,7 @@ const HomeSlideManager = dynamic(
   { ssr: false }
 )
 import type { HomeTabProps, Announcement, RsvpAttendee } from "../types"
+import { isAdminRole, isLeaderRole } from "@/lib/roles"
 
 export { HomeTabProps }
 
@@ -81,12 +82,12 @@ export function HomeTab({
   // ── Curated home hero carousel ──
   const [slideRsvping, setSlideRsvping] = useState(false)
   const [managerOpen, setManagerOpen] = useState(false)
-  const canCurateHome = ["admin", "leader", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
+  const canCurateHome = isLeaderRole(userRole)
 
   // ── Getting-started checklist (admin-tier, new ministries only) ──
   // The server action re-gates eligibility (admin-tier + ministry age +
   // dismissal); this client check just avoids a pointless fetch for members.
-  const isAdmin = ["admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
+  const isAdmin = isAdminRole(userRole)
   const { data: checklist, mutate: mutateChecklist } = useSWR(
     isAdmin ? ["setup-checklist", ministryId] : null,
     () => getSetupChecklist()
@@ -153,7 +154,7 @@ export function HomeTab({
     setTimeout(() => onResponded?.(), 2200)
   }
 
-  const isLeaderOrAdmin = ["leader", "admin", "deacon", "elder", "pastor"].includes(userRole.toLowerCase())
+  const isLeaderOrAdmin = isLeaderRole(userRole)
   const top3 = recentChats.slice(0, 3)
   const totalUnread = top3.reduce((s, c) => s + (c.muted ? 0 : c.unreadCount), 0)
   const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })

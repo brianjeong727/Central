@@ -14,7 +14,9 @@
 // fresh profile fetch drives every gate + RLS with the new role.
 
 import { useEffect, useState } from "react"
+// eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ server actions); flagged Phase 2, refactor pending
 import { switchMinistryRole, resetToSuper, getSandboxTeams, switchWorkspaceRole, type SandboxTeam } from "@/app/actions/super"
+// eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ constants); flagged Phase 2, refactor pending
 import { SUPER_UUID, HOME_ROLE, MINISTRY_ROLES, roleLabel } from "@/app/actions/super-constants"
 
 function cap(role: string): string {
