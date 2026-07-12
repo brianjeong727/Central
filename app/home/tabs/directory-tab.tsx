@@ -23,6 +23,7 @@ async function loadDirectoryMembers(
     .from("profiles")
     .select("id, name, graduation_year, role, avatar_url")
     .eq("ministry_id", ministryId)
+    .is("deleted_at", null) // hide deleted-account tombstones ("Former member")
     .order("name")
   return data ?? []
 }

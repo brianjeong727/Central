@@ -62,6 +62,21 @@ if [[ $SKIP_BUILD -eq 0 ]]; then
   fi
 fi
 
+# ── (b2) lockfile parity (Vercel deploys with pnpm --frozen-lockfile) ────────
+# Deps added via npm leave pnpm-lock.yaml stale and kill EVERY deploy at the
+# install step (ERR_PNPM_OUTDATED_LOCKFILE — broke prod all day 2026-07-12).
+LOCK_STATUS="skipped (no pnpm)"
+if command -v pnpm >/dev/null 2>&1; then
+  echo "▶ pnpm frozen-lockfile check (Vercel parity)"
+  if pnpm install --frozen-lockfile --ignore-scripts >/dev/null 2>&1; then
+    LOCK_STATUS="pass"
+  else
+    LOCK_STATUS="fail"
+    echo "✗ pnpm-lock.yaml out of sync with package.json — run: pnpm install (and commit the lockfile). Vercel WILL fail at install."
+    exit 1
+  fi
+fi
+
 # ── (c) lint (errors BLOCK; warnings reported, non-fatal) ────────────────────
 echo "▶ npm run lint"
 LINT_LOG="$(mktemp)"
@@ -151,6 +166,7 @@ echo ""
 echo "════════════ VERIFY SUMMARY ════════════"
 printf '  %-8s %s\n' "build"  "$BUILD_STATUS"
 printf '  %-8s %s\n' "lint"   "$LINT_STATUS"
+printf '  %-8s %s\n' "lockfile" "$LOCK_STATUS"
 printf '  %-8s %s\n' "hex"    "$HEX_STATUS"
 printf '  %-8s %s (:%s)\n' "server" "$SERVER_STATUS" "$PORT"
 printf '  %-8s %s\n' "e2e"    "$E2E_STATUS"

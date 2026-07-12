@@ -387,7 +387,7 @@ export function SettingsTab({
         // invite_code/staff_invite_code are column-revoked for browser clients
         // (Q2 migration) — they load via the admin-scoped getMinistryCodes action.
         supabase.from("ministries").select("name, university, size, is_public, automation_settings, governance_settings, moderation_settings, archive_requested_by, archive_requested_at").eq("id", ministryId).maybeSingle(),
-        supabase.from("profiles").select("id, name, email, role, graduation_year").eq("ministry_id", ministryId).order("name"),
+        supabase.from("profiles").select("id, name, email, role, graduation_year").eq("ministry_id", ministryId).is("deleted_at", null).order("name"),
         supabase.from("ministry_schools").select("id, name, abbreviation, sort_order").eq("ministry_id", ministryId).order("sort_order"),
         getReceiptLimits(ministryId),
         getHomeVerses(ministryId),
