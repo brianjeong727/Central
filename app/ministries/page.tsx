@@ -9,7 +9,8 @@ import { Spinner, RingCrossLogo } from "@/app/home/components/shared"
 import { MonogramChip } from "@/components/central/MonogramChip"
 import { PlanSubTabStrip } from "@/components/central/plan-sub-tab-strip"
 import { CentralButton } from "@/components/central/button"
-import { usePostJoinPickers, PostJoinPickerModals, SIZE_LABELS } from "@/app/join/post-join-pickers"
+import { CentralModal } from "@/components/central"
+import { usePostJoinPickers, PostJoinPickerModals, SIZE_LABELS, ModalAction } from "./post-join-pickers"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 
 const SANS  = "var(--font-inter), system-ui, sans-serif"
@@ -76,13 +77,22 @@ function MinistriesContent() {
   const [joiningCode, setJoiningCode] = useState(false)
   const [codeError, setCodeError]     = useState<string | null>(null)
 
+  // Staff-code join — a staff invite code grants a pastor/deacon/elder role, so we
+  // collect that role via a picker before completing the join. (Ported from the
+  // retired /join route 2026-07-12 so /ministries fully handles staff codes.)
+  const [needsStaffRole, setNeedsStaffRole]     = useState(false)
+  const [staffMinistryName, setStaffMinistryName] = useState<string | null>(null)
+  const [staffRole, setStaffRole]               = useState<"pastor" | "deacon" | "elder" | "">("")
+  const [joiningStaff, setJoiningStaff]         = useState(false)
+  const [staffRoleError, setStaffRoleError]     = useState<string | null>(null)
+
   // Member invite codes per my-ministry (member-visible by rule change 2026-07-04),
   // so members can share their ministry's code without asking an admin.
   const [memberCodes, setMemberCodes] = useState<Record<string, string>>({})
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null)
 
-  // Gender + school pickers — shared with /join so every join path enforces
-  // the same profile-completeness flow.
+  // Gender + school pickers — every join path enforces the same
+  // profile-completeness flow.
   const pickers = usePostJoinPickers()
 
   useEffect(() => {
@@ -165,12 +175,13 @@ function MinistriesContent() {
     setJoiningCode(true)
     setCodeError(null)
     try {
-      const { error, isStaffCode } = await joinMinistryByCode(inviteCode)
+      const { error, isStaffCode, ministryName } = await joinMinistryByCode(inviteCode)
       if (isStaffCode) {
-        // Staff codes need the staff-role picker, which lives on /join. Hand off
-        // WITHOUT the code in the URL — a staff code is a pastor-granting
-        // credential and must not land in browser history / server logs.
-        window.location.assign("/join?tab=code")
+        // Staff codes grant a pastor/deacon/elder role — open the role picker to
+        // capture it before completing the join. The code never leaves in a URL.
+        setStaffMinistryName(ministryName)
+        setNeedsStaffRole(true)
+        setJoiningCode(false)
         return
       }
       if (error) { setCodeError(error); setJoiningCode(false); return }
@@ -179,6 +190,22 @@ function MinistriesContent() {
     } catch {
       setCodeError("Something went wrong. Please try again.")
       setJoiningCode(false)
+    }
+  }
+
+  async function doStaffCodeJoin() {
+    if (!staffRole) return
+    setJoiningStaff(true)
+    setStaffRoleError(null)
+    try {
+      const { error } = await joinMinistryByCode(inviteCode, staffRole)
+      if (error) { setStaffRoleError(error); setJoiningStaff(false); return }
+      setNeedsStaffRole(false)
+      const shown = await pickers.maybeShowSchoolPicker(() => window.location.assign("/home"))
+      if (shown) setJoiningStaff(false)
+    } catch {
+      setStaffRoleError("Something went wrong. Please try again.")
+      setJoiningStaff(false)
     }
   }
 
@@ -193,8 +220,54 @@ function MinistriesContent() {
   return (
     <div style={{ minHeight: "100svh", background: "var(--cream)", fontFamily: SANS, color: "var(--ink)" }}>
 
-      {/* ── Gender + school picker modals (shared with /join) ── */}
+      {/* ── Gender + school picker modals ── */}
       <PostJoinPickerModals pickers={pickers} />
+
+      {/* ── Staff role picker modal (CentralModal shell, §4.17) ── */}
+      {needsStaffRole && (
+        <CentralModal
+          onClose={() => { setNeedsStaffRole(false); setStaffRole(""); setStaffRoleError(null) }}
+          eyebrow="Staff invite code"
+          title={staffMinistryName ? `Join ${staffMinistryName}` : "Join ministry"}
+          maxWidth={360}
+        >
+          <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 20px", lineHeight: 1.5 }}>
+            Select your staff role to continue.
+          </p>
+          {staffRoleError && (
+            <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "var(--plum)", marginBottom: 14 }}>
+              {staffRoleError}
+            </div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 }}>
+            {([
+              { value: "pastor" as const,  label: "Pastor",  desc: "Senior leader"  },
+              { value: "deacon" as const,  label: "Deacon",  desc: "Servant leader" },
+              { value: "elder"  as const,  label: "Elder",   desc: "Elder board"    },
+            ]).map(({ value, label, desc }) => {
+              const active = staffRole === value
+              return (
+                <button key={value} type="button" onClick={() => setStaffRole(value)} style={{
+                  padding: "14px 18px", borderRadius: 12, textAlign: "left", cursor: "pointer",
+                  border: `1px solid ${active ? "var(--plum-2)" : "var(--line-2)"}`,
+                  background: active ? "var(--plum-2)" : "var(--cream-panel)",
+                  transition: "all .12s ease",
+                }}>
+                  <div style={{ fontFamily: SERIF, fontSize: 20, color: active ? "var(--cream-panel)" : "var(--ink)" }}>{label}</div>
+                  <div style={{ fontSize: 13, color: active ? "rgba(251,248,242,0.72)" : "var(--muted-text)", marginTop: 4 }}>{desc}</div>
+                </button>
+              )
+            })}
+          </div>
+          <ModalAction onClick={doStaffCodeJoin} disabled={!staffRole || joiningStaff}>
+            {joiningStaff ? "Joining…" : `Join as ${staffRole || "…"}`}
+          </ModalAction>
+          <button type="button" onClick={() => { setNeedsStaffRole(false); setStaffRole(""); setStaffRoleError(null) }}
+            style={{ width: "100%", background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: SANS }}>
+            Cancel
+          </button>
+        </CentralModal>
+      )}
 
       {/* ── Top bar ── */}
       <div style={{

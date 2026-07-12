@@ -234,7 +234,6 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/(auth)/shared.tsx` | Canonical shared auth components: `AuthPhotoPanel`, `SplitShell`, `GoogleButton`, `OrDivider`, `EyeButton`. All auth pages must use these — do not reimplement the split layout inline. |
 | `app/(auth)/login/page.tsx` | Email + password login |
 | `app/(auth)/signup/page.tsx` | Signup with name, email, password, graduation year |
-| `app/join/page.tsx` | Post-signup — enter invite code OR register new ministry |
 | `app/landing/page.tsx` | Redirects to `/` (landing content now lives at root) |
 | `app/page.tsx` | Public landing / marketing page (renders `LandingPage` component) |
 | `app/ministries/page.tsx` | Public ministry discovery + My Ministries |
@@ -279,14 +278,14 @@ A third SECURITY DEFINER helper, `is_group_member(group_id, user_id)`, gates the
 - `message_reactions` INSERT requires membership of the target message's group (closed a cross-ministry reaction gap).
 - `group_members` INSERT allows admin/leader, the group creator, self, **or any existing member of a non-church group** (mirrors the chat UI's `canManage`).
 
-New users with no `ministry_id` are redirected to `/join` by middleware.
+New users with no `ministry_id` are redirected to `/ministries` by middleware.
 
 ### Routing flow
 ```
 /              → public LandingPage (marketing page; logged-in users are NOT auto-redirected)
 /landing       → redirects to /
 /login, /signup → auth pages (no ministry required)
-/join          → invite code or register new ministry
+/join          → redirects to /ministries?tab=code (page retired 2026-07-12)
 /home          → main app shell (requires auth + ministry_id)
 /ministries    → public ministry discovery
 /register-ministry → role-gated entry point (public); server-side: no auth → /signup?intent=register, admin-tier → /onboarding, non-admin → gate page
@@ -418,7 +417,7 @@ HomeApp (root — owns all global state)
 **Ministry admin**
 `user_ministries`, `ministry_schools`, `ministry_bans`, `ministry_departures`, `audit_logs`
 
-**Profile trigger:** `handle_new_user()` fires `AFTER INSERT ON auth.users` and auto-creates a `profiles` row. `ministry_id` is NULL until the user completes `/join`.
+**Profile trigger:** `handle_new_user()` fires `AFTER INSERT ON auth.users` and auto-creates a `profiles` row. `ministry_id` is NULL until the user joins a ministry via `/ministries`.
 
 **Ministry approval:** `approveMinistry` (founder-email-gated, in `app/actions/ministry.ts`) activates the ministry, creates the onboarding workspaces, seeds `ministry_schools`, and seeds starter content — a pinned welcome announcement + a "Leaders" church chat with the founder (idempotent; seeding failure never blocks approval).
 

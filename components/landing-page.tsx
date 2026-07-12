@@ -184,6 +184,24 @@ export default function LandingPage() {
         setMinistryCount(data?.length ?? 0)
       }
     })
+
+    // Keep the header honest when auth changes elsewhere. A mount-time getUser()
+    // alone can't catch a sign-out that happens in another tab/context, leaving a
+    // stale "Open app". SIGNED_OUT clears the authed state; SIGNED_IN refreshes it.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        setAuthUser(false)
+        setMinistryCount(null)
+        setAuthChecked(true)
+      } else if (event === "SIGNED_IN") {
+        setAuthUser(Boolean(session?.user))
+        setAuthChecked(true)
+        if (session?.user) {
+          getUserMinistries().then(({ data }) => setMinistryCount(data?.length ?? 0))
+        }
+      }
+    })
+    return () => subscription.unsubscribe()
   }, [])
 
 
@@ -194,7 +212,7 @@ export default function LandingPage() {
   }
 
   function handleOpenApp() {
-    if (ministryCount === 0) router.push("/join")
+    if (ministryCount === 0) router.push("/ministries")
     else if (ministryCount !== null && ministryCount > 1) router.push("/pick-ministry")
     else router.push("/home")
   }

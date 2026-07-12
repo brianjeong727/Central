@@ -981,7 +981,7 @@ export function ProfileTab({
     setLeaveError(null)
     const { error } = await selfLeaveMinistry()
     if (error) { setLeaveError(error); setLeaving(false); return }
-    router.push("/join")
+    router.push("/ministries")
   }
 
   async function handleAccountDeleted() {

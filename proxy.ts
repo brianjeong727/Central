@@ -39,6 +39,13 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // /join is retired (2026-07-12) — its join-by-code flow now lives on /ministries.
+  // Redirect old links/bookmarks to the code tab so they never 404. Universal (runs
+  // before the auth branches) since a logged-out user may still hit a stale link.
+  if (pathname === '/join' || pathname.startsWith('/join/')) {
+    return NextResponse.redirect(new URL('/ministries?tab=code', request.url))
+  }
+
   const isPublicPath =
     pathname === '/' ||
     pathname.startsWith('/landing') ||
@@ -55,9 +62,6 @@ export async function proxy(request: NextRequest) {
   if (!user) {
     if (pathname.startsWith('/onboarding')) {
       return NextResponse.redirect(new URL('/signup?intent=register', request.url))
-    }
-    if (pathname.startsWith('/join')) {
-      return NextResponse.redirect(new URL('/login?intent=join', request.url))
     }
     if (!isPublicPath) {
       return NextResponse.redirect(new URL('/landing', request.url))
@@ -88,13 +92,12 @@ export async function proxy(request: NextRequest) {
     .eq('id', user.id)
     .maybeSingle()
 
-  // No ministry yet — allow join/onboarding/public paths; everything else goes to
+  // No ministry yet — allow onboarding/public paths; everything else goes to
   // /ministries (the polished discovery destination: browse + invite code + register —
-  // actionable, unlike the marketing page). /join stays allowed (it's the code-entry
-  // hand-off target from /ministries), but /ministries is the canonical landing.
+  // actionable, unlike the marketing page). /ministries is the canonical landing.
   // Fresh registrants land on /onboarding straight from signup, so it stays open here.
   if (!profile?.ministry_id) {
-    if (!pathname.startsWith('/join') && !pathname.startsWith('/onboarding') && !isPublicPath) {
+    if (!pathname.startsWith('/onboarding') && !isPublicPath) {
       return NextResponse.redirect(new URL('/ministries', request.url))
     }
     return supabaseResponse
@@ -151,9 +154,9 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL('/pick-ministry', request.url))
     }
 
-    // /join stays open — a pending registrant may want to join an existing
+    // /ministries stays open — a pending registrant may want to join an existing
     // ministry instead of waiting (previously they had to sign out first).
-    if (!pathname.startsWith('/pending') && !pathname.startsWith('/landing') && !pathname.startsWith('/join') && pathname !== '/') {
+    if (!pathname.startsWith('/pending') && !pathname.startsWith('/landing') && !pathname.startsWith('/ministries') && pathname !== '/') {
       return NextResponse.redirect(new URL('/pending', request.url))
     }
     return supabaseResponse
@@ -164,7 +167,7 @@ export async function proxy(request: NextRequest) {
   if (status === 'rejected') {
     // /register-ministry must stay reachable — /pending's "Register again" CTA
     // points there (its page then routes admin-tier founders to /onboarding).
-    const allowedForRejected = pathname.startsWith('/pending') || pathname.startsWith('/landing') || pathname.startsWith('/join') || pathname.startsWith('/onboarding') || pathname.startsWith('/register-ministry') || pathname === '/'
+    const allowedForRejected = pathname.startsWith('/pending') || pathname.startsWith('/landing') || pathname.startsWith('/ministries') || pathname.startsWith('/onboarding') || pathname.startsWith('/register-ministry') || pathname === '/'
     if (!allowedForRejected) {
       return NextResponse.redirect(new URL('/pending', request.url))
     }
@@ -175,14 +178,14 @@ export async function proxy(request: NextRequest) {
   // /home — treat exactly like 'rejected' (only pending/rejected have their own
   // branches above; everything else that isn't 'active' lands here).
   if (status !== 'active') {
-    const allowedForInactive = pathname.startsWith('/pending') || pathname.startsWith('/landing') || pathname.startsWith('/join') || pathname.startsWith('/onboarding') || pathname.startsWith('/register-ministry') || pathname === '/'
+    const allowedForInactive = pathname.startsWith('/pending') || pathname.startsWith('/landing') || pathname.startsWith('/ministries') || pathname.startsWith('/onboarding') || pathname.startsWith('/register-ministry') || pathname === '/'
     if (!allowedForInactive) {
       return NextResponse.redirect(new URL('/pending', request.url))
     }
     return supabaseResponse
   }
 
-  // Active ministry — block pending page only; /join and /onboarding stay open for multi-ministry users
+  // Active ministry — block pending page only; /ministries and /onboarding stay open for multi-ministry users
   if (pathname.startsWith('/pending')) {
     return NextResponse.redirect(new URL('/home', request.url))
   }

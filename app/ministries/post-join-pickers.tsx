@@ -1,8 +1,10 @@
 "use client"
 
-// Post-join profile-completeness pickers (gender + school), shared by /join and
-// /ministries so EVERY join path enforces the same flow (previously /ministries
-// joins skipped both and landed on /home with an incomplete profile).
+// Post-join profile-completeness pickers (gender + school) used by the /ministries
+// join surface so EVERY join path enforces the same flow (previously joins skipped
+// both and landed on /home with an incomplete profile). Also exports ModalAction,
+// reused by the /ministries staff-role picker. (Relocated from the retired /join
+// route 2026-07-12.)
 //
 // Usage:
 //   const pickers = usePostJoinPickers()
@@ -25,14 +27,14 @@ const GENDERS = [
   { value: "female", label: "Female" },
 ] as const
 
-// Ministry-size display labels — shared by /join and /ministries.
+// Ministry-size display labels.
 export const SIZE_LABELS: Record<string, string> = {
   small: "Under 50",
   medium: "50–100",
   large: "100+",
 }
 
-// Shared modal primary button — also used by /join's staff-role modal.
+// Shared modal primary button — also used by the /ministries staff-role modal.
 export function ModalAction({ children, onClick, disabled }: {
   children: React.ReactNode; onClick?: () => void; disabled?: boolean
 }) {
