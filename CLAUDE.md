@@ -70,12 +70,8 @@ When you learn something from a mistake, discover a non-obvious constraint, or a
 
 ## Critical Conventions
 1. **Never use `localStorage` or `sessionStorage`** — Supabase session only.
-2. **Role checks — three patterns; use the right one for the gate:**
-   - `isAdmin = ["admin","deacon","elder","pastor"].includes(role.toLowerCase())` — admin-tier gates (settings, ministry config, giving editor, etc.)
-   - `isLeaderOrAdmin = ["leader","admin","deacon","elder","pastor"].includes(role.toLowerCase())` — leader+admin gates (e.g. announcement create/edit)
-   - `isAdminOrLeader = ["admin","leader","deacon","elder"].includes(role.toLowerCase())` — chat management, pins; **pastor is intentionally excluded here**
-   These must stay consistent with `permissions.md`, which is the canonical source of truth for who can do what. Do not maintain a parallel description here that could drift from it.
-3. **Visitor parity:** any check like `role === "member"` must be `["member", "visitor"].includes(role)`. Any check like `["admin", "leader", "member"].includes(role)` must add `"visitor"`.
+2. **Role checks — use `lib/roles.ts`, never inline arrays:** all role gating goes through the canonical predicates — `isAdminRole` (admin-tier: settings, ministry config, giving editor), `isLeaderRole` (leader+admin: announcement create/edit), `isChatManageRole` (chat management, pins; **pastor is intentionally excluded**), `isStaffRole` (pastor/deacon/elder: staff invite code, founder role), `isMemberTier` (member+visitor). `lib/roles.ts` is the single code encoding of `permissions.md` (the canonical source of truth) — change roles THERE only. Writing a new inline role array is a violation unless the gate is a genuine nonconformer (document why at the site). Legit nonconformers today: the home-tab honorific subset, group-algorithm visitor heuristics, super-constants' full role enum, and UI role-picker enums.
+3. **Visitor parity:** any check like `role === "member"` must be `isMemberTier(role)` (member + visitor). Any bespoke list that includes `"member"` must include `"visitor"`.
 4. **Optimistic updates** on all user-facing writes (messages, reactions, RSVPs).
 5. **All DB writes** go through the browser Supabase client or server actions — no raw fetch.
 6. **App shell structure:** `app/home/home-app.tsx` is the tab orchestrator (~713 lines) — it owns global state (`activeTab`, `globalOpenChat`, `totalChatsUnread`, `chatRefreshKey`, `recentChats`, `userTeams`, etc.) and renders the active tab. Each tab is its own file in `app/home/tabs/`. Shared UI components live in `components/central/`. When building new UI inside a tab, add it to that tab's file or extract a component into `components/central/` — do not add tab-level logic back into `home-app.tsx`.
