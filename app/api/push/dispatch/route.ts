@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import webpush, { WebPushError } from "web-push"
 import { createAdminClient } from "@/lib/supabase-admin"
+import { apnsReady, sendApnsNotification } from "@/lib/apns"
 import { isAdminRole } from "@/lib/roles"
 import type { NotificationSettings } from "@/app/home/types"
 
@@ -51,6 +52,19 @@ interface SubRow {
 }
 
 const SMART_THRESHOLD = 30 // mirrors read-receipt large-room threshold (Convention #18)
+
+// The subset of a recipient's subscriptions a given Resolved actually delivers to,
+// after Tier-3 platform gating. Shared by dryRun's routing breakdown and the real
+// fan-out so both agree exactly:
+//   • webOnly (Tier-3 desk-work) → platform='web' ONLY (excludes ios-pwa AND ios-native)
+//   • mobileOnly (Tier-3 digest) → platform!='web' (ios-pwa + ios-native, the mobile subs)
+//   • neither → all platforms
+// After gating, ios-native rows go to the APNs lane; web/ios-pwa go to web-push.
+function subsForRecipient(r: Resolved, all: SubRow[]): SubRow[] {
+  if (r.webOnly) return all.filter((s) => s.platform === "web")
+  if (r.mobileOnly) return all.filter((s) => s.platform !== "web")
+  return all
+}
 
 function vapidReady(): boolean {
   const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
@@ -770,17 +784,46 @@ export async function POST(req: NextRequest) {
     )
   }
 
+  // 3. Fetch each recipient's push subscriptions (shared by dryRun's routing
+  //    breakdown and the real fan-out).
+  const userIds = [...new Set(resolved.map((r) => r.userId))]
+  const subsByUser = new Map<string, SubRow[]>()
+  if (userIds.length > 0) {
+    const { data: subs } = await admin
+      .from("push_subscriptions")
+      .select("id, user_id, endpoint, p256dh, auth, platform")
+      .in("user_id", userIds)
+    for (const s of (subs ?? []) as SubRow[]) {
+      const list = subsByUser.get(s.user_id) ?? []
+      list.push(s)
+      subsByUser.set(s.user_id, list)
+    }
+  }
+
   const dryRun = req.nextUrl.searchParams.get("dryRun") === "1"
   if (dryRun) {
     const reasons: Record<string, string> = {}
     const webOnly: Record<string, boolean> = {}
     const mobileOnly: Record<string, boolean> = {}
     const counts: Record<string, { forms: number; receipts: number; members: number }> = {}
+    // Per-recipient lane routing after platform gating: how many web-push subs
+    // (web + ios-pwa) vs how many APNs subs (ios-native) this recipient delivers to.
+    // Lets tests assert routing (native → apns lane on Tier-1, EXCLUDED on Tier-3
+    // webOnly) without sending a single notification.
+    const routing: Record<string, { web: number; native: number }> = {}
+    let webLane = 0
+    let apnsLane = 0
     for (const r of resolved) {
       reasons[r.userId] = r.reason
       if (r.webOnly) webOnly[r.userId] = true
       if (r.mobileOnly) mobileOnly[r.userId] = true
       if (r.counts) counts[r.userId] = r.counts
+      const list = subsForRecipient(r, subsByUser.get(r.userId) ?? [])
+      const web = list.filter((s) => s.platform !== "ios-native").length
+      const native = list.filter((s) => s.platform === "ios-native").length
+      routing[r.userId] = { web, native }
+      webLane += web
+      apnsLane += native
     }
     return NextResponse.json({
       table: table ?? null,
@@ -791,6 +834,8 @@ export async function POST(req: NextRequest) {
       webOnly,
       mobileOnly,
       counts,
+      routing,
+      lanes: { web: webLane, apns: apnsLane },
       count: resolved.length,
     })
   }
@@ -799,45 +844,45 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sent: 0, failed: 0, pruned: 0, recipients: 0 })
   }
 
-  // 3. Fetch each recipient's push subscriptions.
   if (!vapidReady()) {
     return NextResponse.json({ error: "vapid-not-configured" }, { status: 500 })
   }
-  const userIds = [...new Set(resolved.map((r) => r.userId))]
-  const { data: subs } = await admin
-    .from("push_subscriptions")
-    .select("id, user_id, endpoint, p256dh, auth, platform")
-    .in("user_id", userIds)
-  const subsByUser = new Map<string, SubRow[]>()
-  for (const s of (subs ?? []) as SubRow[]) {
-    const list = subsByUser.get(s.user_id) ?? []
-    list.push(s)
-    subsByUser.set(s.user_id, list)
-  }
+  const apnsOk = apnsReady()
 
-  // 4. Fan out. One notification per (recipient × their subscriptions). Tier-3
-  //    desk-work senders (webOnly) deliver ONLY to platform='web' subs — the desk
-  //    default; mobile (ios-pwa) subs get the daily digest instead, never a push.
+  // 4. Fan out. One notification per (recipient × their gated subscriptions).
+  //    ios-native rows go to APNs (sendApnsNotification); web + ios-pwa keep
+  //    web-push. Prune parity: APNs 410/Unregistered/BadDeviceToken prunes the row
+  //    exactly like web-push 404/410; transient errors are failed sends, no prune.
   type SendResult = { ok: boolean; prune?: string }
   const sends: Promise<SendResult>[] = []
   for (const r of resolved) {
-    let list = subsByUser.get(r.userId) ?? []
-    if (r.webOnly) list = list.filter((s) => s.platform === "web")
-    else if (r.mobileOnly) list = list.filter((s) => s.platform !== "web")
-    // TODO(apns): native iOS subscriptions are stored as platform='ios-native' with an
-    // 'apns:<token>' pseudo-endpoint and NULL p256dh/auth. web-push cannot deliver to
-    // them — it would 400 on the fake endpoint (and possibly get pruned). The APNs
-    // sender is a post-Apple-enrollment task; until it ships we accumulate the tokens
-    // but SKIP them here so nothing attempts web-push against an APNs endpoint.
-    const nativeSkipped = list.filter((s) => s.platform === "ios-native").length
-    if (nativeSkipped > 0) {
-      console.log(`[push] TODO(apns): skipping ${nativeSkipped} ios-native subscription(s) for user ${r.userId} (${r.reason})`)
-      list = list.filter((s) => s.platform !== "ios-native")
-    }
+    const list = subsForRecipient(r, subsByUser.get(r.userId) ?? [])
     const json = JSON.stringify(r.payload)
     for (const sub of list) {
-      // Runtime narrowing doubling as the type proof: only web/ios-pwa rows reach
-      // here (ios-native filtered above), so keys must exist — skip defensively if not.
+      if (sub.platform === "ios-native") {
+        // Native APNs lane. endpoint is 'apns:<token>' — strip the prefix.
+        const token = sub.endpoint.startsWith("apns:") ? sub.endpoint.slice(5) : sub.endpoint
+        if (!apnsOk || !token) {
+          // No APNs env (dev slot without the key) → preserve the pre-APNs skip.
+          console.log(`[push] TODO(apns): APNs client not configured — skipping ios-native subscription for user ${r.userId} (${r.reason})`)
+          continue
+        }
+        sends.push(
+          sendApnsNotification({
+            token,
+            title: r.payload.title,
+            body: r.payload.body,
+            url: r.payload.url,
+            tag: r.payload.tag,
+          })
+            .then<SendResult>((res) =>
+              res.ok ? { ok: true } : { ok: false, prune: res.prune ? sub.id : undefined },
+            )
+            .catch<SendResult>(() => ({ ok: false })),
+        )
+        continue
+      }
+      // Web-push lane (web + ios-pwa). Both carry real p256dh/auth keys.
       if (!sub.p256dh || !sub.auth) continue
       sends.push(
         webpush
