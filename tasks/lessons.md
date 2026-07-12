@@ -298,3 +298,10 @@ The push-subscribe card was built fully token-compliant (callout surface, mono e
 
 ## Serialize verification tracks that share the sandbox tenant (2026-07-12)
 The full e2e gate ran while the rls-reviewer's Mode-2 probes were arranging rows in the same E2E Sandbox ministry — the suite flaked on polluted recipient lists, then passed 26/26 clean after the probes finished. **Rule:** DB-probe passes and e2e gate runs both use the sandbox; run them sequentially, never concurrently. A gate failure during a live probe pass is presumed collision — re-run after, before debugging anything.
+
+## Capacitor iOS push: two silent killers (2026-07-12, device-debug session)
+Native push failed silently twice on first real-device run, with zero errors anywhere:
+1. **Origin mismatch disables the bridge.** `server.url` was the apex domain; prod 307s apex→www; Capacitor's bridge self-disables when the page origin ≠ configured origin → `window.Capacitor` absent → app falls back to web path → "notifications not supported." Rule: `server.url` must be the CANONICAL final origin (curl -sI the domain and follow the redirect before configuring).
+2. **AppDelegate must forward APNs callbacks.** @capacitor/push-notifications requires manually adding `didRegisterForRemoteNotificationsWithDeviceToken` / `didFailToRegister...` forwarding to AppDelegate.swift (NotificationCenter posts). Without them, register() resolves fine, Apple issues the token, and it dies in the AppDelegate — no JS event, no error. The scaffold template does NOT include them.
+Debug technique that found both: Safari Web Inspector on the Debug-build webview (Develop → device → app) + pasting probe JS against `Capacitor.Plugins.*` in the live console — no deploy cycle needed.
+Also: dev builds carry SANDBOX APNs tokens; prod carries production tokens. APNS_ENV=sandbox on Vercel while the only users are dev builds; flip to production at TestFlight.
