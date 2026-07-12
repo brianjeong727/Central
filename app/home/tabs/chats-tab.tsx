@@ -16,6 +16,7 @@ import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTa
 import { useNavState } from "../nav-state"
 import { InsetHairline } from "@/components/central/hairline"
 import { fetchChatList } from "../chat-list"
+import { PushSubscribeCard } from "../components/notifications"
 import { MessageRow } from "./message-row"
 import { Composer } from "./composer"
 import { MODERATION_DEFAULTS, moderateText, scopeApplies, reverentCapitalize } from "@/lib/moderation"
@@ -3035,6 +3036,11 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         />
       </div>
 
+      {/* Push-notification prompt — self-hides unless permission is 'default' & unsubscribed & not dismissed */}
+      <div className="md:px-4">
+        <PushSubscribeCard userId={userId} ministryId={ministryId} notificationSettings={userProfile.notification_settings} style={{ marginBottom: 16 }} />
+      </div>
+
       {/* Section header with + button */}
       <div className="flex items-center justify-between mb-3 md:px-4">
         <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "var(--ink)", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}
@@ -3380,6 +3386,7 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
 
       {/* List */}
       <div className={`flex-1 overflow-y-auto ${subTab === "church" ? "pt-3" : ""}`}>
+        <PushSubscribeCard userId={userId} ministryId={ministryId} notificationSettings={userProfile?.notification_settings} style={{ margin: "4px 12px 12px", padding: 16 }} />
         {loading ? (
           <div className="px-2 pt-2"><Spinner /></div>
         ) : active.length === 0 && !(subTab === "church" && archivedChurchChats.length > 0) ? (

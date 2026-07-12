@@ -28,6 +28,31 @@ export interface Profile {
   show_journal_streak?: boolean
   seen_workspace_nav_hint?: boolean
   grad_prompt_dismissed?: boolean
+  notification_settings?: NotificationSettings
+}
+
+// ── Web Push v1 — per-user notification preferences (profiles.notification_settings jsonb) ──
+// Every key is OPTIONAL: an absent key means "default on" (group_mode absent = 'smart').
+// Only what the user has explicitly changed is persisted.
+export type GroupNotifyMode = "smart" | "all" | "mentions" | "off"
+
+export interface NotificationSettings {
+  /** Tier 1 — direct messages. Default on. */
+  dms?: boolean
+  /** Tier 1 — @mentions in any chat. Default on. */
+  mentions?: boolean
+  /** Tier 1 — replies to your message. Default on. */
+  replies?: boolean
+  /** Tier 1 — published announcements (official channel). Default on. */
+  announcements?: boolean
+  /** Tier 2 — group-chat firehose control. Default 'smart' (all <30 members, mentions-only ≥30). */
+  group_mode?: GroupNotifyMode
+  /** Tier 3 — desk-work push on web. Default on. */
+  desk_web?: boolean
+  /** Tier 3 — desk-work daily digest (mobile). Default on. */
+  desk_digest?: boolean
+  /** Chats-tab subscribe prompt dismissed. Not localStorage (Convention #1). */
+  prompt_dismissed?: boolean
 }
 
 export interface Devotional {

@@ -3,7 +3,8 @@
 // Every data helper here is HARD-SCOPED to the E2E sandbox ministry
 // (E2E_MINISTRY_ID) and refuses to run without it — so a misconfigured run can
 // never arrange or delete data in a real congregation. All test rows carry the
-// "E2E::" title prefix so cleanup is surgical (deleteAnnouncementsByPrefix).
+// "E2E::" title prefix so cleanup is surgical (deleteAnnouncementsByPrefix /
+// deleteGroupsByPrefix).
 //
 // Node caveat: supabase-js needs an explicit WebSocket impl under Node < 22, or
 // createClient throws at construction — hence `realtime: { transport: ws }`.
@@ -62,11 +63,27 @@ async function adminUserId(db: SupabaseClient): Promise<string> {
   return _adminId
 }
 
+let _memberId: string | null = null
+async function memberUserId(db: SupabaseClient): Promise<string> {
+  if (_memberId) return _memberId
+  const email = requireEnv("E2E_MEMBER_EMAIL")
+  const { data, error } = await db.auth.admin.listUsers({ perPage: 1000 })
+  if (error) throw error
+  const u = data.users.find((x) => x.email === email)
+  if (!u) throw new Error(`[e2e/fixtures] sandbox member user not found: ${email}`)
+  _memberId = u.id
+  return _memberId
+}
+
 export interface CreateAnnouncementInput {
   title: string
   body: string
   is_event?: boolean
   is_pinned?: boolean
+  /** Override the author. Pass `null` for an unattributed announcement (e.g. to
+   *  test recipient resolution without the "exclude the creator" rule kicking in).
+   *  Defaults to the sandbox admin, matching prior behavior. */
+  created_by?: string | null
 }
 
 /**
@@ -82,11 +99,16 @@ export function sandbox() {
     ministryId,
     client: db,
 
+    /** Resolve the sandbox admin's auth user id (cached). */
+    adminUserId: () => adminUserId(db),
+    /** Resolve the sandbox member's auth user id (cached). */
+    memberUserId: () => memberUserId(db),
+
     /** Insert a published announcement into the sandbox ministry. The title is
      *  force-prefixed with "E2E::" if the caller didn't already, so nothing this
      *  helper writes can escape prefix-based cleanup. */
-    async createAnnouncement({ title, body, is_event = false, is_pinned = false }: CreateAnnouncementInput) {
-      const created_by = await adminUserId(db)
+    async createAnnouncement({ title, body, is_event = false, is_pinned = false, created_by }: CreateAnnouncementInput) {
+      const author = created_by === undefined ? await adminUserId(db) : created_by
       const fullTitle = title.startsWith(E2E_PREFIX) ? title : `${E2E_PREFIX}${title}`
       const { data, error } = await db
         .from("announcements")
@@ -98,7 +120,7 @@ export function sandbox() {
           audience: "all",
           status: "published",
           ministry_id: ministryId,
-          created_by,
+          created_by: author,
         })
         .select()
         .single()
@@ -114,6 +136,107 @@ export function sandbox() {
         .delete()
         .eq("ministry_id", ministryId)
         .like("title", `${prefix}%`)
+      if (error) throw error
+    },
+
+    /** Create a "my"-type group + membership rows for the given user ids. Name is
+     *  force-prefixed with "E2E::". `group_members`/`messages` both cascade-delete
+     *  off `groups`, so cleanup only needs to delete the group row. */
+    async createGroup({ name, memberIds }: { name: string; memberIds: string[] }) {
+      const creator = memberIds[0] ?? (await adminUserId(db))
+      const fullName = name.startsWith(E2E_PREFIX) ? name : `${E2E_PREFIX}${name}`
+      const { data: group, error } = await db
+        .from("groups")
+        .insert({ ministry_id: ministryId, name: fullName, type: "my", created_by: creator })
+        .select()
+        .single()
+      if (error) throw error
+      const { error: memErr } = await db
+        .from("group_members")
+        .insert(memberIds.map((user_id) => ({ group_id: group.id, user_id })))
+      if (memErr) throw memErr
+      return group
+    },
+
+    /** Delete every sandbox group whose name starts with `prefix` (cascades to
+     *  group_members + messages). Scoped to the sandbox ministry. */
+    async deleteGroupsByPrefix(prefix: string = E2E_PREFIX) {
+      const { error } = await db
+        .from("groups")
+        .delete()
+        .eq("ministry_id", ministryId)
+        .like("name", `${prefix}%`)
+      if (error) throw error
+    },
+
+    /** Flip a member's per-chat mute flag (group_members.muted — the hard override
+     *  the push dispatch route checks before anything else). */
+    async setGroupMemberMuted(groupId: string, userId: string, muted: boolean) {
+      const { error } = await db
+        .from("group_members")
+        .update({ muted })
+        .eq("group_id", groupId)
+        .eq("user_id", userId)
+      if (error) throw error
+    },
+
+    /** Insert a chat message directly (bypasses the composer). Fires the real
+     *  `notify_new_message` DB trigger (fire-and-forget pg_net POST to the prod
+     *  dispatch URL per app_config) — harmless no-op against fake/absent
+     *  subscriptions, but tests should resolve recipients via a direct localhost
+     *  dryRun POST rather than relying on that trigger. */
+    async insertMessage({ groupId, senderId, content }: { groupId: string; senderId: string; content: string }) {
+      const { data, error } = await db
+        .from("messages")
+        .insert({ group_id: groupId, sender_id: senderId, content, message_type: "text" })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    /** Reset a sandbox user's notification_settings to {} (defaults). */
+    async resetNotificationSettings(userId: string) {
+      const { error } = await db
+        .from("profiles")
+        .update({ notification_settings: {} })
+        .eq("id", userId)
+        .eq("ministry_id", ministryId)
+      if (error) throw error
+    },
+
+    /** Directly insert a push_subscriptions row (bypassing the claim_push_endpoint
+     *  RPC / real PushManager — used as the documented fallback when a headless
+     *  browser can't complete a real subscribe(), per e2e/push.spec.ts). */
+    async insertPushSubscription({
+      userId,
+      endpoint,
+      platform = "web",
+    }: {
+      userId: string
+      endpoint: string
+      platform?: string
+    }) {
+      const { data, error } = await db
+        .from("push_subscriptions")
+        .insert({
+          user_id: userId,
+          ministry_id: ministryId,
+          endpoint,
+          p256dh: "E2E-fake-p256dh-key-000000000000000000000",
+          auth: "E2E-fake-auth-key-0000000",
+          platform,
+        })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+
+    /** Delete every push_subscriptions row for a given user (cleanup for the
+     *  fallback-created fake subscriptions above). */
+    async deletePushSubscriptionsForUser(userId: string) {
+      const { error } = await db.from("push_subscriptions").delete().eq("user_id", userId)
       if (error) throw error
     },
   }
