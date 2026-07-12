@@ -7,7 +7,7 @@ import type { NotificationSettings } from "@/app/home/types"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-// ── Web Push dispatch (v1 messages/announcements + v2 event-driven senders) ──
+// ── Web Push dispatch (v1 messages/announcements + v2 event-driven + v2b cron) ──
 // A Postgres AFTER trigger POSTs { table, record_id, event? } here with the shared
 // secret in `x-push-secret`. We re-read the row with the service-role client (never
 // trust the payload), resolve recipients + per-user prefs + per-chat mutes + the
@@ -17,10 +17,29 @@ export const dynamic = "force-dynamic"
 // can share one table (receipts submitted vs decision; profiles role-change vs join).
 // Tier-1 senders honor the `activity` pref; Tier-3 (desk-work) senders honor `desk_web`
 // AND are delivered ONLY to platform='web' subscriptions (webOnly on the Resolved).
+//
+// v2b adds two CRON-driven senders (no source row of their own):
+//   • event_reminder (Tier 1): a pg_cron job (`enqueue_due_event_reminders`) finds
+//     events starting within ~2h and POSTs { table:'announcements', record_id, event:
+//     'event_reminder' } once per event; the resolver pushes every RSVP'd user (ALL
+//     platforms). Honors the `announcements` pref (see build-report §Pref choice).
+//   • desk_digest (Tier 3, mobile): a daily pg_cron job POSTs { event:'desk_digest' }
+//     with NO record_id; the resolver fans across ALL ministries in one invocation,
+//     computes per-recipient 24h pending counts, and emits ONE summary per eligible
+//     leader/admin — delivered ONLY to their NON-web subs (mobileOnly on the Resolved).
 
 type PushPayload = { title: string; body: string; url: string; tag: string }
-// webOnly = Tier-3 desk-work: deliver to this recipient's platform='web' subs only.
-type Resolved = { userId: string; reason: string; payload: PushPayload; webOnly?: boolean }
+// webOnly   = Tier-3 desk-work push: deliver to this recipient's platform='web' subs only.
+// mobileOnly = Tier-3 daily digest: deliver to this recipient's platform!='web' subs only.
+// counts     = digest per-recipient item breakdown (surfaced in dryRun for verification).
+type Resolved = {
+  userId: string
+  reason: string
+  payload: PushPayload
+  webOnly?: boolean
+  mobileOnly?: boolean
+  counts?: { forms: number; receipts: number; members: number }
+}
 
 interface SubRow {
   id: string
@@ -264,6 +283,41 @@ async function resolveTreasurers(admin: AdminClient, ministryId: string): Promis
 async function adminTierIds(admin: AdminClient, ministryId: string): Promise<string[]> {
   const { data } = await admin.from("profiles").select("id, role").eq("ministry_id", ministryId)
   return ((data ?? []) as { id: string; role: string | null }[]).filter((p) => isAdminRole(p.role)).map((p) => p.id)
+}
+
+// Ministry sign-off authorities — mirrors finance-auth.computeFinanceCapability's
+// canSignOff: admin-tier (fallback) OR `is_president` on a team_type='finance' team.
+async function resolveSignoffIds(admin: AdminClient, ministryId: string): Promise<Set<string>> {
+  const ids = new Set<string>()
+  const { data: profs } = await admin.from("profiles").select("id, role").eq("ministry_id", ministryId)
+  for (const p of (profs ?? []) as { id: string; role: string | null }[]) {
+    if (isAdminRole(p.role)) ids.add(p.id)
+  }
+  const { data: financeTeams } = await admin
+    .from("teams").select("id").eq("ministry_id", ministryId).eq("team_type", "finance")
+  const teamIds = (financeTeams ?? []).map((t: { id: string }) => t.id)
+  if (teamIds.length > 0) {
+    const { data: rows } = await admin
+      .from("team_members")
+      .select("user_id, team_roles!role_id(is_president)")
+      .in("team_id", teamIds)
+    for (const row of (rows ?? []) as { user_id: string; team_roles: { is_president?: boolean } | null }[]) {
+      if (row.team_roles?.is_president) ids.add(row.user_id)
+    }
+  }
+  return ids
+}
+
+// event_date is timestamptz (UTC — the composer writes `new Date(local).toISOString()`).
+// There is NO per-ministry timezone column (verified), so absolute reminder times are
+// rendered in a single platform-default zone; documented in build-report §Timezone.
+// A follow-on to add `ministries.timezone` would make this per-ministry correct.
+const DEFAULT_EVENT_TZ = "America/Los_Angeles"
+function eventTime(iso: string | null | undefined): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ""
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: DEFAULT_EVENT_TZ })
 }
 
 // ── v2: Receipt decision -> submitter (Tier 1, `activity`) ────────────────────
@@ -524,6 +578,148 @@ async function resolveFormResponse(admin: AdminClient, recordId: string): Promis
   }]
 }
 
+// ── v2b: Event reminder -> everyone who RSVP'd (Tier 1, `announcements`, ALL platforms) ──
+// Fired by the `enqueue_due_event_reminders` cron ~2h before an event. The cron already
+// scopes to future, published, unsent events; the future-guard here is defense-in-depth
+// so a stray/replayed call never reminds a past or already-started event.
+async function resolveEventReminder(admin: AdminClient, recordId: string): Promise<Resolved[]> {
+  const { data: ann } = await admin
+    .from("announcements")
+    .select("id, ministry_id, title, event_date, is_event, status")
+    .eq("id", recordId)
+    .single()
+  if (!ann || ann.is_event !== true || ann.status !== "published" || !ann.event_date) return []
+  if (new Date(ann.event_date).getTime() <= Date.now()) return [] // never remind a started/past event
+
+  const { data: rsvps } = await admin.from("rsvps").select("user_id").eq("announcement_id", recordId)
+  const userIds = [...new Set(((rsvps ?? []) as { user_id: string | null }[]).map((r) => r.user_id).filter(Boolean))] as string[]
+  if (userIds.length === 0) return []
+
+  const { data: profs } = await admin.from("profiles").select("id, notification_settings").in("id", userIds)
+  const time = eventTime(ann.event_date)
+  const title = "Starting soon"
+  const body = time
+    ? `${ann.title || "An event you're attending"} at ${time}`
+    : ann.title || "An event you're attending is starting soon."
+
+  const results: Resolved[] = []
+  for (const p of (profs ?? []) as { id: string; notification_settings: NotificationSettings | null }[]) {
+    const settings = (p.notification_settings as NotificationSettings) ?? {}
+    if (settings.announcements === false) continue // event reminders ride the announcements pref
+    results.push({
+      userId: p.id,
+      reason: "event_reminder",
+      payload: {
+        title,
+        body: preview(body),
+        url: `/home?tab=announcements&ann=${ann.id}`,
+        tag: `event-reminder-${ann.id}`,
+      },
+    })
+  }
+  return results
+}
+
+// ── v2b: Desk digest -> eligible leaders/admins across ALL ministries (Tier 3, mobile) ──
+// One daily summary per recipient of their last-24h desk work. Delivered ONLY to non-web
+// subs (mobileOnly); the web equivalents already fired live via the Tier-3 `desk_web`
+// senders. Recipients with zero items get NOTHING (an empty digest is spam). Queries are
+// aggregated per ministry then mapped to recipients — no per-user round-trips.
+async function resolveDeskDigest(admin: AdminClient): Promise<Resolved[]> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+  // 1. Candidate recipients = users with at least one NON-web subscription. (Web-only
+  //    users can't receive a mobile digest, so they never enter the candidate set.)
+  const { data: subs } = await admin.from("push_subscriptions").select("user_id, platform").neq("platform", "web")
+  const candidateIds = [...new Set(((subs ?? []) as { user_id: string | null }[]).map((s) => s.user_id).filter(Boolean))] as string[]
+  if (candidateIds.length === 0) return []
+
+  // 2. Their profiles (ministry + role + prefs). Honor desk_digest here.
+  const { data: profs } = await admin
+    .from("profiles").select("id, ministry_id, role, notification_settings").in("id", candidateIds)
+  type Cand = { id: string; ministryId: string; role: string | null }
+  const byMinistry = new Map<string, Cand[]>()
+  for (const p of (profs ?? []) as { id: string; ministry_id: string | null; role: string | null; notification_settings: NotificationSettings | null }[]) {
+    if (!p.ministry_id) continue
+    const settings = (p.notification_settings as NotificationSettings) ?? {}
+    if (settings.desk_digest === false) continue
+    const list = byMinistry.get(p.ministry_id) ?? []
+    list.push({ id: p.id, ministryId: p.ministry_id, role: p.role })
+    byMinistry.set(p.ministry_id, list)
+  }
+  if (byMinistry.size === 0) return []
+
+  const results: Resolved[] = []
+  for (const [ministryId, group] of byMinistry) {
+    // a. Form responses in the last 24h -> tally by the response's recipient
+    //    (announcement creator, fallback form creator — mirrors resolveFormResponse).
+    const forms = new Map<string, number>()
+    const { data: fr } = await admin
+      .from("form_responses").select("id, form_id, announcement_id")
+      .eq("ministry_id", ministryId).gte("submitted_at", since)
+    if (fr && fr.length > 0) {
+      const annIds = [...new Set((fr as { announcement_id: string | null }[]).map((r) => r.announcement_id).filter(Boolean))] as string[]
+      const formIds = [...new Set((fr as { form_id: string | null }[]).map((r) => r.form_id).filter(Boolean))] as string[]
+      const annCreator = new Map<string, string>()
+      if (annIds.length > 0) {
+        const { data: anns } = await admin.from("announcements").select("id, created_by").in("id", annIds)
+        for (const a of (anns ?? []) as { id: string; created_by: string | null }[]) if (a.created_by) annCreator.set(a.id, a.created_by)
+      }
+      const formCreator = new Map<string, string>()
+      if (formIds.length > 0) {
+        const { data: fms } = await admin.from("announcement_forms").select("id, created_by").in("id", formIds)
+        for (const f of (fms ?? []) as { id: string; created_by: string | null }[]) if (f.created_by) formCreator.set(f.id, f.created_by)
+      }
+      for (const r of fr as { announcement_id: string | null; form_id: string | null }[]) {
+        const creator = (r.announcement_id && annCreator.get(r.announcement_id)) || (r.form_id && formCreator.get(r.form_id)) || null
+        if (creator) forms.set(creator, (forms.get(creator) ?? 0) + 1)
+      }
+    }
+
+    // b. Receipts awaiting action in the last 24h: pending (treasurer) + approved (president).
+    const { data: pend } = await admin.from("receipts").select("id").eq("ministry_id", ministryId).eq("status", "pending").gte("submitted_at", since)
+    const pendingReceipts = (pend ?? []).length
+    const { data: appr } = await admin.from("receipts").select("id").eq("ministry_id", ministryId).eq("status", "approved").gte("reviewed_at", since)
+    const approvedReceipts = (appr ?? []).length
+
+    // c. New members joined in the last 24h (membership creation is the join moment).
+    const { data: um } = await admin.from("user_ministries").select("id").eq("ministry_id", ministryId).gte("created_at", since)
+    const joins = (um ?? []).length
+
+    // Finance capability sets computed once per ministry, only when relevant.
+    const treasurers = pendingReceipts > 0 ? await resolveTreasurers(admin, ministryId) : new Set<string>()
+    const signers = approvedReceipts > 0 ? await resolveSignoffIds(admin, ministryId) : new Set<string>()
+
+    for (const c of group) {
+      const formCount = forms.get(c.id) ?? 0
+      let receiptCount = 0
+      if (treasurers.has(c.id)) receiptCount += pendingReceipts
+      if (signers.has(c.id)) receiptCount += approvedReceipts
+      const memberCount = joins > 0 && isAdminRole(c.role) ? joins : 0
+
+      const clauses: string[] = []
+      if (formCount > 0) clauses.push(`${formCount} form response${formCount === 1 ? "" : "s"}`)
+      if (receiptCount > 0) clauses.push(`${receiptCount} receipt${receiptCount === 1 ? "" : "s"} awaiting review`)
+      if (memberCount > 0) clauses.push(`${memberCount} new member${memberCount === 1 ? "" : "s"}`)
+      if (clauses.length === 0) continue // zero items -> no digest
+
+      results.push({
+        userId: c.id,
+        reason: "desk_digest",
+        mobileOnly: true,
+        counts: { forms: formCount, receipts: receiptCount, members: memberCount },
+        payload: {
+          title: "Your daily summary",
+          body: clauses.slice(0, 3).join(" · "),
+          url: "/home?tab=home",
+          tag: "desk-digest",
+        },
+      })
+    }
+  }
+  return results
+}
+
 export async function POST(req: NextRequest) {
   // 1. Shared-secret gate.
   const secret = req.headers.get("x-push-secret")
@@ -542,17 +738,20 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "bad-request" }, { status: 400 })
   }
-  if (!table || !recordId) {
+  // desk_digest is a cron-driven global event with NO source row (no table/record_id).
+  if (event !== "desk_digest" && (!table || !recordId)) {
     return NextResponse.json({ error: "missing-fields" }, { status: 400 })
   }
 
   const admin = createAdminClient()
 
   // 2. Resolve recipients per table (+ event discriminator for v2 senders that
-  //    share a table).
+  //    share a table, and v2b cron senders keyed on `event` alone).
   let resolved: Resolved[] = []
   try {
-    if (table === "messages") resolved = await resolveMessage(admin, recordId)
+    if (event === "desk_digest") resolved = await resolveDeskDigest(admin)
+    else if (table === "messages") resolved = await resolveMessage(admin, recordId)
+    else if (table === "announcements" && event === "event_reminder") resolved = await resolveEventReminder(admin, recordId)
     else if (table === "announcements") resolved = await resolveAnnouncement(admin, recordId)
     else if (table === "receipts" && event === "receipt_decision") resolved = await resolveReceiptDecision(admin, recordId)
     else if (table === "receipts" && event === "receipt_submitted") resolved = await resolveReceiptSubmitted(admin, recordId)
@@ -575,17 +774,23 @@ export async function POST(req: NextRequest) {
   if (dryRun) {
     const reasons: Record<string, string> = {}
     const webOnly: Record<string, boolean> = {}
+    const mobileOnly: Record<string, boolean> = {}
+    const counts: Record<string, { forms: number; receipts: number; members: number }> = {}
     for (const r of resolved) {
       reasons[r.userId] = r.reason
       if (r.webOnly) webOnly[r.userId] = true
+      if (r.mobileOnly) mobileOnly[r.userId] = true
+      if (r.counts) counts[r.userId] = r.counts
     }
     return NextResponse.json({
-      table,
+      table: table ?? null,
       event: event ?? null,
-      record_id: recordId,
+      record_id: recordId ?? null,
       recipients: resolved.map((r) => r.userId),
       reasons,
       webOnly,
+      mobileOnly,
+      counts,
       count: resolved.length,
     })
   }
@@ -618,6 +823,7 @@ export async function POST(req: NextRequest) {
   for (const r of resolved) {
     let list = subsByUser.get(r.userId) ?? []
     if (r.webOnly) list = list.filter((s) => s.platform === "web")
+    else if (r.mobileOnly) list = list.filter((s) => s.platform !== "web")
     const json = JSON.stringify(r.payload)
     for (const sub of list) {
       sends.push(
