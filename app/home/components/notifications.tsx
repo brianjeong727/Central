@@ -10,12 +10,10 @@ import {
   Select,
   MONO_STYLE,
 } from "@/components/central"
-import {
-  subscribeToPush,
-  unsubscribeFromPush,
-  getPushState,
-  type PushState,
-} from "@/lib/push"
+import { unsubscribeFromPush, type PushState } from "@/lib/push"
+// Native-aware wrappers: inside the Capacitor iOS shell these route to APNs; on plain
+// web they fall through to the identical lib/push path (web behavior byte-unchanged).
+import { subscribeToPushUnified, getPushStateUnified } from "@/lib/native-push"
 import type { NotificationSettings, GroupNotifyMode } from "../types"
 
 // Merge a saved-settings write that PRESERVES keys we don't own here (e.g.
@@ -55,7 +53,7 @@ export function PushSubscribeCard({
   useEffect(() => {
     let cancelled = false
     if (notificationSettings?.prompt_dismissed) return
-    getPushState().then((state) => {
+    getPushStateUnified().then((state) => {
       if (cancelled) return
       setVisible(state.supported && state.permission === "default" && !state.subscribed)
     })
@@ -67,7 +65,7 @@ export function PushSubscribeCard({
   async function handleEnable() {
     setBusy(true)
     setError(null)
-    const res = await subscribeToPush()
+    const res = await subscribeToPushUnified()
     setBusy(false) // always resets the pending state, even on rejection
     if (res.ok || res.reason === "denied") {
       // Success, or the user blocked it — either way the prompt is done. A denied
@@ -230,7 +228,7 @@ export function NotificationsSection({
   const [enableError, setEnableError] = useState<string | null>(null)
 
   const refreshPushState = useCallback(() => {
-    getPushState().then(setPushState)
+    getPushStateUnified().then(setPushState)
   }, [])
 
   useEffect(() => {
@@ -262,7 +260,7 @@ export function NotificationsSection({
   async function handleEnable() {
     setBusy(true)
     setEnableError(null)
-    const res = await subscribeToPush()
+    const res = await subscribeToPushUnified()
     setBusy(false) // always resets the pending state, even on rejection
     // Denied surfaces through the permission row's "Blocked" settings hint (from
     // refreshPushState). Any other failure is transient — show a quiet inline

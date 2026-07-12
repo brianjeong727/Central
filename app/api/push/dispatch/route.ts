@@ -45,8 +45,8 @@ interface SubRow {
   id: string
   user_id: string
   endpoint: string
-  p256dh: string
-  auth: string
+  p256dh: string | null // NULL on platform='ios-native' (APNs token rows — filtered out before web-push send)
+  auth: string | null
   platform: string
 }
 
@@ -824,8 +824,21 @@ export async function POST(req: NextRequest) {
     let list = subsByUser.get(r.userId) ?? []
     if (r.webOnly) list = list.filter((s) => s.platform === "web")
     else if (r.mobileOnly) list = list.filter((s) => s.platform !== "web")
+    // TODO(apns): native iOS subscriptions are stored as platform='ios-native' with an
+    // 'apns:<token>' pseudo-endpoint and NULL p256dh/auth. web-push cannot deliver to
+    // them — it would 400 on the fake endpoint (and possibly get pruned). The APNs
+    // sender is a post-Apple-enrollment task; until it ships we accumulate the tokens
+    // but SKIP them here so nothing attempts web-push against an APNs endpoint.
+    const nativeSkipped = list.filter((s) => s.platform === "ios-native").length
+    if (nativeSkipped > 0) {
+      console.log(`[push] TODO(apns): skipping ${nativeSkipped} ios-native subscription(s) for user ${r.userId} (${r.reason})`)
+      list = list.filter((s) => s.platform !== "ios-native")
+    }
     const json = JSON.stringify(r.payload)
     for (const sub of list) {
+      // Runtime narrowing doubling as the type proof: only web/ios-pwa rows reach
+      // here (ios-native filtered above), so keys must exist — skip defensively if not.
+      if (!sub.p256dh || !sub.auth) continue
       sends.push(
         webpush
           .sendNotification(
