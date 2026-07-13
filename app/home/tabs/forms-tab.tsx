@@ -668,7 +668,7 @@ export function FormResponsesView({ formId, title, onClose }: {
   return (
     <>
       {/* Mobile header — compact, with back */}
-      <div className="md:hidden px-5 pt-14 pb-3">
+      <div className="md:hidden px-5 pt-14 pb-5">
         <button
           onClick={onClose}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--body)', fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 10 }}

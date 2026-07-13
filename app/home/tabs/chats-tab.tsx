@@ -2874,6 +2874,9 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
     return (p === "church" || p === "my") ? p : "church"
   })
   const [showCreateChat, setShowCreateChat] = useState<"my" | "church" | null>(null)
+  // Which church section the create sheet should pre-select, when opened from a
+  // section header's + (ignored for My Chats). Reset whenever the sheet closes.
+  const [createChatCategory, setCreateChatCategory] = useState<ChurchSection | undefined>(undefined)
   const [showArchived, setShowArchived] = useState(false)
   const [search, setSearch] = useState("")
 
@@ -2953,9 +2956,14 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
     ? rawActive.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
     : rawActive
   const churchSections = subTab === "church" ? sectionChurchChats(active) : null
-  const showPlusButton = subTab === "my" || (subTab === "church" && canCreateChurchChat)
 
   const monoStyle = MONO_STYLE
+
+  // Bold (prominent, weight-400 serif — serif is never > 400 per the design
+  // contract) mobile section header + its per-section create "+". Replaces the
+  // old page-level "Church chats" heading; the create now lives on each section.
+  const sectionHeaderStyle = { fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }
+  const plusBtnClass = "size-8 rounded-xl bg-[var(--cream-panel)] border border-[var(--line)] flex items-center justify-center hover:bg-[var(--cream-2)] active:scale-95 transition-all flex-shrink-0"
 
   return (
     <div className="pb-2 md:pb-0 md:h-full md:flex md:flex-col">
@@ -2992,8 +3000,9 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       </div>
 
       <div className="px-5 pt-14 pb-2 md:pt-2 md:px-0 md:flex-1 md:overflow-y-auto">
-      {/* Mobile header */}
-      <div className="flex items-center justify-between mb-6 md:hidden">
+      {/* Mobile header — wordmark + scope pills form one tight band (the pills sit
+          directly under the title), then breathing room before the content. */}
+      <div className="flex items-center justify-between mb-3 md:hidden">
         <div className="flex items-center gap-2.5">
           <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
             <path d="M70 28 A32 32 0 1 0 70 72" stroke="var(--plum)" strokeWidth="8" strokeLinecap="round" />
@@ -3041,67 +3050,64 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         <PushSubscribeCard userId={userId} ministryId={ministryId} notificationSettings={userProfile.notification_settings} style={{ marginBottom: 16 }} />
       </div>
 
-      {/* Section header with + button */}
-      <div className="flex items-center justify-between mb-3 md:px-4">
-        <h3 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "var(--ink)", fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }}
-          className="md:hidden">
-          {subTab === "church" ? "Church chats" : "My chats"}
-        </h3>
-        {/* Desktop mono section label */}
-        <p className="hidden md:block mb-1" style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: "11px", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)" }}>
-          {subTab === "church" ? `Church · ${churchChats.length}` : `Direct · ${myChats.length}`}
-        </p>
-        {showPlusButton && (
-          <button
-            onClick={() => setShowCreateChat(subTab)}
-            className="size-8 rounded-xl bg-[var(--cream-panel)] border border-[var(--line)] flex items-center justify-center hover:bg-[var(--cream-2)] active:scale-95 transition-all md:size-7 md:rounded-lg"
-          >
-            <Plus className="w-4 h-4 text-[var(--plum)] md:w-3.5 md:h-3.5" />
-          </button>
-        )}
-      </div>
-
       {loading ? (
         <Spinner />
-      ) : active.length === 0 && !(subTab === "church" && archivedChurchChats.length > 0) ? (
-        <EmptyState
-          icon={<Users className="w-7 h-7" />}
-          title={search.trim() ? "No chats found" : subTab === "church" ? "No church chats" : "No personal chats"}
-          subtitle={
-            search.trim()
-              ? `No chats match "${search.trim()}"`
-              : subTab === "church"
-              ? "You haven't been added to any church chats yet"
-              : "Tap + to start a new chat"
-          }
-        />
-      ) : (
-        <div className="flex flex-col gap-2.5 md:gap-0">
-          {churchSections ? (
-            CHURCH_SECTION_DEFS.flatMap(({ key, label }) => {
-              const rooms = partitionPinned(churchSections[key])
-              if (rooms.length === 0) return []
-              return [
-                <div key={`sec-${key}`} className="pt-3 pb-2 px-1 md:px-4">
-                  <span className="text-[11px] font-normal text-[var(--muted-text)]/40 uppercase tracking-wider">{label}</span>
-                </div>,
-                ...rooms.map((group) => (
-                  <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} locked={isLockedChat(group, ministryName)} />
-                )),
-              ]
-            })
+      ) : subTab === "my" ? (
+        /* My Chats — flat list under one bold "Messages" header; the create "+"
+           lives on the header and stays reachable even when the list is empty. */
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-center justify-between pt-1 pb-1">
+            <span style={sectionHeaderStyle}>Messages</span>
+            <button onClick={() => { setCreateChatCategory(undefined); setShowCreateChat("my") }} className={plusBtnClass} aria-label="New chat">
+              <Plus className="w-4 h-4 text-[var(--plum)]" />
+            </button>
+          </div>
+          {active.length === 0 ? (
+            <EmptyState
+              icon={<Users className="w-7 h-7" />}
+              title={search.trim() ? "No chats found" : "No personal chats"}
+              subtitle={search.trim() ? `No chats match "${search.trim()}"` : "Tap + to start a new chat"}
+            />
           ) : (
             partitionPinned(active).map((group) => (
               <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} />
             ))
           )}
+        </div>
+      ) : active.length === 0 && archivedChurchChats.length === 0 ? (
+        <EmptyState
+          icon={<Users className="w-7 h-7" />}
+          title={search.trim() ? "No chats found" : "No church chats"}
+          subtitle={search.trim() ? `No chats match "${search.trim()}"` : "You haven't been added to any church chats yet"}
+        />
+      ) : (
+        /* Church Chats — one bold header per non-empty section, each carrying its
+           own section-scoped create "+" (opens create pre-set to that section). */
+        <div className="flex flex-col gap-2.5">
+          {CHURCH_SECTION_DEFS.flatMap(({ key, label }) => {
+            const rooms = partitionPinned(churchSections![key])
+            if (rooms.length === 0) return []
+            return [
+              <div key={`sec-${key}`} className="flex items-center justify-between pt-2 pb-1">
+                <span style={sectionHeaderStyle}>{label}</span>
+                {canCreateChurchChat && (
+                  <button onClick={() => { setCreateChatCategory(key); setShowCreateChat("church") }} className={plusBtnClass} aria-label={`New ${label} chat`}>
+                    <Plus className="w-4 h-4 text-[var(--plum)]" />
+                  </button>
+                )}
+              </div>,
+              ...rooms.map((group) => (
+                <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} locked={isLockedChat(group, ministryName)} />
+              )),
+            ]
+          })}
 
           {/* Archived section (Church Chats only) */}
-          {subTab === "church" && archivedChurchChats.length > 0 && (
+          {archivedChurchChats.length > 0 && (
             <div className="mt-2">
               <button
                 onClick={() => setShowArchived((s) => !s)}
-                className="w-full flex items-center justify-between py-3 px-1 md:px-4"
+                className="w-full flex items-center justify-between py-3 px-1"
               >
                 <span className="text-[11px] font-normal text-[var(--muted-text)]/40 uppercase tracking-wider">
                   Archived · {archivedChurchChats.length}
@@ -3128,7 +3134,8 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           userName={userProfile.name}
           ministryId={ministryId}
           groupType={showCreateChat}
-          onClose={() => setShowCreateChat(null)}
+          initialCategory={showCreateChat === "church" ? createChatCategory : undefined}
+          onClose={() => { setShowCreateChat(null); setCreateChatCategory(undefined) }}
           onCreated={(group) => {
             const newGroup: ChatGroup = {
               id: group.id,
@@ -3143,6 +3150,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             }
             mutate((current) => [newGroup, ...(current ?? [])], { revalidate: false })
             setShowCreateChat(null)
+            setCreateChatCategory(undefined)
             onOpenChat(group.id, group.name)
           }}
         />
