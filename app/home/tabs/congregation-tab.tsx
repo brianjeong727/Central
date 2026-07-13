@@ -254,7 +254,7 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
     <div className="pb-28 md:pb-0">
       {/* Mobile header — title only; the create lives in the Questions content header below */}
       {view === "list" && (
-        <div className="md:hidden px-5 pt-14 pb-3">
+        <div className="md:hidden px-5 pt-6 pb-5">
           <p style={{ ...MONO_STYLE, margin: 0 }}>Congregation Pulse</p>
           <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>
             Congregation

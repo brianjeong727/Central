@@ -958,7 +958,7 @@ export function SettingsTab({
   return (
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile header */}
-      <div className="md:hidden px-5 pt-14 pb-5">
+      <div className="md:hidden px-5 pt-6 pb-5">
         <p style={EYEBROW_STYLE}>
           {isAdmin ? "Ministry Admin" : "Ministry Workspace"}
         </p>

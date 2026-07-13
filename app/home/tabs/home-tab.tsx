@@ -547,7 +547,7 @@ export function HomeTab({
   return (
     <div className="pb-28 md:pb-0">
       {/* ── Mobile top bar ── */}
-      <div className="flex items-center justify-between px-5 pt-14 pb-4 md:hidden">
+      <div className="flex items-center justify-between px-5 pt-6 pb-5 md:hidden">
         <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
           <RingCrossLogo size={26} color="var(--plum)" />
           <span style={{ fontFamily: "var(--serif)", fontSize: 26, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>

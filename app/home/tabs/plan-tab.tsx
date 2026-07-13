@@ -2526,7 +2526,7 @@ export function PlanTab({
   return (
     <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile Header */}
-      <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
+      <div className="flex items-center justify-between px-5 pt-6 pb-5 md:hidden">
         <div className="flex items-center gap-2.5">
           <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
             <path d="M70 28 A32 32 0 1 0 70 72" stroke="var(--plum)" strokeWidth="8" strokeLinecap="round" />

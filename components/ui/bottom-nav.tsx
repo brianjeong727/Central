@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, MessageCircle, User, ClipboardList, BookOpen } from "lucide-react"
+import { Home, MessageCircle, User, ClipboardList } from "lucide-react"
 import { sectionForTab } from "@/components/central/nav-sections"
 
 // "network" is included so activeTab can carry it (admin-only, desktop-nav-only);
@@ -17,7 +17,6 @@ interface BottomNavProps {
 const TABS_BASE = [
   { id: "home" as Tab,      label: "Home",      icon: Home },
   { id: "chats" as Tab,     label: "Chats",     icon: MessageCircle },
-  { id: "directory" as Tab, label: "Directory", icon: BookOpen },
   { id: "profile" as Tab,   label: "You",       icon: User },
 ]
 
@@ -32,8 +31,14 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = 
   const compact = tabs.length > 5
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-[var(--cream-panel)] border-t border-[#F0EEF8] h-16 z-50 md:hidden">
-      <div className="flex items-center justify-around h-full">
+    <nav
+      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-[var(--cream-panel)] border-t border-[#F0EEF8] z-50 md:hidden"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      {/* Fixed 64px tab row sits ABOVE the home-indicator inset (the nav's total
+          height grows by env(safe-area-inset-bottom)). Horizontal inset + a
+          centered max width keep the 3–4 tabs from gluing to the screen edges. */}
+      <div className="flex items-center justify-around h-16 px-4 max-w-[360px] mx-auto">
         {tabs.map((tab) => {
           // Highlight derives tab→section membership from the single nav-section
           // config (R7) — congregation now lights Home, not You.
