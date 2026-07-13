@@ -1044,6 +1044,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 onGoToProfile={() => handleNavClick("profile")}
                 onOpenAnnouncement={handleOpenAnnouncement}
                 onGoToTab={(t) => handleNavClick(t)}
+                userTeams={userTeams}
                 avatarUrl={avatarUrl}
                 activeQuestion={activeQuestion}
                 hasResponded={hasResponded}

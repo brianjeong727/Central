@@ -3,16 +3,18 @@
 import { useState } from "react"
 import dynamic from "next/dynamic"
 import useSWR from "swr"
-import { ChevronRight, Bell, Calendar } from "lucide-react"
+import { ChevronRight, Bell, Calendar, Gift, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { ChatsSection } from "@/components/ui/chats-section"
-import { RingCrossLogo, EYEBROW_STYLE } from "../components/shared"
+import { EYEBROW_STYLE, PlanLineIcon } from "../components/shared"
+import { PocketHeader } from "../components/pocket-header"
+import { PocketUpNext, type PocketCard } from "../components/pocket-up-next"
+import { teamIconKey } from "../workspace-presets"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getSetupChecklist, setLeadersInvited, dismissSetupChecklist } from "@/app/actions/setup-checklist"
-import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard } from "@/components/central"
-import type { HeroSlide, SetupChecklistData } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard, MonogramChip } from "@/components/central"
+import type { HeroSlide, SetupChecklistData, UpNextEventDetail } from "@/components/central"
 // Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
 // so keep it out of the initial home-tab bundle every member/visitor downloads.
 const HomeSlideManager = dynamic(
@@ -40,6 +42,8 @@ type HomeData = {
   rsvpCount: number
   rsvpAttendees: RsvpAttendee[]
   forYouItems: Announcement[]
+  // Latest 2 announcements (by recency) for the mobile Pocket announcements preview.
+  recentAnns: Announcement[]
   rsvpedAnnIds: Set<string>
   slides: HeroSlide[]
   slideRsvpedIds: Set<string>
@@ -47,6 +51,169 @@ type HomeData = {
   slideRsvpAttendees: Record<string, RsvpAttendee[]>
   slideShowAttendeesIds: Set<string>
   homeVerse: { reference: string; text: string } | null
+}
+
+// ── Mobile "Pocket" helpers ───────────────────────────────────────────────────
+
+// A curated HeroSlide RSVPs through this announcement (events reuse their linked
+// announcement); null when there's nothing to RSVP to. Mirrors the resolution in
+// HomeHeroCarousel so the Pocket up-next reuses the same data source.
+function slideAnnId(s: HeroSlide): string | null {
+  if (s.kind === "announcement") return s.isEvent ? s.announcementId : null
+  if (s.kind === "event") return s.linkedAnnouncementId
+  return null
+}
+function slideDetailId(s: HeroSlide): string | null {
+  if (s.kind === "announcement") return s.announcementId
+  if (s.kind === "event") return s.linkedAnnouncementId
+  return null
+}
+function slideIsEvent(s: HeroSlide): boolean {
+  return s.kind === "event" || (s.kind === "announcement" && s.isEvent)
+}
+function slideEventDetail(s: HeroSlide): UpNextEventDetail | undefined {
+  if (s.kind === "event") return s.eventDetail
+  if (s.kind === "announcement") return s.eventDetail
+  return undefined
+}
+
+// Compact event eyebrow + meta line for a cream Pocket event card.
+function fmtEvent(detail: UpNextEventDetail): { eyebrow: string; meta: string } {
+  const d = new Date(detail.startDate)
+  const monthDay = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+  const weekday = d.toLocaleDateString("en-US", { weekday: "short" })
+  const time = detail.allDay ? "All day" : d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+  const meta = [`${weekday}, ${monthDay}`, time, detail.location].filter(Boolean).join(" · ")
+  return { eyebrow: `Up next · ${monthDay}`, meta }
+}
+
+// Cream event card — the "further upcoming" cards after the plum lead in the Pocket
+// up-next carousel. Pill buttons (radius 999) per the ratified mobile form.
+function PocketEventCard({
+  eyebrow,
+  title,
+  meta,
+  isRsvped,
+  disabled,
+  onRsvp,
+  onDetails,
+}: {
+  eyebrow: string
+  title: string
+  meta?: string
+  isRsvped: boolean
+  disabled?: boolean
+  onRsvp?: () => void
+  onDetails?: () => void
+}) {
+  return (
+    <div
+      style={{
+        height: "100%",
+        boxSizing: "border-box",
+        background: "var(--cream-panel)",
+        border: "1px solid var(--line)",
+        borderRadius: "var(--r-pocket)",
+        padding: "var(--space-8)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div style={{ ...EYEBROW_STYLE, color: "var(--plum)" }}>{eyebrow}</div>
+      <div
+        className="line-clamp-2"
+        style={{ fontFamily: "var(--serif)", fontSize: 24, fontWeight: 600, letterSpacing: "-0.015em", lineHeight: 1.12, color: "var(--ink)", marginTop: "var(--space-4)" }}
+      >
+        {title}
+      </div>
+      {meta && (
+        <div style={{ fontSize: 13, color: "var(--body)", marginTop: "var(--space-4)", fontFamily: "var(--sans)" }}>{meta}</div>
+      )}
+      <div style={{ display: "flex", gap: 8, marginTop: "auto", paddingTop: "var(--space-7)", flexWrap: "wrap" }}>
+        {onRsvp && (
+          <button
+            type="button"
+            onClick={onRsvp}
+            disabled={disabled}
+            style={{
+              borderRadius: 999,
+              padding: "var(--space-4) var(--space-7)",
+              fontSize: 13,
+              fontWeight: 500,
+              fontFamily: "var(--sans)",
+              cursor: disabled ? "default" : "pointer",
+              opacity: disabled ? 0.5 : 1,
+              border: isRsvped ? "1px solid var(--line-2)" : "none",
+              background: isRsvped ? "transparent" : "var(--plum)",
+              color: isRsvped ? "var(--muted-text)" : "var(--cream)",
+            }}
+          >
+            {isRsvped ? "Going ✓" : "RSVP"}
+          </button>
+        )}
+        {onDetails && (
+          <button
+            type="button"
+            onClick={onDetails}
+            style={{
+              borderRadius: 999,
+              padding: "var(--space-4) var(--space-7)",
+              fontSize: 13,
+              fontWeight: 500,
+              fontFamily: "var(--sans)",
+              cursor: "pointer",
+              border: "1px solid var(--line-2)",
+              background: "transparent",
+              color: "var(--body)",
+            }}
+          >
+            Details
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Kicker row for a Pocket preview section: small serif title + "See all ›".
+function PocketSectionHeader({ title, onSeeAll }: { title: string; onSeeAll: () => void }) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+      <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.01em" }}>{title}</span>
+      <button
+        onClick={onSeeAll}
+        style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
+      >
+        See all <ChevronRight style={{ width: 12, height: 12 }} />
+      </button>
+    </div>
+  )
+}
+
+// A single quick-action tile in the Pocket 2-up grid.
+function PocketQuickTile({ icon, label, subtitle, onClick }: { icon: React.ReactNode; label: string; subtitle: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        textAlign: "left",
+        background: "var(--cream-panel)",
+        border: "1px solid var(--line)",
+        borderRadius: "var(--r-pocket)",
+        padding: "var(--space-8)",
+        display: "flex",
+        flexDirection: "column",
+        gap: "var(--space-6)",
+        cursor: "pointer",
+      }}
+    >
+      {icon}
+      <div>
+        <div style={{ fontFamily: "var(--serif)", fontSize: 17, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.01em" }}>{label}</div>
+        <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2, fontFamily: "var(--sans)" }}>{subtitle}</div>
+      </div>
+    </button>
+  )
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -63,6 +230,7 @@ export function HomeTab({
   onGoToProfile,
   onOpenAnnouncement,
   onGoToTab,
+  userTeams = [],
   avatarUrl,
   activeQuestion,
   hasResponded,
@@ -220,6 +388,10 @@ export function HomeTab({
     const list = anns ?? []
     const hero = list.find((a) => a.is_pinned) ?? list[0] ?? null
     const eventCount = list.filter((a) => a.is_event).length
+    // Latest 2 by recency (list is pinned-first, so re-sort by created_at for "latest").
+    const recentAnns = [...list]
+      .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
+      .slice(0, 2)
 
     const rows = slideRows ?? []
     const slideAnnIds = rows.filter((r) => r.slide_type === "announcement").map((r) => r.announcement_id).filter(Boolean) as string[]
@@ -396,6 +568,7 @@ export function HomeTab({
       rsvpCount,
       rsvpAttendees,
       forYouItems,
+      recentAnns,
       rsvpedAnnIds: userRsvpIds,
       slides,
       slideRsvpedIds,
@@ -416,12 +589,12 @@ export function HomeTab({
   const loading = isLoading || !data
   const heroAnn = data?.heroAnn ?? null
   const latestAnn = data?.latestAnn ?? null
-  const eventCount = data?.eventCount ?? 0
   const featuredShowAttendees = data?.featuredShowAttendees ?? false
   const userHasRsvped = data?.userHasRsvped ?? false
   const rsvpCount = data?.rsvpCount ?? 0
   const rsvpAttendees = data?.rsvpAttendees ?? []
   const forYouItems = data?.forYouItems ?? []
+  const recentAnns = data?.recentAnns ?? []
   const rsvpedAnnIds = data?.rsvpedAnnIds ?? new Set<string>()
   const slides = data?.slides ?? []
   const slideRsvpedIds = data?.slideRsvpedIds ?? new Set<string>()
@@ -544,33 +717,141 @@ export function HomeTab({
   const pulseNodeDesktop = pulseCardProps ? <PulseSlideCard {...pulseCardProps} /> : null
   const pulseNodeMobile = pulseCardProps ? <PulseSlideCard {...pulseCardProps} mobile /> : null
 
+  // ── Mobile "Pocket" up-next carousel cards ──
+  // Reuses the SAME data source as the desktop hero (curated home_slides → else the
+  // pinned/next announcement → else latest). Lead is the plum FeaturedHeroCard (the
+  // one plum surface); "further upcoming" events render as cream PocketEventCards.
+  // Photo slides are shelved (loadHomeData already skips them); narrow to the
+  // announcement/event reference slides the Pocket cards actually render.
+  const pocketSlides = slides.filter(
+    (s): s is Extract<HeroSlide, { kind: "announcement" } | { kind: "event" }> => s.kind !== "photo"
+  )
+  const pocketCards: PocketCard[] = []
+  if (pulseNodeMobile) pocketCards.push({ key: "__pulse__", node: pulseNodeMobile })
+
+  if (pocketSlides.length > 0) {
+    const s = pocketSlides[0]
+    const annId = slideAnnId(s)
+    const attendees = annId ? slideRsvpAttendees[annId] ?? [] : []
+    const showAttendees = !!annId && attendees.length > 0 && (isLeaderOrAdmin || slideShowAttendeesIds.has(annId))
+    const detailId = slideDetailId(s)
+    pocketCards.push({
+      key: s.key,
+      node: (
+        <FeaturedHeroCard
+          mobile
+          style={{ height: "100%" }}
+          eyebrowLabel={s.kind === "announcement" ? s.eyebrowLabel ?? "Up next" : "Up next"}
+          title={s.title}
+          body={s.body}
+          isEvent={slideIsEvent(s)}
+          hasForm={s.kind === "announcement" ? s.hasForm : undefined}
+          postedDate={s.kind === "announcement" ? s.createdAt : undefined}
+          eventDetail={slideEventDetail(s)}
+          userHasRsvped={annId ? slideRsvpedIds.has(annId) : false}
+          rsvping={slideRsvping}
+          rsvpCount={annId ? slideRsvpCounts[annId] ?? 0 : 0}
+          attendees={attendees}
+          showAttendees={showAttendees}
+          onRsvp={annId ? () => handleSlideRsvp(annId) : undefined}
+          onDetails={detailId ? () => onOpenAnnouncement(detailId) : undefined}
+        />
+      ),
+    })
+  } else if (heroAnn) {
+    pocketCards.push({
+      key: heroAnn.id,
+      node: (
+        <FeaturedHeroCard
+          mobile
+          style={{ height: "100%" }}
+          eyebrowLabel="Up next"
+          title={heroAnn.title}
+          body={heroAnn.body}
+          isEvent={heroAnn.is_event}
+          postedDate={heroAnn.created_at}
+          eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
+          userHasRsvped={userHasRsvped}
+          rsvping={rsvping}
+          rsvpCount={rsvpCount}
+          attendees={rsvpAttendees}
+          showAttendees={showAttendeeList}
+          onRsvp={handleHomeRsvp}
+          onDetails={() => onOpenAnnouncement(heroAnn.id)}
+        />
+      ),
+    })
+  } else if (latestAnn) {
+    pocketCards.push({
+      key: latestAnn.id,
+      node: (
+        <FeaturedHeroCard
+          mobile
+          style={{ height: "100%" }}
+          eyebrowLabel="Latest"
+          title={latestAnn.title}
+          body={latestAnn.body}
+          isEvent={false}
+          postedDate={latestAnn.created_at}
+          onDetails={() => onOpenAnnouncement(latestAnn.id)}
+        />
+      ),
+    })
+  }
+
+  const slideAnnIdSet = new Set(pocketSlides.map(slideAnnId).filter(Boolean) as string[])
+  for (const s of pocketSlides.slice(1).filter(slideIsEvent)) {
+    const annId = slideAnnId(s)
+    const detailId = slideDetailId(s)
+    const ed = slideEventDetail(s)
+    const { eyebrow, meta } = ed ? fmtEvent(ed) : { eyebrow: "Up next", meta: "" }
+    pocketCards.push({
+      key: s.key,
+      node: (
+        <PocketEventCard
+          eyebrow={eyebrow}
+          title={s.title}
+          meta={meta}
+          isRsvped={annId ? slideRsvpedIds.has(annId) : false}
+          disabled={slideRsvping}
+          onRsvp={annId ? () => handleSlideRsvp(annId) : undefined}
+          onDetails={detailId ? () => onOpenAnnouncement(detailId) : undefined}
+        />
+      ),
+    })
+  }
+  for (const a of forYouItems.filter((it) => it.is_event && !slideAnnIdSet.has(it.id))) {
+    const ed: UpNextEventDetail | undefined = a.event_date ? { startDate: a.event_date, endDate: a.event_date, allDay: false, location: null } : undefined
+    const { eyebrow, meta } = ed ? fmtEvent(ed) : { eyebrow: "Up next", meta: "" }
+    pocketCards.push({
+      key: a.id,
+      node: (
+        <PocketEventCard
+          eyebrow={eyebrow}
+          title={a.title}
+          meta={meta}
+          isRsvped={rsvpedAnnIds.has(a.id)}
+          onRsvp={() => handleForYouRsvp(a.id)}
+          onDetails={() => onOpenAnnouncement(a.id)}
+        />
+      ),
+    })
+  }
+
+  // Contextual quick-grid second tile: the user's first team (icon + role) when on a
+  // team, else a Directory shortcut. No fabricated progress metric — label + subtitle.
+  const firstTeam = userTeams[0]
+
   return (
     <div className="pb-28 md:pb-0">
-      {/* ── Mobile top bar ── */}
-      <div className="flex items-center justify-between px-5 pt-6 pb-5 md:hidden">
-        <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
-          <RingCrossLogo size={26} color="var(--plum)" />
-          <span style={{ fontFamily: "var(--serif)", fontSize: 26, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>
-            {ministryName}
-          </span>
-        </a>
-        <button
-          onClick={onGoToProfile}
-          style={{
-            width: 36, height: 36, borderRadius: 999, overflow: "hidden",
-            background: "var(--plum)", border: "1px solid var(--line)",
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          }}
-          aria-label="Your profile"
-        >
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="Profile" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <span style={{ color: "var(--cream)", fontWeight: 600, fontSize: 11, fontFamily: "var(--sans)" }}>
-              {getInitials(profile.name)}
-            </span>
-          )}
-        </button>
+      {/* ── Mobile chrome header (Pocket) ── */}
+      <div className="md:hidden px-5">
+        <PocketHeader
+          ministryName={ministryName}
+          userName={profile.name}
+          avatarUrl={avatarUrl}
+          onAvatarClick={onGoToProfile}
+        />
       </div>
 
       {/* ── Grad-check banner ── */}
@@ -873,23 +1154,8 @@ export function HomeTab({
 
       <div className="md:hidden px-5 pb-4">
 
-        {/* Mobile greeting header */}
-        <PageTitle eyebrow={dateLabel} title={greetingNode} titleSize={34} style={{ marginBottom: "var(--space-8)" }}>
-          {(eventCount > 0 || totalUnread > 0) && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
-              {eventCount > 0 && (
-                <span style={{ fontSize: 11, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>
-                  {eventCount} event{eventCount !== 1 ? "s" : ""}
-                </span>
-              )}
-              {totalUnread > 0 && (
-                <span style={{ fontSize: 11, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>
-                  {totalUnread} unread
-                </span>
-              )}
-            </div>
-          )}
-        </PageTitle>
+        {/* Mono date eyebrow */}
+        <div style={{ ...EYEBROW_STYLE, marginBottom: "var(--space-8)" }}>{dateLabel}</div>
 
         <div className="flex flex-col" style={{ gap: "var(--space-9)" }}>
 
@@ -903,68 +1169,17 @@ export function HomeTab({
             />
           )}
 
-          {/* ── Up Next — mobile ── */}
+          {/* ── Up Next — mobile (Pocket scroll-snap carousel) ── */}
           <section>
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-              <div style={{ ...EYEBROW_STYLE, color: "var(--plum)" }}>
-                Up next
-              </div>
-              <button
-                onClick={onSeeAnnouncements}
-                style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
-              >
-                See all <ChevronRight style={{ width: 12, height: 12 }} />
-              </button>
-            </div>
-
-            {/* Section header above paints immediately; only the fetch-dependent
-                card area skeletons (label lives in the real header, so hide it). */}
+            {/* §4.1b constant "Featured" eyebrow above the carousel */}
+            <HeroSectionLabel breathe />
             {loading ? (
               <HomeHeroSkeleton showLabel={false} />
-            ) : slides.length > 0 || pulseNodeMobile ? (
-              <HomeHeroCarousel
-                slides={slides}
-                pulseNode={pulseNodeMobile}
-                mobile
-                rsvpedIds={slideRsvpedIds}
-                rsvpCounts={slideRsvpCounts}
-                rsvpAttendees={slideRsvpAttendees}
-                showAttendeesIds={slideShowAttendeesIds}
-                isLeaderOrAdmin={isLeaderOrAdmin}
-                rsvping={slideRsvping}
-                onRsvp={handleSlideRsvp}
-                onDetails={handleSlideDetails}
-              />
-            ) : heroAnn ? (
-              <FeaturedHeroCard
-                mobile
-                eyebrowLabel="Up next"
-                title={heroAnn.title}
-                body={heroAnn.body}
-                isEvent={heroAnn.is_event}
-                postedDate={heroAnn.created_at}
-                eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
-                userHasRsvped={userHasRsvped}
-                rsvping={rsvping}
-                rsvpCount={rsvpCount}
-                attendees={rsvpAttendees}
-                showAttendees={showAttendeeList}
-                onRsvp={handleHomeRsvp}
-                onDetails={() => onOpenAnnouncement(heroAnn.id)}
-              />
-            ) : latestAnn ? (
-              <FeaturedHeroCard
-                mobile
-                eyebrowLabel="Latest"
-                title={latestAnn.title}
-                body={latestAnn.body}
-                isEvent={false}
-                postedDate={latestAnn.created_at}
-                onDetails={() => onOpenAnnouncement(latestAnn.id)}
-              />
+            ) : pocketCards.length > 0 ? (
+              <PocketUpNext cards={pocketCards} />
             ) : (
               <CentralCard
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center" }}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center", borderRadius: "var(--r-pocket)" }}
                 padding="32px 24px"
               >
                 <Calendar style={{ width: 28, height: 28, color: "var(--dashed)" }} />
@@ -974,110 +1189,99 @@ export function HomeTab({
             )}
           </section>
 
-          {/* ── For You — mobile ── */}
-          {forYouItems.length > 0 && (
+          {/* ── Announcements preview — mobile (latest 2) ── */}
+          {recentAnns.length > 0 && (
             <section>
-              <SectionHeader
-                eyebrow="Announcements"
-                title="For you"
-                titleSize={22}
-                action={
+              <PocketSectionHeader title="Announcements" onSeeAll={onSeeAnnouncements} />
+              <div style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: "var(--r-pocket)", overflow: "hidden" }}>
+                {recentAnns.map((a, i) => (
                   <button
-                    onClick={onSeeAnnouncements}
-                    style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
+                    key={a.id}
+                    onClick={() => onOpenAnnouncement(a.id)}
+                    style={{ width: "100%", textAlign: "left", background: "none", cursor: "pointer", border: "none", borderTop: i === 0 ? "none" : "1px solid var(--line)", padding: "var(--space-7)", display: "block" }}
                   >
-                    See all <ChevronRight style={{ width: 12, height: 12 }} />
-                  </button>
-                }
-                style={{ marginBottom: 12 }}
-              />
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {forYouItems.map((a) => (
-                  <CentralCard key={a.id} padding={16}>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10, justifyContent: "space-between" }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <span
-                          style={{
-                            fontSize: 10,
-                            letterSpacing: "0.5px",
-                            fontWeight: 500,
-                            textTransform: "uppercase",
-                            color: a.is_sub_pinned ? "var(--plum)" : "var(--muted-text)",
-                            fontFamily: "var(--sans)",
-                          }}
-                        >
-                          {a.is_sub_pinned ? "For you" : a.is_event ? "Event" : "Post"}
-                        </span>
-                        <CardTitle
-                          size={18}
-                          style={{
-                            marginTop: 4,
-                            overflow: "hidden",
-                            display: "-webkit-box",
-                            WebkitLineClamp: 1,
-                            WebkitBoxOrient: "vertical",
-                          } as React.CSSProperties}
-                        >
-                          {a.title}
-                        </CardTitle>
-                      </div>
-                      {a.is_event ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                          <button
-                            onClick={() => handleForYouRsvp(a.id)}
-                            style={{
-                              fontSize: 12,
-                              fontWeight: 500,
-                              padding: "5px 12px",
-                              borderRadius: 999,
-                              border: `1px solid ${rsvpedAnnIds.has(a.id) ? "var(--line-2)" : "var(--plum)"}`,
-                              background: rsvpedAnnIds.has(a.id) ? "var(--ivory)" : "transparent",
-                              color: rsvpedAnnIds.has(a.id) ? "var(--muted-text)" : "var(--plum)",
-                              cursor: "pointer",
-                              fontFamily: "var(--sans)",
-                            }}
-                          >
-                            {rsvpedAnnIds.has(a.id) ? "Going" : "RSVP"}
-                          </button>
-                          <button
-                            onClick={() => onOpenAnnouncement(a.id)}
-                            style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
-                          >
-                            View →
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => onOpenAnnouncement(a.id)}
-                          style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", flexShrink: 0, fontFamily: "var(--sans)" }}
-                        >
-                          See →
-                        </button>
-                      )}
-                    </div>
-                    {!a.is_event && (
-                      <p
-                        className="line-clamp-2"
-                        style={{ marginTop: 6, fontSize: 12, color: "var(--body)", lineHeight: 1.5, fontFamily: "var(--sans)" }}
-                      >
-                        {previewBody(a.body)}
-                      </p>
+                    <div className="line-clamp-1" style={{ fontFamily: "var(--serif)", fontSize: 16, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2 }}>{a.title}</div>
+                    {a.body && (
+                      <p className="line-clamp-1" style={{ marginTop: 4, fontSize: 13, color: "var(--body)", fontFamily: "var(--sans)" }}>{previewBody(a.body)}</p>
                     )}
-                  </CentralCard>
+                  </button>
                 ))}
               </div>
             </section>
           )}
 
-          {/* ── Chats — mobile ── */}
-          {top3.length > 0 && (
-            <ChatsSection
-              chats={top3}
-              totalUnread={totalUnread}
-              onSeeAll={onSeeChats}
-              onOpenChat={onOpenChat}
-            />
+          {/* ── Chats preview — mobile (top 2) ── */}
+          {recentChats.length > 0 && (
+            <section>
+              <PocketSectionHeader title="Chats" onSeeAll={onSeeChats} />
+              <div style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: "var(--r-pocket)", overflow: "hidden" }}>
+                {recentChats.slice(0, 2).map((c, i) => (
+                  <button
+                    key={c.id}
+                    onClick={() => onOpenChat(c.id, c.groupName, c.type)}
+                    style={{ width: "100%", textAlign: "left", background: "none", cursor: "pointer", border: "none", borderTop: i === 0 ? "none" : "1px solid var(--line)", padding: "var(--space-7)", display: "flex", alignItems: "center", gap: "var(--space-6)" }}
+                  >
+                    <MonogramChip initials={getInitials(c.groupName)} className="w-11 h-11 flex-shrink-0" style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 400 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--sans)" }}>{c.groupName}</span>
+                        <span style={{ fontSize: 11, color: "var(--muted-text)", flexShrink: 0, fontFamily: "var(--sans)" }}>{c.time}</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 2 }}>
+                        <span className="line-clamp-1" style={{ fontSize: 12.5, color: "var(--body)", fontFamily: "var(--sans)" }}>
+                          {c.lastMessageSender ? `${c.lastMessageSender}: ${c.lastMessage}` : c.lastMessage || "No messages yet"}
+                        </span>
+                        {c.unreadCount > 0 && !c.muted && (
+                          <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--plum)", flexShrink: 0 }} />
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Quick grid — mobile (Give + contextual tile) ── */}
+          <section>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <PocketQuickTile
+                icon={<div style={{ width: 40, height: 40, borderRadius: 999, background: "var(--plum)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Gift style={{ width: 20, height: 20, color: "var(--cream-on-dark)" }} strokeWidth={1.5} /></div>}
+                label="Give"
+                subtitle="Support the ministry"
+                onClick={() => onGoToTab?.("give")}
+              />
+              {firstTeam ? (
+                <PocketQuickTile
+                  icon={<PlanLineIcon iconKey={teamIconKey({ team_type: firstTeam.teamType, name: firstTeam.teamName })} size={40} />}
+                  label={firstTeam.teamName}
+                  subtitle={firstTeam.roleName}
+                  onClick={() => onGoToTab?.("plan")}
+                />
+              ) : (
+                <PocketQuickTile
+                  icon={<div style={{ width: 40, height: 40, borderRadius: 999, background: "var(--plum)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Users style={{ width: 20, height: 20, color: "var(--cream-on-dark)" }} strokeWidth={1.5} /></div>}
+                  label="Directory"
+                  subtitle="Browse members"
+                  onClick={() => onGoToTab?.("directory")}
+                />
+              )}
+            </div>
+          </section>
+
+          {/* ── Daily verse — mobile ── */}
+          {homeVerse && (
+            <section>
+              <div style={{ background: "var(--plum-tint)", border: "1px solid var(--line)", borderRadius: "var(--r-pocket)", padding: "var(--space-8)" }}>
+                <div style={{ ...EYEBROW_STYLE, color: "var(--plum)" }}>Today&apos;s verse</div>
+                <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 17, lineHeight: 1.5, color: "var(--plum-2)", marginTop: "var(--space-5)" }}>
+                  &ldquo;{homeVerse.text}&rdquo;
+                </p>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginTop: "var(--space-5)" }}>
+                  {homeVerse.reference}
+                </div>
+              </div>
+            </section>
           )}
 
         </div>

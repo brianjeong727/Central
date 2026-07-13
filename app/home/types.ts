@@ -327,9 +327,12 @@ export interface HomeTabProps {
   onOpenChat: (id: string, name: string, type?: string) => void
   onGoToProfile: () => void
   onOpenAnnouncement: (id: string) => void
-  // Getting-started checklist deep-links (give / plan). Wired to the shell's
-  // handleNavClick so navigation stays one atomic param replace.
-  onGoToTab?: (tab: "give" | "plan") => void
+  // Getting-started checklist deep-links + Pocket quick-grid tiles (give / plan /
+  // directory / announcements). Wired to the shell's handleNavClick so navigation
+  // stays one atomic param replace.
+  onGoToTab?: (tab: "give" | "plan" | "directory" | "announcements") => void
+  // Current user's team memberships — drives the Pocket quick-grid contextual tile.
+  userTeams?: UserTeam[]
   avatarUrl?: string | null
   activeQuestion?: CongregationQuestion | null
   hasResponded?: boolean
