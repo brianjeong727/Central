@@ -145,3 +145,13 @@ export async function getPushStateUnified(): Promise<PushState> {
 export async function isNativeShell(): Promise<boolean> {
   return detectNative()
 }
+
+// SYNCHRONOUS best-effort heuristic for render-time gating (the async detectNative()
+// above is authoritative but can't run before first paint). Capacitor injects a global
+// `window.Capacitor` into the WebView, so its mere presence means "very likely the
+// native shell" — enough to withhold the marketing splash for a beat while the async
+// check confirms. On plain web `window.Capacitor` is undefined → false → web renders
+// immediately with no delay. SSR-safe (guards `window`).
+export function isLikelyNativeShell(): boolean {
+  return typeof window !== "undefined" && !!(window as { Capacitor?: unknown }).Capacitor
+}
