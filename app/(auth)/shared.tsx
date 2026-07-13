@@ -52,11 +52,14 @@ export function AuthPhotoPanel() {
 // use marginRight:"auto" on a Back link to push the secondary link right.
 export function SplitShell({ topBar, children }: { topBar?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div style={{
+    <div className="grid grid-cols-1 md:grid-cols-[0.786fr_1fr]" style={{
       width: "100%", minHeight: "100svh",
-      display: "grid", gridTemplateColumns: "0.786fr 1fr", alignItems: "start",
+      alignItems: "start",
       background: "var(--cream-panel)", fontFamily: SANS,
     }}>
+      {/* On mobile the photo panel is display:none — the grid MUST collapse to a
+          single column, or its reserved 0.786fr track crams every auth page into
+          the left ~44% with dead space on the right. */}
       <AuthPhotoPanel />
       <div style={{ minHeight: "100svh", display: "flex", flexDirection: "column" }}>
         {/* Top bar */}
