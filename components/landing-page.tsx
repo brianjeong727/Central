@@ -7,6 +7,7 @@ import { Menu, X, Lock, Plus, MessageCircle } from "lucide-react"
 import { getUserMinistries } from "@/app/actions/ministry"
 import { RingCrossLogo } from "@/app/home/components/shared"
 import { createClient } from "@/lib/supabase"
+import { isNativeShell, isLikelyNativeShell } from "@/lib/native-push"
 
 /* ── §0 Token constants ── */
 const INK    = "var(--ink)"
@@ -158,6 +159,13 @@ export default function LandingPage() {
   const [authChecked, setAuthChecked]     = useState(false)
   const [ministryCount, setMinistryCount] = useState<number | null>(null)
   const [menuOpen, setMenuOpen]           = useState(false)
+  // Native-shell gate. The marketing page must NEVER render inside the Capacitor iOS
+  // shell. Lazy-init from the synchronous heuristic: in the shell `window.Capacitor`
+  // exists → start "pending" so we withhold marketing while the async check confirms
+  // and redirects; on plain web it's undefined → false → marketing renders immediately
+  // (no delay). On the server there's no window → false, so SSR/web is byte-for-byte
+  // unchanged and only the in-shell client hydration diverges (it redirects away at once).
+  const [shellPending, setShellPending]   = useState<boolean>(isLikelyNativeShell)
 
   // ── Scroll (nav border). Closing the mobile menu on scroll happens HERE, in
   // the scroll handler, rather than in a separate scrolled→setMenuOpen effect
@@ -204,6 +212,27 @@ export default function LandingPage() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // ── Native shell: never show marketing. Authoritative async detection (the sync
+  // lazy-init above is only a first-paint heuristic). In the shell → route by session:
+  // signed-in → /home, signed-out → /login. Anything that isn't the native shell —
+  // including a false-positive on the sync heuristic — clears the gate so the marketing
+  // page reveals. Web (detectNative → false) just clears an already-false flag: no-op.
+  useEffect(() => {
+    let cancelled = false
+    isNativeShell().then(async (native) => {
+      if (cancelled) return
+      if (!native) {
+        setShellPending(false)
+        return
+      }
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (cancelled) return
+      router.replace(session ? "/home" : "/login")
+    })
+    return () => { cancelled = true }
+  }, [router])
+
 
   async function handleSignOut() {
     const supabase = createClient()
@@ -215,6 +244,13 @@ export default function LandingPage() {
     if (ministryCount === 0) router.push("/ministries")
     else if (ministryCount !== null && ministryCount > 1) router.push("/pick-ministry")
     else router.push("/home")
+  }
+
+  // In the native shell, hold a cream splash-colored surface (matching --cream / the
+  // Capacitor splash) instead of flashing the marketing page while the async native
+  // check resolves and redirects. On web this is never true, so nothing is withheld.
+  if (shellPending) {
+    return <main style={{ minHeight: "100vh", background: CREAM }} />
   }
 
   return (

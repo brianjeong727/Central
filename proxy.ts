@@ -64,6 +64,18 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/ministries?tab=code', request.url))
   }
 
+  // Native shell (Capacitor iOS) must never see the marketing landing page. The shell's
+  // WebView User-Agent carries "CentralShell" (capacitor.config.ts ios.appendUserAgent).
+  // When such a request hits the landing page (/), redirect server-side — signed-in →
+  // /home (subsequent middleware passes route founders/no-ministry/pending onward),
+  // signed-out → /login — so the shell never receives the marketing HTML at all. Only
+  // "/" is intercepted; /login and every other auth route pass through untouched, so
+  // in-app navigation inside the shell is unaffected.
+  const isNativeShell = (request.headers.get('user-agent') ?? '').includes('CentralShell')
+  if (isNativeShell && pathname === '/') {
+    return NextResponse.redirect(new URL(user ? '/home' : '/login', request.url))
+  }
+
   const isPublicPath =
     pathname === '/' ||
     pathname.startsWith('/landing') ||

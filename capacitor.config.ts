@@ -26,6 +26,12 @@ const config: CapacitorConfig = {
     contentInset: "automatic",
     scrollEnabled: true,
     backgroundColor: "#FBF8F2",
+    // Tag the WebView's User-Agent so the server (proxy.ts) can recognize the native
+    // shell and skip the marketing landing page — signed-in users land on /home,
+    // signed-out on /login, never the public marketing site. Appended (not overridden)
+    // so the underlying Safari UA — and every heuristic that reads it — stays intact.
+    // Takes effect only after the next `npx cap sync ios` + device build.
+    appendUserAgent: "CentralShell",
   },
   plugins: {
     SplashScreen: {
