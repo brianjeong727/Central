@@ -389,6 +389,8 @@ export interface ChatSettingsProps {
   groupName: string
   groupType: string
   groupArchived?: boolean
+  // Ministry-wide central chat (groups.is_central_chat) — gates rename/archive/delete.
+  isCentral?: boolean
   userId: string
   userName: string
   ministryId: string

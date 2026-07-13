@@ -24,7 +24,7 @@ test.describe("smoke (admin)", () => {
 
     // Chats — the Church | My Chats mode switcher.
     await page.goto("/home?tab=chats")
-    await expect(page.getByText("Church Chats").first()).toBeVisible()
+    await expect(page.getByText("My Chats").first()).toBeVisible()
 
     // Directory.
     await page.goto("/home?tab=directory")

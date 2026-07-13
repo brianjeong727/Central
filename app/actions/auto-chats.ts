@@ -29,25 +29,31 @@ export async function ensureMinistryChats(
   const admin = createAdminClient()
   const centralName = `${ministryName} Chat`
 
+  // The central chat is now guaranteed by a DB auto-create trigger (one per
+  // ministry, enforced by the `groups_one_central_per_ministry` partial unique
+  // index). Identify it by the flag, never by name. This is idempotent: if the
+  // trigger already made it, we simply return it and never create a duplicate.
   const { data: existing } = await admin
     .from("groups")
     .select("id, name")
     .eq("ministry_id", ministryId)
-    .eq("type", "church")
-    .eq("name", centralName)
+    .eq("is_central_chat", true)
     .maybeSingle()
 
   const chatMap = new Map<string, string>()
   if (existing) {
     chatMap.set(existing.name, existing.id)
-  } else {
-    const { data } = await admin
-      .from("groups")
-      .insert({ name: centralName, type: "church", category: "general", ministry_id: ministryId, created_by: createdBy })
-      .select("id, name")
-      .single()
-    if (data) chatMap.set(data.name, data.id)
+    return chatMap
   }
+
+  // Defensive fallback — the trigger should have created it. If somehow absent,
+  // create it flagged central. Safe under the unique index because none exists here.
+  const { data } = await admin
+    .from("groups")
+    .insert({ name: centralName, type: "church", category: "general", ministry_id: ministryId, created_by: createdBy, is_central_chat: true })
+    .select("id, name")
+    .single()
+  if (data) chatMap.set(data.name, data.id)
 
   return chatMap
 }
@@ -80,10 +86,20 @@ export async function autoAddUserToChats(
   if (!ministry) return
 
   const settings = (ministry.automation_settings ?? {}) as Record<string, boolean>
+  const groupIdsToJoin: string[] = []
   const namesToJoin: string[] = []
 
+  // Central chat — identified by the `is_central_chat` flag (name-independent),
+  // guaranteed to exist by the DB trigger. New members are always enrolled here
+  // regardless of what the chat is named, unless the automation is turned off.
   if (settings.auto_central_chat !== false) {
-    namesToJoin.push(`${ministry.name} Chat`)
+    const { data: central } = await admin
+      .from("groups")
+      .select("id")
+      .eq("ministry_id", ministryId)
+      .eq("is_central_chat", true)
+      .maybeSingle()
+    if (central) groupIdsToJoin.push(central.id)
   }
 
   if (settings.auto_grade_chats === true && graduationYear) {
@@ -128,20 +144,22 @@ export async function autoAddUserToChats(
     namesToJoin.push(staffChatName)
   }
 
-  if (namesToJoin.length === 0) return
+  // Resolve the remaining name-based chats (grade / staff) to ids.
+  if (namesToJoin.length > 0) {
+    const { data: groups } = await admin
+      .from("groups")
+      .select("id")
+      .eq("ministry_id", ministryId)
+      .in("name", namesToJoin)
+    for (const g of (groups ?? []) as { id: string }[]) groupIdsToJoin.push(g.id)
+  }
 
-  const { data: groups } = await admin
-    .from("groups")
-    .select("id")
-    .eq("ministry_id", ministryId)
-    .in("name", namesToJoin)
-
-  if (!groups || groups.length === 0) return
+  if (groupIdsToJoin.length === 0) return
 
   await admin
     .from("group_members")
     .upsert(
-      groups.map((g: { id: string }) => ({ group_id: g.id, user_id: userId })),
+      groupIdsToJoin.map((id) => ({ group_id: id, user_id: userId })),
       { onConflict: "group_id,user_id", ignoreDuplicates: true }
     )
 }
@@ -171,9 +189,9 @@ export async function retroactivelyApplyToggle(
     const { data: profiles } = await admin
       .from("profiles").select("id").eq("ministry_id", ministryId)
 
-    const centralName = `${ministry.name} Chat`
+    // Identify the central chat by the flag, not by name (rename-safe).
     const { data: group } = await admin
-      .from("groups").select("id").eq("ministry_id", ministryId).eq("name", centralName).maybeSingle()
+      .from("groups").select("id").eq("ministry_id", ministryId).eq("is_central_chat", true).maybeSingle()
     if (!group) return { added: 0 }
 
     const ids = (profiles ?? []).map((p: { id: string }) => p.id)
