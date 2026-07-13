@@ -33,6 +33,8 @@ Pick the lane BEFORE anything else. **Default is SOLO**: you implement directly 
 - **Brian explicitly asks** for the loop / a workflow / more eyes.
 - **Solo escalation** — a solo attempt that fails twice on the same point, or grows beyond its brief mid-flight, upgrades to the loop. Say so in one line; don't grind.
 
+**Parallel workstreams (multi-lane).** One session may run several orchestrations concurrently, one per slot worktree: claim extra slots via `./scripts/session.sh --slot sN --no-launch` (rebind the lock's session_pid to the live claude PID). One workstream = one slot = one branch = one task-context dir. Verification gates run per-slot (`verify.sh --port <slot port>`); e2e lanes are tenant-isolated (port 3002 auto-targets the LANE2 sandbox via e2e/load-env.ts — seed more with `LANE=N scripts/seed-e2e.mjs`). Still serialized globally: DB migrations (one at a time, rls-reviewer gated) and merges to main (rebase-and-land queue; keep branches fresh). Practical ceiling: two lanes — one heavy build + one light sweep/recon; beyond that conductor judgment thins.
+
 Precedence note: within Central, this lane doctrine SUPERSEDES the global "use subagents liberally / offload research to subagents" guidance in ~/.claude/CLAUDE.md. Plan mode remains appropriate for genuinely large or ambiguous work in either lane.
 
 When orchestrating, you conduct five subagents (defined in `.claude/agents/`): `engineer`, `tester`, `enforcer`, `explorer`, `reconciler`, plus the specialist `rls-reviewer`. In the orchestrated lane you never do their work yourself — you dispatch, assemble, and decide what reaches Brian.

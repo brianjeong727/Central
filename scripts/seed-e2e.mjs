@@ -15,11 +15,16 @@ const PASSWORD = process.env.E2E_PASSWORD
 if (!URL_ || !KEY) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY")
 if (!PASSWORD) throw new Error("Missing E2E_PASSWORD in .env.local")
 
-const MINISTRY_NAME = "E2E Sandbox"
-const INVITE_CODE = "E2E-SBX"
+// LANE env var seeds a per-slot sandbox (LANE=2 -> "E2E Sandbox 2", e2e2.* users)
+// so parallel verification gates never collide in one tenant.
+const LANE = process.env.LANE && process.env.LANE !== "1" ? process.env.LANE : ""
+const SUF = LANE ? ` ${LANE}` : ""
+const ESUF = LANE ? LANE : ""
+const MINISTRY_NAME = `E2E Sandbox${SUF}`
+const INVITE_CODE = `E2E-SBX${ESUF}`
 const USERS = [
-  { email: "e2e.admin@test.com", name: "E2E Admin", role: "admin" },
-  { email: "e2e.member@test.com", name: "E2E Member", role: "member" },
+  { email: `e2e${ESUF}.admin@test.com`, name: `E2E Admin${SUF}`, role: "admin" },
+  { email: `e2e${ESUF}.member@test.com`, name: `E2E Member${SUF}`, role: "member" },
 ]
 
 const db = createClient(URL_, KEY, {
@@ -61,7 +66,7 @@ if (!ministry) {
       invite_code: INVITE_CODE,
       status: "active",
       is_public: false,
-      created_by: ids["e2e.admin@test.com"],
+      created_by: ids[USERS[0].email],
     })
     .select("id")
     .single()

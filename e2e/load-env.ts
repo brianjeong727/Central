@@ -45,4 +45,18 @@ export function loadEnv(): void {
     // (e.g. E2E_PORT passed on the command line by verify.sh).
     if (!(key in process.env)) process.env[key] = val
   }
+
+  // ── Lane overlay ──────────────────────────────────────────────────────────────
+  // Parallel verification lanes: slot s2 (port 3002) runs against its OWN sandbox
+  // tenant so concurrent gates never collide in one ministry (lessons.md
+  // "Serialize verification tracks" — this removes the reason to serialize).
+  // E2E_LANE=2 (or E2E_PORT=3002) swaps the three identity vars to the *_LANE2 set.
+  const lane = process.env.E2E_LANE ?? (process.env.E2E_PORT === "3002" ? "2" : "1")
+  if (lane === "2") {
+    for (const k of ["E2E_MINISTRY_ID", "E2E_ADMIN_EMAIL", "E2E_MEMBER_EMAIL"] as const) {
+      const v = process.env[`${k}_LANE2`]
+      if (!v) throw new Error(`[e2e] lane 2 requested but ${k}_LANE2 missing from .env.local`)
+      process.env[k] = v
+    }
+  }
 }
