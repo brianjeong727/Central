@@ -126,6 +126,13 @@
   --r-callout: 14px; /* sidebar callouts, prominent cards */
   --r-pill-lg: 16px; /* composer pill */
   --r-hero:   18px;  /* hero banner, full-bleed modal */
+  --r-pocket: 20px;  /* mobile "Pocket" card radius (ratified B3 mobile form) */
+
+  /* Floating pill-nav lift — the ONE sanctioned shadow in the app (ratified B3
+     mobile Pocket nav). No other surface carries elevation; the no-shadow system
+     holds everywhere else. Plum-tinted so it reads as depth under the plum-2 pill. */
+  --shadow-nav: 0 6px 20px -4px color-mix(in srgb, var(--plum-2) 42%, transparent),
+                0 2px 6px color-mix(in srgb, var(--plum-2) 26%, transparent);
 
   /* ── shadcn semantic aliases → Central palette ──────────────────────────── */
   --background:          #FDFCF8; /* cream — never white */
@@ -244,6 +251,18 @@
 *::-webkit-scrollbar-thumb:hover {
   background: var(--dashed);
 }
+
+/* Mobile Pocket up-next carousel — horizontal scroll-snap with peeking cards.
+   Scrollbar hidden (the dot row is the position indicator). */
+.pocket-hscroll {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.pocket-hscroll::-webkit-scrollbar { display: none; }
+.pocket-hscroll > * { scroll-snap-align: start; flex: 0 0 auto; }
 
 /* ── Design tokens ───────────────────────────────────────────────────────── */
 :root {

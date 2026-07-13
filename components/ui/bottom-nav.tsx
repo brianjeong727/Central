@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, MessageCircle, User, ClipboardList, Bell } from "lucide-react"
+import { Home, MessageCircle, ClipboardList, Bell } from "lucide-react"
 import { sectionForTab } from "@/components/central/nav-sections"
 
 // "network" is included so activeTab can carry it (admin-only, desktop-nav-only);
@@ -14,39 +14,42 @@ interface BottomNavProps {
   showPlan?: boolean
 }
 
-// Announcements is a CORE mobile tab for everyone (core church comms), unlike the
-// desktop rail where it folds under Home. Workspace stays role-gated (showPlan).
+// Floating "Pocket" pill nav (ratified B3 mobile). Home / Announcements / Chats /
+// Workspace only — Profile ("You") is NOT here; it's the chrome avatar (top-right of
+// each Pocket screen). Workspace stays role-gated via showPlan (→ 3-icon pill for
+// non-team members). Active item = cream circle + plum-2 icon.
 const TABS_BASE = [
   { id: "home" as Tab,          label: "Home",          icon: Home },
   { id: "chats" as Tab,         label: "Chats",         icon: MessageCircle },
   { id: "announcements" as Tab, label: "Announcements", icon: Bell },
-  { id: "profile" as Tab,       label: "You",           icon: User },
 ]
 
 const PLAN_TAB = { id: "plan" as Tab, label: "Workspace", icon: ClipboardList }
 
 export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false }: BottomNavProps) {
-  const base = TABS_BASE.filter(t => t.id !== "profile")
-  const profile = TABS_BASE.find(t => t.id === "profile")!
-  // Plain member: Home/Chats/Announcements/You (4). Team member/leader/gov admin: +Workspace (5).
-  const tabs = showPlan
-    ? [...base, PLAN_TAB, profile]
-    : [...base, profile]
+  // Plain member: Home/Chats/Announcements (3). Team member/leader/gov admin: +Workspace (4).
+  const tabs = showPlan ? [...TABS_BASE, PLAN_TAB] : TABS_BASE
   return (
-    <nav
-      className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-[var(--cream-panel)] border-t border-[#F0EEF8] z-50 md:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    <div
+      className="fixed left-1/2 -translate-x-1/2 z-50 md:hidden"
+      style={{ bottom: "calc(env(safe-area-inset-bottom) + 14px)" }}
     >
-      {/* Fixed 64px tab row sits ABOVE the home-indicator inset (the nav's total
-          height grows by env(safe-area-inset-bottom)). Horizontal inset + a
-          centered max width keep the 3–4 tabs from gluing to the screen edges. */}
-      <div className="flex items-center justify-around h-16 px-4 max-w-[360px] mx-auto">
+      <nav
+        className="flex items-center"
+        style={{
+          gap: 4,
+          padding: 6,
+          borderRadius: 999,
+          background: "var(--plum-2)",
+          boxShadow: "var(--shadow-nav)",
+        }}
+      >
         {tabs.map((tab) => {
           // Highlight derives from the single nav-section config (R7). Mobile-only
-          // exception: Announcements is a first-class bottom-nav item here even though
-          // nav-sections folds it under Home (for the desktop rail, which has no
-          // Announcements item). So when on the announcements tab, light ONLY that
-          // item; otherwise resolve normally (Home wins for give/forms/settings/etc.).
+          // exception: Announcements is a first-class item here even though nav-sections
+          // folds it under Home — so on the announcements tab light ONLY that item;
+          // otherwise resolve normally (Home wins for give/forms/settings/etc.). On the
+          // profile tab nothing lights (Profile isn't in the pill — it's the avatar).
           const isActive =
             activeTab === "announcements"
               ? tab.id === "announcements"
@@ -59,31 +62,47 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = 
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               aria-label={tab.label}
-              className={`flex flex-col items-center justify-center gap-1.5 px-3 py-1 transition-[color,transform] duration-150 active:scale-[0.92] ${
-                isActive ? "text-[var(--plum)]" : "text-[var(--faint)] hover:text-[#9CA3AF]"
-              }`}
+              aria-current={isActive ? "page" : undefined}
+              className="relative flex items-center justify-center transition-transform duration-150 active:scale-[0.92]"
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 999,
+                border: "none",
+                cursor: "pointer",
+                background: isActive ? "var(--cream)" : "transparent",
+              }}
             >
-              {/* Labels removed — icons are self-explanatory; sized up to compensate.
-                  Active state = plum color + a small underline dot, no text. */}
-              {isActive && (
-                <span className="w-5 h-0.5 bg-[var(--plum)] rounded-full" />
+              <Icon
+                style={{ width: 22, height: 22 }}
+                strokeWidth={isActive ? 2 : 1.75}
+                color={isActive ? "var(--plum-2)" : "var(--cream-on-dark)"}
+              />
+              {showBadge && (
+                <span
+                  className="absolute flex items-center justify-center"
+                  style={{
+                    top: 4,
+                    right: 4,
+                    minWidth: 16,
+                    height: 16,
+                    padding: "0 4px",
+                    borderRadius: 999,
+                    background: "var(--cream)",
+                    border: "1.5px solid var(--plum-2)",
+                    color: "var(--plum-2)",
+                    fontSize: 9,
+                    fontWeight: 600,
+                    fontFamily: "var(--sans)",
+                  }}
+                >
+                  {chatsUnread > 99 ? "99+" : chatsUnread}
+                </span>
               )}
-              <div className="relative">
-                <Icon
-                  className={`transition-all w-[27px] h-[27px] ${
-                    isActive ? "stroke-[2px]" : "stroke-[1.5px]"
-                  }`}
-                />
-                {showBadge && (
-                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-[var(--plum)] rounded-full text-[9px] font-semibold text-[var(--cream)] flex items-center justify-center px-1">
-                    {chatsUnread > 99 ? "99+" : chatsUnread}
-                  </span>
-                )}
-              </div>
             </button>
           )
         })}
-      </div>
-    </nav>
+      </nav>
+    </div>
   )
 }
