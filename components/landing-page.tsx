@@ -259,8 +259,8 @@ export default function LandingPage() {
             ) : (
               <>
                 <a href="/login" className="cl-desktop-only cl-signin" style={{ fontSize: 15, color: BODY, textDecoration: "none" }}>Sign in</a>
-                <button onClick={() => router.push("/login")} className="cl-desktop-only cl-btn-primary" style={{ ...btnPrimary, padding: "10px 20px", fontSize: 14 }}>
-                  Open app
+                <button onClick={() => router.push("/signup")} className="cl-desktop-only cl-btn-primary" style={{ ...btnPrimary, padding: "10px 20px", fontSize: 14 }}>
+                  Get started
                 </button>
               </>
             )}
@@ -293,9 +293,14 @@ export default function LandingPage() {
               Open app
             </button>
           ) : (
-            <a href="/login" onClick={() => setMenuOpen(false)} style={{ ...btnPrimary, height: 46, borderRadius: 12, fontSize: 14, fontWeight: 600, width: "100%" }}>
-              Sign in
-            </a>
+            <>
+              <a href="/signup" onClick={() => setMenuOpen(false)} style={{ ...btnPrimary, height: 46, borderRadius: 12, fontSize: 14, fontWeight: 600, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>
+                Get started
+              </a>
+              <a href="/login" onClick={() => setMenuOpen(false)} style={{ height: 46, borderRadius: 12, fontSize: 14, fontWeight: 600, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", textDecoration: "none", color: INK, border: `1px solid ${LINE}` }}>
+                Sign in
+              </a>
+            </>
           )}
         </div>
       </div>
