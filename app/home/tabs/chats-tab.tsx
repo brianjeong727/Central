@@ -372,7 +372,7 @@ function ChatPrefsCard({ pendingMuted, pendingPinned, onToggleMuted, onTogglePin
   )
 }
 
-export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, userId, userName, ministryId, ministryName, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
+export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, isCentral = false, userId, userName, ministryId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
   const supabase = createClient()
   const { mutate: mutateGlobal } = useSWRConfig()
   const [members, setMembers] = useState<GroupMember[]>([])
@@ -406,10 +406,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const isDM = groupType === "dm"
   const isMy = groupType === "my"
   const isChurch = groupType === "church"
-  // The ministry-wide central chat is identified by the naming convention used in
-  // auto-chats.ts (`${ministryName} Chat`). It must never be renamed, archived, or
-  // deleted — renaming it would silently break the auto-enroll trigger.
-  const isCentralChat = isChurch && groupName === `${ministryName} Chat`
+  // The ministry-wide central chat is identified by the groups.is_central_chat
+  // flag (set by the DB auto-create trigger), NOT by a name match — so renaming it
+  // can never break identification, auto-enroll, or the delete/archive guards.
+  const isCentralChat = isChurch && isCentral
   const canManage = (isChurch && isAdminOrLeader) || isMy
   const canLeave = isMy || isDM
   const canArchive = isChurch && isAdminOrLeader && !groupArchived && !isCentralChat
@@ -585,8 +585,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   }
 
   async function handleArchive() {
+    // Friendly pre-check — the DB trigger also hard-blocks this, but surface a
+    // clean message instead of a raw Postgres exception.
+    if (isCentralChat) { setError("The ministry chat can't be archived."); return }
     const { error: err } = await supabase.from("groups").update({ archived: true }).eq("id", groupId).eq("ministry_id", ministryId)
-    if (!err) onClose()
+    if (err) { setError("The ministry chat can't be archived."); return }
+    onClose()
   }
 
   async function handleUnarchive() {
@@ -595,8 +599,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   }
 
   async function handleDelete() {
+    // Friendly pre-check — deleteGroup + the DB trigger also block this.
+    if (isCentralChat) { setError("The ministry chat can't be deleted."); return }
     const { error: err } = await deleteGroup(groupId)
-    if (!err) onClose()
+    if (err) { setError(err); return }
+    onClose()
   }
 
   const filteredProfiles = allProfiles.filter((p) =>
@@ -1004,6 +1011,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   useEffect(() => { setDisplayName(groupName) }, [groupName])
   const [groupType, setGroupType] = useState("")
   const [groupArchived, setGroupArchived] = useState(false)
+  // Central (ministry-wide) chat flag — sourced from groups.is_central_chat, not a
+  // name match. Drives moderation scope + the ChatSettings central-chat gates.
+  const [groupIsCentral, setGroupIsCentral] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
@@ -1109,10 +1119,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     async () => {
       const { data } = await supabase
         .from("groups")
-        .select("type, archived, pinned_message_id")
+        .select("type, archived, pinned_message_id, is_central_chat")
         .eq("id", groupId)
         .single()
-      return (data as { type: string; archived: boolean | null; pinned_message_id: string | null } | null) ?? null
+      return (data as { type: string; archived: boolean | null; pinned_message_id: string | null; is_central_chat: boolean | null } | null) ?? null
     }
   )
   // Chat moderation config — ministry-scoped, SWR-cached. Falls back to defaults
@@ -1127,7 +1137,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // Room scope context (mirrors the settings' isCentralChat / group-type logic).
   const modIsChurch = groupType === "church"
   const modIsPersonal = groupType === "my" || groupType === "dm"
-  const modIsMinistryDefault = modIsChurch && groupName === `${ministryName} Chat`
+  const modIsMinistryDefault = modIsChurch && groupIsCentral
   // Transient "your message was filtered" banner; auto-dismisses.
   const [moderationWarning, setModerationWarning] = useState<string | null>(null)
   useEffect(() => {
@@ -1511,6 +1521,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     if (!groupMeta) return
     setGroupType(groupMeta.type)
     setGroupArchived(groupMeta.archived ?? false)
+    setGroupIsCentral(groupMeta.is_central_chat ?? false)
     if (groupMeta.pinned_message_id) {
       setPinnedMessageId(groupMeta.pinned_message_id)
       supabase
@@ -2294,6 +2305,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         groupName={displayName}
         groupType={groupType}
         groupArchived={groupArchived}
+        isCentral={groupIsCentral}
         userId={userId}
         userName={userName}
         ministryId={ministryId}

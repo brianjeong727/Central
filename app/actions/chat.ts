@@ -23,11 +23,15 @@ export async function deleteGroup(groupId: string): Promise<{ error: string | nu
 
   const { data: group } = await admin
     .from("groups")
-    .select("id")
+    .select("id, is_central_chat")
     .eq("id", groupId)
     .eq("ministry_id", profile.ministry_id)
     .maybeSingle()
   if (!group) return { error: "Chat not found in your ministry." }
+
+  // The ministry-wide central chat can never be deleted. Surface a friendly
+  // message before hitting the DB (a BEFORE DELETE trigger is the hard backstop).
+  if (group.is_central_chat) return { error: "The ministry chat can't be deleted." }
 
   // Delete in FK-safe order
   const { data: msgs } = await admin.from("messages").select("id").eq("group_id", groupId)
