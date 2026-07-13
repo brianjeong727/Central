@@ -668,7 +668,7 @@ export function FormResponsesView({ formId, title, onClose }: {
   return (
     <>
       {/* Mobile header — compact, with back */}
-      <div className="md:hidden px-5 pt-14 pb-5">
+      <div className="md:hidden px-5 pt-6 pb-5">
         <button
           onClick={onClose}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--body)', fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 10 }}
@@ -1001,7 +1001,7 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
     <>
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile header — compact */}
-      <div className="md:hidden px-5 pt-14 pb-5 flex items-end justify-between">
+      <div className="md:hidden px-5 pt-6 pb-5 flex items-end justify-between">
         <div>
           <p style={MONO_STYLE}>Forms</p>
           <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>Forms</h1>

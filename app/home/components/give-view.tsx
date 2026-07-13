@@ -117,7 +117,7 @@ export function GiveView({
   return (
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile header */}
-      <div className="md:hidden px-5 pt-14 pb-5">
+      <div className="md:hidden px-5 pt-6 pb-5">
         <p style={EYEBROW_STYLE}>Give · 2 Corinthians 9:7</p>
         <h1 style={{ fontFamily: "var(--serif)", fontSize: 36, color: "var(--ink)", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Give</h1>
         <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>Give directly to your ministry through Zelle.</p>

@@ -299,7 +299,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   return (
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden" style={{ background: "var(--cream)" }}>
       {/* ── Mobile header — safe-area inset, back affordance ── */}
-      <div className="md:hidden flex items-center gap-3 px-5 pt-12 pb-4" style={{ borderBottom: "1px solid var(--line)" }}>
+      <div className="md:hidden flex items-center gap-3 px-5 pt-6 pb-4" style={{ borderBottom: "1px solid var(--line)" }}>
         <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-xl -ml-1 hover:bg-[var(--ivory)] transition-colors">
           <ArrowLeft className="w-5 h-5" style={{ color: "var(--plum)" }} />
         </button>
@@ -1013,7 +1013,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     <>
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile Header */}
-      <div className="flex items-center justify-between px-5 pt-14 pb-5 md:hidden">
+      <div className="flex items-center justify-between px-5 pt-6 pb-5 md:hidden">
         <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
           <RingCrossLogo size={26} color="var(--plum)" />
           <span style={{ fontFamily: "var(--serif)", fontSize: "28px", color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>

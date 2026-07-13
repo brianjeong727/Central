@@ -1119,7 +1119,7 @@ export function ProfileTab({
           {/* Mobile header — compact, gear inline right.
               NB: Tailwind flex CLASSES, not inline display:flex — an inline display
               would override md:hidden and leak the mobile header onto desktop. */}
-          <div className="md:hidden flex items-center justify-between gap-3 px-5 pt-14 pb-5">
+          <div className="md:hidden flex items-center justify-between gap-3 px-5 pt-6 pb-5">
             <h1 style={{ fontFamily: "var(--serif)", fontSize: 25, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: 0 }}>Journal</h1>
             <JournalSettingsMenu showEntries={profile.show_journal_entries ?? false} showStreak={profile.show_journal_streak ?? false} onToggleEntries={handleToggleEntries} onToggleStreak={handleToggleStreak} />
           </div>
@@ -1149,7 +1149,7 @@ export function ProfileTab({
       {activeSection === "spiritual-profile" && <div className="md:flex md:flex-col md:flex-1">
 
         {/* ── Mobile: top bar ── */}
-        <div className="flex items-center gap-2.5 px-5 pt-14 pb-5 md:hidden">
+        <div className="flex items-center gap-2.5 px-5 pt-6 pb-5 md:hidden">
           <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
             <RingCrossLogo size={26} color="var(--plum)" />
             <span style={{ fontFamily: "var(--serif)", fontSize: 28, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>

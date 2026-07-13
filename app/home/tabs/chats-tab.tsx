@@ -2999,38 +2999,37 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         />
       </div>
 
-      <div className="px-5 pt-14 pb-2 md:pt-2 md:px-0 md:flex-1 md:overflow-y-auto">
-      {/* Mobile header — wordmark + scope pills form one tight band (the pills sit
-          directly under the title), then breathing room before the content. */}
-      <div className="flex items-center justify-between mb-3 md:hidden">
-        <div className="flex items-center gap-2.5">
-          <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
+      <div className="px-5 pt-6 pb-2 md:pt-2 md:px-0 md:flex-1 md:overflow-y-auto">
+      {/* Mobile header — ministry wordmark, scope pills, and the directory icon all
+          share ONE row; the name truncates (min-w-0 + flex-1) so the pills always
+          fit. Compact top padding — the native shell already insets the status bar,
+          so the old pt-14 editorial gap wasted the first fold. */}
+      <div className="flex items-center gap-2 mb-5 md:hidden">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <svg width="24" height="24" viewBox="0 0 100 100" fill="none" className="flex-shrink-0">
             <path d="M70 28 A32 32 0 1 0 70 72" stroke="var(--plum)" strokeWidth="8" strokeLinecap="round" />
             <circle cx="50" cy="50" r="6" fill="var(--plum)" />
           </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
+          <span className="truncate" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
         </div>
-        <button
-          onClick={onOpenDirectory}
-          className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[#F0EEF8] transition-colors"
-          aria-label="Directory"
-        >
-          <Users className="w-5 h-5 text-[var(--plum)]" />
-        </button>
-      </div>
-
-      {/* Mode switcher — mobile only. Exclusive filter (Church | My Chats), SegmentedControl (R4/R12) */}
-      <div className="flex mb-5 md:hidden">
         <SegmentedControl
           aria-label="Chat scope"
-          options={[{ id: "church", label: "Church Chats" }, { id: "my", label: "My Chats" }]}
+          options={[{ id: "church", label: "Church" }, { id: "my", label: "My Chats" }]}
           value={subTab}
           onChange={(t) => {
             setSubTab(t)
             setSearch("")
             setParam("chats", t === "church" ? null : t)
           }}
+          className="flex-shrink-0"
         />
+        <button
+          onClick={onOpenDirectory}
+          className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl hover:bg-[#F0EEF8] transition-colors"
+          aria-label="Directory"
+        >
+          <Users className="w-5 h-5 text-[var(--plum)]" />
+        </button>
       </div>
 
       {/* Search bar — mobile only (desktop has one in the panel header above) */}
