@@ -10,6 +10,24 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next({ request })
   }
 
+  // Stranded OAuth code recovery. Supabase drops the `?code=` on the Site URL root
+  // (`/?code=…`) rather than our /auth/callback when the provider round-trip resolves
+  // to the bare origin. With detectSessionInUrl OFF the browser correctly refuses to
+  // redeem it — but the user is left dumped on the marketing page with a cryptic code
+  // and no verdict. Forward any code-bearing root request into the guarded callback so
+  // the real exchange + unknown-mint teardown runs and the user lands on /login with a
+  // proper message. flow=signin: a stranded code is always a sign-in return (register
+  // uses intent=register, preserved if present).
+  if (
+    (request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/landing') &&
+    request.nextUrl.searchParams.has('code')
+  ) {
+    const cb = new URL('/auth/callback', request.url)
+    cb.search = request.nextUrl.search
+    if (!cb.searchParams.has('flow')) cb.searchParams.set('flow', 'signin')
+    return NextResponse.redirect(cb)
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
