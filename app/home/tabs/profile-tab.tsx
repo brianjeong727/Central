@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import dynamic from "next/dynamic"
 import useSWR from "swr"
 import { useRouter } from "next/navigation"
-import { ChevronRight, ChevronDown, X, Check, Camera, Pencil, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings } from "lucide-react"
+import { ChevronRight, ChevronDown, X, Check, Camera, Pencil, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings, LogOut } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { MONO_STYLE, RingCrossLogo, EmptyState } from "../components/shared"
 import { getInitials } from "../utils"
@@ -1271,6 +1271,13 @@ export function ProfileTab({
               onSettingsChange={(s: NotificationSettings) => setProfile(p => ({ ...p, notification_settings: s }))}
             />
           </div>
+          {/* Sign out — mobile only. Desktop reaches this via the sidebar nav
+              (desktop-nav.tsx); the mobile pill nav has no Profile item, so the
+              sign-out affordance must live here. Neutral action, kept OUT of the
+              red Danger Zone below (which is Leave / Delete account). */}
+          <CentralButton variant="secondary" onClick={onLogout} style={{ width: "100%", justifyContent: "center", marginBottom: 24 }}>
+            <LogOut size={14} />Sign out
+          </CentralButton>
           <DangerZone
             ministryName={ministryName}
             leaveConfirm={leaveConfirm}
