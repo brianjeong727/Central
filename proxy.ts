@@ -86,11 +86,34 @@ export async function proxy(request: NextRequest) {
   }
 
   // Look up ministry_id + role (role gates /onboarding below)
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('ministry_id, role')
     .eq('id', user.id)
     .maybeSingle()
+
+  // SECURITY BACKSTOP — kill sessions of accounts that have NO profiles row.
+  //
+  // handle_new_user() creates a profiles row via an AFTER INSERT trigger on auth.users,
+  // in the SAME transaction that mints the auth user — so a legitimately-signed-up user
+  // ALWAYS has a profile row the instant their session is valid (there is no honest
+  // "authed but profile-less" window mid-signup). Therefore an authenticated request
+  // whose user has no profile row is a deleted account, or an illegitimate mint that
+  // slipped past /auth/callback (e.g. via the OAuth URL-detection bypass before it was
+  // fixed) whose profile was torn down. Sign it out and bounce to login.
+  //
+  // Reuses the existing profile read (no extra query). Only a genuine "no row" (null data,
+  // null error) triggers teardown — a transient query error is NOT treated as no-account.
+  // The founder admin is exempt (handled by the ADMIN_EMAIL branch above, before this).
+  if (!profile && !profileError) {
+    // scope:'local' clears the auth cookies without a network revoke round-trip; the
+    // ssr cookie adapter's setAll expires them on supabaseResponse, which we then copy
+    // onto the redirect so the browser drops the session on its way to /login.
+    await supabase.auth.signOut({ scope: 'local' })
+    const redirect = NextResponse.redirect(new URL('/login?error=no-account', request.url))
+    supabaseResponse.cookies.getAll().forEach((c) => redirect.cookies.set(c))
+    return redirect
+  }
 
   // No ministry yet — allow onboarding/public paths; everything else goes to
   // /ministries (the polished discovery destination: browse + invite code + register —

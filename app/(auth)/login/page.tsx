@@ -22,6 +22,8 @@ function LoginContent() {
   const [error, setError] = useState<string | null>(
     searchParams.get("error") === "no-account"
       ? "No Central account exists for that Google email yet — create an account first."
+      : searchParams.get("error") === "recovery-failed"
+      ? "That password reset link is invalid or expired — request a new one."
       : null
   )
   const [loading, setLoading] = useState(false)

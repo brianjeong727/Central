@@ -23,8 +23,13 @@ export default function ForgotPasswordPage() {
     setLoading(true)
     setError(null)
     const supabase = createClient()
+    // Route the recovery link through the SERVER confirm route, not straight to
+    // /update-password. The browser client no longer self-establishes a session from
+    // URL artifacts (detectSessionInUrl is off — see lib/supabase.ts), so the recovery
+    // token/code must be exchanged server-side (/auth/confirm sets the recovery session
+    // in cookies, then forwards to /update-password where updateUser runs).
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: siteOrigin() + "/update-password",
+      redirectTo: siteOrigin() + "/auth/confirm?next=/update-password",
     })
     if (error) {
       setError(error.message)
