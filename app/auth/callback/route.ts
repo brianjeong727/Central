@@ -57,7 +57,12 @@ export async function GET(request: NextRequest) {
     // grandfathers every pre-marker account). Anything else is a fresh unknown mint
     // and gets torn down. Marker-based, not a 60s age heuristic — a retry after 60s
     // used to sail straight through.
-    if (flow === "signin") {
+    // Anything that is NOT an explicit flow=signup is treated as signin-strict — including
+    // a MISSING flow param. Only our own signup entry points ever send flow=signup, and
+    // minting there is legitimate registration. An attacker hand-crafting a code-bearing
+    // redirect_to WITHOUT params must not slip through the lenient (mint-allowed) path;
+    // flow-less callbacks now run the same unknown-mint teardown as flow=signin.
+    if (flow !== "signup") {
       const hasMarker = data.user.user_metadata?.central_signup === true
       const olderThan24h = new Date(data.user.created_at).getTime() < Date.now() - 24 * 60 * 60 * 1000
       let legitimate = hasMarker || olderThan24h
