@@ -250,11 +250,11 @@ function ComposerImpl({
 
       {/* ── Input bar ── */}
       {groupArchived ? (
-        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 flex items-center justify-center">
+        <div className="flex-shrink-0 bg-[var(--cream)] px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] flex items-center justify-center">
           <p className="text-[13px] text-[var(--muted-text)]">This chat is archived</p>
         </div>
       ) : (
-        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-3 md:px-10 md:py-3.5 relative">
+        <div className="flex-shrink-0 bg-[var(--cream)] px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] md:px-10 md:py-3.5 relative">
           {/* @mention dropdown */}
           {mentionQuery !== null && filteredMentions.length > 0 && (
             <div className="absolute bottom-full left-4 mb-1 bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] overflow-hidden min-w-[180px] z-10">
