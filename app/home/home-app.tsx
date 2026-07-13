@@ -1141,6 +1141,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 activeTeamId={activeTeamId}
                 onOpenChat={handleOpenChat}
                 onTeamSelect={handleTeamChange}
+                onExitTeam={() => { setActiveTeamId(null); setParams({ team: null, ...TEAM_SUBPARAMS }) }}
                 studentOrgSection={studentOrgSection}
                 onStudentOrgSectionChange={handleStudentOrgSectionChange}
                 studentOrgPlanningEvent={studentOrgPlanningEvent}

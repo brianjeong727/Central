@@ -690,6 +690,9 @@ export interface PlanTabProps {
   onOpenChat?: (id: string, name: string, type?: string) => void
   // Called when user clicks a team card in the picker (no-team-selected state)
   onTeamSelect?: (teamId: string) => void
+  // Clears the active team back to the workspace picker (mobile "← All workspaces";
+  // desktop uses the shell "Workspace" breadcrumb). Mirrors home-app's null-clear.
+  onExitTeam?: () => void
   // Lifted student-org planning state (for breadcrumb + sidebar)
   studentOrgSection?: string
   onStudentOrgSectionChange?: (s: string) => void
