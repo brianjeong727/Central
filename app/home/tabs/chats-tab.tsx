@@ -160,7 +160,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
 
         {/* Header */}
         <div className="flex-shrink-0 border-b border-[var(--line)]">
-          <div className="flex items-center justify-between px-5 pt-12 pb-3 md:pt-6">
+          <div className="flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),48px)] pb-3 md:pt-6">
             <button
               onClick={onClose}
               className="size-9 bg-[var(--cream-panel)] border border-[var(--line)] rounded-full flex items-center justify-center hover:bg-[var(--cream-2)] transition-colors flex-shrink-0"
@@ -2317,7 +2317,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       />
     )
     return inline ? settingsEl : (
-      <div className="fixed inset-0 z-[110] overflow-y-auto pt-12 md:pt-0 md:left-[var(--shell-offset)]" style={{ background: "var(--cream)" }}>
+      <div className="fixed inset-0 z-[110] overflow-y-auto pt-[max(env(safe-area-inset-top),48px)] md:pt-0 md:left-[var(--shell-offset)]" style={{ background: "var(--cream)" }}>
         {settingsEl}
       </div>
     )
@@ -2329,7 +2329,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     <div className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
-      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-12 pb-3 md:py-3.5 border-b border-[var(--line)]"} bg-[var(--cream)]`}>
+      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-[max(env(safe-area-inset-top),48px)] pb-3 md:py-3.5 border-b border-[var(--line)]"} bg-[var(--cream)]`}>
         {searchMode ? (
           <>
             {/* Search bar mode */}
@@ -2862,7 +2862,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         onClick={() => setLightboxUrl(null)}
       >
         <button
-          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-[var(--cream-panel)]/10 flex items-center justify-center text-white hover:bg-[var(--cream-panel)]/20 transition-colors"
+          className="absolute top-[max(env(safe-area-inset-top),1rem)] right-4 w-10 h-10 rounded-full bg-[var(--cream-panel)]/10 flex items-center justify-center text-white hover:bg-[var(--cream-panel)]/20 transition-colors"
           onClick={() => setLightboxUrl(null)}
         >
           <X className="w-5 h-5" />

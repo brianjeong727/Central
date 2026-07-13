@@ -21,9 +21,13 @@ const config: CapacitorConfig = {
     allowNavigation: ["joincentral.app", "*.joincentral.app", "*.supabase.co"],
   },
   ios: {
-    // Sane defaults so the cream web surface isn't clipped or double-scrolled by the
-    // native WebView chrome.
-    contentInset: "automatic",
+    // "never": the WKWebView scroll view adds NO native safe-area inset. Paired with
+    // viewport-fit=cover (app/layout.tsx viewport), the web layer owns ALL safe areas
+    // via env(safe-area-inset-*). Under the old "automatic" the native inset was ADDED
+    // on top of the web's 100svh, making entry pages one status-bar taller than the
+    // screen (scroll bug) and leaving a cream bar above `fixed inset-0` surfaces.
+    // NOTE: changing this requires `npx cap sync ios` + an app rebuild to take effect.
+    contentInset: "never",
     scrollEnabled: true,
     backgroundColor: "#FBF8F2",
     // Tag the WebView's User-Agent so the server (proxy.ts) can recognize the native
@@ -38,7 +42,12 @@ const config: CapacitorConfig = {
       // Cream (--cream, DESIGN_SYSTEM) so the launch surface matches the app.
       backgroundColor: "#FBF8F2",
       showSpinner: false,
-      launchAutoHide: true,
+      // Kept up until EntrySplash calls SplashScreen.hide() on its first painted
+      // frame — the native cream splash then hands off directly to the plum "One
+      // Body" overlay with no flash. When the overlay is skipped (web/desktop/warm
+      // nav) EntrySplash's always-mounted effect still calls hide(), so the native
+      // splash never sticks.
+      launchAutoHide: false,
     },
   },
 }

@@ -7,6 +7,7 @@ import { MessageCircle } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { BottomNav } from "@/components/ui/bottom-nav"
+import { EntrySplash } from "@/app/home/components/entry-splash"
 import type { ChatPreview } from "@/components/ui/chats-section"
 
 // Types
@@ -930,7 +931,13 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     })
 
   return (
-    <div className="relative min-h-screen bg-[var(--cream)] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[var(--cream)]">
+    // Mobile column owns the status-bar safe area for EVERY tab it hosts (cover +
+    // contentInset:"never" means the web layer clears the inset). env() = 0 on desktop,
+    // so the md: flex/h-screen layout is visually untouched.
+    <div
+      className="relative min-h-screen bg-[var(--cream)] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[var(--cream)]"
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
+    >
 
       {/* Desktop sidebar — hidden on mobile */}
       <DesktopSidebar
@@ -1326,6 +1333,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
           Root instance owns the top banner (both viewports) + the mobile floating
           chip; the desktop trigger is docked in the rail (superSwitcherSlot). */}
       <SuperSwitcher variant="floating" profile={{ id: initialProfile.id, role: initialProfile.role }} />
+
+      {/* Native cold-launch splash (self-gated: no-ops on web/desktop/warm nav, and
+          releases the native launch splash even when it skips rendering). */}
+      <EntrySplash />
     </div>
   )
 }

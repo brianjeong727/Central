@@ -5159,7 +5159,7 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
         return (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "var(--plum)", display: "flex", flexDirection: "column" }}>
             <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 55%, rgba(246,244,239,0.12) 0%, transparent 65%)", pointerEvents: "none" }} />
-            <button onClick={() => setSlidesOverlayOpen(false)} style={{ position: "absolute", top: 20, right: 20, zIndex: 10, width: 36, height: 36, borderRadius: "50%", background: "rgba(246,244,239,0.12)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--cream-on-dark)" }}>
+            <button onClick={() => setSlidesOverlayOpen(false)} style={{ position: "absolute", top: "max(env(safe-area-inset-top), 20px)", right: 20, zIndex: 10, width: 36, height: 36, borderRadius: "50%", background: "rgba(246,244,239,0.12)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--cream-on-dark)" }}>
               <X className="w-5 h-5" />
             </button>
             <div onClick={() => setSlidesActiveIndex(i => Math.max(i - 1, 0))} style={{ position: "absolute", left: 0, top: 0, width: "33%", height: "100%", zIndex: 5, cursor: slidesActiveIndex > 0 ? "pointer" : "default" }} />
@@ -5341,7 +5341,7 @@ function SetListPdfViewer({
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "var(--ink)", display: "flex", flexDirection: "column" }}>
       {/* Toolbar */}
-      <div style={{ background: "#1E1825", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "14px 16px", paddingTop: 52, display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+      <div style={{ background: "#1E1825", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "14px 16px", paddingTop: "max(env(safe-area-inset-top), 52px)", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
         <button onClick={onClose} style={{ padding: 6, background: "transparent", border: "none", cursor: "pointer", color: "var(--muted-text)", display: "flex", alignItems: "center", flexShrink: 0 }}>
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -6186,7 +6186,7 @@ export function AddEventModal({
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--cream-panel)", display: "flex", flexDirection: "column", overflowY: "auto" }}>
-      <div style={{ maxWidth: 600, width: "100%", margin: "0 auto", padding: "48px 24px 60px" }}>
+      <div style={{ maxWidth: 600, width: "100%", margin: "0 auto", paddingTop: "max(env(safe-area-inset-top), 48px)", paddingLeft: 24, paddingRight: 24, paddingBottom: 60 }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
           <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, fontWeight: 400, color: "var(--ink)", margin: 0 }}>
@@ -9827,7 +9827,7 @@ function GroupGeneratorWizard({
     >
       {/* Header — full-bleed bar, inner content centered to the wizard column.
           Back/X are mobile-only; on desktop the shell breadcrumb is the exit (§175). */}
-      <div style={{ padding: "22px 32px 0", borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
+      <div style={{ paddingTop: "max(env(safe-area-inset-top), 22px)", paddingLeft: 32, paddingRight: 32, paddingBottom: 0, borderBottom: "1px solid var(--line)", flexShrink: 0 }}>
         <div style={{ maxWidth: 680, margin: "0 auto", width: "100%" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

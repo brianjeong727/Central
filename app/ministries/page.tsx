@@ -217,10 +217,45 @@ function MinistriesContent() {
     doCodeJoin()
   }
 
-  return (
-    <div style={{ minHeight: "100svh", background: "var(--cream)", fontFamily: SANS, color: "var(--ink)" }}>
+  // ── Mobile (Pocket) styles — KEEP form per ratified reconciliation ──
+  const mSerif = "var(--serif)"
+  const mSub: React.CSSProperties = { fontSize: 14.5, color: "var(--body)", lineHeight: 1.55 }
+  const mEyebrow: React.CSSProperties = { ...mono, margin: "24px 4px 4px" }
+  const mRow: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: 12, width: "100%", background: "var(--ivory)",
+    border: "none", borderRadius: 18, textAlign: "left", padding: "14px 16px", marginTop: 10,
+  }
+  const mChip = (solid: boolean): React.CSSProperties => ({
+    width: 42, height: 42, borderRadius: 14, background: solid ? "var(--plum)" : "var(--line-2)",
+    color: solid ? "var(--cream)" : "var(--plum)", display: "grid", placeItems: "center",
+    fontSize: 13, fontWeight: 600, flexShrink: 0, fontFamily: mSerif,
+  })
+  const mFchip = (on: boolean): React.CSSProperties => ({
+    border: "none", background: on ? "var(--plum)" : "var(--ivory)", color: on ? "var(--cream)" : "var(--body)",
+    borderRadius: 999, padding: "10px 18px", fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", fontFamily: SANS,
+  })
+  const mOpenPill: React.CSSProperties = {
+    background: "var(--plum)", color: "var(--cream)", borderRadius: 999, minHeight: 38, fontSize: 12.5,
+    fontWeight: 600, padding: "0 18px", border: "none", cursor: "pointer", flexShrink: 0, fontFamily: SANS,
+  }
+  const mJoinPill: React.CSSProperties = {
+    background: "var(--cream)", color: "var(--ink)", borderRadius: 999, minHeight: 38, fontSize: 12.5,
+    fontWeight: 600, padding: "0 18px", border: "1px solid var(--line-2)", cursor: "pointer", flexShrink: 0, fontFamily: SANS,
+  }
+  const mTitle: React.CSSProperties = {
+    fontFamily: mSerif, fontSize: 30, fontWeight: 600, letterSpacing: "-0.025em",
+    lineHeight: 1.08, margin: "8px 0 0", color: "var(--ink)",
+  }
+  const mRowName: React.CSSProperties = {
+    display: "block", fontSize: 15.5, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)",
+    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+  }
+  const mRowSub: React.CSSProperties = { display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2 }
 
-      {/* ── Gender + school picker modals ── */}
+  return (
+    <>
+
+      {/* ── Gender + school picker modals (shared across viewports; portaled) ── */}
       <PostJoinPickerModals pickers={pickers} />
 
       {/* ── Staff role picker modal (CentralModal shell, §4.17) ── */}
@@ -268,6 +303,9 @@ function MinistriesContent() {
           </button>
         </CentralModal>
       )}
+
+      {/* ── Desktop (≥768px) — unchanged; only wrapped ── */}
+      <div className="hidden md:block" style={{ minHeight: "100svh", background: "var(--cream)", fontFamily: SANS, color: "var(--ink)" }}>
 
       {/* ── Top bar ── */}
       <div style={{
@@ -523,7 +561,123 @@ function MinistriesContent() {
         </div>
 
       </div>
-    </div>
+      </div>
+
+      {/* ── Mobile (<768px) — Pocket tree; reuses all state/handlers/modals above ── */}
+      <div className="md:hidden" style={{ minHeight: "100svh", background: "var(--cream)", fontFamily: SANS, color: "var(--ink)" }}>
+        <div className="max-w-[390px] mx-auto w-full" style={{ padding: "calc(env(safe-area-inset-top) + 22px) 24px calc(env(safe-area-inset-bottom) + 40px)" }}>
+
+          <div style={mono}>{isLoggedIn && myMinistries.length === 0 ? "Almost there" : "Ministries"}</div>
+          <h1 style={mTitle}>Choose a ministry</h1>
+          <div style={{ ...mSub, marginTop: 8 }}>Your communities, and ones you can join.</div>
+
+          <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+            <button type="button" style={mFchip(tab === "browse")} onClick={() => changeTab("browse")}>Browse</button>
+            <button type="button" style={mFchip(tab === "code")} onClick={() => changeTab("code")}>Invite code</button>
+          </div>
+
+          {tab === "browse" && (
+            <>
+              {(joinError || browseError) && (
+                <div style={{ marginTop: 16, borderRadius: 12, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 18%, transparent)", padding: "10px 14px", fontSize: 13, color: "var(--danger)" }}>
+                  {joinError ?? browseError}
+                </div>
+              )}
+
+              {loadingMine && <div style={{ display: "flex", justifyContent: "center", paddingTop: 32 }}><Spinner/></div>}
+
+              {!loadingMine && myMinistries.length > 0 && (
+                <>
+                  <div style={mEyebrow}>Your ministries</div>
+                  {myMinistries.map(m => (
+                    <div key={m.id} style={mRow}>
+                      <span style={mChip(true)}>{m.name.charAt(0).toUpperCase()}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={mRowName}>{m.name}</span>
+                        <span style={mRowSub}>{m.university}</span>
+                      </span>
+                      <button type="button" onClick={() => handleGoToMinistry(m.id)} disabled={switchingId === m.id} style={{ ...mOpenPill, opacity: switchingId === m.id ? 0.6 : 1 }}>
+                        {switchingId === m.id ? "Opening…" : "Open"}
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {browsingPublic && <div style={{ display: "flex", justifyContent: "center", paddingTop: 32 }}><Spinner/></div>}
+
+              {!browsingPublic && browseable.length > 0 && (
+                <>
+                  <div style={mEyebrow}>Near you</div>
+                  {browseable.map(m => (
+                    <div key={m.id} style={mRow}>
+                      <span style={mChip(false)}>{m.name.charAt(0).toUpperCase()}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={mRowName}>{m.name}</span>
+                        <span style={mRowSub}>{m.university}{!m.is_public ? " · Private" : ""}</span>
+                      </span>
+                      {m.is_public ? (
+                        <button type="button" onClick={() => handleJoin(m)} disabled={joiningId === m.id} style={{ ...mJoinPill, opacity: joiningId === m.id ? 0.6 : 1 }}>
+                          {joiningId === m.id ? "Joining…" : "Join"}
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => changeTab("code")} title="This ministry is private — joining requires an invite code" style={{ ...mJoinPill, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                          Code
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
+
+              {!browsingPublic && browseable.length === 0 && !browseError && authChecked && (
+                <p style={{ fontSize: 14, color: "var(--muted-text)", marginTop: 28, textAlign: "center" }}>
+                  {myIds.size > 0 ? "You&apos;ve joined all listed ministries." : "No ministries to show."}
+                </p>
+              )}
+
+              <div style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "26px 4px 0", lineHeight: 1.5 }}>
+                Registering a new ministry?{" "}
+                <button type="button" onClick={() => router.push("/register-ministry")} style={{ background: "none", border: "none", padding: 0, color: "var(--plum)", fontWeight: 500, cursor: "pointer", fontFamily: SANS, fontSize: 12.5 }}>
+                  That works best on desktop.
+                </button>
+              </div>
+            </>
+          )}
+
+          {tab === "code" && (
+            <div style={{ marginTop: 22 }}>
+              <p style={{ ...mSub, margin: "0 0 18px" }}>Have an invite code from a ministry leader? Enter it to join their workspace directly.</p>
+              {codeError && (
+                <div style={{ marginBottom: 14, borderRadius: 12, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 18%, transparent)", padding: "10px 14px", fontSize: 13, color: "var(--danger)" }}>{codeError}</div>
+              )}
+              <form onSubmit={handleCodeJoin}>
+                <label style={{ display: "block", fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", color: "var(--muted-text)", textTransform: "uppercase", marginBottom: 7, paddingLeft: 4 }}>Invite code</label>
+                <input
+                  value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
+                  placeholder="MERCY24" autoComplete="off" autoCapitalize="characters" maxLength={10}
+                  style={{ width: "100%", minHeight: 52, border: "none", borderRadius: 16, background: "var(--ivory)", padding: "0 18px", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 20, letterSpacing: "3px", textTransform: "uppercase", color: "var(--ink)", outline: "none", boxSizing: "border-box" }}
+                />
+                <button type="submit" disabled={joiningCode || inviteCode.trim().length < 4} style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%",
+                  background: "var(--plum)", color: "var(--cream)", borderRadius: 999, minHeight: 50,
+                  fontSize: 14.5, fontWeight: 600, border: "none", marginTop: 18, fontFamily: mSerif,
+                  cursor: (joiningCode || inviteCode.trim().length < 4) ? "not-allowed" : "pointer",
+                  opacity: (joiningCode || inviteCode.trim().length < 4) ? 0.6 : 1,
+                }}>
+                  {joiningCode ? "Joining…" : "Join ministry"}
+                </button>
+                <p style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 14 }}>
+                  Codes are case-insensitive. Ask your ministry&apos;s admin or leader if you don&apos;t have one.
+                </p>
+              </form>
+            </div>
+          )}
+
+        </div>
+      </div>
+    </>
   )
 }
 

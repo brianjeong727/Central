@@ -18,6 +18,11 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // Extend the layout viewport edge-to-edge under the status bar / home indicator on
+  // iOS (adds viewport-fit=cover). Required so `fixed inset-0` surfaces (the native
+  // splash) reach the true screen top and so env(safe-area-inset-*) reports real
+  // insets for the web side to own. Pairs with capacitor ios.contentInset "never".
+  viewportFit: "cover",
   themeColor: "#3E1540",
 };
 
