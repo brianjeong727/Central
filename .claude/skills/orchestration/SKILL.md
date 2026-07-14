@@ -164,9 +164,11 @@ End the handoff with a multiple-choice push decision. Do NOT ask in prose or wai
 
 ( ) Push it — approve, push the commit to the current branch, done.
 ( ) Push it, but I have a note — push FIRST, then capture Brian's note (a lesson to log, a follow-up to flag, a watch-item). The note does not block the push.
+( ) Check it on the sim first — run `/sim` (rebuild the simulator against this session's dev server), hold the push, and re-present this same decision after Brian has looked. Offer this option whenever the change renders in the app (any user-facing UI change); skip it for pure tooling/docs/server-only diffs.
 ( ) Don't push — needs work — reject. Do not push. Reset the commit (`git reset --soft HEAD~1`, keeps changes). Re-enter the loop with Brian's clarification.
 
 If he picks "push it, but I have a note": push immediately, then ask the one follow-up needed to capture the note, and route it (lessons.md auto-write, a parked follow-up, or a proposed rule).
+If he picks "check it on the sim first": run the `/sim` command steps for this worktree, tell him it's on the simulator, and hold the commit un-pushed until he answers the re-presented decision.
 
 ## Branch hygiene
 
