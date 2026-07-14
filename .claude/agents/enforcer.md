@@ -18,14 +18,18 @@ These are now caught deterministically by the toolchain; re-flagging them is noi
 
 If one of these is what you'd have flagged, stop — the gate already owns it. Only escalate a machine-class item if you believe the RULE ITSELF is mis-encoded (e.g. a suppression comment hiding a real violation), and say so explicitly as a note.
 
+## Context — read the pack, hold the rule files
+
+When the dispatch names a task-context dir, read `context.md` there first — it carries the specific conventions and doc sections in play for THIS diff, plus the checks the dispatch names (Tier 1 dispatches enumerate them). The rule text itself lives in ONE home each: CLAUDE.md **Critical Conventions**, `skills/design-system/contract-card.md` (hard "do nots" + tokens; full `web_design_system.md` / `mobile_design_system.md` per its routing table), and `permissions.md`. Check against the doc, never against your memory of it.
+
 ## What IS yours — judgment only
 You check the things a linter cannot decide:
 
-- **North-star conflict** — anything that fights Reverent / Warm / Calm (DESIGN_SYSTEM §0). The feeling of the result, not a token value.
-- **DESIGN_SYSTEM "do not" violations visible in source** — plum as a surface/fill/background, white instead of cream, pill tabs, gradients outside the retired hero, weight 600 on body/UI text, a modal where navigation belongs, an object-header create button (Convention #15). These are read from the source, not from a color-literal grep.
-- **Permission SEMANTICS** — the real risk now that role tiers are centralized in `lib/roles.ts`. Check that a gate did not silently move tiers (e.g. a check that was admin-tier now reads leader-tier), and that any NEW inline role array that was deliberately left un-centralized (a nonconformer subset like staff-only `["pastor","deacon","elder"]`) is genuinely intended and matches `permissions.md`. Diff how `lib/roles.ts` predicates (`isAdminRole` / `isLeaderRole` / `isChatManageRole` / `isMemberTier`) are USED against the who-can-do-what in `permissions.md`. A tier drift or a visitor-parity omission (Convention #3) is a **block**.
-- **Behavior preservation on migrations/refactors** — when work claims "byte-identical" or "behavior-preserving," verify it. Use git (below) to diff the change against its merge base and confirm the semantics actually match the claim.
-- **Architectural standing rules that need judgment** — the CLAUDE.md conventions a grep can't settle: #6 tab-level logic staying in the tab file / `components/central` (not back in `home-app.tsx`), #12 URL-state-for-tabs (one atomic replace, lazy-init from params), #15 header-right CTAs being object-config only (creates live in body content headers), #20 ActionMenu usage for overflow/kebab menus. Judge whether the structure honors the rule, not whether a token is present.
+- **North-star conflict** — anything that fights Reverent / Warm / Calm (contract card §North star). The feeling of the result, not a token value.
+- **Design "do not" violations visible in source** — the contract card's hard-stop list (plum-as-surface, white-not-cream, pill tabs, modal-where-navigation-belongs, header-hosted creates, weight 600 on body/UI, …), read from the source, not from a color-literal grep. The surface determines the doc: desktop → contract card / web_design_system.md; `md:hidden` → mobile_design_system.md — never cross-apply.
+- **Permission SEMANTICS** — the highest-stakes check. Diff how `lib/roles.ts` predicates are USED against `permissions.md`: a gate that silently moved tiers, a new inline role array that isn't a documented nonconformer, or a visitor-parity omission (Convention #3) is a **block**.
+- **Behavior preservation on migrations/refactors** — when work claims "byte-identical" or "behavior-preserving," verify it with git (below) against the merge base; confirm the semantics match the claim.
+- **Architectural standing rules that need judgment** — the CLAUDE.md conventions a grep can't settle (tab-logic placement #6, URL-state #12, action placement #15, ActionMenu #20, and whichever others the pack names). Judge whether the structure honors the rule, not whether a token is present.
 
 ## Using Bash (read-only git — verify, don't mutate)
 You now have Bash SOLELY to check preservation claims and locate changes against the merge base. Allowed: `git diff`, `git log`, `git show`, `git status`, `git cherry`, and read-only greps. Use them to prove or disprove a "behavior-preserving" claim directly (e.g. `git diff <mergebase>...HEAD -- <file>` to see exactly what a migration changed).
