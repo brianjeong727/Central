@@ -23,8 +23,18 @@ export function formatRelativeTime(dateStr: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
+// Parse a date string as a LOCAL date. A bare "YYYY-MM-DD" (date-only, e.g. an
+// event_date) is otherwise parsed as UTC midnight and shifts a day back when
+// displayed in a behind-UTC timezone — split it and build a local Date instead.
+// Strings that carry a time component are parsed as-is.
+export function parseDateLocal(dateStr: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr)
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  return new Date(dateStr)
+}
+
 export function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
+  return parseDateLocal(dateStr).toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",

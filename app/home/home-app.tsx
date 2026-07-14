@@ -1062,7 +1062,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
 
           {activeTab === "announcements" && (
             <div className="md:h-full md:overflow-y-auto">
-              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} onOpenAnnouncement={handleOpenAnnouncement} />
+              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} avatarUrl={avatarUrl} onGoToProfile={() => handleNavClick("profile")} onOpenAnnouncement={handleOpenAnnouncement} />
             </div>
           )}
 
@@ -1081,6 +1081,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                   onTotalUnreadChange={setTotalChatsUnread}
                   refreshKey={chatRefreshKey}
                   onOpenDirectory={() => handleNavClick("directory")}
+                  onGoToProfile={() => handleNavClick("profile")}
                   activeGroupId={globalOpenChat?.id}
                   canCreateChurchChat={canCreateChurchChat}
                   fallbackChats={chatListData}
@@ -1128,6 +1129,8 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 userName={initialProfile.name}
                 ministryId={ministryId}
                 ministryName={ministryName}
+                avatarUrl={avatarUrl}
+                onGoToProfile={() => handleNavClick("profile")}
                 userTeams={userTeams}
                 allTeams={allTeams}
                 isAdmin={isAdmin}
@@ -1141,6 +1144,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 activeTeamId={activeTeamId}
                 onOpenChat={handleOpenChat}
                 onTeamSelect={handleTeamChange}
+                onExitTeam={() => { setActiveTeamId(null); setParams({ team: null, ...TEAM_SUBPARAMS }) }}
                 studentOrgSection={studentOrgSection}
                 onStudentOrgSectionChange={handleStudentOrgSectionChange}
                 studentOrgPlanningEvent={studentOrgPlanningEvent}

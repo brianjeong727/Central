@@ -164,6 +164,9 @@ export interface ChatGroup {
   category?: "general" | "group" | "team" | null
   muted?: boolean
   pinned?: boolean
+  // Ministry-wide central chat (groups.is_central_chat) — drives the solid-plum
+  // monogram chip in the mobile Pocket chat list.
+  is_central_chat?: boolean
 }
 
 export interface GroupMember {
@@ -356,6 +359,8 @@ export interface AnnouncementsTabProps {
   userGradYear: number | null
   ministryId: string
   ministryName: string
+  avatarUrl?: string | null
+  onGoToProfile: () => void
   onOpenAnnouncement: (id: string) => void
 }
 
@@ -452,6 +457,7 @@ export interface ChatsTabProps {
   onTotalUnreadChange: (count: number) => void
   refreshKey: number
   onOpenDirectory: () => void
+  onGoToProfile: () => void
   activeGroupId?: string | null
   canCreateChurchChat: boolean
   fallbackChats?: ChatGroup[]
@@ -674,6 +680,8 @@ export interface PlanTabProps {
   userName: string
   ministryId: string
   ministryName: string
+  avatarUrl?: string | null
+  onGoToProfile: () => void
   userTeams: UserTeam[]
   allTeams: Team[]
   isAdmin: boolean
@@ -690,6 +698,9 @@ export interface PlanTabProps {
   onOpenChat?: (id: string, name: string, type?: string) => void
   // Called when user clicks a team card in the picker (no-team-selected state)
   onTeamSelect?: (teamId: string) => void
+  // Clears the active team back to the workspace picker (mobile "← All workspaces";
+  // desktop uses the shell "Workspace" breadcrumb). Mirrors home-app's null-clear.
+  onExitTeam?: () => void
   // Lifted student-org planning state (for breadcrumb + sidebar)
   studentOrgSection?: string
   onStudentOrgSectionChange?: (s: string) => void

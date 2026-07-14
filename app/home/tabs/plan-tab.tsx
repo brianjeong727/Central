@@ -36,6 +36,7 @@ import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, t
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
+import { PocketChrome, PocketChip } from "../components/pocket-header"
 import { getInitials, formatRelativeTime } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
@@ -1542,7 +1543,7 @@ export function StudentOrgTeamHome({
       {meetingNoteOpen ? (
         <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} openNoteId={openNoteId} onOpenNote={setOpenNoteAndUrl} />
       ) : (
-      <div className="px-5 md:px-14" style={{ paddingTop: 24, paddingBottom: 60 }}>
+      <div className="md:px-14" style={{ paddingTop: 24, paddingBottom: 60 }}>
 
         {/* GENERAL — calendar full-width + meeting notes */}
         {displaySection === "General" && (
@@ -2277,10 +2278,57 @@ function WsAddTile({ onClick }: { onClick: () => void }) {
   )
 }
 
+// Month + day for the workspace progress meta ("next Jul 16").
+function monthDay(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+
+// Mobile workspace card (B3 Pocket Daybreak): tonal --ivory card, squircle letter
+// monogram + name (18/600) + role·members meta, and (ruling #3) a real progress
+// bar for the team's next upcoming event. Whole body taps to enter the workspace;
+// the quiet gear (kept from 6e6a01c) opens team settings for those who can manage.
+function MobileWsRow({ letter, name, sub, progress, onEnter, onManage }: {
+  letter: string
+  name: string
+  sub?: string
+  progress?: { done: number; total: number; nextDate: string }
+  onEnter: () => void
+  onManage?: () => void
+}) {
+  return (
+    <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: 18 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <button onClick={onEnter} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 14, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+            <PocketChip letter={letter} />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontFamily: "var(--serif)", fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+              {sub && <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2 }}>{sub}</span>}
+            </span>
+          </div>
+          {progress && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
+              <span style={{ flex: 1, height: 4, background: "var(--line-2)", borderRadius: 999, overflow: "hidden" }}>
+                <span style={{ display: "block", height: "100%", borderRadius: 999, background: "var(--plum)", width: progress.total > 0 ? `${Math.round((progress.done / progress.total) * 100)}%` : "0%" }} />
+              </span>
+              <span style={{ whiteSpace: "nowrap", fontSize: 12, color: "var(--muted-text)" }}>
+                {progress.total > 0 ? `${progress.done}/${progress.total} · next ${monthDay(progress.nextDate)}` : `next ${monthDay(progress.nextDate)}`}
+              </span>
+            </div>
+          )}
+        </button>
+        {onManage && (
+          <IconButton dim={34} onClick={onManage} title="Team settings"><Settings className="w-4 h-4" /></IconButton>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function PlanTab({
-  userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, isGovernanceAdmin, governanceSettings, isDGL, isPastor,
+  userId, userName, ministryId, ministryName, avatarUrl, onGoToProfile, userTeams, allTeams, isAdmin, isGovernanceAdmin, governanceSettings, isDGL, isPastor,
   onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onOpenChat,
-  onTeamSelect,
+  onTeamSelect, onExitTeam,
   studentOrgSection, onStudentOrgSectionChange, studentOrgPlanningEvent, onStudentOrgPlanningEventChange, onStudentOrgCalEventsChange,
   sglSection, onSglSectionChange,
   financeSection: financeSectionProp, onFinanceSectionChange,
@@ -2304,29 +2352,6 @@ export function PlanTab({
   const financeSection = (financeSectionProp ?? "reimbursements") as FinanceSection
   const setFinanceSection = (s: FinanceSection) => onFinanceSectionChange?.(s)
   const [studentOrgRefreshSignal, setStudentOrgRefreshSignal] = useState(0)
-  const [teamEventCounts, setTeamEventCounts] = useState<Record<string, number>>({})
-
-  // Fetch upcoming event counts per team — only runs when the picker is visible (no team selected)
-  useEffect(() => {
-    if (activeTeamId || userTeams.length === 0) return
-    const teamIds = userTeams.map(t => t.teamId)
-    const now = new Date().toISOString()
-    supabase
-      .from("calendar_events")
-      .select("team_id")
-      .eq("ministry_id", ministryId)
-      .in("team_id", teamIds)
-      .gte("start_date", now)
-      .then(({ data }) => {
-        const counts: Record<string, number> = {}
-        for (const ev of (data ?? []) as { team_id: string }[]) {
-          counts[ev.team_id] = (counts[ev.team_id] ?? 0) + 1
-        }
-        setTeamEventCounts(counts)
-      })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTeamId, userTeams.length, ministryId])
-
   function getPickerSectionCount(team: UserTeam): number {
     const name = team.teamName.toLowerCase()
     const perms = team.permissions
@@ -2408,8 +2433,6 @@ export function PlanTab({
     setOpenTeam(null)
   }, [closeSubpageSignal])
 
-  const hasAnyPlanning = isAdmin || userTeams.length > 0
-
   const monoStyle: React.CSSProperties = EYEBROW_STYLE
 
   const activeUserTeam = userTeams.find(t => t.teamId === activeTeamId)
@@ -2480,6 +2503,61 @@ export function PlanTab({
     ...govTeams.map(t => ({ id: t.id, name: t.name })),
   ]
 
+  // ── Workspace-card progress (mobile picker, ruling #3) ──────────────────────
+  // For every picker team, find its NEXT upcoming calendar_event and count that
+  // event's plan tasks (done/total). ONE batched trio of queries, SWR-cached,
+  // only while the picker is visible (no team selected). Hidden per team when it
+  // has no upcoming event.
+  const pickerTeamIds = activeTeamId ? [] : [...userTeams.map(t => t.teamId), ...govTeams.map(t => t.id)]
+  const pickerTeamKey = pickerTeamIds.join(",")
+  const { data: teamProgress } = useSWR(
+    pickerTeamIds.length > 0 ? ["ws-progress", ministryId, pickerTeamKey] : null,
+    async (): Promise<Record<string, { done: number; total: number; nextDate: string }>> => {
+      const now = new Date().toISOString()
+      const { data: events } = await supabase
+        .from("calendar_events")
+        .select("id, team_id, start_date")
+        .eq("ministry_id", ministryId)
+        .in("team_id", pickerTeamIds)
+        .gte("start_date", now)
+        .order("start_date", { ascending: true })
+      // Earliest upcoming event per team.
+      const nextByTeam: Record<string, { id: string; start_date: string }> = {}
+      for (const ev of (events ?? []) as { id: string; team_id: string; start_date: string }[]) {
+        if (!nextByTeam[ev.team_id]) nextByTeam[ev.team_id] = { id: ev.id, start_date: ev.start_date }
+      }
+      const nextEventIds = Object.values(nextByTeam).map(e => e.id)
+      const planByEvent: Record<string, string> = {}
+      if (nextEventIds.length > 0) {
+        const { data: plans } = await supabase
+          .from("event_plans")
+          .select("id, calendar_event_id")
+          .in("calendar_event_id", nextEventIds)
+        for (const p of (plans ?? []) as { id: string; calendar_event_id: string }[]) planByEvent[p.calendar_event_id] = p.id
+      }
+      const planIds = Object.values(planByEvent)
+      const tasksByPlan: Record<string, { done: number; total: number }> = {}
+      if (planIds.length > 0) {
+        const { data: tasks } = await supabase
+          .from("event_tasks")
+          .select("event_plan_id, completed")
+          .in("event_plan_id", planIds)
+        for (const t of (tasks ?? []) as { event_plan_id: string; completed: boolean }[]) {
+          const b = (tasksByPlan[t.event_plan_id] ??= { done: 0, total: 0 })
+          b.total++
+          if (t.completed) b.done++
+        }
+      }
+      const out: Record<string, { done: number; total: number; nextDate: string }> = {}
+      for (const [teamId, ev] of Object.entries(nextByTeam)) {
+        const planId = planByEvent[ev.id]
+        const counts = planId ? (tasksByPlan[planId] ?? { done: 0, total: 0 }) : { done: 0, total: 0 }
+        out[teamId] = { done: counts.done, total: counts.total, nextDate: ev.start_date }
+      }
+      return out
+    },
+  )
+
   // Team-settings subpage — rendered IN-CONTENT (not a portal) via SubpageShell.
   // Mounted once per viewport (desktop section swaps the team body for it; mobile
   // area wraps it in md:hidden), mirroring the file's existing double-mount pattern.
@@ -2525,26 +2603,14 @@ export function PlanTab({
 
   return (
     <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
-      {/* Mobile Header */}
-      <div className="flex items-center justify-between px-5 pt-6 pb-5 md:hidden">
-        <div className="flex items-center gap-2.5">
-          <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
-            <path d="M70 28 A32 32 0 1 0 70 72" stroke="var(--plum)" strokeWidth="8" strokeLinecap="round" />
-            <circle cx="50" cy="50" r="6" fill="var(--plum)" />
-          </svg>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "28px", color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
-        </div>
-        {isGovernanceAdmin && (
-          <button onClick={() => setShowCreateTeam(true)} className="size-9 bg-[var(--plum)] rounded-xl flex items-center justify-center hover:bg-[var(--plum-2)] transition-colors">
-            <Plus className="w-4 h-4 text-[var(--cream-on-dark)]" />
-          </button>
-        )}
-      </div>
-
-      {/* Mobile title */}
-      <div className="flex items-end justify-between px-5 mb-5 md:hidden">
-        <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "36px", fontWeight: 400, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: 0 }}>Plan</h1>
-      </div>
+      {/* Mobile chrome (B3 Pocket) — "Workspace" + avatar (no action button; the
+          create affordance is the Add-workspace card in the picker). */}
+      <PocketChrome
+        title="Workspace"
+        userName={userName}
+        avatarUrl={avatarUrl}
+        onAvatarClick={onGoToProfile}
+      />
 
       {/* Edit planning event modal */}
       {showEditEvent && studentOrgPlanningEvent && (
@@ -2858,8 +2924,83 @@ export function PlanTab({
         /* Add-workspace subpage (SubpageShell) — overrides mobile content; its own
            md:hidden back row is the back. Mobile has no shell breadcrumb. */
         <div className="md:hidden">{addWorkspaceModal}</div>
+      ) : !activeTeamId ? (
+        /* ── Mobile workspace picker (no team selected) — mirrors desktop 2604-2727
+           gating: 2+ member teams OR any governance-visible team → card list; else
+           the 0-team empty state. The 1-team case is auto-entered upstream. ── */
+        <div className="md:hidden px-5 pb-28">
+          {(userTeams.length >= 2 || govTeams.length > 0) ? (
+            <>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)", margin: "6px 4px 0" }}>Your workspaces</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 14 }}>
+                {userTeams.map(t => {
+                  const role = t.isPresident ? "President" : t.roleName
+                  const members = t.memberCount != null ? `${t.memberCount} member${t.memberCount === 1 ? "" : "s"}` : null
+                  return (
+                    <MobileWsRow
+                      key={t.teamId}
+                      letter={t.teamName.charAt(0).toUpperCase()}
+                      name={t.teamName}
+                      sub={members ? `${role} · ${members}` : role}
+                      progress={teamProgress?.[t.teamId]}
+                      onEnter={() => handleWorkspaceCardClick(userTeamToTeam(t))}
+                      onManage={t.isPresident ? () => openSettings(userTeamToTeam(t)) : undefined}
+                    />
+                  )
+                })}
+                {/* Receipts — a shared surface across your teams (not a team itself). */}
+                <MobileWsRow
+                  letter="R"
+                  name="Receipts"
+                  sub={`${receiptsTeams.length} team${receiptsTeams.length === 1 ? "" : "s"}`}
+                  onEnter={() => onTeamSelect?.("receipts")}
+                />
+                {isGovernanceAdmin && (
+                  <button onClick={() => setShowCreateTeam(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: 18, background: "var(--ivory)", border: "1px dashed var(--dashed)", borderRadius: "var(--r-pocket)", color: "var(--plum)", cursor: "pointer", fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600 }}>
+                    <Plus style={{ width: 16, height: 16 }} strokeWidth={2.2} /> Add workspace
+                  </button>
+                )}
+              </div>
+              {govTeams.length > 0 && (
+                <>
+                  <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)", margin: "26px 4px 0" }}>Admin access · view only</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 14 }}>
+                    {govTeams.map(t => (
+                      <MobileWsRow
+                        key={t.id}
+                        letter={t.name.charAt(0).toUpperCase()}
+                        name={t.name}
+                        sub={`${t.member_count} member${t.member_count === 1 ? "" : "s"}`}
+                        progress={teamProgress?.[t.id]}
+                        onEnter={() => handleWorkspaceCardClick(t)}
+                        onManage={() => openSettings(t)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center text-center" style={{ paddingTop: 64 }}>
+              <div style={{ ...MONO_STYLE, marginBottom: 12 }}>{isAdmin ? "YOUR TEAMS · 0" : "NO TEAM YET"}</div>
+              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
+                {isAdmin ? "Add your first workspace." : "You're not on a team yet."}
+              </h2>
+              <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 320, lineHeight: 1.6, margin: "0 0 24px" }}>
+                {isAdmin
+                  ? "Workspaces keep your ministry organized — Small Group Leaders, Student Org Board, Finance, and more."
+                  : "Ask a leader to add you to a team."}
+              </p>
+              {isGovernanceAdmin && (
+                <CentralButton variant="primary" size="md" onClick={() => setShowCreateTeam(true)}>
+                  <Plus style={{ width: 14, height: 14 }} /> Add a workspace
+                </CentralButton>
+              )}
+            </div>
+          )}
+        </div>
       ) : activeTeamId === "receipts" ? (
-        <div className="md:hidden pb-4">
+        <div className="md:hidden pb-28">
           <ReceiptsWorkspace
             ministryId={ministryId}
             userId={userId}
@@ -2871,7 +3012,7 @@ export function PlanTab({
           />
         </div>
       ) : teamKind === "finance" && activeTeamId && financeCanAccess ? (
-        <div className="md:hidden pb-4">
+        <div className="md:hidden pb-28">
           {/* Read-only pill + section strip each carry their own px-5 mobile inset;
               FinanceWorkspace is bare so its detail SubpageShell stays full-bleed.
               Mobile uses the lightweight pill (no full mat frame — too cramped). */}
@@ -2900,7 +3041,14 @@ export function PlanTab({
           />
         </div>
       ) : (
-      <div className="md:hidden px-5 pb-4">
+      <div className="md:hidden px-5 pb-28">
+        {/* Back to the picker — only meaningful when the picker would offer >1 option
+            (a single-workspace user is auto-re-entered upstream). */}
+        {(userTeams.length >= 2 || govTeams.length > 0) && onExitTeam && (
+          <button onClick={onExitTeam} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", marginBottom: 16, background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--muted-text)", fontSize: 13, cursor: "pointer" }}>
+            <ArrowLeft style={{ width: 13, height: 13 }} /> All workspaces
+          </button>
+        )}
         {activeTeamId && govView && (
           <div style={{ marginBottom: 16 }}>
             <ReadOnlyPill />
@@ -2964,53 +3112,23 @@ export function PlanTab({
               )?.id ?? null
             }
           />
-        ) : (
-          <>
-            {/* Admin: team management */}
-            {isAdmin && (
-              <div className="mb-8">
-                <PlanSectionHeader>Teams</PlanSectionHeader>
-                {allTeams.length === 0 ? (
-                  <EmptyState variant="bordered" icon={<Users className="w-6 h-6" />} title="No teams yet." subtitle="Tap + above to create your first team." />
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {allTeams.map((team) => (
-                      <button
-                        key={team.id}
-                        onClick={() => openSettings(team)}
-                        className="w-full bg-[var(--cream)] rounded-2xl border border-[var(--line)] p-4 text-left flex items-center gap-3 hover:bg-[var(--cream)] transition-colors"
-                      >
-                        <PlanLineIcon iconKey={team.icon ?? "👥"} bg="var(--plum)" fg="var(--cream-on-dark)" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[14px] font-medium text-[var(--ink)]">{team.name}</p>
-                          <p className="text-[12px] text-[var(--muted-text)]">{team.member_count} member{team.member_count !== 1 ? "s" : ""}</p>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-[var(--faint)] flex-shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="mt-4">
-              <PlanSectionHeader>Tools</PlanSectionHeader>
-              <div className="grid grid-cols-2 gap-2">
-                {[{ icon: "set", name: "Set" }, { icon: "sparkle", name: "Slides" }, { icon: "calendar", name: "Schedule" }, { icon: "book", name: "Bible Study" }].map((tool) => (
-                  <div key={tool.name} className="bg-[var(--cream)] rounded-2xl border border-[var(--line)] p-4 opacity-60 flex flex-col gap-2">
-                    <PlanLineIcon iconKey={tool.icon} bg="var(--cream)" fg="var(--plum)" size={36} />
-                    <div>
-                      <p className="text-[13px] font-medium text-[var(--ink)]">{tool.name}</p>
-                      <p style={{ fontFamily: "var(--mono)", fontSize: "9px", color: "var(--muted-text)", letterSpacing: "0.08em", textTransform: "uppercase", marginTop: "2px" }}>Coming soon</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {!isAdmin && !hasAnyPlanning && userTeams.length === 0 && (
-              <EmptyState icon={<ClipboardList className="w-6 h-6" />} title="You're not on a team yet" subtitle="Ask a leader to add you." />
-            )}
-          </>
-        )}
+        ) : (() => {
+          /* Standard team selected → the ministry calendar (mirrors the desktop
+             fallback). Visible to members who can view/plan, or any governance
+             access; edit comes from member perm or governance-write. */
+          const perms = activeUserTeam?.permissions ?? []
+          if (!perms.includes("can_plan_events") && !govWrite && !govView) return null
+          return (
+            <MinistryCalendar
+              ministryId={ministryId}
+              teamId={activeTeamId}
+              teamName={activeTeamName}
+              userId={userId}
+              canEdit={perms.includes("can_plan_events") || govWrite}
+              onOpenChat={onOpenChat}
+            />
+          )
+        })()}
       </div>
       )}
 

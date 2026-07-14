@@ -9,6 +9,7 @@ import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
+import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
 import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, FilterChip } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
@@ -2879,7 +2880,74 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   )
 }
 
-export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId, canCreateChurchChat, fallbackChats }: ChatsTabProps) {
+// Tonal pill filter chip (mockup `.fchip`) — Church / My chats scope switch.
+function ChatFilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        border: "none", borderRadius: 999, padding: "9px 16px",
+        fontFamily: "var(--serif)", fontSize: 13,
+        background: active ? "var(--plum)" : "var(--ivory)",
+        color: active ? "var(--cream-on-dark)" : "var(--body)",
+        fontWeight: active ? 600 : 500, cursor: "pointer", flexShrink: 0,
+      }}
+    >
+      {label}
+    </button>
+  )
+}
+
+// One conversation row inside a Pocket grouped card (mockup `.row`): squircle
+// monogram chip, name (15/600) + single-line "Sender: text" preview, right column
+// time (11 --faint) with a plum unread dot below. `solid` = ministry-wide chat.
+function PocketChatRow({ group, ministryName, isLast, onClick }: { group: ChatGroup; ministryName: string; isLast: boolean; onClick: () => void }) {
+  const solid = group.is_central_chat === true
+  const locked = isLockedChat(group, ministryName)
+  const showUnread = group.unread_count > 0 && !group.muted
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", gap: 12, width: "100%",
+        background: "none", border: "none", textAlign: "left", cursor: "pointer",
+        padding: "13px 0", borderBottom: isLast ? "none" : "1px solid var(--line-3)",
+      }}
+    >
+      <PocketChip letter={group.name.charAt(0).toUpperCase()} solid={solid} />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.name}</span>
+          {group.pinned && <Pin style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} aria-label="Pinned" />}
+          {group.muted && <BellOff style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} aria-label="Muted" />}
+          {locked && !group.pinned && !group.muted && <Lock style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} aria-label="Members only" />}
+        </span>
+        <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {group.last_message
+            ? (group.last_sender ? `${group.last_sender}: ${group.last_message}` : group.last_message)
+            : "No messages yet"}
+        </span>
+      </span>
+      <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
+        {group.last_message_time && <span style={{ fontSize: 11, color: "var(--faint)" }}>{formatRelativeTime(group.last_message_time)}</span>}
+        {showUnread && <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--plum)" }} />}
+      </span>
+    </button>
+  )
+}
+
+// The single tonal grouped card holding a set of chat rows (mockup `.card`).
+function PocketChatCard({ groups, ministryName, onOpen }: { groups: ChatGroup[]; ministryName: string; onOpen: (id: string, name: string) => void }) {
+  return (
+    <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "6px 18px" }}>
+      {groups.map((g, i) => (
+        <PocketChatRow key={g.id} group={g} ministryName={ministryName} isLast={i === groups.length - 1} onClick={() => onOpen(g.id, g.name)} />
+      ))}
+    </div>
+  )
+}
+
+export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onGoToProfile, activeGroupId, canCreateChurchChat, fallbackChats }: ChatsTabProps) {
   const { setParam } = useNavState()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
@@ -2967,18 +3035,31 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   const active = search.trim()
     ? rawActive.filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
     : rawActive
-  const churchSections = subTab === "church" ? sectionChurchChats(active) : null
-
   const monoStyle = MONO_STYLE
 
-  // Bold (prominent, weight-400 serif — serif is never > 400 per the design
-  // contract) mobile section header + its per-section create "+". Replaces the
-  // old page-level "Church chats" heading; the create now lives on each section.
-  const sectionHeaderStyle = { fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1, margin: 0 }
-  const plusBtnClass = "size-8 rounded-xl bg-[var(--cream-panel)] border border-[var(--line)] flex items-center justify-center hover:bg-[var(--cream-2)] active:scale-95 transition-all flex-shrink-0"
+  // New-chat from the chrome — opens the create sheet for the active scope. On the
+  // Church scope it's leader/admin-gated (hidden otherwise); My chats are always open.
+  const canShowNewChat = subTab === "my" || canCreateChurchChat
+  const openNewChat = () => {
+    setCreateChatCategory(undefined)
+    setShowCreateChat(subTab === "church" ? "church" : "my")
+  }
 
   return (
     <div className="pb-2 md:pb-0 md:h-full md:flex md:flex-col">
+      {/* Mobile chrome (B3 Pocket) — "Chats" + new-chat ghost + avatar. */}
+      <PocketChrome
+        title="Chats"
+        userName={userProfile.name}
+        avatarUrl={userProfile.avatar_url}
+        onAvatarClick={onGoToProfile}
+        action={canShowNewChat ? (
+          <PocketRoundButton variant="ghost" onClick={openNewChat} ariaLabel="New chat">
+            <Users style={{ width: 17, height: 17 }} strokeWidth={1.6} />
+          </PocketRoundButton>
+        ) : undefined}
+      />
+
       {/* Desktop Plan C header */}
       <div className="hidden md:block px-5 pt-5 pb-4 border-b border-[var(--line-2)] flex-shrink-0">
         <p style={monoStyle}>Workspace</p>
@@ -3011,49 +3092,11 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         />
       </div>
 
-      <div className="px-5 pt-6 pb-2 md:pt-2 md:px-0 md:flex-1 md:overflow-y-auto">
-      {/* Mobile header — ministry wordmark, scope pills, and the directory icon all
-          share ONE row; the name truncates (min-w-0 + flex-1) so the pills always
-          fit. Compact top padding — the native shell already insets the status bar,
-          so the old pt-14 editorial gap wasted the first fold. */}
-      <div className="flex items-center gap-2 mb-5 md:hidden">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <svg width="24" height="24" viewBox="0 0 100 100" fill="none" className="flex-shrink-0">
-            <path d="M70 28 A32 32 0 1 0 70 72" stroke="var(--plum)" strokeWidth="8" strokeLinecap="round" />
-            <circle cx="50" cy="50" r="6" fill="var(--plum)" />
-          </svg>
-          <span className="truncate" style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "26px", color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
-        </div>
-        <SegmentedControl
-          aria-label="Chat scope"
-          options={[{ id: "church", label: "Church" }, { id: "my", label: "My Chats" }]}
-          value={subTab}
-          onChange={(t) => {
-            setSubTab(t)
-            setSearch("")
-            setParam("chats", t === "church" ? null : t)
-          }}
-          className="flex-shrink-0"
-        />
-        <button
-          onClick={onOpenDirectory}
-          className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-xl hover:bg-[#F0EEF8] transition-colors"
-          aria-label="Directory"
-        >
-          <Users className="w-5 h-5 text-[var(--plum)]" />
-        </button>
-      </div>
-
-      {/* Search bar — mobile only (desktop has one in the panel header above) */}
-      <div className="relative mb-4 md:hidden">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-text)]/40" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search chats…"
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[var(--faint)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 border border-[var(--line-3)] focus:border-[var(--plum)]/30 transition-all"
-        />
+      <div className="px-5 pt-1 pb-2 md:pt-2 md:px-0 md:flex-1 md:overflow-y-auto">
+      {/* Mobile scope pills (B3 Pocket) — Church / My chats. */}
+      <div className="flex gap-2 mb-4 md:hidden">
+        <ChatFilterChip label="Church" active={subTab === "church"} onClick={() => { setSubTab("church"); setSearch(""); setParam("chats", null) }} />
+        <ChatFilterChip label="My chats" active={subTab === "my"} onClick={() => { setSubTab("my"); setSearch(""); setParam("chats", "my") }} />
       </div>
 
       {/* Push-notification prompt — self-hides unless permission is 'default' & unsubscribed & not dismissed */}
@@ -3064,74 +3107,45 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       {loading ? (
         <Spinner />
       ) : subTab === "my" ? (
-        /* My Chats — flat list under one bold "Messages" header; the create "+"
-           lives on the header and stays reachable even when the list is empty. */
-        <div className="flex flex-col gap-2.5">
-          <div className="flex items-center justify-between pt-1 pb-1">
-            <span style={sectionHeaderStyle}>Messages</span>
-            <button onClick={() => { setCreateChatCategory(undefined); setShowCreateChat("my") }} className={plusBtnClass} aria-label="New chat">
-              <Plus className="w-4 h-4 text-[var(--plum)]" />
-            </button>
-          </div>
-          {active.length === 0 ? (
-            <EmptyState
-              icon={<Users className="w-7 h-7" />}
-              title={search.trim() ? "No chats found" : "No personal chats"}
-              subtitle={search.trim() ? `No chats match "${search.trim()}"` : "Tap + to start a new chat"}
-            />
-          ) : (
-            partitionPinned(active).map((group) => (
-              <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} />
-            ))
-          )}
-        </div>
+        /* My chats — one flat Pocket grouped card (mockup); pinned-first order. */
+        active.length === 0 ? (
+          <EmptyState
+            icon={<Users className="w-7 h-7" />}
+            title="No personal chats"
+            subtitle="Start a new chat from the header."
+          />
+        ) : (
+          <PocketChatCard groups={partitionPinned(active)} ministryName={ministryName} onOpen={handleOpenChat} />
+        )
       ) : active.length === 0 && archivedChurchChats.length === 0 ? (
         <EmptyState
           icon={<Users className="w-7 h-7" />}
-          title={search.trim() ? "No chats found" : "No church chats"}
-          subtitle={search.trim() ? `No chats match "${search.trim()}"` : "You haven't been added to any church chats yet"}
+          title="No church chats"
+          subtitle="You haven't been added to any church chats yet"
         />
       ) : (
-        /* Church Chats — one bold header per non-empty section, each carrying its
-           own section-scoped create "+" (opens create pre-set to that section). */
-        <div className="flex flex-col gap-2.5">
-          {CHURCH_SECTION_DEFS.flatMap(({ key, label }) => {
-            const rooms = partitionPinned(churchSections![key])
-            if (rooms.length === 0) return []
-            return [
-              <div key={`sec-${key}`} className="flex items-center justify-between pt-2 pb-1">
-                <span style={sectionHeaderStyle}>{label}</span>
-                {canCreateChurchChat && (
-                  <button onClick={() => { setCreateChatCategory(key); setShowCreateChat("church") }} className={plusBtnClass} aria-label={`New ${label} chat`}>
-                    <Plus className="w-4 h-4 text-[var(--plum)]" />
-                  </button>
-                )}
-              </div>,
-              ...rooms.map((group) => (
-                <ChatGroupCard key={group.id} group={group} onClick={() => handleOpenChat(group.id, group.name)} isActive={activeGroupId === group.id} locked={isLockedChat(group, ministryName)} />
-              )),
-            ]
-          })}
+        /* Church chats — one flat Pocket grouped card (mockup flattens the
+           General/Groups/Teams sections into a single card); archived self-hides. */
+        <div className="flex flex-col gap-4">
+          {active.length > 0 && (
+            <PocketChatCard groups={partitionPinned(active)} ministryName={ministryName} onOpen={handleOpenChat} />
+          )}
 
-          {/* Archived section (Church Chats only) */}
+          {/* Archived (Church chats only) — collapsed accordion, self-hides when none */}
           {archivedChurchChats.length > 0 && (
-            <div className="mt-2">
+            <div>
               <button
                 onClick={() => setShowArchived((s) => !s)}
-                className="w-full flex items-center justify-between py-3 px-1"
+                className="w-full flex items-center justify-between py-2 px-1"
               >
-                <span className="text-[11px] font-normal text-[var(--muted-text)]/40 uppercase tracking-wider">
+                <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)" }}>
                   Archived · {archivedChurchChats.length}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-[var(--muted-text)]/30 transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-4 h-4 text-[var(--muted-text)] transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />
               </button>
               {showArchived && (
-                <div className="flex flex-col gap-2.5">
-                  {archivedChurchChats.map((group) => (
-                    <div key={group.id} className="opacity-50">
-                      <ChatGroupCard group={group} onClick={() => handleOpenChat(group.id, group.name)} />
-                    </div>
-                  ))}
+                <div style={{ opacity: 0.6, marginTop: 8 }}>
+                  <PocketChatCard groups={archivedChurchChats} ministryName={ministryName} onOpen={handleOpenChat} />
                 </div>
               )}
             </div>
