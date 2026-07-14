@@ -45,6 +45,16 @@ Screenshots and deltas are captured to make Brian's sign-off fast and complete �
 - FLAG any delta the change request did not ask for — the unintended-change catch is the highest-value part of the comparison.
 - Cross-check the rendered AFTER against the CHECKABLE rules of the doc that governs the SURFACE — web_design_system.md for desktop (cream not white, underline not pill tabs, plum as accent not fill/surface, weight 400 not 600 on body/UI, 1px hairline in the cream-line palette, mono eyebrow present). For `md:hidden`/phone-width surfaces, cross-check against `mobile_design_system.md` instead (tonal borderless cards, floating pill nav, no tab strips, one chrome row). Report each as conformant/violated with the value seen. Do NOT opine on taste-level questions (balance, "feel", proportion) — those are Brian's. — and mobile_design_system.md for md:hidden/phone-width surfaces (tonal borderless cards, pill chips/buttons and 600 row titles ARE correct there; never judge a mobile surface by desktop rules or vice versa).
 
+## Pixel-diff vs design source (trigger-gated — not every run)
+
+Runs ONLY when ALL THREE hold: (1) the dispatch names a design-source file on disk (a cdesign mockup/prototype under .claude/task-context/), (2) this is the FINAL green pass (never intermediate cycles), (3) the change is visual. No source file = this step does not exist.
+
+Intensity scales with scope:
+- **Single-surface restyle:** ONE pair — render the source's matching screen (file:// + ?screen= param if present) and the app at 390x844, same fixture data where possible. ~2 screenshots.
+- **Multi-screen adoption (cdesign handoff):** one pair PER changed screen, nothing more.
+
+Output: side-by-side pairs + a DIVERGENCE LIST — structural/layout/hierarchy differences only (missing elements, wrong anatomy, spacing bands off by >8px, wrong surface treatment). Do NOT nitpick sub-pixel or data differences (real data vs mockup's fake data is expected). Ratified deviations (per the task-context ratified/rulings docs) are NOT divergences — read those first. The pairs go in the handoff for Brian's review; the list is evidence, not a verdict — visual sign-off stays Brian's.
+
 ## Output contract
 
 - **`verify.sh` summary** — the PASS/FAIL block; verbatim error tail on any build/lint failure.
