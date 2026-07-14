@@ -11,5 +11,8 @@ esac
 
 # Lint just this one file. Non-blocking: report problems back to the loop
 # (exit 0 always) — the Tester is the real gate; this is fast early warning.
-npx eslint "$FILE_PATH" 2>&1 || echo "Lint warnings in $FILE_PATH (above) — not blocking; Tester will verify." >&2
+# --cache cuts repeat cost: an engineer touching 15 files otherwise pays a
+# full cold ESLint boot 15 times.
+CACHE="${CLAUDE_PROJECT_DIR:-.}/.claude/.eslintcache"
+npx eslint --cache --cache-location "$CACHE" "$FILE_PATH" 2>&1 || echo "Lint warnings in $FILE_PATH (above) — not blocking; Tester will verify." >&2
 exit 0

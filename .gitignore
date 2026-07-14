@@ -52,3 +52,6 @@ next-env.d.ts
 /ds-entry.ts
 /.ds-entry.tsx
 .claude/task-context/
+.claude/.eslintcache
+.claude/.ship-authorized
+.claude/.destructive-git-authorized
