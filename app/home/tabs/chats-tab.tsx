@@ -2949,9 +2949,8 @@ function ChatFilterChip({ label, active, onClick }: { label: string; active: boo
 // One conversation row inside a Pocket grouped card (mockup `.row`): squircle
 // monogram chip, name (15/600) + single-line "Sender: text" preview, right column
 // time (11 --faint) with a plum unread dot below. `solid` = ministry-wide chat.
-function PocketChatRow({ group, ministryName, isLast, onClick }: { group: ChatGroup; ministryName: string; isLast: boolean; onClick: () => void }) {
+function PocketChatRow({ group, isLast, onClick }: { group: ChatGroup; isLast: boolean; onClick: () => void }) {
   const solid = group.is_central_chat === true
-  const locked = isLockedChat(group, ministryName)
   const showUnread = group.unread_count > 0 && !group.muted
   return (
     <button
@@ -2968,7 +2967,6 @@ function PocketChatRow({ group, ministryName, isLast, onClick }: { group: ChatGr
           <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.name}</span>
           {group.pinned && <Pin style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} aria-label="Pinned" />}
           {group.muted && <BellOff style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} aria-label="Muted" />}
-          {locked && !group.pinned && !group.muted && <Lock style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} aria-label="Members only" />}
         </span>
         <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {group.last_message
@@ -2985,12 +2983,49 @@ function PocketChatRow({ group, ministryName, isLast, onClick }: { group: ChatGr
 }
 
 // The single tonal grouped card holding a set of chat rows (mockup `.card`).
-function PocketChatCard({ groups, ministryName, onOpen }: { groups: ChatGroup[]; ministryName: string; onOpen: (id: string, name: string) => void }) {
+function PocketChatCard({ groups, onOpen }: { groups: ChatGroup[]; onOpen: (id: string, name: string) => void }) {
   return (
     <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "6px 18px" }}>
       {groups.map((g, i) => (
-        <PocketChatRow key={g.id} group={g} ministryName={ministryName} isLast={i === groups.length - 1} onClick={() => onOpen(g.id, g.name)} />
+        <PocketChatRow key={g.id} group={g} isLast={i === groups.length - 1} onClick={() => onOpen(g.id, g.name)} />
       ))}
+    </div>
+  )
+}
+
+// Church chats sectioned into General / Groups / Teams (mockup `.grp` headers +
+// per-section tonal card). Each header carries its own compact plum + that opens
+// the create sheet pre-set to that section's category (leader/admin only). Empty
+// sections self-hide; a fully-empty church scope is handled by the caller.
+function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
+  sections: Record<ChurchSection, ChatGroup[]>
+  canCreate: boolean
+  onOpen: (id: string, name: string) => void
+  onAddInSection: (category: ChurchSection) => void
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {CHURCH_SECTION_DEFS.map(({ key, label }) => {
+        const rooms = partitionPinned(sections[key])
+        if (rooms.length === 0) return null
+        return (
+          <div key={key}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "20px 4px 8px" }}>
+              <span style={{ flex: 1, fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)" }}>{label}</span>
+              {canCreate && (
+                <button
+                  onClick={() => onAddInSection(key)}
+                  aria-label={`New ${label.toLowerCase()} chat`}
+                  style={{ background: "none", border: "none", color: "var(--plum)", width: 26, height: 26, display: "grid", placeItems: "center", margin: "-4px 0", cursor: "pointer" }}
+                >
+                  <Plus style={{ width: 15, height: 15 }} strokeWidth={1.8} />
+                </button>
+              )}
+            </div>
+            <PocketChatCard groups={rooms} onOpen={onOpen} />
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -3172,7 +3207,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             subtitle="Tap + to start a new chat."
           />
         ) : (
-          <PocketChatCard groups={partitionPinned(active)} ministryName={ministryName} onOpen={handleOpenChat} />
+          <PocketChatCard groups={partitionPinned(active)} onOpen={handleOpenChat} />
         )
       ) : active.length === 0 && archivedChurchChats.length === 0 ? (
         <EmptyState
@@ -3181,11 +3216,16 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           subtitle="You haven't been added to any church chats yet"
         />
       ) : (
-        /* Church chats — one flat Pocket grouped card (mockup flattens the
-           General/Groups/Teams sections into a single card); archived self-hides. */
+        /* Church chats — sectioned into General / Groups / Teams (Daybreak ruling
+           #3), each its own tonal card with a per-section + create; archived self-hides. */
         <div className="flex flex-col gap-4">
           {active.length > 0 && (
-            <PocketChatCard groups={partitionPinned(active)} ministryName={ministryName} onOpen={handleOpenChat} />
+            <PocketChurchSections
+              sections={sectionChurchChats(active)}
+              canCreate={canCreateChurchChat}
+              onOpen={handleOpenChat}
+              onAddInSection={(category) => { setCreateChatCategory(category); setShowCreateChat("church") }}
+            />
           )}
 
           {/* Archived (Church chats only) — collapsed accordion, self-hides when none */}
@@ -3202,7 +3242,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
               </button>
               {showArchived && (
                 <div style={{ opacity: 0.6, marginTop: 8 }}>
-                  <PocketChatCard groups={archivedChurchChats} ministryName={ministryName} onOpen={handleOpenChat} />
+                  <PocketChatCard groups={archivedChurchChats} onOpen={handleOpenChat} />
                 </div>
               )}
             </div>

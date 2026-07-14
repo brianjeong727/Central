@@ -217,15 +217,23 @@ test.describe("mobile plan workspace entry (3a15bd6)", () => {
       assertNoErrors(errors)
     })
 
-    test("6. student-org-named team renders StudentOrgTeamHome (General/Meeting Notes/Events)", async ({ page }) => {
+    test("6. student-org-named team renders the mobile hub (Planning/Ministry drill-in rows)", async ({ page }) => {
+      // B-1: the mobile sub-tab strip is replaced by the Daybreak hub — grouped
+      // Planning/Ministry row cards that drill into the existing section surfaces.
       const errors = watchConsole(page)
       await page.goto("/home?tab=plan")
       await page.getByText(STUDENT_ORG_NAME, { exact: false }).filter({ visible: true }).click()
       await expect.poll(() => page.url()).toContain(`team=${studentOrgTeamId}`)
 
-      await expect(page.getByRole("button", { name: "General" }).filter({ visible: true })).toBeVisible()
-      await expect(page.getByRole("button", { name: "Meeting Notes" }).filter({ visible: true })).toBeVisible()
-      await expect(page.getByRole("button", { name: "Events" }).filter({ visible: true })).toBeVisible()
+      // Hub landing — section labels + drill-in rows (not the old strip buttons).
+      await expect(page.getByText("Planning", { exact: true }).filter({ visible: true })).toBeVisible()
+      await expect(page.getByText("Ministry", { exact: true }).filter({ visible: true })).toBeVisible()
+      const eventsRow = page.getByRole("button", { name: /Events/ }).filter({ visible: true }).first()
+      await expect(eventsRow).toBeVisible()
+
+      // Drilling into a row reveals the section content + a back-to-hub affordance.
+      await eventsRow.click()
+      await expect(page.getByRole("button", { name: STUDENT_ORG_NAME }).filter({ visible: true })).toBeVisible()
 
       assertNoErrors(errors)
     })

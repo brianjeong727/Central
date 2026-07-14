@@ -38,6 +38,7 @@ import { elevateToLeader } from "@/app/actions/ministry"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketChip } from "../components/pocket-header"
 import { getInitials, formatRelativeTime } from "../utils"
+import { useIsMobile } from "../use-is-mobile"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
@@ -1280,14 +1281,18 @@ export function StudentOrgTeamHome({
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
-  const [teamTab, setTeamTab] = useState<"General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations">(() => {
+  // Mobile drill state (ruling B-1): "Hub" is the mobile landing; other values
+  // are drill-ins into the existing section surfaces. Desktop ignores teamTab
+  // (it uses desktopSection), so the "Hub" default is desktop-safe.
+  type SoTab = "Hub" | "General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations"
+  const [teamTab, setTeamTab] = useState<SoTab>(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sotab") : null
-    return (["General", "Meeting Notes", "Events", "Resources", "Groups", "Rotations"].includes(p ?? "") ? p : "General") as "General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations"
+    return (["Hub", "General", "Meeting Notes", "Events", "Resources", "Groups", "Rotations"].includes(p ?? "") ? p : "Hub") as SoTab
   })
 
-  function setTeamTabAndUrl(tab: "General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations") {
+  function setTeamTabAndUrl(tab: SoTab) {
     setTeamTab(tab)
-    setParam("sotab", tab)
+    setParam("sotab", tab === "Hub" ? null : tab)
   }
 
   // On desktop: section is driven by sidebar prop; on mobile: by internal teamTab state
@@ -1304,6 +1309,25 @@ export function StudentOrgTeamHome({
   const calEvents = useMemo(() => (calData?.events ?? []).filter(e => e.parent_event_id == null), [calData])
   const plannedIds = calData?.plannedIds ?? EMPTY_ID_SET
   const [currentMonth, setCurrentMonth] = useState(new Date())
+
+  // Mobile hub up-next hero (ruling B-1): the team's next upcoming event + its
+  // plan-task completion, fetched lazily only when an upcoming event exists.
+  const nextEvent = useMemo(() => {
+    const now = Date.now()
+    return calEvents
+      .filter(e => new Date(e.start_date).getTime() >= now)
+      .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())[0] ?? null
+  }, [calEvents])
+  const { data: heroProgress } = useSWR(
+    nextEvent ? (["hub-hero-progress", nextEvent.id] as const) : null,
+    async () => {
+      const { data: planRow } = await supabase.from("event_plans").select("id, crunch_date").eq("calendar_event_id", nextEvent!.id).maybeSingle()
+      if (!planRow) return { done: 0, total: 0, crunch: null as string | null }
+      const { data: taskRows } = await supabase.from("event_tasks").select("completed").eq("event_plan_id", (planRow as { id: string }).id)
+      const list = (taskRows ?? []) as { completed: boolean }[]
+      return { done: list.filter(t => t.completed).length, total: list.length, crunch: (planRow as { crunch_date: string | null }).crunch_date }
+    },
+  )
 
   // Add / delete
   const [showAddModal, setShowAddModal] = useState(false)
@@ -1500,29 +1524,10 @@ export function StudentOrgTeamHome({
   return (
     <>
     <div>
-      {/* Mobile tab strip — desktop uses sidebar nav */}
-      {!isDesktopView && (
-        <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <PlanSubTabStrip
-              tabs={[
-                { key: "General", label: "General" },
-                { key: "Meeting Notes", label: "Meeting Notes" },
-                { key: "Events", label: "Events" },
-                { key: "Resources", label: "Resources" },
-                { key: "Groups", label: "Groups" },
-                { key: "Rotations", label: "Rotations" },
-              ]}
-              active={teamTab}
-              onChange={t => setTeamTabAndUrl(t as "General" | "Meeting Notes" | "Events" | "Resources" | "Groups" | "Rotations")}
-            />
-          </div>
-          {onTeamSettings && (
-            <IconButton dim={32} onClick={onTeamSettings} title="Team settings" className="ml-auto">
-              <Settings className="w-4 h-4" />
-            </IconButton>
-          )}
-        </div>
+      {/* Mobile hub back row (ruling B-1) — the strip nav is replaced by the hub;
+          a drilled-in section shows a back-to-hub row. Desktop uses sidebar nav. */}
+      {!isDesktopView && displaySection !== "Hub" && (
+        <MobileHubBackRow label={teamName} onBack={() => setTeamTabAndUrl("Hub")} />
       )}
 
       {/* Desktop object header — workspace name + settings gear only.
@@ -1544,6 +1549,34 @@ export function StudentOrgTeamHome({
         <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} openNoteId={openNoteId} onOpenNote={setOpenNoteAndUrl} />
       ) : (
       <div className="md:px-14" style={{ paddingTop: 24, paddingBottom: 60 }}>
+
+        {/* MOBILE HUB — Daybreak landing (ruling B-1/B-3). Rows drill into the
+            existing section surfaces below. Never rendered on desktop. */}
+        {!isDesktopView && displaySection === "Hub" && (
+          <MobilePocketHub
+            teamName={teamName}
+            onSettings={onTeamSettings}
+            hero={nextEvent ? {
+              eyebrow: "Up next",
+              title: nextEvent.title,
+              meta: [monthDay(nextEvent.start_date), heroProgress?.crunch ? `crunch ${monthDay(heroProgress.crunch)}` : null].filter(Boolean).join(" · "),
+              progress: heroProgress ? { done: heroProgress.done, total: heroProgress.total } : null,
+              onClick: () => onPlanningEventChange(nextEvent),
+            } : null}
+            groups={[
+              { label: "Planning", rows: [
+                { iconKey: "clipboard", title: "Events", subtitle: nextEvent ? `Next · ${nextEvent.title}` : "No upcoming events", onClick: () => setTeamTabAndUrl("Events") },
+                { iconKey: "book", title: "Meeting notes", subtitle: "Agendas & recaps", onClick: () => setTeamTabAndUrl("Meeting Notes") },
+                { iconKey: "calendar", title: "Calendar", subtitle: "Month view of everything scheduled", onClick: () => setTeamTabAndUrl("General") },
+              ] },
+              { label: "Ministry", rows: [
+                { iconKey: "sparkle", title: "Resources", subtitle: "Role guides & links", onClick: () => setTeamTabAndUrl("Resources") },
+                { iconKey: "users", title: "Groups", subtitle: "Split the ministry into balanced small groups", onClick: () => setTeamTabAndUrl("Groups") },
+                { iconKey: "set", title: "Rotations", subtitle: "Semester sign-up slots", onClick: () => setTeamTabAndUrl("Rotations") },
+              ] },
+            ]}
+          />
+        )}
 
         {/* GENERAL — calendar full-width + meeting notes */}
         {displaySection === "General" && (
@@ -2283,6 +2316,78 @@ function monthDay(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
+// ── Mobile team hub (Daybreak, ruling B-1/B-3) ──────────────────────────────
+// Replaces the mobile sub-tab strip: a team-name header (+ gear), an optional
+// plum up-next hero, and grouped row cards that drill into the team's EXISTING
+// mobile section surfaces. Row icons are PlanLineIcon stroked glyphs (ruling #7),
+// never unicode. Shared by StudentOrgTeamHome and SmallGroupLeadersTab.
+type HubRow = { iconKey: string; title: string; subtitle: string; meta?: string; onClick: () => void }
+function MobilePocketHub({ teamName, onSettings, hero, groups }: {
+  teamName: string
+  onSettings?: () => void
+  hero?: { eyebrow: string; title: string; meta: string; progress?: { done: number; total: number } | null; onClick: () => void } | null
+  groups: { label: string; rows: HubRow[] }[]
+}) {
+  const dimCream = "color-mix(in srgb, var(--cream) 62%, transparent)"
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+        <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{teamName}</span>
+        {onSettings && (
+          <IconButton dim={34} onClick={onSettings} title="Team settings"><Settings className="w-4 h-4" /></IconButton>
+        )}
+      </div>
+
+      {hero && (
+        <button onClick={hero.onClick} style={{ textAlign: "left", width: "100%", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: "var(--r-pocket)", padding: 20, border: "none", cursor: "pointer" }}>
+          <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: dimCream }}>{hero.eyebrow}</div>
+          <div style={{ fontSize: 21, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.15, marginTop: 8 }}>{hero.title}</div>
+          <div style={{ fontSize: 13, color: "color-mix(in srgb, var(--cream) 68%, transparent)", marginTop: 5 }}>{hero.meta}</div>
+          {hero.progress && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
+              <span style={{ flex: 1, height: 4, background: "color-mix(in srgb, var(--cream) 20%, transparent)", borderRadius: 999, overflow: "hidden" }}>
+                <span style={{ display: "block", height: "100%", background: "var(--cream)", borderRadius: 999, width: hero.progress.total > 0 ? `${Math.round(hero.progress.done / hero.progress.total * 100)}%` : "0%" }} />
+              </span>
+              <span style={{ whiteSpace: "nowrap", fontSize: 12, color: "color-mix(in srgb, var(--cream) 68%, transparent)" }}>{hero.progress.done}/{hero.progress.total} done</span>
+            </div>
+          )}
+        </button>
+      )}
+
+      {groups.map((g, gi) => (
+        <div key={g.label}>
+          <div style={{ margin: (gi === 0 && !hero) ? "6px 4px 10px" : "26px 4px 10px" }}>
+            <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)" }}>{g.label}</span>
+          </div>
+          <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "6px 18px" }}>
+            {g.rows.map((r, ri) => (
+              <button key={r.title} onClick={r.onClick} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", background: "none", border: "none", textAlign: "left", cursor: "pointer", padding: "13px 0", borderBottom: ri === g.rows.length - 1 ? "none" : "1px solid var(--line-3)" }}>
+                <PlanLineIcon iconKey={r.iconKey} size={40} radius={14} bg="var(--line-2)" fg="var(--plum)" />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)" }}>{r.title}</span>
+                  <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.subtitle}</span>
+                </span>
+                {r.meta && <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{r.meta}</span>}
+                <ChevronRight style={{ width: 15, height: 15, color: "var(--faint)", flexShrink: 0 }} />
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Back row shown when a hub row is drilled into on mobile — "← {section}" returns
+// to the hub. Sits above the existing section content.
+function MobileHubBackRow({ label, onBack }: { label: string; onBack: () => void }) {
+  return (
+    <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 12px 0 6px", marginBottom: 18, background: "transparent", border: "none", color: "var(--plum)", fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+      <ArrowLeft style={{ width: 18, height: 18 }} /> {label}
+    </button>
+  )
+}
+
 // Mobile workspace card (B3 Pocket Daybreak): tonal --ivory card, squircle letter
 // monogram + name (18/600) + role·members meta, and (ruling #3) a real progress
 // bar for the team's next upcoming event. Whole body taps to enter the workspace;
@@ -2870,6 +2975,7 @@ export function PlanTab({
         ) : teamKind === "dgl" && activeTeamId && activeTeamAllowed ? (
           <SmallGroupLeadersTab
               teamId={activeTeamId}
+              teamName={activeTeamName}
               ministryId={ministryId}
               userId={userId}
               isPresident={isDGLPresident}
@@ -3021,12 +3127,22 @@ export function PlanTab({
               <ReadOnlyPill />
             </div>
           )}
-          <div className="px-5" style={{ marginBottom: 16 }}>
-            <PlanSubTabStrip
-              tabs={financeStripTabs}
-              active={financeSection}
-              onChange={k => setFinanceSection(k as FinanceSection)}
-            />
+          {/* Mobile finance filter (Daybreak ws-fin) — prototype fchip pills in
+              place of the underline strip. Writes live inside FinanceWorkspace
+              (full parity, ruling B-4). md:hidden-scoped: desktop unaffected. */}
+          <div className="px-5 flex gap-2" style={{ marginBottom: 16 }}>
+            {financeStripTabs.map(t => {
+              const on = financeSection === t.key
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setFinanceSection(t.key as FinanceSection)}
+                  style={{ border: "none", borderRadius: 999, padding: "9px 16px", fontFamily: "var(--serif)", fontSize: 13, background: on ? "var(--plum)" : "var(--ivory)", color: on ? "var(--cream-on-dark)" : "var(--body)", fontWeight: on ? 600 : 500, cursor: "pointer", flexShrink: 0 }}
+                >
+                  {t.label}
+                </button>
+              )
+            })}
           </div>
           <FinanceWorkspace
             ministryId={ministryId}
@@ -3097,6 +3213,7 @@ export function PlanTab({
         ) : teamKind === "dgl" && activeTeamId && activeTeamAllowed ? (
           <SmallGroupLeadersTab
             teamId={activeTeamId}
+            teamName={activeTeamName}
             ministryId={ministryId}
             userId={userId}
             isPresident={isDGLPresident}
@@ -6788,6 +6905,9 @@ export function EventPlanWorkspace({
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
+  // Mobile-only Daybreak restyle (ruling B-2): applied via viewport branch so the
+  // shared EventPlanWorkspace tree stays byte-identical on desktop.
+  const isMobile = useIsMobile()
   const cfg = getEventConfig(calendarEvent)
   const typeCfg = EVENT_TYPE_CONFIGS[calendarEvent.event_type] ?? EVENT_TYPE_CONFIGS.social
   const extraTabs = typeCfg.extraTabs
@@ -7566,7 +7686,7 @@ export function EventPlanWorkspace({
         <button
           onClick={(e) => { e.stopPropagation(); if (canEdit) handleToggleTask(task) }}
           disabled={!canEdit}
-          style={{ width: 20, height: 20, borderRadius: 6, border: "1.6px solid " + (task.completed ? "var(--plum-2)" : "var(--dashed)"), background: task.completed ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: canEdit ? "pointer" : "default", flexShrink: 0 }}
+          style={{ width: 20, height: 20, borderRadius: isMobile ? "var(--r-check)" : 6, border: "1.6px solid " + (task.completed ? "var(--plum-2)" : "var(--dashed)"), background: task.completed ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: canEdit ? "pointer" : "default", flexShrink: 0 }}
         >
           {task.completed && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
         </button>
@@ -7731,7 +7851,7 @@ export function EventPlanWorkspace({
                 ? { color: "var(--faint)", label: "No checklist yet" }
                 : pct === 100 ? { color: "var(--success)", label: "Ready" }
                 : pct >= 50 ? { color: "var(--sage)", label: "In progress" }
-                : { color: "var(--gold)", label: "Needs attention" }
+                : { color: isMobile ? "var(--danger)" : "var(--gold)", label: "Needs attention" }
               // Identity facts — display-only. Two columns: LEFT Time + Location,
               // RIGHT Plan start + Crunch start (dates are edited in the Edit-event
               // modal, not here). Time omits when empty (all-day); Location and
@@ -7854,7 +7974,7 @@ export function EventPlanWorkspace({
                 {/* ── RIGHT column — stat cards ── */}
                 <aside style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }} className="max-md:mt-8">
                   {/* Expected turnout */}
-                  <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
+                  <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22}>
                     <p style={monoLabel}>Expected turnout</p>
                     {canEdit && editingTurnout ? (
                       <input
@@ -7882,7 +8002,7 @@ export function EventPlanWorkspace({
                   </CentralCard>
 
                   {/* Budget */}
-                  <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
+                  <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <p style={monoLabel}>Budget</p>
                       {!canEditBudget && <span style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Treasurer only</span>}
@@ -7929,7 +8049,7 @@ export function EventPlanWorkspace({
                   </CentralCard>
 
                   {/* Readiness */}
-                  <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
+                  <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22}>
                     <p style={monoLabel}>Readiness</p>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
                       <span style={{ width: 8, height: 8, borderRadius: 99, background: readiness.color, flexShrink: 0 }} />
@@ -11803,6 +11923,7 @@ function SglSH({ eyebrow, title, sub, right }: { eyebrow: string; title: string;
 
 function SmallGroupLeadersTab({
   teamId,
+  teamName = "Small Group Leaders",
   ministryId,
   userId,
   isPresident,
@@ -11814,6 +11935,7 @@ function SmallGroupLeadersTab({
   desktopSection,
 }: {
   teamId: string
+  teamName?: string
   ministryId: string
   userId: string
   isPresident: boolean
@@ -11835,8 +11957,15 @@ function SmallGroupLeadersTab({
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sgltab") : null
     return (validTabs.includes(p as SGLTab)) ? p as SGLTab : defaultTab
   })
-  function setActiveSubTabAndUrl(t: SGLTab) {
-    setActiveSubTab(t)
+  // Mobile drill state (ruling B-1): the sub-tab strip is replaced by a heroless
+  // hub; null = hub landing, a tab = drilled-in section. URL-synced via ?sgltab.
+  const [mobileDrill, setMobileDrill] = useState<SGLTab | null>(() => {
+    const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sgltab") : null
+    return validTabs.includes(p as SGLTab) ? (p as SGLTab) : null
+  })
+  function setMobileDrillAndUrl(t: SGLTab | null) {
+    setMobileDrill(t)
+    if (t) setActiveSubTab(t)
     setParam("sgltab", t)
   }
   const [loading, setLoading] = useState(true)
@@ -12350,8 +12479,12 @@ function SmallGroupLeadersTab({
       .eq("semester", semester)
   }
 
-  // On desktop: section is driven by sidebar prop; on mobile: by internal activeSubTab state
-  const effectiveSection = (isDesktopView && desktopSection) ? desktopSection : activeSubTab
+  // On desktop: section is driven by sidebar prop. On mobile: the hub is the
+  // landing (mobileDrill === null → "hub"); a drilled-in tab renders its section.
+  const atMobileHub = !isDesktopView && mobileDrill === null
+  const effectiveSection: string = isDesktopView
+    ? (desktopSection ?? activeSubTab)
+    : (mobileDrill ?? "hub")
 
   if (loading) return <div className="flex items-center justify-center py-20"><Spinner /></div>
 
@@ -12374,28 +12507,30 @@ function SmallGroupLeadersTab({
         </TabPageHeader>
       )}
 
-      {/* Mobile sub-tab switcher */}
-      {!isDesktopView && (
-        <div style={{ marginBottom: 24, display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <PlanSubTabStrip
-              tabs={validTabs.map(k => ({
-                key: k,
-                label: k === "home" ? "Home" : k === "schedule" ? "Schedule" : "Bible Study",
-              }))}
-              active={activeSubTab}
-              onChange={t => setActiveSubTabAndUrl(t as SGLTab)}
-            />
-          </div>
-          {onTeamSettings && (
-            <IconButton dim={32} onClick={onTeamSettings} title="Team settings" className="ml-auto">
-              <Settings className="w-4 h-4" />
-            </IconButton>
-          )}
-        </div>
+      {/* Mobile hub back row (ruling B-1) — the strip nav is replaced by a heroless
+          hub; a drilled-in section shows a back-to-hub row. */}
+      {!isDesktopView && !atMobileHub && (
+        <MobileHubBackRow label={teamName} onBack={() => setMobileDrillAndUrl(null)} />
       )}
 
       <div className={isDesktopView ? "flex-1 overflow-y-auto px-14 py-6 pb-20" : "md:px-14"}>
+      {/* ── Mobile hub landing (ruling B-1/B-3) — heroless row hub; rows drill into
+          the existing section surfaces. Never rendered on desktop. */}
+      {atMobileHub && (
+        <MobilePocketHub
+          teamName={teamName}
+          onSettings={onTeamSettings}
+          groups={[{
+            label: "Sections",
+            rows: validTabs.map(k => ({
+              iconKey: k === "home" ? "clipboard" : k === "schedule" ? "calendar" : "book",
+              title: k === "home" ? "Home" : k === "schedule" ? "Schedule" : "Bible Study",
+              subtitle: k === "home" ? "Your assignments & groups" : k === "schedule" ? "Weekly DGL rotation" : "Study sheets & progress",
+              onClick: () => setMobileDrillAndUrl(k),
+            })),
+          }]}
+        />
+      )}
       {/* ── Bible Study Tab ─────────────────────────────────────────────── */}
       {effectiveSection === "bible_study" && (
         <BibleStudySubTab

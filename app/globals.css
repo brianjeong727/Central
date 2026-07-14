@@ -127,6 +127,8 @@
   --r-pill-lg: 16px; /* composer pill */
   --r-hero:   18px;  /* hero banner, full-bleed modal */
   --r-pocket: 20px;  /* mobile "Pocket" card radius (ratified B3 mobile form) */
+  --r-pocket-sm: 16px; /* mobile Pocket search / stat blocks (ratified Daybreak) */
+  --r-check: 7px;    /* mobile Pocket checklist checkbox (ratified Daybreak) */
 
   /* Floating pill-nav lift — the ONE sanctioned shadow in the app (ratified B3
      mobile Pocket nav). No other surface carries elevation; the no-shadow system
