@@ -8,6 +8,7 @@ import {
   ImageIcon, Inbox,
 } from "lucide-react"
 import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
+import { useIsMobile } from "../use-is-mobile"
 import { MonogramChip, FilterDropdown, SubpageShell, CentralModal } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
@@ -839,6 +840,9 @@ function AllocationSection({
   onAddCategory: (name: string) => Promise<void>
   onDeleteCategory: (name: string) => Promise<void>
 }) {
+  // Mobile-only Daybreak restyle (ruling B-2): the summary stat cards adopt the
+  // 16px --r-pocket-sm radius on mobile via viewport branch; desktop byte-identical.
+  const isMobile = useIsMobile()
   const [fiscalYear, setFiscalYear] = useState<string>(currentFiscalYear)
   const [allocations, setAllocations] = useState<BudgetAllocation[]>([])
   const [actuals, setActuals] = useState<CategoryActual[]>([])
@@ -983,7 +987,7 @@ function AllocationSection({
               <div
                 key={card.label}
                 style={{
-                  padding: 16, borderRadius: 14,
+                  padding: 16, borderRadius: isMobile ? "var(--r-pocket-sm)" : 14,
                   background: card.danger ? DANGER_TINT_BG : "var(--cream)",
                   border: `1px solid ${card.danger ? DANGER_TINT_BORDER : "var(--line)"}`,
                 }}

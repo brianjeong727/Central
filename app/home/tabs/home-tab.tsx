@@ -3,7 +3,7 @@
 import { useState } from "react"
 import dynamic from "next/dynamic"
 import useSWR from "swr"
-import { ChevronRight, Bell, Calendar, Gift, Users } from "lucide-react"
+import { ChevronRight, Bell, Calendar, Gift } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { EYEBROW_STYLE, PlanLineIcon } from "../components/shared"
 import { PocketHeader } from "../components/pocket-header"
@@ -839,7 +839,8 @@ export function HomeTab({
   }
 
   // Contextual quick-grid second tile: the user's first team (icon + role) when on a
-  // team, else a Directory shortcut. No fabricated progress metric — label + subtitle.
+  // team. No fabricated progress metric — label + subtitle. (Directory shortcut
+  // removed — directory access lives in the Chats chrome.)
   const firstTeam = userTeams[0]
 
   return (
@@ -1251,19 +1252,12 @@ export function HomeTab({
                 subtitle="Support the ministry"
                 onClick={() => onGoToTab?.("give")}
               />
-              {firstTeam ? (
+              {firstTeam && (
                 <PocketQuickTile
                   icon={<PlanLineIcon iconKey={teamIconKey({ team_type: firstTeam.teamType, name: firstTeam.teamName })} size={40} />}
                   label={firstTeam.teamName}
                   subtitle={firstTeam.roleName}
                   onClick={() => onGoToTab?.("plan")}
-                />
-              ) : (
-                <PocketQuickTile
-                  icon={<div style={{ width: 40, height: 40, borderRadius: 999, background: "var(--plum)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Users style={{ width: 20, height: 20, color: "var(--cream-on-dark)" }} strokeWidth={1.5} /></div>}
-                  label="Directory"
-                  subtitle="Browse members"
-                  onClick={() => onGoToTab?.("directory")}
                 />
               )}
             </div>

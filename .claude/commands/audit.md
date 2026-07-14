@@ -1,5 +1,5 @@
 ---
-description: Full-codebase, READ-ONLY health audit. Finds duplicate files, likely-dead (ghost) files, hardcoded values that should be tokens/components, and DESIGN_SYSTEM.md violations. Produces ONE categorized report with per-item recommended actions. Deletes and fixes NOTHING on its own — every action is approved by Brian per-item. Heavyweight; run occasionally, not per-commit.
+description: Full-codebase, READ-ONLY health audit. Finds duplicate files, likely-dead (ghost) files, hardcoded values that should be tokens/components, and web_design_system.md violations. Produces ONE categorized report with per-item recommended actions. Deletes and fixes NOTHING on its own — every action is approved by Brian per-item. Heavyweight; run occasionally, not per-commit.
 ---
 
 This is a full-codebase health audit. It is READ-ONLY in its scanning phase and acts on NOTHING without Brian's per-item approval. Load `.claude/skills/orchestration/SKILL.md` for escalation/multiple-choice conventions, then run the audit as follows.
@@ -26,7 +26,7 @@ When unsure whether something is framework-reached, mark confidence LOW and expl
 ### C. Hardcoded values that should be unified (Brian's #1 target)
 Inline hex colors, off-scale spacing (anything not on 4/6/8/10/12/14/18/22/28/36/40/56), raw borders/type values that duplicate a token, and parallel reimplementations of a canonical component (avatar that isn't MonogramChip, tab strip that isn't PlanSubTabStrip, inline button styles, etc.). Group by the token/component each SHOULD consume. This is a refactor list, not a deletion list.
 
-### D. DESIGN_SYSTEM.md violations
+### D. web_design_system.md violations
 Anything the Enforcer flags against a "Do not" or the §0 north star in live code: plum as surface/fill, white instead of cream, pill tabs, gradients outside the (shell-retired) hero, weight 600 on body/UI text, modal-where-navigation-belongs, retired patterns reproduced (plum gradient hero, multi-shape avatars). Report with the section violated.
 
 ## Phase 2 — Report to Brian

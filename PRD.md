@@ -1,6 +1,6 @@
 # CENTRAL — Product Vision & Roadmap
 
-> **Scope:** This is a product vision and roadmap document. Implementation facts live in CLAUDE.md, design in DESIGN_SYSTEM.md, permissions in permissions.md, ministry workflows in MINISTRY_CONTEXT.md. Do not add schema, architecture, or convention detail here — it will drift. Point to the source instead.
+> **Scope:** This is a product vision and roadmap document. Implementation facts live in CLAUDE.md, design in web_design_system.md, permissions in permissions.md, ministry workflows in MINISTRY_CONTEXT.md. Do not add schema, architecture, or convention detail here — it will drift. Point to the source instead.
 
 ---
 
@@ -75,7 +75,7 @@ Pastor-only. A pulse-check tool — posting questions to the congregation and se
 - Not a social media feed
 - Not publicly accessible without an invite (ministries control membership)
 
-**Design direction:** Warm-minimalist — cream surfaces, editorial serif, plum as a surgical accent. Full design contract lives in `DESIGN_SYSTEM.md`.
+**Design direction:** Warm-minimalist — cream surfaces, editorial serif, plum as a surgical accent. Full design contract lives in `web_design_system.md` (desktop) and `mobile_design_system.md` (phone-width).
 
 **Product principles:**
 

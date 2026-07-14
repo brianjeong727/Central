@@ -4,6 +4,8 @@ A formal spec reverse-engineered from `Central Redesign.html` and its component 
 
 This system replaces a more generic, white-card SaaS look with an **editorial cream-and-plum** aesthetic. The mistakes most often made on the originals — and the ones a sub-agent must NOT repeat — are listed at the end of each section as "Do not."
 
+> **Scope: this file governs DESKTOP (≥768px) surfaces.** Phone-width surfaces (`md:hidden`, ≤430px) are governed by `mobile_design_system.md` — the desktop layout rules here (three-column shell, breadcrumbs, sidebars, underline tab strips, 44px page titles) do NOT apply to mobile. When building a mobile surface, use `mobile_design_system.md`, not this doc.
+
 ---
 
 ## 0. Design North Star
@@ -244,13 +246,15 @@ The home "Up Next" slot is a manually-advanced carousel of curated slides sharin
 **Three slide types, one frame** (only the interior differs):
 - **Photo:** full-bleed image; the stored clamped `panel_color` makes a **light mood ramp** — a horizontal clamped-color gradient that fades to transparent by ~70% (**Option A — no solid panel; the photo reads through nearly everywhere**), with a **separate soft radial near-black scrim** anchored to the text for legibility (a true over-photo floor under cream text — never plum/colored, never a dark slab). Static CSS only — no live blur, no per-render image work, SSR-safe. The near-black backdrop/scrim values are kept as inline component constants (one component's internal curve), not global tokens. `panel_color` is computed **once at upload** by a hue-preserving HSL clamp (chroma-weighted dominant hue, near-white/near-black pixels discarded → fixed dark L≈0.13, saturation clamped to a floor/cap; `--plum-deep` fallback only when the image is colorless). Cream caption (with a legibility text-shadow) + cream eyebrow dot.
 - **Event:** real `calendar_events` date/location; if the slide has its own photo → photo treatment + a glass date/RSVP chip; otherwise the **flat-plum FEATURED treatment** (`FeaturedHeroCard`, below). RSVP via the linked announcement when present.
-- **Announcement / event-without-photo (the FEATURED treatment — `FeaturedHeroCard`):** the flat-plum reference card. This is **the ONE sanctioned plum content surface in the app (the prime directive)** — background `--plum`, radius `--r-hero`, no HeroFrame hairline (the light border fights the deep plum, dropped on the plum interior). Interior: a mono eyebrow (`{slide label} · {date range}` for events — 10px mono uppercase, `letterSpacing 0.14em`, `color-mix(in srgb, var(--cream-on-dark) 55%, transparent)`; **"Featured" is NOT repeated** — the section label above the frame already carries it) → serif title 38/600 (30 mobile), `-0.02em`, `--cream-on-dark` → 14px body at `color-mix(cream-on-dark 78%)`, `maxWidth 520` → actions: **RSVP as the §4.3 hero-invert primary** (cream fill / plum text) + a **secondary on-dark ghost** (transparent, `1px color-mix(cream-on-dark 25%)` border, cream text) carrying the detail click-through ("See details" / "See announcement"). A single decorative corner ring ornament (`1px color-mix(cream-on-dark 14%)`, clipped, behind content; the lower ring was dropped where it collided with the detail panel). On desktop the card is a **60/40 split**: the editorial column (eyebrow/title/body/actions) on the left, and on the right a restored **§1.3 date-anchor 40% slot** — a mono micro-label ("Starts" / "Posted") over a **serif 36/600 `--cream-on-dark`** date (event start date; falls back to the posted date), with the event time/location or posted year and a form indicator beneath in `color-mix(cream-on-dark ~74%)` — restoring the retired ivory `UpNextCard`'s information architecture on the plum surface (mobile stays a single stacked column with the date folded in as a compact line). The §4.1c pulse slide (flat `--plum-2`) rides the same frame and is visually distinct; the two never show simultaneously. The **home-tab pinned/latest fallback** (no curated slides) renders this same `FeaturedHeroCard`; the truly-empty state (no announcement to feature) stays the ivory "No upcoming events" card. *(Retired here: the ivory `UpNextCard` 60/40 detail layout as the reference slide — `UpNextCard` remains the ivory component but is no longer used by the hero. The inline form affordance moved to the announcement detail.)*
+- **Announcement / event-without-photo (the FEATURED treatment — `FeaturedHeroCard`):** the flat-plum reference card. This is **the ONE sanctioned plum content surface in the app (the prime directive)** — background `--plum`, radius `--r-hero`, no HeroFrame hairline (the light border fights the deep plum, dropped on the plum interior). Interior: a mono eyebrow (`{slide label} · {date range}` for events — 10px mono uppercase, `letterSpacing 0.14em`, `color-mix(in srgb, var(--cream-on-dark) 55%, transparent)`; **"Featured" is NOT repeated** — the section label above the frame already carries it) → serif title 38/600, `-0.02em`, `--cream-on-dark` → 14px body at `color-mix(cream-on-dark 78%)`, `maxWidth 520` → actions: **RSVP as the §4.3 hero-invert primary** (cream fill / plum text) + a **secondary on-dark ghost** (transparent, `1px color-mix(cream-on-dark 25%)` border, cream text) carrying the detail click-through ("See details" / "See announcement"). A single decorative corner ring ornament (`1px color-mix(cream-on-dark 14%)`, clipped, behind content; the lower ring was dropped where it collided with the detail panel). On desktop the card is a **60/40 split**: the editorial column (eyebrow/title/body/actions) on the left, and on the right a restored **§1.3 date-anchor 40% slot** — a mono micro-label ("Starts" / "Posted") over a **serif 36/600 `--cream-on-dark`** date (event start date; falls back to the posted date), with the event time/location or posted year and a form indicator beneath in `color-mix(cream-on-dark ~74%)` — restoring the retired ivory `UpNextCard`'s information architecture on the plum surface. The §4.1c pulse slide (flat `--plum-2`) rides the same frame and is visually distinct; the two never show simultaneously. The **home-tab pinned/latest fallback** (no curated slides) renders this same `FeaturedHeroCard`; the truly-empty state (no announcement to feature) stays the ivory "No upcoming events" card. *(Retired here: the ivory `UpNextCard` 60/40 detail layout as the reference slide — `UpNextCard` remains the ivory component but is no longer used by the hero. The inline form affordance moved to the announcement detail.)*
 
 **Retired here:**
 - The hollow **"No date, time, or location set yet" placeholder is retired** from the hero. Non-event references fill the frame editorially; events show only the fields that exist (omit unset fields) — never a "nothing set" box.
 - **Cream over photo:** use `--cream` (opacity for hierarchy); do not introduce a separate over-dark cream value. **Eyebrow dot over photos is `--cream`, never `--gold`** (gold stays avatar-accent-only, §1.2).
 
 **New material:** `backdrop-filter: blur` is allowed **only** on the event glass chip as a contained, surgical material — do not let it proliferate to other surfaces.
+
+Mobile: see mobile_design_system.md.
 
 ### 4.1c Pastor Pulse slide — flat-plum lead slide (scoped exception)
 
@@ -403,7 +407,7 @@ Modals are reserved for *new-X* and configure-X flows where context needs to be 
 - **Footer (optional):** action row above a top hairline — confirm/submit buttons live here, right-aligned (or full-width for single primary actions).
 - **Closes three ways, always:** X · backdrop click · Escape (built into the component).
 - **Z-index:** 200 default; override (e.g. 210) only when a modal must stack above another overlay.
-- **Sheet variant** (`sheet` prop): bottom-pinned with rounded top corners on mobile, centered panel on md+ — for thumb-reach flows (polls, receipt submit).
+- **Sheet variant** (`sheet` prop): centered panel on md+ — for thumb-reach flows (polls, receipt submit). Mobile: see mobile_design_system.md.
 
 **Modals are for creation / config / confirmation only — never navigation.** Every destructive action (delete / remove / reject / leave) routes through the shared **`ConfirmDialog`** (§9's danger, two-step wrapper over `CentralModal`) — never a hand-rolled in-card scrim, and **`window.confirm` is banned** (it breaks the veil-token surface and the cream-on-dark type). Bespoke confirm overlays with `backdrop-blur` / `bg-white/…` / raw `#hex` panels are retired; wire the existing delete state to `ConfirmDialog` instead.
 
@@ -417,7 +421,7 @@ A **subpage** is a body button opening a temporary view or action surface (a not
 - **No drop shadow** — a subpage is not a floating layer.
 - **The shell breadcrumb persists and IS the back.** The subpage appends its own crumb(s) via the breadcrumb context; the parent crumb's `onClick` is the back. There is **NO** standalone "← Back" / "All workspaces" button.
 - It renders **in the content area** — **never** a `fixed inset-0` portal.
-- **Mobile** has no breadcrumb (it's desktop-only), so `SubpageShell` renders a single `md:hidden` back row derived from the parent crumb. Desktop stays breadcrumb-only; mobile gets that one back affordance automatically — never hand-roll a second one.
+- Desktop stays breadcrumb-only (the shell breadcrumb persists and IS the back). Mobile: see mobile_design_system.md.
 - Modals (scrim / centered, §4.17) cover *tiny* confirmations, creation/config, and **forms** (the builder + the member fill-out, at §4.17's hefty-form width with the `dirty` guard). Everything else that could plausibly be a full-bleed page — reading an existing entity, a record/note detail, a responses view — stays a subpage.
 - **VERTICAL RHYTHM — HARD RULE (mirror top-level pages exactly; never hand-roll or eyeball these gaps):** a subpage's header/strip/body spacing is FIXED and identical to a `TabPageHeader` + `PlanSubTabStrip` + body composition. Do NOT add ad-hoc `marginTop`/`marginBottom` between the breadcrumb, header, strip, and body — they stack and drift.
   - **Header:** pass `title` to `SubpageShell` (never hand-roll an `<h1>` in the body). It renders `InsetHairline → var(--space-8) (22px) → PageTitle compact (25px serif) → var(--space-8) (22px) → InsetHairline`, butting the breadcrumb with **no top gap**.
@@ -456,7 +460,7 @@ When someone views a workspace they can't edit (a governance admin with view-onl
 - **Status pill** (straddling the top border, centered): `--plum-2` fill / `--cream` text, `EYEBROW_STYLE` mono, radius 999, **no drop-shadow**. "Read-only view · viewing as Admin" with a leading Eye icon (this reuses the §4.7 plum-2 admin-badge fill; it's a badge, not a §4.3 button).
 - **Footer** (pinned at the mat bottom, always visible): top hairline `color-mix(in srgb, var(--plum) 14%, var(--line))`, a Lock icon (`--plum`) + a **`--body` sentence** ("…exactly as an Admin sees it. Nothing here can be changed.", emphasis word `--ink`/weight-500). No action button.
 - **Single-scroller rule:** the mat's scroll region must be byte-equivalent to the plain `flex-1 overflow-y-auto` it replaces (padding lives on the non-scrolling frame, not the scroller) so shell-mounted children (Convention #13) keep exactly one active scrollbar.
-- **Mobile:** lighter — just the `ReadOnlyPill` inline, no frame/footer (a full mat is cramped on a narrow screen).
+- Mobile: see mobile_design_system.md.
 
 **"Up Next" card (the closest upcoming event)** — the one emphasized entry: a plum date number, a **plum timeline node with a subtle pulse ring** (2.4s, `prefers-reduced-motion` → static faint ring), and a `--cream-3` callout carrying the **authorized §8.7 left-border exception** (`border-left: 3px solid var(--plum)`, `--r-callout`). Inside: a plum mono "Up next · Starts in N days" eyebrow (+ plum dot), a serif ~23 title with date-range/location meta, and a right-aligned **big countdown** (serif ~22 `--plum` number + mono unit). This is the only sanctioned left-border rounded callout in the app.
 
@@ -550,12 +554,13 @@ Test before shipping: at desktop width, is there a large band of unused space wi
 ### 7.6 Auth/onboarding split-screen (login, signup, update-password)
 Two-column split layout: photo panel on the left, form column on the right. Right column is wider than left (roughly 56/44). Implemented via `SplitShell` in `app/(auth)/shared.tsx` — use that component; do not reimplement the outer layout in individual auth pages.
 
-**Photo panel (left):** Full-bleed chapel photo with plum gradient overlay. Brand lockup at top (`RingCrossLogo` inside a translucent square badge + "Central" in serif). Tagline at bottom in large-weight serif, followed by an italic scripture verse + mono reference. Panel is sticky so it stays fixed while a long form scrolls. Hidden on mobile.
+**Photo panel (left):** Full-bleed chapel photo with plum gradient overlay. Brand lockup at top (`RingCrossLogo` inside a translucent square badge + "Central" in serif). Tagline at bottom in large-weight serif, followed by an italic scripture verse + mono reference. Panel is sticky so it stays fixed while a long form scrolls.
 
 **Form column (right):** Two-section structure:
 - *Top bar* — persistent `min-height: 64` strip, always visible regardless of scroll. Contains navigation: a Back link (with `marginRight: auto` to push it left) + a secondary link ("Already have an account?" / "New to Central?") right-aligned. Both links in muted body color; the action link is plum-2, no underline until hover.
 - *Form body* — flex-centered content area with `max-width: 460`. Starts with a mono eyebrow, then a large serif H1, then a subtitle in muted body color. Google OAuth button, then an OR divider (no built-in margin — callers add vertical spacing), then the field stack, then the primary plum CTA.
-- Mobile wordmark (hidden on md+): `RingCrossLogo`-adjacent "Central" in serif, shown inline at top of form body when the photo panel is hidden.
+
+Mobile: see mobile_design_system.md.
 
 **Component ownership:** `AuthPhotoPanel` owns the panel. `SplitShell` owns the grid + right column shell. Callers pass `topBar` (React node) and `children` (form body content). Shared primitives: `GoogleButton`, `OrDivider`, `EyeButton` — all from `app/(auth)/shared.tsx`.
 
@@ -577,9 +582,11 @@ Type-led editorial layout on a flat cream background — no full-bleed photo her
 
 **Hero:** Asymmetric 2-column grid (`1.15fr 0.85fr`, `gap: 56`, `align-items: center`), inside a `max-width: 1100px` wrapper with `padding: 96px 0 64px`.
 - *Left column:* Mono eyebrow → serif H1 72px/weight 600/`-0.025em`, ink, with `<em>` in plum-2 italic for the turn-of-phrase clause → serif subtitle 20px/`--body`/`max-width: 460` → CTA row (`gap: 12, margin-top: 34`): plum-2 pill primary (h 50, `padding: 0 26`) + ghost text link in plum-2.
-- *Right column:* Framed photo — `aspect-ratio: 4/5`, `border-radius: 18px` (`--r-hero`), `border: 1px solid --line-2`, `overflow: hidden`. Gradient tint overlay (`linear-gradient(180deg, transparent 40%, rgba(27,10,30,0.72) 100%)`). Verse pinned bottom-left: serif italic 17px ivory + mono 10px reference at 1.4px letter-spacing. Hidden on mobile (`< 900px`).
+- *Right column:* Framed photo — `aspect-ratio: 4/5`, `border-radius: 18px` (`--r-hero`), `border: 1px solid --line-2`, `overflow: hidden`. Gradient tint overlay (`linear-gradient(180deg, transparent 40%, rgba(27,10,30,0.72) 100%)`). Verse pinned bottom-left: serif italic 17px ivory + mono 10px reference at 1.4px letter-spacing.
 
 **Rule:** 1px `--line` hairline divider between hero and features, inset to the `max-width: 1100px` column.
+
+Mobile: see mobile_design_system.md.
 
 **Feature rows:** `padding: 84px 0`. Eyebrow + serif H2 44px/weight 600/`-0.02em`. Four numbered editorial rows, each `display: grid; grid-template-columns: 56px 1fr 1.4fr; gap: 28; align-items: baseline; padding: 30px 0`. First row `border-top: 1px solid --line`; subsequent rows `border-top: 1px solid --line-3`. Columns: serif italic numeral (i/ii/iii/iv, 20px) in `--muted-text` → serif feature title 26px/`--ink` → body copy 15px/`--body`/1.65 line-height.
 

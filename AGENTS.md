@@ -11,7 +11,8 @@ conventions, permissions, and workflow.
 
 Related canonical docs (each owns its domain, all referenced from CLAUDE.md):
 - `CLAUDE.md` — project context, standing rules, facts, key files
-- `DESIGN_SYSTEM.md` (`.claude/skills/design-system/`) — the design contract
+- `web_design_system.md` (`.claude/skills/design-system/`) — the desktop (≥768px) design contract
+- `mobile_design_system.md` (`.claude/skills/design-system/`) — the phone-width (`md:hidden`, ≤430px) design contract
 - `permissions.md` — role/access source of truth
 - `MINISTRY_CONTEXT.md` — real-world ministry workflows and vocabulary
 - `PRD.md` — product vision and roadmap (not implementation detail)
