@@ -2995,7 +2995,7 @@ function PocketChatCard({ groups, ministryName, onOpen }: { groups: ChatGroup[];
   )
 }
 
-export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onGoToProfile, activeGroupId, canCreateChurchChat, fallbackChats }: ChatsTabProps) {
+export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, onGoToProfile, activeGroupId, canCreateChurchChat, fallbackChats }: ChatsTabProps) {
   const { setParam } = useNavState()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
@@ -3095,17 +3095,18 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
 
   return (
     <div className="pb-2 md:pb-0 md:h-full md:flex md:flex-col">
-      {/* Mobile chrome (B3 Pocket) — "Chats" + new-chat ghost + avatar. */}
+      {/* Mobile chrome (B3 Pocket) — "Chats" + directory ghost + avatar. New-chat
+          moved inline onto the scope-pills row below. */}
       <PocketChrome
         title="Chats"
         userName={userProfile.name}
         avatarUrl={userProfile.avatar_url}
         onAvatarClick={onGoToProfile}
-        action={canShowNewChat ? (
-          <PocketRoundButton variant="ghost" onClick={openNewChat} ariaLabel="New chat">
+        action={
+          <PocketRoundButton variant="ghost" onClick={onOpenDirectory} ariaLabel="Directory">
             <Users style={{ width: 17, height: 17 }} strokeWidth={1.6} />
           </PocketRoundButton>
-        ) : undefined}
+        }
       />
 
       {/* Desktop Plan C header */}
@@ -3141,10 +3142,18 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       </div>
 
       <div className="px-5 pt-1 pb-2 md:pt-2 md:px-0 md:flex-1 md:overflow-y-auto">
-      {/* Mobile scope pills (B3 Pocket) — Church / My chats. */}
-      <div className="flex gap-2 mb-4 md:hidden">
+      {/* Mobile scope pills (B3 Pocket) — Church / My chats, with the new-chat +
+          right-aligned on the same row. */}
+      <div className="flex items-center gap-2 mb-4 md:hidden">
         <ChatFilterChip label="Church" active={subTab === "church"} onClick={() => { setSubTab("church"); setSearch(""); setParam("chats", null) }} />
         <ChatFilterChip label="My chats" active={subTab === "my"} onClick={() => { setSubTab("my"); setSearch(""); setParam("chats", "my") }} />
+        {canShowNewChat && (
+          <div className="ml-auto">
+            <PocketRoundButton variant="plum" onClick={openNewChat} ariaLabel="New chat">
+              <Plus style={{ width: 17, height: 17 }} strokeWidth={2} />
+            </PocketRoundButton>
+          </div>
+        )}
       </div>
 
       {/* Push-notification prompt — self-hides unless permission is 'default' & unsubscribed & not dismissed */}
@@ -3160,7 +3169,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           <EmptyState
             icon={<Users className="w-7 h-7" />}
             title="No personal chats"
-            subtitle="Start a new chat from the header."
+            subtitle="Tap + to start a new chat."
           />
         ) : (
           <PocketChatCard groups={partitionPinned(active)} ministryName={ministryName} onOpen={handleOpenChat} />
