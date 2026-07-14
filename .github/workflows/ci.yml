@@ -1,0 +1,150 @@
+# CI — the deterministic gates from scripts/verify.sh, run server-side on every PR.
+#
+# Mirrors Vercel's install exactly (pnpm --frozen-lockfile), so lockfile parity is
+# proven here for free — a stale pnpm-lock.yaml fails the install step, the same way
+# it would kill the Vercel deploy (ERR_PNPM_OUTDATED_LOCKFILE, see lessons.md).
+#
+# Two jobs:
+#   core — build + lint + hex ratchet. Needs only the two NEXT_PUBLIC_* values
+#          (public by design — they ship to every browser).
+#   e2e  — full Playwright suite against the E2E sandbox tenant. Requires
+#          SUPABASE_SERVICE_ROLE_KEY in repo secrets; skips cleanly (neutral, not
+#          red) when it's absent. Serialized globally on one concurrency group
+#          because all runs share the one sandbox ministry (lessons.md
+#          "Serialize verification tracks that share the sandbox tenant").
+#          Push-notification specs are excluded unless PUSH_WEBHOOK_SECRET is set
+#          (they hard-fail, not skip, without it).
+#
+# Fork PRs get no secrets (GitHub default) — e2e simply skips for them.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: build · lint · hex
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install (frozen lockfile — Vercel parity)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Hex ratchet
+        run: bash scripts/check-hex.sh
+
+  e2e:
+    name: e2e (sandbox tenant)
+    runs-on: ubuntu-latest
+    needs: core
+    # One sandbox ministry for every run — never let two suites interleave in it.
+    concurrency:
+      group: e2e-sandbox
+      cancel-in-progress: false
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+      E2E_MEMBER_EMAIL: ${{ secrets.E2E_MEMBER_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+      E2E_MINISTRY_ID: ${{ secrets.E2E_MINISTRY_ID }}
+      PUSH_WEBHOOK_SECRET: ${{ secrets.PUSH_WEBHOOK_SECRET }}
+      E2E_PORT: "3001"
+    steps:
+      - name: Gate on sandbox credentials
+        id: gate
+        run: |
+          if [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] && [ -n "$E2E_PASSWORD" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::e2e skipped — SUPABASE_SERVICE_ROLE_KEY / E2E_* secrets not configured for this run."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.enabled == 'true'
+
+      - uses: pnpm/action-setup@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        if: steps.gate.outputs.enabled == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright chromium
+        if: steps.gate.outputs.enabled == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build
+        if: steps.gate.outputs.enabled == 'true'
+        run: pnpm run build
+
+      - name: Start server
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          nohup pnpm run start -- -p "$E2E_PORT" > server.log 2>&1 &
+          for i in $(seq 1 60); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$E2E_PORT" || echo 000)"
+            case "$code" in 200|301|302|307|308) echo "server ready ($code)"; exit 0 ;; esac
+            sleep 2
+          done
+          echo "server never became ready"; tail -50 server.log; exit 1
+
+      - name: Run Playwright suite
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          # Push-notification specs hard-fail (not skip) without PUSH_WEBHOOK_SECRET —
+          # exclude them when it isn't configured.
+          if [ -n "$PUSH_WEBHOOK_SECRET" ]; then
+            pnpm exec playwright test
+          else
+            SPECS="$(ls e2e/*.spec.ts | grep -v '/push' | tr '\n' ' ')"
+            echo "PUSH_WEBHOOK_SECRET unset — running: $SPECS"
+            pnpm exec playwright test $SPECS
+          fi
+
+      - name: Upload artifacts on failure
+        if: failure() && steps.gate.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            test-results/
+            server.log
+          retention-days: 7
