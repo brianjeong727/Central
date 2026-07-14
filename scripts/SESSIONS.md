@@ -36,6 +36,23 @@ is *born* in the right directory with its server already up.
 A slot is **refused** (without `--force`) if it has uncommitted changes or sits on a branch
 with commits not yet in `origin/main` — this protects active/unpushed work.
 
+## Grid view (tmux)
+
+```bash
+./scripts/session-grid.sh          # open (or reattach to) the grid — `cgrid` alias
+./scripts/session-grid.sh --kill   # tear it down
+```
+
+Opens one tiled tmux window over the whole pool: a control pane in the shared `central`
+checkout (running `session-status.sh`, for status/merges) plus one pane per slot. Free
+slots are claimed via `session.sh --slot` — own worktree, own port, `claude` running in
+the pane. Busy/held slots open a plain shell in the slot dir instead; the grid never
+steals or resets anything `session.sh` itself would refuse. Running it while a grid
+already exists just reattaches (one grid at a time).
+
+Requires `tmux` (`brew install tmux`). Pane titles/borders and mouse-copy come from
+`~/.tmux.conf` (a dotfile, not part of this repo).
+
 ## During a session
 
 The `SessionStart` hook reminds you which slot/port you're in. If you ever launch a bare
