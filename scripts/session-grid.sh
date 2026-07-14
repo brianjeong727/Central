@@ -8,6 +8,7 @@
 # Per-pane behavior, decided from live slot state at launch:
 #   free slot → claimed via session.sh --slot <s>: fresh copy of origin/main,
 #               dev server on the slot's fixed port, claude running in the pane
+#               and opening with /catchup (verifies latest main + a healthy 200)
 #   BUSY slot → plain shell in the slot dir (a live session owns it — never steal)
 #   held slot → plain shell in the slot dir showing the unmerged/uncommitted work
 #   main pane → session-status.sh + shell in the shared checkout (status/merges only)
@@ -47,7 +48,10 @@ pane_cmd() {
   elif slot_dirty "$s" || slot_unmerged "$s"; then
     printf 'cd %q 2>/dev/null; echo "⚠ %s holds unfinished work — merge or release before claiming:"; git status --short; git log --oneline origin/main..HEAD 2>/dev/null | head -5; exec zsh' "$dir" "$s"
   else
-    printf 'sleep %d; %q --slot %s; exec zsh' "$delay" "$HERE/session.sh" "$s"
+    # `-- /catchup` becomes claude's opening prompt: the fresh session starts by
+    # running /catchup, which confirms the slot is on latest main AND that its dev
+    # server actually renders a 200 before any work starts.
+    printf 'sleep %d; %q --slot %s -- /catchup; exec zsh' "$delay" "$HERE/session.sh" "$s"
   fi
 }
 
