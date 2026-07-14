@@ -3120,12 +3120,12 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
     : rawActive
   const monoStyle = MONO_STYLE
 
-  // New-chat from the chrome — opens the create sheet for the active scope. On the
-  // Church scope it's leader/admin-gated (hidden otherwise); My chats are always open.
-  const canShowNewChat = subTab === "my" || canCreateChurchChat
+  // New-chat from the chrome — My chats only. On the Church scope the row-level +
+  // is dropped (matches the desktop panel); each church section carries its own +.
+  const canShowNewChat = subTab === "my"
   const openNewChat = () => {
     setCreateChatCategory(undefined)
-    setShowCreateChat(subTab === "church" ? "church" : "my")
+    setShowCreateChat("my")
   }
 
   return (
@@ -3177,8 +3177,8 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       </div>
 
       <div className="px-5 pt-1 pb-2 md:pt-2 md:px-0 md:flex-1 md:overflow-y-auto">
-      {/* Mobile scope pills (B3 Pocket) — Church / My chats, with the new-chat +
-          right-aligned on the same row. */}
+      {/* Mobile scope pills (B3 Pocket) — Church / My chats; the new-chat + sits
+          right-aligned on the same row, My chats scope only. */}
       <div className="flex items-center gap-2 mb-4 md:hidden">
         <ChatFilterChip label="Church" active={subTab === "church"} onClick={() => { setSubTab("church"); setSearch(""); setParam("chats", null) }} />
         <ChatFilterChip label="My chats" active={subTab === "my"} onClick={() => { setSubTab("my"); setSearch(""); setParam("chats", "my") }} />
