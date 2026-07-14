@@ -65,14 +65,26 @@ fi
 # ── (b2) lockfile parity (Vercel deploys with pnpm --frozen-lockfile) ────────
 # Deps added via npm leave pnpm-lock.yaml stale and kill EVERY deploy at the
 # install step (ERR_PNPM_OUTDATED_LOCKFILE — broke prod all day 2026-07-12).
+#
+# Runs in a TEMP DIR on copies of the manifests: a bare `pnpm install` here
+# would perform a REAL install and replace the npm-managed node_modules layout
+# with pnpm's symlink layout, silently corrupting the worktree's deps (the
+# likely root cause of the "stale node_modules → Module not found 500" class).
+# --lockfile-only + --frozen-lockfile validates resolution without writing any
+# node_modules (verified both directions, ~0.5s).
 LOCK_STATUS="skipped (no pnpm)"
 if command -v pnpm >/dev/null 2>&1; then
-  echo "▶ pnpm frozen-lockfile check (Vercel parity)"
-  if pnpm install --frozen-lockfile --ignore-scripts >/dev/null 2>&1; then
+  echo "▶ pnpm frozen-lockfile check (Vercel parity, temp-dir — never touches node_modules)"
+  LOCK_TMP="$(mktemp -d)"
+  cp package.json pnpm-lock.yaml "$LOCK_TMP"/ 2>/dev/null
+  if (cd "$LOCK_TMP" && pnpm install --frozen-lockfile --lockfile-only --ignore-scripts >/dev/null 2>&1); then
     LOCK_STATUS="pass"
   else
     LOCK_STATUS="fail"
-    echo "✗ pnpm-lock.yaml out of sync with package.json — run: pnpm install (and commit the lockfile). Vercel WILL fail at install."
+  fi
+  rm -rf "$LOCK_TMP"
+  if [[ "$LOCK_STATUS" == "fail" ]]; then
+    echo "✗ pnpm-lock.yaml out of sync with package.json — run: pnpm install --lockfile-only (and commit the lockfile). Vercel WILL fail at install."
     exit 1
   fi
 fi
