@@ -12,8 +12,6 @@ import { isAdminRole } from "@/lib/roles"
 // member surface (rendered for the `give` tab).
 // "Give" = member donation; "Finance" = back-office (reimbursements / budget / allocation).
 
-const PRESET_AMOUNTS = ["10", "25", "50", "100", "250"]
-
 // Opens the Zelle app on mobile (with a graceful web fallback), or zellepay.com on desktop.
 function openZelle(onFallback: () => void) {
   if (window.innerWidth < 768) {
@@ -163,14 +161,9 @@ export function GiveView({
           <div className="md:grid md:gap-5" style={{ gridTemplateColumns: "1.3fr 1fr" }}>
             <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, padding: "28px 28px 24px", marginBottom: 16 }} className="md:mb-0">
               <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Your gift</p>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 30 }}>
                 <span style={{ fontFamily: "var(--serif)", fontSize: 40, color: "var(--body)", lineHeight: 1 }}>$</span>
                 <input type="text" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ""))} style={{ background: "transparent", border: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 64, color: "var(--ink)", width: "100%", padding: 0, lineHeight: 1 }} />
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
-                {PRESET_AMOUNTS.map(v => (
-                  <button key={v} onClick={() => setAmount(v)} style={{ height: 30, padding: "0 13px", borderRadius: 999, background: amount === v ? "var(--plum-2)" : "transparent", color: amount === v ? "var(--cream)" : "var(--body)", border: "1px solid var(--line)", fontSize: 13, cursor: "pointer", fontWeight: amount === v ? 500 : 400 }}>${v}</button>
-                ))}
               </div>
               <CentralButton variant="primary" onClick={handleOpenZelle} style={{ width: "100%", height: 48, borderRadius: 12, fontSize: 15, marginBottom: 10 }}>
                 <ExternalLink style={{ width: 16, height: 16 }} />Open Zelle · ${displayAmount}

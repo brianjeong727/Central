@@ -10,7 +10,7 @@ import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, FilterChip } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
@@ -20,6 +20,8 @@ import { fetchChatList } from "../chat-list"
 import { PushSubscribeCard } from "../components/notifications"
 import { MessageRow } from "./message-row"
 import { Composer } from "./composer"
+import { ReportModal } from "../components/report-modal"
+import { useBlocks } from "../use-blocks"
 import { MODERATION_DEFAULTS, moderateText, scopeApplies, reverentCapitalize } from "@/lib/moderation"
 import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
@@ -81,6 +83,8 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Blocked users can't be added to a new chat / DM (§1.2 — silent to them).
+  const { blockedIds } = useBlocks(userId)
   // Section for church chats only (General / Groups / Teams). Seeded from
   // initialCategory when opened from a section's + button; defaults General.
   const [category, setCategory] = useState<ChurchSection>(initialCategory ?? "general")
@@ -116,6 +120,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
   const effectiveName = customName.trim() || defaultName
 
   function toggleMember(id: string) {
+    if (blockedIds.has(id)) return // can't start a chat with a blocked user
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -156,15 +161,15 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
   const noMembers = selectedIds.size === 0
 
   return (
-    <div className="fixed inset-0 z-[60] bg-[var(--cream-panel)] flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
-      <div className="flex flex-col w-full h-full bg-[var(--cream-panel)] md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:border md:border-[var(--line)] md:overflow-hidden">
+    <div className="fixed inset-0 z-[60] bg-[var(--cream)] flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
+      <div className="flex flex-col w-full h-full bg-[var(--cream)] md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:border md:border-[var(--line)] md:overflow-hidden">
 
         {/* Header */}
         <div className="flex-shrink-0 border-b border-[var(--line)]">
           <div className="flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),48px)] pb-3 md:pt-6">
             <button
               onClick={onClose}
-              className="size-9 bg-[var(--cream-panel)] border border-[var(--line)] rounded-full flex items-center justify-center hover:bg-[var(--cream-2)] transition-colors flex-shrink-0"
+              className="size-9 bg-[var(--ivory)] rounded-full flex items-center justify-center hover:bg-[var(--line-2)] transition-colors flex-shrink-0"
             >
               <X className="w-4 h-4 text-[var(--ink)]" />
             </button>
@@ -173,7 +178,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
             </span>
           </div>
           <div className="px-5 pb-5">
-            <h1 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", fontWeight: 400, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: 0 }}>
+            <h1 style={{ fontFamily: "var(--serif)", fontSize: "32px", fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: 0 }}>
               {groupType === "church" ? "New Church Chat" : "New Chat"}
             </h1>
             <p style={{ fontSize: "13px", color: "var(--muted-text)", marginTop: "6px" }}>
@@ -195,11 +200,24 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
             <div className="flex flex-col gap-2.5">
               <label style={{ fontSize: "10px", fontWeight: 400, letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }}>Section</label>
               <div className="flex flex-wrap gap-2">
-                {CHURCH_SECTION_DEFS.map(({ key, label }) => (
-                  <FilterChip key={key} selected={category === key} onClick={() => setCategory(key)}>
-                    {label}
-                  </FilterChip>
-                ))}
+                {CHURCH_SECTION_DEFS.map(({ key, label }) => {
+                  const on = category === key
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setCategory(key)}
+                      style={{
+                        borderRadius: 999, padding: "9px 16px", border: "none", cursor: "pointer",
+                        fontSize: 13, fontWeight: on ? 600 : 500,
+                        background: on ? "var(--plum)" : "var(--ivory)",
+                        color: on ? "var(--cream-on-dark)" : "var(--body)",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -207,7 +225,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
           {/* Chat name — adapts to selection state */}
           {noMembers && (
             // No members selected: show traditional name input (needed for church chats)
-            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] px-4 pt-4 pb-4">
+            <div className="px-4 pt-4 pb-4" style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)" }}>
               <label className="text-[10px] font-normal text-[var(--muted-text)] tracking-wider uppercase block mb-2">Chat Name</label>
               <input
                 type="text"
@@ -215,14 +233,14 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
                 onChange={(e) => setCustomName(e.target.value)}
                 placeholder={groupType === "church" ? "e.g. Freshman Bible Study" : "e.g. Prayer Group"}
                 className="w-full text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none bg-transparent"
-                style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4" }}
+                style={{ fontFamily: "var(--serif)", fontSize: "18px", fontWeight: 600, letterSpacing: "-0.01em", lineHeight: "1.4" }}
               />
             </div>
           )}
 
           {isGroup && (
             // 2+ members: show auto-name with optional edit link
-            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] px-4 pt-4 pb-4">
+            <div className="px-4 pt-4 pb-4" style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)" }}>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-[10px] font-normal text-[var(--muted-text)] tracking-wider uppercase">Chat Name</label>
                 <button
@@ -241,10 +259,10 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
                   placeholder={defaultName}
                   autoFocus
                   className="w-full text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none bg-transparent"
-                  style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4" }}
+                  style={{ fontFamily: "var(--serif)", fontSize: "18px", fontWeight: 600, letterSpacing: "-0.01em", lineHeight: "1.4" }}
                 />
               ) : (
-                <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", letterSpacing: "-0.01em", lineHeight: "1.4", color: "var(--ink)", margin: 0 }}>
+                <p style={{ fontFamily: "var(--serif)", fontSize: "18px", fontWeight: 600, letterSpacing: "-0.01em", lineHeight: "1.4", color: "var(--ink)", margin: 0 }}>
                   {effectiveName}
                 </p>
               )}
@@ -266,7 +284,8 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search members…"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[var(--cream-panel)] text-[13px] placeholder:text-[var(--faint)] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 border border-[var(--line)] focus:border-[var(--plum)]/30 transition-all"
+                className="w-full pl-10 pr-4 py-3 bg-[var(--ivory)] text-[13px] placeholder:text-[var(--faint)] text-[var(--ink)] focus:outline-none border-none transition-all"
+                style={{ borderRadius: 16 }}
               />
             </div>
 
@@ -287,38 +306,44 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
               </div>
             )}
 
-            <div className="flex flex-col rounded-2xl border border-[var(--line)] bg-[var(--cream-panel)] overflow-hidden">
+            <div className="flex flex-col overflow-hidden" style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)" }}>
               {filtered.length === 0 ? (
                 <p className="text-center text-[13px] text-[var(--muted-text)]/50 py-8">No members found</p>
               ) : (
                 filtered.map((member, idx) => {
                   const isSelected = selectedIds.has(member.id)
+                  const isBlocked = blockedIds.has(member.id)
                   return (
                     <button
                       key={member.id}
                       type="button"
                       onClick={() => toggleMember(member.id)}
+                      disabled={isBlocked}
                       className={`flex items-center gap-3 px-4 py-3 transition-all text-left ${
-                        idx > 0 ? "border-t border-[var(--cream-2)]" : ""
-                      } ${isSelected ? "bg-[var(--plum)]/[0.04]" : "hover:bg-[var(--cream)]"}`}
+                        idx > 0 ? "border-t border-[var(--line-2)]" : ""
+                      } ${isBlocked ? "opacity-50 cursor-not-allowed" : isSelected ? "bg-[var(--plum)]/[0.06]" : "hover:bg-[var(--cream)]"}`}
                     >
                       <MonogramChip
                         initials={getInitials(member.name)}
                         avatarUrl={member.avatar_url}
-                        className="w-9 h-9 font-medium text-[11px]"
-                        style={{ fontFamily: "var(--font-instrument-serif)" }}
+                        className="w-10 h-10 font-medium text-[12px]"
+                        style={{ fontFamily: "var(--serif)", fontWeight: 600 }}
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-medium text-[var(--ink)]">{member.name}</p>
+                        <p className="text-[15px] font-semibold text-[var(--ink)]">{member.name}</p>
                         {member.graduation_year && (
                           <p className="text-[11px] text-[var(--muted-text)]">Class of {member.graduation_year}</p>
                         )}
                       </div>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                        isSelected ? "bg-[var(--plum)] border-[var(--plum)]" : "border-[#D4CFCF]"
-                      }`}>
-                        {isSelected && <Check className="w-3 h-3 text-white" />}
-                      </div>
+                      {isBlocked ? (
+                        <span className="text-[11px] font-medium text-[var(--muted-text)] uppercase tracking-wide flex-shrink-0">Blocked</span>
+                      ) : (
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                          isSelected ? "bg-[var(--plum)] border-[var(--plum)]" : "border-[#D4CFCF]"
+                        }`}>
+                          {isSelected && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                      )}
                     </button>
                   )
                 })
@@ -328,11 +353,12 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
         </div>
 
         {/* Create button */}
-        <div className="flex-shrink-0 bg-[var(--cream-panel)] border-t border-[var(--line)] px-5 py-4">
+        <div className="flex-shrink-0 bg-[var(--cream)] border-t border-[var(--line)] px-5 py-4">
           <button
             onClick={handleCreate}
             disabled={creating || !effectiveName.trim()}
-            className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-medium py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide"
+            className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-semibold rounded-full active:scale-[0.97] transition-[transform,background-color] duration-150 text-[15px] tracking-wide"
+            style={{ minHeight: 50 }}
           >
             {creating ? "Creating…" : isDM ? `Message ${selectedMembers[0]?.name.split(" ")[0]}` : `Create Chat${selectedMembers.length > 0 ? ` · ${selectedMembers.length + 1} members` : ""}`}
           </button>
@@ -1025,6 +1051,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState("")
   const [editOriginalText, setEditOriginalText] = useState("")
+  const [reportingMsg, setReportingMsg] = useState<Message | null>(null)
+  // Own block list — hide blocked senders' messages (initial render + realtime).
+  const { blockedIds, mutate: mutateBlocks } = useBlocks(userId)
   const [forwardingMsg, setForwardingMsg] = useState<Message | null>(null)
   const [forwardGroups, setForwardGroups] = useState<{ id: string; name: string }[]>([])
   const [forwardSentTo, setForwardSentTo] = useState<string | null>(null)
@@ -1196,14 +1225,20 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const processedMessages = useMemo((): ProcessedMessage[] => {
     const result: ProcessedMessage[] = []
     const skip = new Set<string>()
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i]
+    // Blocked-user filter (§1.2): drop messages from senders the current user has
+    // blocked. Covers initial-load render AND realtime INSERTs (both flow through
+    // `messages` state). Silent to the blocked party.
+    const visible = blockedIds.size === 0
+      ? messages
+      : messages.filter((m) => !m.sender_id || !blockedIds.has(m.sender_id))
+    for (let i = 0; i < visible.length; i++) {
+      const msg = visible[i]
       if (skip.has(msg.id)) continue
       const isVoteR = msg.message_type === "system" && / voted for "/.test(msg.content)
       if (!isVoteR) { result.push(msg); continue }
       const group = [msg]
-      for (let j = i + 1; j < messages.length; j++) {
-        const next = messages[j]
+      for (let j = i + 1; j < visible.length; j++) {
+        const next = visible[j]
         if (next.message_type === "system" && / voted for "/.test(next.content) &&
             Math.abs(new Date(next.created_at).getTime() - new Date(msg.created_at).getTime()) < 120000) {
           group.push(next)
@@ -1214,7 +1249,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       result.push({ ...msg, _voteGroup: voters })
     }
     return result
-  }, [messages])
+  }, [messages, blockedIds])
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" })
@@ -2529,6 +2564,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   onSaveEdit={handleEditMessage}
                   onStartEdit={startEdit}
                   onForward={openForwardSheet}
+                  onReport={setReportingMsg}
                   onPin={handlePin}
                   onUnpin={handleUnpin}
                   onScrollToMessage={scrollToMessage}
@@ -2852,6 +2888,18 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
               )}
             </div>
         </CentralModal>
+      )}
+
+      {/* Report message (§1.2) */}
+      {reportingMsg && (
+        <ReportModal
+          targetType="message"
+          targetId={reportingMsg.id}
+          targetUserId={reportingMsg.sender_id}
+          targetName={reportingMsg.sender_name}
+          onClose={() => setReportingMsg(null)}
+          onBlocked={() => mutateBlocks()}
+        />
       )}
     </div>
     </AnimateIn>

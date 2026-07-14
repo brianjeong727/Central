@@ -406,6 +406,10 @@ function SignupContent() {
             Select your role to continue.
           </div>
         )}
+        <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5, textAlign: "center", margin: "-4px 0 0" }}>
+          By creating an account you agree to our{" "}
+          <Link href="/privacy" style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">Privacy Policy</Link>.
+        </p>
       </form>
 
       <div style={{ marginTop: 26, paddingTop: 22, borderTop: "1px solid var(--line)", fontSize: 13, color: "var(--body)" }}>
@@ -476,6 +480,10 @@ function SignupContent() {
             {!gender ? "Select your gender to continue." : "Enter a valid graduation year."}
           </div>
         )}
+        <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5, textAlign: "center", margin: "-4px 0 0" }}>
+          By creating an account you agree to our{" "}
+          <Link href="/privacy" style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">Privacy Policy</Link>.
+        </p>
       </form>
 
     </SplitShell>

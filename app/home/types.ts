@@ -286,6 +286,7 @@ export interface MessageRowProps {
   onSaveEdit: () => void
   onStartEdit: (msg: Message) => void
   onForward: (msg: Message) => void
+  onReport: (msg: Message) => void
   onPin: (msgId: string) => void
   onUnpin: () => void
   onScrollToMessage: (id: string) => void

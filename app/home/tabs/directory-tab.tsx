@@ -2,14 +2,67 @@
 
 import { useState, useEffect, useRef } from "react"
 import useSWR from "swr"
-import { Search, ArrowLeft, MessageCircle, Heart, Users } from "lucide-react"
+import { Search, ArrowLeft, MessageCircle, Heart, Users, Flag, Ban, UserCheck } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { EmptyState } from "../components/shared"
-import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, SubpageShell } from "@/components/central"
+import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, SubpageShell, ActionMenu } from "@/components/central"
+import type { ActionMenuItem } from "@/components/central"
 import { getInitials } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
+import { ReportModal } from "../components/report-modal"
+import { useBlocks } from "../use-blocks"
+import { blockUser, unblockUser } from "@/app/actions/blocks"
 import type { DirectoryMember, DirectoryMemberDetail } from "../types"
+
+// Shared Report/Block overflow menu for a directory member (§1.2). Used by both
+// the desktop detail panel and the mobile member sheet. Only rendered for other
+// members (never your own profile).
+function MemberActionsMenu({ member, currentUserId }: { member: DirectoryMember; currentUserId: string }) {
+  const { blocked, blockedIds, mutate } = useBlocks(currentUserId)
+  const [reporting, setReporting] = useState(false)
+  const isBlocked = blockedIds.has(member.id)
+
+  const items: ActionMenuItem[] = [
+    { key: "report", label: "Report", icon: <Flag size={15} />, onSelect: () => setReporting(true) },
+    isBlocked
+      ? {
+          key: "unblock", label: "Unblock", icon: <UserCheck size={15} />,
+          onSelect: async () => {
+            mutate(blocked.filter((b) => b.blocked_id !== member.id), { revalidate: false })
+            await unblockUser(member.id)
+            mutate()
+          },
+        }
+      : {
+          key: "block", label: "Block", tone: "danger", icon: <Ban size={15} />,
+          onSelect: async () => {
+            mutate(
+              [{ blocked_id: member.id, name: member.name, avatar_url: member.avatar_url, created_at: new Date().toISOString() }, ...blocked],
+              { revalidate: false },
+            )
+            await blockUser(member.id)
+            mutate()
+          },
+        },
+  ]
+
+  return (
+    <>
+      <ActionMenu items={items} triggerLabel="Member actions" />
+      {reporting && (
+        <ReportModal
+          targetType="profile"
+          targetId={member.id}
+          targetUserId={member.id}
+          targetName={member.name}
+          onClose={() => setReporting(false)}
+          onBlocked={() => mutate()}
+        />
+      )}
+    </>
+  )
+}
 
 // Shared directory fetcher — both the desktop panel and the mobile list key on
 // ["directory-members", ministryId], so they dedupe to a single request and
@@ -462,6 +515,7 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
             <Heart style={{ width: 15, height: 15, fill: prayingFor ? "var(--plum)" : "none" }} />
             {prayingFor ? "Praying" : "Pray for"}
           </button>
+          <MemberActionsMenu member={member} currentUserId={currentUserId} />
         </div>
       )}
 
@@ -667,14 +721,15 @@ export function MemberSheet({
         </div>
 
         {!isOwnProfile && (
-          <div style={{ marginTop: 28, borderTop: "1px solid var(--line)", paddingTop: 18 }}>
+          <div style={{ marginTop: 28, borderTop: "1px solid var(--line)", paddingTop: 18, display: "flex", gap: 10, alignItems: "center" }}>
             <button
               onClick={handleSendMessage}
               disabled={dmLoading}
-              className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-medium py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide"
+              className="flex-1 bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-medium py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide"
             >
               {dmLoading ? "Opening chat…" : "Send Message"}
             </button>
+            <MemberActionsMenu member={member} currentUserId={currentUserId} />
           </div>
         )}
     </SubpageShell>
