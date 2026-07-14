@@ -111,6 +111,8 @@ only, never claimed. Full guide: `scripts/SESSIONS.md`.
 
 20. **Action menus — always `ActionMenu`, never hand-rolled:** every dropdown/kebab/context action menu must use the shared `ActionMenu` (`components/central/action-menu.tsx`) — it portals to `document.body`, flips above the trigger when there's no room below, and clamps horizontally, so it can never clip at the viewport bottom or inside an `overflow-hidden` ancestor. Never position a menu `absolute`/`fixed` below a trigger without collision handling (this bug recurred 3×). Sole exception: the chat message context menu in `message-row.tsx` (its own frozen flip logic).
 
+21. **Settings surfaces stage changes behind Save:** on any settings surface (ministry/chat/team settings, moderation, automations), control changes update PENDING local state only; the DB write happens on explicit Save, with Cancel reverting. Optimistic updates (Convention #4) apply to conversational writes, not settings commits. Pattern: settings-tab's `pending*Settings`.
+
 ## Database Migrations
 Never create migration files in the `supabase/` folder and ask the user to run them manually. The Supabase MCP is connected — always run migrations directly against the database using the MCP. When a schema change is needed, execute it immediately as part of the task. After running, verify the tables and policies were created correctly by querying the database before moving on.
 

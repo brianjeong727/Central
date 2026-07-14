@@ -4,7 +4,7 @@ description: Flag this task as an authorized design-system change. Pre-authorize
 
 This task is an authorized DESIGN-SYSTEM CHANGE. Brian has declared that this prompt is meant to alter the design system.
 
-Load `.claude/skills/orchestration/SKILL.md` and apply its "/designchange handling" section in full. In summary, for THIS task only:
+Load `.claude/skills/orchestration/SKILL.md` (the core) AND `.claude/skills/orchestration/orchestrated.md`, and apply the playbook's "/designchange handling" section in full. In summary, for THIS task only:
 
 1. Make the change at the TOKEN / COMPONENT source — never inline.
 2. Propagate: find every usage and confirm it inherits the change. Surface any usage that did NOT inherit — that usage was a hardcoded inline value (this is a free inline-drift audit; report the list).

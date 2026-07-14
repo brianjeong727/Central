@@ -9,22 +9,28 @@
 # Safe to run from any worktree: it resolves its own top-level and slot log dir.
 #
 # Usage:
-#   scripts/verify.sh [--port N] [--e2e] [--skip-build]
+#   scripts/verify.sh [--port N] [--e2e] [--skip-build] [--docs-only]
 #     --port N       target port (default 3001); maps 3000→main 3001→s1 3002→s2 3003→s3
 #     --e2e          also run `E2E_PORT=N npx playwright test`
 #     --skip-build   skip `npm run build` (still lints, restarts, polls)
+#     --docs-only    fast path for markdown-only diffs: VERIFIES every changed
+#                    file (vs merge-base + working tree) is *.md, then passes
+#                    without building. Any non-.md file fails the claim — run
+#                    the full gate instead.
 
 set -uo pipefail
 
 PORT=3001
 RUN_E2E=0
 SKIP_BUILD=0
+DOCS_ONLY=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --port) PORT="${2:?--port needs a value}"; shift 2 ;;
     --e2e) RUN_E2E=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
+    --docs-only) DOCS_ONLY=1; shift ;;
     -h|--help) grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "verify.sh: unknown arg '$1'" >&2; exit 2 ;;
   esac
@@ -32,6 +38,22 @@ done
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "verify.sh: not a git repo" >&2; exit 2; }
 cd "$ROOT" || exit 2
+
+# ── docs-only fast path (verifies the claim, then skips the heavy gate) ──────
+if [[ $DOCS_ONLY -eq 1 ]]; then
+  BASE="$(git merge-base HEAD origin/main 2>/dev/null || echo HEAD)"
+  CHANGED="$( { git diff --name-only "$BASE" HEAD 2>/dev/null; git diff --name-only HEAD 2>/dev/null; git ls-files --others --exclude-standard; } | sort -u )"
+  NON_MD="$(printf '%s\n' "$CHANGED" | grep -v '\.md$' | grep -v '^$' || true)"
+  if [[ -n "$NON_MD" ]]; then
+    echo "✗ --docs-only claimed, but non-markdown files changed:"
+    printf '    %s\n' $NON_MD
+    echo "════════ VERIFY RESULT: FAIL (not docs-only — run the full gate) ════════"
+    exit 1
+  fi
+  echo "docs-only verified: every changed file is *.md ($(printf '%s\n' "$CHANGED" | grep -c . ) files)"
+  echo "════════ VERIFY RESULT: PASS (docs-only) ════════"
+  exit 0
+fi
 
 BUILD_STATUS="skipped"
 LINT_STATUS="n/a"
