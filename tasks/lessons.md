@@ -314,3 +314,10 @@ s3's dev server 500'd on `/` and the stop hook pattern-matched it to the usual c
 **Rules:**
 - Before treating a slot 500 as cache corruption, read the devlog. `Module not found` for a package that IS in `package.json` means stale `node_modules` → `npm install --legacy-peer-deps` in that worktree, then restart dev. A cache-corruption 500 looks different (Turbopack panics, missing build-manifest/.sst).
 - When restarting a slot's dev server manually, ALWAYS pass the slot port: `npm run dev -- -p <port>`. Bare `npm run dev` binds 3000 — the shared checkout's port — and leaves the slot dead while squatting on the wrong port.
+
+## Xcode builds inside the iCloud-synced tree fail CodeSign with "detritus not allowed" (2026-07-14)
+The repo lives under `~/Desktop` (iCloud-synced), and iCloud Drive stamps `com.apple.fileprovider.fpfs#P` / `com.apple.FinderInfo` xattrs onto files as it syncs — including Xcode build products. CodeSign then fails with `resource fork, Finder information, or similar detritus not allowed`. `xattr -cr` on the products is a LOSING RACE while sync is live: the first /sim build failed, the strip + rebuild failed again, because iCloud re-stamped between strip and sign.
+**Rules:**
+- Any Xcode/xcodebuild output directory must live OUTSIDE the synced tree: point DerivedData at `~/Library/Developer/...` (per-worktree, e.g. the `ios/DerivedData → ~/Library/Developer/CentralDerivedData-<worktree>` symlink /sim uses; gitignored).
+- If CodeSign still hits detritus after relocating, strip the SOURCES once (`xattr -cr ios/App capacitor-shell`) and rebuild — source files sync rarely, so that strip sticks; product-side strips don't.
+- Same hazard family as the iCloud eviction lesson: filesystem weirdness under ~/Desktop/Projects should always make you suspect iCloud first.
