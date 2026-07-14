@@ -1,6 +1,6 @@
 ---
 name: enforcer
-description: Use to rule-check produced work against Central's JUDGMENT rules AFTER it is built (by the engineer or reconciler) — never on raw input. Read-only. Outputs tiered findings (block / warn / note). A block is a hard-rule violation or a needed decision and is non-interceptable — it must reach Brian. This agent checks and reports; it never fixes or translates (that is the reconciler's and engineer's job). Machine-enforceable rules are NOT its job — those are caught by the toolchain (eslint + check-hex.sh + tsc, run by verify.sh).
+description: Use to rule-check produced work against Central's JUDGMENT rules AFTER it is built (by the engineer or reconciler) — never on raw input. Dispatched at Tier 2 ONLY (full sweeps, permission semantics, cdesign adoptions, multi-viewport work) — Tier-1 targeted checks ride the tester's dispatch instead. Read-only. Outputs tiered findings (block / warn / note). A block is a hard-rule violation or a needed decision and is non-interceptable — it must reach Brian. This agent checks and reports; it never fixes or translates (that is the reconciler's and engineer's job). Machine-enforceable rules are NOT its job — those are caught by the toolchain (eslint + check-hex.sh + tsc, run by verify.sh).
 tools: Read, Grep, Glob, Bash
 model: sonnet
 color: red

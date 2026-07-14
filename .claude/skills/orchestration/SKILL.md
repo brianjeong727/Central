@@ -57,7 +57,7 @@ This runs AGAINST your drive to complete the task. Hold it anyway. Before you di
 
 ## Step 2 — Decide what to spawn
 
-Default loop is: `engineer` builds → `tester` verifies → `enforcer` rule-checks. Spawn the conditional specialists only on their triggers:
+Default loop is: `engineer` builds → `tester` verifies AND carries the Tier-1 rule checks (a standalone `enforcer` runs only at Tier 2 — see the enforcer tiers below). Spawn the conditional specialists only on their triggers:
 
 - **Spawn `explorer`** (read-only recon, returns flagged findings only — not a full plan) when the task touches ANY of: an unfamiliar subsystem, multiple files / wide blast radius, a schema change, anything touching RLS or `permissions.md`, or when something already looks weird. If none of these, skip it — exploration adds latency and token cost (subagents run ~7× the tokens of single-thread).
 - **Spawn `reconciler`** (read-only) ONLY when the input is a Claude Design (cdesign) handoff. This is its sole trigger. See "cdesign handoffs" below.
@@ -84,8 +84,8 @@ Every dispatch then says "read `context.md` first" INSTEAD of telling agents to 
 Never maintain parallel enforcer variants; tier the DISPATCH instead:
 
 - **Tier 0 — skip (no enforcer).** Docs-only diffs, single-line mechanical fixes, and changes fully covered by the toolchain (lint / check-hex / tsc via verify.sh). The main session applies its own judgment and moves on. If a "trivial" diff touches auth, permissions, money, RLS-adjacent code, or a shared component's API — it is NOT trivial; promote it.
-- **Tier 1 — targeted (default).** One enforcer run whose dispatch prompt NAMES the specific checks for this diff (the relevant conventions, the governing design doc per surface, the files at risk). Optionally run at reduced effort for small diffs. This is the standard loop pass.
-- **Tier 2 — full sweep.** Multi-file / multi-commit stacks, anything touching auth/permissions semantics, cdesign adoptions, or work spanning both viewports: full checklist, both design docs surface-routed, desktop byte-identity diffing, high effort.
+- **Tier 1 — folded into the tester (default).** NO standalone enforcer run. The tester's dispatch prompt NAMES the specific judgment checks for this diff (the relevant convention numbers, the governing design doc per surface, the files at risk) alongside its verify/click-through duties — one agent run instead of two, since both were loading the same docs to check the same rules. The tester reports those findings in the enforcer's block/warn/note tiers; blocks remain non-interceptable.
+- **Tier 2 — standalone enforcer, full sweep.** Multi-file / multi-commit stacks, anything touching auth/permissions semantics, cdesign adoptions, or work spanning both viewports: a dedicated enforcer run with the full checklist, both design docs surface-routed, desktop byte-identity diffing, high effort. Permission-semantics checks are ALWAYS Tier 2 — they never ride the tester fold.
 
 Tier choice is the coordinator's call, but misclassification bias goes UP, never down — when unsure between tiers, pick the higher one. Blocks found at any tier remain non-interceptable.
 
@@ -95,7 +95,7 @@ Claude Code does not loop on its own. YOU drive the cycle:
 
 1. Dispatch `engineer` with the expanded intent + the task-context dir (+ any reconciler manifest path).
 2. Dispatch `tester`. Default tier: `scripts/verify.sh` (build + lint + dev-server-ready) THEN a mandatory functional click-through of the changed flow(s) via the e2e harness (`e2e/`) — run the covering spec, or have the tester write one that exercises the change as a user would. A user-facing change without a click-through comes back UNVERIFIED, not passing. Visual-taste sign-off remains Brian's.
-3. Dispatch `enforcer` on the produced work.
+3. Rule-check the produced work per the enforcer tiers above: Tier 1 rides the tester dispatch (name the checks in its prompt); a standalone `enforcer` is dispatched only at Tier 2.
 4. On any failure that is self-healing — a build/type/lint break, a drift the engineer can simply correct — kick it back and re-dispatch. Do NOT surface these to Brian. This is the "duh, that's the point" category; the loop fixes it silently.
 5. Repeat until: behaviorally verified (click-through passed), spec-conformant, no unresolved enforcer `block`. That is the EXIT CONDITION — "ready for visual sign-off", never "complete".
 
