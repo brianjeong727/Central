@@ -68,6 +68,16 @@ Default loop is: `engineer` builds → `tester` verifies → `enforcer` rule-che
 
 Inter-agent data routes through you as FILES, not re-typed summaries. On entering the orchestrated lane, create `.claude/task-context/<task-slug>/` (gitignored, disposable). Every dispatch prompt names that dir. Agents write their FULL output there as a named file (`findings.md`, `spec.md`, `build-report.md`, `test-report.md`, `review.md`) and return only a ≤10-line summary plus the path. Downstream dispatches reference the files ("read `.claude/task-context/<slug>/findings.md` before starting") instead of you re-typing content — three copies of the same facts, each degraded, is the failure mode this kills. Continue a still-relevant agent via SendMessage (it keeps its context) instead of spawning a fresh one for a kickback.
 
+### Enforcer dispatch — three tiers (one agent, throttled compute)
+
+Never maintain parallel enforcer variants; tier the DISPATCH instead:
+
+- **Tier 0 — skip (no enforcer).** Docs-only diffs, single-line mechanical fixes, and changes fully covered by the toolchain (lint / check-hex / tsc via verify.sh). The main session applies its own judgment and moves on. If a "trivial" diff touches auth, permissions, money, RLS-adjacent code, or a shared component's API — it is NOT trivial; promote it.
+- **Tier 1 — targeted (default).** One enforcer run whose dispatch prompt NAMES the specific checks for this diff (the relevant conventions, the governing design doc per surface, the files at risk). Optionally run at reduced effort for small diffs. This is the standard loop pass.
+- **Tier 2 — full sweep.** Multi-file / multi-commit stacks, anything touching auth/permissions semantics, cdesign adoptions, or work spanning both viewports: full checklist, both design docs surface-routed, desktop byte-identity diffing, high effort.
+
+Tier choice is the coordinator's call, but misclassification bias goes UP, never down — when unsure between tiers, pick the higher one. Blocks found at any tier remain non-interceptable.
+
 ## Step 3 — Run the build loop
 
 Claude Code does not loop on its own. YOU drive the cycle:
