@@ -812,6 +812,12 @@ function AccountLinksSection({ userId }: { userId: string }) {
           <span style={label}>Privacy policy</span>
           <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />
         </a>
+
+        {/* Terms of service */}
+        <a href="/terms" style={{ ...rowBase, borderTop: "1px solid var(--line)", textDecoration: "none" }}>
+          <span style={label}>Terms of service</span>
+          <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />
+        </a>
       </div>
     </div>
   )

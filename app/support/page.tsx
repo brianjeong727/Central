@@ -35,6 +35,7 @@ export default function SupportPage() {
 
         <div style={{ marginTop: 40, paddingTop: 22, borderTop: "1px solid var(--line)", display: "flex", gap: 20, fontSize: 14 }}>
           <Link href="/privacy" style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }}>Privacy policy</Link>
+          <Link href="/terms" style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }}>Terms of service</Link>
           <Link href="/" style={{ color: "var(--muted-text)", textDecoration: "none" }}>Back to Central</Link>
         </div>
       </div>

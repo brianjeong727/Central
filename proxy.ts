@@ -88,6 +88,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/api/calendar/') ||
     pathname.startsWith('/register-ministry') ||
     pathname.startsWith('/privacy') ||
+    pathname.startsWith('/terms') ||
     pathname.startsWith('/support')
 
   // No auth — gate protected paths to login/signup

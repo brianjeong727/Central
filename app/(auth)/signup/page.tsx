@@ -443,6 +443,8 @@ function SignupContent() {
         )}
         <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5, textAlign: "center", margin: "-4px 0 0" }}>
           By creating an account you agree to our{" "}
+          <Link href="/terms" style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">Terms of Service</Link>
+          {" "}and{" "}
           <Link href="/privacy" style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">Privacy Policy</Link>.
         </p>
       </form>
@@ -520,6 +522,8 @@ function SignupContent() {
         )}
         <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5, textAlign: "center", margin: "-4px 0 0" }}>
           By creating an account you agree to our{" "}
+          <Link href="/terms" style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">Terms of Service</Link>
+          {" "}and{" "}
           <Link href="/privacy" style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">Privacy Policy</Link>.
         </p>
       </form>

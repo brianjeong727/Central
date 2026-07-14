@@ -642,6 +642,7 @@ export default function LandingPage() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
             <a href="/privacy" style={{ fontSize: 13, color: BODY, textDecoration: "none" }}>Privacy</a>
+            <a href="/terms" style={{ fontSize: 13, color: BODY, textDecoration: "none" }}>Terms</a>
             <a href="/support" style={{ fontSize: 13, color: BODY, textDecoration: "none" }}>Support</a>
             <span style={{ fontSize: 13, color: MUTED, fontStyle: "italic" }}>
               Equipping the saints, administratively. · © Central
