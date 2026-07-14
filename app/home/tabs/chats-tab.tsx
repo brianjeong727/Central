@@ -10,7 +10,7 @@ import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, POCKET_KICKER_STYLE } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
@@ -2928,68 +2928,39 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   )
 }
 
-// Tonal pill filter chip (mockup `.fchip`) — Church / My chats scope switch.
-function ChatFilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        border: "none", borderRadius: 999, padding: "9px 16px",
-        fontFamily: "var(--serif)", fontSize: 13,
-        background: active ? "var(--plum)" : "var(--ivory)",
-        color: active ? "var(--cream-on-dark)" : "var(--body)",
-        fontWeight: active ? 600 : 500, cursor: "pointer", flexShrink: 0,
-      }}
-    >
-      {label}
-    </button>
-  )
-}
-
-// One conversation row inside a Pocket grouped card (mockup `.row`): squircle
-// monogram chip, name (15/600) + single-line "Sender: text" preview, right column
-// time (11 --faint) with a plum unread dot below. `solid` = ministry-wide chat.
+// One conversation row inside a Pocket grouped card: PocketRow fed from a
+// ChatGroup — squircle chip (`solid` = ministry-wide chat), "Sender: text"
+// preview, time + unread dot right column.
 function PocketChatRow({ group, isLast, onClick }: { group: ChatGroup; isLast: boolean; onClick: () => void }) {
-  const solid = group.is_central_chat === true
-  const showUnread = group.unread_count > 0 && !group.muted
   return (
-    <button
-      onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: 12, width: "100%",
-        background: "none", border: "none", textAlign: "left", cursor: "pointer",
-        padding: "13px 0", borderBottom: isLast ? "none" : "1px solid var(--line-3)",
-      }}
-    >
-      <PocketChip letter={group.name.charAt(0).toUpperCase()} solid={solid} />
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.name}</span>
+    <PocketRow
+      leading={<PocketChip letter={group.name.charAt(0).toUpperCase()} solid={group.is_central_chat === true} />}
+      title={group.name}
+      titleAccessory={
+        <>
           {group.pinned && <Pin style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} aria-label="Pinned" />}
           {group.muted && <BellOff style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} aria-label="Muted" />}
-        </span>
-        <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {group.last_message
-            ? (group.last_sender ? `${group.last_sender}: ${group.last_message}` : group.last_message)
-            : "No messages yet"}
-        </span>
-      </span>
-      <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
-        {group.last_message_time && <span style={{ fontSize: 11, color: "var(--faint)" }}>{formatRelativeTime(group.last_message_time)}</span>}
-        {showUnread && <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--plum)" }} />}
-      </span>
-    </button>
+        </>
+      }
+      sub={group.last_message
+        ? (group.last_sender ? `${group.last_sender}: ${group.last_message}` : group.last_message)
+        : "No messages yet"}
+      time={group.last_message_time ? formatRelativeTime(group.last_message_time) : undefined}
+      showDot={group.unread_count > 0 && !group.muted}
+      isLast={isLast}
+      onClick={onClick}
+    />
   )
 }
 
 // The single tonal grouped card holding a set of chat rows (mockup `.card`).
 function PocketChatCard({ groups, onOpen }: { groups: ChatGroup[]; onOpen: (id: string, name: string) => void }) {
   return (
-    <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "6px 18px" }}>
+    <PocketRowCard>
       {groups.map((g, i) => (
         <PocketChatRow key={g.id} group={g} isLast={i === groups.length - 1} onClick={() => onOpen(g.id, g.name)} />
       ))}
-    </div>
+    </PocketRowCard>
   )
 }
 
@@ -3010,9 +2981,10 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
         if (rooms.length === 0) return null
         return (
           <div key={key}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "20px 4px 8px" }}>
-              <span style={{ flex: 1, fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)" }}>{label}</span>
-              {canCreate && (
+            <PocketKicker
+              label={label}
+              style={{ margin: "20px 4px 8px" }}
+              action={canCreate ? (
                 <button
                   onClick={() => onAddInSection(key)}
                   aria-label={`New ${label.toLowerCase()} chat`}
@@ -3020,8 +2992,8 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
                 >
                   <Plus style={{ width: 15, height: 15 }} strokeWidth={1.8} />
                 </button>
-              )}
-            </div>
+              ) : undefined}
+            />
             <PocketChatCard groups={rooms} onOpen={onOpen} />
           </div>
         )
@@ -3180,8 +3152,8 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       {/* Mobile scope pills (B3 Pocket) — Church / My chats; the new-chat + sits
           right-aligned on the same row, My chats scope only. */}
       <div className="flex items-center gap-2 mb-4 md:hidden">
-        <ChatFilterChip label="Church" active={subTab === "church"} onClick={() => { setSubTab("church"); setSearch(""); setParam("chats", null) }} />
-        <ChatFilterChip label="My chats" active={subTab === "my"} onClick={() => { setSubTab("my"); setSearch(""); setParam("chats", "my") }} />
+        <PocketFilterChip label="Church" active={subTab === "church"} onClick={() => { setSubTab("church"); setSearch(""); setParam("chats", null) }} />
+        <PocketFilterChip label="My chats" active={subTab === "my"} onClick={() => { setSubTab("my"); setSearch(""); setParam("chats", "my") }} />
         {canShowNewChat && (
           <div className="ml-auto">
             <PocketRoundButton variant="plum" onClick={openNewChat} ariaLabel="New chat">
@@ -3235,7 +3207,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
                 onClick={() => setShowArchived((s) => !s)}
                 className="w-full flex items-center justify-between py-2 px-1"
               >
-                <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)" }}>
+                <span style={POCKET_KICKER_STYLE}>
                   Archived · {archivedChurchChats.length}
                 </span>
                 <ChevronDown className={`w-4 h-4 text-[var(--muted-text)] transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />

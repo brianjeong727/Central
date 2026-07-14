@@ -89,6 +89,31 @@ Dark plum (`--plum2`) rounded-full bar, centered, `bottom: calc(env(safe-area-in
 
 ## 3. Components
 
+### 3.0 Component inventory — build with these, never re-inline
+
+The grammar below is CODE, not just spec. Every pattern has a shared component; hand-rolling one inline is drift (the pre-extraction codebase had the filter chip written three separate times).
+
+| Pattern | Component | Import |
+|---|---|---|
+| Section kicker (mono 10px label + optional inline action) | `PocketKicker` / `POCKET_KICKER_STYLE` | `@/components/central` |
+| Tonal card | `PocketCard` | `@/components/central` |
+| Row-list card (`6px 18px`) | `PocketRowCard` | `@/components/central` |
+| Universal list row | `PocketRow` | `@/components/central` |
+| Exclusive filter pill (`fchip`) | `PocketFilterChip` | `@/components/central` |
+| Plum hero card | `PocketHeroCard` | `@/components/central` |
+| 4px progress bar (ivory or on-plum) | `PocketProgress` | `@/components/central` |
+| Dashed add-affordance | `PocketDashedButton` | `@/components/central` |
+| "← Section" return row | `PocketBackRow` | `@/components/central` |
+| 40px squircle letter chip | `PocketChip` | `@/components/central` |
+| 34px round chrome action (ghost/plum) | `PocketRoundButton` | `@/components/central` |
+| Chrome row (title + action + avatar) | `PocketChrome` | `app/home/components/pocket-header` |
+| Home brand chrome (logo + ministry name + avatar) | `PocketHeader` | `app/home/components/pocket-header` |
+| Scroll-snap up-next carousel + dots | `PocketUpNext` | `app/home/components/pocket-up-next` |
+| Floating pill nav | `BottomNav` | `components/ui/bottom-nav` |
+| Empty state | `EmptyState` (quiet variant) | `app/home/components/shared` |
+
+Type note: the mobile kicker is **10px / +1.4px** (`POCKET_KICKER_STYLE`). `EYEBROW_STYLE` (11px) is the desktop eyebrow — Home's date line and in-card eyebrows use it; section kickers on mobile use the 10px pocket tier. Don't flatten the two.
+
 ### 3.1 Cards
 - **Standard card:** `--ivory`, radius 20, no border. Full-width block. Tappable cards are `<button>` with left-aligned text.
 - **Row-list card:** standard card at `padding: 6px 18px` holding `.row` items divided by 1px `--line3` (none on last).
@@ -123,7 +148,7 @@ Radius-999 pills: off = `--ivory` bg / `--body`; on = plum fill / cream / 600. U
 Mono 9px uppercase radius-999: default `--line-2`/`--body` ("You", counts); plum fill/cream for roles (Super, Pastor). Count pills on phase headers use the same treatment.
 
 ### 3.8 Empty / placeholder
-Dashed 1.5px card, radius 20, centered: stroked icon, 13.5 body-weight title, 12.5 muted sentence. Copy is descriptive, may name the create action, never contains the button (same rule as desktop §4.19).
+Shipped form: the shared `EmptyState` (quiet variant) — centered stroked icon in a 52px ivory chip, 15/500 title, 13 muted sentence. Copy is descriptive, may name the create action, never contains the button (same rule as desktop §4.19). The dashed-card treatment is reserved for **add-affordances** (`PocketDashedButton`), not empties.
 
 ### 3.9 Carousel
 Horizontal scroll-snap row breaking out of screen padding (`margin: 0 -20px; padding: 0 20px`), cards at 82% width. For peer content of the same kind (upcoming events). Never for navigation.
@@ -132,7 +157,7 @@ Horizontal scroll-snap row breaking out of screen padding (`margin: 0 -20px; pad
 
 ## 4. Screen recipes
 
-- **Home:** date eyebrow → hero carousel → kickered previews (Announcements, Chats — 2 rows each + See all) → Quick action grid (`grid2` tiles — the existing shipped grid; the prototype's Quick section was explicitly not adopted) → verse (italic 15 serif, centered, mono ref). Home is a digest of every tab; each block links into its tab.
+- **Home:** date eyebrow → "Featured" hero carousel (`PocketUpNext`) → serif-titled previews (Announcements, Chats — serif 19/600 section title + quiet "See all ›", 2 rows each; Home's digest sections use serif titles, not mono kickers) → Quick action grid (2-up tiles: Give + first team) → verse (plum-tint card: "Today's verse" eyebrow, italic 17 serif, mono ref). Home is a digest of every tab; each block links into its tab.
 - **Feed (Announcements):** filter chips → stack of full-width cards (eyebrow · 21px headline · 2-line body · optional RSVP row). Create = plum ghost "+" in chrome → full-screen compose.
 - **Compose (full-screen):** chrome = back + title + Save draft (quiet) + Publish (primary, compact); nav hidden; headline input, body textarea, then `sect` groups (audience chips, switches, attachment, form).
 - **Chats:** segmented Church | My chats. Church = room groups (General / Groups / Teams — the real church-chat categories), each with an eyebrow + inline "+" (leader-only create). My chats = flat row card, single "+" on the filter row. Directory via the person icon in the chrome.
@@ -177,3 +202,4 @@ If any box is unchecked, it's a desktop smoosh — go back.
 
 1. Calendar-grids-at-phone-width rule vs the shipped mobile `MinistryCalendar` for standard teams — agenda-list replacement pending Brian's ruling.
 2. "← All workspaces" back pill vs the one-chrome-chevron rule — pending the Scope-B hub landing.
+3. Home's digest cards (announcement/chat previews, quick tiles, `PocketEventCard`, verse) ship as `--cream-panel` + 1px `--line` border — conflicting with §1.1/§5.5 tonal-borderless. Home is a ratified model page, so the conflict stands unresolved; **stale-page redesigns use tonal `--ivory` borderless** until Brian rules on Home's card language.

@@ -42,7 +42,7 @@ import { useIsMobile } from "../use-is-mobile"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketHeroCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow } from "@/components/central"
 import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -2340,7 +2340,6 @@ function MobilePocketHub({ teamName, onBack, onSettings, avatar, hero, groups }:
   hero?: { eyebrow: string; title: string; meta: string; progress?: { done: number; total: number } | null; onClick: () => void } | null
   groups: { label: string; rows: HubRow[] }[]
 }) {
-  const dimCream = "color-mix(in srgb, var(--cream) 62%, transparent)"
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
@@ -2361,39 +2360,32 @@ function MobilePocketHub({ teamName, onBack, onSettings, avatar, hero, groups }:
       </div>
 
       {hero && (
-        <button onClick={hero.onClick} style={{ textAlign: "left", width: "100%", background: "var(--plum)", color: "var(--cream-on-dark)", borderRadius: "var(--r-pocket)", padding: 20, border: "none", cursor: "pointer" }}>
-          <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: dimCream }}>{hero.eyebrow}</div>
-          <div style={{ fontSize: 21, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.15, marginTop: 8 }}>{hero.title}</div>
-          <div style={{ fontSize: 13, color: "color-mix(in srgb, var(--cream) 68%, transparent)", marginTop: 5 }}>{hero.meta}</div>
-          {hero.progress && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 16 }}>
-              <span style={{ flex: 1, height: 4, background: "color-mix(in srgb, var(--cream) 20%, transparent)", borderRadius: 999, overflow: "hidden" }}>
-                <span style={{ display: "block", height: "100%", background: "var(--cream)", borderRadius: 999, width: hero.progress.total > 0 ? `${Math.round(hero.progress.done / hero.progress.total * 100)}%` : "0%" }} />
-              </span>
-              <span style={{ whiteSpace: "nowrap", fontSize: 12, color: "color-mix(in srgb, var(--cream) 68%, transparent)" }}>{hero.progress.done}/{hero.progress.total} done</span>
-            </div>
-          )}
-        </button>
+        <PocketHeroCard
+          eyebrow={hero.eyebrow}
+          title={hero.title}
+          meta={hero.meta}
+          progress={hero.progress}
+          onClick={hero.onClick}
+        />
       )}
 
       {groups.map((g, gi) => (
         <div key={g.label}>
-          <div style={{ margin: (gi === 0 && !hero) ? "6px 4px 10px" : "26px 4px 10px" }}>
-            <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)" }}>{g.label}</span>
-          </div>
-          <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "6px 18px" }}>
+          <PocketKicker label={g.label} style={{ margin: (gi === 0 && !hero) ? "6px 4px 10px" : "26px 4px 10px" }} />
+          <PocketRowCard>
             {g.rows.map((r, ri) => (
-              <button key={r.title} onClick={r.onClick} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", background: "none", border: "none", textAlign: "left", cursor: "pointer", padding: "13px 0", borderBottom: ri === g.rows.length - 1 ? "none" : "1px solid var(--line-3)" }}>
-                <PlanLineIcon iconKey={r.iconKey} size={40} radius={14} bg="var(--line-2)" fg="var(--plum)" />
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)" }}>{r.title}</span>
-                  <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.subtitle}</span>
-                </span>
-                {r.meta && <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{r.meta}</span>}
-                <ChevronRight style={{ width: 15, height: 15, color: "var(--faint)", flexShrink: 0 }} />
-              </button>
+              <PocketRow
+                key={r.title}
+                leading={<PlanLineIcon iconKey={r.iconKey} size={40} radius={14} bg="var(--line-2)" fg="var(--plum)" />}
+                title={r.title}
+                sub={r.subtitle}
+                meta={r.meta}
+                chevron
+                isLast={ri === g.rows.length - 1}
+                onClick={r.onClick}
+              />
             ))}
-          </div>
+          </PocketRowCard>
         </div>
       ))}
     </div>
@@ -2403,11 +2395,7 @@ function MobilePocketHub({ teamName, onBack, onSettings, avatar, hero, groups }:
 // Back row shown when a hub row is drilled into on mobile — "← {section}" returns
 // to the hub. Sits above the existing section content.
 function MobileHubBackRow({ label, onBack }: { label: string; onBack: () => void }) {
-  return (
-    <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 12px 0 6px", marginBottom: 18, background: "transparent", border: "none", color: "var(--plum)", fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
-      <ArrowLeft style={{ width: 18, height: 18 }} /> {label}
-    </button>
-  )
+  return <PocketBackRow label={label} onBack={onBack} />
 }
 
 // Mobile workspace card (B3 Pocket Daybreak): tonal --ivory card, squircle letter
@@ -2423,7 +2411,7 @@ function MobileWsRow({ letter, name, sub, progress, onEnter, onManage }: {
   onManage?: () => void
 }) {
   return (
-    <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: 18 }}>
+    <PocketCard>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
         <button onClick={onEnter} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 14, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
@@ -2435,9 +2423,7 @@ function MobileWsRow({ letter, name, sub, progress, onEnter, onManage }: {
           </div>
           {progress && (
             <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
-              <span style={{ flex: 1, height: 4, background: "var(--line-2)", borderRadius: 999, overflow: "hidden" }}>
-                <span style={{ display: "block", height: "100%", borderRadius: 999, background: "var(--plum)", width: progress.total > 0 ? `${Math.round((progress.done / progress.total) * 100)}%` : "0%" }} />
-              </span>
+              <PocketProgress done={progress.done} total={progress.total} />
               <span style={{ whiteSpace: "nowrap", fontSize: 12, color: "var(--muted-text)" }}>
                 {progress.total > 0 ? `${progress.done}/${progress.total} · next ${monthDay(progress.nextDate)}` : `next ${monthDay(progress.nextDate)}`}
               </span>
@@ -2448,7 +2434,7 @@ function MobileWsRow({ letter, name, sub, progress, onEnter, onManage }: {
           <IconButton dim={34} onClick={onManage} title="Team settings"><Settings className="w-4 h-4" /></IconButton>
         )}
       </div>
-    </div>
+    </PocketCard>
   )
 }
 
@@ -3063,7 +3049,7 @@ export function PlanTab({
         <div className="md:hidden px-5 pb-28">
           {(userTeams.length >= 2 || govTeams.length > 0) ? (
             <>
-              <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)", margin: "6px 4px 0" }}>Your workspaces</div>
+              <PocketKicker label="Your workspaces" style={{ margin: "6px 4px 0" }} />
               <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 14 }}>
                 {userTeams.map(t => {
                   const role = t.isPresident ? "President" : t.roleName
@@ -3088,14 +3074,12 @@ export function PlanTab({
                   onEnter={() => onTeamSelect?.("receipts")}
                 />
                 {isGovernanceAdmin && (
-                  <button onClick={() => setShowCreateTeam(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: 18, background: "var(--ivory)", border: "1px dashed var(--dashed)", borderRadius: "var(--r-pocket)", color: "var(--plum)", cursor: "pointer", fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600 }}>
-                    <Plus style={{ width: 16, height: 16 }} strokeWidth={2.2} /> Add workspace
-                  </button>
+                  <PocketDashedButton label="Add workspace" onClick={() => setShowCreateTeam(true)} />
                 )}
               </div>
               {govTeams.length > 0 && (
                 <>
-                  <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)", margin: "26px 4px 0" }}>Admin access · view only</div>
+                  <PocketKicker label="Admin access · view only" style={{ margin: "26px 4px 0" }} />
                   <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 14 }}>
                     {govTeams.map(t => (
                       <MobileWsRow
@@ -3157,18 +3141,14 @@ export function PlanTab({
               place of the underline strip. Writes live inside FinanceWorkspace
               (full parity, ruling B-4). md:hidden-scoped: desktop unaffected. */}
           <div className="px-5 flex gap-2" style={{ marginBottom: 16 }}>
-            {financeStripTabs.map(t => {
-              const on = financeSection === t.key
-              return (
-                <button
-                  key={t.key}
-                  onClick={() => setFinanceSection(t.key as FinanceSection)}
-                  style={{ border: "none", borderRadius: 999, padding: "9px 16px", fontFamily: "var(--serif)", fontSize: 13, background: on ? "var(--plum)" : "var(--ivory)", color: on ? "var(--cream-on-dark)" : "var(--body)", fontWeight: on ? 600 : 500, cursor: "pointer", flexShrink: 0 }}
-                >
-                  {t.label}
-                </button>
-              )
-            })}
+            {financeStripTabs.map(t => (
+              <PocketFilterChip
+                key={t.key}
+                label={t.label}
+                active={financeSection === t.key}
+                onClick={() => setFinanceSection(t.key as FinanceSection)}
+              />
+            ))}
           </div>
           <FinanceWorkspace
             ministryId={ministryId}

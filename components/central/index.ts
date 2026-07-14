@@ -42,3 +42,17 @@ export type { SetupChecklistData, SetupChecklistEligible, SetupChecklistItem, Se
 export { ConfirmDialog } from "./confirm-dialog"
 export { ReadOnlyMat, ReadOnlyPill } from "./read-only-mat"
 export { SuperSwitcher } from "./super-switcher"
+export {
+  POCKET_KICKER_STYLE,
+  PocketKicker,
+  PocketCard,
+  PocketRowCard,
+  PocketRow,
+  PocketFilterChip,
+  PocketProgress,
+  PocketHeroCard,
+  PocketDashedButton,
+  PocketBackRow,
+  PocketChip,
+  PocketRoundButton,
+} from "./pocket"

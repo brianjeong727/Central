@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, MONO_STYLE, EYEBROW_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu, PocketFilterChip } from "@/components/central"
 import type { ActionMenuItem } from "@/components/central"
 import { audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
@@ -128,25 +128,6 @@ const MOBILE_FILTERS: { id: "all" | "events" | "updates"; label: string }[] = [
   { id: "events", label: "Events" },
   { id: "updates", label: "Updates" },
 ]
-
-// Tonal pill filter chip (mockup `.fchip`): --ivory pill, --body text; the active
-// chip is a solid plum fill with a cream label. Shared idiom across Pocket screens.
-function MobileFilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        border: "none", borderRadius: 999, padding: "9px 16px",
-        fontFamily: "var(--serif)", fontSize: 13,
-        background: active ? "var(--plum)" : "var(--ivory)",
-        color: active ? "var(--cream-on-dark)" : "var(--body)",
-        fontWeight: active ? 600 : 500, cursor: "pointer", flexShrink: 0,
-      }}
-    >
-      {label}
-    </button>
-  )
-}
 
 // ── Create Modal (new only) ──────────────────────────────────────────────────
 
@@ -1099,7 +1080,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
           <div className="md:hidden" style={{ padding: "2px 20px 0" }}>
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
               {MOBILE_FILTERS.map((f) => (
-                <MobileFilterChip key={f.id} label={f.label} active={mobileFilter === f.id} onClick={() => setMobileFilter(f.id)} />
+                <PocketFilterChip key={f.id} label={f.label} active={mobileFilter === f.id} onClick={() => setMobileFilter(f.id)} />
               ))}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16 }}>
