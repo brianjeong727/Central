@@ -321,3 +321,7 @@ The repo lives under `~/Desktop` (iCloud-synced), and iCloud Drive stamps `com.a
 - Any Xcode/xcodebuild output directory must live OUTSIDE the synced tree: point DerivedData at `~/Library/Developer/...` (per-worktree, e.g. the `ios/DerivedData → ~/Library/Developer/CentralDerivedData-<worktree>` symlink /sim uses; gitignored).
 - If CodeSign still hits detritus after relocating, strip the SOURCES once (`xattr -cr ios/App capacitor-shell`) and rebuild — source files sync rarely, so that strip sticks; product-side strips don't.
 - Same hazard family as the iCloud eviction lesson: filesystem weirdness under ~/Desktop/Projects should always make you suspect iCloud first.
+
+## verify.sh's pnpm parity check was silently converting node_modules (2026-07-14)
+
+The "stale node_modules → Module not found 500" failures (§2026-07-14 above) have a root cause: verify.sh's lockfile-parity step ran a bare `pnpm install --frozen-lockfile`, which is a REAL install — it replaces the npm-managed node_modules layout with pnpm's symlink layout on every verify run, and the next `npm install` half-converts it back. Fix (shipped): the check now runs `pnpm install --frozen-lockfile --lockfile-only --ignore-scripts` on manifest COPIES in a temp dir — validates resolution both directions in ~0.5s and writes zero files to the worktree. General rule: never point a second package manager at a live node_modules "just to check" — install-family commands mutate unless proven otherwise.
