@@ -10,8 +10,12 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 
 PROTECTED=("permissions.md" "MINISTRY_CONTEXT.md")
 
+# Match the exact repo-root file, not any path that merely ENDS in the name —
+# the old suffix match false-blocked e.g. a hypothetical docs/foo-permissions.md.
+ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null)}"
+
 for doc in "${PROTECTED[@]}"; do
-  if [[ "$FILE_PATH" == *"$doc" ]]; then
+  if [[ "$FILE_PATH" == "$doc" || ( -n "$ROOT" && "$FILE_PATH" == "$ROOT/$doc" ) ]]; then
     echo "BLOCKED: $doc is a source-of-truth doc. Propose the change to Brian for approval — do not edit it directly. (See the per-doc escalation rules in the orchestration skill.)" >&2
     exit 2
   fi

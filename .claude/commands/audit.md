@@ -4,9 +4,16 @@ description: Full-codebase, READ-ONLY health audit. Finds duplicate files, likel
 
 This is a full-codebase health audit. It is READ-ONLY in its scanning phase and acts on NOTHING without Brian's per-item approval. Load `.claude/skills/orchestration/SKILL.md` for escalation/multiple-choice conventions, then run the audit as follows.
 
-## Phase 1 — Scan (read-only, dispatch existing agents — do not reimplement their logic)
+## Phase 1 — Scan (read-only, orchestrated via the Workflow tool)
 
-Spawn the `explorer` (read-only) for STRUCTURAL findings and the `enforcer` (read-only) for DESIGN-SYSTEM findings. Assemble their results into one report. Categories:
+Brian invoking /audit IS the multi-agent opt-in. Author and run a **Workflow** (don't dispatch two serial agents — the fan-out is the point):
+
+1. **Finders, fanned out** via `pipeline()` over (category × area) shards — areas: `app/home/tabs`, `app/home/components`, `app/actions`, `components/central` + `components/ui`, `lib` + `app/(auth)` + remaining `app/`. Each finder agent gets ONE category brief (A duplicates / B ghosts / C hardcoded values / D design violations, definitions below), one area, reads `contract-card.md` for category D, and returns findings through a `schema` (file(s), category, evidence, confidence) — no prose.
+2. **Dedupe across all finders** (a barrier is correct here — plain code, not an agent), merging same-file/same-issue hits.
+3. **Adversarial verify for category B (ghosts)** — the highest false-positive category: for each ghost candidate, spawn a refuter agent prompted to PROVE the file is reached (framework routing, string matching, dynamic import, state-mounted tabs — the never-flag list below). A candidate survives only if the refuter fails; record the refuter's evidence either way. Categories A/C/D skip this pass but must carry checkable evidence (paths + values), since audit reads are SURFACE reads (see lessons.md §Audit findings).
+4. Assemble the surviving findings into the one categorized report (Phase 2).
+
+Categories:
 
 ### A. Duplicate files
 Exact or near-duplicate implementations — parallel reimplementations of the same component, copy-pasted logic, two files doing one job. Report each pair/group with paths and what overlaps. Distinguish true duplication from intentional variants (flag the latter as "likely intentional — confirm").
