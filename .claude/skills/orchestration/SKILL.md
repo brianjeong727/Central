@@ -44,7 +44,7 @@ When orchestrating, you conduct five subagents (defined in `.claude/agents/`): `
 Brian types raw and shallow. Before anything else:
 
 1. Restate the request as a precise statement of intent.
-2. Reconcile it against the docs: `CLAUDE.md`, `DESIGN_SYSTEM.md`, `permissions.md`, `MINISTRY_CONTEXT.md`. Resolve ambiguity against them — do NOT ask Brian what the docs already settle (e.g. navigate-to-page vs modal is settled in DESIGN_SYSTEM.md §4.17; apply it).
+2. Reconcile it against the docs: `CLAUDE.md`, `web_design_system.md` (desktop) / `mobile_design_system.md` (phone-width `md:hidden`), `permissions.md`, `MINISTRY_CONTEXT.md`. Resolve ambiguity against them — do NOT ask Brian what the docs already settle (e.g. navigate-to-page vs modal is settled in web_design_system.md §4.17; apply it).
 3. Confirm intent WITH YOURSELF. Only escalate to Brian (multiple choice) if intent is genuinely ambiguous and the docs don't resolve it.
 
 ## Step 1 — Challenge the request before dispatching
@@ -62,7 +62,7 @@ Default loop is: `engineer` builds → `tester` verifies → `enforcer` rule-che
 - **Spawn `explorer`** (read-only recon, returns flagged findings only — not a full plan) when the task touches ANY of: an unfamiliar subsystem, multiple files / wide blast radius, a schema change, anything touching RLS or `permissions.md`, or when something already looks weird. If none of these, skip it — exploration adds latency and token cost (subagents run ~7× the tokens of single-thread).
 - **Spawn `reconciler`** (read-only) ONLY when the input is a Claude Design (cdesign) handoff. This is its sole trigger. See "cdesign handoffs" below.
 - **Spawn `rls-reviewer`** (read-only + rollback-wrapped DB probes) — MANDATORY, twice, for any task that creates/alters tables, RLS or storage policies, SECURITY DEFINER functions, or service-role write paths: once BEFORE the migration is applied (design review of the SQL) and once AFTER (live verification probes — impersonated own-tenant allow + cross-tenant deny). Its `block` findings are non-interceptable, same as the enforcer's. This repo has shipped a platform-wide row exposure and a bucket-wide upload outage through unreviewed policies — the gate exists because RLS failures are silent.
-- The `designer` agent is RETIRED. Simple design specs don't need a separate read-only agent — the engineer (or you, solo lane) loads DESIGN_SYSTEM.md and builds compliantly by construction; visual exploration goes to cdesign.
+- The `designer` agent is RETIRED. Simple design specs don't need a separate read-only agent — the engineer (or you, solo lane) loads web_design_system.md (or mobile_design_system.md for `md:hidden`/phone-width surfaces) and builds compliantly by construction; visual exploration goes to cdesign.
 
 ## Artifact protocol — pass paths, not prose
 
@@ -87,13 +87,13 @@ Hard stop: if the loop cannot converge after 3 rebuild cycles, stop and surface 
 Most things never reach him. What does, reaches him as MULTIPLE CHOICE — a one-line diagnosis plus 2–4 mutually-exclusive options (distinct outcomes, not rephrasings) plus an "Explain / something else" escape hatch. If you can't turn an issue into clean options, you don't understand it yet — keep working, don't surface it.
 
 The enforcer's three tiers decide whether something reaches Brian:
-- **block** — hard-rule violation (north-star conflict, a DESIGN_SYSTEM.md "do not", a permissions breach, an architectural standing rule), OR a genuine decision is needed (ambiguous intent, incoherent /designchange). Surfaces to Brian automatically. NON-INTERCEPTABLE — you may not filter, overrule, or rationalize past a block. A block IS the trigger; you do not get to decide it's not worth his time.
+- **block** — hard-rule violation (north-star conflict, a web_design_system.md / mobile_design_system.md "do not", a permissions breach, an architectural standing rule), OR a genuine decision is needed (ambiguous intent, incoherent /designchange). Surfaces to Brian automatically. NON-INTERCEPTABLE — you may not filter, overrule, or rationalize past a block. A block IS the trigger; you do not get to decide it's not worth his time.
 - **warn** — taste/judgment disagreement. You may resolve it yourself.
 - **note** — logged, no action.
 
 Example escalation shape:
 > Enforcer flags: the new card uses `#F2EDE0`, one shade off `--cream-2`.
-> ( ) Intended — update DESIGN_SYSTEM.md to add this surface
+> ( ) Intended — update web_design_system.md (or mobile_design_system.md) to add this surface
 > ( ) Not intended — snap to `--cream-2`
 > ( ) Explain
 
@@ -102,12 +102,12 @@ Example escalation shape:
 | Doc | Rule |
 |---|---|
 | `lessons.md` | Auto-write, never ask. Append-only learning log. |
-| `DESIGN_SYSTEM.md` | Gated — UNLESS this task carried `/designchange` (then the flag is pre-authorization: propagate + auto-update the doc, no ask). Without the flag but the work would change the system → enforcer `block` to Brian. |
+| `web_design_system.md` / `mobile_design_system.md` | Gated — UNLESS this task carried `/designchange` (then the flag is pre-authorization: propagate + auto-update the doc, no ask). Edit the doc that governs the surface: `web_design_system.md` for desktop (≥768px), `mobile_design_system.md` for phone-width (`md:hidden`). Without the flag but the work would change the system → enforcer `block` to Brian. |
 | `CLAUDE.md` | Propose-then-approve. PROPOSE exact text; Brian applies it himself. |
 | `permissions.md` | Propose-then-approve. PROPOSE exact text; Brian applies it himself. |
 | `MINISTRY_CONTEXT.md` | Propose-then-approve. PROPOSE exact text; Brian applies it himself. |
 
-Note: the `protect-docs` hook hard-blocks direct edits to CLAUDE.md / permissions.md / MINISTRY_CONTEXT.md by anyone, including you. So for those three, do NOT attempt to write the file — present the exact proposed text in the handoff and let Brian paste it. lessons.md and DESIGN_SYSTEM.md (under /designchange) are not hook-protected and you write them directly per the table.
+Note: the `protect-docs` hook hard-blocks direct edits to CLAUDE.md / permissions.md / MINISTRY_CONTEXT.md by anyone, including you. So for those three, do NOT attempt to write the file — present the exact proposed text in the handoff and let Brian paste it. lessons.md and web_design_system.md / mobile_design_system.md (under /designchange) are not hook-protected and you write them directly per the table.
 
 ## Commit and push: commit is automatic, push is Brian's gate
 
@@ -123,12 +123,12 @@ When the task carried `/designchange`, Brian has DECLARED this prompt is meant t
 1. The intended change is authorized — make it at the TOKEN/COMPONENT source, never inline.
 2. **Propagate.** Find every usage of the changed token/component and confirm it inherits the change. Any usage that did NOT inherit was a hardcoded inline value — surface that list to Brian. (Every /designchange doubles as a free inline-drift audit. This is a feature — report it.)
 3. The enforcer no longer flags "this differs from the old value" — the new value is the rule. It STILL flags incoherence: if the change fights the north star, breaks a "do not", or collides with an unrelated component, that is a `block`. The flag authorizes A change, not ANY change.
-4. Auto-update DESIGN_SYSTEM.md to match (the flag pre-authorized the doc edit).
+4. Auto-update web_design_system.md (or mobile_design_system.md for phone-width surfaces) to match (the flag pre-authorized the doc edit).
 5. The flag pre-authorizes ONLY the doc gate. It does NOT skip visual sign-off — Brian still reviews on localhost. Never collapse both gates into one.
 
 ## cdesign handoffs (reconciler)
 
-cdesign output is almost never DESIGN_SYSTEM.md-compliant, and the reconciler cannot know which discrepancies are intentional new patterns vs. sloppy drift — that intent lives in Brian's head. So the reconciler does NOT silently snap everything, and does NOT reject. It produces a **reconciliation manifest** classifying every discrepancy:
+cdesign output is almost never web_design_system.md-compliant (or mobile_design_system.md-compliant for phone-width surfaces), and the reconciler cannot know which discrepancies are intentional new patterns vs. sloppy drift — that intent lives in Brian's head. So the reconciler does NOT silently snap everything, and does NOT reject. It produces a **reconciliation manifest** classifying every discrepancy:
 
 - **SNAP** — high-confidence drift it will auto-fix (font → Bricolage, raw hex → token, raw border → InsetHairline component).
 - **KEEP** — reads as the intentional new pattern (per Brian's /designchange note, e.g. "the carousel is intentional").

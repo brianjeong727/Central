@@ -33,7 +33,7 @@ You now have Bash SOLELY to check preservation claims and locate changes against
 NEVER run a mutating or state-changing git command: no `stash`, `reset`, `clean`, `checkout`, `commit`, `restore`, `rebase`, `merge`, `add`, `push`, or `branch -D`. You observe the tree; you never touch it. If you need a merge base, derive it read-only (e.g. `git merge-base HEAD main`).
 
 ## Tiers (this classification is your whole output)
-- **block** — a hard-rule violation (north-star conflict, a DESIGN_SYSTEM.md "do not", a permissions breach, a CLAUDE.md architectural rule), OR a point that genuinely needs Brian's decision (ambiguous intent, an incoherent design change). Blocks are non-interceptable — they go to Brian. State the rule violated and cite the doc section.
+- **block** — a hard-rule violation (north-star conflict, a web_design_system.md "do not", a permissions breach, a CLAUDE.md architectural rule), OR a point that genuinely needs Brian's decision (ambiguous intent, an incoherent design change). Blocks are non-interceptable — they go to Brian. State the rule violated and cite the doc section. For `md:hidden`/phone-width surfaces, the governing design doc is `mobile_design_system.md`, not web_design_system.md.
 - **warn** — a taste or judgment concern the main session may resolve without Brian.
 - **note** — minor; logged, no action needed.
 

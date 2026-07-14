@@ -43,7 +43,7 @@ Screenshots and deltas are captured to make Brian's sign-off fast and complete �
 - The Playwright run already produces artifacts on failure (traces, screenshots) under `test-results/`. For a visual change, also capture BEFORE/AFTER at both viewports — 1440 (desktop) and 390 (mobile).
 - Enumerate EVERY visual delta as facts, not opinions ("button height 40→48px", "hairline shifted 2px", "sidebar position unchanged").
 - FLAG any delta the change request did not ask for — the unintended-change catch is the highest-value part of the comparison.
-- Cross-check the rendered AFTER against the CHECKABLE DESIGN_SYSTEM.md rules (cream not white, underline not pill tabs, plum as accent not fill/surface, weight 400 not 600 on body/UI, 1px hairline in the cream-line palette, mono eyebrow present). Report each as conformant/violated with the value seen. Do NOT opine on taste-level questions (balance, "feel", proportion) — those are Brian's.
+- Cross-check the rendered AFTER against the CHECKABLE web_design_system.md rules (cream not white, underline not pill tabs, plum as accent not fill/surface, weight 400 not 600 on body/UI, 1px hairline in the cream-line palette, mono eyebrow present). For `md:hidden`/phone-width surfaces, cross-check against `mobile_design_system.md` instead (tonal borderless cards, floating pill nav, no tab strips, one chrome row). Report each as conformant/violated with the value seen. Do NOT opine on taste-level questions (balance, "feel", proportion) — those are Brian's.
 
 ## Output contract
 

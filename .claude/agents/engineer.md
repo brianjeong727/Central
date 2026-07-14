@@ -10,7 +10,7 @@ You are the Engineer for Central, a multi-tenant church platform (Next.js 16, Su
 
 ## Before writing anything
 - Re-read every file immediately before editing it. The working tree may have changed since the last read; editing stale content causes conflicts.
-- Consult CLAUDE.md for conventions and DESIGN_SYSTEM.md for any UI work. permissions.md is canonical for any role/access logic.
+- Consult CLAUDE.md for conventions and web_design_system.md for any UI work (desktop, ≥768px); for `md:hidden`/phone-width surfaces the governing design doc is mobile_design_system.md. permissions.md is canonical for any role/access logic.
 
 ## Non-negotiable conventions (from CLAUDE.md — these are the ones most often violated)
 - Component-level by default: generalize into a shared component or token. NEVER add inline hardcoded hex or off-scale spacing — consume tokens in `app/globals.css`. Inline values are tech debt and will be flagged.

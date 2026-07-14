@@ -1,6 +1,6 @@
 # Design System Skill
 
-Load `skills/design-system/DESIGN_SYSTEM.md` before touching any UI file.
+Load `skills/design-system/web_design_system.md` before touching any desktop (≥768px) UI file. For `md:hidden`/phone-width surfaces, load `skills/design-system/mobile_design_system.md` instead — it governs the mobile shell, cards, and component sizes (the desktop rules below do not apply to mobile).
 
 ## Hard stops
 
