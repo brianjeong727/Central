@@ -104,7 +104,9 @@ only by merging to `main`** (a fresh session won't see another session's unmerge
 `./scripts/session-status.sh` (`BUSY`=locked / `held`=unmerged work / `free`); free with `./scripts/session-release.sh`. The
 launcher refuses to reclaim a slot holding uncommitted or unmerged work (`--force` overrides). The `SessionStart` hook
 announces your slot+port (or warns if you're in the shared checkout); `SessionEnd` frees the slot. Ports are bound to the
-directory, not the session. Full guide: `scripts/SESSIONS.md`.
+directory, not the session. `./scripts/session-grid.sh` (alias `cgrid`) opens a tiled tmux grid over the pool — a control
+pane in the shared checkout plus one pane per slot; free slots are claimed via `session.sh`, busy/held slots open a shell
+only, never claimed. Full guide: `scripts/SESSIONS.md`.
 
 18. **Read receipts scale by a member-count threshold:** chats with `memberCount < 30` keep live per-member read receipts (reader avatars under each own message); chats with `memberCount >= 30` instead show an on-demand aggregated "Seen by N" affordance (tap to expand the reader list) and do **not** open the `read-receipts-{groupId}` `group_members`-UPDATE subscription — this escapes the O(members²) read-receipt fan-out at scale. The switch lives in `ChatScreen` (`isLargeRoom = memberCount >= 30`), where `memberCount` comes from the single cached roster SWR keyed `["chat-roster", groupId]` (also the source for @mentions and small-room read state — the three duplicate roster joins were collapsed into it).
 

@@ -115,11 +115,11 @@ Example escalation shape:
 |---|---|
 | `lessons.md` | Auto-write, never ask. Append-only learning log. |
 | `web_design_system.md` / `mobile_design_system.md` | Gated — UNLESS this task carried `/designchange` (then the flag is pre-authorization: propagate + auto-update the doc, no ask). Edit the doc that governs the surface: `web_design_system.md` for desktop (≥768px), `mobile_design_system.md` for phone-width (`md:hidden`). Without the flag but the work would change the system → enforcer `block` to Brian. |
-| `CLAUDE.md` | Propose-then-approve. PROPOSE exact text; Brian applies it himself. |
+| `CLAUDE.md` | Ask-then-write. PROPOSE the exact text and WAIT for Brian's explicit approval **in that task**; once approved verbatim, you write the file yourself. NEVER write CLAUDE.md without that in-task approval — a standing preference, an earlier task's approval, or "he'd probably want this" never counts. If the applied text needs to differ from what was approved, re-ask first. |
 | `permissions.md` | Propose-then-approve. PROPOSE exact text; Brian applies it himself. |
 | `MINISTRY_CONTEXT.md` | Propose-then-approve. PROPOSE exact text; Brian applies it himself. |
 
-Note: the `protect-docs` hook hard-blocks direct edits to CLAUDE.md / permissions.md / MINISTRY_CONTEXT.md by anyone, including you. So for those three, do NOT attempt to write the file — present the exact proposed text in the handoff and let Brian paste it. lessons.md and web_design_system.md / mobile_design_system.md (under /designchange) are not hook-protected and you write them directly per the table.
+Note: the `protect-docs` hook hard-blocks direct edits to permissions.md / MINISTRY_CONTEXT.md by anyone, including you. For those two, do NOT attempt to write the file — present the exact proposed text in the handoff and let Brian paste it. CLAUDE.md is no longer hook-blocked (2026-07-14): the gate is the ask-then-write rule above, enforced by you, not the tooling. lessons.md and web_design_system.md / mobile_design_system.md (under /designchange) are not hook-protected and you write them directly per the table.
 
 ## Commit and push: commit is automatic, push is Brian's gate
 
