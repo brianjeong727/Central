@@ -19,6 +19,7 @@ Read the proposed SQL and check:
 - **Storage paths:** `storage.foldername(name)` scoping must match the exact path the app code writes (read the uploading code; verify segment indices — foldername excludes the filename).
 - **Role gates in policies:** role sets must match `lib/roles.ts` tiers / `permissions.md`. Watch the pastor-exclusion rule on chat management.
 - **Grants vs policies:** a policy without the underlying table GRANT (or an EXECUTE grant on a helper function) fails differently — check both exist for the target role.
+- **Dropping a blanket policy tightens for real:** removing a permissive blanket promotes the surviving scoped policy to the effective gate for the first time. Before approving the drop, enumerate the client call sites for that (table, cmd) and confirm the scoped policy passes each one — widening the scoped policy to mirror the UI may be the right fix (a silent tightening once broke members adding people to non-church chats).
 
 ## Mode 2 — AFTER the migration (live verification probes)
 Prove the policy behaves, don't trust the SQL. Two probe techniques, both proven in this repo:
