@@ -2,7 +2,7 @@
 name: explorer
 description: Use to investigate the codebase BEFORE building when the task touches an unfamiliar subsystem, multiple files / wide blast radius, a schema change, or anything touching RLS or permissions — or when something already looks weird. Read-only recon. Returns ONLY flagged findings the main session needs to know — not a full plan, not a narration of everything read.
 tools: Read, Grep, Glob
-model: sonnet
+model: haiku
 color: cyan
 ---
 
