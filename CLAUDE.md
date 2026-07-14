@@ -53,7 +53,6 @@ Filing rule of thumb: a **fact** → Layer 1; a **rule about behavior** → Laye
 7. **Run `npm run build`** — required before marking anything done. A passing build is mandatory.
 8. **Commit and push** — after every completed task, commit the relevant files and push to the CURRENT branch (never directly to `main`). Never leave completed work uncommitted.
 
-## Capture — propose where new knowledge goes
 ## Capture & self-maintenance — keep this file current (propose, never silently edit)
 This file must stay true to the codebase. You help maintain it, but the user approves every change — never edit CLAUDE.md without explicit approval in that task.
 
@@ -66,8 +65,6 @@ At the END of every task, run this check and proactively raise anything it surfa
 3. **Drift you noticed in passing.** If at any point during the task you saw CLAUDE.md contradict the actual code (a wrong path, an outdated rule, a renamed thing), flag it — even if it wasn't what you were working on. Don't silently work around a stale doc; surface it so it can be fixed.
 
 For each item: state it plainly, propose the exact edit, and wait for approval. The user decides what gets written. Keep proposals short — a one-line "FYI, this is now stale: …" is better than skipping it. Err toward surfacing; an ignored proposal costs nothing, an un-surfaced staleness costs a future audit.
-
-When you learn something from a mistake, discover a non-obvious constraint, or are taught a multi-step workflow, do NOT file it silently. At the end of the task, PROACTIVELY propose: (a) what was learned, (b) which layer it belongs in (Layer 1 fact / Layer 2 rule / Layer 3 lesson / Layer 4 skill), and (c) the exact text to add. The user approves before anything is written. If a workflow is complex enough to re-explain more than once, propose making it a skill. If a lesson has proven general and stable, propose promoting it from `lessons.md` into a Layer 2 rule.
 
 ## Critical Conventions
 1. **Never use `localStorage` or `sessionStorage`** — Supabase session only.
@@ -136,20 +133,19 @@ npm run lint     # ESLint
 
 Before writing any UI code, editing any component, or reviewing any page:
 
-1. **Load `skills/design-system/SKILL.md`** — mandatory before touching any UI file.
-2. **Load `skills/design-system/web_design_system.md`** — the full desktop (≥768px) design contract. For `md:hidden`/phone-width surfaces, load `skills/design-system/mobile_design_system.md` instead (its own shell, cards, and component sizes). 
+1. **Load `skills/design-system/SKILL.md`** — mandatory before touching any UI file. It routes to the cheapest sufficient doc: `contract-card.md` (~5KB, the tokens + hard rules — enough for edits to existing desktop surfaces), the full `web_design_system.md` only for the §sections its routing table names (net-new components, specific component families), and `mobile_design_system.md` for `md:hidden`/phone-width surfaces.
 
 Before starting any feature, fix, or change:
 
-3. **Load `skills/testing/SKILL.md`** — mandatory on every task, not just when asked.
+2. **Load `skills/testing/SKILL.md`** — mandatory on every task, not just when asked.
 
 Before writing any animation, micro-interaction, hover state, or transition:
 
-4. **Load `~/.claude/skills/emil-design-eng/SKILL.md`** — animation decision framework, easing curves, press states, popover origins, performance guardrails. Answers "should this animate?", "what easing?", "how fast?".
+3. **Load `~/.claude/skills/emil-design-eng/SKILL.md`** — animation decision framework, easing curves, press states, popover origins, performance guardrails. Answers "should this animate?", "what easing?", "how fast?".
 
 Before designing new UI components or doing any visual review/polish pass:
 
-5. **Load `~/.claude/skills/taste/taste-skill/SKILL.md`** — bias-correction rules for layout, typography, interactive states, materiality, and empty states. See project overrides below before applying.
+4. **Load `~/.claude/skills/taste/taste-skill/SKILL.md`** — bias-correction rules for layout, typography, interactive states, materiality, and empty states. See project overrides below before applying.
 
 **Additional skills available on demand** (not auto-loaded — invoke explicitly when needed):
 - `~/.claude/skills/ui-ux-pro-max/SKILL.md` — pre-delivery UX review checklist; 99 rules across accessibility, touch, performance, navigation, forms, animation (Apple HIG + Material Design). Use §1 Accessibility, §2 Touch & Interaction, §3 Performance, §9 Navigation Patterns most. **Skip** the Python `search.py` CLI (not set up for this project) and **skip** the `--stack react-native` section (Central is Next.js, not React Native).
@@ -223,9 +219,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/home/tabs/note-editors.tsx` | Rich-text note editors (meeting notes etc.) |
 | `app/home/nav-state.ts` | Shared URL nav-state module — atomic param writes (Convention #5) |
 | `app/home/breadcrumb-context.tsx` | Breadcrumb provider — subpages push crumbs to the shell topbar (§4.18) |
-| `app/home/workspace-presets.ts` | WORKSPACE_PRESETS — the fixed team-preset pool (onboarding/approval/add-workspace all agree); comingSoon gating |
 | `app/home/chat-list.ts` | Chat-list data module (SWR fetchers for the conversations panel) |
-| `app/actions/authz.ts` | Shared server-action authz helpers (requireMinistryMember/SameMinistry/MinistryAdmin/TeamMemberOrAdmin) |
 | `app/actions/auto-chats.ts` | Auto-chat machinery: ministry chat, grade chats, staff chat creation + membership |
 | `app/actions/governance.ts` | Governance server actions (roster, matrix) |
 | `components/central/index.ts` | Barrel for all design-system components (CentralModal, CentralButton, ContentHeader, …) |

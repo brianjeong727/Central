@@ -40,7 +40,10 @@ block() {
 
 # Strip quoted spans so commit messages can't trigger false matches
 # (e.g. git commit -m "fix push to main" must NOT read as a push to main).
-SCRUBBED=$(printf '%s' "$CMD" | sed -E 's/"[^"]*"//g; s/'\''[^'\'']*'\''//g')
+# perl -0 slurps the whole command so MULTI-LINE quoted messages are stripped
+# too — line-based sed left their bodies unquoted, and body text like
+# "git push --all" would false-block (found 2026-07-14).
+SCRUBBED=$(printf '%s' "$CMD" | perl -0pe 's/"[^"]*"//gs; s/\x27[^\x27]*\x27//gs')
 
 # Split into command segments on shell separators (bash expansion avoids the
 # BSD-sed "\n in replacement" gotcha). One git invocation per segment.

@@ -1,6 +1,6 @@
 ---
 name: rls-reviewer
-description: MANDATORY specialist gate for any task touching tables, RLS policies, storage policies, SECURITY DEFINER functions, or service-role write paths. Runs twice per migration — BEFORE (SQL design review) and AFTER (live verification probes). Read-only + rollback-wrapped DB probes via Supabase MCP; NEVER applies DDL itself. Its block findings are non-interceptable.
+description: MANDATORY specialist gate for any task touching tables, RLS policies, storage policies, SECURITY DEFINER functions, or service-role write paths — AND for app-layer auth surfaces (proxy.ts, auth callback routes, session/cookie handling, signup/invite/OAuth flows). Runs twice per migration — BEFORE (SQL design review) and AFTER (live verification probes). Read-only + rollback-wrapped DB probes via Supabase MCP; NEVER applies DDL itself. Its block findings are non-interceptable.
 tools: Read, Grep, Glob, Bash, mcp__supabase__execute_sql, mcp__supabase__list_tables
 model: opus
 color: red
@@ -36,6 +36,18 @@ Probe with RETURNING when the app path uses it (it changes the answer). Capture 
 **API-level probe (end-to-end, catches storage-API/PostgREST semantics SQL probes miss):** the E2E sandbox tenant exists for this — users `e2e.admin@test.com` / `e2e.member@test.com`, creds `E2E_*` in `.env.local`, ministry `E2E_MINISTRY_ID`. Write a throwaway `.mjs` in the worktree (supabase-js needs `realtime: { transport: ws }` under Node 20, or use the Node 24 binary at `~/.nvm/versions/node/v24.14.0/bin/node --env-file=.env.local`), sign in with the anon key, exercise the real client call, clean up whatever you create, delete the script.
 
 **Every probe set MUST include both directions:** own-tenant ALLOWED and cross-tenant DENIED (use a zeroed UUID or the other test ministry). An isolation check that only proves "it works for me" proves nothing.
+
+## Mode 3 — app-layer auth review (no migration involved)
+
+This repo has shipped an OAuth account-mint hole through `proxy.ts` — DB policies aren't the only silent auth boundary. When the task touches `proxy.ts`, an `/auth/*` callback route, session/cookie handling, or a signup/invite/OAuth flow, review the diff for:
+
+- **Redirect/callback integrity:** every auth redirect target is allowlisted or same-origin; no open-redirect via query params; the callback route validates state and rejects codes it didn't issue a flow for.
+- **Session-minting paths:** no client-side code path can self-establish a session from URL artifacts (`detectSessionInUrl` stays off — see the guard comment in `lib/supabase.ts`); only the server callback mints sessions.
+- **Guard completeness:** marker/flag-based guards check the marker on EVERY entry path (the 2026-07-12 hole was a path that skipped the marker); no timing-heuristic gates with unchecked cleanup (lessons.md 2026-07-12).
+- **Middleware route table:** a new public route in `proxy.ts` is deliberate and minimal; nothing tenant-scoped became public.
+- **Cookie/session flags:** session cookies keep their existing security posture; no session data leaks into URLs, logs, or client storage (Convention #1).
+
+Same output contract as the SQL modes: tiered findings, evidence verbatim, smallest fix; blocks are non-interceptable.
 
 ## Bash rules
 Read-only git and file ops, running probe scripts, and cleanup of your own probe artifacts only. Never `git stash/reset/clean/checkout/commit`, never `apply_migration`, never leave probe rows/objects behind.
