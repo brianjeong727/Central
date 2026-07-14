@@ -24,7 +24,7 @@ Steps:
 
 7. **Refresh deps if needed:** quick-check a known dep resolves (`node -e "require.resolve('next')"`). If it fails — or `package.json` changed versus the previous HEAD — run `npm install --legacy-peer-deps` (local installs here need `--legacy-peer-deps`; a brand-new dep added to main is the usual cause of a missing module after catchup).
 
-8. **Restart dev** on the slot's port in the background: `PORT=<port> npm run dev` (this wipes `.next`). Write its log to the slot's devlog if convenient.
+8. **Restart dev** on the slot's port in the background: `npm run dev -- -p <port>` (this wipes `.next`). ALWAYS the `-p` flag — `next dev` ignores the `PORT` env var, so an env-var or bare launch binds default port 3000, collides with the shared checkout's server, and wedges port-less while holding the slot's `.next` (this exact failure took s3 down on 2026-07-14). Write its log to the slot's devlog if convenient.
 
 9. **Verify health BEFORE reporting:** poll until `curl -s -o /dev/null -w '%{http_code}' http://localhost:<port>/` returns `200`, and confirm a real app route (`/home`) returns `200` or a `3xx` auth redirect — NOT `500`. Don't hand back until a rendered route is healthy.
 
