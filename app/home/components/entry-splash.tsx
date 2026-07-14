@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { isNativeShell } from "@/lib/native-auth"
 
 // ── EntrySplash — native-only "One Body" cold-launch splash ────────────────────
 // Renders ONLY on the native shell (Capacitor UA "CentralShell"), ONLY on a cold
@@ -13,10 +14,6 @@ import { useCallback, useEffect, useState } from "react"
 // after /home never re-shows the splash) but resets on a full reload = a real cold
 // launch.
 let splashConsumed = false
-
-function isNativeShell() {
-  return typeof navigator !== "undefined" && navigator.userAgent.includes("CentralShell")
-}
 
 // Release the native (Capacitor) launch splash. `launchAutoHide` is false in
 // capacitor.config.ts, so the native cream splash stays up until we call this. On web

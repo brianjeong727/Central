@@ -6,7 +6,8 @@ import { AlertCircle } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { Spinner } from "@/app/home/components/shared"
-import { SplitShell, GoogleButton, OrDivider, EyeButton } from "@/app/(auth)/shared"
+import { SplitShell, GoogleButton, AppleButton, OrDivider, EyeButton } from "@/app/(auth)/shared"
+import { isNativeShell, useIsNativeShell, signInWithAppleNative } from "@/lib/native-auth"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
 
@@ -159,6 +160,9 @@ function SignupContent() {
   const searchParams = useSearchParams()
   const intent = searchParams.get("intent")
   const [view, setView] = useState<View>(intent === "register" ? "admin" : "role-choice")
+  // Google web-OAuth can't complete inside the WKWebView — hidden in the shell
+  // (see app/(auth)/login/page.tsx for the full rationale).
+  const nativeShell = useIsNativeShell()
 
   // admin state
   const [adminName,     setAdminName]     = useState("")
@@ -216,6 +220,19 @@ function SignupContent() {
     await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback?intent=register&flow=signup" } })
   }
 
+  async function handleAdminApple() {
+    if (isNativeShell()) {
+      setAdminError(null)
+      const res = await signInWithAppleNative("signup")
+      if (res.ok) { window.location.assign("/onboarding"); return }
+      if (res.error === "failed") setAdminError("Apple sign-in failed — please try again.")
+      if (res.error !== "unavailable") return
+      // plugin missing from this binary — fall through to the web flow
+    }
+    const supabase = createClient()
+    await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: siteOrigin() + "/auth/callback?intent=register&flow=signup" } })
+  }
+
   const currentYear = new Date().getFullYear()
   const gradYearNum = parseInt(graduationYear, 10)
   const gradYearValid = gradYearNum >= currentYear && gradYearNum <= currentYear + 6
@@ -242,6 +259,21 @@ function SignupContent() {
   async function handleMemberGoogle() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback?flow=signup" } })
+  }
+
+  async function handleMemberApple() {
+    if (isNativeShell()) {
+      setMemberError(null)
+      const res = await signInWithAppleNative("signup")
+      // Mirrors the web callback's intent=join landing — a fresh member goes to
+      // the join flow, never the marketing landing (hidden in the shell anyway).
+      if (res.ok) { window.location.assign("/ministries?tab=code"); return }
+      if (res.error === "failed") setMemberError("Apple sign-in failed — please try again.")
+      if (res.error !== "unavailable") return
+      // plugin missing from this binary — fall through to the web flow
+    }
+    const supabase = createClient()
+    await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: siteOrigin() + "/auth/callback?flow=signup" } })
   }
 
   async function handleResend() {
@@ -377,7 +409,10 @@ function SignupContent() {
       </p>
 
       <form onSubmit={handleAdminSignup} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        <GoogleButton onClick={handleAdminGoogle}/>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <AppleButton onClick={handleAdminApple}/>
+          {!nativeShell && <GoogleButton onClick={handleAdminGoogle}/>}
+        </div>
         <OrDivider/>
 
         {adminError && <ErrorBanner msg={adminError}/>}
@@ -440,7 +475,10 @@ function SignupContent() {
       </p>
 
       <form onSubmit={handleMemberSignup} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        <GoogleButton onClick={handleMemberGoogle}/>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <AppleButton onClick={handleMemberApple}/>
+          {!nativeShell && <GoogleButton onClick={handleMemberGoogle}/>}
+        </div>
         <OrDivider/>
 
         {memberError && <ErrorBanner msg={memberError}/>}
