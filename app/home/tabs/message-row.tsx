@@ -2,7 +2,7 @@
 
 import { memo, useState, useEffect, useRef, useLayoutEffect } from "react"
 import dynamic from "next/dynamic"
-import { Check, MoreHorizontal, Trash2, CornerUpLeft, Plus, Pencil, Forward, Pin, FileDown } from "lucide-react"
+import { Check, MoreHorizontal, Trash2, CornerUpLeft, Plus, Pencil, Forward, Pin, FileDown, Flag } from "lucide-react"
 import { MonogramChip, ConfirmDialog } from "@/components/central"
 import { formatMessageTime, REACTION_EMOJIS } from "../utils"
 import type { MessageRowProps } from "../types"
@@ -146,6 +146,7 @@ function MessageRowBase({
   onSaveEdit,
   onStartEdit,
   onForward,
+  onReport,
   onPin,
   onUnpin,
   onScrollToMessage,
@@ -461,6 +462,16 @@ function MessageRowBase({
                 <Forward className="w-4 h-4 text-[var(--body)]" />
                 Forward
               </button>
+              {!isOwn && !msg.deleted && (
+                <button
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); onReport(msg) }}
+                  className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[var(--cream-2)] transition-colors border-b border-[var(--line-3)]"
+                >
+                  <Flag className="w-4 h-4 text-[var(--body)]" />
+                  Report
+                </button>
+              )}
               {!msg.deleted && canPin && (
                 <button
                   onPointerDown={(e) => e.stopPropagation()}

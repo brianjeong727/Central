@@ -12,7 +12,9 @@ import { roleLabel } from "@/app/actions/super-constants"
 import { getHomeVerses } from "@/app/actions/home-verses"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { deleteMyAccount } from "@/app/actions/delete-account"
-import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input } from "@/components/central"
+import { unblockUser } from "@/app/actions/blocks"
+import { useBlocks } from "../use-blocks"
+import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, MonogramChip } from "@/components/central"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
 import type { Profile, Devotional, Prayer, Verse, NotificationSettings } from "../types"
@@ -748,6 +750,73 @@ const PROFILE_SECTIONS: {
   },
 ]
 
+// ── Account & support cluster ─────────────────────────────────────────────────
+// Blocked users (list + unblock), switch ministry, contact & support, privacy —
+// sits below Notifications and above Sign out / Danger Zone. Same on mobile +
+// desktop (both call renderProfileSections' siblings).
+function AccountLinksSection({ userId }: { userId: string }) {
+  const { blocked, mutate } = useBlocks(userId)
+  const [showBlocked, setShowBlocked] = useState(false)
+
+  const cardBorder: React.CSSProperties = { border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", background: "var(--cream)" }
+  const rowBase: React.CSSProperties = { display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", color: "var(--ink)" }
+  const label: React.CSSProperties = { flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: "var(--ink)" }
+  const right: React.CSSProperties = { fontSize: 13, color: "var(--muted-text)", flexShrink: 0 }
+
+  async function handleUnblock(id: string) {
+    mutate(blocked.filter((b) => b.blocked_id !== id), { revalidate: false })
+    await unblockUser(id)
+    mutate()
+  }
+
+  return (
+    <div>
+      <p style={{ ...MONO_STYLE, marginBottom: 10, marginTop: 0 }}>Account &amp; support</p>
+      <div style={cardBorder}>
+        {/* Blocked users */}
+        <button type="button" onClick={() => setShowBlocked((v) => !v)} style={rowBase}>
+          <span style={label}>Blocked users</span>
+          <span style={right}>{blocked.length}</span>
+          {showBlocked ? <ChevronDown size={16} style={{ color: "var(--muted-text)" }} /> : <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />}
+        </button>
+        {showBlocked && (
+          <div style={{ borderTop: "1px solid var(--line)", padding: blocked.length ? "6px 0" : "14px 18px" }}>
+            {blocked.length === 0 ? (
+              <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>You haven&apos;t blocked anyone.</p>
+            ) : (
+              blocked.map((b) => (
+                <div key={b.blocked_id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px" }}>
+                  <MonogramChip initials={(b.name || "?").charAt(0).toUpperCase()} avatarUrl={b.avatar_url} className="w-8 h-8 text-[11px] font-medium" />
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: "var(--ink)" }}>{b.name}</span>
+                  <CentralButton variant="secondary" size="sm" onClick={() => handleUnblock(b.blocked_id)}>Unblock</CentralButton>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Switch ministry */}
+        <a href="/ministries" style={{ ...rowBase, borderTop: "1px solid var(--line)", textDecoration: "none" }}>
+          <span style={label}>Switch ministry</span>
+          <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />
+        </a>
+
+        {/* Contact & support */}
+        <a href="mailto:team@joincentral.app" style={{ ...rowBase, borderTop: "1px solid var(--line)", textDecoration: "none" }}>
+          <span style={label}>Contact &amp; support</span>
+          <span style={right}>team@joincentral.app</span>
+        </a>
+
+        {/* Privacy policy */}
+        <a href="/privacy" style={{ ...rowBase, borderTop: "1px solid var(--line)", textDecoration: "none" }}>
+          <span style={label}>Privacy policy</span>
+          <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />
+        </a>
+      </div>
+    </div>
+  )
+}
+
 // ── Danger Zone (§4.20 editorial inline rule) ─────────────────────────────────
 
 function DangerZone({
@@ -1245,6 +1314,9 @@ export function ProfileTab({
               onSettingsChange={(s: NotificationSettings) => setProfile(p => ({ ...p, notification_settings: s }))}
             />
           </div>
+          <div style={{ marginTop: 24 }}>
+            <AccountLinksSection userId={userId} />
+          </div>
           <div style={{ marginTop: "auto" }}>
             <DangerZone
               ministryName={ministryName}
@@ -1270,6 +1342,9 @@ export function ProfileTab({
               notificationSettings={profile.notification_settings}
               onSettingsChange={(s: NotificationSettings) => setProfile(p => ({ ...p, notification_settings: s }))}
             />
+          </div>
+          <div style={{ marginBottom: 24 }}>
+            <AccountLinksSection userId={userId} />
           </div>
           {/* Sign out — mobile only. Desktop reaches this via the sidebar nav
               (desktop-nav.tsx); the mobile pill nav has no Profile item, so the

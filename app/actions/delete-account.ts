@@ -195,6 +195,22 @@ export async function deleteMyAccount(emailConfirmation: string): Promise<Delete
   // Sever leadership pointers that would otherwise dangle on the tombstone.
   await admin.from("small_groups").update({ leader_id: null }).eq("leader_id", userId)
 
+  // Content-moderation cleanup: remove this user's blocks in BOTH directions and
+  // the reports they filed. content_reports.reported_user_id / reviewed_by are
+  // ON DELETE SET NULL FKs to the tombstone, so those rows are left intact.
+  {
+    const { error: blocksErr } = await admin
+      .from("user_blocks")
+      .delete()
+      .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`)
+    if (blocksErr) console.error("[deleteMyAccount] user_blocks cleanup:", blocksErr.message)
+    const { error: reportsErr } = await admin
+      .from("content_reports")
+      .delete()
+      .eq("reporter_id", userId)
+    if (reportsErr) console.error("[deleteMyAccount] content_reports cleanup:", reportsErr.message)
+  }
+
   // (6) Reattribute authored announcements + events to the ministry (created_by
   //     → NULL; UI falls back to the ministry name). Requires the DDL's DROP
   //     NOT NULL — non-fatal if it errors pre-migration.

@@ -28,6 +28,7 @@ import type { HomeVerse } from "@/app/actions/home-verses"
 import { updateGovernanceSettings, updateTeamAdminAccess } from "@/app/actions/governance"
 import { activateSetupChecklist } from "@/app/actions/setup-checklist"
 import { updateModerationSettings } from "@/app/actions/moderation"
+import { updateReportStatus, type ReportStatus } from "@/app/actions/reports"
 import { MODERATION_DEFAULTS } from "@/lib/moderation"
 import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@/lib/moderation"
 import type { GovernanceSettings } from "../types"
@@ -52,7 +53,7 @@ interface MinistryInfo {
 }
 
 type RoleFilter = "all" | "member" | "visitor" | "leader" | "admin" | "deacon" | "elder"
-type ActiveSettingsTab = "general" | "people" | "governance" | "automations" | "chat" | "workspace" | "audit"
+type ActiveSettingsTab = "general" | "people" | "governance" | "automations" | "chat" | "reports" | "workspace" | "audit"
 
 interface GovTeamRow {
   id: string
@@ -82,6 +83,18 @@ function roleBadge(role: string, personId?: string | null) {
 }
 
 const SECTION_LABEL: React.CSSProperties = { ...EYEBROW_STYLE, fontWeight: 400 }
+
+const REPORT_REASON_LABELS: Record<string, string> = {
+  inappropriate: "Inappropriate content",
+  harassment: "Harassment or bullying",
+  spam: "Spam",
+  other: "Something else",
+}
+const REPORT_TARGET_LABELS: Record<string, string> = {
+  message: "Message",
+  announcement: "Announcement",
+  profile: "Profile",
+}
 
 const CARD: React.CSSProperties = {
   background: "var(--cream-panel)", borderRadius: "14px", border: "1px solid var(--line)",
@@ -188,7 +201,7 @@ export function SettingsTab({
   const [activeSettingsTab, setActiveSettingsTab] = useState<ActiveSettingsTab>(() => {
     if (typeof window === "undefined") return "general"
     const p = new URLSearchParams(window.location.search).get("stab")
-    return (["general", "people", "governance", "automations", "chat", "workspace", "audit"].includes(p ?? "") ? p as ActiveSettingsTab : "general")
+    return (["general", "people", "governance", "automations", "chat", "reports", "workspace", "audit"].includes(p ?? "") ? p as ActiveSettingsTab : "general")
   })
   function goToSettingsTab(t: ActiveSettingsTab) {
     setActiveSettingsTab(t)
@@ -270,6 +283,22 @@ export function SettingsTab({
   const [pendingAutomationSettings, setPendingAutomationSettings] = useState<Record<string, boolean>>(AUTOMATION_DEFAULTS)
   const [savingAutomations, setSavingAutomations] = useState(false)
   const [automationSaveMsg, setAutomationSaveMsg] = useState<string | null>(null)
+
+  // Content reports (admin inbox — §1.2)
+  type ReportRow = {
+    id: string
+    reason: string
+    details: string | null
+    status: string
+    target_type: string
+    created_at: string
+    reporter: { name: string | null } | { name: string | null }[] | null
+    reported: { name: string | null } | { name: string | null }[] | null
+  }
+  const [reports, setReports] = useState<ReportRow[]>([])
+  const [reportsLoading, setReportsLoading] = useState(false)
+  const [reportsLoaded, setReportsLoaded] = useState(false)
+  const [reportActioningId, setReportActioningId] = useState<string | null>(null)
 
   // Chat moderation
   const [moderationSettings, setModerationSettings] = useState<ModerationSettings>(MODERATION_DEFAULTS)
@@ -444,8 +473,33 @@ export function SettingsTab({
       supabase.from("audit_logs").select("id, actor_name, action, entity_type, entity_label, metadata, created_at").eq("ministry_id", ministryId).order("created_at", { ascending: false }).limit(100)
         .then(({ data }) => { setAuditLogs((data ?? []) as typeof auditLogs); setAuditLoading(false) })
     }
+    if (activeSettingsTab === "reports" && isAdmin && !reportsLoaded) {
+      loadReports()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSettingsTab])
+
+  async function loadReports() {
+    setReportsLoading(true)
+    const { data } = await supabase
+      .from("content_reports")
+      .select("id, reason, details, status, target_type, created_at, reporter:profiles!reporter_id(name), reported:profiles!reported_user_id(name)")
+      .eq("ministry_id", ministryId)
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+    setReports((data ?? []) as ReportRow[])
+    setReportsLoading(false)
+    setReportsLoaded(true)
+  }
+
+  async function handleReportStatus(id: string, status: ReportStatus) {
+    setReportActioningId(id)
+    // Optimistic: open reports drop off the list once triaged.
+    setReports((prev) => prev.filter((r) => r.id !== id))
+    const { error } = await updateReportStatus(id, status)
+    setReportActioningId(null)
+    if (error) { setReportsLoaded(false); loadReports() }
+  }
 
   // ── Ministry Profile edit session (name + university) ────────────────────────
   function flashSaved(setter: (v: boolean) => void) {
@@ -951,6 +1005,7 @@ export function SettingsTab({
     ...(isAdmin ? [{ key: "governance" as ActiveSettingsTab, label: "Governance" }] : []),
     { key: "automations", label: "Automations" },
     { key: "chat", label: "Chat" },
+    ...(isAdmin ? [{ key: "reports" as ActiveSettingsTab, label: "Reports" }] : []),
     { key: "workspace", label: "Workspace" },
     ...(isAdmin ? [{ key: "audit" as ActiveSettingsTab, label: "Audit Log" }] : []),
   ]
@@ -1728,6 +1783,56 @@ export function SettingsTab({
               {moderationSaveMsg && (
                 <div style={{ padding: "10px 16px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontSize: 13, color: "var(--body)" }}>
                   {moderationSaveMsg}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════ REPORTS TAB ══════════════════ */}
+          {activeSettingsTab === "reports" && isAdmin && (
+            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 40 }}>
+              <div>
+                <SectionHeader eyebrow="Moderation" title="Reports" titleSize={20} />
+                <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", maxWidth: 640, lineHeight: 1.55 }}>Messages, announcements, and profiles your members have reported. Review each one, then mark it reviewed or dismiss it.</p>
+              </div>
+
+              {reportsLoading ? (
+                <p style={{ fontSize: 14, color: "var(--muted-text)" }}>Loading…</p>
+              ) : reports.length === 0 ? (
+                <EmptyState icon={<Shield className="w-7 h-7" />} title="No open reports" subtitle="Reported content will appear here for review." />
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {reports.map((r) => {
+                    const reporter = Array.isArray(r.reporter) ? r.reporter[0] : r.reporter
+                    const reported = Array.isArray(r.reported) ? r.reported[0] : r.reported
+                    const reasonLabel = REPORT_REASON_LABELS[r.reason] ?? r.reason
+                    const targetLabel = REPORT_TARGET_LABELS[r.target_type] ?? r.target_type
+                    const busy = reportActioningId === r.id
+                    return (
+                      <div key={r.id} style={{ ...CARD, padding: 18 }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+                          <div style={{ flex: 1, minWidth: 220 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{reasonLabel}</span>
+                              <span style={{ fontSize: 10, letterSpacing: "0.8px", padding: "2px 8px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line-2)", textTransform: "uppercase", fontWeight: 500, color: "var(--muted-text)" }}>{targetLabel}</span>
+                            </div>
+                            <p style={{ fontSize: 13, color: "var(--body)", marginTop: 6, lineHeight: 1.5 }}>
+                              Reported by {reporter?.name ?? "A member"}
+                              {reported?.name ? ` · about ${reported.name}` : ""}
+                              {" · "}{formatRelativeTime(r.created_at)}
+                            </p>
+                            {r.details && (
+                              <p style={{ fontSize: 13, color: "var(--body)", marginTop: 8, lineHeight: 1.55, fontStyle: "italic" }}>&ldquo;{r.details}&rdquo;</p>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                            <CentralButton variant="secondary" size="sm" disabled={busy} onClick={() => handleReportStatus(r.id, "dismissed")}>Dismiss</CentralButton>
+                            <CentralButton variant="primary" size="sm" disabled={busy} onClick={() => handleReportStatus(r.id, "reviewed")}>Mark reviewed</CentralButton>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
