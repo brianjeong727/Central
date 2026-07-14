@@ -164,6 +164,9 @@ export interface ChatGroup {
   category?: "general" | "group" | "team" | null
   muted?: boolean
   pinned?: boolean
+  // Ministry-wide central chat (groups.is_central_chat) — drives the solid-plum
+  // monogram chip in the mobile Pocket chat list.
+  is_central_chat?: boolean
 }
 
 export interface GroupMember {
@@ -356,6 +359,8 @@ export interface AnnouncementsTabProps {
   userGradYear: number | null
   ministryId: string
   ministryName: string
+  avatarUrl?: string | null
+  onGoToProfile: () => void
   onOpenAnnouncement: (id: string) => void
 }
 
@@ -452,6 +457,7 @@ export interface ChatsTabProps {
   onTotalUnreadChange: (count: number) => void
   refreshKey: number
   onOpenDirectory: () => void
+  onGoToProfile: () => void
   activeGroupId?: string | null
   canCreateChurchChat: boolean
   fallbackChats?: ChatGroup[]
@@ -674,6 +680,8 @@ export interface PlanTabProps {
   userName: string
   ministryId: string
   ministryName: string
+  avatarUrl?: string | null
+  onGoToProfile: () => void
   userTeams: UserTeam[]
   allTeams: Team[]
   isAdmin: boolean
