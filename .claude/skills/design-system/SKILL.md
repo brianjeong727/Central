@@ -1,18 +1,9 @@
 # Design System Skill
 
-Load `skills/design-system/web_design_system.md` before touching any desktop (≥768px) UI file. For `md:hidden`/phone-width surfaces, load `skills/design-system/mobile_design_system.md` instead — it governs the mobile shell, cards, and component sizes (the desktop rules below do not apply to mobile).
+Load order for any UI work — cheapest sufficient doc first:
 
-## Hard stops
+1. **Desktop (≥768px) surfaces → load `skills/design-system/contract-card.md`** (~5KB). It carries the north star, the full token table, typography/spacing rules, action placement, and every hard "do not" — sufficient for edits to existing surfaces. Its routing table names which section of the full doc to open for component-specific or net-new work; open ONLY that section of `web_design_system.md` (~99KB), not the whole file.
+2. **Phone-width (`md:hidden`, ≤430px) surfaces → load `skills/design-system/mobile_design_system.md`** (~14KB, small enough to load whole). Desktop rules never apply to mobile surfaces and vice versa — the surface determines the doc.
+3. **Building a net-new page or component from scratch → read the full `web_design_system.md`** §11 snippets + §13 starter template in addition to the card.
 
-These are non-negotiable checks before writing or editing any UI code. Stop immediately if any of these conditions are true — do not proceed until resolved.
-
-- A new tab strip implementation created instead of using the shared `PlanSubTabStrip` component → **HARD STOP**, find and use the existing one in `app/home/tabs/plan-tab.tsx`
-- Horizontal padding added to the tab strip wrapper `<div>` → **HARD STOP**, remove it; padding belongs on the content div below, not the tab strip wrapper
-- A color used that is not in the §1.2 token table → **HARD STOP**, map it to the nearest token
-- A bold (`fontWeight > 400`) serif heading → **HARD STOP**, serif is always weight 400
-- A pill, segmented, or boxed tab → **HARD STOP**, underline tabs only (§4.2)
-- Pure white (`#fff` or `white`) used as a surface → **HARD STOP**, use cream `#FBF8F2`
-- A modal used for navigation (opening an existing entity) → **HARD STOP**, navigate to a page instead
-- The verse callout removed from the sidebar → **HARD STOP**, it is permanent brand
-- `Inter` or any sans font used for a stat number → **HARD STOP**, stat numbers are serif
-- A drop shadow anywhere → **HARD STOP** — no-shadow system; modals separate via the §4.17 ink veil, not elevation
+The contract card's "Hard do nots" section is the HARD STOP list — if any item fires, stop and resolve before writing code. The card is a distillation, never an override: where card and full doc conflict, the full doc wins, and the conflict itself should be flagged (the card has drifted).

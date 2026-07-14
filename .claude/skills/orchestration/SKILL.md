@@ -68,6 +68,17 @@ Default loop is: `engineer` builds → `tester` verifies → `enforcer` rule-che
 
 Inter-agent data routes through you as FILES, not re-typed summaries. On entering the orchestrated lane, create `.claude/task-context/<task-slug>/` (gitignored, disposable). Every dispatch prompt names that dir. Agents write their FULL output there as a named file (`findings.md`, `spec.md`, `build-report.md`, `test-report.md`, `review.md`) and return only a ≤10-line summary plus the path. Downstream dispatches reference the files ("read `.claude/task-context/<slug>/findings.md` before starting") instead of you re-typing content — three copies of the same facts, each degraded, is the failure mode this kills. Continue a still-relevant agent via SendMessage (it keeps its context) instead of spawning a fresh one for a kickback.
 
+### Context pack — compile the doctrine ONCE, not per agent
+
+The same protocol applies to agent INPUTS, which are far larger than their outputs. Before the first dispatch, write `.claude/task-context/<slug>/context.md` — the task-relevant extract of the doc corpus, compiled by you (you've already read the docs to expand the prompt):
+
+- The specific CLAUDE.md conventions this task can violate (by number, with the rule text) — not all 20.
+- The design contract: for UI work, the relevant parts of `contract-card.md` (or `mobile_design_system.md` for phone-width) plus ONLY the full-doc §sections the routing table names for the surfaces touched.
+- The schema/permissions rows in play (table columns, RLS helpers, `permissions.md` lines) — verified, not from memory.
+- Task intent as expanded in Step 0, plus any interpretation calls already made.
+
+Every dispatch then says "read `context.md` first" INSTEAD of telling agents to consult CLAUDE.md / the design docs wholesale. Agents open the full corpus only when the pack routes them to a named section. This converts a ~40k-token per-agent doctrine ingest into a one-time ~3k-token pack — it is the single largest token lever in the loop. Keep the pack under ~200 lines; a pack that reproduces the corpus has failed at its one job.
+
 ### Enforcer dispatch — three tiers (one agent, throttled compute)
 
 Never maintain parallel enforcer variants; tier the DISPATCH instead:
