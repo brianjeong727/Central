@@ -40,11 +40,15 @@ export function PushSubscribeCard({
   ministryId,
   notificationSettings,
   style,
+  variant = "callout",
 }: {
   userId: string
   ministryId: string
   notificationSettings?: NotificationSettings
   style?: CSSProperties
+  // "pocket" — borderless tonal ivory at --r-pocket for the phone-width chat list
+  // (mobile design system §1.1/§5.5). "callout" keeps the desktop hairline card.
+  variant?: "callout" | "pocket"
 }) {
   const [visible, setVisible] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -89,15 +93,16 @@ export function PushSubscribeCard({
 
   // Quiet nudge at ListRow scale — this mounts inside the narrow chat-list
   // panel, so no icon badge, no serif display size, no body paragraph.
-  return (
-    <CentralCard variant="callout" style={{ padding: "12px 14px", ...style }}>
+  const pocket = variant === "pocket"
+  const cardInner = (
+    <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "0 0 3px" }}>
         <p style={{ ...MONO_STYLE, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
           <Bell size={11} strokeWidth={2} style={{ color: "var(--plum)" }} />
           Stay in the loop
         </p>
-        <IconButton aria-label="Dismiss notification prompt" dim={22} onClick={handleDismiss} disabled={busy} style={{ marginRight: -4 }}>
-          <X size={13} />
+        <IconButton aria-label="Dismiss notification prompt" dim={34} onClick={handleDismiss} disabled={busy} style={{ marginRight: -8 }}>
+          <X size={14} />
         </IconButton>
       </div>
       <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", margin: "0 0 10px", lineHeight: 1.35 }}>
@@ -109,6 +114,19 @@ export function PushSubscribeCard({
       <CentralButton size="sm" onClick={handleEnable} disabled={busy}>
         {busy ? "Turning on…" : "Turn on notifications"}
       </CentralButton>
+    </>
+  )
+
+  if (pocket) {
+    return (
+      <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "12px 14px", ...style }}>
+        {cardInner}
+      </div>
+    )
+  }
+  return (
+    <CentralCard variant="callout" style={{ padding: "12px 14px", ...style }}>
+      {cardInner}
     </CentralCard>
   )
 }

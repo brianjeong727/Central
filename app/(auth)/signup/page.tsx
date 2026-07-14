@@ -6,7 +6,9 @@ import { AlertCircle } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { Spinner } from "@/app/home/components/shared"
-import { SplitShell, GoogleButton, AppleButton, OrDivider, EyeButton } from "@/app/(auth)/shared"
+import { SplitShell, GoogleButton, AppleButton, AppleGlyph, GoogleGlyph, OrDivider, EyeButton,
+  PocketAuthScreen, PocketBack, PocketField, PocketSubmit, PocketError,
+  pocketPillCard, pocketFieldLabel, pocketH1, pocketSub } from "@/app/(auth)/shared"
 import { isNativeShell, useIsNativeShell, signInWithAppleNative } from "@/lib/native-auth"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
@@ -152,6 +154,52 @@ function ErrorBanner({ msg }: { msg: string }) {
     <div style={{ borderRadius: 10, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 18%, transparent)", padding: "10px 14px", fontSize: 13, color: "var(--danger)", fontWeight: 500, display: "flex", gap: 8 }} role="alert">
       <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} /> {msg}
     </div>
+  )
+}
+
+// ─── mobile tonal path tile (ivory, borderless) ───────────────
+function MPathTile({ icon, title, body, onClick }: {
+  icon: React.ReactNode; title: string; body: string; onClick: () => void
+}) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 14,
+      padding: "16px 18px", borderRadius: 16, border: "none", background: "var(--ivory)",
+      cursor: "pointer", fontFamily: SERIF, minHeight: 44,
+    }}>
+      <span style={{ width: 44, height: 44, borderRadius: 12, background: "var(--line-2)", color: "var(--plum)", display: "grid", placeItems: "center", flexShrink: 0 }}>{icon}</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontFamily: SERIF, fontSize: 17, fontWeight: 600, color: "var(--ink)", lineHeight: 1.2 }}>{title}</span>
+        <span style={{ display: "block", fontSize: 13.5, color: "var(--body)", marginTop: 3, lineHeight: 1.45 }}>{body}</span>
+      </span>
+      <Icon d="M9 6l6 6-6 6" size={18} style={{ color: "var(--faint)" }}/>
+    </button>
+  )
+}
+
+// ─── mobile tonal select tile (role) — ivory off, plum on ──────
+function MSelectTile({ title, sub, on, onClick }: {
+  title: string; sub?: string; on: boolean; onClick: () => void
+}) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      flex: 1, textAlign: "left", padding: "12px 14px", borderRadius: 16, border: "none",
+      background: on ? "var(--plum)" : "var(--ivory)", cursor: "pointer", fontFamily: SERIF, minHeight: 44,
+    }}>
+      <div style={{ fontFamily: SERIF, fontWeight: 600, fontSize: 16, lineHeight: 1.1, color: on ? "var(--cream)" : "var(--ink)" }}>{title}</div>
+      {sub && <div style={{ fontSize: 12, marginTop: 3, color: on ? "color-mix(in srgb, var(--cream) 78%, transparent)" : "var(--muted-text)" }}>{sub}</div>}
+    </button>
+  )
+}
+
+// ─── mobile gender pill — ivory off, plum on ───────────────────
+function MGenderPill({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      flex: 1, padding: "12px 16px", borderRadius: 999, border: "none", minHeight: 44,
+      background: on ? "var(--plum)" : "var(--ivory)", color: on ? "var(--cream)" : "var(--body)",
+      fontSize: 14.5, fontWeight: 600, fontFamily: SERIF, cursor: "pointer",
+    }}>{label}</button>
   )
 }
 
@@ -306,7 +354,8 @@ function SignupContent() {
   )
 
   // ── CHECK EMAIL (confirmation sent) ────────────────────────────
-  if (view === "check-email") return (
+  if (view === "check-email") return (<>
+    <div className="hidden md:block">
     <SplitShell topBar={<>{alreadyHaveAccount}</>}>
       <div style={mono}>CHECK YOUR INBOX · CENTRAL</div>
       <h1 style={{ ...serif, fontWeight: 600, fontSize: 44, lineHeight: 1.03, letterSpacing: "-0.02em", margin: "14px 0 0" }}>
@@ -345,10 +394,44 @@ function SignupContent() {
         </button>
       </div>
     </SplitShell>
-  )
+    </div>
+
+    {/* ── Mobile ── */}
+    <div className="md:hidden">
+      <PocketAuthScreen topInset>
+        <div style={{ marginTop: 8 }}>
+          <div style={mono}>Check your inbox</div>
+          <h1 style={{ ...pocketH1, marginTop: 8 }}>Check your email.</h1>
+        </div>
+        <p style={{ ...pocketSub, marginTop: 14 }}>
+          We sent a confirmation link to <span style={{ color: "var(--ink)", fontWeight: 600 }}>{pendingEmail}</span>. Open it to finish setting up your account — the link signs you in and takes you to the next step.
+        </p>
+        <button type="button" onClick={handleResend} disabled={resendLoading} style={{
+          ...pocketPillCard, marginTop: 26,
+          opacity: resendLoading ? 0.7 : 1, cursor: resendLoading ? "default" : "pointer",
+        }}>
+          {resendLoading && <Spinner/>}
+          {resendLoading ? "Sending…" : "Resend email"}
+        </button>
+        {resendStatus && (
+          <div style={{ fontSize: 13, color: resendStatus.ok ? "var(--body)" : "var(--danger)", marginTop: 12, textAlign: "center" }} role="status">
+            {resendStatus.msg}
+          </div>
+        )}
+        <div style={{ marginTop: 22, paddingTop: 20, borderTop: "1px solid var(--line-3)", fontSize: 13.5, color: "var(--body)", textAlign: "center" }}>
+          Wrong address?{" "}
+          <button type="button" onClick={() => { setResendStatus(null); setView(pendingView) }}
+            style={{ color: "var(--plum)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: SERIF, fontSize: 13.5 }}>
+            Go back
+          </button>
+        </div>
+      </PocketAuthScreen>
+    </div>
+  </>)
 
   // ── ROLE CHOICE ────────────────────────────────────────────────
-  if (view === "role-choice") return (
+  if (view === "role-choice") return (<>
+    <div className="hidden md:block">
     <SplitShell topBar={<>
       <Link href="/" style={{
         display: "inline-flex", alignItems: "center", gap: 8,
@@ -383,10 +466,38 @@ function SignupContent() {
         />
       </div>
     </SplitShell>
-  )
+    </div>
+
+    {/* ── Mobile ── */}
+    <div className="md:hidden">
+      <PocketAuthScreen>
+        <PocketBack href="/" />
+        <div style={{ marginTop: 20 }}>
+          <div style={mono}>Get started</div>
+          <h1 style={{ ...pocketH1, marginTop: 8 }}>How are you joining?</h1>
+        </div>
+        <p style={{ ...pocketSub, marginTop: 14 }}>Two ways into Central — start a ministry, or join one that&apos;s already here.</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 26 }}>
+          <MPathTile
+            icon={<Icon d="M3 11l9-8 9 8M5 10v10h14V10" size={20}/>}
+            title="Register a church"
+            body="I'm a pastor, deacon, or elder starting a new ministry."
+            onClick={() => setView("admin")}
+          />
+          <MPathTile
+            icon={<Icon d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M22 21v-2a4 4 0 00-3-3.87M9 11a4 4 0 100-8 4 4 0 000 8zm7-8a4 4 0 010 7.75" size={20}/>}
+            title="Join a ministry"
+            body="I'm a student or member joining an existing ministry."
+            onClick={() => setView("member")}
+          />
+        </div>
+      </PocketAuthScreen>
+    </div>
+  </>)
 
   // ── ADMIN (register a church) ──────────────────────────────────
-  if (view === "admin") return (
+  if (view === "admin") return (<>
+    <div className="hidden md:block">
     <SplitShell topBar={<>
       {intent !== "register" && (
         <span style={{ marginRight: "auto" }}>
@@ -458,10 +569,67 @@ function SignupContent() {
         </button>
       </div>
     </SplitShell>
-  )
+    </div>
+
+    {/* ── Mobile ── */}
+    <div className="md:hidden">
+      <PocketAuthScreen topInset={intent === "register"}>
+        {intent !== "register" && <PocketBack onClick={() => setView("role-choice")} />}
+        <div style={{ marginTop: intent !== "register" ? 20 : 8 }}>
+          <div style={mono}>Register a church · Step 1 of 2</div>
+          <h1 style={{ ...pocketH1, marginTop: 8 }}>Register your church.</h1>
+        </div>
+        <p style={{ ...pocketSub, marginTop: 14 }}>Create your admin account — you&apos;ll set up the workspace next.</p>
+        {/* Apple first + Google hidden in the native shell — mirrors the desktop
+            branch (App Store 4.8 SIWA prominence). */}
+        <button type="button" onClick={handleAdminApple} style={{ ...pocketPillCard, marginTop: 22 }}>
+          <AppleGlyph size={18}/> Continue with Apple
+        </button>
+        {!nativeShell && (
+          <button type="button" onClick={handleAdminGoogle} style={{ ...pocketPillCard, marginTop: 10 }}>
+            <GoogleGlyph size={18}/> Continue with Google
+          </button>
+        )}
+        <div style={{ margin: "18px 0" }}><OrDivider/></div>
+        {adminError && <PocketError msg={adminError}/>}
+        <form onSubmit={handleAdminSignup} style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 4 }}>
+          <PocketField label="Full name" placeholder="Pastor John Smith" value={adminName} onChange={(e) => setAdminName(e.target.value)} required autoComplete="name"/>
+          <PocketField label="Email" type="email" placeholder="you@example.com" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required autoComplete="email"/>
+          <PocketField label="Password" type={adminShowPw ? "text" : "password"} placeholder="••••••••" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} required autoComplete="new-password"
+            hint="At least 6 characters." trailing={<EyeButton show={adminShowPw} onToggle={() => setAdminShowPw(v => !v)}/>}/>
+          <div>
+            <span style={pocketFieldLabel}>Your role</span>
+            <div style={{ display: "flex", gap: 8 }}>
+              {ROLES.map(r => <MSelectTile key={r.key} title={r.title} sub={r.sub} on={founderRole === r.key} onClick={() => setFounderRole(r.key)}/>)}
+            </div>
+          </div>
+          <PocketSubmit loading={adminLoading} disabled={!founderRole || adminLoading}>
+            {adminLoading ? "Creating account…" : "Create account"}
+          </PocketSubmit>
+          {!founderRole && !adminLoading && (
+            <div style={{ fontSize: 13, color: "var(--muted-text)", textAlign: "center", marginTop: -8 }}>Select your role to continue.</div>
+          )}
+          <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5, textAlign: "center", margin: "-4px 0 0" }}>
+            By creating an account you agree to our{" "}
+            <Link href="/terms" style={{ color: "var(--plum)", fontWeight: 500, textDecoration: "none" }}>Terms of Service</Link>
+            {" "}and{" "}
+            <Link href="/privacy" style={{ color: "var(--plum)", fontWeight: 500, textDecoration: "none" }}>Privacy Policy</Link>.
+          </p>
+        </form>
+        <div style={{ marginTop: 22, paddingTop: 20, borderTop: "1px solid var(--line-3)", fontSize: 13.5, color: "var(--body)", textAlign: "center" }}>
+          Not a pastor, deacon, or elder?{" "}
+          <button type="button" onClick={() => setView("member")}
+            style={{ color: "var(--plum)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: SERIF, fontSize: 13.5 }}>
+            Join instead →
+          </button>
+        </div>
+      </PocketAuthScreen>
+    </div>
+  </>)
 
   // ── MEMBER (join a ministry) ────────────────────────────────────
-  return (
+  return (<>
+    <div className="hidden md:block">
     <SplitShell topBar={<>
       <span style={{ marginRight: "auto" }}>
         <BackLink onClick={() => setView("role-choice")}/>
@@ -529,7 +697,62 @@ function SignupContent() {
       </form>
 
     </SplitShell>
-  )
+    </div>
+
+    {/* ── Mobile ── */}
+    <div className="md:hidden">
+      <PocketAuthScreen>
+        <PocketBack onClick={() => setView("role-choice")} />
+        <div style={{ marginTop: 20 }}>
+          <div style={mono}>Join a ministry</div>
+          <h1 style={{ ...pocketH1, marginTop: 8 }}>Create your account.</h1>
+        </div>
+        <p style={{ ...pocketSub, marginTop: 14 }}>Get started with Central in minutes.</p>
+        {/* Apple first + Google hidden in the native shell — mirrors desktop. */}
+        <button type="button" onClick={handleMemberApple} style={{ ...pocketPillCard, marginTop: 22 }}>
+          <AppleGlyph size={18}/> Continue with Apple
+        </button>
+        {!nativeShell && (
+          <button type="button" onClick={handleMemberGoogle} style={{ ...pocketPillCard, marginTop: 10 }}>
+            <GoogleGlyph size={18}/> Continue with Google
+          </button>
+        )}
+        <div style={{ margin: "18px 0" }}><OrDivider/></div>
+        {memberError && <PocketError msg={memberError}/>}
+        <form onSubmit={handleMemberSignup} style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 4 }}>
+          <PocketField label="Full name" placeholder="Brian Jeong" value={memberName} onChange={(e) => setMemberName(e.target.value)} required autoComplete="name"/>
+          <div>
+            <span style={pocketFieldLabel}>Gender</span>
+            <div style={{ fontSize: 12.5, color: "var(--faint)", margin: "-2px 0 8px", paddingLeft: 4 }}>Helps us place you in the right small group.</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {["Male", "Female"].map(g => (
+                <MGenderPill key={g} label={g} on={gender === g.toLowerCase()} onClick={() => setGender(g.toLowerCase())}/>
+              ))}
+            </div>
+          </div>
+          <PocketField label="Email" type="email" placeholder="you@example.com" value={memberEmail} onChange={(e) => setMemberEmail(e.target.value)} required autoComplete="email"/>
+          <PocketField label="Password" type={memberShowPw ? "text" : "password"} placeholder="••••••••" value={memberPassword} onChange={(e) => setMemberPassword(e.target.value)} required autoComplete="new-password"
+            hint="At least 6 characters." trailing={<EyeButton show={memberShowPw} onToggle={() => setMemberShowPw(v => !v)}/>}/>
+          <PocketField label="Graduation year" type="number" placeholder={String(currentYear + 2)} value={graduationYear} onChange={(e) => setGraduationYear(e.target.value)}
+            hint={`Enter the year you graduate (e.g. ${currentYear + 1}, ${currentYear + 2}).`}/>
+          <PocketSubmit loading={memberLoading} disabled={!gradYearValid || !gender || memberLoading}>
+            {memberLoading ? "Creating account…" : "Create account"}
+          </PocketSubmit>
+          {(!gradYearValid || !gender) && !memberLoading && (
+            <div style={{ fontSize: 13, color: "var(--muted-text)", textAlign: "center", marginTop: -8 }}>
+              {!gender ? "Select your gender to continue." : "Enter a valid graduation year."}
+            </div>
+          )}
+          <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5, textAlign: "center", margin: "-4px 0 0" }}>
+            By creating an account you agree to our{" "}
+            <Link href="/terms" style={{ color: "var(--plum)", fontWeight: 500, textDecoration: "none" }}>Terms of Service</Link>
+            {" "}and{" "}
+            <Link href="/privacy" style={{ color: "var(--plum)", fontWeight: 500, textDecoration: "none" }}>Privacy Policy</Link>.
+          </p>
+        </form>
+      </PocketAuthScreen>
+    </div>
+  </>)
 }
 
 export default function SignupPage() {

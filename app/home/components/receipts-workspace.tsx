@@ -1,11 +1,14 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import useSWR from "swr"
 import { Plus, Image as ImageIcon, Settings, Receipt } from "lucide-react"
-import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, SubpageShell, CentralModal, ContentActionButton } from "@/components/central"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, SubpageShell, CentralModal, ContentActionButton, PocketChip, PocketFilterChip, PocketKicker, PocketRoundButton } from "@/components/central"
 import { EmptyState } from "./shared"
+import { MobilePocketHub, PocketHubChrome } from "./mobile-pocket-hub"
+import { useIsMobile } from "../use-is-mobile"
 import { createClient } from "@/lib/supabase"
-import { SubmitReceiptModal, STATUS_META } from "./finance-workspace"
+import { SubmitReceiptModal, STATUS_META, MobileFactsGrid } from "./finance-workspace"
 import {
   listReceiptCategories,
   createReceiptCategory,
@@ -23,11 +26,17 @@ interface ReceiptsWorkspaceProps {
   userName: string
   teams: ReceiptsTeamRef[]
   activeReceiptsTeamId: string | null
-  onReceiptsTeamChange: (id: string) => void
+  // null clears the selection back to the mobile Receipts hub (?rteam removed).
+  onReceiptsTeamChange: (id: string | null) => void
   // Opens the active team's settings (members + president). Provided only when the
   // current user may manage that team (its president or a governance admin); the
   // gear is hidden otherwise.
   onOpenTeamSettings?: () => void
+  // Mobile hub chrome (§2.1): back chevron exits Receipts to the workspace picker;
+  // avatar taps through to the profile tab. Desktop ignores all three.
+  onExitTeam?: () => void
+  avatarUrl?: string | null
+  onGoToProfile?: () => void
 }
 
 const FUND_OPTIONS = [
@@ -38,21 +47,47 @@ const FUND_OPTIONS = [
 export function ReceiptsWorkspace({
   ministryId,
   userId,
+  userName,
   teams,
   activeReceiptsTeamId,
   onReceiptsTeamChange,
   onOpenTeamSettings,
+  onExitTeam,
+  avatarUrl,
+  onGoToProfile,
 }: ReceiptsWorkspaceProps) {
+  const isMobile = useIsMobile()
+
   // Auto-select the first team when none is chosen yet (e.g. landing via the
-  // sidebar "Receipts" entry without an ?rteam param).
+  // sidebar "Receipts" entry without an ?rteam param). Desktop only: on mobile
+  // the no-selection state IS the hub landing (hub-first, sim ruling 2026-07-15).
   useEffect(() => {
-    if (!activeReceiptsTeamId && teams.length > 0) {
+    if (!isMobile && !activeReceiptsTeamId && teams.length > 0) {
       onReceiptsTeamChange(teams[0].id)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeReceiptsTeamId, teams])
+  }, [activeReceiptsTeamId, teams, isMobile])
 
   const activeTeam = teams.find(t => t.id === activeReceiptsTeamId) ?? null
+
+  // Mobile hub: per-team category counts for the row subs. Same RLS scope the
+  // drilled category list resolves under, so the counts always match what the
+  // drill will actually show. Fetched only while the hub is the visible surface.
+  const supabaseHub = createClient()
+  const atMobileHub = isMobile && !activeReceiptsTeamId && teams.length > 0
+  const { data: hubCategoryCounts } = useSWR(
+    atMobileHub ? (["receipts-hub-cat-counts", ministryId, teams.map(t => t.id).join(",")] as const) : null,
+    async () => {
+      const { data } = await supabaseHub
+        .from("receipt_categories")
+        .select("team_id")
+        .eq("ministry_id", ministryId)
+        .in("team_id", teams.map(t => t.id))
+      const counts: Record<string, number> = {}
+      for (const row of ((data ?? []) as { team_id: string }[])) counts[row.team_id] = (counts[row.team_id] ?? 0) + 1
+      return counts
+    },
+  )
 
   const [categories, setCategories] = useState<ReceiptCategory[]>([])
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
@@ -117,37 +152,42 @@ export function ReceiptsWorkspace({
           teamName={detail.teamName}
           onClose={() => setDetail(null)}
         />
+      ) : atMobileHub ? (
+        /* ── Mobile hub landing (hub-first, sim ruling 2026-07-15): "Receipts"
+           chrome + one row per team you can file receipts for; drilling a row
+           selects that team (?rteam). Replaces the retired team-selector chips.
+           px-5: workspace is mounted full-bleed, so it supplies its own inset. */
+        <div className="md:hidden px-5" style={{ paddingTop: 12 }}>
+          <MobilePocketHub
+            teamName="Receipts"
+            onBack={onExitTeam}
+            avatar={onGoToProfile ? { userName, avatarUrl, onClick: onGoToProfile } : undefined}
+            groups={[{
+              label: "Your teams",
+              rows: teams.map(t => {
+                const n = hubCategoryCounts?.[t.id] ?? (hubCategoryCounts ? 0 : null)
+                return {
+                  leading: <PocketChip letter={t.name.charAt(0).toUpperCase()} />,
+                  title: t.name,
+                  subtitle: n == null ? "Receipt categories" : `${n} categor${n === 1 ? "y" : "ies"}`,
+                  onClick: () => onReceiptsTeamChange(t.id),
+                }
+              }),
+            }]}
+          />
+        </div>
       ) : (
       <>
-      {/* Mobile team selector — desktop selects teams from the sidebar.
-          px-5: workspace is now mounted full-bleed (no parent px wrapper), so it
-          supplies its own mobile inset internally. */}
-      {teams.length > 0 && (
-        <div className="flex md:hidden px-5" style={{ gap: 8, overflowX: "auto", paddingBottom: 14, scrollbarWidth: "none" }}>
-          {teams.map(t => {
-            const isActive = t.id === activeReceiptsTeamId
-            return (
-              <button
-                key={t.id}
-                onClick={() => onReceiptsTeamChange(t.id)}
-                style={{
-                  flexShrink: 0,
-                  padding: "7px 14px",
-                  borderRadius: "var(--r-pill)",
-                  border: `1px solid ${isActive ? "var(--plum)" : "var(--line)"}`,
-                  background: isActive ? "var(--plum)" : "var(--ivory)",
-                  color: isActive ? "var(--cream)" : "var(--body)",
-                  fontSize: 13,
-                  fontWeight: isActive ? 500 : 400,
-                  fontFamily: "var(--sans)",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {t.name}
-              </button>
-            )
-          })}
+      {/* Mobile drilled chrome — the team's name + back chevron to the Receipts
+          hub + gear (§2.1 one header per screen). Desktop selects teams from the
+          sidebar and never renders this. */}
+      {activeTeam && (
+        <div className="md:hidden px-5" style={{ paddingTop: 12 }}>
+          <PocketHubChrome
+            title={activeTeam.name}
+            onBack={() => onReceiptsTeamChange(null)}
+            onSettings={onOpenTeamSettings}
+          />
         </div>
       )}
 
@@ -155,22 +195,46 @@ export function ReceiptsWorkspace({
           for the collection lives by the collection's header, not the page title.
           Renders whenever a team is selected — even with zero categories. */}
       {teamId && (
-        <div className="flex items-center justify-between gap-3 px-5 md:px-14 pt-7 pb-3">
-          <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--ink)" }}>Categories</span>
-          <ContentActionButton label="Add category" variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => setShowAddCategory(true)} />
-        </div>
+        <>
+          {/* Desktop categories header (serif title + ghost create). */}
+          <div className="hidden md:flex items-center justify-between gap-3 px-14 pt-7 pb-3">
+            <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--ink)" }}>Categories</span>
+            <ContentActionButton label="Add category" variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => setShowAddCategory(true)} />
+          </div>
+          {/* Mobile categories header: Pocket kicker + plum round create (the one
+              plum-filled create on this screen). Top gap comes from the drilled
+              chrome row's own bottom margin. */}
+          <div className="flex md:hidden items-center justify-between px-5 pb-3">
+            <PocketKicker label="Categories" style={{ margin: 0 }} />
+            <PocketRoundButton variant="plum" ariaLabel="Add category" onClick={() => setShowAddCategory(true)}>
+              <Plus style={{ width: 16, height: 16 }} />
+            </PocketRoundButton>
+          </div>
+        </>
       )}
 
-      {/* Category strip — convention #16 (self-insets md:pl-14 on desktop). Mobile
-          inset comes from the px-5 wrapper (md:px-0 → no desktop double-inset). */}
+      {/* Category selector. Desktop: PlanSubTabStrip (convention #16, self-insets
+          md:pl-14). Mobile: horizontal PocketFilterChip row (scrolls if >3). */}
       {teamId && categories.length > 0 && (
-        <div className="px-5 md:px-0">
-          <PlanSubTabStrip
-            tabs={stripTabs}
-            active={activeCategoryId ?? ""}
-            onChange={setActiveCategoryId}
-          />
-        </div>
+        <>
+          <div className="hidden md:block">
+            <PlanSubTabStrip
+              tabs={stripTabs}
+              active={activeCategoryId ?? ""}
+              onChange={setActiveCategoryId}
+            />
+          </div>
+          <div className="flex md:hidden px-5" style={{ gap: 8, overflowX: "auto", paddingBottom: 14, scrollbarWidth: "none" }}>
+            {categories.map(c => (
+              <PocketFilterChip
+                key={c.id}
+                label={c.name}
+                active={c.id === activeCategoryId}
+                onClick={() => setActiveCategoryId(c.id)}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {/* Content region */}
@@ -181,17 +245,28 @@ export function ReceiptsWorkspace({
             subtitle="Join or govern a team to start tracking receipts."
           />
         ) : categories.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-center" style={{ padding: "56px 24px" }}>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.14em", color: "var(--muted-text)", textTransform: "uppercase", marginBottom: 12 }}>
-              No categories yet
+          <>
+            {/* Desktop: editorial empty hero. */}
+            <div className="hidden md:flex flex-col items-center justify-center text-center" style={{ padding: "56px 24px" }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.14em", color: "var(--muted-text)", textTransform: "uppercase", marginBottom: 12 }}>
+                No categories yet
+              </div>
+              <h2 style={{ fontFamily: "var(--serif)", fontSize: 28, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 10px" }}>
+                Create a category to start adding receipts
+              </h2>
+              <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 360, lineHeight: 1.6, margin: 0 }}>
+                Categories group receipts for {activeTeam?.name ?? "this team"} — like dinners, supplies, or events.
+              </p>
             </div>
-            <h2 style={{ fontFamily: "var(--serif)", fontSize: 28, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 10px" }}>
-              Create a category to start adding receipts
-            </h2>
-            <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 360, lineHeight: 1.6, margin: 0 }}>
-              Categories group receipts for {activeTeam?.name ?? "this team"} — like dinners, supplies, or events.
-            </p>
-          </div>
+            {/* Mobile: quiet EmptyState grammar. */}
+            <div className="md:hidden">
+              <EmptyState
+                icon={<Receipt style={{ width: 22, height: 22 }} />}
+                title="No categories yet"
+                subtitle={`Add a category to start tracking receipts for ${activeTeam?.name ?? "this team"}.`}
+              />
+            </div>
+          </>
         ) : activeCategory ? (
           <CategoryContent
             key={activeCategory.id}
@@ -254,6 +329,7 @@ function CategoryContent({
   onOpenDetail: (receipt: ReceiptRow) => void
 }) {
   const supabase = createClient()
+  const isMobile = useIsMobile()
   const [receipts, setReceipts] = useState<ReceiptRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showSubmit, setShowSubmit] = useState(false)
@@ -292,13 +368,14 @@ function CategoryContent({
       </div>
       {loading ? null : receipts.length === 0 ? (
         <EmptyState
-          variant="bordered"
+          // Quiet on mobile — dashed is reserved for add-affordances (§3.8).
+          variant={isMobile ? "quiet" : "bordered"}
           icon={<Receipt style={{ width: 22, height: 22 }} />}
           title={`No receipts in ${category.name} yet`}
           subtitle="Submit your first receipt with Submit a receipt above."
         />
       ) : (
-        <div style={{ border: "1px solid var(--line)", borderRadius: 14, overflow: "hidden", background: "var(--ivory)" }}>
+        <div style={{ border: isMobile ? "none" : "1px solid var(--line)", borderRadius: isMobile ? "var(--r-pocket)" : 14, overflow: "hidden", background: "var(--ivory)" }}>
           {receipts.map((r, i) => (
             <ReceiptOneLine
               key={r.id}
@@ -386,6 +463,7 @@ function ReceiptDetailOverlay({
   teamName: string
   onClose: () => void
 }) {
+  const isMobile = useIsMobile()
   const isNegative = receipt.status === "rejected" || receipt.status === "declined"
   // Where the receipt sits on the Submitted → Approved → Reimbursed path.
   const reachedIndex = receipt.status === "reimbursed" ? 2 : receipt.status === "approved" ? 1 : 0
@@ -401,7 +479,7 @@ function ReceiptDetailOverlay({
       <div>
         {/* Amount + status */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 22 }}>
-          <p style={{ fontFamily: "var(--serif)", fontSize: 34, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.02em" }}>
+          <p style={{ fontFamily: "var(--serif)", fontSize: isMobile ? 22 : 34, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.02em" }}>
             ${Number(receipt.amount).toFixed(2)}
           </p>
           <div style={{ marginTop: 6 }}><StatusPill status={receipt.status} /></div>
@@ -409,7 +487,7 @@ function ReceiptDetailOverlay({
 
         {/* Status path */}
         {isNegative ? (
-          <div style={{ background: "#FDF9F9", border: "1px solid #E8C5C5", borderRadius: 12, padding: "14px 16px", marginBottom: 24 }}>
+          <div style={{ background: "var(--cream)", border: "1px solid color-mix(in srgb, var(--danger) 30%, var(--cream))", borderRadius: 12, padding: "14px 16px", marginBottom: 24 }}>
             <p style={{ fontSize: 13, fontWeight: 500, color: "var(--danger)", margin: 0 }}>
               {STATUS_META[receipt.status]?.label ?? "Declined"}
             </p>
@@ -437,12 +515,21 @@ function ReceiptDetailOverlay({
         )}
 
         {/* Details */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 22 }}>
-          <DetailRow label="Fund" value={fundLabel(receipt.fund)} />
-          <DetailRow label="Purchase date" value={new Date(receipt.purchase_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} />
-          <DetailRow label="Category" value={categoryName} />
-          <DetailRow label="Team" value={teamName || "—"} />
-        </div>
+        {isMobile ? (
+          <MobileFactsGrid facts={[
+            { label: "Fund", value: fundLabel(receipt.fund) || "—" },
+            { label: "Purchase date", value: new Date(receipt.purchase_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) },
+            { label: "Category", value: categoryName || "—" },
+            { label: "Team", value: teamName || "—" },
+          ]} />
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 22 }}>
+            <DetailRow label="Fund" value={fundLabel(receipt.fund)} />
+            <DetailRow label="Purchase date" value={new Date(receipt.purchase_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} />
+            <DetailRow label="Category" value={categoryName} />
+            <DetailRow label="Team" value={teamName || "—"} />
+          </div>
+        )}
 
         <div style={{ marginBottom: 22 }}>
           <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>Submitted by</p>

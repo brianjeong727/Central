@@ -12,6 +12,10 @@ interface BottomNavProps {
   onTabChange: (tab: Tab) => void
   chatsUnread?: number
   showPlan?: boolean
+  // Suppresses the pill entirely — set while a full-screen mobile surface is up
+  // (open chat overlay, CreateChatScreen, announcement compose). Spec: mobile
+  // design system §2.2 "Hidden on full-screen composers".
+  hidden?: boolean
 }
 
 // Floating "Pocket" pill nav (ratified B3 mobile). Home / Announcements / Chats /
@@ -26,9 +30,10 @@ const TABS_BASE = [
 
 const PLAN_TAB = { id: "plan" as Tab, label: "Workspace", icon: ClipboardList }
 
-export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false }: BottomNavProps) {
+export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false, hidden = false }: BottomNavProps) {
   // Plain member: Home/Chats/Announcements (3). Team member/leader/gov admin: +Workspace (4).
   const tabs = showPlan ? [...TABS_BASE, PLAN_TAB] : TABS_BASE
+  if (hidden) return null
   return (
     <div
       className="fixed left-1/2 -translate-x-1/2 z-50 md:hidden"

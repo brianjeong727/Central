@@ -79,6 +79,9 @@ Dark plum (`--plum2`) rounded-full bar, centered, `bottom: calc(env(safe-area-in
 - Hidden on full-screen composers (e.g. New announcement).
 - Profile and Directory are NOT tabs — reached via avatar (any screen) and the person icon on Chats.
 
+### 2.2b Full-bleed subpages consume the screen (ratified 2026-07-15)
+Any surface reached by **in-page navigation** — a settings page, a detail view, a drilled hub section — replaces the parent screen ENTIRELY. The parent's chrome row (title + actions + avatar) must NOT remain above it; the subpage's own single chrome row (back chevron + its title, e.g. via `SubpageShell`) is the only header. A parent chrome row stacked over a subpage header is the §5.6 two-header failure by another route. (Example violation: team Settings rendering under the "Workspace" chrome row.)
+
 ### 2.3 Navigation model — hub-and-spoke, never tab strips
 - Deep content = **push a new screen with a back chevron**, not a tab. Workspace → workspace hub → its four screens, each with one clear back.
 - **Never a horizontally-scrolling tab strip.** If desktop has 6+ tabs (General / Meeting Notes / Events / Resources / Groups / Rotations), mobile renders them as a **grouped row list on the hub screen** — tappable rows with icon chip, name, one-line status, chevron.

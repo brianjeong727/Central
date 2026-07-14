@@ -28,22 +28,41 @@ export function SubpageShell({ crumbs, title, width = "full", maxWidth = 820, ch
 }) {
   useSubpageCrumbs(crumbs)
   // Desktop uses the shell breadcrumb as the back. Mobile has no breadcrumb,
-  // so the shell renders a back row derived from the nearest parent crumb
-  // (the last crumb that carries an onClick). One affordance, defined once.
+  // so the shell renders ONE Pocket chrome row (mobile_design_system §2.1)
+  // derived from the nearest parent crumb (the last crumb with an onClick):
+  // 34px plum chevron + the subpage title (serif 20/600). When no title is
+  // passed, the row falls back to the PocketBackRow grammar ("← Parent").
   const back = [...crumbs].reverse().find(c => c.onClick)
   return (
     <div className="md:flex md:flex-col md:h-full md:overflow-hidden" style={{ background: "var(--cream)" }}>
-      {back && (
-        <button
-          type="button"
-          onClick={back.onClick}
-          // md:hidden must win on desktop — keep `display` in the class, NOT inline
-          // (an inline `display` would override md:hidden and leak onto desktop).
-          className="md:hidden inline-flex items-center"
-          style={{ alignSelf: "flex-start", gap: 6, height: 36, padding: "0 14px", margin: "12px 0 4px 18px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--muted-text)", fontSize: 13, cursor: "pointer" }}
-        >
-          <ArrowLeft style={{ width: 13, height: 13 }} /> {back.label}
-        </button>
+      {(back || title) && (
+        // md:hidden must win on desktop — keep `display` in the class, NOT inline
+        // (an inline `display` would override md:hidden and leak onto desktop).
+        <div className="md:hidden flex items-center" style={{ gap: 8, padding: "12px 20px 10px" }}>
+          {back && (
+            <button
+              type="button"
+              onClick={back.onClick}
+              aria-label={`Back to ${back.label}`}
+              style={{ width: 34, height: 34, marginLeft: -8, flexShrink: 0, display: "grid", placeItems: "center", background: "none", border: "none", color: "var(--plum)", cursor: "pointer" }}
+            >
+              <ArrowLeft style={{ width: 20, height: 20 }} />
+            </button>
+          )}
+          {title ? (
+            <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {title}
+            </span>
+          ) : back ? (
+            <button
+              type="button"
+              onClick={back.onClick}
+              style={{ background: "none", border: "none", padding: 0, marginLeft: -2, color: "var(--plum)", fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}
+            >
+              {back.label}
+            </button>
+          ) : null}
+        </div>
       )}
       {/* Canonical page header — identical rhythm to TabPageHeader, butting the
           breadcrumb (desktop-only, like every page header). Body below starts at
@@ -58,7 +77,12 @@ export function SubpageShell({ crumbs, title, width = "full", maxWidth = 820, ch
           <InsetHairline />
         </div>
       )}
-      <div className="md:flex-1 md:overflow-y-auto" style={{ paddingTop: title ? 0 : 28, paddingBottom: 56 }}>
+      {/* Mobile bottom pad clears the floating pill nav (§2.1: ~110px + safe
+          area); desktop keeps the original 56px. Mobile top gap is tighter (16px)
+          under the pocket chrome row. */}
+      <div
+        className={`md:flex-1 md:overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+110px)] md:pb-14 ${title ? "pt-0" : "pt-4 md:pt-7"}`}
+      >
         {width === "centered"
           ? <div className="mx-auto w-full px-5" style={{ maxWidth }}>{children}</div>
           : <div className="w-full px-5 md:px-14">{children}</div>}

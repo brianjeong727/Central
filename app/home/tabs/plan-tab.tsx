@@ -42,8 +42,10 @@ import { useIsMobile } from "../use-is-mobile"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketHeroCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow } from "@/components/central"
-import { FinanceWorkspace, type FinanceSection } from "../components/finance-workspace"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, POCKET_KICKER_STYLE } from "@/components/central"
+import { FinanceWorkspace, MobileFactsGrid, type FinanceSection } from "../components/finance-workspace"
+import { MobilePocketHub } from "../components/mobile-pocket-hub"
+import { getReimbursementInbox } from "@/app/actions/receipts"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
@@ -240,6 +242,7 @@ export function StudentOrgRoleTabContent({
   canWrite: boolean
 }) {
   const supabase = createClient()
+  const isMobile = useIsMobile()
 
   const [description, setDescription] = useState<RoleDescription | null>(null)
   const [editingDesc, setEditingDesc] = useState(false)
@@ -473,7 +476,9 @@ export function StudentOrgRoleTabContent({
         )}
 
         {links.length === 0 && !addingLink ? (
-          <div style={{ border: "1px solid var(--line-2)", borderRadius: "var(--r-card)", background: "var(--cream)", textAlign: "center", padding: "28px 20px" }}>
+          <div style={isMobile
+            ? { borderRadius: "var(--r-pocket)", background: "var(--ivory)", textAlign: "center", padding: "28px 20px" }
+            : { border: "1px solid var(--line-2)", borderRadius: "var(--r-card)", background: "var(--cream)", textAlign: "center", padding: "28px 20px" }}>
             <p style={{ fontFamily: "var(--sans)", fontSize: 14, color: "var(--muted-text)", margin: 0 }}>
               {canWrite ? "No links yet. Add one to get started." : "No links yet."}
             </p>
@@ -488,12 +493,14 @@ export function StudentOrgRoleTabContent({
               ) : (
                 <div
                   key={link.id}
-                  className="group flex items-center gap-3.5 border border-[var(--line-2)] rounded-[var(--r-card)] bg-[var(--cream)] hover:border-[var(--dashed)] transition-colors"
+                  className={isMobile
+                    ? "group flex items-center gap-3.5 rounded-[var(--r-pocket)] bg-[var(--ivory)]"
+                    : "group flex items-center gap-3.5 border border-[var(--line-2)] rounded-[var(--r-card)] bg-[var(--cream)] hover:border-[var(--dashed)] transition-colors"}
                   style={{ padding: "14px 16px" }}
                 >
                   {/* Favicon badge — initials from the label */}
                   <span
-                    style={{ width: 36, height: 36, borderRadius: "var(--r-input)", background: "var(--ivory)", display: "grid", placeItems: "center", fontFamily: "var(--sans)", fontWeight: 500, fontSize: 13, color: "var(--body)", flexShrink: 0 }}
+                    style={{ width: 36, height: 36, borderRadius: "var(--r-input)", background: isMobile ? "var(--line-2)" : "var(--ivory)", display: "grid", placeItems: "center", fontFamily: "var(--sans)", fontWeight: 500, fontSize: 13, color: "var(--body)", flexShrink: 0 }}
                     aria-hidden
                   >
                     {linkInitials(link.title)}
@@ -564,6 +571,7 @@ export function MeetingNoteDetail({
   canWrite?: boolean
 }) {
   const supabase = createClient()
+  const isMobile = useIsMobile()
   const [localTitle, setLocalTitle] = useState(note.title)
   const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -593,7 +601,9 @@ export function MeetingNoteDetail({
 
   return (
     <SubpageShell crumbs={[{ label: "Meeting Notes", onClick: onBack }, { label: note.title || "Untitled" }]} width="full">
-      <div style={{ background: "var(--cream)", borderRadius: 16, border: "1px solid var(--line)", overflow: "hidden" }}>
+      <div style={isMobile
+        ? { overflow: "hidden" }
+        : { background: "var(--cream)", borderRadius: 16, border: "1px solid var(--line)", overflow: "hidden" }}>
         {/* Date strip — inset tone to sit above the cream editor body */}
         <div
           style={{
@@ -682,6 +692,7 @@ export function MeetingNotesSection({
   onOpenNote: (id: string | null) => void
 }) {
   const supabase = createClient()
+  const isMobile = useIsMobile()
   const { data: notesData, isLoading: loading, mutate: mutateNotes } = useSWR(
     teamId ? (["meeting-notes", teamId] as const) : null,
     fetchMeetingNotes,
@@ -781,6 +792,27 @@ export function MeetingNotesSection({
             {canWrite ? "No notes yet — start a new one." : "No notes have been created yet."}
           </p>
         </div>
+      ) : isMobile ? (
+        <PocketRowCard>
+          {notes.map((note, i) => {
+            const noteDateLabel = (() => {
+              const d = new Date(note.date + "T12:00:00")
+              return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            })()
+            const editorId = note.updated_by ?? note.created_by
+            const editorName = names[editorId] ?? "Someone"
+            return (
+              <PocketRow
+                key={note.id}
+                title={note.title || "(Untitled)"}
+                sub={`${noteDateLabel} · edited by ${editorName}`}
+                chevron
+                isLast={i === notes.length - 1}
+                onClick={() => onOpenNote(note.id)}
+              />
+            )
+          })}
+        </PocketRowCard>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {notes.map(note => {
@@ -914,6 +946,7 @@ function EventsAgendaList({
   plannedIds: Set<string>
 }) {
   const now = useMemo(() => new Date(), [])
+  const isMobile = useIsMobile()
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   // null = user hasn't toggled anything → fall back to the derived default (up-next open).
   const [openSubs, setOpenSubs] = useState<Set<string> | null>(null)
@@ -959,6 +992,60 @@ function EventsAgendaList({
         <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>
           No events yet. Click &ldquo;New Event&rdquo; to get started.
         </p>
+      </div>
+    )
+  }
+
+  // ── Mobile agenda (Pocket) — borderless tonal rows with a leading date chip.
+  // Timeline spine, hover-reveal delete, and desktop date serifs are dropped;
+  // delete folds into the event detail (edit modal) where it already lives.
+  if (isMobile) {
+    const dateChip = (d: Date, dim: boolean) => (
+      <span style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, display: "grid", placeItems: "center", background: "var(--line-2)", lineHeight: 1 }}>
+        <span style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, color: dim ? "var(--muted-text)" : "var(--ink)" }}>{d.getDate()}</span>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", marginTop: 1 }}>{d.toLocaleDateString("en-US", { month: "short" })}</span>
+      </span>
+    )
+    const agendaRow = (ev: CalendarEvent, dim: boolean, isLast: boolean) => {
+      const d = new Date(ev.start_date)
+      const timeStr = ev.all_day ? "All day" : d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      const sub = ev.location ? `${timeStr} · ${ev.location}` : timeStr
+      return (
+        <PocketRow
+          key={ev.id}
+          leading={dateChip(d, dim)}
+          title={ev.title}
+          sub={sub}
+          chevron
+          isLast={isLast}
+          onClick={() => onOpenEvent(ev)}
+        />
+      )
+    }
+    const pastDescM = [...past].reverse()
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+        {upcoming.length > 0 && (
+          <PocketRowCard>
+            {upcoming.map((ev, i) => agendaRow(ev, false, i === upcoming.length - 1))}
+          </PocketRowCard>
+        )}
+        {past.length > 0 && (
+          <>
+            <button
+              onClick={() => setShowPastOverride(v => !(v ?? (upcoming.length === 0)))}
+              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", cursor: "pointer", padding: "0 4px" }}
+            >
+              <span style={{ ...POCKET_KICKER_STYLE, flex: 1, textAlign: "left" }}>Past events · {past.length}</span>
+              <ChevronDown style={{ width: 15, height: 15, color: "var(--faint)", transform: showPast ? "rotate(180deg)" : "none", transition: "transform 200ms ease" }} />
+            </button>
+            {showPast && (
+              <PocketRowCard>
+                {pastDescM.map((ev, i) => agendaRow(ev, true, i === pastDescM.length - 1))}
+              </PocketRowCard>
+            )}
+          </>
+        )}
       </div>
     )
   }
@@ -1347,6 +1434,10 @@ export function StudentOrgTeamHome({
   useEffect(() => {
     setPlanningChild(null)
   }, [planningEvent?.id])
+  // Mobile drilled-section crumb reported by EventPlanWorkspace (null at the
+  // hub and always on desktop) — appended as the tail crumb so the SubpageShell
+  // chrome chevron returns section → hub (§2.3 one level; §5.3 single back).
+  const [evMobileCrumb, setEvMobileCrumb] = useState<{ label: string; onBack: () => void } | null>(null)
 
   // Roster
   const [roster, setRoster] = useState<{ id: string; user_id: string; name: string; role: string }[]>([])
@@ -1466,7 +1557,7 @@ export function StudentOrgTeamHome({
     // capped at one level: onOpenChild is only passed while viewing the parent,
     // so a sub-event offers no further drill affordance.
     const activeEvent = planningChild ?? planningEvent
-    const crumbs = planningChild
+    const baseCrumbs = planningChild
       ? [
           { label: teamName, onClick: () => { setPlanningChild(null); onPlanningEventChange(null) } },
           { label: planningEvent.title, onClick: () => setPlanningChild(null) },
@@ -1476,6 +1567,18 @@ export function StudentOrgTeamHome({
           { label: teamName, onClick: () => onPlanningEventChange(null) },
           { label: planningEvent.title },
         ]
+    // While a mobile section is drilled, the ACTIVE event crumb gains an onClick
+    // back to the event hub and the section becomes the tail crumb — SubpageShell
+    // derives its chrome chevron from the last onClick-bearing crumb, so the back
+    // walks section → hub → team. evMobileCrumb is null on desktop, keeping the
+    // desktop trail byte-identical.
+    const crumbs = evMobileCrumb
+      ? [
+          ...baseCrumbs.slice(0, -1),
+          { label: activeEvent.title, onClick: evMobileCrumb.onBack },
+          { label: evMobileCrumb.label },
+        ]
+      : baseCrumbs
     return (
       <SubpageShell crumbs={crumbs} title={activeEvent.title} width="full">
         {/* key on the event id: remount when switching parent<->sub-event so the
@@ -1496,6 +1599,7 @@ export function StudentOrgTeamHome({
           onEditEvent={onEditEvent}
           onOpenChild={planningChild ? undefined : setPlanningChild}
           refreshSignal={refreshSignal}
+          onMobileCrumbChange={setEvMobileCrumb}
         />
       </SubpageShell>
     )
@@ -1530,8 +1634,11 @@ export function StudentOrgTeamHome({
     <>
     <div>
       {/* Mobile hub back row (ruling B-1) — the strip nav is replaced by the hub;
-          a drilled-in section shows a back-to-hub row. Desktop uses sidebar nav. */}
-      {!isDesktopView && displaySection !== "Hub" && (
+          a drilled-in section shows a back-to-hub row. Desktop uses sidebar nav.
+          Suppressed for the note detail (§2.2b): MeetingNotesSection early-returns
+          its own SubpageShell chrome, so a hub back-row here would stack a second
+          back over the subpage header. */}
+      {!isDesktopView && displaySection !== "Hub" && !meetingNoteOpen && (
         <MobileHubBackRow label={teamName} onBack={() => setTeamTabAndUrl("Hub")} />
       )}
 
@@ -1671,14 +1778,27 @@ export function StudentOrgTeamHome({
               )}
             />
             {resourcesRoles.length > 0 && (
-              <div style={{ marginBottom: 22 }}>
-                <PlanSubTabStrip
-                  tabs={resourcesRoles.map(r => ({ key: r, label: r }))}
-                  active={activeResourcesRole}
-                  onChange={setResourcesRole}
-                  flush
-                />
-              </div>
+              isDesktopView ? (
+                <div style={{ marginBottom: 22 }}>
+                  <PlanSubTabStrip
+                    tabs={resourcesRoles.map(r => ({ key: r, label: r }))}
+                    active={activeResourcesRole}
+                    onChange={setResourcesRole}
+                    flush
+                  />
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 8, overflowX: "auto", marginBottom: 20, paddingBottom: 2 }}>
+                  {resourcesRoles.map(r => (
+                    <PocketFilterChip
+                      key={r}
+                      label={r}
+                      active={r === activeResourcesRole}
+                      onClick={() => setResourcesRole(r)}
+                    />
+                  ))}
+                </div>
+              )
             )}
             <StudentOrgRoleTabContent key={activeResourcesRole} teamId={teamId} roleName={activeResourcesRole} userId={userId} canWrite={canWriteActiveRole} />
           </div>
@@ -1829,6 +1949,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
   teamId: string; ministryId: string; userId: string; canEdit: boolean; newSemesterTrigger?: number
 }) {
   const supabase = createClient()
+  const isMobile = useIsMobile()
   const [semesters, setSemesters] = useState<RotationSemester[]>([])
   const [activeSemesterId, setActiveSemesterId] = useState<string | null>(null)
   const [slots, setSlots] = useState<RotationSlot[]>([])
@@ -1941,10 +2062,17 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
       {/* ── Semester bar ── */}
       {semesters.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", flex: 1, minWidth: 0 }}>
             {semesters.map(sem => {
               const active = sem.id === activeSemesterId
-              return (
+              return isMobile ? (
+                <PocketFilterChip
+                  key={sem.id}
+                  label={sem.name}
+                  active={active}
+                  onClick={() => setActiveSemesterId(sem.id)}
+                />
+              ) : (
                 <FilterChip
                   key={sem.id}
                   selected={active}
@@ -2075,6 +2203,7 @@ function RotationSlotCell({ slot, userId, onClick }: {
   slot: RotationSlot; userId: string; onClick: () => void
 }) {
   const [hover, setHover] = useState(false)
+  const isMobile = useIsMobile()
   const isOpen = !slot.assigned_to
   const isMine = slot.assigned_to === userId
   const claimable = isOpen || isMine
@@ -2085,6 +2214,9 @@ function RotationSlotCell({ slot, userId, onClick }: {
     ? "1px dashed var(--dashed)"
     : "1px solid var(--line-2)"
   const bg = isMine ? "var(--cream-3)" : isOpen ? "var(--cream-2)" : "var(--cream)"
+  // Mobile: borderless tonal (Pocket). Keep the plum outline only for your own
+  // claimed slot as a status affordance; open/others go flat ivory.
+  const mobileBorder = isMine ? "1px solid var(--plum)" : "1px solid transparent"
 
   return (
     <button
@@ -2094,8 +2226,9 @@ function RotationSlotCell({ slot, userId, onClick }: {
       disabled={!claimable}
       style={{
         display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
-        padding: "11px 14px", borderRadius: 11, background: bg,
-        border: claimable && hover && !isMine ? "1px solid var(--dashed)" : border,
+        padding: "11px 14px", borderRadius: isMobile ? "var(--r-pocket-sm)" : 11,
+        background: isMobile ? "var(--ivory)" : bg,
+        border: isMobile ? mobileBorder : (claimable && hover && !isMine ? "1px solid var(--dashed)" : border),
         cursor: claimable ? "pointer" : "default",
         transition: "border-color 150ms, background-color 150ms",
       }}
@@ -2323,75 +2456,6 @@ function monthDay(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
-// ── Mobile team hub (Daybreak, ruling B-1/B-3) ──────────────────────────────
-// Replaces the mobile sub-tab strip: a team-name header (+ gear), an optional
-// plum up-next hero, and grouped row cards that drill into the team's EXISTING
-// mobile section surfaces. Row icons are PlanLineIcon stroked glyphs (ruling #7),
-// never unicode. Shared by StudentOrgTeamHome and SmallGroupLeadersTab.
-type HubRow = { iconKey: string; title: string; subtitle: string; meta?: string; onClick: () => void }
-function MobilePocketHub({ teamName, onBack, onSettings, avatar, hero, groups }: {
-  teamName: string
-  // Single chrome row (mobile_design_system §2.1): back chevron exits the team to
-  // the picker (onExitTeam); no separate "← All workspaces" pill, no PocketChrome
-  // "Workspace" row above — this IS the workspace hub's one header.
-  onBack?: () => void
-  onSettings?: () => void
-  avatar?: { userName: string; avatarUrl?: string | null; onClick: () => void }
-  hero?: { eyebrow: string; title: string; meta: string; progress?: { done: number; total: number } | null; onClick: () => void } | null
-  groups: { label: string; rows: HubRow[] }[]
-}) {
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-        {onBack && (
-          <button onClick={onBack} aria-label="All workspaces" style={{ width: 34, height: 34, marginLeft: -8, flexShrink: 0, display: "grid", placeItems: "center", background: "none", border: "none", color: "var(--plum)", cursor: "pointer" }}>
-            <ArrowLeft style={{ width: 20, height: 20 }} />
-          </button>
-        )}
-        <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{teamName}</span>
-        {onSettings && (
-          <IconButton dim={34} onClick={onSettings} title="Team settings"><Settings className="w-4 h-4" /></IconButton>
-        )}
-        {avatar && (
-          <button onClick={avatar.onClick} aria-label="Your profile" style={{ flexShrink: 0, border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-            <MonogramChip initials={getInitials(avatar.userName)} avatarUrl={avatar.avatarUrl} style={{ width: 34, height: 34, fontFamily: "var(--sans)", fontWeight: 600, fontSize: 11 }} />
-          </button>
-        )}
-      </div>
-
-      {hero && (
-        <PocketHeroCard
-          eyebrow={hero.eyebrow}
-          title={hero.title}
-          meta={hero.meta}
-          progress={hero.progress}
-          onClick={hero.onClick}
-        />
-      )}
-
-      {groups.map((g, gi) => (
-        <div key={g.label}>
-          <PocketKicker label={g.label} style={{ margin: (gi === 0 && !hero) ? "6px 4px 10px" : "26px 4px 10px" }} />
-          <PocketRowCard>
-            {g.rows.map((r, ri) => (
-              <PocketRow
-                key={r.title}
-                leading={<PlanLineIcon iconKey={r.iconKey} size={40} radius={14} bg="var(--line-2)" fg="var(--plum)" />}
-                title={r.title}
-                sub={r.subtitle}
-                meta={r.meta}
-                chevron
-                isLast={ri === g.rows.length - 1}
-                onClick={r.onClick}
-              />
-            ))}
-          </PocketRowCard>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // Back row shown when a hub row is drilled into on mobile — "← {section}" returns
 // to the hub. Sits above the existing section content.
 function MobileHubBackRow({ label, onBack }: { label: string; onBack: () => void }) {
@@ -2455,6 +2519,42 @@ export function PlanTab({
     ?? (isAdmin ? ministryName : "Plan")
   const setShowCreateTeam = onShowCreateTeam
   const supabase = createClient()
+  const isMobile = useIsMobile()
+  const { setParam } = useNavState()
+
+  // ── Mobile hub drill state (hub-first workspaces, ruling B-1) ──────────────
+  // Finance: null = the workspace hub landing; a section = drilled in. Synced to
+  // ?fsec — the URL param is written through home-app's handleFinanceSectionChange
+  // (one atomic replace), EXCEPT back-to-hub which clears it locally (home-app
+  // nulls the param for "reimbursements" anyway, so the desktop state stays
+  // consistent while mobile returns to the hub).
+  const [financeMobileSection, setFinanceMobileSection] = useState<FinanceSection | null>(() => {
+    const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("fsec") : null
+    return p === "reimbursements" || p === "budget" || p === "allocation" ? (p as FinanceSection) : null
+  })
+  // True while the Reimbursements detail subpage owns the mobile screen — hides the
+  // section back-row so the detail's own SubpageShell chrome is the sole header (§2.2b).
+  const [financeDetailOpen, setFinanceDetailOpen] = useState(false)
+  // Same, for the standard-team calendar's event-plan subpage.
+  const [stdCalendarEventOpen, setStdCalendarEventOpen] = useState(false)
+  function setFinanceMobileSectionAndUrl(s: FinanceSection | null) {
+    setFinanceMobileSection(s)
+    // One atomic write per action (Convention #5): drill-ins go through home-app's
+    // handler (state + single replaceParam); back-to-hub clears ?fsec directly —
+    // home-app's desktop section state is irrelevant while the mobile hub shows.
+    if (s) onFinanceSectionChange?.(s)
+    else setParam("fsec", null)
+  }
+  // Standard teams (ministry-calendar fallback): null = hub, "calendar" = drilled.
+  // Synced to ?wtab (cleared on team switch by home-app's TEAM_SUBPARAMS).
+  const [stdMobileSection, setStdMobileSection] = useState<"calendar" | null>(() => {
+    const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("wtab") : null
+    return p === "calendar" ? "calendar" : null
+  })
+  function setStdMobileSectionAndUrl(s: "calendar" | null) {
+    setStdMobileSection(s)
+    setParam("wtab", s)
+  }
   // A subpage is open somewhere in the content area when it has pushed breadcrumb
   // crumbs. §4.18: the subpage consumes the page header, so suppress the team
   // TabPageHeader while one is active (e.g. the finance reimbursement detail).
@@ -2531,6 +2631,10 @@ export function PlanTab({
     if (!teamSwitchRef.current) { teamSwitchRef.current = true; return }
     setOpenTeam(null)
     onStudentOrgPlanningEventChange?.(null)
+    // Mobile hub drills are per-team state — a new team lands at ITS hub. (The
+    // matching ?fsec/?wtab params are cleared by home-app's TEAM_SUBPARAMS.)
+    setFinanceMobileSection(null)
+    setStdMobileSection(null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTeamId])
 
@@ -2579,11 +2683,23 @@ export function PlanTab({
   // Finance write = member with can_view_finances OR governance-write. Read-only under gov-view.
   const financeCanEdit = activeTeamPerms.includes("can_view_finances") || govWrite
   const financeCanAccess = financeCanEdit || govView
-  const financeStripTabs: { key: string; label: string }[] = [
-    { key: "reimbursements", label: "Reimbursements" },
-    { key: "budget", label: "Budget" },
-    { key: "allocation", label: "Allocation" },
-  ]
+  // Mobile finance hub — awaiting-action count for the Reimbursements row sub.
+  // Same server action the inbox section itself uses (capability re-derived
+  // server-side; returns empty + no capability for non-approvers). Fetched only
+  // while the mobile hub is actually the visible surface.
+  const { data: financeHubInbox } = useSWR(
+    isMobile && teamKind === "finance" && !!activeTeamId && financeCanAccess && financeMobileSection === null
+      ? (["finance-hub-inbox", ministryId] as const)
+      : null,
+    () => getReimbursementInbox(ministryId),
+  )
+  const financeReimbSub = (() => {
+    if (!financeHubInbox || (!financeHubInbox.canApprove && !financeHubInbox.canSignOff)) return "Submitted receipts & approvals"
+    const needs = financeHubInbox.items.filter(r =>
+      (financeHubInbox.canApprove && r.status === "pending") || (financeHubInbox.canSignOff && r.status === "approved")
+    ).length
+    return needs === 0 ? "Inbox · all caught up" : `Inbox · ${needs} awaiting action`
+  })()
 
   const studentOrgRole = (teamKind === "studentOrg" ? activeUserTeam?.roleName : undefined) ?? ""
   const canEditStudentOrg = activeTeamPerms.includes("can_plan_events") || govWrite
@@ -2716,13 +2832,24 @@ export function PlanTab({
 
   return (
     <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
-      {/* Mobile chrome (B3 Pocket) — "Workspace" + avatar (no action button; the
-          create affordance is the Add-workspace card in the picker). Suppressed for
-          the hub-bearing team views (student-org / DGL): the hub's own header row is
-          the single chrome (§2.1 one-header rule), carrying its own back/gear/avatar. */}
-      {!(activeTeamId && activeTeamAllowed && (teamKind === "studentOrg" || teamKind === "dgl")) && (
+      {/* Mobile chrome (B3 Pocket) — the generic "Workspace" title renders ONLY on
+          the picker screen; inside a team the title is the workspace's name (sim
+          ruling 2026-07-15). Suppressed entirely for hub-bearing team views
+          (student-org / DGL / finance / standard / Receipts): the hub's own header
+          row is the single chrome (§2.1 one-header rule), carrying its own
+          back/gear/avatar. Worship teams (FROZEN) keep this chrome, renamed.
+          Full-bleed subpages (§2.2b) — team Settings (openTeam) and Add-workspace
+          (showCreateTeam) — consume the whole screen via their own SubpageShell
+          chrome row, so the parent "Workspace" chrome must NOT stack above them. */}
+      {!(
+        openTeam ||
+        showCreateTeam ||
+        (activeTeamId === "receipts" && receiptsTeams.length > 0) ||
+        (activeTeamId && activeTeamId !== "receipts" && activeTeamAllowed && (teamKind === "studentOrg" || teamKind === "dgl" || teamKind === "standard")) ||
+        (activeTeamId && teamKind === "finance" && financeCanAccess)
+      ) && (
         <PocketChrome
-          title="Workspace"
+          title={activeTeamId === "receipts" ? "Receipts" : activeTeamId ? activeTeamName : "Workspace"}
           userName={userName}
           avatarUrl={avatarUrl}
           onAvatarClick={onGoToProfile}
@@ -3125,55 +3252,83 @@ export function PlanTab({
             activeReceiptsTeamId={activeReceiptsTeamId ?? null}
             onReceiptsTeamChange={(id) => onReceiptsTeamChange?.(id)}
             onOpenTeamSettings={canManageReceiptsTeam ? openActiveReceiptsTeamSettings : undefined}
+            onExitTeam={(userTeams.length >= 2 || govTeams.length > 0) ? onExitTeam : undefined}
+            avatarUrl={avatarUrl}
+            onGoToProfile={onGoToProfile}
           />
         </div>
       ) : teamKind === "finance" && activeTeamId && financeCanAccess ? (
         <div className="md:hidden pb-28">
-          {/* Read-only pill + section strip each carry their own px-5 mobile inset;
-              FinanceWorkspace is bare so its detail SubpageShell stays full-bleed.
-              Mobile uses the lightweight pill (no full mat frame — too cramped). */}
-          {govView && (
-            <div className="px-5" style={{ marginBottom: 16 }}>
-              <ReadOnlyPill />
-            </div>
-          )}
-          {/* Mobile finance filter (Daybreak ws-fin) — prototype fchip pills in
-              place of the underline strip. Writes live inside FinanceWorkspace
-              (full parity, ruling B-4). md:hidden-scoped: desktop unaffected. */}
-          <div className="px-5 flex gap-2" style={{ marginBottom: 16 }}>
-            {financeStripTabs.map(t => (
-              <PocketFilterChip
-                key={t.key}
-                label={t.label}
-                active={financeSection === t.key}
-                onClick={() => setFinanceSection(t.key as FinanceSection)}
+          {/* Hub-first (sim ruling 2026-07-15): entering the workspace lands on a
+              MobilePocketHub whose rows are the finance sections (same set as the
+              retired fchip strip — mirrors the desktop FinanceSectionNav); drilling
+              a row shows the existing section body with a single "← {team}" back.
+              FinanceWorkspace stays bare so its detail SubpageShell is full-bleed. */}
+          {financeMobileSection === null ? (
+            <div className="px-5">
+              {govView && (
+                <div style={{ marginBottom: 16 }}>
+                  <ReadOnlyPill />
+                </div>
+              )}
+              <MobilePocketHub
+                teamName={activeTeamName}
+                onBack={(userTeams.length >= 2 || govTeams.length > 0) ? onExitTeam : undefined}
+                onSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
+                avatar={{ userName, avatarUrl, onClick: onGoToProfile }}
+                groups={[{
+                  label: "Sections",
+                  rows: [
+                    { iconKey: "clipboard", title: "Reimbursements", subtitle: financeReimbSub, onClick: () => setFinanceMobileSectionAndUrl("reimbursements") },
+                    { iconKey: "dollar", title: "Budget", subtitle: "Expense ledger & category totals", onClick: () => setFinanceMobileSectionAndUrl("budget") },
+                    { iconKey: "sliders", title: "Allocation", subtitle: "Plan the fiscal year's budget", onClick: () => setFinanceMobileSectionAndUrl("allocation") },
+                  ],
+                }]}
               />
-            ))}
-          </div>
-          <FinanceWorkspace
-            ministryId={ministryId}
-            userId={userId}
-            userName={userName}
-            userRole={activeUserTeam?.roleName ?? ""}
-            section={financeSection}
-            onSectionChange={setFinanceSection}
-            canEditBudget={financeCanEdit}
-            canAccessReimbursements={financeCanEdit}
-            readOnly={govView}
-          />
+            </div>
+          ) : (
+            <>
+              {/* §2.2b: when the reimbursement detail subpage owns the screen it
+                  carries its own SubpageShell back row, so the section back-row
+                  must not stack above it. */}
+              {!financeDetailOpen && (
+                <div className="px-5">
+                  <MobileHubBackRow label={activeTeamName} onBack={() => setFinanceMobileSectionAndUrl(null)} />
+                  {govView && (
+                    <div style={{ marginBottom: 16 }}>
+                      <ReadOnlyPill />
+                    </div>
+                  )}
+                </div>
+              )}
+              <FinanceWorkspace
+                ministryId={ministryId}
+                userId={userId}
+                userName={userName}
+                userRole={activeUserTeam?.roleName ?? ""}
+                section={financeMobileSection}
+                onSectionChange={(s) => setFinanceMobileSectionAndUrl(s as FinanceSection)}
+                onDetailOpenChange={setFinanceDetailOpen}
+                canEditBudget={financeCanEdit}
+                canAccessReimbursements={financeCanEdit}
+                readOnly={govView}
+              />
+            </>
+          )}
         </div>
       ) : (
       <div className="md:hidden px-5 pb-28">
         {/* Back to the picker — only meaningful when the picker would offer >1 option
             (a single-workspace user is auto-re-entered upstream). Suppressed for the
-            hub-bearing team views (student-org / DGL): the hub's own header chevron
-            is the single back affordance (§2.1 — no stacked back-pills). */}
-        {(userTeams.length >= 2 || govTeams.length > 0) && onExitTeam && !(teamKind === "studentOrg" || teamKind === "dgl") && (
+            hub-bearing team views (student-org / DGL / standard): the hub's own
+            header chevron is the single back affordance (§2.1 — no stacked
+            back-pills). Only the FROZEN worship kinds still reach this pill. */}
+        {(userTeams.length >= 2 || govTeams.length > 0) && onExitTeam && !(teamKind === "studentOrg" || teamKind === "dgl" || teamKind === "standard") && (
           <button onClick={onExitTeam} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", marginBottom: 16, background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--muted-text)", fontSize: 13, cursor: "pointer" }}>
             <ArrowLeft style={{ width: 13, height: 13 }} /> All workspaces
           </button>
         )}
-        {activeTeamId && govView && (
+        {activeTeamId && govView && teamKind !== "standard" && (
           <div style={{ marginBottom: 16 }}>
             <ReadOnlyPill />
           </div>
@@ -3245,12 +3400,12 @@ export function PlanTab({
             }
           />
         ) : (() => {
-          /* Standard team selected → the ministry calendar (mirrors the desktop
+          /* Standard team fallback → the ministry calendar (mirrors the desktop
              fallback). Visible to members who can view/plan, or any governance
              access; edit comes from member perm or governance-write. */
           const perms = activeUserTeam?.permissions ?? []
-          if (!perms.includes("can_plan_events") && !govWrite && !govView) return null
-          return (
+          const calendarAllowed = perms.includes("can_plan_events") || govWrite || govView
+          const calendarEl = calendarAllowed ? (
             <MinistryCalendar
               ministryId={ministryId}
               teamId={activeTeamId}
@@ -3258,7 +3413,47 @@ export function PlanTab({
               userId={userId}
               canEdit={perms.includes("can_plan_events") || govWrite}
               onOpenChat={onOpenChat}
+              onEventOpenChange={setStdCalendarEventOpen}
             />
+          ) : null
+          // Non-standard kinds that fall through (e.g. a finance team without
+          // finance access) keep the legacy direct render + back pill above.
+          if (teamKind !== "standard") return calendarEl
+          // Hub-first (sim ruling 2026-07-15): entering a standard workspace lands
+          // on its hub (name + back chevron + gear); the Calendar row drills into
+          // the existing MinistryCalendar body with one back to the hub.
+          if (stdMobileSection === null) {
+            return (
+              <MobilePocketHub
+                teamName={activeTeamName}
+                onBack={(userTeams.length >= 2 || govTeams.length > 0) ? onExitTeam : undefined}
+                onSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
+                avatar={{ userName, avatarUrl, onClick: onGoToProfile }}
+                groups={calendarAllowed ? [{
+                  label: "Sections",
+                  rows: [
+                    { iconKey: "calendar", title: "Calendar", subtitle: "Events & month view", onClick: () => setStdMobileSectionAndUrl("calendar") },
+                  ],
+                }] : []}
+              />
+            )
+          }
+          return (
+            <>
+              {/* §2.2b: the event-plan subpage carries its own SubpageShell back
+                  row, so suppress the section back-row while it owns the screen. */}
+              {!stdCalendarEventOpen && (
+                <>
+                  <MobileHubBackRow label={activeTeamName} onBack={() => setStdMobileSectionAndUrl(null)} />
+                  {govView && (
+                    <div style={{ marginBottom: 16 }}>
+                      <ReadOnlyPill />
+                    </div>
+                  )}
+                </>
+              )}
+              {calendarEl}
+            </>
           )
         })()}
       </div>
@@ -6435,18 +6630,20 @@ export function AddEventModal({
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 80, background: "var(--cream-panel)", display: "flex", flexDirection: "column", overflowY: "auto" }}>
-      <div style={{ maxWidth: 600, width: "100%", margin: "0 auto", paddingTop: "max(env(safe-area-inset-top), 48px)", paddingLeft: 24, paddingRight: 24, paddingBottom: 60 }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 28, fontWeight: 400, color: "var(--ink)", margin: 0 }}>
-            {isEditing ? "Edit Event" : parentEventId ? "Add Sub-event" : "New Event"}
-          </h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-            <X className="w-5 h-5 text-[var(--muted-text)]" />
-          </button>
-        </div>
-
+    <CentralModal
+      onClose={onClose}
+      title={isEditing ? "Edit event" : parentEventId ? "Add sub-event" : "New event"}
+      maxWidth={600}
+      sheet
+      footer={
+        <>
+          <CentralButton variant="quiet" size="sm" onClick={onClose}>Cancel</CentralButton>
+          <CentralButton variant="primary" size="md" onClick={handleSave} disabled={saving}>
+            {saving ? (isEditing ? "Saving…" : "Creating…") : isEditing ? "Save changes" : "Create event"}
+          </CentralButton>
+        </>
+      }
+    >
         <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
           {/* Event type picker — only shown when creating */}
           {!isEditing && (
@@ -6476,7 +6673,7 @@ export function AddEventModal({
               </div>
               {/* Pre-seed preview */}
               {(cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
-                <div style={{ marginTop: 12, padding: "12px 14px", background: "#F5F1E8", borderRadius: 10, fontSize: 12, color: "var(--body)" }}>
+                <div style={{ marginTop: 12, padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 12, color: "var(--body)" }}>
                   <span style={{ fontWeight: 500, color: "var(--plum)" }}>Pre-seeded: </span>
                   {cfg.defaultRoles.map(r => r.name).join(", ")}
                   {cfg.defaultRoles.length > 0 && cfg.defaultPhases.length > 0 && " · "}
@@ -6568,17 +6765,8 @@ export function AddEventModal({
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
-            <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", fontSize: 14, color: "var(--body)", cursor: "pointer" }}>
-              Cancel
-            </button>
-            <CentralButton variant="primary" size="md" onClick={handleSave} disabled={saving}>
-              {saving ? (isEditing ? "Saving…" : "Creating…") : isEditing ? "Save changes" : "Create event"}
-            </CentralButton>
-          </div>
         </div>
-      </div>
-    </div>
+    </CentralModal>
   )
 }
 
@@ -6589,6 +6777,7 @@ export function MinistryCalendar({
   userId,
   canEdit,
   onOpenChat,
+  onEventOpenChange,
 }: {
   ministryId: string
   teamId: string | null
@@ -6596,6 +6785,10 @@ export function MinistryCalendar({
   userId: string
   canEdit: boolean
   onOpenChat?: (id: string, name: string, type?: string) => void
+  /** Fires when the event-plan subpage opens/closes — lets a mobile parent drop
+      its section back-row so the event's own SubpageShell chrome is the sole
+      header (§2.2b full-bleed subpages consume the screen). */
+  onEventOpenChange?: (open: boolean) => void
 }) {
   const supabase = createClient()
   const [view, setView] = useState<"month" | "list">("list")
@@ -6612,6 +6805,17 @@ export function MinistryCalendar({
   const [showAdd, setShowAdd] = useState(false)
   const [planningEvent, setPlanningEvent] = useState<CalendarEvent | null>(null)
   const [showEditEvent, setShowEditEvent] = useState(false)
+  // Mobile drilled-section crumb reported by EventPlanWorkspace (null at the
+  // hub and always on desktop) — appended as the tail crumb so the SubpageShell
+  // chrome chevron returns section → hub (§2.3 one level; §5.3 single back).
+  const [evMobileCrumb, setEvMobileCrumb] = useState<{ label: string; onBack: () => void } | null>(null)
+
+  // Notify the mobile parent whether the event subpage owns the screen (§2.2b),
+  // releasing the flag on unmount (section switch) so its back-row returns.
+  useEffect(() => {
+    onEventOpenChange?.(planningEvent !== null)
+    return () => onEventOpenChange?.(false)
+  }, [planningEvent, onEventOpenChange])
 
   // Event planning view — replaces the calendar while an event is open.
   // SubpageShell consumes the page body (cream, in-content) and supplies the
@@ -6626,8 +6830,19 @@ export function MinistryCalendar({
   // live (per §4.14/§8: click navigates to the plan directly, no intermediate
   // modal; the removed EventDetailPopover's delete affordance is preserved here).
   if (planningEvent) {
+    // While a mobile section is drilled, the event crumb gains an onClick back
+    // to the event hub and the section becomes the tail crumb — SubpageShell's
+    // chrome chevron (last onClick-bearing crumb) then walks section → hub →
+    // team. evMobileCrumb is null on desktop, keeping the desktop trail intact.
+    const crumbs = evMobileCrumb
+      ? [
+          { label: teamName, onClick: () => setPlanningEvent(null) },
+          { label: planningEvent.title, onClick: evMobileCrumb.onBack },
+          { label: evMobileCrumb.label },
+        ]
+      : [{ label: teamName, onClick: () => setPlanningEvent(null) }, { label: planningEvent.title }]
     return (
-      <SubpageShell crumbs={[{ label: teamName, onClick: () => setPlanningEvent(null) }, { label: planningEvent.title }]} title={planningEvent.title} width="full">
+      <SubpageShell crumbs={crumbs} title={planningEvent.title} width="full">
         <EventPlanWorkspace
           key={planningEvent.id}
           inline
@@ -6640,6 +6855,7 @@ export function MinistryCalendar({
           onClose={() => setPlanningEvent(null)}
           onOpenChat={onOpenChat}
           onEditEvent={() => setShowEditEvent(true)}
+          onMobileCrumbChange={setEvMobileCrumb}
         />
         {showEditEvent && (
           <AddEventModal
@@ -6894,6 +7110,7 @@ export function EventPlanWorkspace({
   onEditEvent,
   onOpenChild,
   refreshSignal,
+  onMobileCrumbChange,
 }: {
   calendarEvent: CalendarEvent
   ministryId: string
@@ -6917,6 +7134,13 @@ export function EventPlanWorkspace({
   // plan_start_date / crunch_date so the overview facts + checklist windows
   // reflect edits made in the modal without a manual reload.
   refreshSignal?: number
+  // Mobile chrome-back integration (mobile spec §2.3/§5.3 — ONE back affordance,
+  // one level up): while a section is drilled at phone width this reports
+  // { section label, hub-return } so the parent can append the section as the
+  // tail SubpageShell crumb and point the event crumb at the hub — making the
+  // chrome chevron go section → hub → team. Reports null on desktop / at the
+  // hub / on unmount, so desktop crumbs are untouched.
+  onMobileCrumbChange?: (crumb: { label: string; onBack: () => void } | null) => void
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
@@ -6976,10 +7200,27 @@ export function EventPlanWorkspace({
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("evtab") : null
     return (allValidTabs as string[]).includes(p ?? "") ? p as ActiveSection : 'overview'
   })
+  // Mobile hub-and-spoke (mobile spec §4): phone width has NO tab strip — the
+  // default view is an event hub (facts grid + readiness + section rows) and
+  // sections render one at a time; the back to the hub is the SubpageShell
+  // chrome chevron (wired via onMobileCrumbChange). null = hub. Lazy-inits
+  // from ?evtab so a refresh mid-drill stays drilled (Convention #12).
+  const [mobileSection, setMobileSection] = useState<ActiveSection | null>(() => {
+    const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("evtab") : null
+    return (allValidTabs as string[]).includes(p ?? "") ? p as ActiveSection : null
+  })
   function setActiveSectionAndUrl(s: ActiveSection) {
     setActiveSection(s)
+    setMobileSection(s)
     setParam("evtab", s)
   }
+  function backToMobileHub() {
+    setMobileSection(null)
+    setParam("evtab", null)
+  }
+  // The section the body renders: desktop follows the strip (never null);
+  // mobile follows the hub drill state.
+  const shownSection: ActiveSection | null = isMobile ? mobileSection : activeSection
 
   // Overview edit state
   const [turnout, setTurnout] = useState("")
@@ -7556,6 +7797,22 @@ export function EventPlanWorkspace({
     ...extraTabs.map(t => ({ key: t as ActiveSection, label: EXTRA_TAB_LABELS[t] })),
   ]
 
+  // Report the mobile drill state up (see onMobileCrumbChange prop doc): the
+  // SubpageShell chrome chevron then walks section → hub → team, one level per
+  // §2.3, with no in-body PocketBackRow (§5.3 — never stacked back affordances).
+  useEffect(() => {
+    if (!onMobileCrumbChange) return
+    if (isMobile && mobileSection) {
+      const label = sections.find(s => s.key === mobileSection)?.label ?? "Section"
+      onMobileCrumbChange({ label, onBack: backToMobileHub })
+    } else {
+      onMobileCrumbChange(null)
+    }
+    return () => onMobileCrumbChange(null)
+  // sections/backToMobileHub are re-created per render but derive only from the deps below
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMobile, mobileSection, onMobileCrumbChange])
+
   // ── Date-driven checklist sections ──────────────────────────────────────────
   // Window anchors (local YMD): plan-start … [crunch] … event day … event+2mo cap.
   const eventYMD = toLocalYMD(startDate)
@@ -7671,11 +7928,14 @@ export function EventPlanWorkspace({
     return (
       <div
         key={task.id}
-        draggable={canEdit}
-        onDragStart={canEdit ? (e) => { setDragTaskId(task.id); e.dataTransfer.effectAllowed = "move" } : undefined}
-        onDragOver={canEdit ? (e) => { e.preventDefault(); e.stopPropagation(); setDragOverTaskId(task.id); setDragOverSection(null) } : undefined}
-        onDrop={canEdit ? (e) => { e.preventDefault(); e.stopPropagation(); if (dragTaskId) nest(dragTaskId, task.id); clearDrag() } : undefined}
-        onDragEnd={canEdit ? clearDrag : undefined}
+        // HTML5 drag reorder/nest is desktop-only — no touch fallback exists, so
+        // phone width gets no drag affordances (touch reorder is a flagged
+        // functional gap, deliberately not built in this pass). Tap-to-toggle stays.
+        draggable={canEdit && !isMobile}
+        onDragStart={canEdit && !isMobile ? (e) => { setDragTaskId(task.id); e.dataTransfer.effectAllowed = "move" } : undefined}
+        onDragOver={canEdit && !isMobile ? (e) => { e.preventDefault(); e.stopPropagation(); setDragOverTaskId(task.id); setDragOverSection(null) } : undefined}
+        onDrop={canEdit && !isMobile ? (e) => { e.preventDefault(); e.stopPropagation(); if (dragTaskId) nest(dragTaskId, task.id); clearDrag() } : undefined}
+        onDragEnd={canEdit && !isMobile ? clearDrag : undefined}
         onMouseEnter={() => setHoveredTaskId(task.id)}
         onMouseLeave={() => setHoveredTaskId((cur) => (cur === task.id ? null : cur))}
         style={{
@@ -7835,10 +8095,12 @@ export function EventPlanWorkspace({
       {/* Event-name header is provided by SubpageShell's `title` prop (canonical
           TabPageHeader rhythm) — no hand-rolled header here. */}
 
-      {/* Underline section tabs. Under SubpageShell (bare) the strip bleeds the
-          shell's md:px-14 via md:-mx-14 so its own md:pl-14 self-inset lands at the
-          same 56px edge as the siblings (convention #16 — one effective inset). */}
-      <div className={bare ? "md:-mx-14" : ""}>
+      {/* Underline section tabs — DESKTOP ONLY (mobile uses the §4 event hub
+          below; never a tab strip at phone width). Under SubpageShell (bare) the
+          strip bleeds the shell's md:px-14 via md:-mx-14 so its own md:pl-14
+          self-inset lands at the same 56px edge as the siblings (convention #16
+          — one effective inset). */}
+      <div className={bare ? "hidden md:block md:-mx-14" : "hidden md:block"}>
         <PlanSubTabStrip
           tabs={sections}
           active={activeSection}
@@ -7852,8 +8114,71 @@ export function EventPlanWorkspace({
           <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
         ) : (
           <>
+            {/* ── Mobile event hub (mobile spec §4: facts grid + readiness +
+                jump-into-planning rows). Rows mirror exactly what the desktop
+                strip offers for this event type (core tabs + type extras). ── */}
+            {isMobile && shownSection === null && (() => {
+              const taskTotal = tasks.length
+              const taskDone = tasks.filter(t => t.completed).length
+              const rolesTotal = roles.length
+              const rolesAssigned = roles.filter(r => r.assigned_to).length
+              const hubTime = calendarEvent.all_day ? "" :
+                startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
+                " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              const HUB_META: Record<string, { iconKey: string; sub: string }> = {
+                overview: { iconKey: "chart", sub: "Facts, stats & planning notes" },
+                checklist: { iconKey: "plan", sub: taskTotal > 0 ? `${taskDone} of ${taskTotal} done` : "Tasks to prepare before the event" },
+                roles: { iconKey: "users", sub: rolesTotal > 0 ? `${rolesAssigned} of ${rolesTotal} assigned` : "Assign who owns each part" },
+                notes: { iconKey: "book", sub: "Cross-year pain points" },
+                sub_events: { iconKey: "calendar", sub: EXTRA_TAB_META.sub_events.subtitle },
+                acts: { iconKey: "sparkle", sub: EXTRA_TAB_META.acts.subtitle },
+                teams: { iconKey: "users", sub: EXTRA_TAB_META.teams.subtitle },
+                transport: { iconKey: "globe", sub: EXTRA_TAB_META.transport.subtitle },
+                program: { iconKey: "calendar", sub: EXTRA_TAB_META.program.subtitle },
+              }
+              return (
+                <div>
+                  <MobileFactsGrid facts={[
+                    { label: "Date", value: startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) },
+                    { label: "Time", value: hubTime || "—" },
+                    { label: "Location", value: calendarEvent.location?.trim() || "—" },
+                    { label: "Plan start", value: planStartDate ? fmtMD(planStartDate) : "—" },
+                    { label: "Crunch", value: crunchDate ? fmtMD(crunchDate) : "—" },
+                  ]} />
+                  {taskTotal > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 2px 24px" }}>
+                      <span style={{ ...POCKET_KICKER_STYLE, flexShrink: 0 }}>Readiness</span>
+                      <PocketProgress done={taskDone} total={taskTotal} />
+                      <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{taskDone}/{taskTotal} done</span>
+                    </div>
+                  )}
+                  <PocketKicker label="Jump into planning" style={{ margin: "0 4px 10px" }} />
+                  <PocketRowCard>
+                    {sections.map((s, i) => {
+                      const meta = HUB_META[s.key] ?? { iconKey: "clipboard", sub: "" }
+                      return (
+                        <PocketRow
+                          key={s.key}
+                          leading={<PlanLineIcon iconKey={meta.iconKey} size={40} radius={14} bg="var(--line-2)" fg="var(--plum)" />}
+                          title={s.label}
+                          sub={meta.sub || undefined}
+                          chevron
+                          isLast={i === sections.length - 1}
+                          onClick={() => setActiveSectionAndUrl(s.key)}
+                        />
+                      )
+                    })}
+                  </PocketRowCard>
+                </div>
+              )
+            })()}
+
+            {/* Mobile drill renders one section at a time; the back to the hub
+                is the SubpageShell chrome chevron (via onMobileCrumbChange),
+                NOT an in-body PocketBackRow — one back affordance per screen. */}
+
             {/* ── Overview ── */}
-            {activeSection === 'overview' && (() => {
+            {shownSection === 'overview' && (() => {
               // ── Derived overview metrics ──────────────────────────────────
               const taskTotal = tasks.length
               const taskDone = tasks.filter(t => t.completed).length
@@ -7888,7 +8213,8 @@ export function EventPlanWorkspace({
 
               const monoLabel: React.CSSProperties = { ...MONO_STYLE, margin: 0 }
               const eyebrow: React.CSSProperties = { ...monoLabel, marginBottom: 14 }
-              const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: 34, fontWeight: 400, letterSpacing: -0.6, lineHeight: 1.05, marginTop: 10 }
+              // 34px stat serifs are desktop type — phone width caps at the 22px serif stat tier.
+              const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: isMobile ? 22 : 34, fontWeight: 400, letterSpacing: isMobile ? -0.3 : -0.6, lineHeight: 1.05, marginTop: 10 }
               const bigInput: React.CSSProperties = { ...bigNumber, color: "var(--ink)", background: "transparent", border: "none", outline: "none", padding: 0, width: "100%" }
               const factKey: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }
               const renderFact = (f: { k: string; v: string; muted?: boolean }, keyW: number) => (
@@ -7905,7 +8231,7 @@ export function EventPlanWorkspace({
                   {/* Event identity header */}
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, paddingBottom: 24, marginBottom: "var(--space-9)", borderBottom: "1px solid var(--line)" }}>
                     <div>
-                      <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, fontWeight: 600, color: "var(--ink)", lineHeight: 1.1, letterSpacing: -0.4 }}>{dateOnly}</div>
+                      <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: isMobile ? 22 : 32, fontWeight: 600, color: "var(--ink)", lineHeight: 1.1, letterSpacing: isMobile ? -0.3 : -0.4 }}>{dateOnly}</div>
                       <div style={{ display: "grid", gridTemplateColumns: "300px auto", columnGap: "var(--space-12)", rowGap: 16, marginTop: 18, justifyContent: "start" }} className="max-md:!grid-cols-1">
                         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                           {leftFacts.map(f => renderFact(f, 72))}
@@ -7989,7 +8315,7 @@ export function EventPlanWorkspace({
                 {/* ── RIGHT column — stat cards ── */}
                 <aside style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }} className="max-md:mt-8">
                   {/* Expected turnout */}
-                  <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22}>
+                  <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22} style={isMobile ? { border: "none" } : undefined}>
                     <p style={monoLabel}>Expected turnout</p>
                     {canEdit && editingTurnout ? (
                       <input
@@ -8017,7 +8343,7 @@ export function EventPlanWorkspace({
                   </CentralCard>
 
                   {/* Budget */}
-                  <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22}>
+                  <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22} style={isMobile ? { border: "none" } : undefined}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <p style={monoLabel}>Budget</p>
                       {!canEditBudget && <span style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Treasurer only</span>}
@@ -8064,7 +8390,7 @@ export function EventPlanWorkspace({
                   </CentralCard>
 
                   {/* Readiness */}
-                  <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22}>
+                  <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22} style={isMobile ? { border: "none" } : undefined}>
                     <p style={monoLabel}>Readiness</p>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
                       <span style={{ width: 8, height: 8, borderRadius: 99, background: readiness.color, flexShrink: 0 }} />
@@ -8088,7 +8414,7 @@ export function EventPlanWorkspace({
             })()}
 
             {/* ── Checklist ── */}
-            {activeSection === 'checklist' && (
+            {shownSection === 'checklist' && (
               <div>
                 <EventSectionHeader title="Checklist" action={<span style={{ fontSize: 13, color: "var(--muted-text)" }}>{incompleteTasks.length} of {tasks.length} remaining</span>} />
 
@@ -8115,8 +8441,8 @@ export function EventPlanWorkspace({
                     <div
                       key={section.key}
                       style={{ marginBottom: 28 }}
-                      onDragOver={canEdit ? (e) => { e.preventDefault(); setDragOverSection(section.key); setDragOverTaskId(null) } : undefined}
-                      onDrop={canEdit ? (e) => { e.preventDefault(); if (dragTaskId) requestMoveToSection(dragTaskId, section.key); clearDrag() } : undefined}
+                      onDragOver={canEdit && !isMobile ? (e) => { e.preventDefault(); setDragOverSection(section.key); setDragOverTaskId(null) } : undefined}
+                      onDrop={canEdit && !isMobile ? (e) => { e.preventDefault(); if (dragTaskId) requestMoveToSection(dragTaskId, section.key); clearDrag() } : undefined}
                     >
                       {/* Section header */}
                       <button
@@ -8232,7 +8558,7 @@ export function EventPlanWorkspace({
             )}
 
             {/* ── Roles & Leads ── */}
-            {activeSection === 'roles' && (() => {
+            {shownSection === 'roles' && (() => {
               const needs = roles.filter(r => !r.assigned_to)
               const covered = roles.filter(r => r.assigned_to)
               const iconBtnBase: React.CSSProperties = { background: "none", border: "none", padding: 3, borderRadius: 6, cursor: "pointer", display: "grid", placeItems: "center", color: "var(--faint)" }
@@ -8419,7 +8745,7 @@ export function EventPlanWorkspace({
             })()}
 
             {/* ── Transition Notes (cross-year institutional memory) ── */}
-            {activeSection === 'notes' && (
+            {shownSection === 'notes' && (
               <section>
                 {/* Header row */}
                 <EventSectionHeader
@@ -8629,7 +8955,7 @@ export function EventPlanWorkspace({
             )}
 
             {/* ── Sub-events (Welcome Week) ── */}
-            {activeSection === 'sub_events' && plan && (
+            {shownSection === 'sub_events' && plan && (
               <SubEventsTab
                 parentEvent={calendarEvent}
                 ministryId={ministryId}
@@ -8640,7 +8966,7 @@ export function EventPlanWorkspace({
             )}
 
             {/* ── Acts Lineup (Coffeehouse) ── */}
-            {activeSection === 'acts' && plan && (
+            {shownSection === 'acts' && plan && (
               <ActsTab
                 plan={plan}
                 canEdit={canEdit}
@@ -8649,7 +8975,7 @@ export function EventPlanWorkspace({
             )}
 
             {/* ── Teams (Turkey Bowl) ── */}
-            {activeSection === 'teams' && plan && (
+            {shownSection === 'teams' && plan && (
               <TeamsTab
                 plan={plan}
                 ministryId={ministryId}
@@ -8660,7 +8986,7 @@ export function EventPlanWorkspace({
             )}
 
             {/* ── Transport (Retreat) ── */}
-            {activeSection === 'transport' && plan && (
+            {shownSection === 'transport' && plan && (
               <TransportTab
                 plan={plan}
                 ministryId={ministryId}
@@ -8670,7 +8996,7 @@ export function EventPlanWorkspace({
             )}
 
             {/* ── Program (Retreat) ── */}
-            {activeSection === 'program' && plan && (
+            {shownSection === 'program' && plan && (
               <ProgramTab
                 plan={plan}
                 event={calendarEvent}
@@ -8724,6 +9050,8 @@ function SubEventsTab({
   onOpenChild?: (ev: CalendarEvent) => void
 }) {
   const supabase = createClient()
+  // Mobile restyle only (tonal borderless rows + kicker day labels) — structure unchanged.
+  const isMobile = useIsMobile()
   const [subEvents, setSubEvents] = useState<CalendarEvent[]>([])
   // childId → checklist progress, batched (never N+1).
   const [readiness, setReadiness] = useState<Record<string, { done: number; total: number }>>({})
@@ -8813,8 +9141,8 @@ function SubEventsTab({
             <Fragment key={ev.id}>
               {showHeader && (
                 <div style={{ display: "flex", alignItems: "center", gap: 12, margin: isFirstHeader ? "0 0 12px" : "26px 0 12px" }}>
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)", flexShrink: 0 }}>{dayLabel}</span>
-                  <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+                  <span style={isMobile ? { ...POCKET_KICKER_STYLE, flexShrink: 0 } : { fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)", flexShrink: 0 }}>{dayLabel}</span>
+                  {!isMobile && <span style={{ flex: 1, height: 1, background: "var(--line)" }} />}
                 </div>
               )}
 
@@ -8830,16 +9158,17 @@ function SubEventsTab({
                   alignItems: "center",
                   gap: 16,
                   padding: "15px 16px",
-                  border: `1px solid ${hoveredId === ev.id ? "var(--dashed)" : "var(--line)"}`,
-                  borderRadius: "var(--r-card)",
-                  background: "var(--cream)",
+                  // Mobile: tonal borderless ivory card (Pocket grammar); desktop keeps the hairline cream card.
+                  border: isMobile ? "none" : `1px solid ${hoveredId === ev.id ? "var(--dashed)" : "var(--line)"}`,
+                  borderRadius: isMobile ? "var(--r-pocket)" : "var(--r-card)",
+                  background: isMobile ? "var(--ivory)" : "var(--cream)",
                   marginBottom: 10,
                   transition: "border-color .15s",
                   cursor: drillable ? "pointer" : "default",
                 }}
               >
-                {/* emoji badge — derived from event_type via getEventConfig */}
-                <span style={{ width: 36, height: 36, display: "grid", placeItems: "center", background: "var(--ivory)", borderRadius: "var(--r-input)", fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{evCfg.icon ?? "📅"}</span>
+                {/* emoji badge — derived from event_type via getEventConfig (event-type emoji are a sanctioned exception) */}
+                <span style={{ width: 36, height: 36, display: "grid", placeItems: "center", background: isMobile ? "var(--line-2)" : "var(--ivory)", borderRadius: "var(--r-input)", fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{evCfg.icon ?? "📅"}</span>
 
                 {/* info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -8879,9 +9208,13 @@ function SubEventsTab({
 
                 {/* drill affordance — decorative; the whole row is the click target. Omitted when nesting-capped. */}
                 {drillable && (
-                  <span aria-hidden style={{ width: 34, height: 34, display: "grid", placeItems: "center", borderRadius: "var(--r-input)", border: "1px solid var(--line)", color: "var(--body)", flexShrink: 0 }}>
-                    <ArrowRight style={{ width: 16, height: 16 }} />
-                  </span>
+                  isMobile ? (
+                    <ChevronRight aria-hidden style={{ width: 15, height: 15, color: "var(--faint)", flexShrink: 0 }} />
+                  ) : (
+                    <span aria-hidden style={{ width: 34, height: 34, display: "grid", placeItems: "center", borderRadius: "var(--r-input)", border: "1px solid var(--line)", color: "var(--body)", flexShrink: 0 }}>
+                      <ArrowRight style={{ width: 16, height: 16 }} />
+                    </span>
+                  )
                 )}
               </div>
             </Fragment>
@@ -8948,7 +9281,11 @@ function ActsTab({
       <EventSectionHeader
         title="Acts Lineup"
         action={canEdit ? (
-          <ContentActionButton variant="primary" icon={<Plus style={{ width: 14, height: 14 }} />} label="Add act" onClick={addAct} />
+          // Add is desktop-only: a new act is edited via the grid inputs, which
+          // don't render at phone width (see mobile note below).
+          <span className="hidden md:inline-flex">
+            <ContentActionButton variant="primary" icon={<Plus style={{ width: 14, height: 14 }} />} label="Add act" onClick={addAct} />
+          </span>
         ) : undefined}
       />
 
@@ -8956,15 +9293,37 @@ function ActsTab({
         <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>No acts yet. Add performers to build your lineup.</p>
       )}
 
+      {/* Mobile: acts as stacked read-only rows (order · performer · type/time
+          sub). The editable 6-col grid-table cannot fit 390px — act editing is
+          DESKTOP-ONLY for now (a touch editing pass is a flagged gap, not built
+          here). */}
       {acts.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "0 4px 8px", borderBottom: "1px solid var(--line)" }}>
+        <div className="md:hidden">
+          <PocketRowCard>
+            {acts.map((act, idx) => (
+              <div key={act.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 0", borderBottom: idx === acts.length - 1 ? "none" : "1px solid var(--line-3)" }}>
+                <span style={{ width: 22, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", textAlign: "center" }}>{idx + 1}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: "block", fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: act.performer ? "var(--ink)" : "var(--faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{act.performer || "—"}</span>
+                  <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {[act.type, act.duration, act.sound_check ? `Sound check ${act.sound_check}` : ""].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </PocketRowCard>
+        </div>
+      )}
+
+      {acts.length > 0 && (
+        <div className="hidden md:grid" style={{ gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "0 4px 8px", borderBottom: "1px solid var(--line)" }}>
           {["#", "Performer", "Type", "Duration", "Sound Check", ""].map((h, i) => (
             <span key={i} style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--faint)" }}>{h}</span>
           ))}
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column" }}>
+      <div className="hidden md:flex" style={{ flexDirection: "column" }}>
         {acts.map((act, idx) => (
           <ListRow key={act.id} last={idx === acts.length - 1} style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "12px 4px", alignItems: "center" }}>
             <span style={{ fontSize: 13, color: "var(--faint)", textAlign: "center" }}>{idx + 1}</span>
@@ -9013,6 +9372,8 @@ function TeamsTab({
   onPlanChange: (p: EventPlan) => void
 }) {
   const supabase = createClient()
+  // Mobile restyle only (tonal borderless cards + ≥44px controls) — structure unchanged.
+  const isMobile = useIsMobile()
   const defaultTeams: TurkeyData = { teamA: { name: "Team A", members: [] }, teamB: { name: "Team B", members: [] }, commissioner: "" }
   const teamsData: TurkeyData = (plan.type_data?.turkey as TurkeyData | undefined) ?? defaultTeams
 
@@ -9035,7 +9396,7 @@ function TeamsTab({
   }
 
   const renderTeam = (teamKey: "teamA" | "teamB", team: TurkeyTeam) => (
-    <CentralCard variant="standard" radius="var(--r-callout)" padding={22} style={{ flex: 1 }}>
+    <CentralCard variant="standard" radius={isMobile ? "var(--r-pocket)" : "var(--r-callout)"} padding={isMobile ? 18 : 22} style={{ flex: 1, ...(isMobile ? { border: "none", background: "var(--ivory)" } : null) }}>
       {canEdit ? (
         <input value={team.name} onChange={e => updateTeamName(teamKey, e.target.value)} style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: "var(--ink)", letterSpacing: -0.3, background: "transparent", border: "none", outline: "none", width: "100%", padding: 0, marginBottom: 14 }} />
       ) : (
@@ -9052,7 +9413,7 @@ function TeamsTab({
           )
         })}
         {canEdit && (
-          <AddInlineSelect onChange={e => { addMember(teamKey, e.target.value); e.target.value = "" }} style={{ width: "auto", padding: "6px 10px", borderRadius: 8, color: "var(--muted-text)", fontSize: 12, marginTop: 4 }}>
+          <AddInlineSelect onChange={e => { addMember(teamKey, e.target.value); e.target.value = "" }} style={{ width: "auto", padding: isMobile ? "12px 10px" : "6px 10px", minHeight: isMobile ? 44 : undefined, borderRadius: 8, color: "var(--muted-text)", fontSize: 12, marginTop: 4 }}>
             <option value="">+ Add member…</option>
             {members.filter(m => !teamsData.teamA.members.includes(m.id) && !teamsData.teamB.members.includes(m.id)).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </AddInlineSelect>
@@ -9073,7 +9434,7 @@ function TeamsTab({
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{ fontSize: 14, color: "var(--body)", whiteSpace: "nowrap" }}>Commissioner:</span>
         {canEdit ? (
-          <select value={teamsData.commissioner} onChange={e => save({ ...teamsData, commissioner: e.target.value })} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--plum-2)", fontSize: 13, cursor: "pointer" }}>
+          <select value={teamsData.commissioner} onChange={e => save({ ...teamsData, commissioner: e.target.value })} style={{ padding: isMobile ? "12px 12px" : "6px 12px", minHeight: isMobile ? 44 : undefined, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--plum-2)", fontSize: 13, cursor: "pointer" }}>
             <option value="">Unassigned</option>
             {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
@@ -9101,6 +9462,8 @@ function TransportTab({
   onPlanChange: (p: EventPlan) => void
 }) {
   const supabase = createClient()
+  // Mobile restyle only (tonal borderless cards + ≥44px main controls) — structure unchanged.
+  const isMobile = useIsMobile()
   const [members, setMembers] = useState<{ id: string; name: string }[]>([])
   const cars: CarEntry[] = (plan.type_data?.transport as CarEntry[] | undefined) ?? []
 
@@ -9164,10 +9527,10 @@ function TransportTab({
           const driver = members.find(m => m.id === car.driver_id)
           const availableRiders = members.filter(m => !allRiderIds.includes(m.id) && m.id !== car.driver_id)
           return (
-            <CentralCard key={car.id} variant="standard" radius="var(--r-callout)" padding="18px 22px">
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            <CentralCard key={car.id} variant="standard" radius={isMobile ? "var(--r-pocket)" : "var(--r-callout)"} padding="18px 22px" style={isMobile ? { border: "none", background: "var(--ivory)" } : undefined}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: isMobile ? "wrap" : undefined }}>
                 {canEdit ? (
-                  <select value={car.driver_id} onChange={e => updateCar(car.id, { driver_id: e.target.value })} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--plum-2)", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
+                  <select value={car.driver_id} onChange={e => updateCar(car.id, { driver_id: e.target.value })} style={{ padding: isMobile ? "12px 10px" : "6px 10px", minHeight: isMobile ? 44 : undefined, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--plum-2)", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
                     <option value="">Driver…</option>
                     {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
@@ -9175,12 +9538,12 @@ function TransportTab({
                   <span style={{ fontSize: 14, fontWeight: 500, color: "var(--plum-2)" }}>{driver?.name ?? "No driver"}</span>
                 )}
                 {canEdit ? (
-                  <input value={car.vehicle} onChange={e => updateCar(car.id, { vehicle: e.target.value })} placeholder="Vehicle (e.g. Honda CR-V)" style={{ flex: 1, background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: "6px 10px" }} />
+                  <input value={car.vehicle} onChange={e => updateCar(car.id, { vehicle: e.target.value })} placeholder="Vehicle (e.g. Honda CR-V)" style={{ flex: 1, minWidth: isMobile ? 120 : undefined, background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: isMobile ? "12px 10px" : "6px 10px", minHeight: isMobile ? 44 : undefined, boxSizing: "border-box" }} />
                 ) : (
                   <span style={{ fontSize: 13, color: "var(--body)" }}>{car.vehicle || "—"}</span>
                 )}
                 {canEdit && (
-                  <input type="number" value={car.seats} onChange={e => updateCar(car.id, { seats: parseInt(e.target.value) || 4 })} min={1} max={15} style={{ width: 60, background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, padding: "6px 8px", textAlign: "center" }} />
+                  <input type="number" value={car.seats} onChange={e => updateCar(car.id, { seats: parseInt(e.target.value) || 4 })} min={1} max={15} style={{ width: 60, background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, padding: isMobile ? "12px 8px" : "6px 8px", minHeight: isMobile ? 44 : undefined, textAlign: "center", boxSizing: "border-box" }} />
                 )}
                 <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{car.rider_ids.length}/{car.seats} seats</span>
                 {canEdit && <IconButton dim={24} onClick={() => save(cars.filter(c => c.id !== car.id))} title="Remove car" style={{ marginLeft: "auto" }}><X className="w-3.5 h-3.5" /></IconButton>}
@@ -9228,6 +9591,8 @@ function ProgramTab({
   onPlanChange: (p: EventPlan) => void
 }) {
   const supabase = createClient()
+  // Mobile restyle only (kicker day labels + ≥44px controls) — structure unchanged.
+  const isMobile = useIsMobile()
   const sessions: ProgramSession[] = (plan.type_data?.program as ProgramSession[] | undefined) ?? []
 
   // Generate day list from event start → end
@@ -9266,7 +9631,7 @@ function ProgramTab({
         return (
           <div key={dayIdx} style={{ marginBottom: 36 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <p style={{ fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--body)", fontWeight: 500 }}>
+              <p style={isMobile ? { ...POCKET_KICKER_STYLE, margin: 0 } : { fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--body)", fontWeight: 500 }}>
                 Day {dayIdx + 1} — {dayLabel}
               </p>
               {canEdit && (
@@ -9282,17 +9647,17 @@ function ProgramTab({
             {daySessions.map((session, sIdx) => (
               <ListRow key={session.id} last={sIdx === daySessions.length - 1} style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 28px", gap: 12, padding: "12px 4px", alignItems: "center" }}>
                 {canEdit ? (
-                  <input value={session.time} onChange={e => updateSession(session.id, { time: e.target.value })} placeholder="7:00 PM" style={{ background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
+                  <input value={session.time} onChange={e => updateSession(session.id, { time: e.target.value })} placeholder="7:00 PM" style={{ background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: isMobile ? "12px 8px" : "4px 8px", minHeight: isMobile ? 44 : undefined, width: "100%", boxSizing: "border-box" }} />
                 ) : (
                   <span style={{ fontSize: 13, color: "var(--muted-text)", fontWeight: 500 }}>{session.time || "—"}</span>
                 )}
                 {canEdit ? (
-                  <input value={session.title} onChange={e => updateSession(session.id, { title: e.target.value })} placeholder="Session title…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", width: "100%" }} />
+                  <input value={session.title} onChange={e => updateSession(session.id, { title: e.target.value })} placeholder="Session title…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", width: "100%", minHeight: isMobile ? 44 : undefined }} />
                 ) : (
                   <span style={{ fontSize: 14, color: "var(--ink)" }}>{session.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>—</span>}</span>
                 )}
                 {canEdit ? (
-                  <select value={session.leader_id} onChange={e => updateSession(session.id, { leader_id: e.target.value })} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
+                  <select value={session.leader_id} onChange={e => updateSession(session.id, { leader_id: e.target.value })} style={{ padding: isMobile ? "12px 8px" : "4px 8px", minHeight: isMobile ? 44 : undefined, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
                     <option value="">No leader</option>
                     {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
@@ -9333,6 +9698,7 @@ function GroupsTab({
   generateTrigger?: number
 }) {
   const supabase = createClient()
+  const isMobile = useIsMobile()
   const [sessions, setSessions] = useState<GroupSessionRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [showWizard, setShowWizard] = useState(false)
@@ -9434,6 +9800,19 @@ function GroupsTab({
             </CentralButton>
           )}
         </div>
+      ) : isMobile ? (
+        <PocketRowCard>
+          {sessions.map((session, i) => (
+            <PocketRow
+              key={session.id}
+              title={session.name}
+              sub={`${session.num_groups} groups · ${session.num_people} people${session.config.smallGroupMode === true ? " · SG Mode" : ""}`}
+              chevron
+              isLast={i === sessions.length - 1}
+              onClick={() => setViewSession(session)}
+            />
+          ))}
+        </PocketRowCard>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {sessions.map(session => (
@@ -9442,7 +9821,6 @@ function GroupsTab({
               variant="standard"
               radius="var(--r-callout)"
               padding="18px 22px"
-              style={{ ...(confirmDeleteId === session.id ? { border: "1px solid var(--danger)" } : {}), transition: "border-color 0.15s" }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -9461,47 +9839,34 @@ function GroupsTab({
                   >
                     View
                   </button>
-                  {canEdit && confirmDeleteId !== session.id && (
+                  {canEdit && (
                     <button
                       onClick={() => setConfirmDeleteId(session.id)}
                       disabled={deletingId === session.id}
-                      style={{ padding: "6px 14px", border: "1px solid var(--line-2)", borderRadius: 8, background: "transparent", color: "var(--danger)", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: deletingId === session.id ? 0.5 : 1, fontFamily: "inherit" }}
+                      style={{ padding: "6px 14px", border: "1px solid var(--danger)", borderRadius: 8, background: "transparent", color: "var(--danger)", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: deletingId === session.id ? 0.5 : 1, fontFamily: "inherit" }}
                     >
                       {deletingId === session.id ? "Deleting…" : "Delete"}
                     </button>
                   )}
                 </div>
               </div>
-
-              {/* Inline confirmation row */}
-              {confirmDeleteId === session.id && (
-                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line-3)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 500, color: "var(--danger)", margin: 0 }}>Delete this grouping?</p>
-                    {session.config.smallGroupMode === true && (
-                      <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "3px 0 0" }}>This will also clear all small group assignments. DGLs will see the empty state until groups are re-confirmed.</p>
-                    )}
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                    <button
-                      onClick={() => setConfirmDeleteId(null)}
-                      style={{ padding: "6px 14px", border: "1px solid var(--line-2)", borderRadius: 8, background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => handleDelete(session)}
-                      style={{ padding: "6px 14px", border: "none", borderRadius: 8, background: "var(--danger)", color: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              )}
             </CentralCard>
           ))}
         </div>
       )}
+
+      {/* Delete confirm — routes through the canonical ConfirmDialog (§14),
+          replacing the retired inline #fff-on-danger two-step. */}
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Delete this grouping?"
+        message={sessions.find(s => s.id === confirmDeleteId)?.config.smallGroupMode === true
+          ? "This will also clear all small group assignments. DGLs will see the empty state until groups are re-confirmed."
+          : "This can't be undone."}
+        loading={deletingId !== null}
+        onConfirm={() => { const s = sessions.find(x => x.id === confirmDeleteId); if (s) handleDelete(s) }}
+        onClose={() => setConfirmDeleteId(null)}
+      />
 
       {showWizard && (
         <GroupGeneratorWizard
@@ -10715,7 +11080,7 @@ export function AddWorkspaceModal({ ministryId, userId, ownedKeys, onClose, onCr
                   key={preset.id}
                   onClick={() => handleSelect(preset)}
                   disabled={!!saving}
-                  className="w-full bg-[var(--ivory)] rounded-2xl border border-[var(--line)] p-4 text-left hover:border-[var(--plum)] transition-all md:p-5 disabled:opacity-60"
+                  className="w-full bg-[var(--ivory)] rounded-2xl border-0 md:border md:border-[var(--line)] p-4 text-left hover:border-[var(--plum)] transition-all md:p-5 disabled:opacity-60"
                 >
                   <div className="flex items-start gap-3">
                     <PlanLineIcon iconKey={preset.iconKey} size={40} />
@@ -11303,11 +11668,9 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
       {/* ── Mobile header — SubpageShell's `title` is desktop-only, so mobile keeps a
           self-contained header (team icon + name + inline actions). The mobile back
           row ("← {team}") is rendered by SubpageShell, so no ArrowLeft here. ── */}
-      <div className="md:hidden flex items-center justify-between mb-5" style={{ paddingBottom: 14, borderBottom: "1px solid var(--line)" }}>
+      <div className="md:hidden flex items-center justify-between mb-5" style={{ paddingBottom: 14, borderBottom: "1px solid var(--line-3)" }}>
         {showAddMember ? (
-          <button onClick={() => { setShowAddMember(false); setError(null) }} style={{ display: "flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--muted-text)", fontSize: 13, cursor: "pointer" }}>
-            <ArrowLeft style={{ width: 13, height: 13 }} /> Back to settings
-          </button>
+          <PocketBackRow label="Settings" onBack={() => { setShowAddMember(false); setError(null) }} style={{ marginBottom: 0 }} />
         ) : (
           <>
             <div className="flex items-center gap-2">
@@ -11334,7 +11697,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                 </button>
               ))}
               {canDelete && (
-                <button onClick={() => setConfirmDelete(true)} className="size-9 flex items-center justify-center rounded-full hover:bg-[#FDF0F0] transition-colors">
+                <button onClick={() => setConfirmDelete(true)} className="size-9 flex items-center justify-center rounded-full hover:bg-[color-mix(in_srgb,var(--danger)_8%,var(--cream))] transition-colors">
                   <Trash2 className="w-4 h-4 text-[var(--muted-text)]" />
                 </button>
               )}
@@ -11360,12 +11723,12 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         <p className="text-[13px] text-[var(--muted-text)] text-center py-4">No roles defined.</p>
                       )}
                       {roles.map((role) => (
-                        <div key={role.id} className="bg-[var(--cream)] rounded-2xl border border-[var(--line)] p-4">
+                        <div key={role.id} className="bg-[var(--ivory)] rounded-[var(--r-pocket)] p-4">
                           <p className="text-[14px] font-medium text-[var(--ink)] mb-2">{role.name}</p>
                           {role.permissions.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                               {role.permissions.map((p) => (
-                                <span key={p} className="text-[11px] bg-[var(--ivory)] border border-[var(--line)] text-[var(--body)] px-2 py-0.5 rounded-full">
+                                <span key={p} className="text-[11px] bg-[var(--line-2)] text-[var(--body)] px-2 py-0.5 rounded-full">
                                   {PERMISSION_LABELS[p] ?? p}
                                 </span>
                               ))}
@@ -11380,7 +11743,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                   {canManageTeam && (
                     <div>
                       <PlanSectionHeader>Leadership</PlanSectionHeader>
-                      <div className="bg-[var(--cream)] rounded-2xl border border-[var(--line)] p-4 flex flex-col gap-4">
+                      <div className="bg-[var(--ivory)] rounded-[var(--r-pocket)] p-4 flex flex-col gap-4">
                         <GgToggle
                           checked={allowCoPresidency}
                           onChange={handleToggleCoPresidency}
@@ -11388,7 +11751,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                           label="Co-presidency"
                           desc="Allow this team to have two presidents instead of one."
                         />
-                        <div className="h-px bg-[var(--line)]" />
+                        <div className="h-px bg-[var(--line-3)]" />
                         <GgToggle
                           checked={allowAdminMembers}
                           onChange={handleToggleAdminMembers}
@@ -11402,8 +11765,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3 flex-1 mr-3">
-                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.01em" }}>Members</span>
-                        <div className="flex-1 h-px bg-[var(--line)]" />
+                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.01em" }}>Members</span>
+                        <div className="flex-1 h-px bg-[var(--line-3)]" />
                       </div>
                       {canManageTeam && (
                         <button onClick={() => setShowAddMember(true)} className="text-[12px] font-medium text-[var(--plum)] hover:opacity-70 flex-shrink-0">
@@ -11417,8 +11780,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         const isConfirming = confirmRemoveId === m.user_id
                         const isRevealed = mobileRevealMemberId === m.user_id
                         return (
-                          <div key={m.user_id} className="flex items-center gap-3 rounded-xl border border-[var(--line)] p-3"
-                            style={{ background: isConfirming ? "#FDF0F0" : "var(--cream)", transition: "background 0.1s" }}
+                          <div key={m.user_id} className="flex items-center gap-3 rounded-[var(--r-pocket-sm)] p-3"
+                            style={{ background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--cream))" : "var(--ivory)", transition: "background 0.1s" }}
                             onClick={() => { if (canManageTeam && m.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === m.user_id ? null : m.user_id) }}
                           >
                             <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-medium" />
@@ -11923,7 +12286,28 @@ type DGLAssignmentRow = {
 
 const SLOT_ABBR: Record<DGLAvailSlot, string> = { wednesday: "WED", friday: "FRI", sunday: "SUN" }
 
-function SglSH({ eyebrow, title, sub, right }: { eyebrow: string; title: string; sub?: string; right?: React.ReactNode }) {
+// Mobile availability rows spell the duty out (the desktop matrix only fits SLOT_ABBR)
+const AVAIL_SLOT_LABELS: Record<DGLAvailSlot, string> = {
+  wednesday: "Prayer Meeting",
+  friday: "DG Cooking / Praise",
+  sunday: "Congregational Prayer / Dishes",
+}
+
+function SglSH({ eyebrow, title, sub, right, isMobile }: { eyebrow: string; title: string; sub?: string; right?: React.ReactNode; isMobile?: boolean }) {
+  // Mobile (Pocket) variant: mono 10px kicker + 18/600 sans sub-headline —
+  // desktop keeps the serif-22 editorial header untouched.
+  if (isMobile) {
+    return (
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, margin: "0 4px" }}>
+        <div>
+          <div style={POCKET_KICKER_STYLE}>{eyebrow}</div>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--ink)", margin: "5px 0 0", letterSpacing: "-0.01em", lineHeight: 1.2 }}>{title}</h2>
+          {sub && <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 3 }}>{sub}</div>}
+        </div>
+        {right && <div style={{ flexShrink: 0, marginTop: 2 }}>{right}</div>}
+      </div>
+    )
+  }
   return (
     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
       <div>
@@ -12566,16 +12950,18 @@ function SmallGroupLeadersTab({
         />
       )}
 
-      {/* ── Home Tab ──────────────────────────────────────────────────────── */}
+      {/* ── Home Tab — MOBILE-ONLY section (desktop SGL sidebar only offers
+          bible_study/schedule), styled to the Pocket grammar: borderless --ivory
+          cards at --r-pocket, kicker headers, PocketRow-grammar rows. ───────── */}
       {effectiveSection === "home" && !isPastor && !isDesktopView && (
-        <div className="grid grid-cols-1 md:grid-cols-[1.45fr_1fr] gap-6 md:gap-9 items-start">
+        <div className="flex flex-col gap-7 items-stretch">
 
-          {/* LEFT COLUMN — renewal banner + My Assignments */}
+          {/* Renewal banner + My Assignments */}
           <div className="flex flex-col gap-6">
 
           {/* June 1 renewal banner (president only) */}
           {isPresident && rosterStatus?.needs_roster_renewal && (
-            <div style={{ background: "color-mix(in srgb, var(--gold) 13%, var(--cream))", border: "1.5px solid color-mix(in srgb, var(--gold) 30%, var(--cream))", borderRadius: 14, padding: "16px 18px" }}>
+            <div style={{ background: "color-mix(in srgb, var(--gold) 13%, var(--cream))", borderRadius: "var(--r-pocket)", padding: "18px" }}>
               <p className="text-[14px] font-medium mb-1" style={{ color: "color-mix(in srgb, var(--gold) 65%, var(--ink))" }}>New semester — update your DGL roster?</p>
               <p className="text-[13px] mb-4" style={{ color: "color-mix(in srgb, var(--gold) 65%, var(--ink))" }}>
                 It&apos;s June 1. Do you want to carry over last semester&apos;s DGL roster for the fall, or start fresh?
@@ -12592,7 +12978,7 @@ function SmallGroupLeadersTab({
                 <button
                   onClick={() => handleRosterRenewal("fresh")}
                   disabled={renewalLoading}
-                  style={{ flex: 1, padding: "8px 0", background: "transparent", color: "color-mix(in srgb, var(--gold) 65%, var(--ink))", border: "1.5px solid color-mix(in srgb, var(--gold) 30%, var(--cream))", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
+                  style={{ flex: 1, padding: "8px 0", background: "transparent", color: "color-mix(in srgb, var(--gold) 65%, var(--ink))", border: "1.5px solid color-mix(in srgb, var(--gold) 30%, var(--cream))", borderRadius: 999, fontSize: 13, fontWeight: 500, cursor: renewalLoading ? "not-allowed" : "pointer", opacity: renewalLoading ? 0.6 : 1, fontFamily: "inherit" }}
                 >
                   Start fresh
                 </button>
@@ -12602,10 +12988,10 @@ function SmallGroupLeadersTab({
 
           {/* My Assignments */}
           <section>
-            <SglSH eyebrow="MY ASSIGNMENTS" title="What&apos;s on your plate" />
+            <SglSH isMobile eyebrow="MY ASSIGNMENTS" title="What&apos;s on your plate" />
             {myUpcoming.length === 0 ? (
               <div className="mt-4">
-                <EmptyState variant="bordered" icon={<Calendar className="w-6 h-6" />} title="Nothing scheduled yet" subtitle="Your schedule hasn't been published yet." />
+                <EmptyState icon={<Calendar className="w-6 h-6" />} title="Nothing scheduled yet" subtitle="Your schedule hasn't been published yet." />
               </div>
             ) : (() => {
               const todayStr = new Date().toISOString().split("T")[0]
@@ -12617,7 +13003,7 @@ function SmallGroupLeadersTab({
               }
               const firstUpcomingIdx = myUpcoming.findIndex(a => getDateStr(a) >= todayStr)
               return (
-                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
+                <div className="mt-4 rounded-[var(--r-pocket)] overflow-hidden" style={{ background: "var(--ivory)" }}>
                   {myUpcoming.map((a, i) => {
                     const sunday = new Date(a.week_date + "T12:00:00")
                     const d = new Date(sunday)
@@ -12637,27 +13023,27 @@ function SmallGroupLeadersTab({
                     return (
                       <div
                         key={a.id}
-                        className="flex items-center gap-4 px-5 py-4"
+                        className="flex items-center gap-3.5 px-[18px] py-[13px]"
                         style={{
                           borderTop: i === 0 ? "none" : "1px solid var(--line-3)",
                           borderLeft: isNext ? "3px solid var(--plum)" : "3px solid transparent",
-                          background: isNext ? "var(--cream-3)" : "transparent",
+                          background: isNext ? "color-mix(in srgb, var(--plum) 4%, transparent)" : "transparent",
                           opacity: isPast ? 0.4 : 1,
                           transition: "opacity 0.15s",
                         }}
                       >
-                        <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 48, height: 48, borderRadius: 10, background: isNext ? "var(--plum-tint)" : "var(--cream-3)", border: `1px solid ${isNext ? "color-mix(in srgb, var(--plum) 25%, transparent)" : "var(--line)"}` }}>
+                        <div className="flex-shrink-0 flex flex-col items-center justify-center" style={{ width: 44, height: 44, borderRadius: 14, background: isNext ? "var(--plum-tint)" : "var(--line-2)" }}>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase" as const }}>{dow}</span>
-                          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, color: isNext ? "var(--plum)" : "var(--plum-2)", lineHeight: 1, marginTop: 1 }}>{dayNum}</span>
+                          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: isNext ? "var(--plum)" : "var(--plum-2)", lineHeight: 1, marginTop: 1 }}>{dayNum}</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 19, color: isPast ? "var(--muted-text)" : "var(--ink)", letterSpacing: "-0.01em", textDecoration: isPast ? "line-through" : "none" }}>{DGL_SLOT_LABELS[a.slot]}</p>
-                          <p style={{ ...MONO_STYLE, marginTop: 3 }}>
+                          <p style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: isPast ? "var(--muted-text)" : "var(--ink)", textDecoration: isPast ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{DGL_SLOT_LABELS[a.slot]}</p>
+                          <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 2 }}>
                             {subLabel}
                           </p>
                         </div>
                         {isNext && (
-                          <span style={{ fontSize: 10, fontWeight: 500, color: "var(--plum)", background: "var(--plum-tint)", border: "1px solid color-mix(in srgb, var(--plum) 25%, transparent)", padding: "2px 8px", borderRadius: 999, letterSpacing: "0.05em", flexShrink: 0 }}>UP NEXT</span>
+                          <span style={{ fontSize: 10, fontWeight: 500, color: "var(--plum)", background: "var(--plum-tint)", padding: "3px 9px", borderRadius: 999, letterSpacing: "0.05em", flexShrink: 0 }}>UP NEXT</span>
                         )}
                       </div>
                     )
@@ -12667,21 +13053,22 @@ function SmallGroupLeadersTab({
             })()}
           </section>
 
-          </div>{/* end LEFT COLUMN */}
+          </div>{/* end assignments group */}
 
-          {/* RIGHT COLUMN — Roster + My Groups */}
+          {/* Roster + My Groups */}
           <div className="flex flex-col gap-6">
 
           {/* SMALL GROUP LEADER ROSTER (president only) */}
           {isPresident && (
             <section>
               <SglSH
+                isMobile
                 eyebrow={rosterStatus?.confirmed ? `${rosterMembers.length} DGLs · ${semesterLabel}` : "SGL ROSTER"}
                 title="Small Group Leaders"
                 right={rosterStatus?.confirmed && !rosterAddMode && !editingRoster ? (
                   <button
                     onClick={() => { setPendingRosterIds(new Set(rosterMembers.map(m => m.user_id))); setEditingRoster(true) }}
-                    style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}
+                    style={{ padding: "5px 8px", background: "none", border: "none", color: "var(--plum)", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
                   >
                     Edit
                   </button>
@@ -12699,24 +13086,24 @@ function SmallGroupLeadersTab({
                 <button
                   onClick={() => setRosterAddMode(true)}
                   className="w-full mt-4"
-                  style={{ background: "transparent", border: "1.5px dashed #D4CEDF", borderRadius: 14, padding: "24px 16px", textAlign: "center" as const, cursor: "pointer" }}
+                  style={{ background: "var(--ivory)", border: "1px dashed var(--dashed)", borderRadius: "var(--r-pocket)", padding: "24px 16px", textAlign: "center" as const, cursor: "pointer" }}
                 >
                   <p className="text-[14px] font-medium text-[var(--ink)] mb-1">No roster yet</p>
                   <p className="text-[13px] text-[var(--muted-text)] mb-3">Add DGLs to the {semesterLabel} roster.</p>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: "var(--plum)" }}>+ Add DGLs</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--plum)" }}>+ Add DGLs</span>
                 </button>
               )}
 
               {/* Add / Edit mode — member picker */}
               {(rosterAddMode || editingRoster) && (
-                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
+                <div className="mt-4 rounded-[var(--r-pocket)] overflow-hidden" style={{ background: "var(--ivory)" }}>
                   <div className="px-4 pt-4 pb-3 border-b border-[var(--line-3)]">
                     <input
                       type="text"
                       placeholder="Search members…"
                       value={memberSearch}
                       onChange={e => setMemberSearch(e.target.value)}
-                      style={{ width: "100%", border: "1px solid var(--line-2)", borderRadius: 10, padding: "8px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "var(--cream-panel)" }}
+                      style={{ width: "100%", border: "1px solid var(--line-2)", borderRadius: "var(--r-pocket-sm)", padding: "8px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "var(--cream)" }}
                     />
                   </div>
                   <div style={{ maxHeight: 240, overflowY: "auto" }}>
@@ -12741,7 +13128,7 @@ function SmallGroupLeadersTab({
                   <div className="flex gap-2 px-4 py-3 border-t border-[var(--line-3)]">
                     <button
                       onClick={() => { setRosterAddMode(false); setEditingRoster(false); setPendingRosterIds(new Set()); setMemberSearch("") }}
-                      style={{ flex: 1, padding: "8px 0", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 9, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                      style={{ flex: 1, padding: "8px 0", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 999, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                     >
                       Cancel
                     </button>
@@ -12759,11 +13146,11 @@ function SmallGroupLeadersTab({
 
               {/* Confirmed roster list */}
               {rosterStatus?.confirmed && !rosterAddMode && !editingRoster && (
-                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
+                <div className="mt-4 rounded-[var(--r-pocket)] overflow-hidden" style={{ background: "var(--ivory)", padding: "0 18px" }}>
                   {rosterMembers.map((m, i) => (
-                    <div key={m.user_id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)" }}>
+                    <div key={m.user_id} className="flex items-center gap-3 py-[13px]" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)" }}>
                       <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-medium" />
-                      <p className="flex-1 text-[14px] text-[var(--ink)]">{m.name}</p>
+                      <p className="flex-1 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">{m.name}</p>
                     </div>
                   ))}
                 </div>
@@ -12785,22 +13172,23 @@ function SmallGroupLeadersTab({
             return (
               <section key={group.id}>
                 <SglSH
+                  isMobile
                   eyebrow="MY SMALL GROUP"
                   title={group.name}
                   sub={`${group.type.charAt(0).toUpperCase()}${group.type.slice(1)} · ${members.length} member${members.length !== 1 ? "s" : ""}`}
                   right={isEditing ? (
                     <button
                       onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }}
-                      style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}
+                      style={{ padding: "5px 8px", background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
                     >Cancel</button>
                   ) : (
                     <button
                       onClick={() => { setEditingGroupId(group.id); setEditError(null) }}
-                      style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--plum)", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }}
+                      style={{ padding: "5px 8px", background: "none", border: "none", color: "var(--plum)", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
                     >Edit</button>
                   )}
                 />
-                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
+                <div className="mt-4 rounded-[var(--r-pocket)] overflow-hidden" style={{ background: "var(--ivory)" }}>
                   {members.length === 0 && !pendingAddMemberIds.size ? (
                     <div className="px-4 py-5 text-center"><p className="text-[13px] text-[var(--muted-text)]">No members yet.</p></div>
                   ) : (
@@ -12810,9 +13198,9 @@ function SmallGroupLeadersTab({
                         const isPendingRemove = pendingRemoveMemberIds.has(m.user_id)
                         const isConfirming = confirmRemoveSgMemberId === m.user_id
                         return (
-                          <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)", background: isPendingRemove || isConfirming ? "#FDF8F8" : "transparent" }}>
+                          <div key={m.id} className="flex items-center gap-3 px-[18px] py-[13px]" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)", background: isPendingRemove || isConfirming ? "color-mix(in srgb, var(--danger) 5%, transparent)" : "transparent" }}>
                             <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-medium" />
-                            <p className={`flex-1 text-[14px] ${isPendingRemove ? "line-through text-[var(--danger)]" : "text-[var(--ink)]"}`}>{m.name}</p>
+                            <p className={`flex-1 text-[15px] font-semibold tracking-[-0.01em] ${isPendingRemove ? "line-through text-[var(--danger)]" : "text-[var(--ink)]"}`}>{m.name}</p>
                             {isEditing ? (
                               isPendingRemove ? (
                                 <button onClick={() => setPendingRemoveMemberIds(prev => { const n = new Set(prev); n.delete(m.user_id); return n })} style={{ fontSize: 11, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Undo</button>
@@ -12836,10 +13224,10 @@ function SmallGroupLeadersTab({
                         const person = allMembersForPicker.find(p => p.id === uid)
                         if (!person) return null
                         return (
-                          <div key={uid} className="flex items-center gap-3 px-4 py-3 border-t border-[var(--line-3)]" style={{ background: "color-mix(in srgb, var(--plum) 3%, transparent)" }}>
+                          <div key={uid} className="flex items-center gap-3 px-[18px] py-[13px] border-t border-[var(--line-3)]" style={{ background: "color-mix(in srgb, var(--plum) 3%, transparent)" }}>
                             <MonogramChip initials={getInitials(person.name)} className="w-7 h-7 text-[11px] font-medium" />
-                            <p className="flex-1 text-[14px] text-[var(--ink)]">{person.name}</p>
-                            <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: "0.05em", color: "var(--plum)", background: "color-mix(in srgb, var(--plum) 6%, transparent)", border: "1px solid rgba(62,21,64,0.15)", borderRadius: 4, padding: "1px 5px", marginRight: 4 }}>ADDING</span>
+                            <p className="flex-1 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">{person.name}</p>
+                            <span style={{ fontSize: 9, fontWeight: 500, letterSpacing: "0.05em", color: "var(--plum)", background: "var(--plum-tint)", borderRadius: 999, padding: "2px 7px", marginRight: 4 }}>ADDING</span>
                             <IconButton dim={24} onClick={() => setPendingAddMemberIds(prev => { const n = new Set(prev); n.delete(uid); return n })} title="Remove"><X style={{ width: 13, height: 13 }} /></IconButton>
                           </div>
                         )
@@ -12850,8 +13238,8 @@ function SmallGroupLeadersTab({
                     <div className="border-t border-[var(--line-3)]">
                       {showSgAddPicker ? (
                         <div className="p-3">
-                          <input type="text" placeholder="Search members…" value={sgAddPickerSearch} onChange={e => setSgAddPickerSearch(e.target.value)} autoFocus style={{ width: "100%", border: "1px solid var(--line-2)", borderRadius: 10, padding: "7px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "var(--cream-panel)", marginBottom: 6 }} />
-                          <div style={{ maxHeight: 180, overflowY: "auto", borderRadius: 10, border: "1px solid var(--line)", background: "var(--cream-panel)" }}>
+                          <input type="text" placeholder="Search members…" value={sgAddPickerSearch} onChange={e => setSgAddPickerSearch(e.target.value)} autoFocus style={{ width: "100%", border: "1px solid var(--line-2)", borderRadius: "var(--r-pocket-sm)", padding: "7px 12px", fontSize: 13, fontFamily: "var(--font-inter)", outline: "none", background: "var(--cream)", marginBottom: 6 }} />
+                          <div style={{ maxHeight: 180, overflowY: "auto", borderRadius: "var(--r-pocket-sm)", background: "var(--cream)" }}>
                             {addableMembers.length === 0 ? (
                               <div className="px-4 py-4 text-center"><p style={{ fontSize: 12, color: "var(--muted-text)" }}>No members to add</p></div>
                             ) : addableMembers.map((p, i) => (
@@ -12877,22 +13265,22 @@ function SmallGroupLeadersTab({
                     {editError && <div style={{ marginBottom: 8, padding: "8px 12px", background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: 10, fontSize: 12, color: "var(--danger)" }}>{editError}</div>}
                     <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8, lineHeight: 1.5 }}>Changes sync to your group chat and will reflect immediately.</p>
                     <div className="flex gap-2">
-                      <button onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }} style={{ flex: 1, padding: "9px 0", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                      <button onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }} style={{ flex: 1, padding: "9px 0", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 999, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
                       <CentralButton variant="primary" size="sm" onClick={() => handleSgEditSave(group.id)} disabled={editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0)} style={{ flex: 1 }}>{editSaving ? "Saving…" : "Save changes"}</CentralButton>
                     </div>
                   </div>
                 )}
 
                 {pairedGroup && (
-                  <div className="mt-3">
-                    <p style={{ fontSize: 11, fontWeight: 400, color: "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const, marginBottom: 8 }}>Paired — {pairedGroup.name}</p>
-                    <div className="rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
+                  <div className="mt-4">
+                    <PocketKicker label={`Paired — ${pairedGroup.name}`} />
+                    <div className="rounded-[var(--r-pocket)] overflow-hidden" style={{ background: "var(--ivory)" }}>
                       {pairedMs.length === 0 ? (
-                        <div className="px-4 py-5 text-center"><p className="text-[13px] text-[var(--muted-text)]">No members yet.</p></div>
+                        <div className="px-[18px] py-5 text-center"><p className="text-[13px] text-[var(--muted-text)]">No members yet.</p></div>
                       ) : pairedMs.map((m, i) => (
-                        <div key={m.id} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)" }}>
+                        <div key={m.id} className="flex items-center gap-3 px-[18px] py-[13px]" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)" }}>
                           <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-medium" />
-                          <p className="text-[14px] text-[var(--ink)]">{m.name}</p>
+                          <p className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">{m.name}</p>
                         </div>
                       ))}
                     </div>
@@ -12906,7 +13294,7 @@ function SmallGroupLeadersTab({
             <EmptyState icon={<Users className="w-6 h-6" />} title="No small group assigned yet." subtitle="Your team president will assign you to a group." />
           )}
 
-          </div>{/* end RIGHT COLUMN */}
+          </div>{/* end roster + groups */}
 
         </div>
       )}
@@ -12917,12 +13305,14 @@ function SmallGroupLeadersTab({
 
           {/* Semester selector — president/admin only */}
           {isPresident && (
-            <div className="flex items-center gap-3">
-              <p style={{ ...EYEBROW_STYLE, margin: 0 }}>Semester</p>
+            <div className="flex items-center gap-3" style={isDesktopView ? undefined : { margin: "0 4px" }}>
+              <p style={isDesktopView ? { ...EYEBROW_STYLE, margin: 0 } : { ...POCKET_KICKER_STYLE, margin: 0 }}>Semester</p>
               <select
                 value={semester}
                 onChange={e => setSemester(e.target.value)}
-                style={{ fontSize: 13, padding: "6px 12px", border: "1px solid var(--line-2)", borderRadius: 9, background: "var(--cream-panel)", color: "var(--ink)", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
+                style={isDesktopView
+                  ? { fontSize: 13, padding: "6px 12px", border: "1px solid var(--line-2)", borderRadius: 9, background: "var(--cream-panel)", color: "var(--ink)", cursor: "pointer", outline: "none", fontFamily: "inherit" }
+                  : { fontSize: 13, padding: "8px 14px", border: "none", borderRadius: "var(--r-pocket-sm)", background: "var(--ivory)", color: "var(--ink)", cursor: "pointer", outline: "none", fontFamily: "inherit" }}
               >
                 {getSemesterOptions().map(opt => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -12933,11 +13323,11 @@ function SmallGroupLeadersTab({
 
           {/* Availability Grid — hidden for pastors */}
           {!isPastor && <div>
-            <SglSH eyebrow={`MY AVAILABILITY · ${semesterLabel}`} title="Mark when you&apos;re not available" sub="Changes save automatically." />
+            <SglSH isMobile={!isDesktopView} eyebrow={`MY AVAILABILITY · ${semesterLabel}`} title="Mark when you&apos;re not available" sub="Changes save automatically." />
 
             {!rosterConfirmedForSchedule ? (
               <div className="mt-4">
-                <EmptyState variant="bordered" icon={<Users className="w-6 h-6" />} title="Roster not confirmed" subtitle="The president needs to confirm the DGL roster before availability can be set." />
+                <EmptyState variant={isDesktopView ? "bordered" : "quiet"} icon={<Users className="w-6 h-6" />} title="Roster not confirmed" subtitle="The president needs to confirm the DGL roster before availability can be set." />
               </div>
             ) : (() => {
               const today = new Date().toISOString().split("T")[0]
@@ -12957,6 +13347,95 @@ function SmallGroupLeadersTab({
               const displayMembers = isPresident
                 ? scheduleRosterMembers
                 : scheduleRosterMembers.filter(m => m.user_id === userId)
+
+              // ── Mobile (Pocket): no horizontal-scroll matrix at phone width.
+              // Own availability = month-kicker groups of tappable date rows
+              // driving the SAME toggleBusy/busySet state; the president gets a
+              // read-only per-member summary — the full per-member/per-date
+              // matrix stays a desktop-only surface for now.
+              if (!isDesktopView) {
+                const iAmOnRoster = scheduleRosterMembers.some(m => m.user_id === userId)
+                return (
+                  <>
+                    <p className="text-[13px] text-[var(--muted-text)]" style={{ margin: "10px 4px 16px" }}>
+                      Tap the dates you&apos;re <span className="font-medium text-[var(--plum)]">not available</span>. Changes save automatically.
+                    </p>
+                    {!iAmOnRoster ? (
+                      <EmptyState icon={<Users className="w-6 h-6" />} title="You're not on this roster" subtitle="Only rostered DGLs mark availability." />
+                    ) : (
+                      <div className="flex flex-col gap-5">
+                        {monthGroups.map(group => (
+                          <div key={group.label}>
+                            <PocketKicker label={group.label} />
+                            <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "0 18px" }}>
+                              {group.dates.map(({ date, slot }, i) => {
+                                const key = `${date}::${slot}`
+                                const isBusy = busySet.has(key)
+                                const isPast = date < today
+                                const isSavingThis = savingSlot === key
+                                const d = new Date(date + "T12:00:00")
+                                const dayLabel = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+                                return (
+                                  <button
+                                    key={key}
+                                    onClick={() => toggleBusy(date, slot)}
+                                    disabled={isSavingThis}
+                                    style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", background: "none", border: "none", textAlign: "left", cursor: isSavingThis ? "not-allowed" : "pointer", padding: "12px 0", borderBottom: i < group.dates.length - 1 ? "1px solid var(--line-3)" : "none", opacity: isSavingThis ? 0.5 : isPast ? 0.45 : 1, fontFamily: "inherit" }}
+                                  >
+                                    <span style={{ flex: 1, minWidth: 0 }}>
+                                      <span style={{ display: "block", fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)" }}>{dayLabel}</span>
+                                      <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2 }}>{AVAIL_SLOT_LABELS[slot]}</span>
+                                    </span>
+                                    <span style={{ width: 24, height: 24, borderRadius: "var(--r-check)", flexShrink: 0, display: "grid", placeItems: "center", background: isBusy ? "var(--plum)" : "transparent", border: isBusy ? "none" : "1.5px solid var(--dashed)" }}>
+                                      {isBusy && <X style={{ width: 12, height: 12, color: "var(--cream-on-dark)" }} />}
+                                    </span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Done button — non-president DGLs only */}
+                    {!isPresident && iAmOnRoster && (
+                      <div className="mt-5 flex items-center gap-3" style={{ margin: "20px 4px 0" }}>
+                        {scheduleReady ? (
+                          <span style={{ fontSize: 13, color: "var(--success)", fontWeight: 500, display: "flex", alignItems: "center", gap: 6 }}>
+                            <Check style={{ width: 14, height: 14 }} /> Marked as done — the president will be notified.
+                          </span>
+                        ) : (
+                          <CentralButton variant="primary" size="md" onClick={handleMarkReady} style={{ width: "100%" }}>
+                            Done filling out →
+                          </CentralButton>
+                        )}
+                      </div>
+                    )}
+                    {/* President: read-only team summary (matrix stays desktop) */}
+                    {isPresident && scheduleRosterMembers.length > 0 && (
+                      <div className="mt-6">
+                        <PocketKicker label="Team availability" />
+                        <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "0 18px" }}>
+                          {scheduleRosterMembers.map((m, i) => {
+                            const busyCount = (allBusyMap.get(m.user_id) ?? new Set()).size
+                            const ready = memberReadiness.get(m.user_id) ?? false
+                            return (
+                              <div key={m.user_id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 0", borderBottom: i < scheduleRosterMembers.length - 1 ? "1px solid var(--line-3)" : "none" }}>
+                                <span style={{ flex: 1, minWidth: 0 }}>
+                                  <span style={{ display: "block", fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)" }}>{m.name}</span>
+                                  <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2 }}>{busyCount} date{busyCount === 1 ? "" : "s"} marked unavailable</span>
+                                </span>
+                                <span style={{ fontSize: 12, flexShrink: 0, color: ready ? "var(--success)" : "var(--muted-text)", fontWeight: ready ? 500 : 400 }}>{ready ? "Done" : "Pending"}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )
+              }
+
               return (
                 <>
                   <p className="text-[12px] text-[var(--muted-text)] mb-3 mt-3">
@@ -13057,16 +13536,17 @@ function SmallGroupLeadersTab({
           {/* Pastor: read-only view of published rotation */}
           {isPastor && (
             <div>
-              <SglSH eyebrow="ROTATION" title={`Published — ${semesterLabel}`} />
+              <SglSH isMobile={!isDesktopView} eyebrow="ROTATION" title={`Published — ${semesterLabel}`} />
               {existingAssignments.filter(a => a.published).length === 0 ? (
                 <div className="mt-4">
-                  <EmptyState variant="bordered" icon={<Calendar className="w-6 h-6" />} title="Not published yet" subtitle="The rotation hasn't been published yet." />
+                  <EmptyState variant={isDesktopView ? "bordered" : "quiet"} icon={<Calendar className="w-6 h-6" />} title="Not published yet" subtitle="The rotation hasn't been published yet." />
                 </div>
               ) : (
                 <div className="mt-4">
                   <DGLAssignmentTable
                     assignments={existingAssignments.filter(a => a.published)}
                     flaggedKeys={new Set()}
+                    isMobile={!isDesktopView}
                   />
                 </div>
               )}
@@ -13074,39 +13554,43 @@ function SmallGroupLeadersTab({
           )}
 
           {/* Rotation Assigner (president only) */}
-          {isPresident && !isPastor && (
+          {isPresident && !isPastor && (() => {
+            const btnRadius = isDesktopView ? 8 : 999
+            const rotationActions = (rotationPhase === "saved" || rotationPhase === "published") ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, background: rotationPhase === "published" ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--body-bg)", color: "var(--plum)", fontSize: 11, fontWeight: 500, letterSpacing: "0.02em" }}>
+                  {rotationPhase === "published" ? "Published" : "Draft"}
+                </span>
+                <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "6px 12px", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: btnRadius, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                  <Shuffle style={{ width: 11, height: 11 }} /> Re-generate
+                </button>
+                <button onClick={() => handlePublish(rotationPhase !== "published")} disabled={isPublishing} style={{ padding: "6px 12px", background: rotationPhase === "published" ? "transparent" : "var(--plum)", color: rotationPhase === "published" ? "var(--plum)" : "var(--cream-on-dark)", border: rotationPhase === "published" ? "1px solid var(--plum)" : "none", borderRadius: btnRadius, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isPublishing ? "not-allowed" : "pointer", opacity: isPublishing ? 0.6 : 1 }}>
+                  {isPublishing ? "…" : rotationPhase === "published" ? "Unpublish" : "Publish"}
+                </button>
+              </div>
+            ) : null
+            return (
             <div>
               <SglSH
-                eyebrow="ROTATION · WED PM · FRI SG · SUN SERVICE"
+                isMobile={!isDesktopView}
+                eyebrow={isDesktopView ? "ROTATION · WED PM · FRI SG · SUN SERVICE" : "ROTATION"}
                 title="Rotation Assigner"
-                right={rotationPhase !== "idle" ? (
-                  <div className="flex items-center gap-2">
-                    {(rotationPhase === "saved" || rotationPhase === "published") && (
-                      <>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 999, background: rotationPhase === "published" ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--body-bg)", color: "var(--plum)", fontSize: 11, fontWeight: 500, letterSpacing: "0.02em" }}>
-                          {rotationPhase === "published" ? "Published" : "Draft"}
-                        </span>
-                        <button onClick={handleGenerate} disabled={isGenerating} style={{ padding: "6px 12px", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isGenerating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 5 }}>
-                          <Shuffle style={{ width: 11, height: 11 }} /> Re-generate
-                        </button>
-                        <button onClick={() => handlePublish(rotationPhase !== "published")} disabled={isPublishing} style={{ padding: "6px 12px", background: rotationPhase === "published" ? "transparent" : "var(--plum)", color: rotationPhase === "published" ? "var(--plum)" : "var(--cream-on-dark)", border: rotationPhase === "published" ? "1px solid var(--plum)" : "none", borderRadius: 8, fontSize: 12, fontWeight: 500, fontFamily: "inherit", cursor: isPublishing ? "not-allowed" : "pointer", opacity: isPublishing ? 0.6 : 1 }}>
-                          {isPublishing ? "…" : rotationPhase === "published" ? "Unpublish" : "Publish"}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                ) : undefined}
+                right={isDesktopView ? (rotationActions ?? undefined) : undefined}
               />
+              {/* Mobile: the action cluster won't fit beside a kicker — stack it under the header */}
+              {!isDesktopView && rotationActions && (
+                <div style={{ margin: "12px 4px 0" }}>{rotationActions}</div>
+              )}
 
               {/* DGL readiness summary */}
               {rosterConfirmedForSchedule && scheduleRosterMembers.length > 0 && (
-                <div className="mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
-                  <div className="px-5 py-3 border-b border-[var(--line-3)]" style={{ background: "var(--cream-3)" }}>
-                    <p style={{ ...MONO_STYLE, margin: 0 }}>
+                <div className={isDesktopView ? "mt-4 rounded-[14px] border border-[var(--line)] overflow-hidden" : "mt-4 rounded-[var(--r-pocket)] overflow-hidden"} style={{ background: isDesktopView ? "var(--cream-panel)" : "var(--ivory)" }}>
+                  <div className={isDesktopView ? "px-5 py-3 border-b border-[var(--line-3)]" : "px-[18px] pt-3.5 pb-3 border-b border-[var(--line-3)]"} style={isDesktopView ? { background: "var(--cream-3)" } : undefined}>
+                    <p style={isDesktopView ? { ...MONO_STYLE, margin: 0 } : { ...POCKET_KICKER_STYLE, margin: 0 }}>
                       Availability Status · {scheduleRosterMembers.filter(m => memberReadiness.get(m.user_id)).length}/{scheduleRosterMembers.length} Done
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2 px-5 py-3">
+                  <div className={isDesktopView ? "flex flex-wrap gap-2 px-5 py-3" : "flex flex-wrap gap-2 px-[18px] py-3.5"}>
                     {scheduleRosterMembers.map(m => {
                       const ready = memberReadiness.get(m.user_id) ?? false
                       return (
@@ -13123,7 +13607,7 @@ function SmallGroupLeadersTab({
 
               {!rosterConfirmedForSchedule ? (
                 <div className="mt-4">
-                  <EmptyState variant="bordered" icon={<Users className="w-6 h-6" />} title="Roster required" subtitle="Confirm the DGL roster on the Home tab first to generate a rotation." />
+                  <EmptyState variant={isDesktopView ? "bordered" : "quiet"} icon={<Users className="w-6 h-6" />} title="Roster required" subtitle="Confirm the DGL roster on the Home tab first to generate a rotation." />
                 </div>
               ) : (
                 <>
@@ -13135,7 +13619,7 @@ function SmallGroupLeadersTab({
 
                   {rotationPhase === "idle" && (
                     <div className="mt-4" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-                      <EmptyState variant="bordered" icon={<Shuffle className="w-6 h-6" />} title="No rotation yet" subtitle={`Generate a fair rotation from DGL availability for ${semesterLabel}.`} />
+                      <EmptyState variant={isDesktopView ? "bordered" : "quiet"} icon={<Shuffle className="w-6 h-6" />} title="No rotation yet" subtitle={`Generate a fair rotation from DGL availability for ${semesterLabel}.`} />
                       <CentralButton variant="primary" size="md" onClick={handleGenerate} disabled={isGenerating}>
                         {isGenerating ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Generating…</> : <><Shuffle style={{ width: 14, height: 14 }} /> Generate Rotation</>}
                       </CentralButton>
@@ -13157,6 +13641,38 @@ function SmallGroupLeadersTab({
                           const rows = byMonth.get(month)!
                           const weekDates = [...new Set(rows.map(r => r.week_date))].sort()
                           const isOpen = openRotMonths.has(month)
+                          const monthTable = (
+                            <DGLAssignmentTable
+                              assignments={rows}
+                              flaggedKeys={new Set()}
+                              rosterMembers={scheduleRosterMembers}
+                              isMobile={!isDesktopView}
+                              onSwap={(wd, slot, uid, name) => {
+                                setExistingAssignments(prev => prev.map(a =>
+                                  a.week_date === wd && a.slot === slot ? { ...a, user_id: uid, user_name: name } : a
+                                ))
+                                if (rotationPhase === "published") {
+                                  const row = existingAssignments.find(a => a.week_date === wd && a.slot === slot)
+                                  if (row) void supabase.from("dgl_assignments").update({ user_id: uid }).eq("id", row.id)
+                                }
+                              }}
+                            />
+                          )
+                          // Mobile: no card-in-card — flat kicker-row disclosure, ivory
+                          // week cards render directly beneath it.
+                          if (!isDesktopView) return (
+                            <div key={month}>
+                              <button
+                                onClick={() => setOpenRotMonths(prev => { const n = new Set(prev); isOpen ? n.delete(month) : n.add(month); return n })}
+                                className="w-full flex items-center gap-2 text-left"
+                                style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: "6px 4px 8px" }}
+                              >
+                                <ChevronDown style={{ width: 14, height: 14, color: "var(--muted-text)", flexShrink: 0, transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
+                                <span style={{ ...POCKET_KICKER_STYLE, flex: 1, textAlign: "left" }}>{month} · {weekDates.length} weeks</span>
+                              </button>
+                              {isOpen && monthTable}
+                            </div>
+                          )
                           return (
                             <div key={month} className="rounded-[14px] border border-[var(--line)] overflow-hidden" style={{ background: "var(--cream-panel)" }}>
                               <button
@@ -13170,20 +13686,7 @@ function SmallGroupLeadersTab({
                               </button>
                               {isOpen && (
                                 <div style={{ borderTop: "1px solid var(--line-3)" }}>
-                                  <DGLAssignmentTable
-                                    assignments={rows}
-                                    flaggedKeys={new Set()}
-                                    rosterMembers={scheduleRosterMembers}
-                                    onSwap={(wd, slot, uid, name) => {
-                                      setExistingAssignments(prev => prev.map(a =>
-                                        a.week_date === wd && a.slot === slot ? { ...a, user_id: uid, user_name: name } : a
-                                      ))
-                                      if (rotationPhase === "published") {
-                                        const row = existingAssignments.find(a => a.week_date === wd && a.slot === slot)
-                                        if (row) void supabase.from("dgl_assignments").update({ user_id: uid }).eq("id", row.id)
-                                      }
-                                    }}
-                                  />
+                                  {monthTable}
                                 </div>
                               )}
                             </div>
@@ -13196,7 +13699,7 @@ function SmallGroupLeadersTab({
                   {rotationPhase === "generated" && (
                     <div className="mt-4">
                       {flagged.length > 0 && (
-                        <div className="mb-3 px-3 py-2.5 rounded-xl" style={{ background: "color-mix(in srgb, var(--gold) 13%, var(--cream))", border: "1px solid color-mix(in srgb, var(--gold) 30%, var(--cream))" }}>
+                        <div className={isDesktopView ? "mb-3 px-3 py-2.5 rounded-xl" : "mb-3 px-4 py-3 rounded-[var(--r-pocket-sm)]"} style={{ background: "color-mix(in srgb, var(--gold) 13%, var(--cream))", border: isDesktopView ? "1px solid color-mix(in srgb, var(--gold) 30%, var(--cream))" : "none" }}>
                           <p style={{ fontSize: 12, fontWeight: 500, color: "color-mix(in srgb, var(--gold) 65%, var(--ink))", marginBottom: 4 }}>
                             {flagged.length} week{flagged.length !== 1 ? "s" : ""} need review
                           </p>
@@ -13215,6 +13718,7 @@ function SmallGroupLeadersTab({
                         }))}
                         flaggedKeys={flaggedKeys}
                         rosterMembers={scheduleRosterMembers}
+                        isMobile={!isDesktopView}
                         onSwap={(wd, slot, uid, name) => {
                           setProposedAssignments(prev => prev.map(a =>
                             a.week_date === wd && a.slot === slot ? { ...a, user_id: uid, user_name: name } : a
@@ -13224,7 +13728,7 @@ function SmallGroupLeadersTab({
                       <div className="flex items-center justify-between mt-4">
                         <button
                           onClick={() => { setProposedAssignments([]); setFlagged([]); setRotationPhase(existingAssignments.length === 0 ? "idle" : existingAssignments.some(r => r.published) ? "published" : "saved") }}
-                          style={{ padding: "9px 18px", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 9, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" }}
+                          style={{ padding: "9px 18px", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: isDesktopView ? 9 : 999, fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" }}
                         >
                           Discard
                         </button>
@@ -13237,7 +13741,8 @@ function SmallGroupLeadersTab({
                 </>
               )}
             </div>
-          )}
+            )
+          })()}
         </div>
       )}
       </div>
@@ -14018,11 +14523,15 @@ function DGLAssignmentTable({
   flaggedKeys,
   onSwap,
   rosterMembers,
+  isMobile,
 }: {
   assignments: DGLAssignmentRow[]
   flaggedKeys: Set<string>
   onSwap?: (weekDate: string, slot: DGLSlot, newUserId: string, newUserName: string) => void
   rosterMembers?: { user_id: string; name: string }[]
+  // Pocket surface: borderless --ivory week cards at --r-pocket (desktop keeps
+  // the bordered cream-panel cards). The select-swap is already touch-safe.
+  isMobile?: boolean
 }) {
   const [editingCell, setEditingCell] = useState<{ weekDate: string; slot: DGLSlot } | null>(null)
   const [hoveredCell, setHoveredCell] = useState<{ weekDate: string; slot: DGLSlot } | null>(null)
@@ -14039,15 +14548,21 @@ function DGLAssignmentTable({
   )
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className={isMobile ? "flex flex-col gap-3" : "flex flex-col gap-2"}>
       {weeks.map(wd => {
         const weekRows = byWeek.get(wd) ?? []
         const d = new Date(wd + "T12:00:00")
         const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
         const hasFlagged = SLOTS.some(s => flaggedKeys.has(`${wd}::${s}`))
         return (
-          <div key={wd} className="rounded-[12px] border overflow-hidden" style={{ background: "var(--cream-panel)", borderColor: hasFlagged ? "color-mix(in srgb, var(--gold) 30%, var(--cream))" : "var(--line)" }}>
-            <div className="px-4 py-2.5 border-b flex items-center justify-between" style={{ borderBottomColor: hasFlagged ? "color-mix(in srgb, var(--gold) 30%, var(--cream))" : "var(--line-3)", background: hasFlagged ? "color-mix(in srgb, var(--gold) 13%, var(--cream))" : "var(--cream-3)" }}>
+          <div
+            key={wd}
+            className={isMobile ? "rounded-[var(--r-pocket)] overflow-hidden" : "rounded-[12px] border overflow-hidden"}
+            style={isMobile
+              ? { background: hasFlagged ? "color-mix(in srgb, var(--gold) 8%, var(--ivory))" : "var(--ivory)" }
+              : { background: "var(--cream-panel)", borderColor: hasFlagged ? "color-mix(in srgb, var(--gold) 30%, var(--cream))" : "var(--line)" }}
+          >
+            <div className={isMobile ? "px-[18px] py-2.5 border-b flex items-center justify-between" : "px-4 py-2.5 border-b flex items-center justify-between"} style={{ borderBottomColor: hasFlagged ? "color-mix(in srgb, var(--gold) 30%, var(--cream))" : "var(--line-3)", background: hasFlagged ? "color-mix(in srgb, var(--gold) 13%, var(--cream))" : (isMobile ? "transparent" : "var(--cream-3)") }}>
               <span style={{ fontSize: 12, fontWeight: 500, color: hasFlagged ? "color-mix(in srgb, var(--gold) 65%, var(--ink))" : "var(--body)" }}>{dateStr}</span>
               {hasFlagged && (
                 <span style={{ fontSize: 10, fontWeight: 500, color: "color-mix(in srgb, var(--gold) 65%, var(--ink))", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
@@ -14063,7 +14578,7 @@ function DGLAssignmentTable({
               const isEditing = !isFriday && editingCell?.weekDate === wd && editingCell?.slot === slot
               const isHovered = !isFriday && hoveredCell?.weekDate === wd && hoveredCell?.slot === slot
               return (
-                <div key={slot} className={`px-4 py-2.5 flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[var(--line-3)]" : ""}`} style={isFlagged ? { background: "color-mix(in srgb, var(--gold) 13%, var(--cream))" } : undefined}>
+                <div key={slot} className={`${isMobile ? "px-[18px] py-3" : "px-4 py-2.5"} flex items-center justify-between ${si < SLOTS.length - 1 ? "border-b border-[var(--line-3)]" : ""}`} style={isFlagged ? { background: "color-mix(in srgb, var(--gold) 13%, var(--cream))" } : undefined}>
                   <span style={{ fontSize: 11, fontWeight: 500, color: isFlagged ? "color-mix(in srgb, var(--gold) 65%, var(--ink))" : "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" as const }}>
                     {DGL_SLOT_LABELS[slot]}
                   </span>

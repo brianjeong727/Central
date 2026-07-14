@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef } from "react"
 import useSWR from "swr"
-import { Search, ArrowLeft, MessageCircle, Heart, Users, Flag, Ban, UserCheck } from "lucide-react"
+import { Search, ArrowLeft, MessageCircle, MoreHorizontal, Heart, Users, Flag, Ban, UserCheck } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { EmptyState } from "../components/shared"
-import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, SubpageShell, ActionMenu } from "@/components/central"
+import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, SubpageShell, ActionMenu, PocketCard, PocketRow, PocketRowCard, PocketKicker } from "@/components/central"
 import type { ActionMenuItem } from "@/components/central"
 import { getInitials } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
@@ -15,10 +15,30 @@ import { useBlocks } from "../use-blocks"
 import { blockUser, unblockUser } from "@/app/actions/blocks"
 import type { DirectoryMember, DirectoryMemberDetail } from "../types"
 
+// Borderless tonal role tag for phone-width surfaces (mobile spec §3.7): elevated
+// roles carry the plum fill; member/visitor get a --line-2 tonal pill. No borders.
+function MobileRoleTag({ role, userId }: { role: string; userId: string }) {
+  const elevated = ["admin", "leader", "deacon", "elder", "pastor"].includes(role.toLowerCase())
+  return (
+    <span style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase", borderRadius: 999, padding: "2px 7px", flexShrink: 0, background: elevated ? "var(--plum)" : "var(--line-2)", color: elevated ? "var(--cream-on-dark)" : "var(--body)" }}>
+      {roleLabel(role, userId)}
+    </span>
+  )
+}
+
+// "You" identity tag — tonal, borderless, shares the §3.7 mono-pill grammar.
+function MobileYouTag() {
+  return (
+    <span style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase", borderRadius: 999, padding: "2px 7px", flexShrink: 0, background: "var(--line-2)", color: "var(--body)" }}>You</span>
+  )
+}
+
 // Shared Report/Block overflow menu for a directory member (§1.2). Used by both
 // the desktop detail panel and the mobile member sheet. Only rendered for other
-// members (never your own profile).
-function MemberActionsMenu({ member, currentUserId }: { member: DirectoryMember; currentUserId: string }) {
+// members (never your own profile). `pocketTrigger` swaps the desktop kebab
+// IconButton for a 44px tonal round trigger (mobile §3.3 quiet-on-card, ≥34px
+// tap target) so it sits flush beside the Send Message primary.
+function MemberActionsMenu({ member, currentUserId, pocketTrigger = false }: { member: DirectoryMember; currentUserId: string; pocketTrigger?: boolean }) {
   const { blocked, blockedIds, mutate } = useBlocks(currentUserId)
   const [reporting, setReporting] = useState(false)
   const isBlocked = blockedIds.has(member.id)
@@ -49,7 +69,20 @@ function MemberActionsMenu({ member, currentUserId }: { member: DirectoryMember;
 
   return (
     <>
-      <ActionMenu items={items} triggerLabel="Member actions" />
+      <ActionMenu
+        items={items}
+        triggerLabel="Member actions"
+        renderTrigger={pocketTrigger ? ({ open, toggle }) => (
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label="Member actions"
+            style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 999, border: "none", background: "var(--cream)", color: "var(--plum)", display: "grid", placeItems: "center", cursor: "pointer", opacity: open ? 0.7 : 1 }}
+          >
+            <MoreHorizontal size={18} />
+          </button>
+        ) : undefined}
+      />
       {reporting && (
         <ReportModal
           targetType="profile"
@@ -300,24 +333,26 @@ export function DirectoryTab({
       {/* ── Mobile: member list (hidden while a member subpage is open) ── */}
       {!mobileSelected && (
       <div className="md:hidden">
+        {/* Chrome row (mobile spec §2.1): back chevron + 22px serif title inline */}
         <div className="px-5 pt-14 pb-5">
-          <div className="flex items-center gap-2.5 mb-4">
+          <div className="flex items-center gap-2 mb-4">
             {onBack && (
-              <button onClick={onBack} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[var(--body-bg)] transition-colors -ml-1 mr-0.5" aria-label="Back">
+              <button onClick={onBack} className="flex items-center justify-center rounded-full -ml-1" style={{ width: 34, height: 34, flexShrink: 0 }} aria-label="Back">
                 <ArrowLeft className="w-5 h-5" style={{ color: "var(--plum)" }} />
               </button>
             )}
-            <span style={{ fontFamily: "var(--serif)", fontSize: "36px", color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1, fontWeight: 600 }}>Directory</span>
+            <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.1, fontWeight: 600 }}>Directory</span>
           </div>
+          {/* Tonal search pill (§3.6): --ivory, borderless, radius --r-pocket-sm */}
           <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--muted-text)" }} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--muted-text)" }} />
             <input
               type="text"
               placeholder="Search members…"
               value={mobileSearch}
               onChange={(e) => setMobileSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border text-[13px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20 focus:border-[var(--plum)]/30 transition-all"
-              style={{ background: "var(--cream)", borderColor: "var(--line)", color: "var(--ink)" }}
+              className="w-full pl-10 pr-4 py-3 text-[13px] placeholder:text-[var(--muted-text)] focus:outline-none"
+              style={{ background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", color: "var(--ink)" }}
             />
           </div>
         </div>
@@ -333,38 +368,27 @@ export function DirectoryTab({
             />
           </div>
         ) : (
-          <div className="px-5 pb-4 flex flex-col gap-3">
-            {mobileFiltered.map((member) => (
-              <button
-                key={member.id}
-                onClick={() => setMobileSelected(member)}
-                className="w-full rounded-2xl border p-4 text-left transition-all"
-                style={{
-                  background: "var(--cream)",
-                  borderColor: "var(--line)",
-                }}
-              >
-                <div className="flex items-center gap-3.5">
-                  <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-11 h-11 font-medium text-[11px] tracking-wide" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium text-[14px] tracking-tight" style={{ color: "var(--ink)" }}>{member.name}</h3>
-                      {member.id === currentUserId && (
-                        <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full uppercase tracking-wide" style={{ background: "var(--ivory)", color: "var(--muted-text)" }}>You</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {member.graduation_year && <span className="text-[11px] font-medium" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
-                      {member.role && (
-                        <span className={`text-[10px] font-medium px-2.5 py-0.5 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-[var(--cream)] text-[var(--muted-text)] border-[var(--dashed)]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
-                          {roleLabel(member.role, member.id)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
+          <div className="px-5 pb-4">
+            <PocketKicker label={`${mobileFiltered.length} ${mobileFiltered.length === 1 ? "member" : "members"}`} />
+            <PocketRowCard>
+              {mobileFiltered.map((member, i) => (
+                <PocketRow
+                  key={member.id}
+                  leading={<MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10" style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 500 }} />}
+                  title={member.name}
+                  titleAccessory={
+                    <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                      {member.role && <MobileRoleTag role={member.role} userId={member.id} />}
+                      {member.id === currentUserId && <MobileYouTag />}
+                    </span>
+                  }
+                  sub={member.graduation_year ? `Class of ${member.graduation_year}` : undefined}
+                  chevron
+                  isLast={i === mobileFiltered.length - 1}
+                  onClick={() => setMobileSelected(member)}
+                />
+              ))}
+            </PocketRowCard>
           </div>
         )}
       </div>
@@ -628,28 +652,47 @@ export function MemberSheet({
 
   return (
     <SubpageShell crumbs={[{ label: "Directory", onClick: onClose }, { label: member.name }]} width="full">
-        {/* Identity block */}
+        {/* Identity card (mobile §4 Profile recipe): avatar + name + tags/meta,
+            privacy caption demoted to a muted line inside the card, and the
+            actions row (plum Send Message primary + tonal kebab) living IN the
+            card — no floating fragments, no stray hairline at the bottom. */}
         <div>
-          <div className="flex flex-col items-center mb-7">
-            <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-20 h-20 font-medium text-2xl mb-4" />
-            <h1 className="text-[22px] font-medium text-[var(--ink)] tracking-tight mb-2">{member.name}</h1>
-            <div className="flex items-center gap-2 flex-wrap justify-center">
-              {member.graduation_year && (
-                <span className="text-[12px] text-[var(--muted-text)]">Class of {member.graduation_year}</span>
-              )}
-              {member.role && (
-                <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full uppercase tracking-wide border ${["admin","leader","deacon","elder"].includes(member.role.toLowerCase()) ? "bg-[var(--plum)] text-white border-[var(--plum)]" : member.role.toLowerCase() === "visitor" ? "bg-[var(--cream)] text-[var(--muted-text)] border-[var(--dashed)]" : "bg-[var(--body-bg)] text-[var(--plum)] border-transparent"}`}>
-                  {roleLabel(member.role, member.id)}
-                </span>
-              )}
-              {isOwnProfile && (
-                <span className="text-[10px] bg-[var(--plum)]/10 text-[var(--plum)] font-medium px-2.5 py-1 rounded-full uppercase tracking-wide">You</span>
-              )}
+          <PocketCard style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <MonogramChip
+                initials={getInitials(member.name)}
+                avatarUrl={member.avatar_url}
+                className="flex-shrink-0"
+                style={{ width: 56, height: 56, fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500 }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h1 style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", margin: 0, lineHeight: 1.15 }}>{member.name}</h1>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                  {member.role && <MobileRoleTag role={member.role} userId={member.id} />}
+                  {isOwnProfile && <MobileYouTag />}
+                  {member.graduation_year && (
+                    <span style={{ fontSize: 12.5, color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>
+                  )}
+                </div>
+              </div>
             </div>
-            <p className="mt-3 text-[12px] text-[var(--muted-text)] text-center leading-relaxed max-w-[270px]">
+            <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5, margin: "12px 0 0" }}>
               Shared profile details are visible to members in this ministry.
             </p>
-          </div>
+            {!isOwnProfile && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
+                <button
+                  onClick={handleSendMessage}
+                  disabled={dmLoading}
+                  className="active:scale-[0.97] transition-transform duration-150 disabled:opacity-50"
+                  style={{ flex: 1, minHeight: 44, borderRadius: 999, background: "var(--plum)", color: "var(--cream)", border: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.01em", cursor: dmLoading ? "not-allowed" : "pointer" }}
+                >
+                  {dmLoading ? "Opening chat…" : "Send Message"}
+                </button>
+                <MemberActionsMenu member={member} currentUserId={currentUserId} pocketTrigger />
+              </div>
+            )}
+          </PocketCard>
 
           {(() => {
             const monoLabel: React.CSSProperties = { fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0, marginBottom: 4 }
@@ -693,9 +736,16 @@ export function MemberSheet({
             ].filter(s => s.fields.length > 0)
 
             if (sections.length === 0) {
+              // Quiet EmptyState grammar (mobile §3.8) — never a lone floating sentence.
               return (
-                <div className="flex items-center justify-center py-10">
-                  <p className="text-[13px] text-[var(--muted-text)]/60">No details shared yet</p>
+                <div style={{ paddingTop: 20 }}>
+                  <EmptyState
+                    icon={<Users className="w-6 h-6" strokeWidth={1.5} />}
+                    title="No details shared yet"
+                    subtitle={isOwnProfile
+                      ? "Details you add on your Profile show up here."
+                      : `Details ${member.name.split(" ")[0]} shares will show up here.`}
+                  />
                 </div>
               )
             }
@@ -704,10 +754,10 @@ export function MemberSheet({
               <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                 {sections.map(section => (
                   <div key={section.id}>
-                    <p style={{ ...monoLabel, marginBottom: 10 }}>{section.label}</p>
-                    <div style={{ border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", background: "var(--cream-2)" }}>
+                    <PocketKicker label={section.label} />
+                    <div style={{ borderRadius: "var(--r-pocket)", overflow: "hidden", background: "var(--ivory)" }}>
                       {section.fields.map((field, i) => (
-                        <div key={field.label} style={{ padding: "14px 18px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
+                        <div key={field.label} style={{ padding: "14px 18px", borderTop: i > 0 ? "1px solid var(--line-3)" : "none" }}>
                           <p style={monoLabel}>{field.label}</p>
                           <p style={{ fontSize: 14, color: field.italic ? "var(--plum)" : "var(--ink)", lineHeight: 1.65, whiteSpace: "pre-wrap", margin: 0, fontStyle: field.italic ? "italic" : "normal", fontFamily: field.italic ? "var(--font-instrument-serif)" : "inherit" }}>{field.value}</p>
                         </div>
@@ -719,19 +769,6 @@ export function MemberSheet({
             )
           })()}
         </div>
-
-        {!isOwnProfile && (
-          <div style={{ marginTop: 28, borderTop: "1px solid var(--line)", paddingTop: 18, display: "flex", gap: 10, alignItems: "center" }}>
-            <button
-              onClick={handleSendMessage}
-              disabled={dmLoading}
-              className="flex-1 bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-medium py-4 rounded-xl active:scale-[0.97] transition-[transform,background-color] duration-150 text-[14px] tracking-wide"
-            >
-              {dmLoading ? "Opening chat…" : "Send Message"}
-            </button>
-            <MemberActionsMenu member={member} currentUserId={currentUserId} />
-          </div>
-        )}
     </SubpageShell>
   )
 }

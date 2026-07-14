@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, type ReactNode } from "react"
 import { Archive, ArchiveRestore, Check, ChevronDown, ChevronLeft, ChevronRight, Edit3, FileText, Plus, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE, EYEBROW_STYLE, AnimateIn } from "../components/shared"
-import { TabPageHeader, PageTitle, PlanSubTabStrip, ContentHeader, ContentActionButton, CentralButton, CentralModal } from "@/components/central"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, ContentHeader, ContentActionButton, CentralButton, CentralModal, PocketFilterChip, PocketRoundButton } from "@/components/central"
 import { useNavState } from "../nav-state"
 import type { FormsTabProps, FieldType } from "../types"
 
@@ -697,13 +697,11 @@ export function FormResponsesView({ formId, title, onClose }: {
       </div>
 
       <div className="md:flex-1 md:overflow-y-auto">
-        {/* Subtabs — mobile (inside the content wrapper; no md:pl-14 applies) */}
-        <div className="md:hidden px-5 pt-1">
-          <PlanSubTabStrip
-            tabs={SUBTABS}
-            active={subTab}
-            onChange={k => setSubTab(k as 'responses' | 'summary')}
-          />
+        {/* Subtabs — mobile: exclusive filter → Pocket chip row (§3.4) */}
+        <div className="md:hidden px-5 pt-1 flex gap-2">
+          {SUBTABS.map(t => (
+            <PocketFilterChip key={t.key} label={t.label} active={subTab === t.key} onClick={() => setSubTab(t.key)} />
+          ))}
         </div>
 
         {loading ? (
@@ -717,7 +715,7 @@ export function FormResponsesView({ formId, title, onClose }: {
                 {respondents.map(resp => {
                   const isExpanded = expandedUserId === resp.userId
                   return (
-                    <div key={resp.userId} style={{ border: '1px solid var(--line)', borderRadius: 12, background: 'var(--cream)', overflow: 'hidden' }}>
+                    <div key={resp.userId} className="border-0 bg-[var(--ivory)] rounded-[var(--r-pocket)] md:border md:border-[var(--line)] md:bg-[var(--cream)] md:rounded-[12px]" style={{ overflow: 'hidden' }}>
                       <button
                         onClick={() => setExpandedUserId(isExpanded ? null : resp.userId)}
                         style={{
@@ -952,7 +950,7 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
     const confirming = confirmingDeleteId === item.id
     const canViewResponses = item.response_count > 0
     return (
-      <div style={{ border: '1px solid var(--line)', borderRadius: 14, background: 'var(--cream)', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="flex flex-col border-0 bg-[var(--ivory)] rounded-[var(--r-pocket)] md:border md:border-[var(--line)] md:bg-[var(--cream)] md:rounded-[14px]" style={{ padding: '18px 20px', gap: 14 }}>
         <div className="flex items-start justify-between gap-4">
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 className="line-clamp-2" style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--ink)', lineHeight: 1.15, margin: 0, fontWeight: 400 }}>{item.title}</h3>
@@ -1006,9 +1004,9 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
           <p style={MONO_STYLE}>Forms</p>
           <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>Forms</h1>
         </div>
-        <button onClick={() => openBuilder(null)} aria-label="Create form" className="size-9 bg-[var(--plum)] rounded-xl flex items-center justify-center hover:bg-[var(--plum-2)] transition-colors">
-          <Plus className="w-4 h-4 text-[var(--cream)]" />
-        </button>
+        <PocketRoundButton variant="plum" onClick={() => openBuilder(null)} ariaLabel="Create form">
+          <Plus style={{ width: 16, height: 16 }} strokeWidth={1.8} />
+        </PocketRoundButton>
       </div>
 
       <TabPageHeader>
@@ -1023,11 +1021,15 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
           <div className="px-5 md:px-14 py-6"><Spinner /></div>
         ) : (
           <div className="px-5 md:px-14 py-6 flex flex-col gap-5">
-            {/* Body content header — the create CTA lives here (Convention #15) */}
-            <ContentHeader
-              label="Your forms"
-              action={<ContentActionButton label="Create form" icon={<Plus className="w-4 h-4" />} onClick={() => openBuilder(null)} />}
-            />
+            {/* Body content header — the create CTA lives here (Convention #15).
+                Desktop only: on mobile the single create is the chrome-row "+"
+                (one create per screen, §3.3) — so gate the whole row md:block. */}
+            <div className="hidden md:block">
+              <ContentHeader
+                label="Your forms"
+                action={<ContentActionButton label="Create form" icon={<Plus className="w-4 h-4" />} onClick={() => openBuilder(null)} />}
+              />
+            </div>
 
             {items.length === 0 ? (
               <EmptyState icon={<FileText className="w-7 h-7" />} title="No forms yet" subtitle="Create a form, then attach it to an announcement to collect responses." />

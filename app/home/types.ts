@@ -363,6 +363,9 @@ export interface AnnouncementsTabProps {
   avatarUrl?: string | null
   onGoToProfile: () => void
   onOpenAnnouncement: (id: string) => void
+  // Reports whether the full-screen compose/edit surface is up, so home-app can
+  // suppress the floating pill nav (mobile design system §2.2).
+  onComposerOpenChange?: (open: boolean) => void
 }
 
 export interface AnnouncementCardProps {
@@ -462,6 +465,9 @@ export interface ChatsTabProps {
   activeGroupId?: string | null
   canCreateChurchChat: boolean
   fallbackChats?: ChatGroup[]
+  // Reports whether the full-screen CreateChatScreen is up, so home-app can
+  // suppress the floating pill nav (mobile design system §2.2).
+  onComposerOpenChange?: (open: boolean) => void
 }
 
 // Slim list-row + detail-header shape — fetched for EVERY member on directory
@@ -714,9 +720,10 @@ export interface PlanTabProps {
   // Lifted finance team section state (for sidebar)
   financeSection?: string
   onFinanceSectionChange?: (s: string) => void
-  // Receipts workspace: team selected WITHIN receipts (synced to ?rteam)
+  // Receipts workspace: team selected WITHIN receipts (synced to ?rteam);
+  // null returns to the mobile Receipts hub landing.
   activeReceiptsTeamId?: string | null
-  onReceiptsTeamChange?: (id: string) => void
+  onReceiptsTeamChange?: (id: string | null) => void
   // Bumped by home-app whenever the user clicks a workspace section-nav item
   // (finance/student-org/DGL section, or a receipts team). PlanTab closes any open
   // team-settings subpage on each bump — the subpage state is local to PlanTab, so

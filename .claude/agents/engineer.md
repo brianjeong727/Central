@@ -2,6 +2,7 @@
 name: engineer
 description: Use to implement code changes into Central's real codebase — building components, writing server actions, editing tab files, running migrations via Supabase MCP. The only subagent with write access. Invoke after intent is expanded and any design/reconciliation spec is ready. Does NOT decide visual correctness or self-certify layout — it builds to spec and reports.
 tools: Read, Write, Edit, Bash, Glob, Grep
+model: opus
 color: blue
 ---
 

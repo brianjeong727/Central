@@ -5,7 +5,7 @@ import { useNavState } from "../nav-state"
 import { Plus, X, BarChart2, ChevronLeft } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, MONO_STYLE, EmptyState } from "../components/shared"
-import { TabPageHeader, PageTitle, CentralButton, ContentActionButton, ContentHeader } from "@/components/central"
+import { TabPageHeader, PageTitle, CentralButton, ContentActionButton, ContentHeader, PocketBackRow } from "@/components/central"
 import type { CongregationTabProps, CongregationQuestion } from "../types"
 
 interface Response {
@@ -271,7 +271,7 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
       </TabPageHeader>
 
       <div
-        className={`px-5 md:px-14 ${view === "list" ? "pt-5" : "pt-14"} md:pt-7`}
+        className={`px-5 md:px-14 ${view === "list" ? "pt-5" : "pt-6"} md:pt-7`}
       >
         {/* ── LIST VIEW ── */}
         {view === "list" && (
@@ -296,15 +296,8 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
                 {questions.map((q) => (
                   <div
                     key={q.id}
-                    style={{
-                      borderRadius: "var(--r-card)",
-                      border: "1px solid var(--line)",
-                      background: "var(--cream)",
-                      padding: "14px 16px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 8,
-                    }}
+                    className="flex flex-col border-0 bg-[var(--ivory)] rounded-[var(--r-pocket)] md:border md:border-[var(--line)] md:bg-[var(--cream)] md:rounded-[var(--r-card)]"
+                    style={{ padding: "14px 16px", gap: 8 }}
                   >
                     <span style={{ ...MONO_STYLE, color: q.is_active ? "var(--plum)" : "var(--muted-text)" }}>
                       {q.is_active ? "Active" : "Archived"} · {TYPE_LABELS[q.question_type]}
@@ -346,9 +339,19 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
         {/* ── CREATE VIEW ── */}
         {view === "create" && (
           <div>
-            <CentralButton variant="ghost" onClick={() => goTo("list")} style={{ marginBottom: 16, color: "var(--body)" }}>
-              <ChevronLeft className="w-4 h-4" /> Back
-            </CentralButton>
+            {/* Mobile: single back affordance + one chrome-like title row */}
+            <div className="md:hidden">
+              <PocketBackRow label="Congregation" onBack={() => goTo("list")} />
+              <h1 style={{ fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, margin: "0 0 16px" }}>
+                New question
+              </h1>
+            </div>
+            {/* Desktop: ghost back (shell owns the crumb; title is TabPageHeader) */}
+            <div className="hidden md:block">
+              <CentralButton variant="ghost" onClick={() => goTo("list")} style={{ marginBottom: 16, color: "var(--body)" }}>
+                <ChevronLeft className="w-4 h-4" /> Back
+              </CentralButton>
+            </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
@@ -445,9 +448,16 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
         {/* ── DETAIL VIEW ── */}
         {view === "detail" && (
           <div>
-            <CentralButton variant="ghost" onClick={() => goTo("list")} style={{ marginBottom: 16, color: "var(--body)" }}>
-              <X className="w-4 h-4" /> Back
-            </CentralButton>
+            {/* Mobile: single back affordance up one level to the list */}
+            <div className="md:hidden">
+              <PocketBackRow label="Congregation" onBack={() => goTo("list")} />
+            </div>
+            {/* Desktop: ghost back */}
+            <div className="hidden md:block">
+              <CentralButton variant="ghost" onClick={() => goTo("list")} style={{ marginBottom: 16, color: "var(--body)" }}>
+                <X className="w-4 h-4" /> Back
+              </CentralButton>
+            </div>
 
             {loadingList && !selectedQuestion ? (
               <Spinner />
@@ -458,7 +468,7 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
                 subtitle="It may have been removed."
               />
             ) : (
-              <div style={{ padding: 16, borderRadius: "var(--r-card)", background: "var(--cream)", border: "1px solid var(--line)" }}>
+              <div className="border-0 bg-[var(--ivory)] rounded-[var(--r-pocket)] md:border md:border-[var(--line)] md:bg-[var(--cream)] md:rounded-[var(--r-card)]" style={{ padding: 16 }}>
                 <span style={{ ...MONO_STYLE, color: selectedQuestion.is_active ? "var(--plum)" : "var(--muted-text)", marginBottom: 6, display: "block" }}>
                   {selectedQuestion.is_active ? "Active" : "Archived"} · {TYPE_LABELS[selectedQuestion.question_type]}
                 </span>
