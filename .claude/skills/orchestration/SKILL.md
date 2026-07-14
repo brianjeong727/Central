@@ -90,6 +90,8 @@ Claude Code does not loop on its own. YOU drive the cycle:
 
 **Screenshots are cost-gated to the FINAL pass.** Intermediate rebuild cycles get cheap functional checks only — no screenshots. Only on the final green pass, and only when the change is visual, does the Tester capture the before/after screenshots for the handoff (see Step 6). Image tokens are expensive; never screenshot every cycle.
 
+**Pixel-diff is trigger-gated:** only on the FINAL pass, only when a cdesign source file exists on disk, breadth = one screenshot pair per changed screen (single pair for single-surface work). No design source = no pixel-diff. It produces a divergence list for Brian's handoff, never a self-certified "matches."
+
 Hard stop: if the loop cannot converge after 3 rebuild cycles, stop and surface to Brian rather than burning tokens.
 
 ## Step 4 — Escalation: what reaches Brian, and how
