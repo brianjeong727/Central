@@ -92,8 +92,21 @@ else
   echo "→ $subdir is a detached copy of $BASE — branch (git checkout -b feat/<task>) before committing"
 fi
 
-# --- ensure deps + env (first-run only; symlink .env.local, real node_modules) ---
-[ -e "$dir/node_modules" ] || { echo "→ installing deps in $subdir (first time)"; ( cd "$dir" && npm install --legacy-peer-deps >/dev/null 2>&1 ); }
+# --- ensure deps + env (first-run install; refresh when package.json changed since last install) ---
+# Stamp lives inside node_modules so wiping deps also wipes the stamp. Hash package.json
+# (not a lockfile — this repo carries both npm and pnpm lockfiles and pnpm is authoritative,
+# so package-lock.json can be stale while package.json is the true dep-change signal).
+pkg_hash="$(git -C "$dir" hash-object package.json)"
+deps_stamp="$dir/node_modules/.package-json-hash"
+if [ ! -e "$dir/node_modules" ]; then
+  echo "→ installing deps in $subdir (first time)"
+  ( cd "$dir" && npm install --legacy-peer-deps >/dev/null 2>&1 )
+  echo "$pkg_hash" >"$deps_stamp"
+elif [ "$(cat "$deps_stamp" 2>/dev/null || true)" != "$pkg_hash" ]; then
+  echo "→ package.json changed since last install — refreshing deps in $subdir"
+  ( cd "$dir" && npm install --legacy-peer-deps >/dev/null 2>&1 )
+  echo "$pkg_hash" >"$deps_stamp"
+fi
 for f in .env.local .env; do
   [ -e "$MAIN_WT/$f" ] && [ ! -e "$dir/$f" ] && ln -s "$MAIN_WT/$f" "$dir/$f"
 done
