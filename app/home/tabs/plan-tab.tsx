@@ -1259,6 +1259,7 @@ export function StudentOrgTeamHome({
   teamId, teamName, teamIcon, ministryId, userId, userName, userRole, canEdit, canEditBudget, onTeamSettings,
   planningEvent, onPlanningEventChange, refreshSignal, onOpenChat,
   desktopSection, isDesktopView, onCalEventsChange, onEditEvent,
+  avatarUrl, onGoToProfile, onExitTeam,
 }: {
   teamId: string | null
   teamName: string
@@ -1278,6 +1279,10 @@ export function StudentOrgTeamHome({
   isDesktopView?: boolean
   onCalEventsChange?: (events: CalendarEvent[]) => void
   onEditEvent?: () => void
+  // Mobile hub chrome (§2.1): avatar → profile, back chevron → picker.
+  avatarUrl?: string | null
+  onGoToProfile?: () => void
+  onExitTeam?: () => void
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
@@ -1555,7 +1560,9 @@ export function StudentOrgTeamHome({
         {!isDesktopView && displaySection === "Hub" && (
           <MobilePocketHub
             teamName={teamName}
+            onBack={onExitTeam}
             onSettings={onTeamSettings}
+            avatar={onGoToProfile ? { userName, avatarUrl, onClick: onGoToProfile } : undefined}
             hero={nextEvent ? {
               eyebrow: "Up next",
               title: nextEvent.title,
@@ -2322,9 +2329,14 @@ function monthDay(dateStr: string): string {
 // mobile section surfaces. Row icons are PlanLineIcon stroked glyphs (ruling #7),
 // never unicode. Shared by StudentOrgTeamHome and SmallGroupLeadersTab.
 type HubRow = { iconKey: string; title: string; subtitle: string; meta?: string; onClick: () => void }
-function MobilePocketHub({ teamName, onSettings, hero, groups }: {
+function MobilePocketHub({ teamName, onBack, onSettings, avatar, hero, groups }: {
   teamName: string
+  // Single chrome row (mobile_design_system §2.1): back chevron exits the team to
+  // the picker (onExitTeam); no separate "← All workspaces" pill, no PocketChrome
+  // "Workspace" row above — this IS the workspace hub's one header.
+  onBack?: () => void
   onSettings?: () => void
+  avatar?: { userName: string; avatarUrl?: string | null; onClick: () => void }
   hero?: { eyebrow: string; title: string; meta: string; progress?: { done: number; total: number } | null; onClick: () => void } | null
   groups: { label: string; rows: HubRow[] }[]
 }) {
@@ -2332,9 +2344,19 @@ function MobilePocketHub({ teamName, onSettings, hero, groups }: {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+        {onBack && (
+          <button onClick={onBack} aria-label="All workspaces" style={{ width: 34, height: 34, marginLeft: -8, flexShrink: 0, display: "grid", placeItems: "center", background: "none", border: "none", color: "var(--plum)", cursor: "pointer" }}>
+            <ArrowLeft style={{ width: 20, height: 20 }} />
+          </button>
+        )}
         <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{teamName}</span>
         {onSettings && (
           <IconButton dim={34} onClick={onSettings} title="Team settings"><Settings className="w-4 h-4" /></IconButton>
+        )}
+        {avatar && (
+          <button onClick={avatar.onClick} aria-label="Your profile" style={{ flexShrink: 0, border: "none", background: "none", padding: 0, cursor: "pointer" }}>
+            <MonogramChip initials={getInitials(avatar.userName)} avatarUrl={avatar.avatarUrl} style={{ width: 34, height: 34, fontFamily: "var(--sans)", fontWeight: 600, fontSize: 11 }} />
+          </button>
         )}
       </div>
 
@@ -2709,13 +2731,17 @@ export function PlanTab({
   return (
     <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile chrome (B3 Pocket) — "Workspace" + avatar (no action button; the
-          create affordance is the Add-workspace card in the picker). */}
-      <PocketChrome
-        title="Workspace"
-        userName={userName}
-        avatarUrl={avatarUrl}
-        onAvatarClick={onGoToProfile}
-      />
+          create affordance is the Add-workspace card in the picker). Suppressed for
+          the hub-bearing team views (student-org / DGL): the hub's own header row is
+          the single chrome (§2.1 one-header rule), carrying its own back/gear/avatar. */}
+      {!(activeTeamId && activeTeamAllowed && (teamKind === "studentOrg" || teamKind === "dgl")) && (
+        <PocketChrome
+          title="Workspace"
+          userName={userName}
+          avatarUrl={avatarUrl}
+          onAvatarClick={onGoToProfile}
+        />
+      )}
 
       {/* Edit planning event modal */}
       {showEditEvent && studentOrgPlanningEvent && (
@@ -3159,8 +3185,10 @@ export function PlanTab({
       ) : (
       <div className="md:hidden px-5 pb-28">
         {/* Back to the picker — only meaningful when the picker would offer >1 option
-            (a single-workspace user is auto-re-entered upstream). */}
-        {(userTeams.length >= 2 || govTeams.length > 0) && onExitTeam && (
+            (a single-workspace user is auto-re-entered upstream). Suppressed for the
+            hub-bearing team views (student-org / DGL): the hub's own header chevron
+            is the single back affordance (§2.1 — no stacked back-pills). */}
+        {(userTeams.length >= 2 || govTeams.length > 0) && onExitTeam && !(teamKind === "studentOrg" || teamKind === "dgl") && (
           <button onClick={onExitTeam} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", marginBottom: 16, background: "transparent", border: "1px solid var(--line)", borderRadius: "var(--r-chip)", color: "var(--muted-text)", fontSize: 13, cursor: "pointer" }}>
             <ArrowLeft style={{ width: 13, height: 13 }} /> All workspaces
           </button>
@@ -3209,6 +3237,9 @@ export function PlanTab({
             planningEvent={studentOrgPlanningEvent ?? null}
             onPlanningEventChange={ev => onStudentOrgPlanningEventChange?.(ev)}
             onOpenChat={onOpenChat}
+            avatarUrl={avatarUrl}
+            onGoToProfile={onGoToProfile}
+            onExitTeam={(userTeams.length >= 2 || govTeams.length > 0) ? onExitTeam : undefined}
           />
         ) : teamKind === "dgl" && activeTeamId && activeTeamAllowed ? (
           <SmallGroupLeadersTab
@@ -3216,10 +3247,14 @@ export function PlanTab({
             teamName={activeTeamName}
             ministryId={ministryId}
             userId={userId}
+            userName={userName}
             isPresident={isDGLPresident}
             isPastor={isPastor}
             onOpenChat={onOpenChat}
             onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
+            avatarUrl={avatarUrl}
+            onGoToProfile={onGoToProfile}
+            onExitTeam={(userTeams.length >= 2 || govTeams.length > 0) ? onExitTeam : undefined}
             praiseTeamId={
               allTeams.find(t =>
                 /\b(praise|worship)\b/i.test(t.name) ||
@@ -11933,6 +11968,7 @@ function SmallGroupLeadersTab({
   onTeamSettings,
   isDesktopView,
   desktopSection,
+  userName, avatarUrl, onGoToProfile, onExitTeam,
 }: {
   teamId: string
   teamName?: string
@@ -11945,6 +11981,11 @@ function SmallGroupLeadersTab({
   onTeamSettings?: () => void
   isDesktopView?: boolean
   desktopSection?: string
+  // Mobile hub chrome (§2.1): avatar → profile, back chevron → picker.
+  userName?: string
+  avatarUrl?: string | null
+  onGoToProfile?: () => void
+  onExitTeam?: () => void
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
@@ -12519,7 +12560,9 @@ function SmallGroupLeadersTab({
       {atMobileHub && (
         <MobilePocketHub
           teamName={teamName}
+          onBack={onExitTeam}
           onSettings={onTeamSettings}
+          avatar={onGoToProfile ? { userName: userName ?? "", avatarUrl, onClick: onGoToProfile } : undefined}
           groups={[{
             label: "Sections",
             rows: validTabs.map(k => ({
