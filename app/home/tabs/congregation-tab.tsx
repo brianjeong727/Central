@@ -5,7 +5,9 @@ import { useNavState } from "../nav-state"
 import { Plus, X, BarChart2, ChevronLeft } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, MONO_STYLE, EmptyState } from "../components/shared"
+import { PocketChrome } from "../components/pocket-header"
 import { TabPageHeader, PageTitle, CentralButton, ContentActionButton, ContentHeader } from "@/components/central"
+import { useIsMobile } from "../use-is-mobile"
 import type { CongregationTabProps, CongregationQuestion } from "../types"
 
 interface Response {
@@ -49,9 +51,15 @@ const inputStyle: React.CSSProperties = {
   outline: "none",
 }
 
-export function CongregationTab({ userId, ministryId, onViewChange }: CongregationTabProps) {
+export function CongregationTab({ userId, ministryId, userName, avatarUrl, onGoToProfile, onViewChange }: CongregationTabProps) {
   const supabase = createClient()
   const { setParam } = useNavState()
+  const isMobile = useIsMobile()
+  // Mobile fields adopt the B3 idiom (borderless --ivory, radius 16); desktop
+  // keeps §4.4 chrome exactly.
+  const fieldStyle: React.CSSProperties = isMobile
+    ? { ...inputStyle, border: "none", background: "var(--ivory)", borderRadius: 16 }
+    : inputStyle
 
   // ── View + selection state ──
   // Only the detail/responses view is URL-synced (?cq=<id>) so it survives reload
@@ -244,7 +252,7 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
     return (
       <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
         {texts.map((t, i) => (
-          <div key={i} style={{ padding: "10px 12px", borderRadius: "var(--r-chip)", background: "var(--cream-2)", border: "1px solid var(--line)", fontSize: 13, color: "var(--ink)", lineHeight: 1.5 }}>{t}</div>
+          <div key={i} style={{ padding: isMobile ? "12px 14px" : "10px 12px", borderRadius: isMobile ? 14 : "var(--r-chip)", background: isMobile ? "var(--cream)" : "var(--cream-2)", border: isMobile ? "none" : "1px solid var(--line)", fontSize: 13, color: "var(--ink)", lineHeight: 1.5 }}>{t}</div>
         ))}
       </div>
     )
@@ -252,17 +260,20 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
 
   return (
     <div className="pb-28 md:pb-0">
-      {/* Mobile header — title only; the create lives in the Questions content header below */}
+      {/* Mobile chrome (B3 Pocket Daybreak) — title + avatar chip; the create lives
+          in the Questions content header below (Convention #15). List view only. */}
       {view === "list" && (
-        <div className="md:hidden px-5 pt-6 pb-5">
-          <p style={{ ...MONO_STYLE, margin: 0 }}>Congregation Pulse</p>
-          <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>
-            Congregation
-          </h1>
-          <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>
+        <>
+          <PocketChrome
+            title="Congregation"
+            userName={userName ?? ""}
+            avatarUrl={avatarUrl}
+            onAvatarClick={() => onGoToProfile?.()}
+          />
+          <p className="md:hidden" style={{ padding: "0 20px 8px", fontSize: 14, color: "var(--body)" }}>
             Ask your congregation — responses are anonymous.
           </p>
-        </div>
+        </>
       )}
 
       {/* Desktop header — landing tier (R1); no create in the title row */}
@@ -297,19 +308,19 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
                   <div
                     key={q.id}
                     style={{
-                      borderRadius: "var(--r-card)",
-                      border: "1px solid var(--line)",
-                      background: "var(--cream)",
-                      padding: "14px 16px",
+                      borderRadius: isMobile ? "var(--r-pocket)" : "var(--r-card)",
+                      border: isMobile ? "none" : "1px solid var(--line)",
+                      background: isMobile ? "var(--ivory)" : "var(--cream)",
+                      padding: isMobile ? "18px 18px" : "14px 16px",
                       display: "flex",
                       flexDirection: "column",
-                      gap: 8,
+                      gap: isMobile ? 10 : 8,
                     }}
                   >
                     <span style={{ ...MONO_STYLE, color: q.is_active ? "var(--plum)" : "var(--muted-text)" }}>
                       {q.is_active ? "Active" : "Archived"} · {TYPE_LABELS[q.question_type]}
                     </span>
-                    <p style={{ fontSize: 14, fontWeight: 400, color: "var(--ink)", lineHeight: 1.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <p style={{ fontFamily: isMobile ? "var(--serif)" : undefined, fontSize: isMobile ? 17 : 14, fontWeight: isMobile ? 600 : 400, letterSpacing: isMobile ? "-0.01em" : undefined, color: "var(--ink)", lineHeight: isMobile ? 1.2 : 1.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {q.question_text}
                     </p>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
@@ -358,7 +369,7 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
                   onChange={e => setQuestionText(e.target.value)}
                   placeholder="What's on your heart this week?"
                   rows={3}
-                  style={{ ...inputStyle, resize: "vertical" }}
+                  style={{ ...fieldStyle, resize: "vertical" }}
                 />
               </div>
 
@@ -373,9 +384,9 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
                         onClick={() => setQuestionType(t)}
                         style={{
                           padding: "10px 12px",
-                          borderRadius: "var(--r-input)",
-                          border: `1px solid ${selected ? "var(--plum)" : "var(--line-2)"}`,
-                          background: selected ? "var(--plum-tint)" : "var(--cream)",
+                          borderRadius: isMobile ? 16 : "var(--r-input)",
+                          border: isMobile ? (selected ? "1px solid var(--plum)" : "none") : `1px solid ${selected ? "var(--plum)" : "var(--line-2)"}`,
+                          background: selected ? "var(--plum-tint)" : (isMobile ? "var(--ivory)" : "var(--cream)"),
                           cursor: "pointer",
                           textAlign: "left",
                           transition: "border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out)",
@@ -403,7 +414,7 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
                             setPollOptions(updated)
                           }}
                           placeholder={`Option ${i + 1}`}
-                          style={{ ...inputStyle, padding: "8px 12px", fontSize: 13 }}
+                          style={{ ...fieldStyle, padding: "8px 12px", fontSize: 13 }}
                         />
                         {pollOptions.length > 2 && (
                           <button
@@ -458,11 +469,11 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
                 subtitle="It may have been removed."
               />
             ) : (
-              <div style={{ padding: 16, borderRadius: "var(--r-card)", background: "var(--cream)", border: "1px solid var(--line)" }}>
+              <div style={{ padding: isMobile ? 18 : 16, borderRadius: isMobile ? "var(--r-pocket)" : "var(--r-card)", background: isMobile ? "var(--ivory)" : "var(--cream)", border: isMobile ? "none" : "1px solid var(--line)" }}>
                 <span style={{ ...MONO_STYLE, color: selectedQuestion.is_active ? "var(--plum)" : "var(--muted-text)", marginBottom: 6, display: "block" }}>
                   {selectedQuestion.is_active ? "Active" : "Archived"} · {TYPE_LABELS[selectedQuestion.question_type]}
                 </span>
-                <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", lineHeight: 1.4, marginBottom: 4 }}>{selectedQuestion.question_text}</p>
+                <p style={{ fontFamily: isMobile ? "var(--serif)" : undefined, fontSize: isMobile ? 18 : 15, fontWeight: isMobile ? 600 : 500, letterSpacing: isMobile ? "-0.01em" : undefined, color: "var(--ink)", lineHeight: isMobile ? 1.25 : 1.4, marginBottom: 4 }}>{selectedQuestion.question_text}</p>
                 <p style={{ fontSize: 12, color: "var(--muted-text)" }}>
                   {selectedQuestion.response_count} response{selectedQuestion.response_count !== 1 ? "s" : ""}
                 </p>

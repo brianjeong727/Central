@@ -4,8 +4,10 @@ import { useState, useEffect, useCallback, type ReactNode } from "react"
 import { Archive, ArchiveRestore, Check, ChevronDown, ChevronLeft, ChevronRight, Edit3, FileText, Plus, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE, EYEBROW_STYLE, AnimateIn } from "../components/shared"
+import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
 import { TabPageHeader, PageTitle, PlanSubTabStrip, ContentHeader, ContentActionButton, CentralButton, CentralModal } from "@/components/central"
 import { useNavState } from "../nav-state"
+import { useIsMobile } from "../use-is-mobile"
 import type { FormsTabProps, FieldType } from "../types"
 
 interface FormFieldRow {
@@ -81,6 +83,7 @@ export function FormFillView({ formId, userId, ministryId, announcementId, title
   onSubmitted: () => void
 }) {
   const supabase = createClient()
+  const isMobile = useIsMobile()
   const [fields, setFields] = useState<FormFieldRow[]>([])
   const [loading, setLoading] = useState(true)
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
@@ -211,8 +214,10 @@ export function FormFillView({ formId, userId, ministryId, announcementId, title
               placeholder="Your answer…"
               rows={3}
               style={{
-                width: '100%', padding: '12px 14px', borderRadius: "var(--r-input)",
-                border: '1px solid var(--line-2)', background: 'var(--cream-2)',
+                width: '100%', padding: '12px 14px',
+                borderRadius: isMobile ? 16 : "var(--r-input)",
+                border: isMobile ? 'none' : '1px solid var(--line-2)',
+                background: isMobile ? 'var(--ivory)' : 'var(--cream-2)',
                 fontSize: 15, color: 'var(--ink)', outline: 'none', resize: 'vertical', lineHeight: 1.55,
                 fontFamily: "var(--sans)",
               }}
@@ -224,10 +229,10 @@ export function FormFillView({ formId, userId, ministryId, announcementId, title
                 const selected = answers[field.id] === opt
                 return (
                   <button key={opt} type="button" onClick={() => setSingleAnswer(field.id, opt)} style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10,
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: isMobile ? 14 : 10,
                     cursor: 'pointer', textAlign: 'left', fontSize: 14.5, transition: 'all 0.12s',
-                    border: `1px solid ${selected ? 'var(--plum)' : 'var(--line-2)'}`,
-                    background: selected ? 'var(--ivory)' : 'var(--cream)',
+                    border: `1px solid ${selected ? 'var(--plum)' : (isMobile ? 'transparent' : 'var(--line-2)')}`,
+                    background: isMobile ? 'var(--ivory)' : (selected ? 'var(--ivory)' : 'var(--cream)'),
                     color: 'var(--ink)', fontWeight: selected ? 500 : 400,
                   }}>
                     <span style={{
@@ -249,10 +254,10 @@ export function FormFillView({ formId, userId, ministryId, announcementId, title
                 const checked = ((answers[field.id] as string[]) ?? []).includes(opt)
                 return (
                   <button key={opt} type="button" onClick={() => toggleCheckbox(field.id, opt)} style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10,
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: isMobile ? 14 : 10,
                     cursor: 'pointer', textAlign: 'left', fontSize: 14.5, transition: 'all 0.12s',
-                    border: `1px solid ${checked ? 'var(--plum)' : 'var(--line-2)'}`,
-                    background: checked ? 'var(--ivory)' : 'var(--cream)',
+                    border: `1px solid ${checked ? 'var(--plum)' : (isMobile ? 'transparent' : 'var(--line-2)')}`,
+                    background: isMobile ? 'var(--ivory)' : (checked ? 'var(--ivory)' : 'var(--cream)'),
                     color: 'var(--ink)', fontWeight: checked ? 500 : 400,
                   }}>
                     <span style={{
@@ -580,6 +585,7 @@ export function FormResponsesView({ formId, title, onClose }: {
   onClose: () => void
 }) {
   const supabase = createClient()
+  const isMobile = useIsMobile()
   const [fields, setFields] = useState<FormFieldRow[]>([])
   const [respondents, setRespondents] = useState<RespondentRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -717,7 +723,7 @@ export function FormResponsesView({ formId, title, onClose }: {
                 {respondents.map(resp => {
                   const isExpanded = expandedUserId === resp.userId
                   return (
-                    <div key={resp.userId} style={{ border: '1px solid var(--line)', borderRadius: 12, background: 'var(--cream)', overflow: 'hidden' }}>
+                    <div key={resp.userId} style={{ border: isMobile ? 'none' : '1px solid var(--line)', borderRadius: isMobile ? 'var(--r-pocket)' : 12, background: isMobile ? 'var(--ivory)' : 'var(--cream)', overflow: 'hidden' }}>
                       <button
                         onClick={() => setExpandedUserId(isExpanded ? null : resp.userId)}
                         style={{
@@ -832,9 +838,10 @@ function initialFormsView(): FormsView {
   return { mode: "list" }
 }
 
-export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
+export function FormsTab({ ministryId, userId, userName, avatarUrl, onGoToProfile, onViewChange }: FormsTabProps) {
   const supabase = createClient()
   const { setParams } = useNavState()
+  const isMobile = useIsMobile()
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<FormListItem[]>([])
   const [showArchived, setShowArchived] = useState(false)
@@ -952,10 +959,10 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
     const confirming = confirmingDeleteId === item.id
     const canViewResponses = item.response_count > 0
     return (
-      <div style={{ border: '1px solid var(--line)', borderRadius: 14, background: 'var(--cream)', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ border: isMobile ? 'none' : '1px solid var(--line)', borderRadius: isMobile ? 'var(--r-pocket)' : 14, background: isMobile ? 'var(--ivory)' : 'var(--cream)', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div className="flex items-start justify-between gap-4">
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 className="line-clamp-2" style={{ fontFamily: 'var(--serif)', fontSize: 20, color: 'var(--ink)', lineHeight: 1.15, margin: 0, fontWeight: 400 }}>{item.title}</h3>
+            <h3 className="line-clamp-2" style={{ fontFamily: 'var(--serif)', fontSize: isMobile ? 21 : 20, color: 'var(--ink)', lineHeight: 1.15, margin: 0, fontWeight: isMobile ? 600 : 400 }}>{item.title}</h3>
             <div className="flex items-center gap-2.5 flex-wrap" style={{ marginTop: 8, minWidth: 0 }}>
               <StatusPill item={item} />
               <span style={{ fontSize: 13, color: 'var(--muted-text)' }}>
@@ -1000,16 +1007,18 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
   return (
     <>
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
-      {/* Mobile header — compact */}
-      <div className="md:hidden px-5 pt-6 pb-5 flex items-end justify-between">
-        <div>
-          <p style={MONO_STYLE}>Forms</p>
-          <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>Forms</h1>
-        </div>
-        <button onClick={() => openBuilder(null)} aria-label="Create form" className="size-9 bg-[var(--plum)] rounded-xl flex items-center justify-center hover:bg-[var(--plum-2)] transition-colors">
-          <Plus className="w-4 h-4 text-[var(--cream)]" />
-        </button>
-      </div>
+      {/* Mobile chrome (B3 Pocket Daybreak) — title + plum create + avatar chip */}
+      <PocketChrome
+        title="Forms"
+        userName={userName ?? ""}
+        avatarUrl={avatarUrl}
+        onAvatarClick={() => onGoToProfile?.()}
+        action={
+          <PocketRoundButton variant="plum" onClick={() => openBuilder(null)} ariaLabel="Create form">
+            <Plus style={{ width: 16, height: 16 }} />
+          </PocketRoundButton>
+        }
+      />
 
       <TabPageHeader>
         <PageTitle
@@ -1026,7 +1035,10 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
             {/* Body content header — the create CTA lives here (Convention #15) */}
             <ContentHeader
               label="Your forms"
-              action={<ContentActionButton label="Create form" icon={<Plus className="w-4 h-4" />} onClick={() => openBuilder(null)} />}
+              // Mobile: the PocketChrome "+" owns create (ratified mobile carve-out),
+              // so drop the body-level button to avoid a double affordance. Desktop
+              // keeps its content-header create unchanged.
+              action={isMobile ? undefined : <ContentActionButton label="Create form" icon={<Plus className="w-4 h-4" />} onClick={() => openBuilder(null)} />}
             />
 
             {items.length === 0 ? (

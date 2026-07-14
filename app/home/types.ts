@@ -149,6 +149,8 @@ export interface FormsTabProps {
   userRole: string
   ministryId: string
   ministryName: string
+  avatarUrl?: string | null
+  onGoToProfile?: () => void
   onViewChange?: (view: "list" | "detail", title?: string) => void
 }
 
@@ -316,6 +318,9 @@ export interface CongregationTabProps {
   userId: string
   ministryId: string
   userRole: string
+  userName?: string
+  avatarUrl?: string | null
+  onGoToProfile?: () => void
   onViewChange?: (view: "list" | "create" | "detail") => void
 }
 

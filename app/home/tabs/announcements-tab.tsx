@@ -7,9 +7,9 @@ import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, MONO_STYLE, EYEBROW_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu, MonogramChip } from "@/components/central"
 import type { ActionMenuItem } from "@/components/central"
-import { audienceLabel, formatDate, previewBody } from "../utils"
+import { audienceLabel, formatDate, previewBody, getInitials } from "../utils"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee } from "../types"
 import { isLeaderRole } from "@/lib/roles"
@@ -1667,10 +1667,103 @@ export function AnnouncementDetailView({
       </div>
     )
 
+    // ── MOBILE (B3 Pocket Daybreak) — tonal cards, serif headings, plum pill
+    //    RSVP, MonogramChip attendees. Desktop tree (below) is untouched. ──
+    const mobileDetail = (
+      <div style={{ paddingTop: 4, paddingBottom: 8 }}>
+        {ann.image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={ann.image_url} alt={ann.title} style={{ width: "100%", height: 200, objectFit: "cover", borderRadius: "var(--r-pocket)", display: "block", marginBottom: 20 }} />
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: ann.is_event ? "var(--plum)" : "var(--muted-text)" }}>
+            {ann.is_event ? `Event · ${formatDate(eyebrowSrc)}` : formatDate(ann.created_at)}
+          </span>
+          {ann.audience && ann.audience !== "all" && (
+            <span style={{ fontSize: 9, letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "var(--line-3)", color: "var(--body)", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(ann.audience)}</span>
+          )}
+          {ann.is_pinned && <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--plum)" }}>Pinned</span>}
+        </div>
+        <h1 style={{ fontFamily: "var(--serif)", fontWeight: 600, fontSize: 30, letterSpacing: "-0.02em", lineHeight: 1.08, color: "var(--ink)", margin: "10px 0 0" }}>{ann.title}</h1>
+        <div style={{ fontFamily: "var(--sans)", fontSize: 15.5, lineHeight: 1.7, color: "var(--body)", marginTop: 18, whiteSpace: "pre-wrap" }}>{ann.body}</div>
+
+        {ann.is_event && (
+          <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: 20, marginTop: 24 }}>
+            <div style={monoStyle}>Event</div>
+            {ann.event_date && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontFamily: "var(--sans)", fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>{detailWeekday(ann.event_date)}</div>
+                <div style={{ fontFamily: "var(--serif)", fontSize: 40, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date)}</div>
+                <div style={{ fontFamily: "var(--sans)", fontSize: 17, color: "var(--ink)", marginTop: 8 }}>{detailTime(ann.event_date)}</div>
+              </div>
+            )}
+            <button
+              onClick={handleRsvp}
+              disabled={rsvping}
+              style={{
+                width: "100%", minHeight: 44, marginTop: 18, borderRadius: 999, border: "none",
+                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+                fontFamily: "var(--serif)", fontSize: 14, fontWeight: 600, cursor: rsvping ? "default" : "pointer",
+                background: ann.user_has_rsvped ? "var(--line-2)" : "var(--plum)",
+                color: ann.user_has_rsvped ? "var(--body)" : "var(--cream-on-dark)",
+              }}
+            >
+              {ann.user_has_rsvped ? <><Check style={{ width: 15, height: 15 }} />Going — tap to undo</> : "RSVP"}
+            </button>
+            <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, textAlign: "center" }}>{ann.rsvp_count} going</div>
+            {showAttendees && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", marginTop: 14 }}>
+                {ann.rsvp_attendees.map((a) => (
+                  <div key={a.user_id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <MonogramChip initials={getInitials(a.name)} style={{ width: 26, height: 26, fontFamily: "var(--sans)", fontWeight: 600, fontSize: 10 }} />
+                    <span style={{ fontSize: 12, color: "var(--body)" }}>{a.name.split(" ")[0]}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {ann.has_form && (
+          <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: 20, marginTop: 16 }}>
+            <div style={monoStyle}>Form</div>
+            <div style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)", marginTop: 10 }}>Includes a form</div>
+            {ann.user_has_responded ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: "var(--sage)", marginTop: 14 }}><Check style={{ width: 14, height: 14 }} />Form submitted</div>
+            ) : (
+              <button
+                onClick={() => setFormFillOpen(true)}
+                style={{
+                  width: "100%", minHeight: 44, marginTop: 16, borderRadius: 999,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7,
+                  fontFamily: "var(--serif)", fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  background: formIsPrimary ? "var(--plum)" : "transparent",
+                  color: formIsPrimary ? "var(--cream-on-dark)" : "var(--plum)",
+                  border: formIsPrimary ? "none" : "1px solid var(--plum)",
+                }}
+              >
+                <FileText style={{ width: 14, height: 14 }} />Fill out form
+              </button>
+            )}
+          </div>
+        )}
+
+        <div style={{ marginTop: 24, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
+          <div style={monoStyle}>Posted</div>
+          <div style={{ fontFamily: "var(--sans)", fontSize: 13, color: "var(--faint)", marginTop: 8, lineHeight: 1.55 }}>
+            {detailPosted(ann.created_at)} · {ann.view_count} {ann.view_count === 1 ? "view" : "views"}
+          </div>
+        </div>
+      </div>
+    )
+
     return (
       // SubpageShell owns scroll + horizontal inset (px-5 md:px-14) + vertical
       // padding. No own scroll wrapper / px inset here — that would double both.
       <>
+        {/* ── DESKTOP — unchanged (display:contents so the wrapper adds no box,
+            keeping desktop layout byte-identical); hidden on mobile. ── */}
+        <div className="hidden md:contents">
         {/* Image banner — full-bleed: negate the shell's horizontal inset and
             top padding so it hugs the edges; keeps its bottom hairline. */}
         {ann.image_url && (
@@ -1705,6 +1798,9 @@ export function AnnouncementDetailView({
             </aside>
           )}
         </div>
+        </div>
+        {/* ── MOBILE (B3 Pocket Daybreak) ── */}
+        <div className="md:hidden">{mobileDetail}</div>
       </>
     )
   }

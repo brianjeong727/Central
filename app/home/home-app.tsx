@@ -1230,6 +1230,8 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
               userRole={initialProfile.role}
               ministryId={ministryId}
               ministryName={ministryName}
+              avatarUrl={avatarUrl}
+              onGoToProfile={() => handleNavClick("profile")}
               onViewChange={(v, t) => { setFormsView(v); if (t) setFormsDetailTitle(t) }}
             />
           )}
@@ -1240,6 +1242,9 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 userId={userId}
                 ministryId={ministryId}
                 userRole={initialProfile.role}
+                userName={initialProfile.name}
+                avatarUrl={avatarUrl}
+                onGoToProfile={() => handleNavClick("profile")}
                 onViewChange={setCongregationView}
               />
             </div>
