@@ -520,3 +520,56 @@ test.describe("mobile Pocket sweep — standard team hub (l)", () => {
     assertNoErrors(errors)
   })
 })
+
+test.describe("mobile scroll-reset + zoom-guard (m)", () => {
+  test.use({ storageState: adminState, ...MOBILE })
+
+  // A feed tall enough to scroll ≥600px on a 390×844 viewport — seed a batch of
+  // announcements so the scroll-then-navigate assertion is non-vacuous.
+  test.beforeAll(async () => {
+    const sb = sandbox()
+    for (let i = 0; i < 16; i++) {
+      await sb.createAnnouncement({ title: `Scroll seed ${i}`, body: `Body ${i} for the scroll-reset enforcement spec.` })
+    }
+  })
+  test.afterAll(async () => {
+    await sandbox().deleteAnnouncementsByPrefix()
+  })
+
+  test("viewport meta carries maximum-scale=1 (input-focus zoom guard)", async ({ page }) => {
+    await page.goto("/home")
+    const content = await page.locator('meta[name="viewport"]').getAttribute("content")
+    expect(content ?? "").toContain("maximum-scale=1")
+  })
+
+  test("scrolling the Announcements feed then switching to Chats lands at top", async ({ page }) => {
+    const errors = watchConsole(page)
+    await page.goto("/home?tab=announcements")
+    await expect(vis(page, `${E2E_PREFIX}Scroll seed 0`).first()).toBeVisible({ timeout: 15000 })
+
+    // Scroll the feed down ≥600px, confirm the window actually moved.
+    await page.evaluate(() => window.scrollTo(0, 700))
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(300)
+
+    // Switch to Chats via the pill nav → activeTab change fires the reset.
+    await page.getByRole("button", { name: "Chats" }).filter({ visible: true }).first().click()
+    await expect(page).toHaveURL(/tab=chats/, { timeout: 10000 })
+    await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 5000 }).toBe(0)
+    assertNoErrors(errors)
+  })
+
+  test("scrolling the Settings hub then drilling a row lands at top", async ({ page }) => {
+    const errors = watchConsole(page)
+    await page.goto("/home?tab=settings")
+    await expect(vis(page, "Church Settings").first()).toBeVisible({ timeout: 15000 })
+    const peopleRow = vis(page, "People").first()
+    await expect(peopleRow).toBeVisible({ timeout: 10000 })
+
+    // Scroll the hub, then drill People → mobileSection change fires the reset.
+    await page.evaluate(() => window.scrollTo(0, 400))
+    await peopleRow.click()
+    await expect(page.getByPlaceholder(/Search/i).filter({ visible: true }).first()).toBeVisible({ timeout: 10000 })
+    await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 5000 }).toBe(0)
+    assertNoErrors(errors)
+  })
+})

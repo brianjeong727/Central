@@ -42,7 +42,7 @@ import { useIsMobile } from "../use-is-mobile"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, POCKET_KICKER_STYLE } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
 import { FinanceWorkspace, MobileFactsGrid, type FinanceSection } from "../components/finance-workspace"
 import { MobilePocketHub } from "../components/mobile-pocket-hub"
 import { getReimbursementInbox } from "@/app/actions/receipts"
@@ -1389,6 +1389,8 @@ export function StudentOrgTeamHome({
 
   // On desktop: section is driven by sidebar prop; on mobile: by internal teamTab state
   const displaySection = desktopSection ?? teamTab
+  // Land the mobile hub↔section swap at the top (window scroll on phone width).
+  useScrollResetOn([teamTab])
 
   // Calendar — SWR-cached list of events + planned-event ids (shared key with MinistryCalendar).
   const { data: calData, isLoading: calLoading, mutate: mutateCal } = useSWR(
@@ -2521,6 +2523,8 @@ export function PlanTab({
   const supabase = createClient()
   const isMobile = useIsMobile()
   const { setParam } = useNavState()
+  // Entering/leaving a workspace (picker → team, team → team) lands at the top.
+  useScrollResetOn([activeTeamId])
 
   // ── Mobile hub drill state (hub-first workspaces, ruling B-1) ──────────────
   // Finance: null = the workspace hub landing; a section = drilled in. Synced to
@@ -7214,6 +7218,8 @@ export function EventPlanWorkspace({
     setMobileSection(s)
     setParam("evtab", s)
   }
+  // Land the mobile event hub↔section drill at the top (window scroll on phone).
+  useScrollResetOn([mobileSection])
   function backToMobileHub() {
     setMobileSection(null)
     setParam("evtab", null)
@@ -12373,6 +12379,8 @@ function SmallGroupLeadersTab({
     if (t) setActiveSubTab(t)
     setParam("sgltab", t)
   }
+  // Land the mobile SGL hub↔section drill at the top (window scroll on phone).
+  useScrollResetOn([mobileDrill])
   const [loading, setLoading] = useState(true)
   const [semester, setSemester] = useState(() => getSemesterLabel())
   const semesterWeeks = useMemo(() => getSemesterWeeks(semester), [semester])
