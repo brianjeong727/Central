@@ -14,6 +14,7 @@ import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getSetupChecklist, setLeadersInvited, dismissSetupChecklist } from "@/app/actions/setup-checklist"
 import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard, MonogramChip } from "@/components/central"
+import { useIsNativeShell } from "@/lib/native-auth"
 import type { HeroSlide, SetupChecklistData, UpNextEventDetail } from "@/components/central"
 // Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
 // so keep it out of the initial home-tab bundle every member/visitor downloads.
@@ -288,6 +289,10 @@ export function HomeTab({
       { optimisticData: optimistic, rollbackOnError: true, revalidate: false }
     )
   }
+
+  // Give is web-only in the native shell (App Store 3.2.2(iv)) — the quick tile
+  // and the setup checklist (whose "offering" step navigates to Give) hide there.
+  const nativeShell = useIsNativeShell()
 
   function handleChecklistNavigate(key: "first_announcement" | "offering" | "presidents") {
     if (key === "first_announcement") onSeeAnnouncements()
@@ -900,7 +905,7 @@ export function HomeTab({
         {/* Getting started — admin-tier setup checklist for a fresh ministry.
             Sits directly under the page header, above the hero (hidden once
             dismissed or complete). */}
-        {checklistData && (
+        {checklistData && !nativeShell && (
           <GettingStartedCard
             data={checklistData}
             onToggleLeadersInvited={handleChecklistToggle}
@@ -1161,7 +1166,7 @@ export function HomeTab({
         <div className="flex flex-col" style={{ gap: "var(--space-9)" }}>
 
           {/* ── Getting started — mobile (above Up Next, mirrors desktop) ── */}
-          {checklistData && (
+          {checklistData && !nativeShell && (
             <GettingStartedCard
               data={checklistData}
               onToggleLeadersInvited={handleChecklistToggle}
@@ -1243,15 +1248,18 @@ export function HomeTab({
             </section>
           )}
 
-          {/* ── Quick grid — mobile (Give + contextual tile) ── */}
+          {/* ── Quick grid — mobile (Give + contextual tile; Give is web-only in the shell) ── */}
+          {(!nativeShell || firstTeam) && (
           <section>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {!nativeShell && (
               <PocketQuickTile
                 icon={<div style={{ width: 40, height: 40, borderRadius: 999, background: "var(--plum)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Gift style={{ width: 20, height: 20, color: "var(--cream-on-dark)" }} strokeWidth={1.5} /></div>}
                 label="Give"
                 subtitle="Support the ministry"
                 onClick={() => onGoToTab?.("give")}
               />
+              )}
               {firstTeam && (
                 <PocketQuickTile
                   icon={<PlanLineIcon iconKey={teamIconKey({ team_type: firstTeam.teamType, name: firstTeam.teamName })} size={40} />}
@@ -1262,6 +1270,7 @@ export function HomeTab({
               )}
             </div>
           </section>
+          )}
 
           {/* ── Daily verse — mobile ── */}
           {homeVerse && (

@@ -7,6 +7,7 @@ import { PlanLineIcon, sidebarItemStyle } from "./shared"
 import { DirectoryListSkeleton } from "@/components/central"
 import { RAIL_LABEL_STYLE } from "@/components/central/typography"
 import { sectionForTab } from "@/components/central/nav-sections"
+import { useIsNativeShell } from "@/lib/native-auth"
 import { useBreadcrumbExtra } from "../breadcrumb-context"
 
 // Lazy — pulls the 631-line directory-tab module into its own async chunk instead
@@ -125,6 +126,10 @@ export function DesktopSidebar({
   ]
 
   const subItemStyle = sidebarItemStyle
+
+  // Give is web-only in the native shell (App Store 3.2.2(iv): donations must be
+  // collected outside the app) — every Give entry point is hidden there.
+  const nativeShell = useIsNativeShell()
 
   function getSectionName(): string {
     // Labels that differ from their section's default label, or are dynamic:
@@ -251,7 +256,7 @@ export function DesktopSidebar({
     const homeItems: { label: string; tab: "home" | "announcements" | "give" | "forms" | "settings" | "congregation" }[] = [
       { label: "Overview",          tab: "home" },
       { label: "Announcements",   tab: "announcements" },
-      { label: "Give",            tab: "give" },
+      ...(nativeShell ? [] : [{ label: "Give", tab: "give" as const }]),
       // Forms is a leader-only insights hub — members/visitors fill forms via Announcements.
       ...(isLeaderOrAdmin ? [{ label: "Forms", tab: "forms" as const }] : []),
       ...(isAdmin ? [{ label: "Church Settings", tab: "settings" as const }] : []),

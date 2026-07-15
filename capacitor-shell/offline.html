@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Central</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #fbf8f2; /* --cream */
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #2b2b2b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      main {
+        padding: 0 32px;
+      }
+      h1 {
+        font-family: Georgia, "Times New Roman", serif;
+        font-weight: 400;
+        font-size: 28px;
+        letter-spacing: -0.02em;
+        margin: 0 0 10px;
+      }
+      p {
+        opacity: 0.6;
+        font-size: 15px;
+        line-height: 1.6;
+        margin: 0 0 28px;
+      }
+      button {
+        appearance: none;
+        border: none;
+        border-radius: 999px;
+        background: #3e1540; /* --plum */
+        color: #fbf8f2;
+        font-size: 15px;
+        font-weight: 600;
+        padding: 14px 34px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      server.errorPath target — shown by the shell when the remote app at
+      https://www.joincentral.app fails to load (offline launch, DNS failure).
+      Retry navigates the WebView back to the remote URL (allowNavigation host).
+    -->
+    <main>
+      <h1>You&rsquo;re offline</h1>
+      <p>Central needs an internet connection.<br />Check your network and try again.</p>
+      <button onclick="window.location.href='https://www.joincentral.app'">Try again</button>
+    </main>
+  </body>
+</html>

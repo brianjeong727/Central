@@ -18,7 +18,13 @@ const config: CapacitorConfig = {
     url: "https://www.joincentral.app",
     // In-WebView navigations to these hosts stay in the app; anything else opens in
     // the system browser. Covers the app, its subdomains, and Supabase (auth/storage/realtime).
-    allowNavigation: ["joincentral.app", "*.joincentral.app", "*.supabase.co"],
+    // appleid.apple.com: FALLBACK ONLY — Sign in with Apple is native-first
+    // (lib/native-auth.ts); if the plugin is missing from an old binary the web
+    // OAuth flow must complete in-webview instead of stranding in Safari.
+    allowNavigation: ["joincentral.app", "*.joincentral.app", "*.supabase.co", "appleid.apple.com"],
+    // Offline / failed-load fallback (App Store 2.1 stability): a cream "You're
+    // offline" page with a retry back to the remote URL, instead of a blank error.
+    errorPath: "offline.html",
   },
   ios: {
     // "never": the WKWebView scroll view adds NO native safe-area inset. Paired with

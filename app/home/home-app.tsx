@@ -36,6 +36,7 @@ import type { CalendarEvent } from "./types"
 import type { DirectoryMember } from "./types"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { isAdminRole, isLeaderRole } from "@/lib/roles"
+import { useIsNativeShell } from "@/lib/native-auth"
 
 const AnnouncementsTab = dynamic(() => import("./tabs/announcements-tab").then(m => m.AnnouncementsTab), { loading: () => <AnnouncementsTabSkeleton />, ssr: false })
 const AnnouncementDetailView = dynamic(() => import("./tabs/announcements-tab").then(m => m.AnnouncementDetailView), { loading: () => <Spinner />, ssr: false })
@@ -61,6 +62,8 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   const supabase = createClient()
   const searchParams = useSearchParams()
   const { mutate: globalMutate } = useSWRConfig()
+  // Native Capacitor shell — Give is web-only there (App Store 3.2.2(iv)).
+  const nativeShell = useIsNativeShell()
 
   // Reliable chat-list fetch from the MAIN bundle. ChatListPanel/ChatsTab are
   // code-split (ssr:false) and their own useSWR for this key is unreliable on the
@@ -1184,8 +1187,11 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             </div>
           )}
 
-          {/* Member-facing Give surface — reachable by everyone */}
-          {activeTab === "give" && (
+          {/* Member-facing Give surface — reachable by everyone on the web.
+              Hidden in the native shell (App Store 3.2.2(iv): donations are
+              collected outside the app); every entry point is shell-gated too
+              (desktop-nav Give item, home quick tile, setup checklist). */}
+          {activeTab === "give" && !nativeShell && (
             <div className="md:h-full md:overflow-y-auto">
               <GiveView
                 ministryId={ministryId}

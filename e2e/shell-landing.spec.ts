@@ -31,8 +31,10 @@ test.describe("native shell skips the landing page (CentralShell UA)", () => {
       await expect(
         page.getByRole("heading", { name: /To equip the saints for the work of ministry/ }),
       ).toHaveCount(0)
-      // The login surface actually rendered.
-      await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible()
+      // The login surface actually rendered. (B3 two-step entry: the mobile
+      // welcome step's email pill, not the form's "Sign in" submit — that
+      // button only exists on the second step.)
+      await expect(page.getByRole("button", { name: "Continue with email" })).toBeVisible()
       await page.screenshot({
         path: ".claude/task-context/shell-skip-landing/shell-ua-login-390x844.png",
       })
