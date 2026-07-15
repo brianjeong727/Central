@@ -31,7 +31,7 @@ import { BreadcrumbProvider, useBreadcrumbExtra } from "./breadcrumb-context"
 // the matching Item-2 skeleton where one exists, otherwise the shared Spinner.
 import { HomeTab } from "./tabs/home-tab"
 import { Spinner } from "./components/shared"
-import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, ProfileTabSkeleton, CentralModal, SuperSwitcher, CentralButton } from "@/components/central"
+import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, ProfileTabSkeleton, CentralModal, SuperSwitcher, CentralButton, useScrollResetOn } from "@/components/central"
 import type { CalendarEvent } from "./types"
 import type { DirectoryMember } from "./types"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
@@ -139,6 +139,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(() =>
     searchParams.get("ann")
   )
+  // Scroll reset: land every tab switch and announcement-detail open/close at the
+  // top (mobile window scroll; the desktop shell locks window so scrollTo no-ops
+  // and the inner md:overflow-y-auto container remounts per activeTab key).
+  useScrollResetOn([activeTab, openAnnouncementId != null])
   const [totalChatsUnread, setTotalChatsUnread] = useState(() =>
     (initialRecentChats ?? []).reduce((sum, c) => sum + (c.muted ? 0 : c.unreadCount), 0)
   )

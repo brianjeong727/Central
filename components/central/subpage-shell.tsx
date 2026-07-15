@@ -13,6 +13,7 @@ import { ReactNode } from "react"
 import { ArrowLeft } from "lucide-react"
 import { InsetHairline } from "./hairline"
 import { PageTitle } from "./page-title"
+import { useScrollResetOn } from "./scroll-reset"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ context hook); flagged Phase 2, refactor pending
 import { useSubpageCrumbs } from "@/app/home/breadcrumb-context"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ type import); flagged Phase 2, refactor pending
@@ -27,6 +28,10 @@ export function SubpageShell({ crumbs, title, width = "full", maxWidth = 820, ch
   children: ReactNode
 }) {
   useSubpageCrumbs(crumbs)
+  // Land at the top on mount and whenever the deepest crumb changes — covers
+  // member detail, team settings, event-workspace section drills, and
+  // receipts/finance detail swaps that keep the same SubpageShell mounted.
+  useScrollResetOn([crumbs[crumbs.length - 1]?.label])
   // Desktop uses the shell breadcrumb as the back. Mobile has no breadcrumb,
   // so the shell renders ONE Pocket chrome row (mobile_design_system §2.1)
   // derived from the nearest parent crumb (the last crumb with an onClick):

@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, MONO_STYLE, EYEBROW_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu, PocketFilterChip, PocketCard, POCKET_KICKER_STYLE } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu, PocketFilterChip, PocketCard, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
 import type { ActionMenuItem } from "@/components/central"
 import { audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
@@ -776,6 +776,8 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   // Mobile-only Pocket filter (All / Events / Updates) — separate from the desktop
   // FilterType (which also carries forms/pinned). Updates = non-event posts.
   const [mobileFilter, setMobileFilter] = useState<"all" | "events" | "updates">("all")
+  // Land the mobile filter swap at the top (window scroll on phone width).
+  useScrollResetOn([mobileFilter])
 
   const [editingAnnouncement, setEditingAnnouncement] = useState<EnrichedAnnouncement | null>(null)
 

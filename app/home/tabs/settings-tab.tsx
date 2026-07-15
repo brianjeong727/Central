@@ -34,7 +34,7 @@ import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@
 import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
-import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, PocketKicker, PocketRowCard, PocketRow, PocketBackRow, PocketFilterChip } from "@/components/central"
+import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, PocketKicker, PocketRowCard, PocketRow, PocketBackRow, PocketFilterChip, useScrollResetOn } from "@/components/central"
 import { useNavState } from "../nav-state"
 import { isAdminRole } from "@/lib/roles"
 
@@ -240,6 +240,8 @@ export function SettingsTab({
     setMobileSection(null)
     setParam("stab", null)
   }
+  // Land the mobile hub/section swap at the top (window scroll on phone width).
+  useScrollResetOn([mobileSection])
 
   // People tab state
   const [peopleSearch, setPeopleSearch] = useState("")

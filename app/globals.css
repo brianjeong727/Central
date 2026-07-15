@@ -234,6 +234,11 @@
     @apply font-sans;
     scroll-behavior: smooth;
   }
+  /* Kill double-tap zoom + the 300ms tap delay on interactive elements without
+     disabling pinch-zoom (pairs with viewport maximum-scale=1). Safe on desktop. */
+  button, a, input, select, textarea, label, [role="button"] {
+    touch-action: manipulation;
+  }
 }
 
 /* ── Scrollbar ───────────────────────────────────────────────────────────── */

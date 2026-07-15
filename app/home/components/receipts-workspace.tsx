@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import useSWR from "swr"
 import { Plus, Image as ImageIcon, Settings, Receipt } from "lucide-react"
-import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, SubpageShell, CentralModal, ContentActionButton, PocketChip, PocketFilterChip, PocketKicker, PocketRoundButton } from "@/components/central"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, SubpageShell, CentralModal, ContentActionButton, PocketChip, PocketFilterChip, PocketKicker, PocketRoundButton, useScrollResetOn } from "@/components/central"
 import { EmptyState } from "./shared"
 import { MobilePocketHub, PocketHubChrome } from "./mobile-pocket-hub"
 import { useIsMobile } from "../use-is-mobile"
@@ -111,6 +111,8 @@ export function ReceiptsWorkspace({
   useEffect(() => { refreshCategories() }, [refreshCategories])
 
   const activeCategory = categories.find(c => c.id === activeCategoryId) ?? null
+  // Land each team/category swap at the top (window scroll on phone width).
+  useScrollResetOn([activeReceiptsTeamId, activeCategoryId])
   const stripTabs = categories.map(c => ({ key: c.id, label: c.name }))
 
   function handleCategoryCreated(cat: ReceiptCategory) {

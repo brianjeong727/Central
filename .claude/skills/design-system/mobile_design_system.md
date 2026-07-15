@@ -82,6 +82,10 @@ Dark plum (`--plum2`) rounded-full bar, centered, `bottom: calc(env(safe-area-in
 ### 2.2b Full-bleed subpages consume the screen (ratified 2026-07-15)
 Any surface reached by **in-page navigation** — a settings page, a detail view, a drilled hub section — replaces the parent screen ENTIRELY. The parent's chrome row (title + actions + avatar) must NOT remain above it; the subpage's own single chrome row (back chevron + its title, e.g. via `SubpageShell`) is the only header. A parent chrome row stacked over a subpage header is the §5.6 two-header failure by another route. (Example violation: team Settings rendering under the "Workspace" chrome row.)
 
+### 2.2c Scroll & zoom discipline (ratified 2026-07-15)
+- **Every navigation starts at the top.** Tab changes, hub drills, subpage opens/closes, and section swaps must reset scroll to (0,0) — never inherit the previous surface's offset. Enforced via the shared `useScrollResetOn` hook (`components/central`) wired at every surface-swapping state change, plus `SubpageShell` on mount/crumb change. New surface-swapping state ⇒ wire the hook; an e2e assertion guards the tab-change case. (Exception: `ChatScreen`'s message list owns its own scroll-to-bottom.)
+- **No focus/tap zoom, ever.** `app/layout.tsx` sets viewport `maximumScale: 1` (suppresses iOS input auto-zoom; pinch-zoom stays available — do NOT add `userScalable: false`) and `globals.css` applies `touch-action: manipulation` to all interactive elements (kills double-tap zoom + tap delay). Never remove either; prefer ≥16px input font where the design allows as belt-and-suspenders.
+
 ### 2.3 Navigation model — hub-and-spoke, never tab strips
 - Deep content = **push a new screen with a back chevron**, not a tab. Workspace → workspace hub → its four screens, each with one clear back.
 - **Never a horizontally-scrolling tab strip.** If desktop has 6+ tabs (General / Meeting Notes / Events / Resources / Groups / Rotations), mobile renders them as a **grouped row list on the hub screen** — tappable rows with icon chip, name, one-line status, chevron.

@@ -18,6 +18,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // maximumScale: 1 suppresses iOS's auto-zoom when focusing a sub-16px input
+  // (and double-tap zoom on buttons/menus). Deliberately NOT userScalable:false —
+  // pinch-to-zoom stays available; max-scale alone kills the focus-zoom.
+  maximumScale: 1,
   // Extend the layout viewport edge-to-edge under the status bar / home indicator on
   // iOS (adds viewport-fit=cover). Required so `fixed inset-0` surfaces (the native
   // splash) reach the true screen top and so env(safe-area-inset-*) reports real

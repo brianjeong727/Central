@@ -9,7 +9,7 @@ import {
 } from "lucide-react"
 import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
 import { useIsMobile } from "../use-is-mobile"
-import { MonogramChip, FilterDropdown, SubpageShell, CentralModal, PocketRowCard, PocketRow } from "@/components/central"
+import { MonogramChip, FilterDropdown, SubpageShell, CentralModal, PocketRowCard, PocketRow, useScrollResetOn } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
   getReimbursementInbox, approveReceipt, rejectReceipt, signOffReceipt, declineReceipt,
@@ -638,6 +638,8 @@ export function FinanceWorkspace({
 }: FinanceWorkspaceProps) {
   const supabase = createClient()
   const isMobile = useIsMobile()
+  // Land each finance section swap at the top (window scroll on phone width).
+  useScrollResetOn([section])
 
   const [loading, setLoading] = useState(true)
 

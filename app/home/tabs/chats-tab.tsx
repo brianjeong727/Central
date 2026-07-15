@@ -10,7 +10,7 @@ import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, POCKET_KICKER_STYLE } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
@@ -3009,6 +3009,8 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
     return (p === "church" || p === "my") ? p : "church"
   })
   const [showCreateChat, setShowCreateChat] = useState<"my" | "church" | null>(null)
+  // Land the Church↔My scope swap at the top (window scroll on phone width).
+  useScrollResetOn([subTab])
 
   // Report the full-screen CreateChatScreen up/down so home-app hides the pill
   // nav (§2.2). Cleanup covers unmount-while-open (e.g. URL-driven tab change).
