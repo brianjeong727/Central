@@ -198,3 +198,15 @@ The repo lives under `~/Desktop` (iCloud-synced), and iCloud Drive stamps `com.a
 ## verify.sh's pnpm parity check was silently converting node_modules (2026-07-14)
 
 The "stale node_modules → Module not found 500" failures (§2026-07-14 above) have a root cause: verify.sh's lockfile-parity step ran a bare `pnpm install --frozen-lockfile`, which is a REAL install — it replaces the npm-managed node_modules layout with pnpm's symlink layout on every verify run, and the next `npm install` half-converts it back. Fix (shipped): the check now runs `pnpm install --frozen-lockfile --lockfile-only --ignore-scripts` on manifest COPIES in a temp dir — validates resolution both directions in ~0.5s and writes zero files to the worktree. General rule: never point a second package manager at a live node_modules "just to check" — install-family commands mutate unless proven otherwise.
+
+## E2E harness targets E2E_PORT, not PORT (2026-07-15)
+
+`playwright.config.ts` builds its baseURL from `process.env.E2E_PORT` (default **3001**). Running `PORT=3002 npx playwright test` silently tests ANOTHER SLOT's dev server — old code, wrong tenant — and failures look like your changes didn't apply (SSR curl shows new code, browser shows old). Always invoke as `E2E_PORT=<slot port> npx playwright test …` (verify.sh --port sets it for you). Symptom to recognize: assertions that the tester just passed start failing with page snapshots showing pre-change UI.
+
+## supabase-js multi-row insert nulls omitted columns (2026-07-15)
+
+A multi-row `.insert([...])` unifies keys across rows and sends explicit `null` for any key missing from a given row — Postgres column DEFAULTs never apply, so a NOT NULL DEFAULT false column (e.g. `announcements.show_attendees`) fails with 23502. Set such columns explicitly on EVERY row of a batch insert (or insert row-by-row).
+
+## Auto-chat triggers defeat count-based seed idempotence (2026-07-15)
+
+Seeding a fresh ministry fires the auto-chat machinery (`automation_settings.auto_central_chat`) — a "<Ministry> Chat" group appears on its own. A seeder guard like `if (!groupCount)` then skips ALL custom seeding on re-run while reporting success. Guard find-or-create per named row, never "any rows exist" (scripts/seed-demo.mjs does this now).
