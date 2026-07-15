@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen } from "lucide-react"
+import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen, Building2, Zap, MessageSquare, Flag, LayoutGrid, ScrollText } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EYEBROW_STYLE, PlanLineIcon, EmptyState } from "../components/shared"
@@ -34,7 +34,7 @@ import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@
 import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
-import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu } from "@/components/central"
+import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, PocketKicker, PocketRowCard, PocketRow, PocketBackRow, PocketFilterChip } from "@/components/central"
 import { useNavState } from "../nav-state"
 import { isAdminRole } from "@/lib/roles"
 
@@ -98,6 +98,22 @@ const REPORT_TARGET_LABELS: Record<string, string> = {
 
 const CARD: React.CSSProperties = {
   background: "var(--cream-panel)", borderRadius: "14px", border: "1px solid var(--line)",
+}
+
+// Desktop keeps the CARD hairline surface; phone-width drops to a borderless
+// tonal --ivory card at --r-pocket (Pocket mobile grammar). Added alongside the
+// inline `...CARD` style on every card site — the max-md !overrides beat the
+// inline border/bg/radius below md while desktop renders CARD untouched.
+const CARD_CLS = "max-md:!border-0 max-md:!bg-[var(--ivory)] max-md:!rounded-[var(--r-pocket)]"
+
+// 40px tonal chip holding a settings section glyph — the leading element in the
+// mobile hub rows.
+function SettingsIconChip({ icon }: { icon: React.ReactNode }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 14, background: "var(--line-2)", color: "var(--plum)", flexShrink: 0 }}>
+      {icon}
+    </span>
+  )
 }
 
 // ── Shared edit→stage→confirm→feedback primitives ─────────────────────────────
@@ -206,6 +222,23 @@ export function SettingsTab({
   function goToSettingsTab(t: ActiveSettingsTab) {
     setActiveSettingsTab(t)
     setParam("stab", t === "general" ? null : t)
+  }
+
+  // Mobile is hub-and-spoke: null = the section hub, a key = one drilled section.
+  // Desktop ignores this and stays on the tab strip driven by activeSettingsTab.
+  // Deep links (?stab=…) land pre-drilled on mobile to match desktop.
+  const [mobileSection, setMobileSection] = useState<ActiveSettingsTab | null>(() => {
+    if (typeof window === "undefined") return null
+    const p = new URLSearchParams(window.location.search).get("stab")
+    return (["people", "governance", "automations", "chat", "reports", "workspace", "audit"].includes(p ?? "") ? p as ActiveSettingsTab : null)
+  })
+  function openMobileSection(t: ActiveSettingsTab) {
+    setMobileSection(t)
+    goToSettingsTab(t)
+  }
+  function closeMobileSection() {
+    setMobileSection(null)
+    setParam("stab", null)
   }
 
   // People tab state
@@ -999,6 +1032,16 @@ export function SettingsTab({
     return roleMatch && (!s || m.name.toLowerCase().includes(s) || m.email.toLowerCase().includes(s))
   })
 
+  // People stat tiles double as exclusive role filters — desktop renders them as
+  // stat cards, mobile as a scrollable PocketFilterChip row.
+  const PEOPLE_STAT_TILES: { label: string; value: number; filter: RoleFilter }[] = [
+    { label: "Members",  value: totalMembers,                                              filter: "all" },
+    { label: "Admins",   value: totalAdmins,                                               filter: "admin" },
+    { label: "Leaders",  value: totalLeaders,                                              filter: "leader" },
+    { label: "Regular",  value: totalMembers - totalLeaders - totalAdmins - totalVisitors, filter: "member" },
+    { label: "Visitors", value: totalVisitors,                                             filter: "visitor" },
+  ]
+
   const TABS: { key: ActiveSettingsTab; label: string }[] = [
     { key: "general", label: "General" },
     { key: "people", label: "People" },
@@ -1010,25 +1053,66 @@ export function SettingsTab({
     ...(isAdmin ? [{ key: "audit" as ActiveSettingsTab, label: "Audit Log" }] : []),
   ]
 
+  // Mobile hub grouping (hub-and-spoke). Same role gating as TABS above.
+  const hubGroups: { label: string; rows: { key: ActiveSettingsTab; title: string; sub: string; icon: React.ReactNode }[] }[] = [
+    { label: "Ministry", rows: [
+      { key: "general", title: "General", sub: "Profile, discovery, schools, giving", icon: <Building2 style={{ width: 19, height: 19 }} /> },
+      { key: "people", title: "People", sub: "Members, roles, and access", icon: <Users style={{ width: 19, height: 19 }} /> },
+      ...(isAdmin ? [{ key: "governance" as ActiveSettingsTab, title: "Governance", sub: "Who governs each workspace", icon: <Shield style={{ width: 19, height: 19 }} /> }] : []),
+    ] },
+    { label: "Operations", rows: [
+      { key: "automations", title: "Automations", sub: "Auto-created chats & maintenance", icon: <Zap style={{ width: 19, height: 19 }} /> },
+      { key: "chat", title: "Chat", sub: "Language filter & moderation", icon: <MessageSquare style={{ width: 19, height: 19 }} /> },
+      ...(isAdmin ? [{ key: "reports" as ActiveSettingsTab, title: "Reports", sub: "Review flagged content", icon: <Flag style={{ width: 19, height: 19 }} /> }] : []),
+      { key: "workspace", title: "Workspace", sub: "Join codes, calendar, receipt limits", icon: <LayoutGrid style={{ width: 19, height: 19 }} /> },
+    ] },
+    ...(isAdmin ? [{ label: "Records", rows: [
+      { key: "audit" as ActiveSettingsTab, title: "Audit Log", sub: "Recent admin activity", icon: <ScrollText style={{ width: 19, height: 19 }} /> },
+    ] }] : []),
+  ]
+
   return (
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
-      {/* Mobile header */}
-      <div className="md:hidden px-5 pt-6 pb-5">
-        <p style={EYEBROW_STYLE}>
-          {isAdmin ? "Ministry Admin" : "Ministry Workspace"}
-        </p>
-        <h1 style={{ fontFamily: "var(--serif)", fontSize: 32, color: "var(--ink)", fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.05, margin: "12px 0 0" }}>Church Settings</h1>
-      </div>
+      {/* Mobile chrome title — single 22px serif row, shown at the hub level only */}
+      {mobileSection === null && (
+        <div className="md:hidden px-5 pt-6 pb-2">
+          <h1 style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", fontWeight: 600, letterSpacing: "-0.01em", lineHeight: 1.1, margin: 0 }}>Church Settings</h1>
+        </div>
+      )}
 
       {/* Desktop header — settings tab strip below is the single terminating hairline (R1) */}
       <TabPageHeader noBottomHairline>
         <PageTitle eyebrow={isAdmin ? "Ministry Admin" : "Ministry Workspace"} title="Church Settings" />
       </TabPageHeader>
 
-      {/* Scrollable content: tab strip + tab panels */}
+      {/* Scrollable content: mobile hub + tab strip + tab panels */}
       <div className="md:flex-1 md:overflow-y-auto md:pb-10">
-        {/* ── Tab strip — edge-to-edge per §4.2 ── */}
-        <div>
+        {/* ── Mobile hub — grouped section rows (hub-and-spoke; no phone tab strip §2.3) ── */}
+        {mobileSection === null && (
+          <div className="md:hidden px-5 pt-2 pb-6">
+            {hubGroups.map((g, gi) => (
+              <div key={g.label}>
+                <PocketKicker label={g.label} style={{ margin: gi === 0 ? "6px 4px 10px" : "26px 4px 10px" }} />
+                <PocketRowCard>
+                  {g.rows.map((r, ri) => (
+                    <PocketRow
+                      key={r.key}
+                      leading={<SettingsIconChip icon={r.icon} />}
+                      title={r.title}
+                      sub={r.sub}
+                      chevron
+                      isLast={ri === g.rows.length - 1}
+                      onClick={() => openMobileSection(r.key)}
+                    />
+                  ))}
+                </PocketRowCard>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Tab strip — desktop only (§2.3: never a tab strip at phone width) ── */}
+        <div className="hidden md:block">
           <PlanSubTabStrip
             tabs={TABS}
             active={activeSettingsTab}
@@ -1036,6 +1120,15 @@ export function SettingsTab({
           />
         </div>
 
+        {/* ── Mobile back row when drilled into a section ── */}
+        {mobileSection !== null && (
+          <div className="md:hidden px-5 pt-4">
+            <PocketBackRow label="Settings" onBack={closeMobileSection} />
+          </div>
+        )}
+
+        {/* ── Section bodies: desktop always; mobile only when a section is drilled ── */}
+        <div className={mobileSection === null ? "hidden md:block" : undefined}>
         {loading ? (
           <div className="px-5 md:px-14" style={{ color: "var(--muted-text)", fontSize: "14px", marginTop: 40 }}>Loading…</div>
         ) : (
@@ -1054,7 +1147,7 @@ export function SettingsTab({
                   } />
                   <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>The name, school, and visual identity members see when they find your ministry.</p>
                 </div>
-                <div style={{ ...CARD, padding: "22px 26px", display: "flex", alignItems: "center", gap: 20 }}>
+                <div className={CARD_CLS} style={{ ...CARD, padding: "22px 26px", display: "flex", alignItems: "center", gap: 20 }}>
                   <MonogramChip
                     initials={(ministryInfo?.name ?? ministryName)[0]}
                     className="flex-shrink-0"
@@ -1092,7 +1185,7 @@ export function SettingsTab({
                       const shown = discoveryEditing ? discoveryDraft : isPublic
                       const locked = !discoveryEditing
                       return (
-                        <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
+                        <div className={CARD_CLS} style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
                           <button onClick={discoveryEditing ? () => setDiscoveryDraft(v => !v) : undefined} disabled={locked} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: shown ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: locked ? "default" : "pointer", padding: 0, opacity: locked ? 0.6 : 1 }}>
                             <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(shown ? { right: 2 } : { left: 2 }) }} />
                           </button>
@@ -1111,7 +1204,7 @@ export function SettingsTab({
                     <div style={{ marginBottom: 16 }}>
                       <SectionHeader eyebrow="Schools" title="Linked campuses" titleSize={20} action={isAdmin && !addingSchool ? (<CentralButton variant="create" size="sm" onClick={() => setAddingSchool(true)} style={{ flexShrink: 0 }}>+ Add school</CentralButton>) : undefined} />
                     </div>
-                    <div style={{ ...CARD, overflow: "hidden" }}>
+                    <div className={CARD_CLS} style={{ ...CARD, overflow: "hidden" }}>
                       {schools.length === 0 && !addingSchool && <div style={{ padding: "16px 20px" }}><p style={{ fontSize: 13, color: "var(--muted-text)" }}>No schools added yet.</p></div>}
                       {schools.length > 0 && (
                         <div style={{ padding: "16px 18px", display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -1154,7 +1247,7 @@ export function SettingsTab({
                     } />
                     <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>The Zelle destination members see on the Give tab. The recipient name lets givers confirm they&apos;re sending to the right place.</p>
                   </div>
-                  <div style={{ ...CARD, padding: "20px 22px", maxWidth: 520 }}>
+                  <div className={CARD_CLS} style={{ ...CARD, padding: "20px 22px", maxWidth: 520 }}>
                     {editingGiving ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                         {givingError && <p style={{ fontSize: 13, color: "var(--danger)", margin: 0 }}>{givingError}</p>}
@@ -1269,7 +1362,7 @@ export function SettingsTab({
                     <SectionHeader eyebrow="Onboarding" title="Getting started guide" titleSize={20} />
                     <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Show the setup checklist on Home for all admins — useful when onboarding new leadership.</p>
                   </div>
-                  <div style={{ ...CARD, padding: "20px 22px", maxWidth: 520, display: "flex", alignItems: "center", gap: 16 }}>
+                  <div className={CARD_CLS} style={{ ...CARD, padding: "20px 22px", maxWidth: 520, display: "flex", alignItems: "center", gap: 16 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       {guideActivated ? (
                         <span className="animate-fade-up" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>
@@ -1348,19 +1441,21 @@ export function SettingsTab({
                 <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Every person in {ministryInfo?.name ?? ministryName}, the role they hold, and how they joined.</p>
               </div>
 
-              {/* Stat tiles */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 14 }}>
-                {([
-                  { label: "Members",  value: totalMembers,                                              filter: "all" as RoleFilter },
-                  { label: "Admins",   value: totalAdmins,                                               filter: "admin" as RoleFilter },
-                  { label: "Leaders",  value: totalLeaders,                                              filter: "leader" as RoleFilter },
-                  { label: "Regular",  value: totalMembers - totalLeaders - totalAdmins - totalVisitors, filter: "member" as RoleFilter },
-                  { label: "Visitors", value: totalVisitors,                                             filter: "visitor" as RoleFilter },
-                ] as { label: string; value: number; filter: RoleFilter }[]).map(({ value, label, filter }) => (
+              {/* Stat tiles — desktop grid; on mobile they collapse to the scrollable
+                  PocketFilterChip row below (the tiles ARE exclusive filters). */}
+              <div className="max-md:!hidden" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 14 }}>
+                {PEOPLE_STAT_TILES.map(({ value, label, filter }) => (
                   <button key={label} onClick={() => setPeopleFilter(filter)} style={{ ...CARD, padding: "18px", cursor: "pointer", textAlign: "left", background: peopleFilter === filter ? "var(--plum-tint)" : (CARD.background as string | undefined), borderColor: peopleFilter === filter ? "var(--plum)" : "var(--line)" }}>
                     <p style={{ ...SECTION_LABEL, marginBottom: 8 }}>{label}</p>
                     <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "32px", color: "var(--ink)", fontWeight: 400, lineHeight: 1 }}>{value}</p>
                   </button>
+                ))}
+              </div>
+
+              {/* Mobile filter chips — horizontally scrollable, counts inline; solid plum on-state */}
+              <div className="md:hidden -mx-5 px-5" style={{ display: "flex", gap: 8, overflowX: "auto", WebkitOverflowScrolling: "touch", marginTop: -8 }}>
+                {PEOPLE_STAT_TILES.map(({ value, label, filter }) => (
+                  <PocketFilterChip key={label} label={`${label} · ${value}`} active={peopleFilter === filter} onClick={() => setPeopleFilter(filter)} />
                 ))}
               </div>
 
@@ -1370,7 +1465,8 @@ export function SettingsTab({
                   <Search style={{ width: 15, height: 15, color: "var(--muted-text)", flexShrink: 0 }} />
                   <input value={peopleSearch} onChange={e => setPeopleSearch(e.target.value)} placeholder="Search members…" style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "var(--ink)", fontFamily: "var(--font-inter)" }} />
                 </div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {/* Desktop-only — the mobile filter is the PocketFilterChip row above */}
+                <div className="max-md:!hidden" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {(["all", "admin", "leader", "member", "visitor"] as const).map(f => (
                     <FilterChip key={f} selected={peopleFilter === f} onClick={() => setPeopleFilter(f)} tone="plum">
                       {f === "all" ? "All" : f.charAt(0).toUpperCase() + f.slice(1)}
@@ -1510,7 +1606,7 @@ export function SettingsTab({
                   <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Governance is oversight of teams they aren&apos;t members of — viewing or acting on a team&apos;s roster and work. Church Settings itself stays open to every admin regardless of this list.</p>
                 </div>
 
-                <div style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
+                <div className={CARD_CLS} style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
                   <button onClick={govEditing ? draftToggleAllAdmins : undefined} disabled={!govEditing} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: gAllAdmins ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: govEditing ? "pointer" : "default", padding: 0, opacity: govEditing ? 1 : 0.6 }}>
                     <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(gAllAdmins ? { right: 2 } : { left: 2 }) }} />
                   </button>
@@ -1618,7 +1714,7 @@ export function SettingsTab({
                   const changed = automationsEditing && isToggleOn(key, pendingAutomationSettings) !== isToggleOn(key, automationSettings)
                   const locked = !automationsEditing || !isAdmin
                   return (
-                    <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, outline: changed ? "2px solid var(--plum)" : "none", outlineOffset: -2 }}>
+                    <div key={key} className={CARD_CLS} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, outline: changed ? "2px solid var(--plum)" : "none", outlineOffset: -2 }}>
                       <button onClick={() => handleAutomationToggle(key)} disabled={locked} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: locked ? "default" : "pointer", padding: 0, opacity: locked ? 0.6 : 1 }}>
                         <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(on ? { right: 2 } : { left: 2 }) }} />
                       </button>
@@ -1639,7 +1735,7 @@ export function SettingsTab({
                     { key: "auto_praise_chat",    label: "Auto-create praise team chats", sub: "When a Sunday week is confirmed, a new chat is opened with that week's lineup." },
                     { key: "auto_archive_praise", label: "Auto-archive praise team chats", sub: "After Sunday at 11:59 pm, the chat is archived from your active list." },
                   ] as { key: string; label: string; sub: string }[]).map(({ key, label, sub }) => (
-                    <div key={key} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "var(--cream-2)", opacity: 0.6, pointerEvents: "none" }}>
+                    <div key={key} className={CARD_CLS} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "var(--cream-2)", opacity: 0.6, pointerEvents: "none" }}>
                       <div style={{ width: 38, height: 22, borderRadius: 999, background: "var(--dashed)", position: "relative", flexShrink: 0 }}>
                         <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, left: 2 }} />
                       </div>
@@ -1664,7 +1760,7 @@ export function SettingsTab({
 
               {/* Annual class maintenance */}
               {isAdmin && (
-                <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 18 }}>
+                <div className={CARD_CLS} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 18 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Run annual class maintenance</div>
                     <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Creates the new incoming class chat for this fall, and converts the graduating class chat from a church chat to a my-chat. Safe to run multiple times.</div>
@@ -1678,7 +1774,7 @@ export function SettingsTab({
 
               {/* Departed member cleanup */}
               {isAdmin && (
-                <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 18 }}>
+                <div className={CARD_CLS} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 18 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Departed member cleanup</div>
                     <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Permanently anonymizes messages from members who left more than 30 days ago. Their messages remain but show as &ldquo;Former Member.&rdquo;</div>
@@ -1704,7 +1800,7 @@ export function SettingsTab({
               </div>
 
               {/* Enable toggle */}
-              <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
+              <div className={CARD_CLS} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
                 <button onClick={() => setModField("enabled", !pendingModerationSettings.enabled)} disabled={!moderationEditing || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.enabled ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: (!moderationEditing || !isAdmin) ? "default" : "pointer", padding: 0, opacity: (!moderationEditing || !isAdmin) ? 0.6 : 1 }}>
                   <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(pendingModerationSettings.enabled ? { right: 2 } : { left: 2 }) }} />
                 </button>
@@ -1753,7 +1849,7 @@ export function SettingsTab({
               )}
 
               {/* Reverent capitalization — independent of the language filter */}
-              <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
+              <div className={CARD_CLS} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
                 <button onClick={() => setModField("reverent_caps", !pendingModerationSettings.reverent_caps)} disabled={!moderationEditing || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.reverent_caps ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: (!moderationEditing || !isAdmin) ? "default" : "pointer", padding: 0, opacity: (!moderationEditing || !isAdmin) ? 0.6 : 1 }}>
                   <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(pendingModerationSettings.reverent_caps ? { right: 2 } : { left: 2 }) }} />
                 </button>
@@ -1766,7 +1862,7 @@ export function SettingsTab({
               {/* Coming soon — photo moderation */}
               <div>
                 <p style={{ ...SECTION_LABEL, marginBottom: 12 }}>Coming soon</p>
-                <div style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "var(--cream-2)", opacity: 0.6, pointerEvents: "none" }}>
+                <div className={CARD_CLS} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "var(--cream-2)", opacity: 0.6, pointerEvents: "none" }}>
                   <div style={{ width: 38, height: 22, borderRadius: 999, background: "var(--dashed)", position: "relative", flexShrink: 0 }}>
                     <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, left: 2 }} />
                   </div>
@@ -1809,7 +1905,7 @@ export function SettingsTab({
                     const targetLabel = REPORT_TARGET_LABELS[r.target_type] ?? r.target_type
                     const busy = reportActioningId === r.id
                     return (
-                      <div key={r.id} style={{ ...CARD, padding: 18 }}>
+                      <div key={r.id} className={CARD_CLS} style={{ ...CARD, padding: 18 }}>
                         <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
                           <div style={{ flex: 1, minWidth: 220 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -1850,7 +1946,7 @@ export function SettingsTab({
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: isAdmin && staffCode ? "1fr 1fr" : "1fr", gap: 18, maxWidth: isAdmin && staffCode ? undefined : 480 }}>
                   {/* Invite code */}
-                  <div style={{ ...CARD, padding: 22 }}>
+                  <div className={CARD_CLS} style={{ ...CARD, padding: 22 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Invite code</div>
                     <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Share with members to let them join directly.</div>
                     <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
@@ -1877,7 +1973,7 @@ export function SettingsTab({
 
                   {/* Staff code — admin only */}
                   {isAdmin && staffCode && (
-                    <div style={{ ...CARD, padding: 22 }}>
+                    <div className={CARD_CLS} style={{ ...CARD, padding: 22 }}>
                       <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Staff code</div>
                       <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>For pastors, deacons, and elders. Joining with this code assigns an admin-tier role.</div>
                       <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
@@ -1911,7 +2007,7 @@ export function SettingsTab({
                   <SectionHeader eyebrow="Calendar Integration" title="Sync events to your calendar" titleSize={20} />
                   <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Subscribe to your ministry&apos;s event calendar in Google Calendar, Apple Calendar, or Outlook. Events added in Central sync automatically every few hours.</p>
                 </div>
-                <div style={{ ...CARD, padding: 22 }}>
+                <div className={CARD_CLS} style={{ ...CARD, padding: 22 }}>
                   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                     <div style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 13, color: "var(--body)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{calFeedUrl}</div>
                     <button onClick={copyCalUrl} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
@@ -2067,6 +2163,7 @@ export function SettingsTab({
 
           </>
         )}
+        </div>
       </div>
       <ConfirmDialog
         open={!!confirmDeleteSchool}

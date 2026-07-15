@@ -88,6 +88,8 @@
   --sage:        #5B7A6C;
   --gold:        #D4A45C;
   --danger:      #9F3030;
+  --mention-own:      #F6C96A;  /* @mention highlight on own (plum) chat bubble */
+  --mention-incoming: #8B5E1A;  /* @mention highlight on incoming (ivory) chat bubble */
 
   /* Overlay veils (R11) */
   --veil:      color-mix(in srgb, var(--ink) 55%, transparent); /* modal/overlay ink backdrop scrim (≡ rgba(19,16,26,.55)) — R11 */
@@ -266,6 +268,21 @@
 .pocket-hscroll::-webkit-scrollbar { display: none; }
 .pocket-hscroll > * { scroll-snap-align: start; flex: 0 0 auto; }
 
+/* Mobile Pocket chip rail — ONE horizontally scrollable row of filter chips
+   that breaks out of the 20px screen padding (margin/padding cancel at the
+   edges so chips scroll edge-to-edge). No scroll snap; scrollbar hidden. */
+.pocket-chiprow {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 0 -20px;
+  padding: 0 20px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.pocket-chiprow::-webkit-scrollbar { display: none; }
+.pocket-chiprow > * { flex: 0 0 auto; }
+
 /* ── Design tokens ───────────────────────────────────────────────────────── */
 :root {
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -316,15 +333,21 @@
 /* Shared main-content-column entrance — fires on every top-level tab switch
    (the wrapper in home-app.tsx is keyed by activeTab, so it remounts).
    Gentler/shorter than the overlay entrance because it's high-frequency.
-   Ends at `transform: none` (not translateY(0)) so no lingering transform
-   lingers to trap position:fixed descendants (plan/forms render full-screen
-   overlays inside this column). Tune feel: duration = the 300ms below;
-   rise distance = the 8px translateY in the keyframe below. */
+   fill-mode is `backwards` (NOT `both`/`forwards`) on purpose: per
+   css-transforms-2, an element whose transform is affected by a RUNNING OR
+   FILLED animation is a containing block + stacking context for
+   position:fixed descendants — even when the filled value is `transform:
+   none`. With a forwards fill this column trapped every fixed overlay a tab
+   rendered inline (CreateChatScreen collapsed to the column box; the z-50
+   pill nav painted over z-[60] overlays). `backwards` releases the animation
+   styles at end (the `to` keyframe equals the natural styles, so there is no
+   visual pop). Tune feel: duration = the 300ms below; rise distance = the 8px
+   translateY in the keyframe below. */
 @keyframes content-enter {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: none; }
 }
-.content-enter { animation: content-enter 300ms var(--ease-out) both; }
+.content-enter { animation: content-enter 300ms var(--ease-out) backwards; }
 @media (prefers-reduced-motion: reduce) {
   .content-enter { animation: none; opacity: 1; transform: none; }
 }

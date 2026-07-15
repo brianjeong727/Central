@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, MONO_STYLE, EYEBROW_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu, PocketFilterChip, PocketCard, POCKET_KICKER_STYLE } from "@/components/central"
 import type { ActionMenuItem } from "@/components/central"
 import { audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
@@ -128,25 +128,6 @@ const MOBILE_FILTERS: { id: "all" | "events" | "updates"; label: string }[] = [
   { id: "events", label: "Events" },
   { id: "updates", label: "Updates" },
 ]
-
-// Tonal pill filter chip (mockup `.fchip`): --ivory pill, --body text; the active
-// chip is a solid plum fill with a cream label. Shared idiom across Pocket screens.
-function MobileFilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        border: "none", borderRadius: 999, padding: "9px 16px",
-        fontFamily: "var(--serif)", fontSize: 13,
-        background: active ? "var(--plum)" : "var(--ivory)",
-        color: active ? "var(--cream-on-dark)" : "var(--body)",
-        fontWeight: active ? 600 : 500, cursor: "pointer", flexShrink: 0,
-      }}
-    >
-      {label}
-    </button>
-  )
-}
 
 // ── Create Modal (new only) ──────────────────────────────────────────────────
 
@@ -300,40 +281,47 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const titleText = isEditing ? "Edit announcement" : "New announcement"
 
   // Primary + secondary action buttons (shared by mobile + desktop headers).
-  const PublishButton = (
+  // Height is parametrized so the mobile chrome gets a ≥34px hit target while
+  // desktop stays at its 28px footer size (byte-identical). Padding/line-height
+  // are unchanged, so the taller mobile target doesn't visually bloat the label.
+  const renderPublish = (height: number) => (
     <CentralButton
       type="button"
       variant="primary"
       disabled={submitting}
       onClick={e => handleSubmit(e as unknown as React.FormEvent, false)}
-      style={{ height: 28, padding: "0 16px", borderRadius: 9, fontSize: 13, flexShrink: 0 }}
+      style={{ height, padding: "0 16px", borderRadius: 9, fontSize: 13, flexShrink: 0 }}
     >
       {submitting ? "Saving…" : isEditing ? "Save changes" : "Publish"}
     </CentralButton>
   )
-  const DraftButton = !isEditing ? (
+  // Mobile chrome passes "Save" — the full "Save draft" label crowds the one-line
+  // header and truncates the title (Brian, 2026-07-15); desktop footer keeps it.
+  const renderDraft = (height: number, label = "Save draft") => !isEditing ? (
     <button
       type="button"
       disabled={submitting}
       onClick={e => handleSubmit(e as unknown as React.FormEvent, true)}
       className="flex items-center justify-center transition-colors disabled:opacity-50 hover:bg-[var(--ivory)]"
-      style={{ height: 28, padding: "0 14px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", color: "var(--ink)", fontSize: 13, fontWeight: 500, cursor: submitting ? "default" : "pointer", flexShrink: 0 }}
+      style={{ height, padding: "0 14px", borderRadius: 9, border: "1px solid var(--line)", background: "transparent", color: "var(--ink)", fontSize: 13, fontWeight: 500, cursor: submitting ? "default" : "pointer", flexShrink: 0 }}
     >
-      Save draft
+      {label}
     </button>
   ) : null
 
   return (
-    <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden" style={{ background: "var(--cream)" }}>
-      {/* ── Mobile header — safe-area inset, back affordance ── */}
+    <div className="pb-[calc(env(safe-area-inset-bottom)+24px)] md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden" style={{ background: "var(--cream)" }}>
+      {/* ── Mobile header — ONE line: back · title · actions. Title drops to
+          20px when sharing the row with 2+ actions (mobile §2.1) and truncates
+          rather than wrapping against Save draft + Publish. ── */}
       <div className="md:hidden flex items-center gap-3 px-5 pt-6 pb-4" style={{ borderBottom: "1px solid var(--line)" }}>
-        <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-xl -ml-1 hover:bg-[var(--ivory)] transition-colors">
+        <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-xl -ml-1 flex-shrink-0 hover:bg-[var(--ivory)] transition-colors">
           <ArrowLeft className="w-5 h-5" style={{ color: "var(--plum)" }} />
         </button>
-        <span style={{ fontFamily: "var(--serif)", fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05 }}>{titleText}</span>
-        <div className="flex items-center gap-2 ml-auto">
-          {DraftButton}
-          {PublishButton}
+        <span className="flex-1 min-w-0 truncate" style={{ fontFamily: "var(--serif)", fontSize: isEditing ? 22 : 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05 }}>{titleText}</span>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {renderDraft(34, "Save")}
+          {renderPublish(34)}
         </div>
       </div>
 
@@ -345,7 +333,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           <input
             type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="A clear, scannable headline" required
             className="placeholder:text-[var(--faint)]"
-            style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", width: "100%", paddingBottom: 12 }}
+            style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 21, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", width: "100%", paddingBottom: 12 }}
           />
           <textarea
             value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write the full announcement here…" required rows={8}
@@ -354,28 +342,25 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           />
         </div>
 
-        <div style={{ borderTop: "1px solid var(--line)" }} />
+        <div style={{ borderTop: "1px solid var(--line-3)" }} />
 
-        {/* Audience */}
+        {/* Audience — one horizontally scrollable chip rail (never wraps);
+            .pocket-chiprow breaks out of the px-5 screen padding edge-to-edge. */}
         <div>
           <p style={monoStyle} className="mb-3">Audience</p>
-          <div className="flex flex-wrap gap-2">
+          <div className="pocket-chiprow">
             {AUDIENCE_OPTIONS.map((opt) => (
-              <button
-                key={opt.value} type="button" onClick={() => setAudience(opt.value)}
-                style={{
-                  padding: "6px 12px", borderRadius: 999, fontSize: 12, fontWeight: 500, cursor: "pointer",
-                  border: `1px solid ${audience === opt.value ? "var(--plum)" : "var(--line)"}`,
-                  background: audience === opt.value ? "var(--plum)" : "var(--ivory)",
-                  color: audience === opt.value ? "var(--cream)" : "var(--body)",
-                  transition: "all 0.15s",
-                }}
-              >{opt.label}</button>
+              <PocketFilterChip
+                key={opt.value}
+                label={opt.label}
+                active={audience === opt.value}
+                onClick={() => setAudience(opt.value)}
+              />
             ))}
           </div>
         </div>
 
-        <div style={{ borderTop: "1px solid var(--line)" }} />
+        <div style={{ borderTop: "1px solid var(--line-3)" }} />
 
         {/* Options */}
         <div className="flex flex-col gap-5">
@@ -411,7 +396,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           )}
         </div>
 
-        <div style={{ borderTop: "1px solid var(--line)" }} />
+        <div style={{ borderTop: "1px solid var(--line-3)" }} />
 
         {/* Attachment */}
         <div>
@@ -431,7 +416,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
         </div>
 
-        <div style={{ borderTop: "1px solid var(--line)" }} />
+        <div style={{ borderTop: "1px solid var(--line-3)" }} />
 
         {/* Attach a form — same picker as the desktop rail */}
         <div>
@@ -591,8 +576,8 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
       {/* ── Desktop footer — relocated Save draft + Publish actions ── */}
       <div className="hidden md:flex items-center justify-end gap-3 px-14 py-4 flex-shrink-0" style={{ borderTop: "1px solid var(--line)" }}>
-        {DraftButton}
-        {PublishButton}
+        {renderDraft(28)}
+        {renderPublish(28)}
       </div>
     </div>
   )
@@ -781,7 +766,7 @@ function DesktopActionMenu({
   )
 }
 
-export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, avatarUrl, onGoToProfile, onOpenAnnouncement }: AnnouncementsTabProps) {
+export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, avatarUrl, onGoToProfile, onOpenAnnouncement, onComposerOpenChange }: AnnouncementsTabProps) {
   const supabase = createClient()
   // Compose/edit is ephemeral plain state — never in the URL. A reload mid-compose
   // drops back to the underlying announcements list (Phase 2).
@@ -793,6 +778,15 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   const [mobileFilter, setMobileFilter] = useState<"all" | "events" | "updates">("all")
 
   const [editingAnnouncement, setEditingAnnouncement] = useState<EnrichedAnnouncement | null>(null)
+
+  // Report the full-screen compose/edit surface up/down so home-app hides the
+  // pill nav (§2.2). Cleanup covers unmount-while-open (URL-driven tab change).
+  const composeOpen = showCreate || editingAnnouncement !== null
+  useEffect(() => {
+    onComposerOpenChange?.(composeOpen)
+    return () => onComposerOpenChange?.(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composeOpen])
 
   // Form fill overlay state
   const [formFillState, setFormFillState] = useState<{ formId: string; announcementId: string; title: string } | null>(null)
@@ -1099,7 +1093,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
           <div className="md:hidden" style={{ padding: "2px 20px 0" }}>
             <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
               {MOBILE_FILTERS.map((f) => (
-                <MobileFilterChip key={f.id} label={f.label} active={mobileFilter === f.id} onClick={() => setMobileFilter(f.id)} />
+                <PocketFilterChip key={f.id} label={f.label} active={mobileFilter === f.id} onClick={() => setMobileFilter(f.id)} />
               ))}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16 }}>
@@ -1600,13 +1594,24 @@ export function AnnouncementDetailView({
     const eyebrowSrc = ann.is_event && ann.event_date ? ann.event_date : ann.created_at
 
     const eyebrowRow = (
-      <div className="flex flex-wrap items-center gap-2.5">
-        <span style={monoStyle}>{formatDate(eyebrowSrc)}</span>
-        {ann.audience && ann.audience !== "all" && (
-          <span style={{ ...monoStyle, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
-        )}
-        {ann.is_pinned && <span style={{ ...monoStyle, color: "var(--plum)" }}>📌 Pinned</span>}
-      </div>
+      <>
+        {/* Mobile — pocket 10px kicker, borderless tonal chip */}
+        <div className="md:hidden flex flex-wrap items-center gap-2.5">
+          <span style={POCKET_KICKER_STYLE}>{formatDate(eyebrowSrc)}</span>
+          {ann.audience && ann.audience !== "all" && (
+            <span style={{ ...POCKET_KICKER_STYLE, background: "var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
+          )}
+          {ann.is_pinned && <span style={{ ...POCKET_KICKER_STYLE, color: "var(--plum)" }}>📌 Pinned</span>}
+        </div>
+        {/* Desktop — unchanged editorial eyebrow */}
+        <div className="hidden md:flex flex-wrap items-center gap-2.5">
+          <span style={monoStyle}>{formatDate(eyebrowSrc)}</span>
+          {ann.audience && ann.audience !== "all" && (
+            <span style={{ ...monoStyle, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
+          )}
+          {ann.is_pinned && <span style={{ ...monoStyle, color: "var(--plum)" }}>📌 Pinned</span>}
+        </div>
+      </>
     )
 
     // ── Aside modules (event / form / posted) — each flush, top hairline ──
@@ -1667,6 +1672,65 @@ export function AnnouncementDetailView({
       </div>
     )
 
+    // ── Mobile aside — each module as a tonal borderless PocketCard (§1.1),
+    //    10px pocket kicker, event date scaled to the 22px stat-number tier ──
+    const asideModulesMobile: React.ReactNode[] = []
+    if (ann.is_event) {
+      asideModulesMobile.push(
+        <PocketCard key="event">
+          <div style={POCKET_KICKER_STYLE}>Event</div>
+          {ann.event_date && (
+            <>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 12 }}>{detailWeekday(ann.event_date)}</div>
+              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, color: "var(--ink)", marginTop: 8 }}>{detailTime(ann.event_date)}</div>
+            </>
+          )}
+          <CentralButton
+            variant={ann.user_has_rsvped ? "plum-outline" : "primary"}
+            onClick={handleRsvp}
+            disabled={rsvping}
+            style={{ width: "100%", marginTop: 16 }}
+          >
+            {ann.user_has_rsvped ? <><Check style={{ width: 15, height: 15 }} />Going — tap to undo</> : "RSVP"}
+          </CentralButton>
+          <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, textAlign: "center" }}>{ann.rsvp_count} going</div>
+          {showAttendees && (
+            <div className="flex flex-wrap justify-center gap-1.5" style={{ marginTop: 12 }}>
+              {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "var(--body)", background: "var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
+            </div>
+          )}
+        </PocketCard>
+      )
+    }
+    if (ann.has_form) {
+      asideModulesMobile.push(
+        <PocketCard key="form">
+          <div style={POCKET_KICKER_STYLE}>Form</div>
+          <div style={{ fontFamily: DETAIL_SERIF, fontSize: 18, fontWeight: 500, color: "var(--ink)", marginTop: 10 }}>Includes a form</div>
+          {ann.user_has_responded ? (
+            <div className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "var(--sage)", marginTop: 14 }}><FileText className="w-3.5 h-3.5" />Form submitted</div>
+          ) : (
+            <CentralButton
+              variant={formIsPrimary ? "primary" : "plum-outline"}
+              onClick={() => setFormFillOpen(true)}
+              style={{ width: "100%", marginTop: 16 }}
+            >
+              <FileText style={{ width: 14, height: 14 }} />Fill out form
+            </CentralButton>
+          )}
+        </PocketCard>
+      )
+    }
+    asideModulesMobile.push(
+      <PocketCard key="posted">
+        <div style={POCKET_KICKER_STYLE}>Posted</div>
+        <div style={{ fontFamily: DETAIL_SANS, fontSize: 14, color: "var(--body)", marginTop: 8, lineHeight: 1.55 }}>
+          {detailPosted(ann.created_at)}<br />{ann.view_count} {ann.view_count === 1 ? "view" : "views"}
+        </div>
+      </PocketCard>
+    )
+
     return (
       // SubpageShell owns scroll + horizontal inset (px-5 md:px-14) + vertical
       // padding. No own scroll wrapper / px inset here — that would double both.
@@ -1685,7 +1749,10 @@ export function AnnouncementDetailView({
           {/* Main */}
           <div className="min-w-0">
             {eyebrowRow}
-            <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 600, fontSize: "clamp(28px, 5vw, 46px)", letterSpacing: "-0.02em", lineHeight: 1.02, color: "var(--ink)", margin: "13px 0 0" }}>{ann.title}</h1>
+            {/* clamp lower bound 26px caps the mobile H1 at the pocket editorial
+                tier; desktop (≥768px, 5vw≥38px) never hits the lower bound so it
+                stays byte-identical up to 46px. */}
+            <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 600, fontSize: "clamp(26px, 5vw, 46px)", letterSpacing: "-0.02em", lineHeight: 1.02, color: "var(--ink)", margin: "13px 0 0" }}>{ann.title}</h1>
             <div style={{ fontFamily: DETAIL_SANS, fontSize: 16, lineHeight: 1.75, color: "var(--body)", marginTop: 26, maxWidth: 640, whiteSpace: "pre-wrap" }}>{ann.body}</div>
             {/* No aside → posted/views anchor the bottom of the single column */}
             {!hasAside && (
@@ -1694,15 +1761,22 @@ export function AnnouncementDetailView({
               </div>
             )}
           </div>
-          {/* Aside rail — event / form / posted modules */}
+          {/* Aside rail — event / form / posted modules. Desktop keeps the
+              hairline-divided rail; mobile renders each module as a tonal
+              borderless PocketCard (§1.1). Duplicated by design (small aside). */}
           {hasAside && (
-            <aside className="flex flex-col">
-              {asideModules.map((mod, i) => (
-                <div key={i} style={{ padding: i === 0 ? "0 0 24px" : "24px 0", borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
-                  {mod}
-                </div>
-              ))}
-            </aside>
+            <>
+              <aside className="hidden md:flex flex-col">
+                {asideModules.map((mod, i) => (
+                  <div key={i} style={{ padding: i === 0 ? "0 0 24px" : "24px 0", borderTop: i === 0 ? "none" : "1px solid var(--line)" }}>
+                    {mod}
+                  </div>
+                ))}
+              </aside>
+              <aside className="md:hidden flex flex-col gap-3">
+                {asideModulesMobile}
+              </aside>
+            </>
           )}
         </div>
       </>

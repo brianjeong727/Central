@@ -10,7 +10,7 @@ import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, POCKET_KICKER_STYLE } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
@@ -164,27 +164,22 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
     <div className="fixed inset-0 z-[60] bg-[var(--cream)] flex flex-col md:bg-black/20 md:backdrop-blur-sm md:items-center md:justify-center">
       <div className="flex flex-col w-full h-full bg-[var(--cream)] md:h-auto md:max-h-[85vh] md:max-w-[500px] md:rounded-2xl md:border md:border-[var(--line)] md:overflow-hidden">
 
-        {/* Header */}
+        {/* Header — one chrome row (X + 22px title), subtitle below (mobile §2.1) */}
         <div className="flex-shrink-0 border-b border-[var(--line)]">
-          <div className="flex items-center justify-between px-5 pt-[max(env(safe-area-inset-top),48px)] pb-3 md:pt-6">
+          <div className="flex items-center gap-3 px-5 pt-[max(env(safe-area-inset-top),48px)] pb-3 md:pt-6">
             <button
               onClick={onClose}
               className="size-9 bg-[var(--ivory)] rounded-full flex items-center justify-center hover:bg-[var(--line-2)] transition-colors flex-shrink-0"
             >
               <X className="w-4 h-4 text-[var(--ink)]" />
             </button>
-            <span style={{ fontSize: "10px", letterSpacing: "1.2px", textTransform: "uppercase", fontWeight: 400, color: "var(--muted-text)" }}>
-              {groupType === "church" ? "Church Chat" : "New Chat"}
-            </span>
-          </div>
-          <div className="px-5 pb-5">
-            <h1 style={{ fontFamily: "var(--serif)", fontSize: "32px", fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: 0 }}>
+            <h1 className="flex-1 min-w-0 truncate" style={{ fontFamily: "var(--serif)", fontSize: "22px", fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.15, margin: 0 }}>
               {groupType === "church" ? "New Church Chat" : "New Chat"}
             </h1>
-            <p style={{ fontSize: "13px", color: "var(--muted-text)", marginTop: "6px" }}>
-              {isDM ? `Starting a conversation with ${selectedMembers[0]?.name.split(" ")[0]}.` : "Select people to start a conversation."}
-            </p>
           </div>
+          <p className="px-5 pb-4" style={{ fontSize: "13px", color: "var(--muted-text)", margin: 0 }}>
+            {isDM ? `Starting a conversation with ${selectedMembers[0]?.name.split(" ")[0]}.` : "Select people to start a conversation."}
+          </p>
         </div>
 
         {/* Scrollable body */}
@@ -200,24 +195,14 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
             <div className="flex flex-col gap-2.5">
               <label style={{ fontSize: "10px", fontWeight: 400, letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }}>Section</label>
               <div className="flex flex-wrap gap-2">
-                {CHURCH_SECTION_DEFS.map(({ key, label }) => {
-                  const on = category === key
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setCategory(key)}
-                      style={{
-                        borderRadius: 999, padding: "9px 16px", border: "none", cursor: "pointer",
-                        fontSize: 13, fontWeight: on ? 600 : 500,
-                        background: on ? "var(--plum)" : "var(--ivory)",
-                        color: on ? "var(--cream-on-dark)" : "var(--body)",
-                      }}
-                    >
-                      {label}
-                    </button>
-                  )
-                })}
+                {CHURCH_SECTION_DEFS.map(({ key, label }) => (
+                  <PocketFilterChip
+                    key={key}
+                    label={label}
+                    active={category === key}
+                    onClick={() => setCategory(key)}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -339,7 +324,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
                         <span className="text-[11px] font-medium text-[var(--muted-text)] uppercase tracking-wide flex-shrink-0">Blocked</span>
                       ) : (
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                          isSelected ? "bg-[var(--plum)] border-[var(--plum)]" : "border-[#D4CFCF]"
+                          isSelected ? "bg-[var(--plum)] border-[var(--plum)]" : "border-[var(--dashed)]"
                         }`}>
                           {isSelected && <Check className="w-3 h-3 text-white" />}
                         </div>
@@ -372,29 +357,40 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
 // Staged mute/pin toggle card — one shared render for the desktop + mobile
 // ChatSettings bodies (identical card markup; the Save affordance differs per
 // path and stays in-place). Toggles reflect the PENDING values; nothing writes.
+// Desktop keeps the hairline card; phone-width drops to a borderless tonal
+// --ivory card at --r-pocket (Pocket grammar) via max-md !overrides. Each row
+// is one <button role="switch"> so the WHOLE row is the tap target; the visual
+// switch is a presentational span. (Switch dims stay 38×22 — the shared-Switch
+// size gap is flagged separately.)
+function PrefToggleRow({ label, sub, on, onToggle, divider = false }: {
+  label: string; sub: string; on: boolean; onToggle: () => void; divider?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onToggle}
+      style={{ display: "flex", alignItems: "center", width: "100%", textAlign: "left", padding: "16px 20px", background: "none", border: "none", cursor: "pointer", borderBottom: divider ? "1px solid var(--line-3)" : "none" }}
+    >
+      <div style={{ flex: 1 }}>
+        <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>{label}</p>
+        <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>{sub}</p>
+      </div>
+      <span aria-hidden style={{ display: "block", width: 38, height: 22, borderRadius: 999, background: on ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, transition: "background 0.15s" }}>
+        <span style={{ position: "absolute", top: 2, ...(on ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "var(--cream)" }} />
+      </span>
+    </button>
+  )
+}
+
 function ChatPrefsCard({ pendingMuted, pendingPinned, onToggleMuted, onTogglePinned }: {
   pendingMuted: boolean; pendingPinned: boolean; onToggleMuted: () => void; onTogglePinned: () => void
 }) {
   return (
-    <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--line-3)" }}>
-        <div style={{ flex: 1 }}>
-          <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Mute notifications</p>
-          <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Stay in the chat. Just stop the buzz.</p>
-        </div>
-        <button type="button" onClick={onToggleMuted} style={{ width: 38, height: 22, borderRadius: 999, border: "none", padding: 0, background: pendingMuted ? "var(--plum)" : "var(--dashed)", position: "relative", cursor: "pointer", flexShrink: 0, transition: "background 0.15s" }}>
-          <span style={{ position: "absolute", top: 2, ...(pendingMuted ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "var(--cream)" }} />
-        </button>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", padding: "16px 20px" }}>
-        <div style={{ flex: 1 }}>
-          <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>Pin to top of chats</p>
-          <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Keeps it above the fold.</p>
-        </div>
-        <button type="button" onClick={onTogglePinned} style={{ width: 38, height: 22, borderRadius: 999, border: "none", padding: 0, background: pendingPinned ? "var(--plum)" : "var(--dashed)", position: "relative", cursor: "pointer", flexShrink: 0, transition: "background 0.15s" }}>
-          <span style={{ position: "absolute", top: 2, ...(pendingPinned ? { right: 2 } : { left: 2 }), width: 18, height: 18, borderRadius: 999, background: "var(--cream)" }} />
-        </button>
-      </div>
+    <div className="max-md:!border-0 max-md:!bg-[var(--ivory)] max-md:!rounded-[var(--r-pocket)]" style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
+      <PrefToggleRow label="Mute notifications" sub="Stay in the chat. Just stop the buzz." on={pendingMuted} onToggle={onToggleMuted} divider />
+      <PrefToggleRow label="Pin to top of chats" sub="Keeps it above the fold." on={pendingPinned} onToggle={onTogglePinned} />
     </div>
   )
 }
@@ -683,7 +679,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               value={searchAdd}
               onChange={(e) => setSearchAdd(e.target.value)}
               autoFocus
-              className="w-full pl-10 pr-4 py-3 rounded-xl text-[13px] focus:outline-none border transition-all"
+              className="w-full pl-10 pr-4 py-3 rounded-xl text-[13px] focus:outline-none border transition-all max-md:!bg-[var(--ivory)] max-md:!border-transparent max-md:!rounded-full"
               style={{ background: "var(--cream)", borderColor: "var(--line)", color: "var(--ink)" }}
             />
           </div>
@@ -695,11 +691,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             <div className="flex flex-col gap-2">
               {filteredProfiles.map((profile) => {
                 const selected = selectedToAdd.includes(profile.id)
+                // Mobile drops the hairline (tonal grammar): ivory at rest, the
+                // plum tint alone carries the selected state.
                 return (
                   <button
                     key={profile.id}
                     onClick={() => setSelectedToAdd((prev) => selected ? prev.filter((id) => id !== profile.id) : [...prev, profile.id])}
-                    className="w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left"
+                    className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-left max-md:!border-transparent max-md:!rounded-[var(--r-pocket-sm)]${selected ? "" : " max-md:!bg-[var(--ivory)]"}`}
                     style={{ background: selected ? "color-mix(in srgb, var(--plum) 6%, transparent)" : "var(--cream)", borderColor: selected ? "color-mix(in srgb, var(--plum) 20%, transparent)" : "var(--line)" }}
                   >
                     <MonogramChip initials={getInitials(profile.name)} avatarUrl={profile.avatar_url} className="w-9 h-9 font-medium text-[10px]" />
@@ -764,21 +762,23 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             )}
           </div>
           {loading ? <Spinner /> : (
-            <div className="flex flex-col gap-1.5 mb-6">
-              {members.map((member) => {
+            /* Borderless tonal rows-card (Pocket grammar): one --ivory surface at
+               --r-pocket, rows divided by the --line-3 hairline. */
+            <div className="mb-6" style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "6px 18px" }}>
+              {members.map((member, i) => {
                 const isConfirming = confirmRemoveMemberId === member.user_id
                 const isRevealed = mobileRevealMemberId === member.user_id
                 return (
                   <div
                     key={member.user_id}
-                    className="rounded-xl border p-3.5 flex items-center gap-3"
-                    style={{ background: isConfirming ? "#FDF0F0" : "var(--cream)", borderColor: "var(--line)", transition: "background 0.1s" }}
+                    className="flex items-center gap-3"
+                    style={{ padding: "13px 0", borderBottom: i < members.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--ivory))" : "transparent", transition: "background 0.1s" }}
                     onClick={() => { if (canManage && member.user_id !== userId && !isConfirming) setMobileRevealMemberId((id) => id === member.user_id ? null : member.user_id) }}
                   >
                     <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-medium text-[10px]" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="text-[13px] font-medium truncate" style={{ color: "var(--ink)" }}>{member.name}</p>
+                        <p className="text-[15px] font-semibold truncate" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>{member.name}</p>
                         {member.user_id === userId && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -905,7 +905,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     key={member.user_id}
                     onMouseEnter={() => setHoveredMemberId(member.user_id)}
                     onMouseLeave={() => setHoveredMemberId(null)}
-                    style={{ display: "grid", gridTemplateColumns: "40px 1fr auto auto", alignItems: "center", gap: 14, padding: "15px 20px", borderBottom: i < members.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "#FDF0F0" : isHovered ? "var(--cream-2)" : "transparent", transition: "background 0.1s" }}
+                    style={{ display: "grid", gridTemplateColumns: "40px 1fr auto auto", alignItems: "center", gap: 14, padding: "15px 20px", borderBottom: i < members.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--cream))" : isHovered ? "var(--cream-2)" : "transparent", transition: "background 0.1s" }}
                   >
                     <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-medium text-[11px]" />
                     <div>
@@ -2409,7 +2409,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             {!inline && (
               <button
                 onClick={onClose}
-                className="flex-shrink-0 -ml-1 p-1 hover:bg-[var(--cream-2)] rounded-lg transition-colors md:hidden"
+                className="flex-shrink-0 -ml-1 w-[34px] h-[34px] flex items-center justify-center hover:bg-[var(--cream-2)] rounded-full transition-colors md:hidden"
               >
                 <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
               </button>
@@ -2456,12 +2456,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 <User size={14} />
               </button>
             </div>
-            {/* Mobile: search + settings */}
+            {/* Mobile: search + settings — 34px chrome hit boxes (mobile §1.3) */}
             <div className="flex items-center gap-1 flex-shrink-0 md:hidden">
-              <button onClick={openSearch} className="p-1.5 hover:bg-[var(--cream-2)] rounded-lg transition-colors">
+              <button onClick={openSearch} className="w-[34px] h-[34px] flex items-center justify-center hover:bg-[var(--cream-2)] rounded-full transition-colors">
                 <Search className="w-4 h-4 text-[var(--muted-text)]" />
               </button>
-              <button onClick={() => setShowSettings(true)} className="p-1 hover:bg-[var(--cream-2)] rounded-lg transition-colors">
+              <button onClick={() => setShowSettings(true)} className="w-[34px] h-[34px] flex items-center justify-center hover:bg-[var(--cream-2)] rounded-full transition-colors">
                 <Settings className="w-5 h-5 text-[var(--muted-text)]" />
               </button>
             </div>
@@ -2473,7 +2473,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       {/* ── Pinned message banner ── */}
       {pinnedMessage && (
         <div
-          className="flex-shrink-0 border-b border-[var(--line)] bg-[var(--cream-2)] px-4 py-2 flex items-center gap-2.5 cursor-pointer"
+          className="flex-shrink-0 bg-[var(--ivory)] px-4 py-2 flex items-center gap-2.5 cursor-pointer"
           onClick={() => scrollToMessage(pinnedMessage.id)}
         >
           <Pin className="w-3.5 h-3.5 text-[var(--plum)] flex-shrink-0" />
@@ -2585,7 +2585,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             {Object.entries(typingUsers).slice(0, 3).map(([uid, { name, avatarUrl }]) => (
               <div key={uid} className="flex items-center gap-2 mt-3">
                 <MonogramChip initials={name.charAt(0).toUpperCase()} avatarUrl={avatarUrl || undefined} className="w-7 h-7 text-[11px] font-medium" />
-                <div className="bg-[var(--cream-panel)] border border-[var(--line)] rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex items-center gap-1">
+                <div className="bg-[var(--ivory)] rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex items-center gap-1">
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                   <span className="typing-dot" />
@@ -2736,7 +2736,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                               <span className={`text-[12px] font-medium ${isSelected ? "text-[var(--plum)]" : "text-[var(--muted-text)]"}`}>{count > 0 ? `${pct}%` : ""}</span>
                             </div>
                           </div>
-                          <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
+                          <div className="h-1.5 w-full rounded-full bg-[var(--line-3)] overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-500" style={{ width: vTotal > 0 ? `${pct}%` : "0%", background: isSelected ? "var(--plum)" : "var(--dashed)" }} />
                           </div>
                         </button>
@@ -2872,7 +2872,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   <button
                     key={g.id}
                     onClick={() => handleForward(g.id)}
-                    className="w-full flex items-center justify-between px-3 py-3 rounded-xl hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors"
+                    className="w-full flex items-center justify-between px-3 py-3 rounded-xl hover:bg-[var(--cream-panel)] active:bg-[var(--cream-3)] transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <MonogramChip initials={g.name.charAt(0).toUpperCase()} className="w-9 h-9 text-[12px] font-medium" />
@@ -2928,68 +2928,39 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   )
 }
 
-// Tonal pill filter chip (mockup `.fchip`) — Church / My chats scope switch.
-function ChatFilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        border: "none", borderRadius: 999, padding: "9px 16px",
-        fontFamily: "var(--serif)", fontSize: 13,
-        background: active ? "var(--plum)" : "var(--ivory)",
-        color: active ? "var(--cream-on-dark)" : "var(--body)",
-        fontWeight: active ? 600 : 500, cursor: "pointer", flexShrink: 0,
-      }}
-    >
-      {label}
-    </button>
-  )
-}
-
-// One conversation row inside a Pocket grouped card (mockup `.row`): squircle
-// monogram chip, name (15/600) + single-line "Sender: text" preview, right column
-// time (11 --faint) with a plum unread dot below. `solid` = ministry-wide chat.
+// One conversation row inside a Pocket grouped card: PocketRow fed from a
+// ChatGroup — squircle chip (`solid` = ministry-wide chat), "Sender: text"
+// preview, time + unread dot right column.
 function PocketChatRow({ group, isLast, onClick }: { group: ChatGroup; isLast: boolean; onClick: () => void }) {
-  const solid = group.is_central_chat === true
-  const showUnread = group.unread_count > 0 && !group.muted
   return (
-    <button
-      onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: 12, width: "100%",
-        background: "none", border: "none", textAlign: "left", cursor: "pointer",
-        padding: "13px 0", borderBottom: isLast ? "none" : "1px solid var(--line-3)",
-      }}
-    >
-      <PocketChip letter={group.name.charAt(0).toUpperCase()} solid={solid} />
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{group.name}</span>
+    <PocketRow
+      leading={<PocketChip letter={group.name.charAt(0).toUpperCase()} solid={group.is_central_chat === true} />}
+      title={group.name}
+      titleAccessory={
+        <>
           {group.pinned && <Pin style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} aria-label="Pinned" />}
           {group.muted && <BellOff style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} aria-label="Muted" />}
-        </span>
-        <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {group.last_message
-            ? (group.last_sender ? `${group.last_sender}: ${group.last_message}` : group.last_message)
-            : "No messages yet"}
-        </span>
-      </span>
-      <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
-        {group.last_message_time && <span style={{ fontSize: 11, color: "var(--faint)" }}>{formatRelativeTime(group.last_message_time)}</span>}
-        {showUnread && <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--plum)" }} />}
-      </span>
-    </button>
+        </>
+      }
+      sub={group.last_message
+        ? (group.last_sender ? `${group.last_sender}: ${group.last_message}` : group.last_message)
+        : "No messages yet"}
+      time={group.last_message_time ? formatRelativeTime(group.last_message_time) : undefined}
+      showDot={group.unread_count > 0 && !group.muted}
+      isLast={isLast}
+      onClick={onClick}
+    />
   )
 }
 
 // The single tonal grouped card holding a set of chat rows (mockup `.card`).
 function PocketChatCard({ groups, onOpen }: { groups: ChatGroup[]; onOpen: (id: string, name: string) => void }) {
   return (
-    <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "6px 18px" }}>
+    <PocketRowCard>
       {groups.map((g, i) => (
         <PocketChatRow key={g.id} group={g} isLast={i === groups.length - 1} onClick={() => onOpen(g.id, g.name)} />
       ))}
-    </div>
+    </PocketRowCard>
   )
 }
 
@@ -3010,9 +2981,10 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
         if (rooms.length === 0) return null
         return (
           <div key={key}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "20px 4px 8px" }}>
-              <span style={{ flex: 1, fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)" }}>{label}</span>
-              {canCreate && (
+            <PocketKicker
+              label={label}
+              style={{ margin: "20px 4px 8px" }}
+              action={canCreate ? (
                 <button
                   onClick={() => onAddInSection(key)}
                   aria-label={`New ${label.toLowerCase()} chat`}
@@ -3020,8 +2992,8 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
                 >
                   <Plus style={{ width: 15, height: 15 }} strokeWidth={1.8} />
                 </button>
-              )}
-            </div>
+              ) : undefined}
+            />
             <PocketChatCard groups={rooms} onOpen={onOpen} />
           </div>
         )
@@ -3030,13 +3002,21 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
   )
 }
 
-export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, onGoToProfile, activeGroupId, canCreateChurchChat, fallbackChats }: ChatsTabProps) {
+export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, onGoToProfile, activeGroupId, canCreateChurchChat, fallbackChats, onComposerOpenChange }: ChatsTabProps) {
   const { setParam } = useNavState()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
     return (p === "church" || p === "my") ? p : "church"
   })
   const [showCreateChat, setShowCreateChat] = useState<"my" | "church" | null>(null)
+
+  // Report the full-screen CreateChatScreen up/down so home-app hides the pill
+  // nav (§2.2). Cleanup covers unmount-while-open (e.g. URL-driven tab change).
+  useEffect(() => {
+    onComposerOpenChange?.(showCreateChat !== null)
+    return () => onComposerOpenChange?.(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCreateChat])
   // Which church section the create sheet should pre-select, when opened from a
   // section header's + (ignored for My Chats). Reset whenever the sheet closes.
   const [createChatCategory, setCreateChatCategory] = useState<ChurchSection | undefined>(undefined)
@@ -3180,8 +3160,8 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       {/* Mobile scope pills (B3 Pocket) — Church / My chats; the new-chat + sits
           right-aligned on the same row, My chats scope only. */}
       <div className="flex items-center gap-2 mb-4 md:hidden">
-        <ChatFilterChip label="Church" active={subTab === "church"} onClick={() => { setSubTab("church"); setSearch(""); setParam("chats", null) }} />
-        <ChatFilterChip label="My chats" active={subTab === "my"} onClick={() => { setSubTab("my"); setSearch(""); setParam("chats", "my") }} />
+        <PocketFilterChip label="Church" active={subTab === "church"} onClick={() => { setSubTab("church"); setSearch(""); setParam("chats", null) }} />
+        <PocketFilterChip label="My chats" active={subTab === "my"} onClick={() => { setSubTab("my"); setSearch(""); setParam("chats", "my") }} />
         {canShowNewChat && (
           <div className="ml-auto">
             <PocketRoundButton variant="plum" onClick={openNewChat} ariaLabel="New chat">
@@ -3193,7 +3173,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
 
       {/* Push-notification prompt — self-hides unless permission is 'default' & unsubscribed & not dismissed */}
       <div className="md:px-4">
-        <PushSubscribeCard userId={userId} ministryId={ministryId} notificationSettings={userProfile.notification_settings} style={{ marginBottom: 16 }} />
+        <PushSubscribeCard userId={userId} ministryId={ministryId} notificationSettings={userProfile.notification_settings} variant="pocket" style={{ marginBottom: 16 }} />
       </div>
 
       {loading ? (
@@ -3235,7 +3215,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
                 onClick={() => setShowArchived((s) => !s)}
                 className="w-full flex items-center justify-between py-2 px-1"
               >
-                <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)" }}>
+                <span style={POCKET_KICKER_STYLE}>
                   Archived · {archivedChurchChats.length}
                 </span>
                 <ChevronDown className={`w-4 h-4 text-[var(--muted-text)] transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />

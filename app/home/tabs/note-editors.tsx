@@ -111,7 +111,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
   const currentColor = (editor.getAttributes("textStyle") as { color?: string }).color
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 1, padding: "5px 8px", borderBottom: "1px solid #F0EDE8", flexWrap: "wrap", background: "var(--cream)" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 1, padding: "5px 8px", borderBottom: "1px solid var(--line)", flexWrap: "wrap", background: "var(--cream)" }}>
       {btn(editor.isActive("bold"),      () => editor.chain().focus().toggleBold().run(),   "Bold",          <Bold size={12} />)}
       {btn(editor.isActive("italic"),    () => editor.chain().focus().toggleItalic().run(), "Italic",        <Italic size={12} />)}
       {btn(editor.isActive("underline"), () => editor.chain().focus().toggleUnderline().run(), "Underline",  <UnderlineIcon size={12} />)}
@@ -394,7 +394,7 @@ export function MeetingNoteEditor({
     <div className="meeting-note-editor">
       {/* Presence bar */}
       {activeUsers.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 20px", borderBottom: "1px solid #F0EDE8", background: "var(--cream)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 20px", borderBottom: "1px solid var(--line)", background: "var(--cream)" }}>
           <div style={{ display: "flex" }}>
             {activeUsers.slice(0, 4).map((u, i) => (
               <MonogramChip

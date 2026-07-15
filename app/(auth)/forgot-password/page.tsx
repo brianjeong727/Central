@@ -4,7 +4,8 @@ import { useState } from "react"
 import Link from "next/link"
 import { AlertCircle, CheckCircle2 } from "lucide-react"
 import { createClient, siteOrigin } from "@/lib/supabase"
-import { SplitShell } from "@/app/(auth)/shared"
+import { SplitShell, PocketAuthScreen, PocketBack, PocketField, PocketSubmit, PocketError,
+  pocketH1, pocketSub } from "@/app/(auth)/shared"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
 
@@ -40,7 +41,9 @@ export default function ForgotPasswordPage() {
     setLoading(false)
   }
 
-  return (
+  return (<>
+    {/* ── Desktop ── */}
+    <div className="hidden md:block">
     <SplitShell topBar={<>
       <Link href="/login" style={{
         display: "inline-flex", alignItems: "center", gap: 8,
@@ -108,5 +111,44 @@ export default function ForgotPasswordPage() {
         </form>
       )}
     </SplitShell>
-  )
+    </div>
+
+    {/* ── Mobile ── */}
+    <div className="md:hidden">
+      <PocketAuthScreen>
+        <PocketBack href="/login" label="Back to sign in" />
+        <div style={{ marginTop: 20 }}>
+          <div style={mono}>Reset password</div>
+          <h1 style={{ ...pocketH1, marginTop: 8 }}>Reset your password.</h1>
+        </div>
+        <p style={{ ...pocketSub, marginTop: 14 }}>We&apos;ll send a reset link to your email.</p>
+
+        {sent ? (
+          <div style={{ marginTop: 28, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 12 }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(127,166,127,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <CheckCircle2 size={22} color="var(--success)" />
+            </div>
+            <p style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)", margin: 0, fontFamily: SERIF }}>Check your inbox</p>
+            <p style={{ fontSize: 14, color: "var(--muted-text)", lineHeight: 1.55, margin: 0 }}>
+              We sent a password reset link to <strong style={{ color: "var(--ink)" }}>{email}</strong>. Check your spam folder if it doesn&apos;t arrive within a minute.
+            </p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ marginTop: 26 }}>
+            {error && <PocketError msg={error}/>}
+            <div style={{ marginTop: error ? 16 : 0 }}>
+              <PocketField label="Email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email"/>
+            </div>
+            <PocketSubmit loading={loading} disabled={loading}>
+              {loading ? "Sending…" : "Send reset link"}
+            </PocketSubmit>
+            <p style={{ textAlign: "center", fontSize: 13.5, color: "var(--muted-text)", marginTop: 16 }}>
+              Remember your password?{" "}
+              <Link href="/login" style={{ fontWeight: 600, color: "var(--plum)", textDecoration: "none" }}>Sign in</Link>
+            </p>
+          </form>
+        )}
+      </PocketAuthScreen>
+    </div>
+  </>)
 }

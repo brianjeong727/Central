@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase"
 import { Pencil, Check, Copy, ExternalLink, Wallet } from "lucide-react"
-import { TabPageHeader, PageTitle, FormField, Input, CentralButton } from "@/components/central"
+import { TabPageHeader, PageTitle, FormField, Input, CentralButton, POCKET_KICKER_STYLE } from "@/components/central"
 import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
 import { isAdminRole } from "@/lib/roles"
 
@@ -26,14 +26,15 @@ function openZelle(onFallback: () => void) {
 
 function GivingTrustPanel({ zelleName, zelleInfo, onCopy, copied }: { zelleName: string | null; zelleInfo: string; onCopy: () => void; copied: boolean }) {
   return (
-    <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, padding: "18px 20px" }}>
-      <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Giving destination</p>
-      <div style={{ padding: "12px 14px", border: "1px solid var(--line)", background: "var(--cream)", borderRadius: 12, marginBottom: 12 }}>
+    <div className="border-0 bg-[var(--ivory)] rounded-[var(--r-pocket)] md:border md:border-[var(--line)] md:bg-[var(--cream)] md:rounded-[16px]" style={{ padding: "18px 20px" }}>
+      <p className="hidden md:block" style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Giving destination</p>
+      <p className="md:hidden" style={{ ...POCKET_KICKER_STYLE, marginBottom: 12 }}>Giving destination</p>
+      <div className="border-0 md:border md:border-[var(--line)]" style={{ padding: "12px 14px", background: "var(--cream)", borderRadius: 12, marginBottom: 12 }}>
         {zelleName && <p style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500, lineHeight: 1.3, marginBottom: 4 }}>{zelleName}</p>}
         <p style={{ fontSize: 13.5, color: zelleName ? "var(--body)" : "var(--ink)", fontWeight: 400, lineHeight: 1.2 }}>{zelleInfo}</p>
         <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 4 }}>{zelleName ? "Zelle recipient · confirm this name before sending" : "Zelle email or phone"}</p>
       </div>
-      <button onClick={onCopy} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", height: 38, borderRadius: 10, border: "1px solid var(--line)", background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer", marginBottom: 14 }}>
+      <button onClick={onCopy} className="border-0 md:border md:border-[var(--line)]" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", height: 38, borderRadius: 10, background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer", marginBottom: 14 }}>
         {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}
         {copied ? "Copied" : "Copy Zelle info"}
       </button>
@@ -159,17 +160,27 @@ export function GiveView({
           </div>
         ) : (
           <div className="md:grid md:gap-5" style={{ gridTemplateColumns: "1.3fr 1fr" }}>
-            <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, padding: "28px 28px 24px", marginBottom: 16 }} className="md:mb-0">
-              <p style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Your gift</p>
+            <div className="border-0 bg-[var(--ivory)] rounded-[var(--r-pocket)] md:border md:border-[var(--line)] md:bg-[var(--cream)] md:rounded-[16px] mb-4 md:mb-0" style={{ padding: "28px 28px 24px" }}>
+              <p className="hidden md:block" style={{ fontSize: 11, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Your gift</p>
+              <p className="md:hidden" style={{ ...POCKET_KICKER_STYLE, marginBottom: 12 }}>Your gift</p>
               <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 30 }}>
                 <span style={{ fontFamily: "var(--serif)", fontSize: 40, color: "var(--body)", lineHeight: 1 }}>$</span>
                 <input type="text" inputMode="numeric" value={amount} onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ""))} style={{ background: "transparent", border: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 64, color: "var(--ink)", width: "100%", padding: 0, lineHeight: 1 }} />
               </div>
-              <CentralButton variant="primary" onClick={handleOpenZelle} style={{ width: "100%", height: 48, borderRadius: 12, fontSize: 15, marginBottom: 10 }}>
-                <ExternalLink style={{ width: 16, height: 16 }} />Open Zelle · ${displayAmount}
-              </CentralButton>
+              {/* Zelle CTA — the single plum primary. Mobile: pill radius 999,
+                  ≥44px (§3.3); desktop keeps its 12px radius unchanged. */}
+              <div className="md:hidden" style={{ marginBottom: 10 }}>
+                <CentralButton variant="primary" onClick={handleOpenZelle} style={{ width: "100%", height: 48, borderRadius: 999, fontSize: 15 }}>
+                  <ExternalLink style={{ width: 16, height: 16 }} />Open Zelle · ${displayAmount}
+                </CentralButton>
+              </div>
+              <div className="hidden md:block" style={{ marginBottom: 10 }}>
+                <CentralButton variant="primary" onClick={handleOpenZelle} style={{ width: "100%", height: 48, borderRadius: 12, fontSize: 15 }}>
+                  <ExternalLink style={{ width: 16, height: 16 }} />Open Zelle · ${displayAmount}
+                </CentralButton>
+              </div>
               {zelleFallback && <p style={{ fontSize: 13, color: "var(--body)", textAlign: "center", lineHeight: 1.5, marginBottom: 10 }}>Open Zelle on your phone and send to <strong style={{ color: "var(--ink)" }}>{zelleName ? `${zelleName} (${zelleInfo})` : zelleInfo}</strong></p>}
-              <button onClick={handleCopy} style={{ width: "100%", height: 38, background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", borderRadius: 10, fontSize: 13, border: "1px solid var(--line)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
+              <button onClick={handleCopy} className="border-0 md:border md:border-[var(--line)]" style={{ width: "100%", height: 38, background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", borderRadius: 10, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
                 {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}
                 {copied ? "Copied!" : `Copy info · ${zelleInfo}`}
               </button>
@@ -178,9 +189,10 @@ export function GiveView({
             <div className="flex flex-col gap-4 mt-4 md:mt-0">
               <GivingTrustPanel zelleName={zelleName} zelleInfo={zelleInfo} onCopy={handleCopy} copied={copied} />
               {/* In-app card / Apple Pay giving — coming soon (Zelle above stays the live path). */}
-              <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, padding: "18px 20px" }}>
+              <div className="border-0 bg-[var(--ivory)] rounded-[var(--r-pocket)] md:border md:border-[var(--line)] md:bg-[var(--cream)] md:rounded-[16px]" style={{ padding: "18px 20px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
-                  <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)" }}>Card &amp; Apple Pay</p>
+                  <p className="hidden md:block" style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)" }}>Card &amp; Apple Pay</p>
+                  <p className="md:hidden" style={{ ...POCKET_KICKER_STYLE }}>Card &amp; Apple Pay</p>
                   <span style={{ fontSize: 10, letterSpacing: "0.08em", padding: "2px 8px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line-2)", textTransform: "uppercase", fontWeight: 500, color: "var(--muted-text)" }}>Coming soon</span>
                 </div>
                 <p style={{ fontSize: 12.5, color: "var(--body)", lineHeight: 1.55 }}>Giving in-app with a card or Apple Pay is coming soon. For now, give through Zelle above.</p>

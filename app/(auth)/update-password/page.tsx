@@ -4,7 +4,8 @@ import { useState } from "react"
 import Link from "next/link"
 import { AlertCircle } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { SplitShell, EyeButton } from "@/app/(auth)/shared"
+import { SplitShell, EyeButton, PocketAuthScreen, PocketBack, PocketField, PocketSubmit, PocketError,
+  pocketH1, pocketSub } from "@/app/(auth)/shared"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
 
@@ -42,7 +43,9 @@ export default function UpdatePasswordPage() {
     window.location.assign("/login")
   }
 
-  return (
+  return (<>
+    {/* ── Desktop ── */}
+    <div className="hidden md:block">
     <SplitShell topBar={<>
       <Link href="/login" style={{
         display: "inline-flex", alignItems: "center", gap: 8,
@@ -105,5 +108,31 @@ export default function UpdatePasswordPage() {
         </CentralButton>
       </form>
     </SplitShell>
-  )
+    </div>
+
+    {/* ── Mobile ── */}
+    <div className="md:hidden">
+      <PocketAuthScreen>
+        <PocketBack href="/login" label="Back to sign in" />
+        <div style={{ marginTop: 20 }}>
+          <div style={mono}>New password</div>
+          <h1 style={{ ...pocketH1, marginTop: 8 }}>Set a new password.</h1>
+        </div>
+        <p style={{ ...pocketSub, marginTop: 14 }}>Choose something you&apos;ll remember.</p>
+
+        <form onSubmit={handleSubmit} style={{ marginTop: 26 }}>
+          {error && <PocketError msg={error}/>}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: error ? 16 : 0 }}>
+            <PocketField label="New password" type={showPw ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="new-password"
+              hint="At least 6 characters." trailing={<EyeButton show={showPw} onToggle={() => setShowPw((v) => !v)} />}/>
+            <PocketField label="Confirm password" type={showConfirm ? "text" : "password"} placeholder="••••••••" value={confirm} onChange={(e) => setConfirm(e.target.value)} required autoComplete="new-password"
+              trailing={<EyeButton show={showConfirm} onToggle={() => setShowConfirm((v) => !v)} />}/>
+          </div>
+          <PocketSubmit loading={loading} disabled={loading}>
+            {loading ? "Updating…" : "Update password"}
+          </PocketSubmit>
+        </form>
+      </PocketAuthScreen>
+    </div>
+  </>)
 }

@@ -71,7 +71,7 @@ function renderMentions(content: string, isOwn: boolean): React.ReactNode {
   const parts = content.split(/(@\S+)/g)
   return <>{parts.map((part, i) =>
     part.startsWith("@")
-      ? <span key={i} style={{ fontWeight: 500, color: isOwn ? "#F6C96A" : "#8B5E1A" }}>{part}</span>
+      ? <span key={i} style={{ fontWeight: 500, color: isOwn ? "var(--mention-own)" : "var(--mention-incoming)" }}>{part}</span>
       : part
   )}</>
 }
@@ -245,11 +245,11 @@ function MessageRowBase({
           </div>
         )}
         <div className="flex flex-col items-center mt-4 mb-1">
-          <div className="w-full max-w-[290px] bg-[var(--cream-panel)] border border-[var(--line)] rounded-2xl overflow-hidden">
+          <div className="w-full max-w-[290px] bg-[var(--ivory)] rounded-2xl overflow-hidden">
             {poll ? (
               <>
                 {/* Card header */}
-                <div className="px-4 pt-4 pb-3 border-b border-[#F0EDE6] flex items-start gap-2">
+                <div className="px-4 pt-4 pb-3 border-b border-[var(--line-3)] flex items-start gap-2">
                   <div className="flex-1 text-center">
                     <p className="text-[15px] font-medium text-[var(--ink)] leading-snug">{poll.question}</p>
                     <p className="text-[11px] text-[var(--muted-text)] mt-0.5">{totalVotes} vote{totalVotes !== 1 ? "s" : ""}</p>
@@ -259,12 +259,12 @@ function MessageRowBase({
                     <div className="relative flex-shrink-0 -mt-1 -mr-1">
                       <button
                         onClick={e => { e.stopPropagation(); setPollMenuFor(isPollMenuOpen ? null : msg.id) }}
-                        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-[#F0EDE6] transition-colors"
+                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[var(--line-3)] transition-colors"
                       >
                         <MoreHorizontal className="w-3.5 h-3.5 text-[var(--muted-text)]" />
                       </button>
                       {isPollMenuOpen && (
-                        <div className="absolute right-0 top-8 z-[160] bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] overflow-hidden min-w-[130px]">
+                        <div className="absolute right-0 top-8 z-[160] bg-[var(--ivory)] rounded-xl overflow-hidden min-w-[130px]">
                           <button
                             onClick={() => { setPollMenuFor(null); setConfirmDeletePoll(true) }}
                             className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-[var(--danger)] hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] transition-colors"
@@ -303,7 +303,7 @@ function MessageRowBase({
                           )}
                         </div>
                         {hasVoted && (
-                          <div className="h-1.5 w-full rounded-full bg-[#F0EDE6] overflow-hidden">
+                          <div className="h-1.5 w-full rounded-full bg-[var(--line-3)] overflow-hidden">
                             <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: isSelected ? "var(--plum)" : "var(--dashed)" }} />
                           </div>
                         )}
@@ -330,7 +330,7 @@ function MessageRowBase({
               </div>
             )}
           </div>
-          <p className="text-[11px] text-[#B0A9A0] mt-1.5">{formatMessageTime(msg.created_at)}</p>
+          <p className="text-[11px] text-[var(--faint)] mt-1.5">{formatMessageTime(msg.created_at)}</p>
         </div>
       </div>
     )
@@ -383,7 +383,7 @@ function MessageRowBase({
             className={`absolute z-[160] ${placeBelow ? "top-[calc(100%-4px)]" : "bottom-[calc(100%-4px)]"} ${isOwn ? "right-0" : "left-0"}`}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line-3)] px-3 py-2.5 flex gap-3 items-center">
+            <div className="bg-[var(--ivory)] rounded-2xl px-3 py-2.5 flex gap-3 items-center">
               {REACTION_EMOJIS.map((emoji) => (
                 <button
                   key={emoji}
@@ -398,7 +398,7 @@ function MessageRowBase({
               <button
                 onClick={(e) => { e.stopPropagation(); setEmojiPickerFor(null); setFullReactionPickerFor(msg.id) }}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="w-7 h-7 rounded-full bg-[var(--body-bg)] flex items-center justify-center text-[var(--body)] hover:bg-[var(--line)] transition-colors"
+                className="w-9 h-9 rounded-full bg-[var(--line-2)] flex items-center justify-center text-[var(--body)] hover:bg-[var(--line)] transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
@@ -424,9 +424,9 @@ function MessageRowBase({
             className={`absolute z-[160] ${placeBelow ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <div className="bg-[var(--cream-panel)] rounded-2xl border border-[var(--line)] overflow-hidden min-w-[160px]">
+            <div className="bg-[var(--ivory)] rounded-2xl overflow-hidden min-w-[160px]">
               {!msg.deleted && (
-                <div className="flex gap-3 items-center px-3 py-2.5 border-b border-[#F3EDE6]">
+                <div className="flex gap-3 items-center px-3 py-2.5 border-b border-[var(--line-3)]">
                   {REACTION_EMOJIS.map((emoji) => (
                     <button
                       key={emoji}
@@ -440,7 +440,7 @@ function MessageRowBase({
                   <button
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setFullReactionPickerFor(msg.id) }}
-                    className="w-7 h-7 rounded-full bg-[var(--body-bg)] flex items-center justify-center text-[var(--body)] hover:bg-[var(--line)] transition-colors"
+                    className="w-9 h-9 rounded-full bg-[var(--line-2)] flex items-center justify-center text-[var(--body)] hover:bg-[var(--line)] transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
@@ -449,7 +449,7 @@ function MessageRowBase({
               <button
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setReplyingTo(msg) }}
-                className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--line-3)] active:bg-[var(--line-2)] transition-colors border-b border-[var(--line-3)]"
               >
                 <CornerUpLeft className="w-4 h-4 text-[var(--body)]" />
                 Reply
@@ -457,7 +457,7 @@ function MessageRowBase({
               <button
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.stopPropagation(); onForward(msg) }}
-                className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--line-3)] active:bg-[var(--line-2)] transition-colors border-b border-[var(--line-3)]"
               >
                 <Forward className="w-4 h-4 text-[var(--body)]" />
                 Forward
@@ -466,7 +466,7 @@ function MessageRowBase({
                 <button
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); onReport(msg) }}
-                  className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[var(--cream-2)] transition-colors border-b border-[var(--line-3)]"
+                  className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--line-3)] active:bg-[var(--line-2)] transition-colors border-b border-[var(--line-3)]"
                 >
                   <Flag className="w-4 h-4 text-[var(--body)]" />
                   Report
@@ -476,7 +476,7 @@ function MessageRowBase({
                 <button
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); isPinned ? onUnpin() : onPin(msg.id) }}
-                  className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                  className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--line-3)] active:bg-[var(--line-2)] transition-colors border-b border-[var(--line-3)]"
                 >
                   <Pin className="w-4 h-4 text-[var(--body)]" />
                   {isPinned ? "Unpin" : "Pin"}
@@ -486,7 +486,7 @@ function MessageRowBase({
                 <button
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); onStartEdit(msg) }}
-                  className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--cream-panel)] active:bg-[#F3EDE6] transition-colors border-b border-[#F3EDE6]"
+                  className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--line-3)] active:bg-[var(--line-2)] transition-colors border-b border-[var(--line-3)]"
                 >
                   <Pencil className="w-4 h-4 text-[var(--body)]" />
                   Edit
@@ -552,10 +552,10 @@ function MessageRowBase({
               msg.deleted
                 ? isOwn
                   ? `bg-[var(--plum-2)]/30 text-[color-mix(in_srgb,var(--cream-on-dark)_50%,transparent)] ${outgoingRadius} px-4 py-2`
-                  : `bg-[var(--cream-panel)] border border-[var(--line)] text-[var(--muted-text)] ${incomingRadius} px-4 py-2`
+                  : `bg-[var(--ivory)] text-[var(--muted-text)] ${incomingRadius} px-4 py-2`
                 : isOwn
                   ? `bg-[var(--plum-2)] text-[var(--cream-on-dark)] ${outgoingRadius}`
-                  : `bg-[var(--cream-panel)] border border-[var(--line)] text-[var(--ink)] ${incomingRadius}`
+                  : `bg-[var(--ivory)] text-[var(--ink)] ${incomingRadius}`
             } ${!msg.deleted && !msg.reply_to_id && !(msg.attachment_url && msg.attachment_type?.startsWith("image/")) ? "px-4 py-2.5" : ""}`}
           >
             {msg.deleted ? (
@@ -570,7 +570,7 @@ function MessageRowBase({
                       className={`w-full text-left px-3 py-1.5 rounded-lg flex flex-col gap-0.5 ${
                         isOwn
                           ? "bg-[var(--cream-panel)]/10 border-l-[2px] border-[var(--cream-on-dark)]/50"
-                          : "bg-[var(--ivory)] border-l-[2px] border-[var(--plum)]"
+                          : "bg-[var(--line-2)] border-l-[2px] border-[var(--plum)]"
                       }`}
                     >
                       <span className={`text-[11px] font-medium flex items-center gap-1 ${isOwn ? "text-[color-mix(in_srgb,var(--cream-on-dark)_90%,transparent)]" : "text-[var(--plum)]"}`}>
@@ -630,7 +630,7 @@ function MessageRowBase({
                       <div
                         className="flex items-center gap-2.5 hover:bg-black/5 transition-colors rounded-xl p-1 cursor-pointer"
                       >
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isOwn ? "bg-[var(--cream-panel)]/10" : "bg-[var(--ivory)]"}`}>
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${isOwn ? "bg-[var(--cream-panel)]/10" : "bg-[var(--line-2)]"}`}>
                           <FileDown className="w-4 h-4" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -697,10 +697,10 @@ function MessageRowBase({
                 key={emoji}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => onReact(msg.id, emoji)}
-                className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[12px] border transition-all active:scale-95 ${
+                className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[12px] transition-all active:scale-95 ${
                   userReacted
-                    ? "bg-[var(--plum)] border-[var(--plum)]"
-                    : "bg-[var(--cream-panel)] border-[var(--line)]"
+                    ? "bg-[var(--plum)]"
+                    : "bg-[var(--ivory)]"
                 }`}
               >
                 <span>{emoji}</span>
@@ -738,7 +738,7 @@ function MessageRowBase({
                 ))}
               </div>
             )}
-            <span className="text-[11px] text-[#B0A9A0]">{formatMessageTime(msg.created_at)}</span>
+            <span className="text-[11px] text-[var(--faint)]">{formatMessageTime(msg.created_at)}</span>
           </div>
         )}
 
@@ -749,14 +749,14 @@ function MessageRowBase({
             <button
               onClick={(e) => { e.stopPropagation(); onToggleSeenBy?.() }}
               className="text-[11px] text-[var(--muted-text)] hover:text-[var(--body)] transition-colors"
-              style={{ padding: "4px 10px", border: "1px solid var(--line)", borderRadius: 999, background: "var(--cream-panel)" }}
+              style={{ padding: "4px 10px", borderRadius: 999, background: "var(--ivory)" }}
             >
               Seen by {seenByCount}
             </button>
             {seenByOpen && seenByList && (
               <div
                 className="flex flex-col gap-1.5 items-end"
-                style={{ padding: "8px 10px", border: "1px solid var(--line)", borderRadius: 12, background: "var(--cream-panel)", maxWidth: 220 }}
+                style={{ padding: "8px 10px", borderRadius: 12, background: "var(--ivory)", maxWidth: 220 }}
               >
                 {seenByList.map((r, idx) => (
                   <div key={idx} className="flex items-center gap-2">

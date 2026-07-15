@@ -188,7 +188,7 @@ function ComposerImpl({
             </p>
             <p className="text-[12px] text-[var(--muted-text)] truncate">{replyPreviewLabel(replyingTo.content, replyingTo.attachment_type, replyingTo.attachment_name).slice(0, 60)}</p>
           </div>
-          <button onClick={onClearReply} className="flex-shrink-0 mt-0.5 text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
+          <button onClick={onClearReply} className="flex-shrink-0 mt-0.5 text-[var(--faint)] hover:text-[var(--body)] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -198,15 +198,15 @@ function ComposerImpl({
       {/* ── GIF Picker panel ── */}
       {showGifPicker && !groupArchived && (
         <div className="flex-shrink-0 bg-[var(--cream-panel)] border-t border-[var(--line)] z-[156] relative" style={{ height: 240 }}>
-          <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 border-b border-[#F0EDE6]">
+          <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 border-b border-[var(--line-3)]">
             <input
               autoFocus
               value={gifSearch}
               onChange={e => setGifSearch(e.target.value)}
               placeholder="Search GIFs…"
-              className="flex-1 text-[13px] bg-[#F4F1E8] rounded-xl px-3 py-2 focus:outline-none border border-[var(--line)] focus:border-[#3E1540]/30 placeholder:text-[#C4C4C4]"
+              className="flex-1 text-[13px] bg-[var(--ivory)] rounded-xl px-3 py-2 focus:outline-none border border-[var(--line-2)] focus:border-[var(--plum)]/30 placeholder:text-[var(--faint)]"
             />
-            <button onClick={() => setShowGifPicker(false)} className="text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
+            <button onClick={() => setShowGifPicker(false)} className="w-9 h-9 flex items-center justify-center flex-shrink-0 rounded-full text-[var(--faint)] hover:text-[var(--body)] transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -219,7 +219,7 @@ function ComposerImpl({
               /* Empty state = the announcement. One prominent card explaining why
                  there's nothing here, instead of a mumbled "No GIFs found". */
               <div className="flex items-center justify-center flex-1 px-6">
-                <div style={{ background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 14, padding: "20px 28px", textAlign: "center", maxWidth: 360 }}>
+                <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "20px 28px", textAlign: "center", maxWidth: 360 }}>
                   <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>
                     Coming soon
                   </div>
@@ -237,7 +237,7 @@ function ComposerImpl({
                   <button
                     key={gif.id}
                     onClick={() => { onSendGif(gif.fullUrl); setShowGifPicker(false) }}
-                    className="relative aspect-square rounded-lg overflow-hidden bg-[#F4F1E8] hover:opacity-90 active:scale-95 transition-all"
+                    className="relative aspect-square rounded-lg overflow-hidden bg-[var(--ivory)] hover:opacity-90 active:scale-95 transition-all"
                   >
                     <img src={gif.previewUrl} alt="" className="w-full h-full object-cover" loading="lazy" />
                   </button>
@@ -257,13 +257,13 @@ function ComposerImpl({
         <div className="flex-shrink-0 bg-[var(--cream)] px-4 pt-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] md:px-10 md:py-3.5 relative">
           {/* @mention dropdown */}
           {mentionQuery !== null && filteredMentions.length > 0 && (
-            <div className="absolute bottom-full left-4 mb-1 bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] overflow-hidden min-w-[180px] z-10">
+            <div className="absolute bottom-full left-4 mb-1 bg-[var(--ivory)] rounded-xl overflow-hidden min-w-[180px] z-10">
               {filteredMentions.map((member, idx) => (
                 <button
                   key={member.id}
                   onPointerDown={(e) => e.preventDefault()}
                   onClick={() => handleMentionSelect(member.name)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${idx === mentionIndex ? "bg-[#F4F1E8]" : "hover:bg-[var(--cream-panel)]"} ${idx > 0 ? "border-t border-[#F0EDE6]" : ""}`}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${idx === mentionIndex ? "bg-[var(--line-2)]" : "hover:bg-[var(--line-3)]"} ${idx > 0 ? "border-t border-[var(--line-3)]" : ""}`}
                 >
                   <MonogramChip initials={member.name.charAt(0).toUpperCase()} className="w-7 h-7 text-[11px] font-medium" />
                   <span className="text-[14px] font-medium text-[var(--ink)]">{member.name.split(" ")[0]}</span>
@@ -279,11 +279,12 @@ function ComposerImpl({
               className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) stagePendingAttachment(f); e.target.value = "" }}
             />
-            {/* Left icons — outside the bubble */}
+            {/* Left icons — outside the bubble; ≥34px tap boxes, negative x-margin
+                trims the gap so the icons read as tight as before. */}
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="flex-shrink-0 text-[var(--body)] hover:text-[var(--ink)] transition-colors disabled:opacity-40 mb-2"
+              className="flex-shrink-0 w-9 h-9 -mr-1 flex items-center justify-center rounded-full text-[var(--body)] hover:text-[var(--ink)] hover:bg-[var(--ivory)] transition-colors disabled:opacity-40"
               title="Attach file"
             >
               {uploading
@@ -293,20 +294,20 @@ function ComposerImpl({
             </button>
             <button
               onClick={() => { setShowGifPicker(p => !p); onSetPollOpen(false) }}
-              className={`flex-shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-md border transition-colors mb-2 ${showGifPicker ? "bg-[var(--plum)] text-white border-[var(--plum)]" : "text-[var(--body)] border-[var(--line-2)] hover:border-[#3E1540]/30 hover:text-[var(--ink)]"}`}
+              className={`flex-shrink-0 h-9 -mr-0.5 flex items-center text-[11px] font-medium px-2.5 rounded-full border transition-colors ${showGifPicker ? "bg-[var(--plum)] text-[var(--cream-on-dark)] border-[var(--plum)]" : "text-[var(--body)] border-[var(--line-2)] hover:border-[var(--plum)]/30 hover:text-[var(--ink)]"}`}
               title="Send a GIF"
             >
               GIF
             </button>
             <button
               onClick={() => { setShowGifPicker(false); onSetPollOpen(!pollActive) }}
-              className={`flex-shrink-0 transition-colors mb-2 ${pollActive ? "text-[var(--plum)]" : "text-[var(--body)] hover:text-[var(--ink)]"}`}
+              className={`flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full transition-colors hover:bg-[var(--ivory)] ${pollActive ? "text-[var(--plum)]" : "text-[var(--body)] hover:text-[var(--ink)]"}`}
               title="Create a poll"
             >
               <BarChart2 className="w-4 h-4" />
             </button>
             {/* Textarea bubble — its own bordered component */}
-            <div className="flex-1 border border-[var(--line-2)] rounded-2xl bg-[#F8F4EA] px-3 py-[9px]">
+            <div className="flex-1 border border-[var(--line-2)] rounded-2xl bg-[var(--ivory)] px-3 py-[9px]">
               {/* Attachment preview — inside the bubble, above the textarea */}
               {pendingAttachment && (
                 <div className="mb-2">
@@ -325,15 +326,15 @@ function ComposerImpl({
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 bg-[#EDE9DF] rounded-xl px-2.5 py-2">
-                      <div className="w-7 h-7 rounded-lg bg-[#F4F1E8] border border-[var(--line)] flex items-center justify-center flex-shrink-0">
+                    <div className="flex items-center gap-2 bg-[var(--line-2)] rounded-xl px-2.5 py-2">
+                      <div className="w-7 h-7 rounded-lg bg-[var(--ivory)] flex items-center justify-center flex-shrink-0">
                         <FileDown className="w-3.5 h-3.5 text-[var(--body)]" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[12px] font-medium text-[var(--ink)] truncate">{pendingAttachment.file.name}</p>
                         <p className="text-[10px] text-[var(--muted-text)]">{formatFileSize(pendingAttachment.file.size)}</p>
                       </div>
-                      <button onClick={clearPendingAttachment} className="flex-shrink-0 text-[#C4C4C4] hover:text-[var(--body)] transition-colors">
+                      <button onClick={clearPendingAttachment} className="flex-shrink-0 text-[var(--faint)] hover:text-[var(--body)] transition-colors">
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -352,10 +353,10 @@ function ComposerImpl({
               />
             </div>
             {/* Right icons — outside the bubble */}
-            <div className="relative mb-2">
+            <div className="relative">
               <button
                 onClick={() => setShowComposerEmojiPicker(p => !p)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--body)] hover:bg-[var(--line)] transition-colors"
+                className="w-9 h-9 flex items-center justify-center rounded-full text-[var(--body)] hover:bg-[var(--ivory)] transition-colors"
               >
                 <Smile className="w-4 h-4" />
               </button>
@@ -372,13 +373,13 @@ function ComposerImpl({
             <button
               onClick={triggerSend}
               disabled={(!inputText.trim() && !pendingAttachment) || sending}
-              className="flex-shrink-0 flex items-center justify-center disabled:opacity-50 hover:bg-[var(--ink)] transition-all active:scale-95 bg-[var(--plum-2)] mb-2"
-              style={{ width: 34, height: 34, borderRadius: 10 }}
+              className="flex-shrink-0 flex items-center justify-center disabled:opacity-50 hover:bg-[var(--ink)] transition-all active:scale-95 bg-[var(--plum-2)]"
+              style={{ width: 44, height: 44, borderRadius: 14 }}
             >
-              <Send className="w-4 h-4 text-white" style={{ transform: "rotate(-30deg)" }} />
+              <Send className="w-4 h-4 text-[var(--cream-on-dark)]" style={{ transform: "rotate(-30deg)" }} />
             </button>
           </div>
-          <div className="hidden md:flex justify-between mt-2 text-[11px] text-[#A09A8C]">
+          <div className="hidden md:flex justify-between mt-2 text-[11px] text-[var(--faint)]">
             <span>Press <span style={{ fontFamily: "ui-monospace,monospace" }}>↵</span> to send · <span style={{ fontFamily: "ui-monospace,monospace" }}>⇧↵</span> for new line</span>
             <span>End-to-end visible to {displayName} members</span>
           </div>

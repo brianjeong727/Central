@@ -175,7 +175,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
 
   // Sub-page params that belong to a team workspace — cleared on every team switch
   // so the new team never inherits the previous team's deep-link state.
-  const TEAM_SUBPARAMS = { sotab: null, ptab: null, sgltab: null, fsec: null, evtab: null, rteam: null, notetab: null } as const
+  const TEAM_SUBPARAMS = { sotab: null, ptab: null, sgltab: null, fsec: null, evtab: null, rteam: null, notetab: null, wtab: null } as const
 
   function handleTeamChange(teamId: string) {
     setActiveTeamId(teamId)
@@ -190,7 +190,8 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     () => searchParams.get("rteam")
   )
 
-  function handleReceiptsTeamChange(teamId: string) {
+  // null clears the selection (mobile Receipts hub landing — ?rteam removed).
+  function handleReceiptsTeamChange(teamId: string | null) {
     setActiveReceiptsTeamId(teamId)
     // One atomic replace (Convention #5) via the shared nav-state module.
     // Assert the owning tab so a mount-fired write can't clobber ?tab (race fix).
@@ -216,6 +217,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   }
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [ministryIsPublic, setMinistryIsPublic] = useState(false)
+  // A full-screen mobile composer (CreateChatScreen / announcement compose) is
+  // up — reported by the owning tab via onComposerOpenChange. Suppresses the
+  // floating pill nav + the floating super-switcher chip (mobile §2.2).
+  const [composerOpen, setComposerOpen] = useState(false)
 
   // Graduation prompt — show once per session if user's graduation year has passed
   const [showGradPrompt, setShowGradPrompt] = useState(false)
@@ -1065,7 +1070,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
 
           {activeTab === "announcements" && (
             <div className="md:h-full md:overflow-y-auto">
-              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} avatarUrl={avatarUrl} onGoToProfile={() => handleNavClick("profile")} onOpenAnnouncement={handleOpenAnnouncement} />
+              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} avatarUrl={avatarUrl} onGoToProfile={() => handleNavClick("profile")} onOpenAnnouncement={handleOpenAnnouncement} onComposerOpenChange={setComposerOpen} />
             </div>
           )}
 
@@ -1088,6 +1093,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                   activeGroupId={globalOpenChat?.id}
                   canCreateChurchChat={canCreateChurchChat}
                   fallbackChats={chatListData}
+                  onComposerOpenChange={setComposerOpen}
                 />
               </div>
               {/* Desktop only: thread content area (list lives in DesktopSidebar panel) */}
@@ -1264,11 +1270,15 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
 
         </div>
 
+        {/* Hidden while any full-screen mobile surface is up: an open chat
+            overlay or a composer (§2.2 "nav hidden on full-screen composers").
+            The nav must never paint over a fixed overlay. */}
         <BottomNav
           activeTab={activeTab}
           onTabChange={handleNavClick}
           chatsUnread={totalChatsUnread}
           showPlan={showPlanTab}
+          hidden={composerOpen || globalOpenChat !== null}
         />
 
       </div>
@@ -1341,8 +1351,12 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
 
       {/* Super-account POV switcher — renders only for the super (gated on id).
           Root instance owns the top banner (both viewports) + the mobile floating
-          chip; the desktop trigger is docked in the rail (superSwitcherSlot). */}
-      <SuperSwitcher variant="floating" profile={{ id: initialProfile.id, role: initialProfile.role }} />
+          chip; the desktop trigger is docked in the rail (superSwitcherSlot).
+          Hidden at phone width while a full-screen composer is up — the chip is
+          z-140 and would float over the z-[60] composer overlays. */}
+      <div className={composerOpen ? "contents max-md:hidden" : "contents"}>
+        <SuperSwitcher variant="floating" profile={{ id: initialProfile.id, role: initialProfile.role }} />
+      </div>
 
       {/* Native cold-launch splash (self-gated: no-ops on web/desktop/warm nav, and
           releases the native launch splash even when it skips rendering). */}

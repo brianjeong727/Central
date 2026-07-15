@@ -171,15 +171,19 @@ test.describe("mobile plan workspace entry (3a15bd6)", () => {
       assertNoErrors(errors)
     })
 
-    test("3. '← All workspaces' chip returns to the picker and clears ?team=", async ({ page }) => {
+    test("3. hub chrome chevron returns to the picker and clears ?team= (back pill retired)", async ({ page }) => {
+      // Hub-first rework (sim ruling 2026-07-15): standard teams land on the
+      // MobilePocketHub; the chrome chevron is the single back — the bordered
+      // "← All workspaces" pill is retired on this path (§5.3).
       const errors = watchConsole(page)
       await page.goto("/home?tab=plan")
       await page.getByText(OUTREACH_NAME, { exact: false }).filter({ visible: true }).click()
       await expect.poll(() => page.url()).toContain(`team=${outreachTeamId}`)
 
-      const backChip = page.getByText("All workspaces", { exact: false }).filter({ visible: true })
-      await expect(backChip).toBeVisible()
-      await backChip.click()
+      await expect(page.getByText("All workspaces", { exact: false }).filter({ visible: true })).toHaveCount(0)
+      const backChevron = page.getByRole("button", { name: "Back" }).filter({ visible: true }).first()
+      await expect(backChevron).toBeVisible()
+      await backChevron.click()
 
       await expect.poll(() => page.url()).not.toContain("team=")
       await expect(page.getByText("Your workspaces", { exact: true }).filter({ visible: true })).toBeVisible()
@@ -202,17 +206,24 @@ test.describe("mobile plan workspace entry (3a15bd6)", () => {
       assertNoErrors(errors)
     })
 
-    test("5. standard-team branch renders MinistryCalendar", async ({ page }) => {
+    test("5. standard-team branch lands on the hub; Calendar row drills into MinistryCalendar", async ({ page }) => {
       const errors = watchConsole(page)
       await page.goto("/home?tab=plan")
       await page.getByText(OUTREACH_NAME, { exact: false }).filter({ visible: true }).click()
       await expect.poll(() => page.url()).toContain(`team=${outreachTeamId}`)
 
+      // Hub-first landing: team-name chrome + Calendar section row.
+      const calRow = page.getByText("Calendar", { exact: true }).filter({ visible: true }).first()
+      await expect(calRow).toBeVisible()
+      // Confirms this is the standard hub, NOT the studentOrg board.
+      await expect(page.getByText("Meeting notes", { exact: true }).filter({ visible: true })).toHaveCount(0)
+
+      // Drill -> the existing MinistryCalendar body (?wtab synced).
+      await calRow.click()
+      await expect.poll(() => page.url()).toContain("wtab=calendar")
       await expect(page.getByText("Upcoming", { exact: true }).filter({ visible: true })).toBeVisible()
       await expect(page.getByRole("button", { name: "Month" }).filter({ visible: true })).toBeVisible()
       await expect(page.getByRole("button", { name: "List" }).filter({ visible: true })).toBeVisible()
-      // Confirms this is the calendar fallback, NOT the studentOrg board.
-      await expect(page.getByRole("button", { name: "Meeting Notes" }).filter({ visible: true })).toHaveCount(0)
 
       assertNoErrors(errors)
     })
@@ -271,13 +282,17 @@ test.describe("mobile plan workspace entry (3a15bd6)", () => {
       assertNoErrors(errors)
     })
 
-    test("8. member taps a team card and enters the workspace", async ({ page }) => {
+    test("8. member taps a team card and enters the workspace (hub landing)", async ({ page }) => {
       const errors = watchConsole(page)
       await page.goto("/home?tab=plan")
       await page.getByText(OUTREACH_NAME, { exact: false }).filter({ visible: true }).click()
 
       await expect.poll(() => page.url()).toContain(`team=${outreachTeamId}`)
-      await expect(page.getByText("All workspaces", { exact: false }).filter({ visible: true })).toBeVisible()
+      // Hub-first landing (back pill retired): chrome chevron + Calendar row.
+      await expect(page.getByRole("button", { name: "Back" }).filter({ visible: true }).first()).toBeVisible()
+      const calRow = page.getByText("Calendar", { exact: true }).filter({ visible: true }).first()
+      await expect(calRow).toBeVisible()
+      await calRow.click()
       await expect(page.getByText("Upcoming", { exact: true }).filter({ visible: true })).toBeVisible()
 
       assertNoErrors(errors)

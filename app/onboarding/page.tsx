@@ -84,7 +84,7 @@ function ToggleRow({ title, desc, on, onClick }: {
   title: string; desc: string; on: boolean; onClick: () => void
 }) {
   return (
-    <div style={{
+    <div className="max-md:!border-transparent max-md:!bg-[var(--ivory)] max-md:!rounded-[var(--r-pocket)]" style={{
       display: "flex", alignItems: "flex-start", gap: 14, padding: 18,
       border: "1px solid var(--line)", borderRadius: 12, background: "var(--cream)", marginTop: 12,
     }}>
@@ -110,6 +110,11 @@ function WorkspacePickCard({ iconKey, name, desc, selected, comingSoon, onToggle
       disabled={comingSoon}
       onClick={onToggle}
       aria-pressed={selected}
+      // Mobile: borderless tonal --ivory tiles; selected = solid plum on-state
+      // (PocketFilterChip selection language). Desktop unchanged below.
+      className={`max-md:!border-transparent max-md:!rounded-[var(--r-pocket)] ${
+        selected && !comingSoon ? "max-md:!bg-[var(--plum)]" : "max-md:!bg-[var(--ivory)]"
+      }`}
       style={{
         width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px",
         border: `1.5px solid ${selected ? "var(--plum)" : "var(--line-2)"}`,
@@ -125,7 +130,7 @@ function WorkspacePickCard({ iconKey, name, desc, selected, comingSoon, onToggle
       <PlanLineIcon iconKey={iconKey} size={38} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 15, color: "var(--ink)" }}>{name}</span>
+          <span className={selected && !comingSoon ? "max-md:!text-[var(--cream)]" : ""} style={{ fontSize: 15, color: "var(--ink)" }}>{name}</span>
           {comingSoon && (
             <span style={{
               ...mono, fontSize: 9.5, letterSpacing: "0.1em", color: "var(--muted-text)",
@@ -133,15 +138,18 @@ function WorkspacePickCard({ iconKey, name, desc, selected, comingSoon, onToggle
             }}>Coming soon</span>
           )}
         </div>
-        <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 2 }}>{desc}</div>
+        <div className={selected && !comingSoon ? "max-md:!text-[var(--cream-on-dark)]" : ""} style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 2 }}>{desc}</div>
       </div>
       {!comingSoon && (
-        <span style={{
-          width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-          border: `2px solid ${selected ? "var(--plum)" : "var(--dashed)"}`,
-          background: selected ? "var(--plum)" : "transparent",
-          display: "grid", placeItems: "center",
-        }}>
+        <span
+          className={selected ? "max-md:!border-[var(--cream)] max-md:!bg-transparent" : ""}
+          style={{
+            width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+            border: `2px solid ${selected ? "var(--plum)" : "var(--dashed)"}`,
+            background: selected ? "var(--plum)" : "transparent",
+            display: "grid", placeItems: "center",
+          }}
+        >
           {selected && (
             <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="var(--cream)" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <polyline points="20 6 9 17 4 12"/>
@@ -166,6 +174,7 @@ function Field({ label, value, onChange, placeholder, readOnly, mono: monoFont, 
         readOnly={readOnly}
         onChange={e => onChange?.(e.target.value)}
         placeholder={placeholder}
+        className={`max-md:min-h-[46px] max-md:!bg-[var(--ivory)] max-md:!rounded-[var(--r-pocket)] ${error ? "" : "max-md:!border-transparent"}`}
         style={{
           width: "100%", padding: "13px 15px",
           border: `1px solid ${error ? "var(--danger)" : "var(--line-2)"}`,
@@ -199,7 +208,7 @@ function StepHeader({ eyebrow, title, sub }: { eyebrow: string; title: string; s
   return (
     <div style={{ marginBottom: 28 }}>
       <div style={mono}>{eyebrow}</div>
-      <h1 style={{
+      <h1 className="max-md:!text-[22px]" style={{
         fontFamily: SERIF, fontWeight: 600, fontSize: 38, letterSpacing: "-0.02em",
         color: "var(--ink)", margin: "12px 0 8px", lineHeight: 1.1,
       }}>{title}</h1>
@@ -215,7 +224,7 @@ function NavRow({ onBack, onNext, nextLabel, disabled }: {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 36, gap: 14 }}>
       {onBack ? (
-        <button type="button" onClick={onBack} style={{
+        <button type="button" onClick={onBack} className="max-md:min-h-[44px] max-md:shrink-0" style={{
           background: "none", border: "none", fontFamily: SANS, fontSize: 14,
           color: "var(--muted-text)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8,
           padding: 0,
@@ -223,9 +232,11 @@ function NavRow({ onBack, onNext, nextLabel, disabled }: {
           <Icon d="M19 12H5M12 19l-7-7 7-7" size={16}/> Back
         </button>
       ) : <span/>}
-      <CentralButton type="button" variant="primary" onClick={onNext} disabled={disabled} style={{
-        padding: "14px 32px", borderRadius: 10, fontSize: 15,
-      }}>
+      {/* Mobile: full-width ≥48px plum pill (end-of-scroll footer); desktop unchanged */}
+      <CentralButton type="button" variant="primary" onClick={onNext} disabled={disabled}
+        className="max-md:flex-1 max-md:min-h-[48px] max-md:!rounded-full"
+        style={{ padding: "14px 32px", borderRadius: 10, fontSize: 15 }}
+      >
         {nextLabel}
       </CentralButton>
     </div>
@@ -303,13 +314,43 @@ export default function OnboardingPage() {
   const discoveryLabel = isPublic ? "Public" : "Private"
 
   return (
-    <div style={{ display: "flex", height: "100svh", overflow: "hidden", fontFamily: SANS, color: "var(--ink)" }}>
+    <div className="flex flex-col md:flex-row h-svh overflow-hidden" style={{ fontFamily: SANS, color: "var(--ink)" }}>
 
-      {/* ── Left cream rail ── */}
-      <div style={{
+      {/* ── Mobile header — wordmark + step-dot indicator (single block; rail is desktop furniture) ── */}
+      <div className="md:hidden shrink-0" style={{
+        padding: "calc(14px + env(safe-area-inset-top)) 20px 12px",
+        background: "var(--cream)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+          <Link href="/" aria-label="Central — home" style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none", color: "inherit" }}>
+            <span style={{
+              width: 32, height: 32, borderRadius: 9, display: "grid", placeItems: "center",
+              background: "var(--plum-2)", flexShrink: 0,
+            }}>
+              <RingCrossLogo size={19} color="var(--ivory)"/>
+            </span>
+            <span style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)" }}>Central</span>
+          </Link>
+          <span style={{ flex: 1 }}/>
+          <span
+            aria-label={`Step ${step + 1} of ${STEPS.length}: ${STEPS[step].label}`}
+            style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
+          >
+            {STEPS.map((s, i) => (
+              <span key={s.label} style={{
+                height: 6, borderRadius: 999, transition: "all .14s ease",
+                width: i === step ? 18 : 6,
+                background: i <= step ? "var(--plum)" : "var(--line-2)",
+              }}/>
+            ))}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Left cream rail (desktop only) ── */}
+      <div className="hidden md:flex md:flex-col" style={{
         width: 320, flexShrink: 0,
         background: "var(--body-bg)", borderRight: "1px solid var(--line)",
-        display: "flex", flexDirection: "column",
       }}>
         {/* Brand */}
         <div style={{ padding: "30px 28px 24px" }}>
@@ -353,11 +394,11 @@ export default function OnboardingPage() {
 
       {/* ── Content area ── */}
       <div style={{ flex: 1, background: "var(--cream)", overflowY: "auto" }}>
-        <div style={{ maxWidth: 560, margin: "0 auto", padding: "56px 40px 80px" }}>
+        <div className="max-w-[560px] mx-auto px-5 pt-6 pb-[calc(48px+env(safe-area-inset-bottom))] md:px-10 md:pt-14 md:pb-20">
 
-          {/* Persistent exit — back to landing (shown on every step, both layouts) */}
-          <Link href="/" className="transition-opacity hover:opacity-70" style={{
-            display: "inline-flex", alignItems: "center", gap: 8,
+          {/* Persistent exit — back to landing (desktop; on mobile the wordmark row is the exit) */}
+          <Link href="/" className="hidden md:inline-flex transition-opacity hover:opacity-70" style={{
+            alignItems: "center", gap: 8,
             color: "var(--body)", textDecoration: "none", fontSize: 14, marginBottom: 28,
           }}>
             <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -393,6 +434,7 @@ export default function OnboardingPage() {
                       onChange={e => setUniInput(e.target.value)}
                       onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addUniversity() } }}
                       placeholder="e.g. University of Pittsburgh"
+                      className={`max-md:min-h-[46px] max-md:!bg-[var(--ivory)] max-md:!rounded-[var(--r-pocket)] ${step1Touched && universities.length === 0 ? "" : "max-md:!border-transparent"}`}
                       style={{
                         flex: 1, padding: "13px 15px",
                         border: `1px solid ${step1Touched && universities.length === 0 ? "var(--danger)" : "var(--line-2)"}`,
@@ -401,7 +443,7 @@ export default function OnboardingPage() {
                         boxSizing: "border-box",
                       }}
                     />
-                    <button type="button" onClick={addUniversity} style={{
+                    <button type="button" onClick={addUniversity} className="max-md:min-h-[46px] max-md:!border-transparent max-md:!rounded-[var(--r-pocket)]" style={{
                       padding: "0 20px", border: "1px solid var(--line-2)", borderRadius: 10,
                       background: "var(--ivory)", color: "var(--plum-2)",
                       fontFamily: SANS, fontSize: 14, fontWeight: 500, cursor: "pointer",
@@ -411,7 +453,7 @@ export default function OnboardingPage() {
                   {universities.length > 0 && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
                       {universities.map(u => (
-                        <span key={u} style={{
+                        <span key={u} className="max-md:!border-transparent max-md:!bg-[var(--ivory)]" style={{
                           display: "inline-flex", alignItems: "center", gap: 8,
                           padding: "7px 8px 7px 14px", borderRadius: 999,
                           background: "var(--cream-3)", border: "1px solid var(--line)",
@@ -448,13 +490,15 @@ export default function OnboardingPage() {
                   <div style={{ ...mono, marginBottom: 9 }}>Approximate size</div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
                     {SIZE_OPTIONS.map(opt => (
-                      <button key={opt.value} type="button" onClick={() => setSize(opt.value)} style={{
-                        border: `1px solid ${size === opt.value ? "var(--plum-2)" : "var(--line-2)"}`,
-                        borderRadius: 10, background: size === opt.value ? "var(--plum-2)" : "var(--cream)",
-                        padding: 18, cursor: "pointer", textAlign: "left",
-                        transition: "all .12s ease",
-                      }}>
-                        <div style={{
+                      <button key={opt.value} type="button" onClick={() => setSize(opt.value)}
+                        className={`max-md:!rounded-[var(--r-pocket-sm)] max-md:!p-3.5 ${size === opt.value ? "" : "max-md:!border-transparent max-md:!bg-[var(--ivory)]"}`}
+                        style={{
+                          border: `1px solid ${size === opt.value ? "var(--plum-2)" : "var(--line-2)"}`,
+                          borderRadius: 10, background: size === opt.value ? "var(--plum-2)" : "var(--cream)",
+                          padding: 18, cursor: "pointer", textAlign: "left",
+                          transition: "all .12s ease",
+                        }}>
+                        <div className="max-md:!text-[19px]" style={{
                           fontFamily: SERIF, fontSize: 24, color: size === opt.value ? "var(--cream)" : "var(--ink)",
                         }}>{opt.label}</div>
                         <div style={{ fontSize: 12.5, marginTop: 5, color: size === opt.value ? "rgba(253,252,248,0.72)" : "var(--body)" }}>{opt.sub}</div>
@@ -544,7 +588,7 @@ export default function OnboardingPage() {
               )}
 
               {/* Review card */}
-              <div style={{
+              <div className="max-md:!border-transparent max-md:!bg-[var(--ivory)] max-md:!rounded-[var(--r-pocket)]" style={{
                 border: "1px solid var(--line)", borderRadius: 12, background: "var(--cream)",
                 padding: "6px 20px", marginTop: 14,
               }}>
@@ -557,7 +601,7 @@ export default function OnboardingPage() {
               </div>
 
               {/* Approval notice */}
-              <div style={{
+              <div className="max-md:!border-transparent max-md:!bg-[var(--ivory)] max-md:!rounded-[var(--r-pocket)]" style={{
                 display: "flex", alignItems: "center", gap: 10,
                 marginTop: 22, fontSize: 13.5, color: "var(--body)",
                 background: "var(--cream-3)", border: "1px solid var(--line)", borderRadius: 10, padding: "14px 16px",

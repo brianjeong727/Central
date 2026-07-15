@@ -98,48 +98,7 @@ export function PocketChrome({
   )
 }
 
-// 34px round chrome action button. `plum` = filled plum primary (create); `ghost`
-// = tonal --ivory pill (mockup `.ghost` colorway). Icon supplied as children.
-export function PocketRoundButton({
-  variant = "ghost", onClick, ariaLabel, children,
-}: {
-  variant?: "plum" | "ghost"
-  onClick: () => void
-  ariaLabel: string
-  children: ReactNode
-}) {
-  const plum = variant === "plum"
-  return (
-    <button
-      onClick={onClick}
-      aria-label={ariaLabel}
-      style={{
-        width: 34, height: 34, borderRadius: 999, flexShrink: 0,
-        display: "grid", placeItems: "center", border: "none", cursor: "pointer",
-        background: plum ? "var(--plum)" : "var(--ivory)",
-        color: plum ? "var(--cream-on-dark)" : "var(--body)",
-        transition: "background var(--dur-fast)",
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
-// 40px squircle monogram chip (mockup `.chip`): --line-2 tonal with a plum
-// letter; `solid` inverts to a plum fill with a cream letter (ministry-wide chat).
-export function PocketChip({ letter, solid = false, size = 40 }: { letter: string; solid?: boolean; size?: number }) {
-  return (
-    <span
-      style={{
-        width: size, height: size, borderRadius: 14, flexShrink: 0,
-        display: "grid", placeItems: "center",
-        fontFamily: "var(--serif)", fontSize: 13, fontWeight: 600,
-        background: solid ? "var(--plum)" : "var(--line-2)",
-        color: solid ? "var(--cream-on-dark)" : "var(--plum)",
-      }}
-    >
-      {letter}
-    </span>
-  )
-}
+// PocketRoundButton and PocketChip moved to the design-system leaf
+// (components/central/pocket.tsx); re-exported here so existing imports keep
+// working. New code should import from "@/components/central".
+export { PocketRoundButton, PocketChip } from "@/components/central/pocket"

@@ -14,7 +14,7 @@ import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { deleteMyAccount } from "@/app/actions/delete-account"
 import { unblockUser } from "@/app/actions/blocks"
 import { useBlocks } from "../use-blocks"
-import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, MonogramChip } from "@/components/central"
+import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, MonogramChip, PocketFilterChip } from "@/components/central"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
 import type { Profile, Devotional, Prayer, Verse, NotificationSettings } from "../types"
@@ -36,6 +36,23 @@ type JournalTabId = "devotionals" | "prayers" | "verses"
 
 function fmtJournalDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
+// Entry-card + search surfaces switch on viewport: mobile uses borderless tonal
+// --ivory (mobile spec §1.1/§3.1/§3.6); desktop keeps the hairline card language.
+function journalCardStyle(mobile: boolean): React.CSSProperties {
+  return mobile
+    ? { background: "var(--ivory)", borderRadius: "var(--r-pocket)" }
+    : { background: "var(--cream)", borderRadius: "var(--r-card)", border: "1px solid var(--line)" }
+}
+function journalSearchStyle(mobile: boolean): React.CSSProperties {
+  return {
+    width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9,
+    fontSize: 13, color: "var(--ink)", outline: "none", fontFamily: "inherit",
+    ...(mobile
+      ? { background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)" }
+      : { background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10 }),
+  }
 }
 
 // ── Pure SWR fetchers (no setState — side-effects run in useEffect on data) ────
@@ -61,7 +78,7 @@ async function loadMinistrySchools(supabase: ReturnType<typeof createClient>, mi
 
 // ── Journal Devotionals Tab ───────────────────────────────────────────────────
 
-export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { userId: string; ministryId: string; onCountChange?: (n: number, dates: string[]) => void }) {
+export function JournalDevotionalsTab({ userId, ministryId, onCountChange, mobile = false }: { userId: string; ministryId: string; onCountChange?: (n: number, dates: string[]) => void; mobile?: boolean }) {
   const supabase = createClient()
   const imageInputRef = useRef<HTMLInputElement>(null)
   const { data, isLoading: loading, mutate } = useSWR(
@@ -122,6 +139,9 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
 
   function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
+  // Mobile → borderless tonal --ivory (spec §1.1/§3.1); desktop → hairline card.
+  const cardStyle = journalCardStyle(mobile)
+  const searchStyle = journalSearchStyle(mobile)
 
   if (showEditor) {
     return (
@@ -167,7 +187,7 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <div style={{ flex: 1, position: "relative" }}>
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
-          <input type="text" placeholder="Search devotionals…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--ink)", outline: "none", fontFamily: "inherit" }} />
+          <input type="text" placeholder="Search devotionals…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={searchStyle} />
         </div>
         <CentralButton variant="create" size="sm" onClick={openNew} style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
           <Plus size={14} />New entry
@@ -188,7 +208,7 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
             const isFirst = idx === 0 && !searchQuery.trim()
             const isExpanded = isFirst || expandedIds.has(entry.id) || searchQuery.trim().length > 0
             return (
-              <div key={entry.id} style={{ background: "var(--cream)", borderRadius: "var(--r-card)", border: "1px solid var(--line)" }}>
+              <div key={entry.id} style={cardStyle}>
                 <div style={{ padding: isExpanded ? "20px 20px 0" : "14px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id) } }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -236,7 +256,7 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange }: { u
 
 // ── Journal Prayers Tab ───────────────────────────────────────────────────────
 
-export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userId: string; ministryId: string; onCountChange?: (n: number) => void }) {
+export function JournalPrayersTab({ userId, ministryId, onCountChange, mobile = false }: { userId: string; ministryId: string; onCountChange?: (n: number) => void; mobile?: boolean }) {
   const supabase = createClient()
   const { data, isLoading: loading, mutate } = useSWR(
     ["prayers", userId, ministryId],
@@ -287,6 +307,8 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
   function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
 
   const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
+  const cardStyle = journalCardStyle(mobile)
+  const searchStyle = journalSearchStyle(mobile)
 
   if (showEditor) {
     return (
@@ -318,7 +340,7 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <div style={{ flex: 1, position: "relative" }}>
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
-          <input type="text" placeholder="Search prayers…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--ink)", outline: "none", fontFamily: "inherit" }} />
+          <input type="text" placeholder="Search prayers…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={searchStyle} />
         </div>
         <CentralButton variant="create" size="sm" onClick={openNew} style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
           <Plus size={14} />New prayer
@@ -341,7 +363,7 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
             const isExpanded = isFirst || expandedIds.has(entry.id) || searchQuery.trim().length > 0
             const hasBody = !!(entry.content && entry.content.replace(/<[^>]*>/g, "").trim())
             return (
-              <div key={entry.id} style={{ background: "var(--cream)", borderRadius: "var(--r-card)", border: "1px solid var(--line)" }}>
+              <div key={entry.id} style={cardStyle}>
                 <div style={{ padding: isExpanded ? (hasBody ? "18px 20px 0" : "18px 20px 16px") : "13px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id) } }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -387,7 +409,7 @@ export function JournalPrayersTab({ userId, ministryId, onCountChange }: { userI
 
 // ── Journal Verses Tab ────────────────────────────────────────────────────────
 
-export function JournalVersesTab({ userId, ministryId }: { userId: string; ministryId: string }) {
+export function JournalVersesTab({ userId, ministryId, mobile = false }: { userId: string; ministryId: string; mobile?: boolean }) {
   const supabase = createClient()
   const { data, isLoading: loading, mutate } = useSWR(
     ["verses", userId, ministryId],
@@ -430,6 +452,8 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
   }
   function toggleExpand(id: string) { setExpandedIds(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n }) }
   const inputBase: React.CSSProperties = { display: "block", width: "100%", background: "transparent", border: "none", outline: "none", fontFamily: "inherit" }
+  const cardStyle = journalCardStyle(mobile)
+  const searchStyle = journalSearchStyle(mobile)
 
   if (showEditor) {
     return (
@@ -453,7 +477,7 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 20 }}>
         <div style={{ flex: 1, position: "relative" }}>
           <Search size={14} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted-text)", pointerEvents: "none" }} />
-          <input type="text" placeholder="Search verses…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ width: "100%", paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--ink)", outline: "none", fontFamily: "inherit" }} />
+          <input type="text" placeholder="Search verses…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={searchStyle} />
         </div>
         <CentralButton variant="create" size="sm" onClick={openNew} style={{ flexShrink: 0, whiteSpace: "nowrap" }}>
           <Plus size={14} />Add verse
@@ -475,7 +499,7 @@ export function JournalVersesTab({ userId, ministryId }: { userId: string; minis
             const isExpanded = isFirst || expandedIds.has(entry.id) || searchQuery.trim().length > 0
             const preview = entry.verse_text.length > 90 ? entry.verse_text.slice(0, 90) + "…" : entry.verse_text
             return (
-              <div key={entry.id} style={{ background: "var(--cream)", borderRadius: "var(--r-card)", border: "1px solid var(--line)" }}>
+              <div key={entry.id} style={cardStyle}>
                 <div style={{ padding: isExpanded ? "20px 20px 0" : "14px 18px", cursor: isFirst ? "default" : "pointer" }} onClick={() => { if (!isFirst) { toggleExpand(entry.id) } }}>
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -651,57 +675,65 @@ export function JournalSection({
     ...(showStreak ? [{ label: "Streak", value: streak }] : []),
   ]
 
-  // A computed node (not a nested component) so it isn't re-created during
-  // render — avoids react-hooks/static-components. Rendered in both the mobile
-  // and desktop branches (only one is visible at a time).
-  const verseCard = homeVerse ? (
-    <div style={{ marginTop: 32, padding: "20px 24px", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: "var(--r-card)" }}>
-      <p style={{ ...MONO_STYLE, margin: "0 0 10px" }}>Today&apos;s Verse</p>
-      <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 16, color: "var(--ink)", lineHeight: 1.75, margin: "0 0 8px" }}>&ldquo;{homeVerse.text}&rdquo;</p>
-      <p style={{ fontFamily: "var(--serif)", fontSize: 13, color: "var(--plum)", margin: 0 }}>— {homeVerse.reference}</p>
-    </div>
-  ) : null
+  // Computed nodes (not nested components) so they aren't re-created during
+  // render — avoids react-hooks/static-components. Each takes `mobile` so the
+  // phone-width branch renders borderless tonal --ivory (spec §1.1) while
+  // desktop keeps the hairline card language. Called as functions (lowercase),
+  // never as JSX elements.
+  function statsBarNode(mobile: boolean) {
+    if (!showStats) return null
+    const divider = mobile ? "var(--line-3)" : "var(--line)"
+    return (
+      <div style={{ display: "flex", background: mobile ? "var(--ivory)" : "var(--cream)", border: mobile ? "none" : "1px solid var(--line)", borderRadius: mobile ? "var(--r-pocket)" : 12, overflow: "hidden", marginBottom: 24 }}>
+        {statsItems.map((item, i) => (
+          <div key={item.label} style={{ flex: 1, padding: "14px 16px", textAlign: "center", borderRight: i < statsItems.length - 1 ? `1px solid ${divider}` : "none" }}>
+            <p style={{ ...MONO_STYLE, margin: "0 0 4px" }}>{item.label}</p>
+            <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", margin: 0, lineHeight: 1 }}>{item.value}</p>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  function verseCardNode(mobile: boolean) {
+    if (!homeVerse) return null
+    return (
+      <div style={{ marginTop: 32, padding: "20px 24px", background: mobile ? "var(--ivory)" : "var(--cream)", border: mobile ? "none" : "1px solid var(--line)", borderRadius: mobile ? "var(--r-pocket)" : "var(--r-card)" }}>
+        <p style={{ ...MONO_STYLE, margin: "0 0 10px" }}>Today&apos;s Verse</p>
+        <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 16, color: "var(--ink)", lineHeight: 1.75, margin: "0 0 8px" }}>&ldquo;{homeVerse.text}&rdquo;</p>
+        <p style={{ fontFamily: "var(--serif)", fontSize: 13, color: "var(--plum)", margin: 0 }}>— {homeVerse.reference}</p>
+      </div>
+    )
+  }
 
   return (
     <>
-      {/* Stats bar (the display-settings gear now lives in the Journal header) */}
-      {showStats && (
-        <div style={{ display: "flex", background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", marginBottom: 24 }}>
-          {statsItems.map((item, i) => (
-            <div key={item.label} style={{ flex: 1, padding: "14px 16px", textAlign: "center", borderRight: i < statsItems.length - 1 ? "1px solid var(--line)" : "none" }}>
-              <p style={{ ...MONO_STYLE, margin: "0 0 4px" }}>{item.label}</p>
-              <p style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", margin: 0, lineHeight: 1 }}>{item.value}</p>
-            </div>
+      {/* Mobile: PocketFilterChip filters + single column (hub-and-spoke — no
+          tab strip at phone width). Stats + verse cards render borderless tonal. */}
+      <div className="md:hidden" style={{ paddingTop: showStats ? 0 : 24, paddingBottom: 52 }}>
+        {statsBarNode(true)}
+        <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
+          {JOURNAL_TABS.map(t => (
+            <PocketFilterChip key={t.key} label={t.label} active={journalTab === t.key} onClick={() => changeJournalTab(t.key)} />
           ))}
         </div>
-      )}
-
-      {/* Mobile: tab strip + single column */}
-      <div className="md:hidden" style={{ paddingTop: showStats ? 0 : 24, paddingBottom: 52 }}>
-        <div style={{ marginBottom: 24 }}>
-          <PlanSubTabStrip
-            tabs={JOURNAL_TABS}
-            active={journalTab}
-            onChange={k => changeJournalTab(k as JournalTabId)}
-          />
-        </div>
-        {journalTab === "devotionals" && <JournalDevotionalsTab userId={userId} ministryId={ministryId} onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />}
-        {journalTab === "prayers" && <JournalPrayersTab userId={userId} ministryId={ministryId} onCountChange={n => setPrayerCount(n)} />}
-        {journalTab === "verses" && <JournalVersesTab userId={userId} ministryId={ministryId} />}
-        {verseCard}
+        {journalTab === "devotionals" && <JournalDevotionalsTab userId={userId} ministryId={ministryId} mobile onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />}
+        {journalTab === "prayers" && <JournalPrayersTab userId={userId} ministryId={ministryId} mobile onCountChange={n => setPrayerCount(n)} />}
+        {journalTab === "verses" && <JournalVersesTab userId={userId} ministryId={ministryId} mobile />}
+        {verseCardNode(true)}
       </div>
 
       {/* Desktop: tab strip + single full-width column. The strip breaks out of the
           parent px-14 wrapper (-mx-14) so it runs full-bleed and its internal md:pl-14
           re-insets the labels to align with the px-14 content below (§4.2 / convention #16). */}
       <div className="hidden md:block" style={{ paddingTop: showStats ? 0 : 4, paddingBottom: 52 }}>
+        {statsBarNode(false)}
         <div className="-mx-14" style={{ marginBottom: 28 }}>
           <PlanSubTabStrip tabs={JOURNAL_TABS} active={journalTab} onChange={k => changeJournalTab(k as JournalTabId)} />
         </div>
         {journalTab === "devotionals" && <JournalDevotionalsTab userId={userId} ministryId={ministryId} onCountChange={(n, dates) => { setEntryCount(n); setEntryDates(dates) }} />}
         {journalTab === "prayers" && <JournalPrayersTab userId={userId} ministryId={ministryId} onCountChange={n => setPrayerCount(n)} />}
         {journalTab === "verses" && <JournalVersesTab userId={userId} ministryId={ministryId} />}
-        {verseCard}
+        {verseCardNode(false)}
       </div>
     </>
   )
@@ -754,11 +786,16 @@ const PROFILE_SECTIONS: {
 // Blocked users (list + unblock), switch ministry, contact & support, privacy —
 // sits below Notifications and above Sign out / Danger Zone. Same on mobile +
 // desktop (both call renderProfileSections' siblings).
-function AccountLinksSection({ userId }: { userId: string }) {
+function AccountLinksSection({ userId, mobile = false }: { userId: string; mobile?: boolean }) {
   const { blocked, mutate } = useBlocks(userId)
   const [showBlocked, setShowBlocked] = useState(false)
 
-  const cardBorder: React.CSSProperties = { border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", background: "var(--cream)" }
+  // Mobile → borderless tonal --ivory card + --line-3 row dividers (spec §1.1);
+  // desktop keeps the hairline cream card language.
+  const cardBorder: React.CSSProperties = mobile
+    ? { borderRadius: "var(--r-pocket)", overflow: "hidden", background: "var(--ivory)" }
+    : { border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", background: "var(--cream)" }
+  const hair = mobile ? "var(--line-3)" : "var(--line)"
   const rowBase: React.CSSProperties = { display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", color: "var(--ink)" }
   const label: React.CSSProperties = { flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: "var(--ink)" }
   const right: React.CSSProperties = { fontSize: 13, color: "var(--muted-text)", flexShrink: 0 }
@@ -780,7 +817,7 @@ function AccountLinksSection({ userId }: { userId: string }) {
           {showBlocked ? <ChevronDown size={16} style={{ color: "var(--muted-text)" }} /> : <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />}
         </button>
         {showBlocked && (
-          <div style={{ borderTop: "1px solid var(--line)", padding: blocked.length ? "6px 0" : "14px 18px" }}>
+          <div style={{ borderTop: `1px solid ${hair}`, padding: blocked.length ? "6px 0" : "14px 18px" }}>
             {blocked.length === 0 ? (
               <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>You haven&apos;t blocked anyone.</p>
             ) : (
@@ -796,25 +833,25 @@ function AccountLinksSection({ userId }: { userId: string }) {
         )}
 
         {/* Switch ministry */}
-        <a href="/ministries" style={{ ...rowBase, borderTop: "1px solid var(--line)", textDecoration: "none" }}>
+        <a href="/ministries" style={{ ...rowBase, borderTop: `1px solid ${hair}`, textDecoration: "none" }}>
           <span style={label}>Switch ministry</span>
           <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />
         </a>
 
         {/* Contact & support */}
-        <a href="mailto:team@joincentral.app" style={{ ...rowBase, borderTop: "1px solid var(--line)", textDecoration: "none" }}>
+        <a href="mailto:team@joincentral.app" style={{ ...rowBase, borderTop: `1px solid ${hair}`, textDecoration: "none" }}>
           <span style={label}>Contact &amp; support</span>
           <span style={right}>team@joincentral.app</span>
         </a>
 
         {/* Privacy policy */}
-        <a href="/privacy" style={{ ...rowBase, borderTop: "1px solid var(--line)", textDecoration: "none" }}>
+        <a href="/privacy" style={{ ...rowBase, borderTop: `1px solid ${hair}`, textDecoration: "none" }}>
           <span style={label}>Privacy policy</span>
           <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />
         </a>
 
         {/* Terms of service */}
-        <a href="/terms" style={{ ...rowBase, borderTop: "1px solid var(--line)", textDecoration: "none" }}>
+        <a href="/terms" style={{ ...rowBase, borderTop: `1px solid ${hair}`, textDecoration: "none" }}>
           <span style={label}>Terms of service</span>
           <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />
         </a>
@@ -835,6 +872,7 @@ function DangerZone({
   onConfirm,
   email,
   onAccountDeleted,
+  mobile = false,
 }: {
   ministryName: string
   leaveConfirm: boolean
@@ -845,13 +883,16 @@ function DangerZone({
   onConfirm: () => void
   email: string
   onAccountDeleted: () => void
+  mobile?: boolean
 }) {
+  // Mobile hairline token is --line-3; desktop keeps --line.
+  const hair = mobile ? "var(--line-3)" : "var(--line)"
   return (
     <div style={{ paddingTop: 48 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-        <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+        <div style={{ flex: 1, height: 1, background: hair }} />
         <span style={{ fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase" as const, color: "var(--danger)" }}>Danger Zone</span>
-        <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+        <div style={{ flex: 1, height: 1, background: hair }} />
       </div>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 200 }}>
@@ -870,7 +911,7 @@ function DangerZone({
           </div>
         )}
       </div>
-      <DeleteAccountSection email={email} onDeleted={onAccountDeleted} />
+      <DeleteAccountSection email={email} onDeleted={onAccountDeleted} mobile={mobile} />
     </div>
   )
 }
@@ -882,7 +923,7 @@ function DangerZone({
 // user retyping their exact email — the client-side match only enables the
 // button; the SERVER re-verifies the email before doing anything.
 
-function DeleteAccountSection({ email, onDeleted }: { email: string; onDeleted: () => void }) {
+function DeleteAccountSection({ email, onDeleted, mobile = false }: { email: string; onDeleted: () => void; mobile?: boolean }) {
   const [phase, setPhase] = useState<"idle" | "confirm">("idle")
   const [typed, setTyped] = useState("")
   const [deleting, setDeleting] = useState(false)
@@ -919,7 +960,7 @@ function DeleteAccountSection({ email, onDeleted }: { email: string; onDeleted: 
   }
 
   return (
-    <div style={{ marginTop: 28, border: "1px solid var(--danger)", borderRadius: 12, padding: "20px 22px", background: "var(--cream)" }}>
+    <div style={{ marginTop: 28, border: "1px solid var(--danger)", borderRadius: mobile ? "var(--r-pocket)" : 12, padding: "20px 22px", background: mobile ? "var(--ivory)" : "var(--cream)" }}>
       <p style={{ fontFamily: "var(--serif)", fontSize: 20, fontWeight: 400, color: "var(--ink)", margin: "0 0 6px" }}>Delete your account?</p>
       <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 16px", lineHeight: 1.55 }}>
         This permanently deletes your login and personal data. It can’t be undone. Type your email <strong style={{ color: "var(--ink)" }}>{email}</strong> to confirm.
@@ -1100,7 +1141,13 @@ export function ProfileTab({
     marginBottom: 4,
   }
 
-  function renderProfileSections() {
+  function renderProfileSections(mobile: boolean) {
+    // Mobile → borderless tonal --ivory card, --line-3 field dividers (spec
+    // §1.1/§3.1); desktop keeps the hairline cream card language.
+    const sectionCard: React.CSSProperties = mobile
+      ? { borderRadius: "var(--r-pocket)", overflow: "hidden", background: "var(--ivory)" }
+      : { border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", background: "var(--cream)" }
+    const fieldDivider = mobile ? "var(--line-3)" : "var(--line)"
     const hasAnyContent = PROFILE_SECTIONS.some(s => s.fields.some(f => !!getFieldValue(f.key).trim()))
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -1111,9 +1158,9 @@ export function ProfileTab({
           return (
             <div key={section.id}>
               <p style={{ ...MONO_STYLE, marginBottom: 10, marginTop: 0 }}>{section.label}</p>
-              <div style={{ border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", background: "var(--cream)" }}>
+              <div style={sectionCard}>
                 {fieldsToRender.map((field, i) => (
-                  <div key={field.key} style={{ padding: "14px 18px", borderTop: i > 0 ? "1px solid var(--line)" : "none" }}>
+                  <div key={field.key} style={{ padding: "14px 18px", borderTop: i > 0 ? `1px solid ${fieldDivider}` : "none" }}>
                     {editing ? (
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                         <p style={monoFieldLabel}>{field.label}</p>
@@ -1155,7 +1202,7 @@ export function ProfileTab({
         {editing && schoolOptions.length > 0 && (
           <div>
             <p style={{ ...MONO_STYLE, marginBottom: 10, marginTop: 0 }}>School</p>
-            <div style={{ border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", background: "var(--cream)" }}>
+            <div style={sectionCard}>
               <div style={{ padding: "14px 18px" }}>
                 <select
                   value={currentSchoolId ?? ""}
@@ -1311,7 +1358,7 @@ export function ProfileTab({
 
         {/* ── Desktop: profile sections ── */}
         <div className="hidden md:flex md:flex-col md:flex-1 px-14 pt-6 pb-10">
-          {renderProfileSections()}
+          {renderProfileSections(false)}
           <div style={{ marginTop: 24 }}>
             <NotificationsSection
               userId={userId}
@@ -1325,6 +1372,7 @@ export function ProfileTab({
           </div>
           <div style={{ marginTop: "auto" }}>
             <DangerZone
+              mobile={false}
               ministryName={ministryName}
               leaveConfirm={leaveConfirm}
               leaving={leaving}
@@ -1340,7 +1388,7 @@ export function ProfileTab({
 
         {/* ── Mobile: profile sections ── */}
         <div className="md:hidden px-5 pb-6">
-          {renderProfileSections()}
+          {renderProfileSections(true)}
           <div style={{ marginTop: 24, marginBottom: 24 }}>
             <NotificationsSection
               userId={userId}
@@ -1350,7 +1398,7 @@ export function ProfileTab({
             />
           </div>
           <div style={{ marginBottom: 24 }}>
-            <AccountLinksSection userId={userId} />
+            <AccountLinksSection userId={userId} mobile />
           </div>
           {/* Sign out — mobile only. Desktop reaches this via the sidebar nav
               (desktop-nav.tsx); the mobile pill nav has no Profile item, so the
@@ -1360,6 +1408,7 @@ export function ProfileTab({
             <LogOut size={14} />Sign out
           </CentralButton>
           <DangerZone
+            mobile
             ministryName={ministryName}
             leaveConfirm={leaveConfirm}
             leaving={leaving}

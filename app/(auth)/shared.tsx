@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { AlertCircle } from "lucide-react"
 import { RingCrossLogo } from "@/app/home/components/shared"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 
@@ -158,6 +159,117 @@ export function OrDivider() {
       <span style={{ flex: 1, height: 1, background: "var(--line)" }}/>
       <span style={{ ...mono, color: "var(--faint)", textTransform: "lowercase", letterSpacing: "0.06em" }}>or</span>
       <span style={{ flex: 1, height: 1, background: "var(--line)" }}/>
+    </div>
+  )
+}
+
+// ── Mobile Pocket idiom (ratified in login's md:hidden branch) ──────────────
+// Shared style tokens + primitives for auth mobile screens so signup /
+// forgot-password / update-password match login without re-inlining the grammar.
+// Desktop keeps SplitShell; these are for the `md:hidden` branches only.
+
+export const pocketPillBase: React.CSSProperties = {
+  display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
+  borderRadius: 999, fontSize: 14.5, fontWeight: 600, border: "none",
+  minHeight: 50, padding: "0 22px", width: "100%", cursor: "pointer", fontFamily: "var(--serif)",
+}
+export const pocketPillPrimary: React.CSSProperties = { ...pocketPillBase, background: "var(--plum)", color: "var(--cream)" }
+export const pocketPillCard: React.CSSProperties = { ...pocketPillBase, background: "var(--ivory)", color: "var(--ink)" }
+export const pocketFieldLabel: React.CSSProperties = {
+  display: "block", fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px",
+  color: "var(--muted-text)", textTransform: "uppercase", marginBottom: 7, paddingLeft: 4,
+}
+export const pocketFieldBox: React.CSSProperties = {
+  display: "flex", alignItems: "center", width: "100%", minHeight: 52,
+  border: "none", borderRadius: 16, background: "var(--ivory)", padding: "0 18px",
+}
+export const pocketFieldInput: React.CSSProperties = {
+  flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent",
+  fontSize: 16, fontFamily: "var(--serif)", color: "var(--ink)", padding: "14px 0",
+}
+export const pocketH1: React.CSSProperties = {
+  fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.025em",
+  lineHeight: 1.08, color: "var(--ink)", margin: 0,
+}
+export const pocketSub: React.CSSProperties = { fontSize: 14.5, color: "var(--body)", lineHeight: 1.55 }
+
+// Full-viewport scroll container matching login's md:hidden form step (exact-fit
+// height:100dvh + overflowY:auto so short forms fit with no scroll, tall ones scroll).
+// `topInset` — welcome-style screens use `calc(env(safe-area-inset-top) + 24px)`;
+// screens with a Back row at the top use bare `env(safe-area-inset-top)`.
+export function PocketAuthScreen({ children, topInset = false }: { children: React.ReactNode; topInset?: boolean }) {
+  return (
+    <div className="max-w-[390px] mx-auto w-full" style={{
+      height: "100dvh", overflowY: "auto", background: "var(--cream)", display: "flex", flexDirection: "column",
+      padding: `${topInset ? "calc(env(safe-area-inset-top) + 24px)" : "env(safe-area-inset-top)"} 24px calc(env(safe-area-inset-bottom) + 24px)`,
+    }}>
+      {children}
+    </div>
+  )
+}
+
+// Back chevron row used at the top of a mobile auth screen (matches login).
+export function PocketBack({ onClick, href, label = "Back" }: { onClick?: () => void; href?: string; label?: string }) {
+  const style: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: 6, alignSelf: "flex-start",
+    background: "none", border: "none", color: "var(--muted-text)", fontSize: 14,
+    padding: "14px 0 4px", cursor: "pointer", fontFamily: "var(--serif)", textDecoration: "none",
+  }
+  const inner = (
+    <>
+      <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      {label}
+    </>
+  )
+  return href
+    ? <Link href={href} style={style}>{inner}</Link>
+    : <button type="button" onClick={onClick} style={style}>{inner}</button>
+}
+
+// Ivory pill field (label + tonal box + input, optional trailing eye/etc.).
+export function PocketField({ label, trailing, hint, ...input }: {
+  label: string; trailing?: React.ReactNode; hint?: React.ReactNode
+} & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <label style={{ display: "block" }}>
+      <span style={pocketFieldLabel}>{label}</span>
+      <div style={pocketFieldBox}>
+        <input {...input} style={pocketFieldInput} />
+        {trailing}
+      </div>
+      {hint && <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 7, paddingLeft: 4 }}>{hint}</div>}
+    </label>
+  )
+}
+
+// Plum pill submit button (≥48px) with spinner slot.
+export function PocketSubmit({ loading, children, disabled, ...rest }: {
+  loading?: boolean; children: React.ReactNode
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button {...rest} disabled={disabled} style={{
+      ...pocketPillPrimary, marginTop: 24,
+      opacity: disabled ? 0.7 : 1, cursor: disabled ? "not-allowed" : "pointer",
+    }}>
+      {loading && (
+        <div style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid color-mix(in srgb, var(--cream) 30%, transparent)", borderTopColor: "var(--cream)", animation: "spin 0.7s linear infinite", flexShrink: 0 }} />
+      )}
+      {children}
+    </button>
+  )
+}
+
+// Mobile error banner (matches login's md:hidden alert).
+export function PocketError({ msg }: { msg: string }) {
+  return (
+    <div style={{
+      borderRadius: 12, background: "color-mix(in srgb, var(--danger) 8%, transparent)",
+      border: "1px solid color-mix(in srgb, var(--danger) 18%, transparent)",
+      padding: "10px 14px", fontSize: 13, color: "var(--danger)", fontWeight: 500,
+      display: "flex", alignItems: "flex-start", gap: 8, marginTop: 22,
+    }} role="alert">
+      <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+      {msg}
     </div>
   )
 }

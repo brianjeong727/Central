@@ -9,7 +9,7 @@ import {
 } from "lucide-react"
 import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
 import { useIsMobile } from "../use-is-mobile"
-import { MonogramChip, FilterDropdown, SubpageShell, CentralModal } from "@/components/central"
+import { MonogramChip, FilterDropdown, SubpageShell, CentralModal, PocketRowCard, PocketRow } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
   getReimbursementInbox, approveReceipt, rejectReceipt, signOffReceipt, declineReceipt,
@@ -235,6 +235,40 @@ function FinanceStatusPill({ status }: { status: string }) {
   )
 }
 
+// Mobile-only §4 facts grid: 2-col auto/1fr, mono 9.5 keys, 14/500 values, unset
+// "—" rendered faint. Shared by both detail overlays (finance + receipts).
+export function MobileFactsGrid({ facts }: { facts: { label: string; value: string }[] }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 16, rowGap: 12, marginBottom: 22 }}>
+      {facts.map(f => {
+        const unset = !f.value || f.value === "—"
+        return (
+          <div key={f.label} style={{ display: "contents" }}>
+            <span style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", alignSelf: "center" }}>{f.label}</span>
+            <span style={{ fontSize: 14, fontWeight: 500, color: unset ? "var(--faint)" : "var(--ink)", textAlign: "right" }}>{unset ? "—" : f.value}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// Mobile-only data row: 15/600 title, 13 muted sub, right-aligned 15/600 value —
+// the phone presentation of a desktop ledger / allocation grid row.
+function MobileDataRow({ title, sub, right, rightColor = "var(--ink)", isLast }: {
+  title: string; sub?: string; right: string; rightColor?: string; isLast: boolean
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 0", borderBottom: isLast ? "none" : "1px solid var(--line-3)" }}>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
+        {sub && <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>}
+      </span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: rightColor, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{right}</span>
+    </div>
+  )
+}
+
 function InboxRow({ receipt: r, first, onClick }: { receipt: InboxReceipt; first: boolean; onClick: () => void }) {
   const meta = [r.team_name, r.category_name ?? r.category].filter(Boolean).join(" · ")
   return (
@@ -266,13 +300,16 @@ function InboxRow({ receipt: r, first, onClick }: { receipt: InboxReceipt; first
 }
 
 function InboxEmpty({ title, subtitle }: { title: string; subtitle: string }) {
-  return <EmptyState variant="bordered" icon={<Inbox className="w-7 h-7" />} title={title} subtitle={subtitle} />
+  // Mobile keeps the quiet EmptyState grammar — dashed borders are reserved for
+  // add-affordances on phone width (mobile_design_system §3.8). Desktop unchanged.
+  const isMobile = useIsMobile()
+  return <EmptyState variant={isMobile ? "quiet" : "bordered"} icon={<Inbox className="w-7 h-7" />} title={title} subtitle={subtitle} />
 }
 
 type InboxFilter = "needs" | "all"
 
 function ReimbursementInbox({
-  ministryId, items, loading, canApprove, canSignOff, readOnly, onRefetch,
+  ministryId, items, loading, canApprove, canSignOff, readOnly, onRefetch, onDetailOpenChange,
 }: {
   ministryId: string
   items: InboxReceipt[]
@@ -281,9 +318,18 @@ function ReimbursementInbox({
   canSignOff: boolean
   readOnly: boolean
   onRefetch: () => void
+  onDetailOpenChange?: (open: boolean) => void
 }) {
   const [filter, setFilter] = useState<InboxFilter>("needs")
   const [detail, setDetail] = useState<InboxReceipt | null>(null)
+  const isMobile = useIsMobile()
+
+  // Notify the mobile parent whether the detail subpage owns the screen (§2.2b),
+  // and always release the flag on unmount (section switch) so the back-row returns.
+  useEffect(() => {
+    onDetailOpenChange?.(detail !== null)
+    return () => onDetailOpenChange?.(false)
+  }, [detail, onDetailOpenChange])
 
   // Action capabilities the UI actually exposes — gov-view suppresses every action.
   const uiCanApprove = canApprove && !readOnly
@@ -333,6 +379,23 @@ function ReimbursementInbox({
           title={filter === "needs" ? "Nothing needs your action" : "No receipts yet"}
           subtitle={filter === "needs" ? "You're all caught up." : "Submitted receipts will appear here."}
         />
+      ) : isMobile ? (
+        <PocketRowCard>
+          {shown.map((r, i) => {
+            const meta = [r.team_name, r.category_name ?? r.category].filter(Boolean).join(" · ")
+            return (
+              <PocketRow
+                key={r.id}
+                title={r.submitted_by_name ?? "Unknown"}
+                titleAccessory={<FinanceStatusPill status={r.status} />}
+                sub={meta || undefined}
+                meta={`$${Number(r.amount).toFixed(2)}`}
+                isLast={i === shown.length - 1}
+                onClick={() => setDetail(r)}
+              />
+            )
+          })}
+        </PocketRowCard>
       ) : (
         <div style={{ borderRadius: 12, border: "1px solid var(--line)", overflow: "hidden", background: "var(--cream)" }}>
           {shown.map((r, i) => (
@@ -369,6 +432,7 @@ function InboxDetailOverlay({
   const [reason, setReason] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const isMobile = useIsMobile()
 
   const isNegative = r.status === "rejected" || r.status === "declined"
   const reachedIndex = r.status === "reimbursed" ? 2 : r.status === "approved" ? 1 : 0
@@ -391,11 +455,11 @@ function InboxDetailOverlay({
   }
 
   const primaryBtn: React.CSSProperties = {
-    flex: 1, height: 44, background: "var(--plum)", color: "var(--cream)", borderRadius: 12,
+    flex: 1, height: 44, background: "var(--plum)", color: "var(--cream)", borderRadius: isMobile ? 999 : 12,
     border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)",
   }
   const secondaryBtn: React.CSSProperties = {
-    flex: 1, height: 44, background: "var(--ivory)", color: "var(--danger)", borderRadius: 12,
+    flex: 1, height: 44, background: "var(--ivory)", color: "var(--danger)", borderRadius: isMobile ? 999 : 12,
     border: "1px solid var(--line)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)",
   }
 
@@ -404,7 +468,7 @@ function InboxDetailOverlay({
       <div>
         {/* Amount + status */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 22 }}>
-          <p style={{ fontFamily: "var(--serif)", fontSize: 34, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.02em" }}>
+          <p style={{ fontFamily: "var(--serif)", fontSize: isMobile ? 22 : 34, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.02em" }}>
             ${Number(r.amount).toFixed(2)}
           </p>
           <div style={{ marginTop: 6 }}><FinanceStatusPill status={r.status} /></div>
@@ -440,12 +504,21 @@ function InboxDetailOverlay({
         )}
 
         {/* Details */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 22 }}>
-          <InboxDetailRow label="Fund" value={fundLabel(r.fund) || "—"} />
-          <InboxDetailRow label="Purchase date" value={r.purchase_date ? new Date(r.purchase_date + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—"} />
-          <InboxDetailRow label="Category" value={r.category_name ?? r.category ?? "—"} />
-          <InboxDetailRow label="Team" value={r.team_name || "—"} />
-        </div>
+        {isMobile ? (
+          <MobileFactsGrid facts={[
+            { label: "Fund", value: fundLabel(r.fund) || "—" },
+            { label: "Purchase date", value: r.purchase_date ? new Date(r.purchase_date + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—" },
+            { label: "Category", value: r.category_name ?? r.category ?? "—" },
+            { label: "Team", value: r.team_name || "—" },
+          ]} />
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 22 }}>
+            <InboxDetailRow label="Fund" value={fundLabel(r.fund) || "—"} />
+            <InboxDetailRow label="Purchase date" value={r.purchase_date ? new Date(r.purchase_date + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—"} />
+            <InboxDetailRow label="Category" value={r.category_name ?? r.category ?? "—"} />
+            <InboxDetailRow label="Team" value={r.team_name || "—"} />
+          </div>
+        )}
 
         <div style={{ marginBottom: 22 }}>
           <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>Submitted by</p>
@@ -493,7 +566,7 @@ function InboxDetailOverlay({
                 style={{ ...inputStyle, resize: "none" }}
               />
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => { setMode("idle"); setReason("") }} disabled={busy} style={{ flex: 1, height: 44, background: "var(--ivory)", color: "var(--body)", borderRadius: 12, border: "1px solid var(--line)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>
+                <button onClick={() => { setMode("idle"); setReason("") }} disabled={busy} style={{ flex: 1, height: 44, background: "var(--ivory)", color: "var(--body)", borderRadius: isMobile ? 999 : 12, border: "1px solid var(--line)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>
                   Cancel
                 </button>
                 <button
@@ -551,14 +624,20 @@ interface FinanceWorkspaceProps {
   canAccessReimbursements: boolean
   /** Governance view-only: render all sections but disable every mutation control. */
   readOnly: boolean
+  /** Fires when the reimbursement-detail subpage opens/closes — lets a mobile
+      parent (plan-tab) drop its section back-row so the detail's own SubpageShell
+      chrome is the only header (§2.2b full-bleed subpages consume the screen). */
+  onDetailOpenChange?: (open: boolean) => void
 }
 
 export function FinanceWorkspace({
   ministryId, userId,
   section, onSectionChange,
   canEditBudget, canAccessReimbursements, readOnly,
+  onDetailOpenChange,
 }: FinanceWorkspaceProps) {
   const supabase = createClient()
+  const isMobile = useIsMobile()
 
   const [loading, setLoading] = useState(true)
 
@@ -716,6 +795,7 @@ export function FinanceWorkspace({
               canSignOff={inboxCanSignOff}
               readOnly={readOnly}
               onRefetch={loadInbox}
+              onDetailOpenChange={onDetailOpenChange}
             />
           )}
         </div>
@@ -789,6 +869,18 @@ export function FinanceWorkspace({
               <p style={{ fontSize: 14 }}>No budget entries yet</p>
               <p style={{ fontSize: 12, marginTop: 4 }}>Submitted reimbursement forms are logged automatically.</p>
             </div>
+          ) : isMobile ? (
+            <PocketRowCard>
+              {budgetEntries.map((e, i) => (
+                <MobileDataRow
+                  key={e.id}
+                  title={e.description || "—"}
+                  sub={`${new Date(e.entry_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${e.category}`}
+                  right={`$${Number(e.amount).toFixed(2)}`}
+                  isLast={i === budgetEntries.length - 1}
+                />
+              ))}
+            </PocketRowCard>
           ) : (
             <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
               <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 130px 90px 80px", gap: 8, padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "var(--cream)" }}>
@@ -988,8 +1080,8 @@ function AllocationSection({
                 key={card.label}
                 style={{
                   padding: 16, borderRadius: isMobile ? "var(--r-pocket-sm)" : 14,
-                  background: card.danger ? DANGER_TINT_BG : "var(--cream)",
-                  border: `1px solid ${card.danger ? DANGER_TINT_BORDER : "var(--line)"}`,
+                  background: card.danger ? DANGER_TINT_BG : (isMobile ? "var(--ivory)" : "var(--cream)"),
+                  border: `1px solid ${card.danger ? DANGER_TINT_BORDER : (isMobile ? "transparent" : "var(--line)")}`,
                 }}
               >
                 <p style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
@@ -1017,6 +1109,10 @@ function AllocationSection({
             </div>
           )}
 
+          {/* Allocation editing is desktop-only for now — the editable 8-col grid,
+              per-cell inputs, and custom-category management render only at ≥md.
+              Mobile shows a read-only per-category summary list below. */}
+          <div className="hidden md:block">
           {/* Allocation table */}
           <div style={{ border: "1px solid var(--line)", borderRadius: 14, overflow: "hidden" }}>
             {/* Table header */}
@@ -1274,6 +1370,35 @@ function AllocationSection({
               No budget set for {fiscalYear} yet. Click any Church, CMU, or Pitt cell to start allocating.
             </p>
           )}
+          </div>
+
+          {/* Mobile: read-only per-category summary (editing is desktop-only). */}
+          <div className="md:hidden">
+            {allCategories.length === 0 ? (
+              <p style={{ textAlign: "center", fontSize: 13, color: "var(--muted-text)", padding: "24px 0", fontStyle: "italic" }}>
+                No categories to allocate yet.
+              </p>
+            ) : (
+              <PocketRowCard>
+                {allCategories.map((cat, i) => {
+                  const catTotal = FUNDS.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
+                  const spent = getActual(cat.value)
+                  const remaining = catTotal - spent
+                  const rowOver = remaining < 0 && catTotal > 0
+                  return (
+                    <MobileDataRow
+                      key={cat.value}
+                      title={cat.label}
+                      sub={catTotal > 0 ? `Spent $${spent.toFixed(2)} of $${catTotal.toFixed(2)}` : "Not budgeted"}
+                      right={catTotal > 0 ? (remaining < 0 ? `-$${Math.abs(remaining).toFixed(2)}` : `$${remaining.toFixed(2)}`) : "—"}
+                      rightColor={rowOver ? "var(--danger)" : catTotal > 0 && remaining > 0 ? BUDGET_GREEN : "var(--faint)"}
+                      isLast={i === allCategories.length - 1}
+                    />
+                  )
+                })}
+              </PocketRowCard>
+            )}
+          </div>
         </>
       )}
     </div>
