@@ -16,7 +16,10 @@ export interface ModerationSettings {
 }
 
 export const MODERATION_DEFAULTS: ModerationSettings = {
-  enabled: false,
+  // Default-ON (App Store 1.2 requires a live method for filtering objectionable
+  // material). Ministries that explicitly saved enabled:false keep their opt-out —
+  // consumers merge stored settings over these defaults.
+  enabled: true,
   behavior: "asterisk_first",
   strictness: "moderate",
   scope: "all",
