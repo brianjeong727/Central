@@ -82,7 +82,9 @@ test.describe("compliance §5.1.1 — links (signed out, desktop)", () => {
     const errors = watchConsole(page)
     await page.goto("/signup")
     // /signup opens on the role-choice screen; the Privacy note lives on the form.
-    await page.getByText("Join a ministry").click()
+    // Desktop + mobile signup trees are both mounted (dual-render); scope to the
+    // visible one so getByText doesn't strict-violate on the hidden md:hidden twin.
+    await page.getByText("Join a ministry").filter({ visible: true }).click()
     const link = page.getByRole("link", { name: "Privacy Policy" }).first()
     await expect(link).toBeVisible()
     await expect(link).toHaveAttribute("href", "/privacy")
@@ -187,8 +189,10 @@ test.describe("compliance §1.2 — member: report + block (mobile)", () => {
 
     // Block via the directory member kebab.
     await page.goto("/home?tab=directory")
-    await page.getByPlaceholder("Search members…").fill("E2E Admin 2")
-    const memberRow = page.getByRole("button", { name: /E2E Admin 2/ })
+    // Name is lane-suffixed at verify time ("E2E Admin" on lane 1, "E2E Admin 2"
+    // on lane 2) — match the lane-agnostic prefix so this passes on either tenant.
+    await page.getByPlaceholder("Search members…").fill("E2E Admin")
+    const memberRow = page.getByRole("button", { name: /E2E Admin/ })
     await memberRow.first().click()
     await page.getByRole("button", { name: "Member actions" }).click()
     await page.getByRole("button", { name: "Block", exact: true }).click()
@@ -219,10 +223,10 @@ test.describe("compliance §1.2 — member: report + block (mobile)", () => {
     await page.goto("/home?tab=chats&chats=my")
     await page.getByRole("button", { name: "New chat" }).click()
     await expect(page.getByRole("heading", { name: "New Chat" })).toBeVisible()
-    await page.getByPlaceholder("Search members…").fill("E2E Admin 2")
+    await page.getByPlaceholder("Search members…").fill("E2E Admin")
     // Scope to the create-chat member row via the "Blocked" label (the only place
-    // that text appears here) — the background chat list also has E2E Admin 2 buttons.
-    const blockedRow = page.locator('button:has-text("E2E Admin 2")').filter({ hasText: "Blocked" })
+    // that text appears here) — the background chat list also has E2E Admin buttons.
+    const blockedRow = page.locator('button:has-text("E2E Admin")').filter({ hasText: "Blocked" })
     await expect(blockedRow).toBeVisible({ timeout: 8000 })
     await expect(blockedRow).toBeDisabled()
 
@@ -231,7 +235,9 @@ test.describe("compliance §1.2 — member: report + block (mobile)", () => {
     const blockedToggle = page.getByRole("button", { name: /Blocked users/ })
     await expect(blockedToggle).toBeVisible({ timeout: 15000 })
     await blockedToggle.click()
-    await expect(page.getByText("E2E Admin 2")).toBeVisible()
+    // AccountLinksSection is dual-rendered (desktop + mobile trees both mounted);
+    // scope to the visible instance and match the lane-agnostic name prefix.
+    await expect(page.getByText(/E2E Admin/).filter({ visible: true }).first()).toBeVisible()
     await page.getByRole("button", { name: "Unblock" }).first().click()
 
     await expect
@@ -373,7 +379,11 @@ test.describe("compliance — admin surfaces (mobile)", () => {
   test("8. Create church chat (mobile restyle): pills, name, search, list, create pill", async ({ page }) => {
     const errors = watchConsole(page)
     await page.goto("/home?tab=chats")
-    await page.getByRole("button", { name: "New chat" }).click()
+    // Mobile church-chat creation is per-section now (Pocket sweep): the top-level
+    // "New chat" round button is My-chats-scope only; church scope exposes a
+    // per-section "New <section> chat" + affordance. Click the first visible one to
+    // open the church CreateChatScreen (heading assertion below is unchanged).
+    await page.getByRole("button", { name: /New .+ chat/ }).first().click()
 
     await expect(page.getByRole("heading", { name: "New Church Chat" })).toBeVisible({ timeout: 10000 })
     // Section pills.
@@ -383,7 +393,7 @@ test.describe("compliance — admin surfaces (mobile)", () => {
     // Name field, search, member list, create pill.
     await expect(page.getByPlaceholder(/e\.g\./)).toBeVisible() // chat-name input
     await expect(page.getByPlaceholder("Search members…")).toBeVisible()
-    await expect(page.getByRole("button", { name: /E2E (Admin|Member) 2/ }).first()).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole("button", { name: /E2E (Admin|Member)/ }).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByRole("button", { name: /Create Chat/ })).toBeVisible()
     expect(errors, `console/page errors:\n${errors.join("\n")}`).toEqual([])
   })
@@ -405,8 +415,9 @@ test.describe("compliance — desktop spot-check (1440)", () => {
   test("9b. Directory detail kebab exposes Report + Block; no mobile tree", async ({ page }) => {
     const errors = watchConsole(page)
     await page.goto("/home?tab=directory")
-    // Select another member in the desktop list panel.
-    const listItem = page.getByRole("button", { name: /E2E Member 2/ }).first()
+    // Select another member in the desktop list panel. Name is lane-suffixed at
+    // verify time ("E2E Member" / "E2E Member 2") — match the lane-agnostic prefix.
+    const listItem = page.getByRole("button", { name: /E2E Member/ }).first()
     await expect(listItem).toBeVisible({ timeout: 15000 })
     await listItem.click()
     await page.getByRole("button", { name: "Member actions" }).click()

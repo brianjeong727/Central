@@ -851,7 +851,7 @@ function AccountLinksSection({ userId, mobile = false }: { userId: string; mobil
         </a>
 
         {/* Terms of service */}
-        <a href="/terms" style={{ ...rowBase, borderTop: "1px solid var(--line)", textDecoration: "none" }}>
+        <a href="/terms" style={{ ...rowBase, borderTop: `1px solid ${hair}`, textDecoration: "none" }}>
           <span style={label}>Terms of service</span>
           <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />
         </a>
