@@ -6,7 +6,7 @@ import Link from "next/link"
 import { AlertCircle } from "lucide-react"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { SplitShell, GoogleButton, GoogleGlyph, AppleButton, AppleGlyph, OrDivider, EyeButton } from "@/app/(auth)/shared"
-import { isNativeShell, useIsNativeShell, signInWithAppleNative, routeAfterNativeSignIn } from "@/lib/native-auth"
+import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn } from "@/lib/native-auth"
 import { RingCrossLogo } from "@/app/home/components/shared"
 import { EntrySplash } from "@/app/home/components/entry-splash"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
@@ -35,11 +35,12 @@ function LoginContent() {
   const [mobileStep, setMobileStep] = useState<"welcome" | "form">(
     searchParams.get("error") ? "form" : "welcome"
   )
-  // In the native shell the Google web-OAuth flow can't complete inside the
-  // WKWebView (Google blocks embedded webviews; the flow strands in Safari) —
-  // hide it there. Apple + email cover the shell; a Google-created account can
-  // sign in with Apple on the same email (Supabase links verified identities).
+  // Google's web-OAuth flow can't run inside the WKWebView (Google blocks
+  // embedded webviews), so the shell uses the NATIVE Google sheet instead —
+  // shown only once the iOS OAuth client ID is configured. Until then the
+  // shell shows Apple + email only; the web always keeps all providers.
   const nativeShell = useIsNativeShell()
+  const googleInShell = googleNativeConfigured()
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -83,6 +84,22 @@ function LoginContent() {
   }
 
   async function handleGoogleLogin() {
+    if (isNativeShell()) {
+      setError(null)
+      const res = await signInWithGoogleNative("signin")
+      if (!res.ok) {
+        if (res.error === "no-account") setError("No Central account exists for that Google email yet — create an account first.")
+        else if (res.error === "failed") setError("Google sign-in didn't complete — please try again.")
+        else if (res.error === "unavailable") setError("Google sign-in needs the latest app version — update Central and try again.")
+        else return // canceled — no error surface
+        setMobileStep("form")
+        return
+      }
+      if (intent === "register") { window.location.assign("/onboarding"); return }
+      if (intent === "join") { window.location.assign("/ministries"); return }
+      await routeAfterNativeSignIn(createClient())
+      return
+    }
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -97,7 +114,7 @@ function LoginContent() {
       if (!res.ok) {
         if (res.error === "unavailable") { await webAppleOAuth(); return }
         if (res.error === "no-account") setError("No Central account exists for that Apple ID yet — create an account first.")
-        else if (res.error === "failed") setError("Apple sign-in failed — please try again.")
+        else if (res.error === "failed") setError("Apple sign-in didn't complete — make sure this device is signed in to an Apple ID (Settings), then try again.")
         else return // canceled — no error surface
         // The mobile welcome step has no error banner — surface it on the form step.
         setMobileStep("form")
@@ -185,7 +202,7 @@ function LoginContent() {
 
       <div style={{ marginTop: 30, display: "flex", flexDirection: "column", gap: 10 }}>
         <AppleButton onClick={handleAppleLogin} />
-        {!nativeShell && <GoogleButton onClick={handleGoogleLogin} />}
+        {(!nativeShell || googleInShell) && <GoogleButton onClick={handleGoogleLogin} />}
       </div>
 
       <div style={{ margin: "22px 0" }}>
@@ -273,7 +290,7 @@ function LoginContent() {
               <AppleGlyph size={18} />
               Continue with Apple
             </button>
-            {!nativeShell && (
+            {(!nativeShell || googleInShell) && (
               <button type="button" onClick={handleGoogleLogin} style={pillCard}>
                 <GoogleGlyph size={18} />
                 Continue with Google
