@@ -81,9 +81,19 @@ export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<
       scopes: "email name",
       nonce: hashedNonce,
     })
-  } catch {
-    // The native sheet was dismissed (or denied) — not an error state.
-    return { ok: false, error: "canceled" }
+  } catch (err) {
+    // Distinguish the three real cases — swallowing everything as "canceled"
+    // once made a binary without the native plugin look like a dead button.
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error("[native-auth] authorize failed:", msg)
+    // Capacitor's UNIMPLEMENTED: the JS bundle (remote) is newer than the
+    // installed binary — no native module. Fall back to the web OAuth flow.
+    if (/not implemented|unimplemented/i.test(msg)) return { ok: false, error: "unavailable" }
+    // ASAuthorizationError 1001 = user dismissed the sheet — genuinely silent.
+    if (/1001|cancel/i.test(msg)) return { ok: false, error: "canceled" }
+    // Everything else (1000 = no Apple ID signed in on the device, 1004 =
+    // request failed, entitlement problems) must SURFACE, not vanish.
+    return { ok: false, error: "failed" }
   }
 
   const identityToken = authorization.response?.identityToken
@@ -118,6 +128,65 @@ export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<
   const { ok } = await verifyNativeOAuthSession(flow)
   if (!ok) {
     // Torn down server-side; clear the local session too.
+    await supabase.auth.signOut()
+    return { ok: false, error: "no-account" }
+  }
+  return { ok: true }
+}
+
+// ── Native Google sign-in ─────────────────────────────────────────────────────
+// Same architecture as Apple: native sheet (GoogleSignIn SDK via
+// @capgo/capacitor-social-login) → signInWithIdToken → the same mint guard.
+// Google's web OAuth flow cannot run in a WKWebView (disallowed_useragent), so
+// native is the ONLY way the shell gets a Google button. Gated on the iOS
+// OAuth client ID being configured — until then the shell hides Google.
+
+export function googleNativeConfigured(): boolean {
+  return !!process.env.NEXT_PUBLIC_GOOGLE_IOS_CLIENT_ID
+}
+
+let googleInitialized = false
+
+export async function signInWithGoogleNative(flow: "signin" | "signup"): Promise<NativeAppleResult> {
+  const iOSClientId = process.env.NEXT_PUBLIC_GOOGLE_IOS_CLIENT_ID
+  if (!iOSClientId) return { ok: false, error: "unavailable" }
+
+  let SocialLogin: typeof import("@capgo/capacitor-social-login").SocialLogin
+  try {
+    ;({ SocialLogin } = await import("@capgo/capacitor-social-login"))
+  } catch {
+    return { ok: false, error: "unavailable" }
+  }
+
+  let idToken: string | null | undefined
+  try {
+    if (!googleInitialized) {
+      await SocialLogin.initialize({ google: { iOSClientId } })
+      googleInitialized = true
+    }
+    const { result } = await SocialLogin.login({
+      provider: "google",
+      options: { scopes: ["email", "profile"] },
+    })
+    idToken = "idToken" in result ? result.idToken : null
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error("[native-auth] google login failed:", msg)
+    if (/not implemented|unimplemented/i.test(msg)) return { ok: false, error: "unavailable" }
+    if (/cancel|-5\b|user closed/i.test(msg)) return { ok: false, error: "canceled" }
+    return { ok: false, error: "failed" }
+  }
+  if (!idToken) return { ok: false, error: "failed" }
+
+  const supabase = createClient()
+  const { data, error } = await supabase.auth.signInWithIdToken({ provider: "google", token: idToken })
+  if (error || !data?.user) {
+    console.error("[native-auth] google signInWithIdToken failed:", error)
+    return { ok: false, error: "failed" }
+  }
+
+  const { ok } = await verifyNativeOAuthSession(flow)
+  if (!ok) {
     await supabase.auth.signOut()
     return { ok: false, error: "no-account" }
   }

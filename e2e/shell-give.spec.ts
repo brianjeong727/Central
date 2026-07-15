@@ -34,17 +34,27 @@ test.describe("shell UA hides Give — desktop sidebar", () => {
   })
 })
 
-test.describe("shell UA hides Google sign-in", () => {
+test.describe("shell UA gates Google sign-in on native config", () => {
   test.use({
     storageState: { cookies: [], origins: [] },
     userAgent: SHELL_UA,
     viewport: { width: 390, height: 844 },
   })
 
-  test("/login welcome shows Apple, not Google", async ({ page }) => {
+  // Google in the shell uses the NATIVE sheet (web OAuth can't run in a
+  // WKWebView), so the button shows only when NEXT_PUBLIC_GOOGLE_IOS_CLIENT_ID
+  // is configured. Both this process and the dev server read .env.local, so the
+  // expectation tracks the same switch the app uses.
+  const googleConfigured = !!process.env.NEXT_PUBLIC_GOOGLE_IOS_CLIENT_ID
+
+  test("/login welcome shows Apple; Google only when configured", async ({ page }) => {
     await page.goto("/login")
     await expect(page.getByRole("button", { name: "Continue with Apple" })).toBeVisible()
-    await expect(page.getByRole("button", { name: "Continue with Google" })).toHaveCount(0)
+    if (googleConfigured) {
+      await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible()
+    } else {
+      await expect(page.getByRole("button", { name: "Continue with Google" })).toHaveCount(0)
+    }
   })
 })
 

@@ -9,7 +9,7 @@ import { Spinner } from "@/app/home/components/shared"
 import { SplitShell, GoogleButton, AppleButton, AppleGlyph, GoogleGlyph, OrDivider, EyeButton,
   PocketAuthScreen, PocketBack, PocketField, PocketSubmit, PocketError,
   pocketPillCard, pocketFieldLabel, pocketH1, pocketSub } from "@/app/(auth)/shared"
-import { isNativeShell, useIsNativeShell, signInWithAppleNative } from "@/lib/native-auth"
+import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured } from "@/lib/native-auth"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
 
@@ -208,9 +208,11 @@ function SignupContent() {
   const searchParams = useSearchParams()
   const intent = searchParams.get("intent")
   const [view, setView] = useState<View>(intent === "register" ? "admin" : "role-choice")
-  // Google web-OAuth can't complete inside the WKWebView — hidden in the shell
+  // Google web-OAuth can't run inside the WKWebView — the shell uses the native
+  // Google sheet instead, shown only once the iOS client ID is configured
   // (see app/(auth)/login/page.tsx for the full rationale).
   const nativeShell = useIsNativeShell()
+  const googleInShell = googleNativeConfigured()
 
   // admin state
   const [adminName,     setAdminName]     = useState("")
@@ -264,6 +266,14 @@ function SignupContent() {
   }
 
   async function handleAdminGoogle() {
+    if (isNativeShell()) {
+      setAdminError(null)
+      const res = await signInWithGoogleNative("signup")
+      if (res.ok) { window.location.assign("/onboarding"); return }
+      if (res.error === "failed") setAdminError("Google sign-in didn't complete — please try again.")
+      else if (res.error === "unavailable") setAdminError("Google sign-in needs the latest app version — update Central and try again.")
+      return
+    }
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback?intent=register&flow=signup" } })
   }
@@ -273,7 +283,7 @@ function SignupContent() {
       setAdminError(null)
       const res = await signInWithAppleNative("signup")
       if (res.ok) { window.location.assign("/onboarding"); return }
-      if (res.error === "failed") setAdminError("Apple sign-in failed — please try again.")
+      if (res.error === "failed") setAdminError("Apple sign-in didn't complete — make sure this device is signed in to an Apple ID (Settings), then try again.")
       if (res.error !== "unavailable") return
       // plugin missing from this binary — fall through to the web flow
     }
@@ -305,6 +315,14 @@ function SignupContent() {
   }
 
   async function handleMemberGoogle() {
+    if (isNativeShell()) {
+      setMemberError(null)
+      const res = await signInWithGoogleNative("signup")
+      if (res.ok) { window.location.assign("/ministries?tab=code"); return }
+      if (res.error === "failed") setMemberError("Google sign-in didn't complete — please try again.")
+      else if (res.error === "unavailable") setMemberError("Google sign-in needs the latest app version — update Central and try again.")
+      return
+    }
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback?flow=signup" } })
   }
@@ -316,7 +334,7 @@ function SignupContent() {
       // Mirrors the web callback's intent=join landing — a fresh member goes to
       // the join flow, never the marketing landing (hidden in the shell anyway).
       if (res.ok) { window.location.assign("/ministries?tab=code"); return }
-      if (res.error === "failed") setMemberError("Apple sign-in failed — please try again.")
+      if (res.error === "failed") setMemberError("Apple sign-in didn't complete — make sure this device is signed in to an Apple ID (Settings), then try again.")
       if (res.error !== "unavailable") return
       // plugin missing from this binary — fall through to the web flow
     }
@@ -522,7 +540,7 @@ function SignupContent() {
       <form onSubmit={handleAdminSignup} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <AppleButton onClick={handleAdminApple}/>
-          {!nativeShell && <GoogleButton onClick={handleAdminGoogle}/>}
+          {(!nativeShell || googleInShell) && <GoogleButton onClick={handleAdminGoogle}/>}
         </div>
         <OrDivider/>
 
@@ -647,7 +665,7 @@ function SignupContent() {
       <form onSubmit={handleMemberSignup} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <AppleButton onClick={handleMemberApple}/>
-          {!nativeShell && <GoogleButton onClick={handleMemberGoogle}/>}
+          {(!nativeShell || googleInShell) && <GoogleButton onClick={handleMemberGoogle}/>}
         </div>
         <OrDivider/>
 
