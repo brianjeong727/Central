@@ -52,7 +52,7 @@ import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
 import type {
-  PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventConfirmation,
+  PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventConfirmation, EventBlock,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
   WorshipWeek, WorshipRoleRow, PraiseTeamMember, WorshipSong, WorshipInvite, WorshipChart, AnnotationObj, Category,
   EventType, EventExtraTab,
@@ -6107,7 +6107,7 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
       { name: "Treasurer Liaison", notes: "Manages sign-up payments, tracks deposits, submits reimbursements" },
       { name: "Logistics Lead", notes: "Food, supplies, lodging check-in, and day-of execution" },
     ],
-    extraTabs: ["transport", "program"],
+    extraTabs: ["transport"],
   },
   appreciation_night: {
     label: "Appreciation Night", icon: "✨", dot: "#C97BB0", bg: "#FAF0F7", text: "#8A3070",
@@ -7225,8 +7225,8 @@ export function EventPlanWorkspace({
   const typeCfg = EVENT_TYPE_CONFIGS[calendarEvent.event_type] ?? EVENT_TYPE_CONFIGS.social
   const extraTabs = typeCfg.extraTabs
 
-  type ActiveSection = 'overview' | 'checklist' | 'roles' | EventExtraTab
-  const coreTabs: ActiveSection[] = ['overview', 'checklist', 'roles']
+  type ActiveSection = 'overview' | 'checklist' | 'roles' | 'runsheet' | EventExtraTab
+  const coreTabs: ActiveSection[] = ['overview', 'checklist', 'roles', 'runsheet']
   const allValidTabs: ActiveSection[] = [...coreTabs, ...extraTabs]
 
   // Core data state
@@ -7826,6 +7826,7 @@ export function EventPlanWorkspace({
     { key: 'overview', label: 'Overview' },
     { key: 'checklist', label: 'Checklist' },
     { key: 'roles', label: 'Roles & Leads' },
+    { key: 'runsheet', label: 'Run of show' },
     ...extraTabs.map(t => ({ key: t as ActiveSection, label: EXTRA_TAB_LABELS[t] })),
   ]
 
@@ -8862,14 +8863,15 @@ export function EventPlanWorkspace({
               />
             )}
 
-            {/* ── Program (Retreat) ── */}
-            {shownSection === 'program' && plan && (
-              <ProgramTab
+            {/* ── Run of show (all event types) ── */}
+            {shownSection === 'runsheet' && plan && (
+              <RunSheetTab
                 plan={plan}
                 event={calendarEvent}
                 members={members}
                 canEdit={canEdit}
-                onPlanChange={setPlan}
+                ministryId={ministryId}
+                userId={userId}
               />
             )}
           </>
@@ -9449,102 +9451,133 @@ function TransportTab({
   )
 }
 
-// ── ProgramTab ────────────────────────────────────────────────────────────────
+// ── RunSheetTab — day-of run-of-show (Run Sheet P3; generalizes retreat-only program) ──
+// Backed by the event_blocks table (per-row CRUD), available on EVERY event type. Edit mode is
+// a per-day grid (time · title · owner · brief); read mode is a run-of-show that highlights the
+// next block on today's day. Live status/ripple (event_blocks.status) is dormant until Phase 3b.
 
-type ProgramSession = { id: string; time: string; title: string; leader_id: string; day_index: number }
-
-function ProgramTab({
+function RunSheetTab({
   plan,
   event,
   members,
   canEdit,
-  onPlanChange,
+  ministryId,
+  userId,
 }: {
   plan: EventPlan
   event: CalendarEvent
   members: { id: string; name: string }[]
   canEdit: boolean
-  onPlanChange: (p: EventPlan) => void
+  ministryId: string
+  userId: string
 }) {
   const supabase = createClient()
-  // Mobile restyle only (kicker day labels + ≥44px controls) — structure unchanged.
   const isMobile = useIsMobile()
-  const sessions: ProgramSession[] = (plan.type_data?.program as ProgramSession[] | undefined) ?? []
+  const [blocks, setBlocks] = useState<EventBlock[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Generate day list from event start → end
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from("event_blocks").select("*")
+        .eq("event_plan_id", plan.id)
+        .order("day_index", { ascending: true })
+        .order("sort_order", { ascending: true })
+      if (!cancelled) { setBlocks((data ?? []) as EventBlock[]); setLoading(false) }
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan.id])
+
   const days: Date[] = []
   const start = new Date(event.start_date)
   const end = new Date(event.end_date)
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    days.push(new Date(d))
-  }
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) days.push(new Date(d))
   if (days.length === 0) days.push(start)
+  const todayIdx = days.findIndex(d => d.toDateString() === new Date().toDateString())
 
-  async function save(newSessions: ProgramSession[]) {
-    const { data } = await supabase.from("event_plans").update({ type_data: { ...plan.type_data, program: newSessions } }).eq("id", plan.id).select("*").single()
-    if (data) onPlanChange(data as EventPlan)
+  const ctrlInput: React.CSSProperties = { background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: isMobile ? "12px 8px" : "4px 8px", minHeight: isMobile ? 44 : undefined, width: "100%", boxSizing: "border-box" }
+  const ctrlSelect: React.CSSProperties = { padding: isMobile ? "12px 8px" : "4px 8px", minHeight: isMobile ? 44 : undefined, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer" }
+
+  async function addBlock(dayIndex: number) {
+    const maxSort = blocks.filter(b => b.day_index === dayIndex).reduce((m, b) => Math.max(m, b.sort_order), -1)
+    const { data } = await supabase.from("event_blocks")
+      .insert({ ministry_id: ministryId, event_plan_id: plan.id, day_index: dayIndex, title: "", sort_order: maxSort + 1, created_by: userId })
+      .select("*").single()
+    if (data) setBlocks(prev => [...prev, data as EventBlock])
+  }
+  async function updateBlock(id: string, patch: Partial<EventBlock>) {
+    setBlocks(prev => prev.map(b => b.id === id ? { ...b, ...patch } : b))
+    await supabase.from("event_blocks").update(patch).eq("id", id).eq("ministry_id", ministryId)
+  }
+  async function deleteBlock(id: string) {
+    setBlocks(prev => prev.filter(b => b.id !== id))
+    await supabase.from("event_blocks").delete().eq("id", id).eq("ministry_id", ministryId)
   }
 
-  function addSession(dayIndex: number) {
-    save([...sessions, { id: crypto.randomUUID(), time: "", title: "", leader_id: "", day_index: dayIndex }])
-  }
-
-  function updateSession(id: string, updates: Partial<ProgramSession>) {
-    save(sessions.map(s => s.id === id ? { ...s, ...updates } : s))
-  }
-
-  function deleteSession(id: string) {
-    save(sessions.filter(s => s.id !== id))
-  }
+  if (loading) return <div><EventSectionHeader title="Run of show" /><p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p></div>
 
   return (
     <div>
-      <EventSectionHeader title="Program" />
+      <EventSectionHeader title="Run of show" />
 
       {days.map((day, dayIdx) => {
-        const daySessions = sessions.filter(s => s.day_index === dayIdx).sort((a, b) => a.time.localeCompare(b.time))
+        const dayBlocks = blocks.filter(b => b.day_index === dayIdx)
         const dayLabel = day.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+        const isToday = dayIdx === todayIdx
+        const upNextId = isToday ? dayBlocks.find(b => b.status !== "done")?.id : undefined
         return (
           <div key={dayIdx} style={{ marginBottom: 36 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <p style={isMobile ? { ...POCKET_KICKER_STYLE, margin: 0 } : { fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--body)", fontWeight: 500 }}>
-                Day {dayIdx + 1} — {dayLabel}
+              <p style={isMobile ? { ...POCKET_KICKER_STYLE, margin: 0 } : { fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: isToday ? "var(--plum)" : "var(--body)", fontWeight: 500 }}>
+                Day {dayIdx + 1} — {dayLabel}{isToday ? " · Today" : ""}
               </p>
               {canEdit && (
-                <CentralButton variant="secondary" size="sm" onClick={() => addSession(dayIdx)}><Plus style={{ width: 14, height: 14 }} /> Add session</CentralButton>
+                <CentralButton variant="secondary" size="sm" onClick={() => addBlock(dayIdx)}><Plus style={{ width: 14, height: 14 }} /> Add block</CentralButton>
               )}
             </div>
             <div style={{ borderTop: "1px solid var(--line)" }} />
 
-            {daySessions.length === 0 && (
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--faint)", padding: "12px 4px" }}>No sessions yet.</p>
+            {dayBlocks.length === 0 && (
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--faint)", padding: "12px 4px" }}>No blocks yet.</p>
             )}
 
-            {daySessions.map((session, sIdx) => (
-              <ListRow key={session.id} last={sIdx === daySessions.length - 1} style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 28px", gap: 12, padding: "12px 4px", alignItems: "center" }}>
-                {canEdit ? (
-                  <input value={session.time} onChange={e => updateSession(session.id, { time: e.target.value })} placeholder="7:00 PM" style={{ background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: isMobile ? "12px 8px" : "4px 8px", minHeight: isMobile ? 44 : undefined, width: "100%", boxSizing: "border-box" }} />
-                ) : (
-                  <span style={{ fontSize: 13, color: "var(--muted-text)", fontWeight: 500 }}>{session.time || "—"}</span>
-                )}
-                {canEdit ? (
-                  <input value={session.title} onChange={e => updateSession(session.id, { title: e.target.value })} placeholder="Session title…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", width: "100%", minHeight: isMobile ? 44 : undefined }} />
-                ) : (
-                  <span style={{ fontSize: 14, color: "var(--ink)" }}>{session.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>—</span>}</span>
-                )}
-                {canEdit ? (
-                  <select value={session.leader_id} onChange={e => updateSession(session.id, { leader_id: e.target.value })} style={{ padding: isMobile ? "12px 8px" : "4px 8px", minHeight: isMobile ? 44 : undefined, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
-                    <option value="">No leader</option>
-                    {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
-                ) : (
-                  <span style={{ fontSize: 12, color: "var(--body)" }}>{members.find(m => m.id === session.leader_id)?.name ?? "—"}</span>
-                )}
-                {canEdit ? (
-                  <IconButton dim={24} onClick={() => deleteSession(session.id)} title="Remove session"><X className="w-3.5 h-3.5" /></IconButton>
-                ) : <span />}
-              </ListRow>
-            ))}
+            {dayBlocks.map((block, bIdx) => {
+              const isUpNext = block.id === upNextId
+              return (
+                <ListRow key={block.id} last={bIdx === dayBlocks.length - 1} style={{ display: "block", padding: "12px 4px", ...(isUpNext ? { background: "color-mix(in srgb, var(--plum) 5%, transparent)", borderRadius: 8 } : {}) }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 28px", gap: 12, alignItems: "center" }}>
+                    {canEdit ? (
+                      <input value={block.time_label ?? ""} onChange={e => updateBlock(block.id, { time_label: e.target.value })} placeholder="7:00 PM" style={ctrlInput} />
+                    ) : (
+                      <span style={{ fontSize: 13, color: isUpNext ? "var(--plum)" : "var(--muted-text)", fontWeight: 500 }}>{block.time_label || "—"}</span>
+                    )}
+                    {canEdit ? (
+                      <input value={block.title} onChange={e => updateBlock(block.id, { title: e.target.value })} placeholder="Block title…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", width: "100%", minHeight: isMobile ? 44 : undefined }} />
+                    ) : (
+                      <span style={{ fontSize: 14, color: "var(--ink)" }}>{block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>—</span>}</span>
+                    )}
+                    {canEdit ? (
+                      <select value={block.owner_id ?? ""} onChange={e => updateBlock(block.id, { owner_id: e.target.value || null })} style={ctrlSelect}>
+                        <option value="">No owner</option>
+                        {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    ) : (
+                      <span style={{ fontSize: 12, color: "var(--body)" }}>{members.find(m => m.id === block.owner_id)?.name ?? "—"}</span>
+                    )}
+                    {canEdit ? (
+                      <IconButton dim={24} onClick={() => deleteBlock(block.id)} title="Remove block"><X className="w-3.5 h-3.5" /></IconButton>
+                    ) : <span />}
+                  </div>
+                  {canEdit ? (
+                    <input value={block.brief ?? ""} onChange={e => updateBlock(block.id, { brief: e.target.value })} placeholder="Brief — what this block needs, the gotcha…" style={{ marginTop: 6, background: "none", border: "none", outline: "none", fontSize: 12.5, fontFamily: "var(--font-inter)", color: "var(--faint)", width: "100%" }} />
+                  ) : block.brief ? (
+                    <p style={{ marginTop: 4, fontSize: 12.5, color: "var(--faint)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{block.brief}</p>
+                  ) : null}
+                </ListRow>
+              )
+            })}
           </div>
         )
       })}

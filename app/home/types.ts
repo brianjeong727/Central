@@ -603,6 +603,23 @@ export interface EventRole {
   notes: string | null
 }
 
+// Run Sheet P3 — day-of run-of-show blocks (generalizes retreat-only type_data.program).
+export interface EventBlock {
+  id: string
+  ministry_id: string
+  event_plan_id: string
+  day_index: number
+  time_label: string | null
+  start_time: string | null
+  duration_min: number | null
+  title: string
+  owner_id: string | null
+  owner_name?: string
+  brief: string | null
+  sort_order: number
+  status: 'pending' | 'active' | 'done' | 'skipped'
+}
+
 export interface EventConfirmation {
   id: string
   ministry_id: string
