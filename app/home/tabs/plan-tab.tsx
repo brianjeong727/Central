@@ -6795,6 +6795,7 @@ export function MinistryCalendar({
   onEventOpenChange?: (open: boolean) => void
 }) {
   const supabase = createClient()
+  const isMobile = useIsMobile()
   const [view, setView] = useState<"month" | "list">("list")
   // SWR-cached events + planned-event ids (shared key with StudentOrgTeamHome).
   const { data: calData, isLoading: loading, mutate: mutateCal } = useSWR(
@@ -6899,9 +6900,10 @@ export function MinistryCalendar({
   }
 
   return (
-    <div className="px-14 py-7" style={{ marginBottom: 32 }}>
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 20 }}>
+    <div className={isMobile ? "" : "px-14 py-7"} style={{ marginBottom: 32 }}>
+      {/* Header — stacks on mobile so the toggle + Add event never overflow the
+          narrow phone width (the desktop right-aligned row would clip). */}
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "flex-end", justifyContent: "space-between", gap: isMobile ? 14 : 0, marginBottom: 20 }}>
         <div>
           <p style={{ fontFamily: "var(--mono)", fontSize: "11px", fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 6 }}>
             Upcoming
@@ -6910,7 +6912,7 @@ export function MinistryCalendar({
             {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}
           </h2>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: isMobile ? "space-between" : "flex-end" }}>
           {/* View toggle */}
           <div style={{ display: "flex", background: "var(--body-bg)", borderRadius: 8, padding: 2, gap: 2 }}>
             <button
@@ -6947,9 +6949,9 @@ export function MinistryCalendar({
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 28, alignItems: "flex-start" }}>
-        {/* Calendar — left */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ display: "flex", gap: 28, alignItems: "flex-start", flexDirection: isMobile ? "column" : "row" }}>
+        {/* Calendar — left (full width on mobile) */}
+        <div style={{ flex: 1, minWidth: 0, width: isMobile ? "100%" : undefined }}>
           {loading ? (
             <div style={{ textAlign: "center", padding: "32px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
           ) : view === "month" ? (
@@ -6964,7 +6966,10 @@ export function MinistryCalendar({
           )}
         </div>
 
-        {/* Events panel — right */}
+        {/* Events panel — right. Desktop only: on mobile the TimelineView above
+            already lists every event, so this fixed 232px rail would just overlap
+            the narrow phone column (the bug this branch fixes). */}
+        {!isMobile && (
         <div style={{ width: 232, flexShrink: 0, borderLeft: "1px solid var(--line-2)", paddingLeft: 20 }}>
           <p style={{ ...MONO_STYLE, margin: "0 0 10px" }}>
             Events · {events.length || 3}
@@ -7025,6 +7030,7 @@ export function MinistryCalendar({
             })
           )}
         </div>
+        )}
       </div>
 
       {showAdd && (
