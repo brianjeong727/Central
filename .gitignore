@@ -55,3 +55,7 @@ next-env.d.ts
 .claude/.eslintcache
 .claude/.ship-authorized
 .claude/.destructive-git-authorized
+
+# Throwaway App Store submission checklists (local only)
+APPSTORE_SUBMISSION_STEPS.md
+APPSTORE_SUBMISSION_STEPS.html

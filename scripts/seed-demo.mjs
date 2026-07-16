@@ -207,17 +207,21 @@ const { count: teamCount } = await db
 
 if (!teamCount) {
   const { data: team, error: tErr } = await db.from("teams")
+    // "Leadership Team" NAME matters: classifyTeam() (app/home/team-type.ts)
+    // routes board/leadership/officer/student-org names to the rich six-section
+    // StudentOrgTeamHome workspace. A plain "standard" name would fall back to
+    // the thin ministry-calendar hub instead. Keep a matching keyword in the name.
     .insert({
-      ministry_id: mid, name: "Welcome Team", team_type: "standard",
-      description: "First-touch hospitality — greeting, follow-ups, new-folk dinners.",
+      ministry_id: mid, name: "Leadership Team", team_type: "standard",
+      description: "Ministry leadership — planning, meetings, small groups, rotations.",
       created_by: reviewerId,
     })
     .select("id").single()
   if (tErr) throw tErr
 
   const { data: roles, error: rErr } = await db.from("team_roles").insert([
-    { team_id: team.id, name: "President", is_president: true, permissions: [] },
-    { team_id: team.id, name: "Member", is_president: false, permissions: [] },
+    { team_id: team.id, name: "President", is_president: true, permissions: ["can_plan_events", "can_manage_members", "can_track_attendance"] },
+    { team_id: team.id, name: "Member", is_president: false, permissions: ["can_plan_events"] },
   ]).select("id, is_president")
   if (rErr) throw rErr
 
@@ -229,6 +233,168 @@ if (!teamCount) {
     { team_id: team.id, user_id: ids[USERS[2].email], role_id: member, added_by: reviewerId },
   ])
   if (tmErr) throw tmErr
+}
+
+// Calendar events — so the workspace Calendar (and Home "up next") is populated,
+// not empty. Idempotent by title. Anchored to the current week so it always
+// reads as upcoming. `category` must be one of welcoming/retreat/social/service/regular.
+const leadershipTeam = await db.from("teams")
+  .select("id").eq("ministry_id", mid).eq("name", "Leadership Team").maybeSingle()
+const leadershipTeamId = leadershipTeam.data?.id ?? null
+const startOfWeek = new Date()
+startOfWeek.setHours(0, 0, 0, 0)
+startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()) // Sunday
+const at = (days, hour) => {
+  const d = new Date(startOfWeek)
+  d.setDate(d.getDate() + days)
+  d.setHours(hour)
+  return d.toISOString()
+}
+const EVENTS = [
+  { title: "Friday Night Worship", team_id: leadershipTeamId, category: "service", location: "Campus Chapel",
+    description: "Worship + fellowship in the campus chapel. Dessert afterward.", start: at(5, 19), end: at(5, 21) },
+  { title: "New Student Welcome Dinner", team_id: leadershipTeamId, category: "welcoming", location: "Fellowship Hall",
+    description: "Dinner for first-time students, hosted by the leadership team.", start: at(10, 18), end: at(10, 20) },
+  { title: "Sunday Service", team_id: null, category: "service", location: "Main Sanctuary",
+    description: "Weekly gathering — worship, teaching, community.", start: at(7, 10), end: at(7, 12) },
+]
+for (const e of EVENTS) {
+  const { data: existing } = await db.from("calendar_events")
+    .select("id").eq("ministry_id", mid).eq("title", e.title).maybeSingle()
+  if (existing) continue
+  const { error } = await db.from("calendar_events").insert({
+    ministry_id: mid, team_id: e.team_id, title: e.title, description: e.description,
+    location: e.location, start_date: e.start, end_date: e.end, all_day: false,
+    category: e.category, created_by: reviewerId,
+  })
+  if (error) throw error
+}
+
+// ── Workspace sections — so the Leadership Team workspace (the "a workspace"
+// review screenshot) reads as a live, worked-in space on every hub row, not a
+// scaffold of empty sections. All idempotent (guarded by existence checks).
+const jamesId = ids[USERS[2].email]
+const emilyId = ids[USERS[3].email]
+const danielId = ids[USERS[4].email]
+
+if (leadershipTeamId) {
+  // ── Event plan + tasks for "Friday Night Worship" ─────────────────────────
+  // Drives the mobile hub "Up next" progress ring AND the Events → plan workspace.
+  const { data: fridayEv } = await db.from("calendar_events")
+    .select("id, start_date").eq("ministry_id", mid).eq("title", "Friday Night Worship").maybeSingle()
+  if (fridayEv) {
+    let { data: plan } = await db.from("event_plans")
+      .select("id").eq("calendar_event_id", fridayEv.id).maybeSingle()
+    if (!plan) {
+      const ymd = (d) => d.toISOString().split("T")[0]
+      const crunch = new Date(fridayEv.start_date); crunch.setDate(crunch.getDate() - 2)
+      const planStart = new Date(fridayEv.start_date); planStart.setDate(planStart.getDate() - 14)
+      const { data: np, error: pErr } = await db.from("event_plans").insert({
+        ministry_id: mid, calendar_event_id: fridayEv.id, created_by: reviewerId,
+        overview_notes: "Weekly worship + fellowship night in the campus chapel. Aim for a warm, welcoming room — extra effort on greeting first-time students.",
+        expected_turnout: 80, plan_start_date: ymd(planStart), crunch_date: ymd(crunch),
+      }).select("id").single()
+      if (pErr) throw pErr
+      plan = np
+      const TASKS = [
+        ["Confirm chapel reservation", "pre_event", true, reviewerId],
+        ["Line up the worship team", "pre_event", true, sarahId],
+        ["Design & post the announcement", "pre_event", true, reviewerId],
+        ["Order dessert (keep it under $40)", "pre_event", false, sarahId],
+        ["Prepare welcome slides", "pre_event", false, jamesId],
+        ["Set up sound & seating", "day_of", false, jamesId],
+        ["Brief the greeter team", "day_of", false, sarahId],
+        ["Send thank-you + follow-up to first-timers", "post_event", false, reviewerId],
+      ]
+      const nowIso = new Date().toISOString()
+      const { error: tErr } = await db.from("event_tasks").insert(TASKS.map(([title, phase, done, uid], i) => ({
+        event_plan_id: plan.id, title, phase, completed: done, assigned_to: uid,
+        created_by: reviewerId, sort_order: i, completed_at: done ? nowIso : null,
+      })))
+      if (tErr) throw tErr
+    }
+  }
+
+  // ── Meeting notes ─────────────────────────────────────────────────────────
+  const { count: noteCount } = await db.from("meeting_notes")
+    .select("id", { count: "exact", head: true }).eq("team_id", leadershipTeamId)
+  if (!noteCount) {
+    const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().split("T")[0] }
+    const NOTES = [
+      { n: 1, date: daysAgo(18), title: "Semester Kickoff Planning", by: reviewerId,
+        body: "<p>First leadership sync of the semester. Set the tone and locked in the big rocks.</p><ul><li>Friday Night Worship stays weekly, campus chapel, 7pm.</li><li>Push a strong first-two-weeks welcome for new students.</li><li>Small group placements go out before week 2.</li></ul><p>Everyone owns follow-up with the students they invited.</p>" },
+      { n: 2, date: daysAgo(10), title: "Small Group Placements", by: sarahId,
+        body: "<p>Finalized group assignments and leaders.</p><ul><li>Balanced by year; kept transfer students together where it helped.</li><li>Leaders reach out to their groups this week.</li><li>First meetings kick off next week.</li></ul>" },
+      { n: 3, date: daysAgo(3), title: "Weekly Leadership Sync", by: reviewerId,
+        body: "<p>Quick check-in ahead of Friday.</p><ul><li>Turnout trending up — plan for ~80.</li><li>Dessert + greeter team still need owners (see event plan).</li><li>Welcome Dinner prep starts next week.</li></ul>" },
+    ]
+    const { error: nErr } = await db.from("meeting_notes").insert(NOTES.map(x => ({
+      team_id: leadershipTeamId, note_number: x.n, date: x.date, title: x.title, body: x.body, created_by: x.by,
+    })))
+    if (nErr) throw nErr
+  }
+
+  // ── Role descriptions (Resources section) ─────────────────────────────────
+  const { count: descCount } = await db.from("team_role_descriptions")
+    .select("id", { count: "exact", head: true }).eq("team_id", leadershipTeamId)
+  if (!descCount) {
+    const { error: dErr } = await db.from("team_role_descriptions").insert([
+      { team_id: leadershipTeamId, role_name: "President", created_by: reviewerId, updated_by: reviewerId,
+        summary: "Sets the vision and owns the health of the ministry. Runs leadership meetings, keeps the team aligned, and is the final call on planning decisions.",
+        responsibilities: ["Lead weekly leadership syncs", "Own the event calendar and big-picture planning", "Shepherd and develop the leadership team", "Represent the ministry to campus staff and partners"] },
+      { team_id: leadershipTeamId, role_name: "Member", created_by: reviewerId, updated_by: reviewerId,
+        summary: "Carries a piece of the ministry's week-to-week work and helps events run. Owns tasks end to end and follows up with students.",
+        responsibilities: ["Take ownership of assigned event tasks", "Help set up and run weekly gatherings", "Follow up with students you invited or lead", "Show up prepared to leadership syncs"] },
+    ])
+    if (dErr) throw dErr
+  }
+
+  // ── Small groups (Groups section) ─────────────────────────────────────────
+  const { count: sessCount } = await db.from("group_sessions")
+    .select("id", { count: "exact", head: true }).eq("team_id", leadershipTeamId)
+  if (!sessCount) {
+    const { data: session, error: sErr } = await db.from("group_sessions").insert({
+      team_id: leadershipTeamId, ministry_id: mid, name: "Fall 2026 Small Groups",
+      source_type: "roster", config: { numGroups: 2, balanceByYear: true, separateVisitors: false, smallGroupMode: false, naming: "custom" },
+      created_by: reviewerId,
+    }).select("id").single()
+    if (sErr) throw sErr
+    const GROUPS = [
+      { name: "Tuesday Night DG", members: [reviewerId, emilyId, danielId] },
+      { name: "Thursday Night DG", members: [sarahId, jamesId] },
+    ]
+    for (let i = 0; i < GROUPS.length; i++) {
+      const { data: g, error: gErr } = await db.from("generated_groups")
+        .insert({ session_id: session.id, name: GROUPS[i].name, order_index: i }).select("id").single()
+      if (gErr) throw gErr
+      const { error: gmErr } = await db.from("generated_group_members")
+        .insert(GROUPS[i].members.map(uid => ({ group_id: g.id, user_id: uid })))
+      if (gmErr) throw gmErr
+    }
+  }
+
+  // ── Rotations (Rotations section) — a semester of Sunday prayer slots ──────
+  const { count: semCount } = await db.from("rotation_semesters")
+    .select("id", { count: "exact", head: true }).eq("team_id", leadershipTeamId)
+  if (!semCount) {
+    const semStart = new Date(startOfWeek) // this week's Sunday
+    const semEnd = new Date(startOfWeek); semEnd.setDate(semEnd.getDate() + 7 * 6) // 6 weeks out
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    const { data: sem, error: semErr } = await db.from("rotation_semesters").insert({
+      ministry_id: mid, team_id: leadershipTeamId, name: "Fall 2026",
+      start_date: ymd(semStart), end_date: ymd(semEnd), created_by: reviewerId,
+    }).select("id").single()
+    if (semErr) throw semErr
+    // Sundays in range → Sunday Lunch Prayer slots; first few pre-assigned.
+    const sundays = []
+    for (let d = new Date(semStart); d <= semEnd; d.setDate(d.getDate() + 7)) sundays.push(ymd(new Date(d)))
+    const assignees = [reviewerId, sarahId, jamesId, null, null, null, null]
+    const { error: rErr } = await db.from("ccsf_rotations").insert(sundays.map((wd, i) => ({
+      ministry_id: mid, team_id: leadershipTeamId, semester_id: sem.id,
+      rotation_type: "sunday_lunch_prayer", week_date: wd, assigned_to: assignees[i] ?? null,
+    })))
+    if (rErr) throw rErr
+  }
 }
 
 console.log(`✓ App Store demo tenant ready`)
