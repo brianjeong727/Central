@@ -207,17 +207,19 @@ const { count: teamCount } = await db
 
 if (!teamCount) {
   const { data: team, error: tErr } = await db.from("teams")
+    // "Leadership Team" NAME matters: classifyTeam() (app/home/team-type.ts)
+    // routes board/leadership/officer/student-org names to the rich six-section
+    // StudentOrgTeamHome workspace. A plain "standard" name would fall back to
+    // the thin ministry-calendar hub instead. Keep a matching keyword in the name.
     .insert({
-      ministry_id: mid, name: "Welcome Team", team_type: "standard",
-      description: "First-touch hospitality — greeting, follow-ups, new-folk dinners.",
+      ministry_id: mid, name: "Leadership Team", team_type: "standard",
+      description: "Ministry leadership — planning, meetings, small groups, rotations.",
       created_by: reviewerId,
     })
     .select("id").single()
   if (tErr) throw tErr
 
   const { data: roles, error: rErr } = await db.from("team_roles").insert([
-    // can_plan_events gates the standard-team workspace hub — without it the
-    // mobile workspace renders blank (no Calendar section). Keep it on both roles.
     { team_id: team.id, name: "President", is_president: true, permissions: ["can_plan_events", "can_manage_members", "can_track_attendance"] },
     { team_id: team.id, name: "Member", is_president: false, permissions: ["can_plan_events"] },
   ]).select("id, is_president")
@@ -236,9 +238,9 @@ if (!teamCount) {
 // Calendar events — so the workspace Calendar (and Home "up next") is populated,
 // not empty. Idempotent by title. Anchored to the current week so it always
 // reads as upcoming. `category` must be one of welcoming/retreat/social/service/regular.
-const welcomeTeam = await db.from("teams")
-  .select("id").eq("ministry_id", mid).eq("name", "Welcome Team").maybeSingle()
-const welcomeTeamId = welcomeTeam.data?.id ?? null
+const leadershipTeam = await db.from("teams")
+  .select("id").eq("ministry_id", mid).eq("name", "Leadership Team").maybeSingle()
+const leadershipTeamId = leadershipTeam.data?.id ?? null
 const startOfWeek = new Date()
 startOfWeek.setHours(0, 0, 0, 0)
 startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()) // Sunday
@@ -249,10 +251,10 @@ const at = (days, hour) => {
   return d.toISOString()
 }
 const EVENTS = [
-  { title: "Friday Night Worship", team_id: welcomeTeamId, category: "service", location: "Campus Chapel",
+  { title: "Friday Night Worship", team_id: leadershipTeamId, category: "service", location: "Campus Chapel",
     description: "Worship + fellowship in the campus chapel. Dessert afterward.", start: at(5, 19), end: at(5, 21) },
-  { title: "New Student Welcome Dinner", team_id: welcomeTeamId, category: "welcoming", location: "Fellowship Hall",
-    description: "Welcome Team hosts dinner for first-time students.", start: at(10, 18), end: at(10, 20) },
+  { title: "New Student Welcome Dinner", team_id: leadershipTeamId, category: "welcoming", location: "Fellowship Hall",
+    description: "Dinner for first-time students, hosted by the leadership team.", start: at(10, 18), end: at(10, 20) },
   { title: "Sunday Service", team_id: null, category: "service", location: "Main Sanctuary",
     description: "Weekly gathering — worship, teaching, community.", start: at(7, 10), end: at(7, 12) },
 ]
