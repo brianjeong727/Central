@@ -36,6 +36,7 @@ import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, t
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
 import { instantiateTemplateAction } from "@/app/actions/event-templates"
+import { setBlockStatusAction, shiftBlocksAction } from "@/app/actions/event-blocks"
 import { EventCompileModal } from "./event-compile"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketChip } from "../components/pocket-header"
@@ -8467,6 +8468,13 @@ export function EventPlanWorkspace({
               <div>
                 <EventSectionHeader title="Checklist" action={<span style={{ fontSize: 13, color: "var(--muted-text)" }}>{incompleteTasks.length} of {tasks.length} remaining</span>} />
 
+                {/* Run Sheet P3 — day-of timing lives in the Run of show tab, not here */}
+                <p style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "0 0 16px" }}>
+                  Day-of timing lives in the{" "}
+                  <button onClick={() => setActiveSectionAndUrl("runsheet")} style={{ background: "none", border: "none", padding: 0, color: "var(--plum)", cursor: "pointer", fontSize: 12.5, fontWeight: 500 }}>Run of show</button>{" "}
+                  tab.
+                </p>
+
                 {/* Pinned band — top-level pinned tasks (+ their children) */}
                 {pinnedTop.length > 0 && (
                   <CentralCard variant="inset" radius="var(--r-callout)" padding="6px 14px 8px" style={{ marginBottom: 24 }}>
@@ -9476,19 +9484,32 @@ function RunSheetTab({
   const [blocks, setBlocks] = useState<EventBlock[]>([])
   const [loading, setLoading] = useState(true)
 
+  async function loadBlocks() {
+    const { data } = await supabase
+      .from("event_blocks").select("*")
+      .eq("event_plan_id", plan.id)
+      .order("day_index", { ascending: true })
+      .order("sort_order", { ascending: true })
+    setBlocks((data ?? []) as EventBlock[]); setLoading(false)
+  }
   useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      const { data } = await supabase
-        .from("event_blocks").select("*")
-        .eq("event_plan_id", plan.id)
-        .order("day_index", { ascending: true })
-        .order("sort_order", { ascending: true })
-      if (!cancelled) { setBlocks((data ?? []) as EventBlock[]); setLoading(false) }
-    })()
-    return () => { cancelled = true }
+    loadBlocks()
+    // Live day-of: any block change on this plan (owner check-off, running-late shift) refetches.
+    const ch = supabase.channel(`event-blocks-${plan.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "event_blocks", filter: `event_plan_id=eq.${plan.id}` }, () => loadBlocks())
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan.id])
+
+  async function toggleDone(block: EventBlock) {
+    const next = block.status === "done" ? "pending" : "done"
+    setBlocks(prev => prev.map(b => b.id === block.id ? { ...b, status: next } : b))  // optimistic; realtime reconciles
+    await setBlockStatusAction(block.id, next)
+  }
+  async function runLate(block: EventBlock, minutes: number) {
+    await shiftBlocksAction(block.id, minutes)  // realtime refetch reflects the shifted times
+  }
 
   const days: Date[] = []
   const start = new Date(event.start_date)
@@ -9547,16 +9568,23 @@ function RunSheetTab({
               const isUpNext = block.id === upNextId
               return (
                 <ListRow key={block.id} last={bIdx === dayBlocks.length - 1} style={{ display: "block", padding: "12px 4px", ...(isUpNext ? { background: "color-mix(in srgb, var(--plum) 5%, transparent)", borderRadius: 8 } : {}) }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 28px", gap: 12, alignItems: "center" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "26px 80px 1fr 140px auto", gap: 12, alignItems: "center" }}>
+                    {/* status check — the block's owner OR a leader marks it done (live across devices) */}
+                    {(canEdit || block.owner_id === userId) ? (
+                      <button onClick={() => toggleDone(block)} title={block.status === "done" ? "Mark not done" : "Mark done"}
+                        style={{ width: 20, height: 20, borderRadius: 6, border: "1.6px solid " + (block.status === "done" ? "var(--plum-2)" : "var(--dashed)"), background: block.status === "done" ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}>
+                        {block.status === "done" && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
+                      </button>
+                    ) : <span />}
                     {canEdit ? (
                       <input value={block.time_label ?? ""} onChange={e => updateBlock(block.id, { time_label: e.target.value })} placeholder="7:00 PM" style={ctrlInput} />
                     ) : (
                       <span style={{ fontSize: 13, color: isUpNext ? "var(--plum)" : "var(--muted-text)", fontWeight: 500 }}>{block.time_label || "—"}</span>
                     )}
                     {canEdit ? (
-                      <input value={block.title} onChange={e => updateBlock(block.id, { title: e.target.value })} placeholder="Block title…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", width: "100%", minHeight: isMobile ? 44 : undefined }} />
+                      <input value={block.title} onChange={e => updateBlock(block.id, { title: e.target.value })} placeholder="Block title…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: block.status === "done" ? "var(--faint)" : "var(--ink)", textDecoration: block.status === "done" ? "line-through" : "none", width: "100%", minHeight: isMobile ? 44 : undefined }} />
                     ) : (
-                      <span style={{ fontSize: 14, color: "var(--ink)" }}>{block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>—</span>}</span>
+                      <span style={{ fontSize: 14, color: block.status === "done" ? "var(--faint)" : "var(--ink)", textDecoration: block.status === "done" ? "line-through" : "none" }}>{block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>—</span>}</span>
                     )}
                     {canEdit ? (
                       <select value={block.owner_id ?? ""} onChange={e => updateBlock(block.id, { owner_id: e.target.value || null })} style={ctrlSelect}>
@@ -9567,7 +9595,11 @@ function RunSheetTab({
                       <span style={{ fontSize: 12, color: "var(--body)" }}>{members.find(m => m.id === block.owner_id)?.name ?? "—"}</span>
                     )}
                     {canEdit ? (
-                      <IconButton dim={24} onClick={() => deleteBlock(block.id)} title="Remove block"><X className="w-3.5 h-3.5" /></IconButton>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
+                        <button onClick={() => runLate(block, 10)} title="Running 10 min late — push this and later blocks"
+                          style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.03em", color: "var(--body)", background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "3px 9px", cursor: "pointer", whiteSpace: "nowrap" }}>+10m</button>
+                        <IconButton dim={24} onClick={() => deleteBlock(block.id)} title="Remove block"><X className="w-3.5 h-3.5" /></IconButton>
+                      </div>
                     ) : <span />}
                   </div>
                   {canEdit ? (
