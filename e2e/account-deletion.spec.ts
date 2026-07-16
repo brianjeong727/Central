@@ -34,10 +34,13 @@ test.beforeAll(async () => {
   if (error || !created?.user) throw new Error(`[account-deletion] createUser failed: ${error?.message}`)
   userId = created.user.id
 
-  // 2. Attach them to the sandbox ministry so /login lands on /home.
+  // 2. Attach them to the sandbox ministry so /login lands on /home. gender +
+  //    graduation_year are also required — the OAuth onboarding gate
+  //    (proxy.ts) redirects any member-tier profile missing either to
+  //    /complete-profile, which would break loginAsThrowaway's /home wait.
   const { error: upErr } = await box.client
     .from("profiles")
-    .update({ ministry_id: box.ministryId, role: "member", name: THROWAWAY_NAME })
+    .update({ ministry_id: box.ministryId, role: "member", name: THROWAWAY_NAME, gender: "female", graduation_year: new Date().getFullYear() + 2 })
     .eq("id", userId)
   if (upErr) throw new Error(`[account-deletion] profile attach failed: ${upErr.message}`)
 

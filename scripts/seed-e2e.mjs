@@ -77,7 +77,14 @@ if (!ministry) {
 for (const u of USERS) {
   const { error } = await db
     .from("profiles")
-    .update({ ministry_id: ministry.id, role: u.role, name: u.name, needs_grad_check: false })
+    // gender + graduation_year are REQUIRED for member-tier accounts: the OAuth
+    // onboarding gate (proxy.ts) redirects any member/visitor profile missing
+    // either to /complete-profile, which would break auth.setup + every
+    // memberState spec. Seed them complete so a fresh re-seed stays green.
+    .update({
+      ministry_id: ministry.id, role: u.role, name: u.name, needs_grad_check: false,
+      gender: "female", graduation_year: new Date().getFullYear() + 2,
+    })
     .eq("id", ids[u.email])
   if (error) throw error
 }
