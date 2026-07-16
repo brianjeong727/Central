@@ -262,6 +262,22 @@ assign task → count bumps.
 
 ## Review log
 
+### Phase 2 — IN PROGRESS (2026-07-16, branch feat/run-sheet-p2, off main w/ Phase 1 merged)
+- Schema APPLIED via MCP: event_templates / template_tasks / template_roles + event_plans.template_id
+  + event_tasks.brief. rls-reviewer BEFORE: no blocks; W1 (event_templates_update WITH CHECK) folded in.
+- Sandbox fixture SEEDED (Brian's Sandbox 6c68111b…): "Student Org Board" team (standard; Brian=president,
+  Alex/Grace=can-plan officers, Daniel/Emily=members) + "Spring Retreat 2026" (COMPLETE, 2026-05-16;
+  8 tasks w/ due+completed_at, 4 roles, 2 retreat transition_notes) = the compile source. "Fall Retreat"
+  (2026-08-05) = run-it-back target.
+- Explorer recon → findings.md (AddEventModal hook, EVENT_TYPE_CONFIGS, Notes-tab retire checklist,
+  compile-button placement, team classification: standard + /board|student org|leadership|officer/i).
+- Engineer building (spec.md): types, event-templates.ts (compile/instantiate, PT offset math), 
+  event-compile.tsx modal, plan-tab wiring + Notes-tab retirement + task brief line.
+- Sandbox mandate recorded in memory [[project_personal_sandbox]] — seed/play/leave-fixtures + per-phase
+  "how to test yourself". Phase 1 PR #189 MERGED to main; migration 04 (cron) still pending prod deploy.
+- REMAINING: drive compile→instantiate in sandbox, tester + enforcer, handoff w/ how-to-test guide.
+
+
 ### Phase 1 — in progress (2026-07-15, branch feat/run-sheet-p1)
 - Migrations 01-03 APPLIED via MCP (notification_ledger, event_confirmations + cleanup trigger,
   run_sheet_tick fn). Migration 04 (cron schedule) HELD until end-to-end verified.
