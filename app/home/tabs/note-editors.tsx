@@ -54,9 +54,9 @@ export function RoleDescriptionEditor({
 
   return (
     <div className="role-description-editor">
-      <TiptapToolbar editor={editor} />
+      <TiptapToolbar editor={editor} flush />
       {children}
-      <div style={{ padding: "14px 16px", minHeight: minHeight ? minHeight + 28 : undefined }}>
+      <div style={{ padding: "14px 0", minHeight: minHeight ? minHeight + 28 : undefined }}>
         <EditorContent editor={editor} />
       </div>
     </div>
@@ -70,7 +70,7 @@ const NOTE_COLORS = [
   "#EC4899", "var(--plum)",
 ]
 
-export function TiptapToolbar({ editor }: { editor: Editor | null }) {
+export function TiptapToolbar({ editor, flush = false }: { editor: Editor | null; flush?: boolean }) {
   const [showColors, setShowColors] = useState(false)
   const colorRef = useRef<HTMLDivElement>(null)
 
@@ -111,7 +111,7 @@ export function TiptapToolbar({ editor }: { editor: Editor | null }) {
   const currentColor = (editor.getAttributes("textStyle") as { color?: string }).color
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 1, padding: "5px 8px", borderBottom: "1px solid var(--line)", flexWrap: "wrap", background: "var(--cream)" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 1, padding: flush ? "5px 0" : "5px 8px", borderBottom: "1px solid var(--line)", flexWrap: "wrap", background: "var(--cream)" }}>
       {btn(editor.isActive("bold"),      () => editor.chain().focus().toggleBold().run(),   "Bold",          <Bold size={12} />)}
       {btn(editor.isActive("italic"),    () => editor.chain().focus().toggleItalic().run(), "Italic",        <Italic size={12} />)}
       {btn(editor.isActive("underline"), () => editor.chain().focus().toggleUnderline().run(), "Underline",  <UnderlineIcon size={12} />)}
