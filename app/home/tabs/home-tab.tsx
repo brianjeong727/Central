@@ -24,6 +24,7 @@ const HomeSlideManager = dynamic(
 )
 import type { HomeTabProps, Announcement, RsvpAttendee } from "../types"
 import { isAdminRole, isLeaderRole } from "@/lib/roles"
+import { HomeDeadlines } from "./home-deadlines"
 
 export { HomeTabProps }
 
@@ -1007,6 +1008,9 @@ export function HomeTab({
           style={{ marginTop: "var(--space-8)" }}
         />
 
+        {/* ── My Deadlines — desktop (own SWR key; between chats and For You) ── */}
+        <HomeDeadlines ministryId={ministryId} profileId={profile.id} variant="desktop" />
+
         {/* ── For You section — desktop ── */}
         {forYouItems.length > 0 && (
           <div style={{ marginTop: 36 }}>
@@ -1194,6 +1198,9 @@ export function HomeTab({
               </CentralCard>
             )}
           </section>
+
+          {/* ── My Deadlines — mobile (between Up Next and Announcements) ── */}
+          <HomeDeadlines ministryId={ministryId} profileId={profile.id} variant="mobile" onSeeAll={() => onGoToTab?.("plan")} />
 
           {/* ── Announcements preview — mobile (latest 2) ── */}
           {recentAnns.length > 0 && (

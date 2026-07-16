@@ -334,6 +334,45 @@ function eventTime(iso: string | null | undefined): string {
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: DEFAULT_EVENT_TZ })
 }
 
+// Today's / tomorrow's calendar date in PT as 'YYYY-MM-DD' (matches event_tasks.due_date,
+// a plain DATE). en-CA formats as ISO date; tomorrow is computed from a UTC-anchored copy of
+// today so it's DST-safe (we only ever add one calendar day to a date-only string).
+function ptDate(offsetDays = 0): string {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: DEFAULT_EVENT_TZ })
+  if (offsetDays === 0) return today
+  const d = new Date(`${today}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + offsetDays)
+  return d.toISOString().slice(0, 10)
+}
+
+// event_plan → { team (for deep-link), event title, plan creator, ministry } via calendar_events.
+// Sequential single-table reads to match the resolver style above.
+type PlanContext = { teamId: string | null; eventTitle: string; createdBy: string | null; ministryId: string | null }
+async function planContext(admin: AdminClient, eventPlanId: string): Promise<PlanContext> {
+  const { data: ep } = await admin
+    .from("event_plans")
+    .select("id, ministry_id, created_by, calendar_event_id")
+    .eq("id", eventPlanId)
+    .single()
+  if (!ep) return { teamId: null, eventTitle: "", createdBy: null, ministryId: null }
+  let teamId: string | null = null
+  let eventTitle = ""
+  if (ep.calendar_event_id) {
+    const { data: ce } = await admin
+      .from("calendar_events")
+      .select("title, team_id")
+      .eq("id", ep.calendar_event_id)
+      .single()
+    teamId = ce?.team_id ?? null
+    eventTitle = ce?.title ?? ""
+  }
+  return { teamId, eventTitle, createdBy: ep.created_by ?? null, ministryId: ep.ministry_id ?? null }
+}
+
+function planUrl(teamId: string | null): string {
+  return teamId ? `/home?tab=plan&team=${teamId}` : "/home?tab=plan"
+}
+
 // ── v2: Receipt decision -> submitter (Tier 1, `activity`) ────────────────────
 async function resolveReceiptDecision(admin: AdminClient, recordId: string): Promise<Resolved[]> {
   const { data: r } = await admin
@@ -489,6 +528,138 @@ async function resolveEventRoleAssigned(admin: AdminClient, recordId: string): P
       tag: `event-role-${r.id}`,
     },
   }]
+}
+
+// ── Run Sheet: Task due nudge -> assignee (Tier 1, NEW `deadlines` pref) ──────
+// Cron-driven (run_sheet_tick, offsets due_tomorrow/due_today). Two nudges max, no re-nag.
+async function resolveTaskDue(admin: AdminClient, recordId: string): Promise<Resolved[]> {
+  const { data: t } = await admin
+    .from("event_tasks")
+    .select("id, title, assigned_to, completed, due_date, event_plan_id")
+    .eq("id", recordId)
+    .single()
+  if (!t || t.completed === true || !t.assigned_to) return []
+
+  const settings = await settingsFor(admin, t.assigned_to)
+  if (settings.deadlines === false) return []
+
+  // Wording keys off due_date (a DATE) vs today/tomorrow in PT.
+  const title = t.title || "a task"
+  let body: string
+  if (t.due_date === ptDate(0)) body = `Due today: ${title}`
+  else if (t.due_date === ptDate(1)) body = `Due tomorrow: ${title}`
+  else body = `Task due soon: ${title}`
+
+  const { teamId } = await planContext(admin, t.event_plan_id)
+  return [{
+    userId: t.assigned_to,
+    reason: "task_due",
+    payload: {
+      title: "Task reminder",
+      body: preview(body),
+      url: planUrl(teamId),
+      tag: `task-due-${t.id}`,
+    },
+  }]
+}
+
+// ── Run Sheet: Confirmation request -> the assigned role-holder (Tier 1, `deadlines`) ──
+// Cron/action-driven. Skips if the row is no longer 'requested' (a race: already responded).
+async function resolveConfirmRequest(admin: AdminClient, recordId: string): Promise<Resolved[]> {
+  const { data: c } = await admin
+    .from("event_confirmations")
+    .select("id, user_id, status, subject_type, subject_id, event_plan_id")
+    .eq("id", recordId)
+    .single()
+  if (!c || c.status !== "requested" || !c.user_id) return []
+
+  const settings = await settingsFor(admin, c.user_id)
+  if (settings.deadlines === false) return []
+
+  let roleName = "your role"
+  if (c.subject_type === "role") {
+    const { data: role } = await admin
+      .from("event_roles")
+      .select("role_name")
+      .eq("id", c.subject_id)
+      .single()
+    if (!role) return [] // role deleted out from under the confirmation → no misleading ping
+    roleName = role.role_name || roleName
+  }
+
+  const { teamId, eventTitle } = await planContext(admin, c.event_plan_id)
+  const evTitle = eventTitle || "your event"
+  return [{
+    userId: c.user_id,
+    reason: "confirm_request",
+    payload: {
+      title: "Please confirm",
+      body: preview(`${evTitle}: confirm you're set for ${roleName}`),
+      url: planUrl(teamId),
+      tag: `confirm-${c.id}`,
+    },
+  }]
+}
+
+// ── Run Sheet: Confirmation escalation -> the event creator (Tier 1, `activity`) ──
+// Cron-driven (24h silence). Recipient = event_plan.created_by; falls back to ministry
+// admin-tier if the creator is gone / no longer in the ministry.
+async function resolveConfirmEscalation(admin: AdminClient, recordId: string): Promise<Resolved[]> {
+  const { data: c } = await admin
+    .from("event_confirmations")
+    .select("id, user_id, status, subject_type, subject_id, event_plan_id, ministry_id")
+    .eq("id", recordId)
+    .single()
+  if (!c || c.status !== "escalated") return []
+
+  const { teamId, eventTitle, createdBy, ministryId } = await planContext(admin, c.event_plan_id)
+  const planMinistry = ministryId ?? c.ministry_id
+
+  // Recipient resolution: creator if still a member of the plan's ministry, else admin-tier fallback.
+  let recipientIds: string[] = []
+  if (createdBy) {
+    const { data: creator } = await admin
+      .from("profiles")
+      .select("id, ministry_id")
+      .eq("id", createdBy)
+      .maybeSingle()
+    if (creator && creator.ministry_id === planMinistry) recipientIds = [createdBy]
+  }
+  if (recipientIds.length === 0 && planMinistry) {
+    recipientIds = await adminTierIds(admin, planMinistry)
+  }
+  if (recipientIds.length === 0) return []
+
+  // The silent user's name + the role they went quiet on.
+  let userName = "Someone"
+  if (c.user_id) {
+    const { data: prof } = await admin.from("profiles").select("name").eq("id", c.user_id).single()
+    userName = prof?.name ?? "Someone"
+  }
+  let roleName = "their role"
+  if (c.subject_type === "role") {
+    const { data: role } = await admin.from("event_roles").select("role_name").eq("id", c.subject_id).single()
+    roleName = role?.role_name || roleName
+  }
+  const evTitle = eventTitle || "an event"
+
+  const results: Resolved[] = []
+  for (const uid of recipientIds) {
+    if (uid === c.user_id) continue // don't escalate a person to themselves
+    const settings = await settingsFor(admin, uid)
+    if (settings.activity === false) continue
+    results.push({
+      userId: uid,
+      reason: "confirm_escalation",
+      payload: {
+        title: "Confirmation needed",
+        body: preview(`${userName} hasn't confirmed ${roleName} for ${evTitle}`),
+        url: planUrl(teamId),
+        tag: `confirm-esc-${c.id}`,
+      },
+    })
+  }
+  return results
 }
 
 // ── v2: DGL week assignment -> assignee (Tier 1, `activity`) ──────────────────
@@ -771,7 +942,10 @@ export async function POST(req: NextRequest) {
     else if (table === "receipts" && event === "receipt_submitted") resolved = await resolveReceiptSubmitted(admin, recordId)
     else if (table === "profiles" && event === "role_change") resolved = await resolveRoleChange(admin, recordId)
     else if (table === "profiles" && event === "member_joined") resolved = await resolveMemberJoined(admin, recordId)
+    else if (table === "event_tasks" && event === "task_due") resolved = await resolveTaskDue(admin, recordId)
     else if (table === "event_tasks") resolved = await resolveTaskAssigned(admin, recordId)
+    else if (table === "event_confirmations" && event === "confirm_request") resolved = await resolveConfirmRequest(admin, recordId)
+    else if (table === "event_confirmations" && event === "confirm_escalation") resolved = await resolveConfirmEscalation(admin, recordId)
     else if (table === "event_roles") resolved = await resolveEventRoleAssigned(admin, recordId)
     else if (table === "dgl_assignments") resolved = await resolveDglAssigned(admin, recordId)
     else if (table === "congregation_questions") resolved = await resolvePulseQuestion(admin, recordId)

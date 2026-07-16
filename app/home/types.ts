@@ -49,6 +49,9 @@ export interface NotificationSettings {
    *  decisions, role changes, pulse questions. One toggle for these rare, weighty,
    *  personal events. Default on. */
   activity?: boolean
+  /** Tier 1 — Run Sheet deadline nudges: task-due reminders + tap-to-confirm requests.
+   *  Confirmation ESCALATIONS (to the leader) ride `activity`, not this key. Default on. */
+  deadlines?: boolean
   /** Tier 2 — group-chat firehose control. Default 'smart' (all <30 members, mentions-only ≥30). */
   group_mode?: GroupNotifyMode
   /** Tier 3 — desk-work push on web. Default on. */
@@ -594,6 +597,25 @@ export interface EventRole {
   assigned_to: string | null
   assigned_name?: string
   notes: string | null
+}
+
+export interface EventConfirmation {
+  id: string
+  ministry_id: string
+  event_plan_id: string
+  subject_type: 'role' | 'block'
+  subject_id: string
+  user_id: string
+  status: 'requested' | 'confirmed' | 'declined' | 'escalated'
+  round: number
+  requested_at: string
+  responded_at: string | null
+  note: string | null
+  created_at: string
+  /** Joined display fields (populated by the resolver/rollup query, not columns). */
+  assigned_name?: string
+  role_name?: string
+  event_title?: string
 }
 
 export interface EventNote {
