@@ -249,12 +249,15 @@ test.describe("mobile Pocket sweep — directory via chats (e)", () => {
     const back = page.getByRole("button", { name: "Back to Directory" }).filter({ visible: true }).first()
     await back.click()
 
-    // Own profile (E2E Member, member session) has no shared details -> the
-    // quiet EmptyState block, and no Send Message (own profile).
+    // Own profile (E2E Member, member session) — no Send Message (own profile).
+    // The member fixture always carries a graduation_year (required by the OAuth
+    // onboarding gate: every member-tier account must have gender + graduation_year
+    // to reach protected pages at all), so the Contact section renders instead of
+    // the full "No details shared yet" EmptyState.
     const selfRow = vis(page, "E2E Member").first()
     await expect(selfRow).toBeVisible({ timeout: 10000 })
     await selfRow.click()
-    await expect(vis(page, "No details shared yet").first()).toBeVisible({ timeout: 10000 })
+    await expect(vis(page, "Graduation year").first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText("Send Message", { exact: true }).filter({ visible: true })).toHaveCount(0)
     assertNoErrors(errors)
   })

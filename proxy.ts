@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { isMemberTier } from '@/lib/roles'
 
 const ADMIN_EMAIL = 'brianjeong13@gmail.com'
 
@@ -121,7 +122,7 @@ export async function proxy(request: NextRequest) {
   // Look up ministry_id + role (role gates /onboarding below)
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('ministry_id, role')
+    .select('ministry_id, role, gender, graduation_year')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -146,6 +147,44 @@ export async function proxy(request: NextRequest) {
     const redirect = NextResponse.redirect(new URL('/login?error=no-account', request.url))
     supabaseResponse.cookies.getAll().forEach((c) => redirect.cookies.set(c))
     return redirect
+  }
+
+  // /complete-profile must stay reachable for any authed user with a profile,
+  // regardless of ministry state — else the no-ministry/status branches below
+  // redirect it away and the completeness gate loops forever.
+  if (pathname.startsWith('/complete-profile')) return supabaseResponse
+
+  // Profile-completeness gate — member/visitor-tier users must have gender +
+  // graduation_year. Email's member signup form collects both (persisted via the
+  // handle_new_user metadata trigger); OAuth (web) and native signInWithIdToken
+  // collect neither and never pass through /auth/callback, so proxy is the only
+  // durable chokepoint. Admin-tier is exempt (email admin signup never asked either).
+  // /complete-profile is exempt (or it loops); /onboarding + /register-ministry are
+  // exempt so a fresh registrant (role='member' until the wizard self-promotes) is
+  // not diverted out of the registration flow.
+  const gateExempt =
+    pathname.startsWith('/complete-profile') ||
+    pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/register-ministry') ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/signup') ||
+    pathname.startsWith('/forgot-password') ||
+    pathname.startsWith('/update-password') ||
+    pathname.startsWith('/auth/') ||
+    pathname === '/' ||
+    pathname.startsWith('/landing') ||
+    pathname.startsWith('/privacy') ||
+    pathname.startsWith('/terms') ||
+    pathname.startsWith('/support')
+
+  const profileIncomplete = !profile?.gender || profile?.graduation_year == null
+  if (isMemberTier(profile?.role) && profileIncomplete && !gateExempt) {
+    const nextPath = pathname + (request.nextUrl.search || '')
+    const url = new URL('/complete-profile', request.url)
+    if (nextPath && nextPath !== '/complete-profile') url.searchParams.set('next', nextPath)
+    const gateRedirect = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach((c) => gateRedirect.cookies.set(c))
+    return gateRedirect
   }
 
   // No ministry yet — allow onboarding/public paths; everything else goes to
