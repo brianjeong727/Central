@@ -35,6 +35,8 @@ import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamCh
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
+import { instantiateTemplateAction } from "@/app/actions/event-templates"
+import { EventCompileModal } from "./event-compile"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketChip } from "../components/pocket-header"
 import { getInitials, formatRelativeTime } from "../utils"
@@ -53,7 +55,7 @@ import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventConfirmation,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
   WorshipWeek, WorshipRoleRow, PraiseTeamMember, WorshipSong, WorshipInvite, WorshipChart, AnnotationObj, Category,
-  EventType, EventExtraTab, TransitionNote,
+  EventType, EventExtraTab,
 } from "../types"
 import { requestConfirmationsAction, reRequestConfirmationAction } from "@/app/actions/event-confirmations"
 import { teamAccessLevel, type TeamAccess } from "../governance"
@@ -6455,6 +6457,10 @@ export function AddEventModal({
   const [error, setError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Run Sheet P2 — "Run it back": if a compiled playbook exists for this (team, type),
+  // offer to instantiate from it instead of the static EVENT_TYPE_CONFIGS seed.
+  const [template, setTemplate] = useState<{ id: string; name: string } | null>(null)
+  const [useTemplate, setUseTemplate] = useState(true)
 
   // Refs to the required inputs so a failed submit scrolls to + focuses the
   // offending field. The validation error renders at the bottom of the body,
@@ -6487,6 +6493,23 @@ export function AddEventModal({
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Run Sheet P2 — look up a matching playbook for NEW events (re-runs on type change).
+  useEffect(() => {
+    if (isEditing) { setTemplate(null); return }
+    let cancelled = false
+    ;(async () => {
+      let q = supabase.from("event_templates").select("id, name")
+        .eq("ministry_id", ministryId).eq("event_type", eventType)
+      q = teamId ? q.eq("team_id", teamId) : q.is("team_id", null)
+      const { data } = await q.maybeSingle()
+      if (cancelled) return
+      setTemplate(data ? { id: data.id as string, name: data.name as string } : null)
+      setUseTemplate(true)
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventType, teamId, ministryId, isEditing])
 
   async function handleDelete() {
     if (!existing) return
@@ -6614,22 +6637,26 @@ export function AddEventModal({
 
         if (planData) {
           const planId = (planData as { id: string }).id
-          const typeCfg = EVENT_TYPE_CONFIGS[eventType]
 
-          if (typeCfg.defaultRoles.length > 0) {
-            await supabase.from("event_roles").insert(
-              typeCfg.defaultRoles.map(r => ({ event_plan_id: planId, role_name: r.name, notes: r.notes || null, created_by: userId }))
-            )
-          }
-
-          const taskRows: { event_plan_id: string; title: string; phase: string; sort_order: number; completed: boolean; created_by: string }[] = []
-          let sortIdx = 0
-          for (const phase of typeCfg.defaultPhases) {
-            for (const taskTitle of phase.tasks) {
-              taskRows.push({ event_plan_id: planId, title: taskTitle, phase: phase.key, sort_order: sortIdx++, completed: false, created_by: userId })
+          if (useTemplate && template) {
+            // Run Sheet P2 — "Run it back": seed from the compiled playbook (offsets → dates).
+            await instantiateTemplateAction(template.id, evData.id)
+          } else {
+            const typeCfg = EVENT_TYPE_CONFIGS[eventType]
+            if (typeCfg.defaultRoles.length > 0) {
+              await supabase.from("event_roles").insert(
+                typeCfg.defaultRoles.map(r => ({ event_plan_id: planId, role_name: r.name, notes: r.notes || null, created_by: userId }))
+              )
             }
+            const taskRows: { event_plan_id: string; title: string; phase: string; sort_order: number; completed: boolean; created_by: string }[] = []
+            let sortIdx = 0
+            for (const phase of typeCfg.defaultPhases) {
+              for (const taskTitle of phase.tasks) {
+                taskRows.push({ event_plan_id: planId, title: taskTitle, phase: phase.key, sort_order: sortIdx++, completed: false, created_by: userId })
+              }
+            }
+            if (taskRows.length > 0) await supabase.from("event_tasks").insert(taskRows)
           }
-          if (taskRows.length > 0) await supabase.from("event_tasks").insert(taskRows)
         }
       }
 
@@ -6688,8 +6715,32 @@ export function AddEventModal({
                   )
                 })}
               </div>
-              {/* Pre-seed preview */}
-              {(cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
+              {/* Run Sheet P2 — "Run it back" vs "Start fresh" when a playbook exists for this type */}
+              {template ? (
+                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <button type="button" onClick={() => setUseTemplate(true)}
+                      style={{ padding: "11px 13px", borderRadius: 10, textAlign: "left", cursor: "pointer",
+                        border: useTemplate ? "2px solid var(--plum)" : "2px solid var(--line)",
+                        background: useTemplate ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--cream-panel)" }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: useTemplate ? "var(--plum)" : "var(--ink)" }}>Run it back</div>
+                      <div style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>{template.name}</div>
+                    </button>
+                    <button type="button" onClick={() => setUseTemplate(false)}
+                      style={{ padding: "11px 13px", borderRadius: 10, textAlign: "left", cursor: "pointer",
+                        border: !useTemplate ? "2px solid var(--plum)" : "2px solid var(--line)",
+                        background: !useTemplate ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--cream-panel)" }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: !useTemplate ? "var(--plum)" : "var(--ink)" }}>Start fresh</div>
+                      <div style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>The standard {cfg.label} checklist</div>
+                    </button>
+                  </div>
+                  <div style={{ padding: "10px 13px", background: "var(--ivory)", borderRadius: 10, fontSize: 12, color: "var(--body)", lineHeight: 1.5 }}>
+                    {useTemplate
+                      ? <><span style={{ fontWeight: 500, color: "var(--plum)" }}>Playbook: </span>recreates last time&apos;s tasks &amp; roles, with due dates recomputed from the saved offsets.</>
+                      : <><span style={{ fontWeight: 500, color: "var(--plum)" }}>Pre-seeded: </span>{cfg.defaultRoles.map(r => r.name).join(", ")}{cfg.defaultRoles.length > 0 && cfg.defaultPhases.length > 0 && " · "}{cfg.defaultPhases.reduce((n, p) => n + p.tasks.length, 0)} checklist tasks</>}
+                  </div>
+                </div>
+              ) : (cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
                 <div style={{ marginTop: 12, padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 12, color: "var(--body)" }}>
                   <span style={{ fontWeight: 500, color: "var(--plum)" }}>Pre-seeded: </span>
                   {cfg.defaultRoles.map(r => r.name).join(", ")}
@@ -7174,8 +7225,8 @@ export function EventPlanWorkspace({
   const typeCfg = EVENT_TYPE_CONFIGS[calendarEvent.event_type] ?? EVENT_TYPE_CONFIGS.social
   const extraTabs = typeCfg.extraTabs
 
-  type ActiveSection = 'overview' | 'checklist' | 'roles' | 'notes' | EventExtraTab
-  const coreTabs: ActiveSection[] = ['overview', 'checklist', 'roles', 'notes']
+  type ActiveSection = 'overview' | 'checklist' | 'roles' | EventExtraTab
+  const coreTabs: ActiveSection[] = ['overview', 'checklist', 'roles']
   const allValidTabs: ActiveSection[] = [...coreTabs, ...extraTabs]
 
   // Core data state
@@ -7208,6 +7259,7 @@ export function EventPlanWorkspace({
       parent_id: (t.parent_id as string | null) ?? null,
       pinned: (t.pinned as boolean) ?? false,
       priority: (t.priority as EventTask["priority"]) ?? "none",
+      brief: (t.brief as string | null) ?? null,
     }
   }
 
@@ -7215,6 +7267,7 @@ export function EventPlanWorkspace({
   const [planningGroupId, setPlanningGroupId] = useState<string | null>(null)
   const [creatingPlanChat, setCreatingPlanChat] = useState(false)
   const [planChatError, setPlanChatError] = useState<string | null>(null)
+  const [compileOpen, setCompileOpen] = useState(false)  // Run Sheet P2 — compile-playbook modal
   const [loading, setLoading] = useState(true)
   const [rsvpCount, setRsvpCount] = useState<number | null>(null)
   const [ministryBudget, setMinistryBudget] = useState<{ total: number; byFund: Record<string, number> } | null>(null)
@@ -7341,47 +7394,8 @@ export function EventPlanWorkspace({
     if (!("error" in res)) await reloadConfirmations(plan.id)
   }
 
-  // Transition Notes (cross-year institutional memory of pain points)
-  const CURRENT_CLASS_YEAR = currentFiscalYear()
-  const [transitionNotes, setTransitionNotes] = useState<TransitionNote[]>([])
-  const [ppCategoryFilter, setPpCategoryFilter] = useState<string>("All")
-  const [ppModalOpen, setPpModalOpen] = useState(false)
-  const [ppTitle, setPpTitle] = useState("")
-  const [ppCategory, setPpCategory] = useState("Venue")
-  const [ppWatch, setPpWatch] = useState("")
-  const [ppSolved, setPpSolved] = useState("")
-  const [addingPp, setAddingPp] = useState(false)
-
-  const PP_CATEGORIES = ["Venue", "Food", "Budget", "Promo", "People", "Logistics"] as const
-  const PP_FILTERS = ["All", ...PP_CATEGORIES] as const
-
-  // Group transition notes by class_year: current year first (always present,
-  // even when empty), then past years descending. Cards are pre-filtered by the
-  // active category chip, so counts + emptiness reflect the current filter.
-  const transitionGroups = useMemo(() => {
-    const filtered = ppCategoryFilter === "All"
-      ? transitionNotes
-      : transitionNotes.filter(n => (n.category ?? "") === ppCategoryFilter)
-    const map = new Map<string, TransitionNote[]>()
-    for (const n of filtered) {
-      const arr = map.get(n.class_year) ?? []
-      arr.push(n)
-      map.set(n.class_year, arr)
-    }
-    map.set(CURRENT_CLASS_YEAR, map.get(CURRENT_CLASS_YEAR) ?? [])
-    const years = [...map.keys()].sort((a, b) =>
-      a === CURRENT_CLASS_YEAR ? -1 : b === CURRENT_CLASS_YEAR ? 1 : b.localeCompare(a)
-    )
-    return years.map(y => ({ year: y, notes: map.get(y) ?? [] }))
-  }, [transitionNotes, ppCategoryFilter, CURRENT_CLASS_YEAR])
-
-  // Escape closes the "Log a pain point" modal.
-  useEffect(() => {
-    if (!ppModalOpen) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPpModalOpen(false) }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [ppModalOpen])
+  // Transition Notes UI retired (Run Sheet P2) — the transition_notes table remains as a
+  // dark archive; its content now surfaces as brief candidates in the compile-playbook modal.
 
   const startDate = new Date(calendarEvent.start_date)
   const endDate = new Date(calendarEvent.end_date)
@@ -7466,19 +7480,6 @@ export function EventPlanWorkspace({
       const confMap: Record<string, EventConfirmation> = {}
       for (const c of (confData ?? []) as EventConfirmation[]) confMap[c.subject_id] = c
       setConfirmations(confMap)
-
-      // Fetch Transition Notes — cross-year pain points keyed on team_id +
-      // event_type so a recurring event's record accumulates across class years.
-      let transitionQuery = supabase
-        .from("transition_notes")
-        .select("*")
-        .eq("ministry_id", ministryId)
-        .eq("event_type", calendarEvent.event_type)
-      transitionQuery = teamId
-        ? transitionQuery.eq("team_id", teamId)
-        : transitionQuery.is("team_id", null)
-      const { data: transitionData } = await transitionQuery.order("created_at", { ascending: false })
-      setTransitionNotes((transitionData ?? []) as TransitionNote[])
 
       // Assignee list = the entire ministry (student org) member list — the team
       // roster is often unpopulated, and tasks should be assignable to anyone in
@@ -7804,39 +7805,6 @@ export function EventPlanWorkspace({
     onOpenChat?.(result.groupId, `${calendarEvent.title} Planning`)
   }
 
-  async function handleAddPainPoint() {
-    if (!canEdit || !ppTitle.trim()) return
-    setAddingPp(true)
-    const authorName = members.find(m => m.id === userId)?.name ?? null
-    const { data } = await supabase
-      .from("transition_notes")
-      .insert({
-        ministry_id: ministryId,
-        team_id: teamId ?? null,
-        event_type: calendarEvent.event_type,
-        class_year: CURRENT_CLASS_YEAR,
-        title: ppTitle.trim(),
-        category: ppCategory || null,
-        watch_text: ppWatch.trim() || null,
-        solved_text: ppSolved.trim() || null,
-        created_by: userId,
-        created_by_name: authorName,
-      })
-      .eq("ministry_id", ministryId)
-      .select("*")
-      .single()
-    if (data) {
-      setTransitionNotes(prev => [data as TransitionNote, ...prev])
-    }
-    setPpTitle("")
-    setPpCategory("Venue")
-    setPpWatch("")
-    setPpSolved("")
-    setPpCategoryFilter("All")
-    setPpModalOpen(false)
-    setAddingPp(false)
-  }
-
   const incompleteTasks = tasks.filter((t) => !t.completed)
 
   const EXTRA_TAB_LABELS: Record<EventExtraTab, string> = {
@@ -7858,7 +7826,6 @@ export function EventPlanWorkspace({
     { key: 'overview', label: 'Overview' },
     { key: 'checklist', label: 'Checklist' },
     { key: 'roles', label: 'Roles & Leads' },
-    { key: 'notes', label: 'Notes' },
     ...extraTabs.map(t => ({ key: t as ActiveSection, label: EXTRA_TAB_LABELS[t] })),
   ]
 
@@ -8030,8 +7997,13 @@ export function EventPlanWorkspace({
         >
           {task.completed && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
         </button>
-        {/* title */}
-        <span style={{ flex: 1, minWidth: 0, fontSize: isChild ? 14.5 : 15.5, color: task.completed ? "var(--faint)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
+        {/* title + optional playbook brief (Run Sheet P2) */}
+        <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontSize: isChild ? 14.5 : 15.5, color: task.completed ? "var(--faint)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
+          {task.brief && (
+            <span style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{task.brief}</span>
+          )}
+        </span>
         {/* subcount */}
         {!isChild && hasKids && (
           <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap", flexShrink: 0 }}>✓ {doneKids}/{kids.length}</span>
@@ -8473,6 +8445,17 @@ export function EventPlanWorkspace({
                       </div>
                     )}
                   </CentralCard>
+
+                  {/* Run Sheet P2 — Compile playbook (leader-only, once the event has passed) */}
+                  {canEdit && plan && new Date(calendarEvent.start_date).getTime() < Date.now() && (
+                    <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22} style={isMobile ? { border: "none" } : undefined}>
+                      <p style={monoLabel}>Playbook</p>
+                      <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5, margin: "10px 0 14px" }}>
+                        Save this event&apos;s tasks, roles, and timing as a reusable playbook — next year&apos;s team can &ldquo;Run it back.&rdquo;
+                      </p>
+                      <CentralButton variant="secondary" size="sm" onClick={() => setCompileOpen(true)}>Compile playbook</CentralButton>
+                    </CentralCard>
+                  )}
                 </aside>
               </div>
               )
@@ -8838,216 +8821,6 @@ export function EventPlanWorkspace({
               )
             })()}
 
-            {/* ── Transition Notes (cross-year institutional memory) ── */}
-            {shownSection === 'notes' && (
-              <section>
-                {/* Header row */}
-                <EventSectionHeader
-                  title="Transition Notes"
-                  action={canEdit ? (
-                    <button
-                      onClick={() => setPpModalOpen(true)}
-                      style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "var(--plum)", color: "var(--cream-on-dark)", border: "none", borderRadius: 9999, padding: "9px 16px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-inter)" }}
-                    >
-                      <Plus className="w-4 h-4" /> Log a pain point
-                    </button>
-                  ) : undefined}
-                />
-
-                {/* Category filter chips */}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 22 }}>
-                  {PP_FILTERS.map(cat => {
-                    const active = ppCategoryFilter === cat
-                    return (
-                      <FilterChip
-                        key={cat}
-                        selected={active}
-                        onClick={() => setPpCategoryFilter(cat)}
-                        tone="plum"
-                        style={{ fontWeight: 500 }}
-                      >
-                        {cat}
-                      </FilterChip>
-                    )
-                  })}
-                </div>
-
-                {/* Year groups */}
-                <div style={{ marginTop: 30, display: "flex", flexDirection: "column", gap: 36 }}>
-                  {ppCategoryFilter !== "All" && transitionGroups.every(g => g.notes.length === 0) ? (
-                    <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--faint)" }}>
-                      Nothing tagged &ldquo;{ppCategoryFilter}&rdquo; yet.
-                    </p>
-                  ) : transitionGroups.map(({ year, notes: yearNotes }) => {
-                    const isCurrent = year === CURRENT_CLASS_YEAR
-                    const showEmpty = isCurrent && ppCategoryFilter === "All" && yearNotes.length === 0
-                    // Hide non-current empty groups, and current empty groups under a category filter.
-                    if (yearNotes.length === 0 && !showEmpty) return null
-                    return (
-                      <div key={year}>
-                        {/* Year header */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, fontWeight: 400, color: "var(--ink)", letterSpacing: -0.2, whiteSpace: "nowrap" }}>
-                            {year.replace("-", "–")}
-                          </span>
-                          {isCurrent && (
-                            <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", background: "var(--plum)", color: "var(--cream-on-dark)", padding: "3px 9px", borderRadius: 9999, whiteSpace: "nowrap" }}>
-                              Current
-                            </span>
-                          )}
-                          <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-                            {yearNotes.length} {yearNotes.length === 1 ? "note" : "notes"}
-                          </span>
-                          <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-                        </div>
-
-                        {showEmpty ? (
-                          <p style={{ marginTop: 16, fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>
-                            No pain points logged yet — add the first one for this class.
-                          </p>
-                        ) : (
-                          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 16 }}>
-                            {yearNotes.map(pp => (
-                              <CentralCard
-                                key={pp.id}
-                                variant="callout"
-                                radius="var(--r-callout)"
-                                padding="22px 22px"
-                              >
-                                {/* Title + category */}
-                                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-                                  <h3 style={{ fontSize: 16.5, fontWeight: 500, color: "var(--ink)", margin: 0, lineHeight: 1.35, fontFamily: "var(--font-inter)" }}>{pp.title}</h3>
-                                  {pp.category && (
-                                    <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.05em", textTransform: "uppercase", background: "var(--ivory)", border: "1px solid var(--line-2)", color: "var(--body)", padding: "3px 9px", borderRadius: 9999, whiteSpace: "nowrap", flexShrink: 0 }}>
-                                      {pp.category}
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Watch / Solved columns */}
-                                {(pp.watch_text || pp.solved_text) && (
-                                  <div style={{ display: "grid", gridTemplateColumns: pp.watch_text && pp.solved_text ? "1fr 1fr" : "1fr", gap: 20, marginTop: 16 }} className="max-md:!grid-cols-1">
-                                    {pp.watch_text && (
-                                      <div>
-                                        <p style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
-                                          <AlertTriangle className="w-3.5 h-3.5" /> Watch out for
-                                        </p>
-                                        <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.55, margin: "8px 0 0" }}>{pp.watch_text}</p>
-                                      </div>
-                                    )}
-                                    {pp.solved_text && (
-                                      <div style={{ borderLeft: "2px solid var(--plum)", paddingLeft: 15 }}>
-                                        <p style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
-                                          <Check className="w-3.5 h-3.5" style={{ color: "var(--plum)" }} /> How they solved it
-                                        </p>
-                                        <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.55, margin: "8px 0 0" }}>{pp.solved_text}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Footer */}
-                                <p style={{ marginTop: 16, fontSize: 12.5, color: "var(--muted-text)" }}>
-                                  <span style={{ color: "var(--body)", fontWeight: 500 }}>{pp.created_by_name ?? "Someone"}</span>
-                                  {" · "}{new Date(pp.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                                </p>
-                              </CentralCard>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </section>
-            )}
-
-            {/* ── Log a pain point modal (§4.17 creation modal) ── */}
-            {ppModalOpen && canEdit && (
-              <CentralModal
-                onClose={() => setPpModalOpen(false)}
-                eyebrow="Log a pain point"
-                title="Add to the record"
-                maxWidth={560}
-                footer={
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap", width: "100%" }}>
-                    <span style={{ fontSize: 12, color: "var(--muted-text)" }}>
-                      Adding to {CURRENT_CLASS_YEAR.replace("-", "–")} · signed as {members.find(m => m.id === userId)?.name ?? "you"}
-                    </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <CentralButton variant="secondary" size="sm" onClick={() => setPpModalOpen(false)}>Cancel</CentralButton>
-                      <CentralButton
-                        variant="primary" size="sm"
-                        onClick={handleAddPainPoint}
-                        disabled={addingPp || !ppTitle.trim()}
-                      >
-                        {addingPp ? "Adding…" : "Add to record"}
-                      </CentralButton>
-                    </div>
-                  </div>
-                }
-              >
-                  <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.5, margin: "0 0 20px", maxWidth: 420 }}>
-                    Capture what tripped this class up so the next one doesn&apos;t hit the same wall.
-                  </p>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                    {/* Pain point (title) */}
-                    <FormField label="Pain point">
-                      <Input
-                        value={ppTitle}
-                        onChange={e => setPpTitle(e.target.value)}
-                        placeholder="What went wrong?"
-                      />
-                    </FormField>
-
-                    {/* Category + Class */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }} className="max-md:!grid-cols-1">
-                      <FormField label="Category">
-                        <Select
-                          value={ppCategory}
-                          onChange={e => setPpCategory(e.target.value)}
-                          style={{ appearance: "none" }}
-                        >
-                          {PP_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </Select>
-                      </FormField>
-                      <FormField label="Class">
-                        <Select
-                          value={CURRENT_CLASS_YEAR}
-                          disabled
-                          style={{ appearance: "none", background: "var(--ivory)", color: "var(--muted-text)", cursor: "not-allowed" }}
-                        >
-                          <option value={CURRENT_CLASS_YEAR}>{CURRENT_CLASS_YEAR.replace("-", "–")}</option>
-                        </Select>
-                      </FormField>
-                    </div>
-
-                    {/* Watch */}
-                    <FormField label="What to look out for">
-                      <Textarea
-                        value={ppWatch}
-                        onChange={e => setPpWatch(e.target.value)}
-                        rows={3}
-                        placeholder="The trap the next class should see coming…"
-                        style={{ minHeight: 76 }}
-                      />
-                    </FormField>
-
-                    {/* Solved */}
-                    <FormField label="How you solved it">
-                      <Textarea
-                        value={ppSolved}
-                        onChange={e => setPpSolved(e.target.value)}
-                        rows={3}
-                        placeholder="What actually worked…"
-                        style={{ minHeight: 76 }}
-                      />
-                    </FormField>
-                  </div>
-              </CentralModal>
-            )}
-
             {/* ── Sub-events (Welcome Week) ── */}
             {shownSection === 'sub_events' && plan && (
               <SubEventsTab
@@ -9109,6 +8882,15 @@ export function EventPlanWorkspace({
         onConfirm={() => { confirm?.onConfirm(); setConfirm(null) }}
         onClose={() => setConfirm(null)}
       />
+      {compileOpen && plan && (
+        <EventCompileModal
+          eventPlanId={plan.id}
+          calendarEvent={calendarEvent}
+          ministryId={ministryId}
+          teamId={teamId ?? null}
+          onClose={() => setCompileOpen(false)}
+        />
+      )}
     </div>
   )
 }
