@@ -191,7 +191,8 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | File | Purpose |
 |------|---------|
 | `app/home/home-app.tsx` | Tab orchestrator — owns global state, **code-splits tabs via `next/dynamic`**, renders the active tab, mounts global overlays. Also owns governance (`governance_settings`/`govTeams`), the Receipts-workspace sidebar + `?rteam`/`?fsec` URL state, and the team-agnostic "← All workspaces" back button. |
-| `app/home/tabs/home-tab.tsx` | Home tab — greeting, role badge, up-next hero, recent chats, congregation question prompt. The Up Next slot renders `HomeHeroCarousel` when curated `home_slides` exist, else falls back to the pinned-or-latest announcement (existing behavior). Leader/admin Curate action is a ghost `ContentActionButton` in the hero's `HeroSectionLabel` action slot (desktop only), opening `HomeSlideManager` — never in the `TabPageHeader` (Convention #15). |
+| `app/home/tabs/home-tab.tsx` | Home tab — greeting, role badge, up-next hero, recent chats, congregation question prompt. The Up Next slot renders `HomeHeroCarousel` when curated `home_slides` exist, else falls back to the pinned-or-latest announcement (existing behavior). Leader/admin Curate action is a ghost `ContentActionButton` in the hero's `HeroSectionLabel` action slot (desktop only), opening `HomeSlideManager` — never in the `TabPageHeader` (Convention #15). Also mounts `HomeDeadlines` (My Deadlines) between recent chats and "For you" (desktop) / Up Next and the Announcements preview (Pocket). |
+| `app/home/tabs/home-deadlines.tsx` | **My Deadlines** Home section (Run Sheet P1), desktop + Pocket — a member's open assigned `event_tasks` (with due dates) + pending `event_confirmations`, urgency-sorted; inline checkbox mark-done + Confirm/Decline. Own SWR key `["my-deadlines", ministryId, profileId]` (NOT `loadHomeData` — independent revalidation on taps). Urgency in plum, never `--danger`/`--gold`. |
 | `app/home/tabs/announcements-tab.tsx` | Announcements tab — full feed, RSVP, admin/leader CRUD, pinning, announcement detail view |
 | `app/home/tabs/chats-tab.tsx` | Chats tab — on desktop: `ChatListPanel` (conversation list) renders in `DesktopSidebar` via `chatPanelContent` prop; `ChatScreen inline` renders in the content area. Mobile: `ChatsTab` (full list + overlay chat) wrapped in `md:hidden`. Also exports `ChatScreen`, `ChatSettings`, `CreateChatScreen`. |
 | `app/home/tabs/plan-tab.tsx` | Plan tab — team planning. Desktop uses the shared shell pattern: `hidden md:flex` section + `TabPageHeader` (keeps its bottom `InsetHairline` always) + optional cream event sub-header (back-to-calendar, event title, edit pencil; `borderBottom: 1px solid var(--line)`) + `flex-1 overflow-y-auto` body. Strip-bearing teams (PraiseTeamTab, StudentOrgTeamHome, SmallGroupLeadersTab) render with no outer `px-14` wrapper; `PlanSubTabStrip` labels are inset via inner `md:pl-14`; the under-tabs hairline is `md:mx-14` inset matching `InsetHairline`. Non-strip teams (DgPraiseTeam, OneTimeTeam, TechTeam) use `px-14 py-7` wrappers. Mobile (`md:hidden`) is a sibling outside the desktop section, untouched. |
@@ -223,6 +224,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/home/breadcrumb-context.tsx` | Breadcrumb provider — subpages push crumbs to the shell topbar (§4.18) |
 | `app/home/chat-list.ts` | Chat-list data module (SWR fetchers for the conversations panel) |
 | `app/actions/auto-chats.ts` | Auto-chat machinery: ministry chat, grade chats, staff chat creation + membership |
+| `app/actions/event-confirmations.ts` | Run Sheet P1 confirmation/task actions: `requestConfirmationsAction` (leader manual T-2 trigger — inserts `event_confirmations` for assigned roles), `reRequestConfirmationAction` (round+1 reset), `completeTaskAction` (assignee marks own task done — `event_tasks` UPDATE RLS is leader-only, so this admin-client action gates on assignee-or-leader). Each claims `notification_ledger` then POSTs the dispatch route (mirrors the SQL tick's claim-then-post, so a later tick never double-sends). `authorizePlan()` mirrors the `event_confirmations` INSERT RLS (leader OR `can_plan_events`). |
 | `app/actions/governance.ts` | Governance server actions (roster, matrix) |
 | `components/central/index.ts` | Barrel for all design-system components (CentralModal, CentralButton, ContentHeader, …) |
 | `app/home/components/desktop-nav.tsx` | Desktop sidebar navigation |
@@ -342,6 +344,9 @@ HomeApp (root — owns all global state)
 | `own-memberships-{userId}` | `group_members` | INSERT, UPDATE, DELETE — filtered to `user_id=eq.{userId}` | `HomeApp` — refreshes the scoped `home-app-recent-chats` filter when the user creates/joins/leaves a chat |
 | `typing-{groupId}` | — | broadcast | `ChatScreen` (typing indicator) |
 
+### Push dispatch — Run Sheet events (P1)
+The push dispatch route (`app/api/push/dispatch/route.ts`) gained 3 cron/action-driven resolvers: `task_due` (table `event_tasks`), `confirm_request` + `confirm_escalation` (table `event_confirmations`). `task_due`/`confirm_request` gate on the new `NotificationSettings.deadlines` pref (default on); `confirm_escalation` rides the existing `activity` pref. Fired by `run_sheet_tick()` (see Schema → Run Sheet) and the `event-confirmations.ts` actions (immediate delivery on manual request). ⚠️ The cron that drives these (`cron.schedule('run-sheet-tick', …)`) is applied ONLY after prod deploys the resolvers — scheduling it against a route without them mis-maps `task_due` onto the legacy `task_assigned` resolver.
+
 ### Supabase project
 - Project ID: `wgqpnilaokfipocsugqo`
 - Storage buckets: `announcement-images` (public; also holds reimbursement `receipts/` and home hero `home-slides/{ministryId}/` photos), `bible-study` (public), `chat-attachments` (public), `devotionals` (public), `profile-images` (public), `worship-charts` (public)
@@ -391,6 +396,9 @@ HomeApp (root — owns all global state)
 
 **Events & Calendar**
 `calendar_events`, `event_plans`, `event_tasks`, `event_notes`, `event_roles`, `event_new_folks`
+
+**Run Sheet (P1 — trigger engine + confirmations)**
+`event_confirmations` (tap-to-confirm reliability signal; polymorphic `subject_type` `role`|`block`; RSVP-style own-row respond restricted to `status`∈{confirmed,declined} via column grant; INSERT/DELETE gated by `can_plan_events`; `AFTER DELETE OR UPDATE OF assigned_to ON event_roles` trigger `cleanup_role_confirmations()` drops stale rows on role delete/reassign), `notification_ledger` (per-`(subject,offset)` idempotency for cron-fired pings; RLS-on/**zero-policy** — service/cron only). Scheduled fn `run_sheet_tick()` (pg_cron, hourly `5 * * * *`, self-gated to the 9–10am PT window) fires task-due nudges (`due_tomorrow`/`due_today`), auto-creates + pings T-2 role confirmations, and escalates 24h-silent confirmations to `event_plans.created_by` — all idempotent via `notification_ledger`.
 
 **Worship / Praise Team**
 `worship_weeks`, `worship_songs`, `worship_charts`, `worship_roles`, `worship_invites`, `worship_availability`, `worship_annotations`

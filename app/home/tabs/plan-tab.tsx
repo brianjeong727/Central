@@ -50,11 +50,12 @@ import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
 import type {
-  PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole,
+  PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventConfirmation,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
   WorshipWeek, WorshipRoleRow, PraiseTeamMember, WorshipSong, WorshipInvite, WorshipChart, AnnotationObj, Category,
   EventType, EventExtraTab, TransitionNote,
 } from "../types"
+import { requestConfirmationsAction, reRequestConfirmationAction } from "@/app/actions/event-confirmations"
 import { teamAccessLevel, type TeamAccess } from "../governance"
 
 // Rich-text / collaborative note editors are lazy-loaded so the heavy @tiptap/*
@@ -7298,6 +7299,36 @@ export function EventPlanWorkspace({
   const [showAddRole, setShowAddRole] = useState(false)
   const [assigningRoleId, setAssigningRoleId] = useState<string | null>(null)
 
+  // Run Sheet confirmations — leader rollup of each assigned role's confirm state,
+  // keyed by subject_id (= event_roles.id). Loaded alongside roles.
+  const [confirmations, setConfirmations] = useState<Record<string, EventConfirmation>>({})
+  const [requestingConfirmations, setRequestingConfirmations] = useState(false)
+
+  async function reloadConfirmations(planId: string) {
+    const { data } = await supabase
+      .from("event_confirmations")
+      .select("*")
+      .eq("event_plan_id", planId)
+      .eq("subject_type", "role")
+    const map: Record<string, EventConfirmation> = {}
+    for (const c of (data ?? []) as EventConfirmation[]) map[c.subject_id] = c
+    setConfirmations(map)
+  }
+
+  async function handleRequestConfirmations() {
+    if (!plan || requestingConfirmations) return
+    setRequestingConfirmations(true)
+    const res = await requestConfirmationsAction(plan.id)
+    if (!("error" in res)) await reloadConfirmations(plan.id)
+    setRequestingConfirmations(false)
+  }
+
+  async function handleReRequestConfirmation(confirmationId: string) {
+    if (!plan) return
+    const res = await reRequestConfirmationAction(confirmationId)
+    if (!("error" in res)) await reloadConfirmations(plan.id)
+  }
+
   // Transition Notes (cross-year institutional memory of pain points)
   const CURRENT_CLASS_YEAR = currentFiscalYear()
   const [transitionNotes, setTransitionNotes] = useState<TransitionNote[]>([])
@@ -7413,6 +7444,16 @@ export function EventPlanWorkspace({
         assigned_name: (r.profiles as { name?: string } | null)?.name,
         notes: r.notes as string | null,
       })))
+
+      // Run Sheet confirmation state for the Roles rollup (keyed by role id).
+      const { data: confData } = await supabase
+        .from("event_confirmations")
+        .select("*")
+        .eq("event_plan_id", planId)
+        .eq("subject_type", "role")
+      const confMap: Record<string, EventConfirmation> = {}
+      for (const c of (confData ?? []) as EventConfirmation[]) confMap[c.subject_id] = c
+      setConfirmations(confMap)
 
       // Fetch Transition Notes — cross-year pain points keyed on team_id +
       // event_type so a recurring event's record accumulates across class years.
@@ -8630,6 +8671,25 @@ export function EventPlanWorkspace({
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       {isCovered ? (
                         <>
+                          {(() => {
+                            const c = confirmations[role.id]
+                            if (!c) return null
+                            const meta: Record<EventConfirmation["status"], { label: string; color: string }> = {
+                              requested: { label: "Awaiting", color: "var(--plum)" },
+                              escalated: { label: "Escalated", color: "var(--plum)" },
+                              confirmed: { label: "Confirmed", color: "var(--plum)" },
+                              declined: { label: "Declined", color: "var(--muted-text)" },
+                            }
+                            const canReRequest = canEdit && (c.status === "declined" || c.status === "escalated")
+                            return (
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
+                                <span style={{ fontSize: 13, fontWeight: 500, color: meta[c.status].color, fontFamily: "var(--font-inter)" }}>{meta[c.status].label}</span>
+                                {canReRequest && (
+                                  <button onClick={() => handleReRequestConfirmation(c.id)} style={{ fontSize: 12, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-inter)", padding: 0 }}>Re-request</button>
+                                )}
+                              </span>
+                            )
+                          })()}
                           <span style={{ fontSize: 14, color: "var(--ink)", whiteSpace: "nowrap", fontFamily: "var(--font-inter)" }}>{role.assigned_name}</span>
                           {canEdit && (
                             <button className="role-icon danger" title="Unassign" onClick={() => handleUnassignRole(role.id)} style={iconBtnBase}>
@@ -8692,6 +8752,16 @@ export function EventPlanWorkspace({
                           onClick={handleCreatePlanningChat}
                           disabled={creatingPlanChat || covered.length === 0}
                           title={covered.length === 0 ? "Assign roles first" : "Create a group chat with all role holders"}
+                        />
+                      )}
+                      {covered.length > 0 && (
+                        <ContentActionButton
+                          variant="ghost"
+                          icon={<CheckCircle2 style={{ width: 14, height: 14 }} />}
+                          label={requestingConfirmations ? "Requesting…" : "Request confirmations"}
+                          onClick={handleRequestConfirmations}
+                          disabled={requestingConfirmations}
+                          title="Ask every assigned role-holder to confirm they're set"
                         />
                       )}
                       {!showAddRole && !editingRoleId && (

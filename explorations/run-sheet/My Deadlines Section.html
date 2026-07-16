@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Home — My Deadlines</title>
+<link rel="stylesheet" href="../../styles.css" />
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--cream);-webkit-font-smoothing:antialiased;display:grid;place-items:start center;min-height:100vh;padding:56px 24px}
+  button{font-family:inherit;cursor:pointer}
+  a{color:var(--plum);text-decoration:none}
+  a:hover{color:var(--plum-2)}
+
+  .col{width:680px;max-width:100%}
+  .note{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted-text);margin-bottom:22px}
+
+  .shead{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px}
+  .shead h2{font-family:var(--serif);font-size:25px;font-weight:600;letter-spacing:-0.02em;margin:0}
+  .shead .ct{font-size:13.5px;color:var(--muted-text)}
+  .ssub{font-size:14px;color:var(--body);margin:0 0 18px}
+
+  .list{display:flex;flex-direction:column;gap:9px}
+  .dl{background:var(--cream);border:1px solid var(--line-2);border-radius:var(--r-card,14px);overflow:hidden;transition:border-color .15s}
+  .dl:hover{border-color:var(--dashed)}
+  .dl.urgent{border-color:var(--danger);border-left:3px solid var(--danger)}
+  .dl.soon{border-left:3px solid var(--gold)}
+  .dl.done{background:var(--cream-2)}
+
+  .row{display:flex;align-items:center;gap:14px;padding:15px 18px;width:100%;background:none;border:none;text-align:left}
+  .due{width:74px;flex-shrink:0}
+  .due .d1,.due .d2,.what .t,.what .s{display:block}
+  .due .d1{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);letter-spacing:.3px}
+  .dl.urgent .due .d1{color:var(--danger)}
+  .due .d2{font-family:var(--mono);font-size:10.5px;color:var(--muted-text);margin-top:2px}
+  .what{flex:1;min-width:0}
+  .what .t{font-size:15px;font-weight:500;color:var(--ink);line-height:1.3}
+  .dl.done .what .t{color:var(--body);text-decoration:line-through;text-decoration-color:var(--dashed)}
+  .what .s{font-size:12.5px;color:var(--muted-text);margin-top:3px}
+  .go{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:500;color:var(--plum);background:var(--plum-tint);border:none;border-radius:9px;padding:8px 14px;flex-shrink:0;white-space:nowrap}
+  .go:hover{background:var(--ivory)}
+  .go svg{width:13px;height:13px}
+  .donechip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--success);flex-shrink:0}
+  .donechip svg{width:14px;height:14px}
+
+  /* inline submit drawer */
+  .drawer{display:none;border-top:1px solid var(--line-2);background:var(--cream-panel);padding:16px 18px}
+  .dl.open .drawer{display:block}
+  .drop{border:1.5px dashed var(--dashed);border-radius:11px;padding:22px;text-align:center;color:var(--muted-text);font-size:13.5px;line-height:1.5;background:var(--cream)}
+  .drop b{display:block;color:var(--ink);font-weight:500;font-size:14.5px;margin-bottom:3px}
+  .drop:hover{border-color:var(--plum);cursor:pointer}
+  .drawer .alt{display:flex;align-items:center;justify-content:space-between;margin-top:12px}
+  .drawer .alt span{font-size:12px;color:var(--muted-text)}
+  .send{font-size:13px;font-weight:500;color:var(--cream-on-dark);background:var(--plum-2);border:none;border-radius:9px;padding:9px 18px;opacity:.45}
+  .send.ready{opacity:1}
+  .send.ready:hover{background:var(--plum)}
+
+  .empty{font-size:13px;color:var(--muted-text);text-align:center;padding:14px 0 2px}
+
+  .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(12px);background:var(--ink);color:var(--cream-on-dark);font-size:13.5px;border-radius:11px;padding:12px 18px;display:flex;align-items:center;gap:10px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast .d{width:7px;height:7px;border-radius:50%;background:var(--success)}
+</style>
+</head>
+<body>
+<div class="col" data-screen-label="Home — My Deadlines section">
+  <p class="note">Section mock — lives on every member's Home</p>
+
+  <div class="shead">
+    <h2>My deadlines</h2>
+    <span class="ct">3 open · 1 done</span>
+  </div>
+  <p class="ssub">Everything you owe, most urgent first. Tap to submit right here.</p>
+
+  <div class="list">
+
+    <!-- URGENT -->
+    <div class="dl urgent" id="dl1">
+      <button class="row" data-toggle="dl1">
+        <span class="due"><span class="d1">2 DAYS</span><span class="d2">Fri, Jul 17</span></span>
+        <span class="what">
+          <span class="t">Your letter — Senior Send-off</span>
+          <span class="s">Junior class · goes into the seniors' keepsake book</span>
+        </span>
+        <span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>Submit</span>
+      </button>
+      <div class="drawer">
+        <div class="drop" id="drop1"><b>Drop your letter here</b>or tap to write it in place — a photo of a handwritten one works too</div>
+        <div class="alt"><span>Only leaders running Send-off can see submissions.</span><button class="send" id="send1">Send it in</button></div>
+      </div>
+    </div>
+
+    <!-- SOON -->
+    <div class="dl soon" id="dl2">
+      <button class="row" data-toggle="dl2">
+        <span class="due"><span class="d1">6 DAYS</span><span class="d2">Tue, Jul 21</span></span>
+        <span class="what">
+          <span class="t">Grade video clip — Senior Send-off</span>
+          <span class="s">30–60s, landscape · your class's montage</span>
+        </span>
+        <span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>Submit</span>
+      </button>
+      <div class="drawer">
+        <div class="drop"><b>Drop your video here</b>straight from your camera roll — we handle the format</div>
+        <div class="alt"><span>Goes into the junior-class montage automatically.</span><button class="send">Send it in</button></div>
+      </div>
+    </div>
+
+    <!-- LATER -->
+    <div class="dl" id="dl3">
+      <button class="row" data-toggle="dl3">
+        <span class="due"><span class="d1">2 WKS</span><span class="d2">Wed, Jul 29</span></span>
+        <span class="what">
+          <span class="t">Backing track — Coffee House duet</span>
+          <span class="s">Performance 4 of 7 · rehearsal starts Aug 3</span>
+        </span>
+        <span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"></path></svg>Submit</span>
+      </button>
+      <div class="drawer">
+        <div class="drop"><b>Drop your track here</b>MP3 or a link — it lands with the sound crew</div>
+        <div class="alt"><span>Sound crew gets it the moment you send.</span><button class="send">Send it in</button></div>
+      </div>
+    </div>
+
+    <!-- DONE -->
+    <div class="dl done">
+      <div class="row" style="cursor:default">
+        <span class="due"><span class="d1">DONE</span><span class="d2">Jul 10</span></span>
+        <span class="what">
+          <span class="t">Slide photo — Sisters Appreciation Night</span>
+          <span class="s">Submitted on time — first in your grade</span>
+        </span>
+        <span class="donechip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 13l4 4L19 7"></path></svg>In</span>
+      </div>
+    </div>
+
+  </div>
+  <p class="empty">That's everything. New deadlines land here the moment a leader sets them.</p>
+</div>
+
+<div class="toast" id="toast"><span class="d"></span><span id="toastmsg"></span></div>
+
+<script>
+(function(){
+  var toast = document.getElementById('toast');
+  var toastmsg = document.getElementById('toastmsg');
+  var tmr;
+  function say(msg){
+    toastmsg.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(tmr);
+    tmr = setTimeout(function(){ toast.classList.remove('show'); }, 3200);
+  }
+
+  document.querySelectorAll('[data-toggle]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var dl = document.getElementById(b.getAttribute('data-toggle'));
+      var open = dl.classList.contains('open');
+      document.querySelectorAll('.dl.open').forEach(function(o){ o.classList.remove('open'); });
+      if (!open) dl.classList.add('open');
+    });
+  });
+
+  // demo: first drawer becomes "ready" on drop-click, then sends
+  var drop1 = document.getElementById('drop1');
+  var send1 = document.getElementById('send1');
+  drop1.addEventListener('click', function(){
+    drop1.innerHTML = '<b>letter-to-seniors.pdf</b>attached — ready to send';
+    send1.classList.add('ready');
+  });
+  send1.addEventListener('click', function(){
+    if (!send1.classList.contains('ready')) return;
+    var dl = document.getElementById('dl1');
+    dl.classList.remove('open','urgent');
+    dl.classList.add('done');
+    dl.querySelector('.d1').textContent = 'DONE';
+    dl.querySelector('.d2').textContent = 'Jul 15';
+    dl.querySelector('.s').textContent = 'Submitted — 2 days early';
+    dl.querySelector('.go').outerHTML = '<span class="donechip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M5 13l4 4L19 7"></path></svg>In</span>';
+    say('Letter in — the Send-off leads were notified. 2 days early.');
+  });
+})();
+</script>
+</body>
+</html>
