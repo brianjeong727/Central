@@ -216,8 +216,10 @@ if (!teamCount) {
   if (tErr) throw tErr
 
   const { data: roles, error: rErr } = await db.from("team_roles").insert([
-    { team_id: team.id, name: "President", is_president: true, permissions: [] },
-    { team_id: team.id, name: "Member", is_president: false, permissions: [] },
+    // can_plan_events gates the standard-team workspace hub — without it the
+    // mobile workspace renders blank (no Calendar section). Keep it on both roles.
+    { team_id: team.id, name: "President", is_president: true, permissions: ["can_plan_events", "can_manage_members", "can_track_attendance"] },
+    { team_id: team.id, name: "Member", is_president: false, permissions: ["can_plan_events"] },
   ]).select("id, is_president")
   if (rErr) throw rErr
 
@@ -229,6 +231,41 @@ if (!teamCount) {
     { team_id: team.id, user_id: ids[USERS[2].email], role_id: member, added_by: reviewerId },
   ])
   if (tmErr) throw tmErr
+}
+
+// Calendar events — so the workspace Calendar (and Home "up next") is populated,
+// not empty. Idempotent by title. Anchored to the current week so it always
+// reads as upcoming. `category` must be one of welcoming/retreat/social/service/regular.
+const welcomeTeam = await db.from("teams")
+  .select("id").eq("ministry_id", mid).eq("name", "Welcome Team").maybeSingle()
+const welcomeTeamId = welcomeTeam.data?.id ?? null
+const startOfWeek = new Date()
+startOfWeek.setHours(0, 0, 0, 0)
+startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()) // Sunday
+const at = (days, hour) => {
+  const d = new Date(startOfWeek)
+  d.setDate(d.getDate() + days)
+  d.setHours(hour)
+  return d.toISOString()
+}
+const EVENTS = [
+  { title: "Friday Night Worship", team_id: welcomeTeamId, category: "service", location: "Campus Chapel",
+    description: "Worship + fellowship in the campus chapel. Dessert afterward.", start: at(5, 19), end: at(5, 21) },
+  { title: "New Student Welcome Dinner", team_id: welcomeTeamId, category: "welcoming", location: "Fellowship Hall",
+    description: "Welcome Team hosts dinner for first-time students.", start: at(10, 18), end: at(10, 20) },
+  { title: "Sunday Service", team_id: null, category: "service", location: "Main Sanctuary",
+    description: "Weekly gathering — worship, teaching, community.", start: at(7, 10), end: at(7, 12) },
+]
+for (const e of EVENTS) {
+  const { data: existing } = await db.from("calendar_events")
+    .select("id").eq("ministry_id", mid).eq("title", e.title).maybeSingle()
+  if (existing) continue
+  const { error } = await db.from("calendar_events").insert({
+    ministry_id: mid, team_id: e.team_id, title: e.title, description: e.description,
+    location: e.location, start_date: e.start, end_date: e.end, all_day: false,
+    category: e.category, created_by: reviewerId,
+  })
+  if (error) throw error
 }
 
 console.log(`✓ App Store demo tenant ready`)
