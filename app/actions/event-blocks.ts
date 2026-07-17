@@ -55,8 +55,9 @@ export async function setBlockStatusAction(
   return error ? { error: error.message } : { ok: true }
 }
 
-// "Running late": push this block and every later block on the same day by `minutes`.
-// start_time is authoritative; time_label is re-derived (12h) for the ones we can shift.
+// Ripple after a block's time is edited: push every LATER block on the same day by `minutes`
+// (the edited block already carries its own new time). start_time is authoritative; time_label
+// is re-derived (12h) for the ones we can shift; free-text-only blocks are skipped.
 export async function shiftBlocksAction(
   blockId: string,
   minutes: number,
@@ -68,13 +69,13 @@ export async function shiftBlocksAction(
   if (!block) return { error: "Not found." }
   if (!canManage) return { error: "Not authorized." }
 
-  // Downstream = same plan + day, sort_order >= this block's, with a parseable start_time.
+  // Strictly-downstream: same plan + day, sort_order > this block's, with a parseable start_time.
   const { data: rows } = await admin
     .from("event_blocks")
     .select("id, start_time, sort_order")
     .eq("event_plan_id", block.event_plan_id)
     .eq("day_index", block.day_index)
-    .gte("sort_order", block.sort_order)
+    .gt("sort_order", block.sort_order)
     .order("sort_order", { ascending: true })
 
   let shifted = 0
