@@ -58,6 +58,10 @@ The rule-check tiers decide whether something reaches Brian:
 - **If Brian rejects at sign-off:** `git reset --soft HEAD~1` (keeps the changes for rework), never a stacked revert commit. Re-enter the work with his clarification.
 - **Never commit or push to main** — the main-branch-guard hook backstops this; sanctioned merges go through /ship or a GitHub PR.
 
+## Handoff to Brian: always include the self-test
+
+Every completed task/phase you hand back includes a **"How to test it yourself"** section — the exact Brian's Sandbox fixtures you seeded (row titles, member names, IDs) and the click path to reach them (`/pick-ministry` → "Brian's Sandbox" → …), so Brian verifies without re-deriving anything. This is a required deliverable, not optional: the work is seeded and exercised in Brian's Sandbox (`6c68111b…`, `is_sandbox=true`) per the testing skill BEFORE it reaches him, and the fixtures are left in place. Details/cast/teardown: memory `project-personal-sandbox`.
+
 ## The push decision (Step 7 — closes every task)
 
 End every task with the push decision **as an `AskUserQuestion` call** (never prose):
