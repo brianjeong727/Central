@@ -52,6 +52,7 @@ Filing rule of thumb: a **fact** → Layer 1; a **rule about behavior** → Laye
 ### After every task
 7. **Run `npm run build`** — required before marking anything done. A passing build is mandatory.
 8. **Commit and push** — after every completed task, commit the relevant files and push to the CURRENT branch (never directly to `main`). Never leave completed work uncommitted.
+9. **Seed + self-test in Brian's Sandbox** — verify every feature in the private prod sandbox ministry "Brian's Sandbox" (`6c68111b-0248-45ba-9ab1-169ee33f62c9`, `is_sandbox=true`): seed real fixtures via Supabase MCP, exercise it end-to-end, leave the fixtures in place, and hand back a **"How to test it yourself"** section (exact seeded rows + IDs + click path). Details in the testing skill and memory `project-personal-sandbox`.
 
 ## Capture & self-maintenance — keep this file current (propose, never silently edit)
 This file must stay true to the codebase. You help maintain it, but the user approves every change — never edit CLAUDE.md without explicit approval in that task.

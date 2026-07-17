@@ -26,6 +26,17 @@ Can't answer all five → read the schema and PRD first.
 8. **Mobile** — 390px: no horizontal overflow, ≥44px touch targets.
 9. **Concurrency** — any resource two users can touch simultaneously has a UNIQUE constraint or conflict handling (`ON CONFLICT DO NOTHING` / optimistic locking), not hope.
 
+## Sandbox verification & self-test handoff (every task)
+
+Verify against **Brian's Sandbox** — the private prod sandbox ministry `6c68111b-0248-45ba-9ab1-169ee33f62c9` (`is_sandbox=true`), NOT the automated E2E tenants (`is_sandbox=false`). For every feature/phase:
+
+1. **Seed what it needs** — real rows via Supabase MCP scoped to `6c68111b…` (users, teams, events, plans, tasks, confirmations…). Never mock. When seeding messages/announcements, disable `notify_new_message`/`notify_new_announcement` in one tx, insert, re-enable (push is live in prod — this avoids phone spam).
+2. **Play it out end-to-end** in that ministry (sim / browser / SQL probes) as the relevant role — super POV switching works here (`is_sandbox=true`). Build-and-assume is not verification.
+3. **Leave the fixtures in place** so Brian can self-test.
+4. **Write a "How to test it yourself" section** in the handoff — the exact seeded rows (event titles, member names, IDs) + the click path (`/pick-ministry` → "Brian's Sandbox" → …), so Brian verifies without you.
+
+Cast, push-safety trick, and teardown details live in memory `project-personal-sandbox` — load it before seeding.
+
 ## Routing into references.md
 
 | Task involves… | Read |
@@ -40,4 +51,4 @@ Can't answer all five → read the schema and PRD first.
 
 ## Definition of done
 
-Happy path ✓ empty state ✓ edge cases (0/1/max) ✓ ≥2 roles verified (UI + DB) ✓ persistence confirmed in Supabase ✓ errors visible ✓ realtime cleanup (if applicable) ✓ 390px layout ✓ `scripts/verify.sh` passes. Any unchecked → not complete.
+Happy path ✓ empty state ✓ edge cases (0/1/max) ✓ ≥2 roles verified (UI + DB) ✓ persistence confirmed in Supabase ✓ errors visible ✓ realtime cleanup (if applicable) ✓ 390px layout ✓ seeded + exercised in Brian's Sandbox ✓ "How to test it yourself" section written ✓ `scripts/verify.sh` passes. Any unchecked → not complete.
