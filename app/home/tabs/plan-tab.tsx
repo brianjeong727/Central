@@ -6456,6 +6456,18 @@ export function AddEventModal({
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // Refs to the required inputs so a failed submit scrolls to + focuses the
+  // offending field. The validation error renders at the bottom of the body,
+  // far from the field it names (e.g. "Title is required" while Title is
+  // scrolled off the top) — focusing the field takes the user straight to it.
+  const titleInputRef = useRef<HTMLInputElement>(null)
+  const startDateInputRef = useRef<HTMLInputElement>(null)
+  const endDateInputRef = useRef<HTMLInputElement>(null)
+  function focusInvalidField(ref: React.RefObject<HTMLInputElement | null>) {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+    ref.current?.focus({ preventScroll: true })
+  }
+
   // Seed plan/crunch from the event's plan (or the event−1mo / event−1wk defaults)
   // when editing an existing event.
   useEffect(() => {
@@ -6510,9 +6522,9 @@ export function AddEventModal({
   const cfg = EVENT_TYPE_CONFIGS[eventType]
 
   async function handleSave() {
-    if (!title.trim()) { setError("Title is required."); return }
-    if (!startDateStr) { setError("Start date is required."); return }
-    if (!endDateStr) { setError("End date is required."); return }
+    if (!title.trim()) { setError("Title is required."); focusInvalidField(titleInputRef); return }
+    if (!startDateStr) { setError("Start date is required."); focusInvalidField(startDateInputRef); return }
+    if (!endDateStr) { setError("End date is required."); focusInvalidField(endDateInputRef); return }
 
     const startTs = allDay
       ? `${startDateStr}T00:00:00+00:00`
@@ -6690,7 +6702,7 @@ export function AddEventModal({
 
           {/* Title */}
           <FormField label="Title *">
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" />
+            <Input ref={titleInputRef} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" />
           </FormField>
 
           {/* Description */}
@@ -6712,13 +6724,13 @@ export function AddEventModal({
           {/* Dates + times */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <FormField label="Start date *">
-              <Input type="date" value={startDateStr} onChange={(e) => setStartDateStr(e.target.value)} />
+              <Input ref={startDateInputRef} type="date" value={startDateStr} onChange={(e) => setStartDateStr(e.target.value)} />
             </FormField>
             <FormField label="Start time">
               <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={startTimeStr} onChange={(e) => setStartTimeStr(e.target.value)} disabled={allDay} />
             </FormField>
             <FormField label="End date *">
-              <Input type="date" value={endDateStr} onChange={(e) => setEndDateStr(e.target.value)} />
+              <Input ref={endDateInputRef} type="date" value={endDateStr} onChange={(e) => setEndDateStr(e.target.value)} />
             </FormField>
             <FormField label="End time">
               <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={endTimeStr} onChange={(e) => setEndTimeStr(e.target.value)} disabled={allDay} />
