@@ -15,7 +15,7 @@ Publication now = `group_members, meeting_notes, message_reactions, messages` (a
 To restore any table: `ALTER PUBLICATION supabase_realtime ADD TABLE <t>;`
 
 ## Still open (follow-ups from Deliverable B)
-- **Subscription/publication reconcile (correctness):** app subscribes to `announcements, small_groups, event_confirmations, dgl_assignments` which are NOT published → those live-update features silently do nothing. Add to publication (if needed) or delete dead subscription code — decide per feature.
+- **Subscription/publication reconcile (correctness): RESOLVED 2026-07-17** — only **2** genuine `postgres_changes` subscriptions were unpublished (`small_groups`, `dgl_assignments`, both in `plan-tab.tsx`); the earlier "4" over-counted — `announcements`/`event_confirmations` `table:` hits were push-dispatch payload strings, not subscriptions. Both real ones added to the publication (+ `REPLICA IDENTITY FULL`) in migration `realtime_publish_small_groups_dgl_assignments`. Publication now == the 6 actually-subscribed tables. See `tasks/realtime-publish-plan-tab-subs-APPLIED.md`.
 - **Channel fan-out:** consolidate the many per-user channels (each subscribe fires a ~137 ms refresh query).
 - **`pg_timezone_names`** hot query (656 ms × 1071) — cache the tz lookup.
 - **Supabase Pro upgrade** — dedicated compute; compounds with this trim.
