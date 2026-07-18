@@ -36,6 +36,7 @@ import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, t
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
 import { instantiateTemplateAction } from "@/app/actions/event-templates"
+import { setBlockStatusAction, shiftBlocksAction } from "@/app/actions/event-blocks"
 import { EventCompileModal } from "./event-compile"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketChip } from "../components/pocket-header"
@@ -52,7 +53,7 @@ import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
 import type {
-  PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventConfirmation,
+  PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventConfirmation, EventBlock,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
   WorshipWeek, WorshipRoleRow, PraiseTeamMember, WorshipSong, WorshipInvite, WorshipChart, AnnotationObj, Category,
   EventType, EventExtraTab,
@@ -6107,7 +6108,7 @@ const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
       { name: "Treasurer Liaison", notes: "Manages sign-up payments, tracks deposits, submits reimbursements" },
       { name: "Logistics Lead", notes: "Food, supplies, lodging check-in, and day-of execution" },
     ],
-    extraTabs: ["transport", "program"],
+    extraTabs: ["transport"],
   },
   appreciation_night: {
     label: "Appreciation Night", icon: "✨", dot: "#C97BB0", bg: "#FAF0F7", text: "#8A3070",
@@ -7225,8 +7226,8 @@ export function EventPlanWorkspace({
   const typeCfg = EVENT_TYPE_CONFIGS[calendarEvent.event_type] ?? EVENT_TYPE_CONFIGS.social
   const extraTabs = typeCfg.extraTabs
 
-  type ActiveSection = 'overview' | 'checklist' | 'roles' | EventExtraTab
-  const coreTabs: ActiveSection[] = ['overview', 'checklist', 'roles']
+  type ActiveSection = 'overview' | 'checklist' | 'roles' | 'runsheet' | EventExtraTab
+  const coreTabs: ActiveSection[] = ['overview', 'checklist', 'roles', 'runsheet']
   const allValidTabs: ActiveSection[] = [...coreTabs, ...extraTabs]
 
   // Core data state
@@ -7826,6 +7827,7 @@ export function EventPlanWorkspace({
     { key: 'overview', label: 'Overview' },
     { key: 'checklist', label: 'Checklist' },
     { key: 'roles', label: 'Roles & Leads' },
+    { key: 'runsheet', label: 'Run of show' },
     ...extraTabs.map(t => ({ key: t as ActiveSection, label: EXTRA_TAB_LABELS[t] })),
   ]
 
@@ -8466,6 +8468,13 @@ export function EventPlanWorkspace({
               <div>
                 <EventSectionHeader title="Checklist" action={<span style={{ fontSize: 13, color: "var(--muted-text)" }}>{incompleteTasks.length} of {tasks.length} remaining</span>} />
 
+                {/* Run Sheet P3 — day-of timing lives in the Run of show tab, not here */}
+                <p style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "0 0 16px" }}>
+                  Day-of timing lives in the{" "}
+                  <button onClick={() => setActiveSectionAndUrl("runsheet")} style={{ background: "none", border: "none", padding: 0, color: "var(--plum)", cursor: "pointer", fontSize: 12.5, fontWeight: 500 }}>Run of show</button>{" "}
+                  tab.
+                </p>
+
                 {/* Pinned band — top-level pinned tasks (+ their children) */}
                 {pinnedTop.length > 0 && (
                   <CentralCard variant="inset" radius="var(--r-callout)" padding="6px 14px 8px" style={{ marginBottom: 24 }}>
@@ -8862,14 +8871,15 @@ export function EventPlanWorkspace({
               />
             )}
 
-            {/* ── Program (Retreat) ── */}
-            {shownSection === 'program' && plan && (
-              <ProgramTab
+            {/* ── Run of show (all event types) ── */}
+            {shownSection === 'runsheet' && plan && (
+              <RunSheetTab
                 plan={plan}
                 event={calendarEvent}
                 members={members}
                 canEdit={canEdit}
-                onPlanChange={setPlan}
+                ministryId={ministryId}
+                userId={userId}
               />
             )}
           </>
@@ -9449,105 +9459,213 @@ function TransportTab({
   )
 }
 
-// ── ProgramTab ────────────────────────────────────────────────────────────────
+// ── RunSheetTab — day-of run-of-show (Run Sheet P3; generalizes retreat-only program) ──
+// Backed by the event_blocks table (per-row CRUD), available on EVERY event type. Edit mode is
+// a per-day grid (time · title · owner · brief); read mode is a run-of-show that highlights the
+// next block on today's day. Live status/ripple (event_blocks.status) is dormant until Phase 3b.
 
-type ProgramSession = { id: string; time: string; title: string; leader_id: string; day_index: number }
-
-function ProgramTab({
+function RunSheetTab({
   plan,
   event,
   members,
   canEdit,
-  onPlanChange,
+  ministryId,
+  userId,
 }: {
   plan: EventPlan
   event: CalendarEvent
   members: { id: string; name: string }[]
   canEdit: boolean
-  onPlanChange: (p: EventPlan) => void
+  ministryId: string
+  userId: string
 }) {
   const supabase = createClient()
-  // Mobile restyle only (kicker day labels + ≥44px controls) — structure unchanged.
   const isMobile = useIsMobile()
-  const sessions: ProgramSession[] = (plan.type_data?.program as ProgramSession[] | undefined) ?? []
+  const [blocks, setBlocks] = useState<EventBlock[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draft, setDraft] = useState<{ time: string; title: string; owner: string; brief: string }>({ time: "", title: "", owner: "", brief: "" })
+  const [ripple, setRipple] = useState<{ blockId: string; delta: number; count: number } | null>(null)
 
-  // Generate day list from event start → end
+  async function loadBlocks() {
+    const { data } = await supabase
+      .from("event_blocks").select("*")
+      .eq("event_plan_id", plan.id)
+      .order("day_index", { ascending: true })
+      .order("sort_order", { ascending: true })
+    setBlocks((data ?? []) as EventBlock[]); setLoading(false)
+  }
+  useEffect(() => {
+    loadBlocks()
+    // Live day-of: any block change on this plan (check-off, time shift) refetches for every viewer.
+    const ch = supabase.channel(`event-blocks-${plan.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "event_blocks", filter: `event_plan_id=eq.${plan.id}` }, () => loadBlocks())
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan.id])
+
+  async function toggleDone(block: EventBlock) {
+    const next = block.status === "done" ? "pending" : "done"
+    setBlocks(prev => prev.map(b => b.id === block.id ? { ...b, status: next } : b))  // optimistic; realtime reconciles
+    await setBlockStatusAction(block.id, next)
+  }
+
+  // Free-text time → { start_time "HH:MM", label "H:MM AM" } | null (unparseable keeps the raw text).
+  function parseTime(s: string): { start: string; label: string } | null {
+    const m = s.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/i)
+    if (!m) return null
+    let h = parseInt(m[1], 10); const min = m[2] ? parseInt(m[2], 10) : 0
+    const ap = m[3]?.toLowerCase()
+    if (ap === "pm" && h < 12) h += 12
+    if (ap === "am" && h === 12) h = 0
+    if (h > 23 || min > 59) return null
+    const h12 = h % 12 === 0 ? 12 : h % 12
+    return { start: `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`, label: `${h12}:${String(min).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}` }
+  }
+  const toMin = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m }
+
   const days: Date[] = []
   const start = new Date(event.start_date)
   const end = new Date(event.end_date)
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    days.push(new Date(d))
-  }
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) days.push(new Date(d))
   if (days.length === 0) days.push(start)
+  const todayIdx = days.findIndex(d => d.toDateString() === new Date().toDateString())
 
-  async function save(newSessions: ProgramSession[]) {
-    const { data } = await supabase.from("event_plans").update({ type_data: { ...plan.type_data, program: newSessions } }).eq("id", plan.id).select("*").single()
-    if (data) onPlanChange(data as EventPlan)
+  const ctrlInput: React.CSSProperties = { background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: isMobile ? "12px 10px" : "6px 10px", minHeight: isMobile ? 44 : undefined, width: "100%", boxSizing: "border-box" }
+  const ctrlSelect: React.CSSProperties = { padding: isMobile ? "12px 8px" : "6px 8px", minHeight: isMobile ? 44 : undefined, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", color: "var(--body)", fontSize: 12, cursor: "pointer", width: "100%", boxSizing: "border-box" }
+
+  function startEdit(block: EventBlock) {
+    setEditingId(block.id)
+    setDraft({ time: block.time_label ?? "", title: block.title, owner: block.owner_id ?? "", brief: block.brief ?? "" })
+  }
+  async function addBlock(dayIndex: number) {
+    const maxSort = blocks.filter(b => b.day_index === dayIndex).reduce((m, b) => Math.max(m, b.sort_order), -1)
+    const { data } = await supabase.from("event_blocks")
+      .insert({ ministry_id: ministryId, event_plan_id: plan.id, day_index: dayIndex, title: "", sort_order: maxSort + 1, created_by: userId })
+      .select("*").single()
+    if (data) { const nb = data as EventBlock; setBlocks(prev => [...prev, nb]); setEditingId(nb.id); setDraft({ time: "", title: "", owner: "", brief: "" }) }
+  }
+  async function saveEdit(block: EventBlock) {
+    const parsed = parseTime(draft.time)
+    const patch = { time_label: parsed ? parsed.label : (draft.time.trim() || null), start_time: parsed ? parsed.start : null, title: draft.title.trim(), owner_id: draft.owner || null, brief: draft.brief.trim() || null }
+    setBlocks(prev => prev.map(b => b.id === block.id ? { ...b, ...patch } : b))
+    setEditingId(null)
+    await supabase.from("event_blocks").update(patch).eq("id", block.id).eq("ministry_id", ministryId)
+    // If the time moved and there are later blocks that day, offer to ripple.
+    if (parsed && block.start_time) {
+      const delta = toMin(parsed.start) - toMin(block.start_time)
+      const downstream = blocks.filter(b => b.day_index === block.day_index && b.sort_order > block.sort_order && b.start_time)
+      if (delta !== 0 && downstream.length > 0) setRipple({ blockId: block.id, delta, count: downstream.length })
+    }
+  }
+  async function deleteBlock(id: string) {
+    setBlocks(prev => prev.filter(b => b.id !== id))
+    await supabase.from("event_blocks").delete().eq("id", id).eq("ministry_id", ministryId)
+  }
+  async function confirmRipple() {
+    if (ripple) await shiftBlocksAction(ripple.blockId, ripple.delta)
+    setRipple(null)
   }
 
-  function addSession(dayIndex: number) {
-    save([...sessions, { id: crypto.randomUUID(), time: "", title: "", leader_id: "", day_index: dayIndex }])
-  }
-
-  function updateSession(id: string, updates: Partial<ProgramSession>) {
-    save(sessions.map(s => s.id === id ? { ...s, ...updates } : s))
-  }
-
-  function deleteSession(id: string) {
-    save(sessions.filter(s => s.id !== id))
-  }
+  if (loading) return <div><EventSectionHeader title="Run of show" /><p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p></div>
 
   return (
     <div>
-      <EventSectionHeader title="Program" />
+      <EventSectionHeader title="Run of show" />
 
       {days.map((day, dayIdx) => {
-        const daySessions = sessions.filter(s => s.day_index === dayIdx).sort((a, b) => a.time.localeCompare(b.time))
+        const dayBlocks = blocks.filter(b => b.day_index === dayIdx)
         const dayLabel = day.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+        const isToday = dayIdx === todayIdx
+        const upNextId = isToday ? dayBlocks.find(b => b.status !== "done")?.id : undefined
         return (
           <div key={dayIdx} style={{ marginBottom: 36 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <p style={isMobile ? { ...POCKET_KICKER_STYLE, margin: 0 } : { fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--body)", fontWeight: 500 }}>
-                Day {dayIdx + 1} — {dayLabel}
+              <p style={isMobile ? { ...POCKET_KICKER_STYLE, margin: 0 } : { fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: isToday ? "var(--plum)" : "var(--body)", fontWeight: 500 }}>
+                Day {dayIdx + 1} — {dayLabel}{isToday ? " · Today" : ""}
               </p>
               {canEdit && (
-                <CentralButton variant="secondary" size="sm" onClick={() => addSession(dayIdx)}><Plus style={{ width: 14, height: 14 }} /> Add session</CentralButton>
+                <CentralButton variant="secondary" size="sm" onClick={() => addBlock(dayIdx)}><Plus style={{ width: 14, height: 14 }} /> Add block</CentralButton>
               )}
             </div>
             <div style={{ borderTop: "1px solid var(--line)" }} />
 
-            {daySessions.length === 0 && (
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--faint)", padding: "12px 4px" }}>No sessions yet.</p>
+            {dayBlocks.length === 0 && (
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--faint)", padding: "12px 4px" }}>No blocks yet.</p>
             )}
 
-            {daySessions.map((session, sIdx) => (
-              <ListRow key={session.id} last={sIdx === daySessions.length - 1} style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 28px", gap: 12, padding: "12px 4px", alignItems: "center" }}>
-                {canEdit ? (
-                  <input value={session.time} onChange={e => updateSession(session.id, { time: e.target.value })} placeholder="7:00 PM" style={{ background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: isMobile ? "12px 8px" : "4px 8px", minHeight: isMobile ? 44 : undefined, width: "100%", boxSizing: "border-box" }} />
-                ) : (
-                  <span style={{ fontSize: 13, color: "var(--muted-text)", fontWeight: 500 }}>{session.time || "—"}</span>
-                )}
-                {canEdit ? (
-                  <input value={session.title} onChange={e => updateSession(session.id, { title: e.target.value })} placeholder="Session title…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", width: "100%", minHeight: isMobile ? 44 : undefined }} />
-                ) : (
-                  <span style={{ fontSize: 14, color: "var(--ink)" }}>{session.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>—</span>}</span>
-                )}
-                {canEdit ? (
-                  <select value={session.leader_id} onChange={e => updateSession(session.id, { leader_id: e.target.value })} style={{ padding: isMobile ? "12px 8px" : "4px 8px", minHeight: isMobile ? 44 : undefined, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
-                    <option value="">No leader</option>
-                    {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
-                ) : (
-                  <span style={{ fontSize: 12, color: "var(--body)" }}>{members.find(m => m.id === session.leader_id)?.name ?? "—"}</span>
-                )}
-                {canEdit ? (
-                  <IconButton dim={24} onClick={() => deleteSession(session.id)} title="Remove session"><X className="w-3.5 h-3.5" /></IconButton>
-                ) : <span />}
-              </ListRow>
-            ))}
+            {dayBlocks.map((block, bIdx) => {
+              const isUpNext = block.id === upNextId
+              const editing = editingId === block.id
+              const done = block.status === "done"
+              const ownerName = members.find(m => m.id === block.owner_id)?.name
+              return (
+                <ListRow key={block.id} last={bIdx === dayBlocks.length - 1}
+                  style={{ display: "block", padding: isUpNext ? "12px 4px 12px 13px" : "12px 4px", ...(isUpNext ? { background: "color-mix(in srgb, var(--plum) 7%, transparent)", borderLeft: "3px solid var(--plum)", borderRadius: 8 } : {}) }}>
+                  {isUpNext && (
+                    <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 600, margin: "0 0 6px" }}>Up next</p>
+                  )}
+
+                  {editing ? (
+                    /* ── EDIT MODE — inputs + Save/Cancel ── */
+                    <div>
+                      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "100px 1fr 160px", gap: 10, alignItems: "center" }}>
+                        <input value={draft.time} onChange={e => setDraft(d => ({ ...d, time: e.target.value }))} placeholder="7:00 PM" style={ctrlInput} />
+                        <input value={draft.title} autoFocus onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="Block title…" style={ctrlInput} />
+                        <select value={draft.owner} onChange={e => setDraft(d => ({ ...d, owner: e.target.value }))} style={ctrlSelect}>
+                          <option value="">No owner</option>
+                          {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </select>
+                      </div>
+                      <input value={draft.brief} onChange={e => setDraft(d => ({ ...d, brief: e.target.value }))} placeholder="Brief — what this block needs, the gotcha…" style={{ ...ctrlInput, marginTop: 8, fontSize: 12.5 }} />
+                      <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
+                        <CentralButton variant="secondary" size="sm" onClick={() => setEditingId(null)}>Cancel</CentralButton>
+                        <CentralButton variant="primary" size="sm" onClick={() => saveEdit(block)}>Save</CentralButton>
+                      </div>
+                    </div>
+                  ) : (
+                    /* ── READ MODE — clean display + pencil ── */
+                    <>
+                      <div style={{ display: "grid", gridTemplateColumns: "26px 84px 1fr 140px auto", gap: 12, alignItems: "center" }}>
+                        {(canEdit || block.owner_id === userId) ? (
+                          <button onClick={() => toggleDone(block)} title={done ? "Mark not done" : "Mark done"}
+                            style={{ width: 20, height: 20, borderRadius: 6, border: "1.6px solid " + (done ? "var(--plum-2)" : "var(--dashed)"), background: done ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}>
+                            {done && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
+                          </button>
+                        ) : <span />}
+                        <span style={{ fontSize: 13, fontWeight: isUpNext ? 600 : 500, color: done ? "var(--faint)" : isUpNext ? "var(--plum)" : "var(--muted-text)" }}>{block.time_label || "—"}</span>
+                        <span style={{ fontSize: 14, color: done ? "var(--faint)" : "var(--ink)", textDecoration: done ? "line-through" : "none" }}>{block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Untitled block</span>}</span>
+                        <span style={{ fontSize: 12, color: "var(--body)" }}>{ownerName ?? "—"}</span>
+                        {canEdit ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                            <IconButton dim={24} onClick={() => startEdit(block)} title="Edit block"><Pencil style={{ width: 13, height: 13 }} /></IconButton>
+                            <IconButton dim={24} onClick={() => deleteBlock(block.id)} title="Remove block"><X className="w-3.5 h-3.5" /></IconButton>
+                          </div>
+                        ) : <span />}
+                      </div>
+                      {block.brief && (
+                        <p style={{ marginTop: 4, marginLeft: 38, fontSize: 12.5, color: "var(--faint)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{block.brief}</p>
+                      )}
+                    </>
+                  )}
+                </ListRow>
+              )
+            })}
           </div>
         )
       })}
+
+      <ConfirmDialog
+        open={!!ripple}
+        title="Shift the later blocks too?"
+        message={ripple ? `That time moved ${ripple.delta > 0 ? "+" : ""}${ripple.delta} min. Shift the ${ripple.count} later block${ripple.count === 1 ? "" : "s"} today by the same amount?` : ""}
+        confirmLabel="Shift them"
+        cancelLabel="Just this one"
+        danger={false}
+        onConfirm={confirmRipple}
+        onClose={() => setRipple(null)}
+      />
     </div>
   )
 }
