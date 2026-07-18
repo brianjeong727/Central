@@ -60,6 +60,7 @@ import type {
 } from "../types"
 import { requestConfirmationsAction, reRequestConfirmationAction } from "@/app/actions/event-confirmations"
 import { teamAccessLevel, type TeamAccess } from "../governance"
+import { CountdownTab, TriggerBadge, CountdownWhisper, CountdownPill, type RowAug, type CountdownPhase } from "./countdown-tab"
 
 // Rich-text / collaborative note editors are lazy-loaded so the heavy @tiptap/*
 // and yjs runtime deps stay OUT of plan-tab's static module graph. They sit behind
@@ -7317,7 +7318,6 @@ export function EventPlanWorkspace({
   const [newTaskDue, setNewTaskDue] = useState("")
   const [newTaskSection, setNewTaskSection] = useState<string>("")
   const [addingTask, setAddingTask] = useState(false)
-  const [collapsedPhases, setCollapsedPhases] = useState<Set<string>>(new Set())
 
   // Plan/crunch date state — drives the checklist section windows. Display-only
   // in the overview facts now; edited via the Edit-event modal (AddEventModal).
@@ -7348,6 +7348,10 @@ export function EventPlanWorkspace({
   // user confirms the date change (see §14 / date-reseed warning).
   const [pendingSectionMove, setPendingSectionMove] = useState<{ taskId: string; sectionKey: string } | null>(null)
   const [sectionMoveBusy, setSectionMoveBusy] = useState(false)
+  // Countdown augmentations: fired-nudge task ids (from notification_ledger), the
+  // drag-over phase key (drag-to-phase re-date), and the pending phase re-date.
+  const [firedTaskIds, setFiredTaskIds] = useState<Set<string>>(new Set())
+  const [dragOverPhase, setDragOverPhase] = useState<string | null>(null)
 
   // Role add state
   const [newRoleName, setNewRoleName] = useState("")
@@ -7454,7 +7458,22 @@ export function EventPlanWorkspace({
         .eq("event_plan_id", planId)
         .order("sort_order", { ascending: true })
 
-      setTasks((tasksData ?? []).map(mapTask))
+      const mappedTasks = (tasksData ?? []).map(mapTask)
+      setTasks(mappedTasks)
+
+      // Countdown trigger badges — which of this plan's tasks have already had a
+      // deadline nudge sent (notification_ledger). Read once; a Set of fired ids
+      // lights the "fired" badge. (Cron is dormant, so only seeded rows appear.)
+      const taskIds = mappedTasks.map((t) => t.id)
+      if (taskIds.length) {
+        const { data: ledgerData } = await supabase
+          .from("notification_ledger")
+          .select("subject_id")
+          .eq("subject_type", "event_task")
+          .in("offset_key", ["due_today", "due_tomorrow"])
+          .in("subject_id", taskIds)
+        setFiredTaskIds(new Set((ledgerData ?? []).map((r: { subject_id: string }) => r.subject_id)))
+      }
 
       // Fetch roles with assignee name
       const { data: rolesData } = await supabase
@@ -7726,6 +7745,16 @@ export function EventPlanWorkspace({
     setDragTaskId(null)
     setDragOverTaskId(null)
     setDragOverSection(null)
+    setDragOverPhase(null)
+  }
+
+  // Countdown reassign-by-load: set a single task's assignee (augmentation #3),
+  // reusing the same client-side supabase write pattern as the other task ops.
+  async function reassignTask(task: EventTask, newAssignee: string) {
+    if (!canEdit) return
+    const name = assigneePool.find((a) => a.id === newAssignee)?.name
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, assigned_to: newAssignee, assigned_name: name } : t)))
+    await supabase.from("event_tasks").update({ assigned_to: newAssignee }).eq("id", task.id)
   }
 
   async function handleAddRole() {
@@ -7825,9 +7854,9 @@ export function EventPlanWorkspace({
 
   const sections: { key: ActiveSection; label: string }[] = [
     { key: 'overview', label: 'Overview' },
-    { key: 'checklist', label: 'Checklist' },
+    { key: 'checklist', label: 'Countdown' },
     { key: 'roles', label: 'Roles & Leads' },
-    { key: 'runsheet', label: 'Run of show' },
+    { key: 'runsheet', label: 'Showtime' },
     ...extraTabs.map(t => ({ key: t as ActiveSection, label: EXTRA_TAB_LABELS[t] })),
   ]
 
@@ -7886,10 +7915,6 @@ export function EventPlanWorkspace({
   // ── Checklist hierarchy helpers ────────────────────────────────────────────
   const childrenOf = (id: string) => tasks.filter((t) => t.parent_id === id).sort((a, b) => a.sort_order - b.sort_order)
   const pinnedTop = tasks.filter((t) => t.parent_id === null && t.pinned)
-  const pinnedIds = new Set(pinnedTop.map((t) => t.id))
-  // A task lives in the top Pinned band if it's a pinned top-level task or a
-  // child of one — those never appear in the date-driven sections below.
-  const inBand = (t: EventTask) => (t.parent_id === null ? t.pinned : pinnedIds.has(t.parent_id ?? ""))
 
   // The roomy inline editor card that replaces a row while it's being edited.
   function renderTaskEditor(task: EventTask) {
@@ -7947,7 +7972,7 @@ export function EventPlanWorkspace({
 
   // A single checklist row (top-level or child). isChild → tighter, promote
   // action instead of pin/add-subtask, no disclosure/subcount.
-  function renderTaskRow(task: EventTask, isChild: boolean) {
+  function renderTaskRow(task: EventTask, isChild: boolean, aug?: RowAug) {
     if (canEdit && editingTaskId === task.id) return renderTaskEditor(task)
     const kids = childrenOf(task.id)
     const hasKids = kids.length > 0
@@ -7982,6 +8007,11 @@ export function EventPlanWorkspace({
           borderRadius: isDragOver ? 8 : 0,
         }}
       >
+        {/* Countdown focus/risk accent — 3px left bar on an active row (K1/K3),
+            NOT a rounded callout. plum = the "now" task, danger = an overdue risk. */}
+        {aug?.variant && (
+          <span aria-hidden style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, borderRadius: "0 2px 2px 0", background: aug.variant === "risk" ? "var(--danger)" : "var(--plum)" }} />
+        )}
         {/* disclosure or spacer (no drag-grip gutter — rows sit flush left; the row itself stays draggable) */}
         {!isChild && hasKids ? (
           <button type="button" onClick={(e) => { e.stopPropagation(); setCollapsedTasks((prev) => { const n = new Set(prev); if (n.has(task.id)) n.delete(task.id); else n.add(task.id); return n }) }}
@@ -8002,21 +8032,45 @@ export function EventPlanWorkspace({
         {/* title + optional playbook brief (Run Sheet P2) */}
         <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
           <span style={{ fontSize: isChild ? 14.5 : 15.5, color: task.completed ? "var(--faint)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
+          {/* Countdown sub-line (mock's tk-sub): assignee + trigger badge live INSIDE the
+              body column, under the title — so the flex:1 body keeps full width and the
+              title/whisper never get starved by right-side siblings (matches the mobile row). */}
+          {aug?.countdown && (task.assigned_name || aug?.badge) && (
+            <span style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", margin: "4px 0 2px" }}>
+              {task.assigned_name && (
+                <span style={{ padding: "3px 10px", borderRadius: 999, background: "var(--ivory)", fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{task.assigned_name}</span>
+              )}
+              {aug?.badge && <TriggerBadge kind={aug.badge} copy={aug.badgeCopy} />}
+            </span>
+          )}
+          {/* Playbook whisper — cream-3 accent callout in Countdown, plain faint line elsewhere. */}
           {task.brief && (
-            <span style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{task.brief}</span>
+            aug?.countdown
+              ? <CountdownWhisper text={task.brief} />
+              : <span style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{task.brief}</span>
           )}
         </span>
+        {/* Countdown trigger badge (nudge state) — non-Countdown callers only; in
+            Countdown it renders in the sub-line above. */}
+        {!aug?.countdown && aug?.badge && <TriggerBadge kind={aug.badge} copy={aug.badgeCopy} />}
         {/* subcount */}
         {!isChild && hasKids && (
           <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap", flexShrink: 0 }}>✓ {doneKids}/{kids.length}</span>
         )}
-        {/* assignee */}
-        {task.assigned_name && (
+        {/* assignee — non-Countdown callers only (Countdown shows it in the sub-line) */}
+        {!aug?.countdown && task.assigned_name && (
           <span style={{ padding: "3px 10px", borderRadius: 999, background: "var(--ivory)", fontSize: 12, color: "var(--body)", whiteSpace: "nowrap", flexShrink: 0 }}>{task.assigned_name}</span>
         )}
-        {/* due */}
-        {task.due_date && (
-          <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{fmtMD(task.due_date)}</span>
+        {/* due — with the Countdown reassign-by-load stacked BELOW it in a right
+            column (mock's tk-right), so the risk row's body keeps the same full
+            width as non-risk rows (title on one line, whisper reads normally). */}
+        {(task.due_date || aug?.reassign) && (
+          <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+            {task.due_date && (
+              <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{fmtMD(task.due_date)}</span>
+            )}
+            {aug?.reassign}
+          </span>
         )}
         {/* hover actions — two-step delete confirm (§14) takes over the cluster */}
         {canEdit && (
@@ -8063,7 +8117,7 @@ export function EventPlanWorkspace({
 
   // A top-level task plus (when expanded) its indented children block and the
   // "Add subtask" affordance / inline input.
-  function renderTaskTree(task: EventTask) {
+  function renderTaskTree(task: EventTask, aug?: RowAug) {
     const kids = childrenOf(task.id)
     const hasKids = kids.length > 0
     const collapsed = collapsedTasks.has(task.id)
@@ -8071,7 +8125,7 @@ export function EventPlanWorkspace({
     const inputOpen = addingChildFor === task.id
     return (
       <Fragment key={task.id}>
-        {renderTaskRow(task, false)}
+        {renderTaskRow(task, false, aug)}
         {(showChildren || inputOpen) && (
           <div style={{ marginLeft: 30, paddingLeft: 16, borderLeft: "1px solid var(--line-2)" }}>
             {showChildren && kids.map((k) => renderTaskRow(k, true))}
@@ -8094,6 +8148,51 @@ export function EventPlanWorkspace({
             )}
           </div>
         )}
+      </Fragment>
+    )
+  }
+
+  // Mobile Countdown row (mobile_design_system.md §131): tap-to-toggle, the title
+  // on its OWN wrapping line, then assignee · due · trigger badge stacked below —
+  // never the desktop inline grid (which crushes the title at phone width). Nested
+  // subtasks render as lighter indented rows. Reuses handleToggleTask; hover-only
+  // desktop actions (edit/delete/pin/drag) are intentionally absent on touch, as
+  // they already were in the prior mobile checklist.
+  function renderMobileTaskRow(task: EventTask, aug?: RowAug, isChild = false): React.ReactNode {
+    const kids = isChild ? [] : childrenOf(task.id)
+    const badge = aug?.badge
+    return (
+      <Fragment key={task.id}>
+        <div style={{ position: "relative", display: "flex", gap: 12, alignItems: "flex-start", padding: "13px 0", paddingLeft: isChild ? 14 : 0, borderBottom: "1px solid var(--line-3)" }}>
+          {aug?.variant && !isChild && (
+            <span aria-hidden style={{ position: "absolute", left: -2, top: 0, bottom: 0, width: 3, borderRadius: "0 2px 2px 0", background: aug.variant === "risk" ? "var(--danger)" : "var(--plum)" }} />
+          )}
+          <button
+            onClick={() => { if (canEdit) handleToggleTask(task) }}
+            disabled={!canEdit}
+            aria-label={task.completed ? "Mark incomplete" : "Mark complete"}
+            style={{ marginTop: 1, width: 20, height: 20, borderRadius: "var(--r-check)", border: "1.6px solid " + (task.completed ? "var(--plum-2)" : "var(--dashed)"), background: task.completed ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: canEdit ? "pointer" : "default", flexShrink: 0 }}
+          >
+            {task.completed && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
+          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: isChild ? 400 : 500, color: task.completed ? "var(--faint)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.35, overflowWrap: "anywhere" }}>{task.title}</div>
+            {(task.assigned_name || task.due_date || badge || aug?.reassign) && (
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 7 }}>
+                {task.assigned_name && (
+                  <span style={{ padding: "2px 9px", borderRadius: 999, background: "var(--ivory)", fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{task.assigned_name}</span>
+                )}
+                {task.due_date && (
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{fmtMD(task.due_date)}</span>
+                )}
+                {badge && <TriggerBadge kind={badge} copy={aug!.badgeCopy} />}
+                {aug?.reassign}
+              </div>
+            )}
+            {task.brief && aug?.countdown && <CountdownWhisper text={task.brief} />}
+          </div>
+        </div>
+        {kids.map((k) => renderMobileTaskRow(k, undefined, true))}
       </Fragment>
     )
   }
@@ -8166,7 +8265,7 @@ export function EventPlanWorkspace({
                 " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
               const HUB_META: Record<string, { iconKey: string; sub: string }> = {
                 overview: { iconKey: "chart", sub: "Facts, stats & planning notes" },
-                checklist: { iconKey: "plan", sub: taskTotal > 0 ? `${taskDone} of ${taskTotal} done` : "Tasks to prepare before the event" },
+                checklist: { iconKey: "plan", sub: taskTotal > 0 ? `${taskDone} of ${taskTotal} done` : "The T-minus plan — tasks by phase" },
                 roles: { iconKey: "users", sub: rolesTotal > 0 ? `${rolesAssigned} of ${rolesTotal} assigned` : "Assign who owns each part" },
                 notes: { iconKey: "book", sub: "Cross-year pain points" },
                 sub_events: { iconKey: "calendar", sub: EXTRA_TAB_META.sub_events.subtitle },
@@ -8301,8 +8400,8 @@ export function EventPlanWorkspace({
                     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
                       <LaunchpadRow
                         icon={ClipboardList}
-                        title="Checklist"
-                        subtitle="Tasks to prepare before the event"
+                        title="Countdown"
+                        subtitle="The T-minus plan — tasks by phase"
                         onClick={() => setActiveSectionAndUrl('checklist')}
                         right={
                           <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -8464,121 +8563,97 @@ export function EventPlanWorkspace({
             })()}
 
             {/* ── Checklist ── */}
-            {shownSection === 'checklist' && (
+            {shownSection === 'checklist' && (() => {
+              const cd = countdownLabel(startDate, new Date())
+              const pillLabel = cd
+                ? `${cd.label} · ${startDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`
+                : null
+              // The inline add-row, reused per Countdown phase — seeds the new task's
+              // due to the phase window and calls the SAME handleAddTask write path.
+              const renderPhaseAddRow = (phase: CountdownPhase) => {
+                if (!canEdit || !phase.defaultDue) return null
+                const active = phase.key === newTaskSection
+                return (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 12px", borderBottom: "1px dashed var(--dashed)" }}>
+                    <Plus style={{ width: 14, height: 14, color: "var(--faint)", flexShrink: 0 }} />
+                    <input
+                      value={active ? newTaskTitle : ""}
+                      onChange={(e) => {
+                        if (!active) { setNewTaskSection(phase.key); setNewTaskDue(phase.defaultDue) }
+                        setNewTaskTitle(e.target.value)
+                      }}
+                      onFocus={() => { if (!active) { setNewTaskSection(phase.key); setNewTaskDue(phase.defaultDue) } }}
+                      placeholder={`Add to ${phase.tk}…`}
+                      style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
+                      onKeyDown={(e) => { if (e.key === "Enter" && newTaskTitle.trim() && active) handleAddTask({ defaultDue: phase.defaultDue, phase: phase.eventPhase }) }}
+                    />
+                    {active && newTaskTitle.trim() && (
+                      <>
+                        <select
+                          value={newTaskAssignee}
+                          onChange={(e) => setNewTaskAssignee(e.target.value)}
+                          style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
+                        >
+                          <option value="">Unassigned</option>
+                          {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </select>
+                        <input
+                          type="date"
+                          value={newTaskDue}
+                          min={planStartDate || undefined}
+                          max={eventPlusTwoMonthsYMD}
+                          onChange={(e) => setNewTaskDue(e.target.value)}
+                          style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
+                        />
+                        <CentralButton variant="primary" size="sm" onClick={() => handleAddTask({ defaultDue: phase.defaultDue, phase: phase.eventPhase })} disabled={addingTask}>Add</CentralButton>
+                      </>
+                    )}
+                  </div>
+                )
+              }
+              // Pinned band — reuses the existing top-level pinned tasks + renderTaskTree.
+              const pinnedBand = pinnedTop.length > 0 ? (
+                <CentralCard variant="inset" radius="var(--r-callout)" padding="6px 14px 8px" style={{ marginBottom: 24 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0 6px" }}>
+                    <Star style={{ width: 12, height: 12, color: "var(--plum)", fill: "currentColor" }} />
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 500 }}>Pinned</span>
+                  </div>
+                  {pinnedTop.map((task) => isMobile ? renderMobileTaskRow(task) : renderTaskTree(task))}
+                </CentralCard>
+              ) : null
+
+              const pillNode = pillLabel ? <CountdownPill label={pillLabel} soon={cd!.soon} /> : null
+              return (
               <div>
-                <EventSectionHeader title="Checklist" action={<span style={{ fontSize: 13, color: "var(--muted-text)" }}>{incompleteTasks.length} of {tasks.length} remaining</span>} />
-
-                {/* Run Sheet P3 — day-of timing lives in the Run of show tab, not here */}
-                <p style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "0 0 16px" }}>
-                  Day-of timing lives in the{" "}
-                  <button onClick={() => setActiveSectionAndUrl("runsheet")} style={{ background: "none", border: "none", padding: 0, color: "var(--plum)", cursor: "pointer", fontSize: 12.5, fontWeight: 500 }}>Run of show</button>{" "}
-                  tab.
-                </p>
-
-                {/* Pinned band — top-level pinned tasks (+ their children) */}
-                {pinnedTop.length > 0 && (
-                  <CentralCard variant="inset" radius="var(--r-callout)" padding="6px 14px 8px" style={{ marginBottom: 24 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0 6px" }}>
-                      <Star style={{ width: 12, height: 12, color: "var(--plum)", fill: "currentColor" }} />
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 500 }}>Pinned</span>
-                    </div>
-                    {pinnedTop.map((task) => renderTaskTree(task))}
-                  </CentralCard>
+                {!isMobile && (
+                  <EventSectionHeader
+                    title="Countdown"
+                    action={pillNode ?? <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{incompleteTasks.length} of {tasks.length} remaining</span>}
+                  />
                 )}
 
-                {/* Date-driven sections — top-level, non-pinned tasks grouped by window */}
-                {sectionDefs.map((section) => {
-                  const sectionTop = tasks
-                    .filter((t) => t.parent_id === null && !t.pinned && sectionOf(t) === section.key)
-                    .sort((a, b) => (Number(b.priority === "high") - Number(a.priority === "high")) || (a.sort_order - b.sort_order))
-                  const remaining = tasks.filter((t) => !inBand(t) && sectionOf(t) === section.key && !t.completed).length
-                  const isCollapsed = collapsedPhases.has(section.key)
-                  const isDropZone = dragOverSection === section.key
-                  return (
-                    <div
-                      key={section.key}
-                      style={{ marginBottom: 28 }}
-                      onDragOver={canEdit && !isMobile ? (e) => { e.preventDefault(); setDragOverSection(section.key); setDragOverTaskId(null) } : undefined}
-                      onDrop={canEdit && !isMobile ? (e) => { e.preventDefault(); if (dragTaskId) requestMoveToSection(dragTaskId, section.key); clearDrag() } : undefined}
-                    >
-                      {/* Section header */}
-                      <button
-                        onClick={() => setCollapsedPhases(prev => {
-                          const next = new Set(prev)
-                          if (next.has(section.key)) next.delete(section.key)
-                          else next.add(section.key)
-                          return next
-                        })}
-                        style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "0 0 10px", width: "100%", textAlign: "left" }}
-                      >
-                        <span style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", fontWeight: 500 }}>{section.label}</span>
-                        <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--body)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px" }}>{remaining} remaining</span>
-                        <ChevronRight style={{ marginLeft: "auto", width: 14, height: 14, color: "var(--faint)", transform: isCollapsed ? "rotate(0deg)" : "rotate(90deg)", transition: "transform .15s ease" }} />
-                      </button>
-                      <div style={{ borderTop: "1px solid var(--line)" }} />
-
-                      {isDropZone && (
-                        <div style={{ margin: "10px 0", padding: "12px", border: "1.5px dashed var(--plum)", borderRadius: 10, textAlign: "center" }}>
-                          <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--plum)" }}>Drop here to make it a standalone task</span>
-                        </div>
-                      )}
-
-                      {!isCollapsed && (
-                        <>
-                          {sectionTop.length === 0 && !isDropZone && (
-                            <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--faint)", padding: "14px 4px 6px" }}>No tasks yet for this section.</p>
-                          )}
-                          {sectionTop.map((task) => renderTaskTree(task))}
-
-                          {/* Inline add row per section — prefills due to the section window */}
-                          {canEdit && (
-                            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 12px", borderBottom: "1px dashed var(--dashed)" }}>
-                              <Plus style={{ width: 14, height: 14, color: "var(--faint)", flexShrink: 0 }} />
-                              <input
-                                value={section.key === newTaskSection ? newTaskTitle : ""}
-                                onChange={(e) => {
-                                  if (section.key !== newTaskSection) { setNewTaskSection(section.key); setNewTaskDue(section.defaultDue) }
-                                  setNewTaskTitle(e.target.value)
-                                }}
-                                onFocus={() => { if (section.key !== newTaskSection) { setNewTaskSection(section.key); setNewTaskDue(section.defaultDue) } }}
-                                placeholder={`Add to ${section.label}…`}
-                                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)" }}
-                                onKeyDown={(e) => { if (e.key === "Enter" && newTaskTitle.trim() && newTaskSection === section.key) handleAddTask(section) }}
-                              />
-                              {section.key === newTaskSection && newTaskTitle.trim() && (
-                                <>
-                                  <select
-                                    value={newTaskAssignee}
-                                    onChange={(e) => setNewTaskAssignee(e.target.value)}
-                                    style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
-                                  >
-                                    <option value="">Unassigned</option>
-                                    {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                                  </select>
-                                  <input
-                                    type="date"
-                                    value={newTaskDue}
-                                    min={planStartDate || undefined}
-                                    max={eventPlusTwoMonthsYMD}
-                                    onChange={(e) => setNewTaskDue(e.target.value)}
-                                    style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
-                                  />
-                                  <CentralButton
-                                    variant="primary" size="sm"
-                                    onClick={() => handleAddTask(section)}
-                                    disabled={addingTask}
-                                  >
-                                    Add
-                                  </CentralButton>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )
-                })}
+                <CountdownTab
+                  tasks={tasks}
+                  eventStartISO={calendarEvent.start_date}
+                  teamId={teamId ?? (calendarEvent as { team_id?: string | null }).team_id ?? null}
+                  assigneePool={assigneePool}
+                  firedIds={firedTaskIds}
+                  canEdit={canEdit}
+                  isMobile={isMobile}
+                  hasCrunch={!!crunchDate}
+                  countdownPill={pillNode}
+                  pinnedBand={pinnedBand}
+                  onGoRunSheet={() => setActiveSectionAndUrl("runsheet")}
+                  renderRow={(task, aug) => renderTaskTree(task, aug)}
+                  renderMobileRow={(task, aug) => renderMobileTaskRow(task, aug)}
+                  renderAddRow={renderPhaseAddRow}
+                  onReassign={reassignTask}
+                  dragActive={!!(canEdit && !isMobile && dragTaskId)}
+                  dragOverPhaseKey={dragOverPhase}
+                  onPhaseDragOver={(k) => { setDragOverPhase(k); setDragOverTaskId(null) }}
+                  onPhaseDrop={(phase) => { if (dragTaskId) requestMoveToSection(dragTaskId, phase.sectionKey); clearDrag() }}
+                  stickyTop={0}
+                />
 
                 {/* Section-move date-change confirmation (dated task → different window) */}
                 {pendingSectionMove && (
@@ -8612,7 +8687,8 @@ export function EventPlanWorkspace({
                   </CentralModal>
                 )}
               </div>
-            )}
+              )
+            })()}
 
             {/* ── Roles & Leads ── */}
             {shownSection === 'roles' && (() => {
@@ -8871,7 +8947,7 @@ export function EventPlanWorkspace({
               />
             )}
 
-            {/* ── Run of show (all event types) ── */}
+            {/* ── Showtime (all event types) ── */}
             {shownSection === 'runsheet' && plan && (
               <RunSheetTab
                 plan={plan}
@@ -9568,11 +9644,11 @@ function RunSheetTab({
     setRipple(null)
   }
 
-  if (loading) return <div><EventSectionHeader title="Run of show" /><p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p></div>
+  if (loading) return <div><EventSectionHeader title="Showtime" /><p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p></div>
 
   return (
     <div>
-      <EventSectionHeader title="Run of show" />
+      <EventSectionHeader title="Showtime" />
 
       {days.map((day, dayIdx) => {
         const dayBlocks = blocks.filter(b => b.day_index === dayIdx)
