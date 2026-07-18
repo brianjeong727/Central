@@ -52,6 +52,7 @@ import { getReimbursementInbox } from "@/app/actions/receipts"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
+import { EVENT_TYPE_CONFIGS, nextAnchorYMD, addDaysToYMD, ymdOf } from "../event-presets"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventConfirmation, EventBlock,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -5945,236 +5946,9 @@ const CATEGORY_CONFIG = {
   regular:   { label: "Regular",   dot: "var(--muted-text)", bg: "var(--plum-tint)", text: "var(--body)" },
 } as const
 
-type EventTypeConfig = {
-  label: string; icon: string; dot: string; bg: string; text: string
-  budgetCategory: string | null; canHaveSubEvents: boolean; description: string
-  defaultPhases: { key: string; label: string; tasks: string[] }[]
-  defaultRoles: { name: string; notes: string }[]
-  extraTabs: EventExtraTab[]
-}
-
-const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
-  welcome_week: {
-    label: "Welcome Week", icon: "🎉", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--plum)",
-    budgetCategory: "welcoming_week", canHaveSubEvents: true,
-    description: "Multi-day freshman welcome — Popsicle Socials, Game Night, Sports Day, Welcoming Night, Praise Night. Plan in June; reserve all venues in June.",
-    defaultPhases: [
-      { key: "pre_event", label: "June Planning", tasks: [
-        "Reserve venues for all five sub-events (Popsicle Social, Game Night, Sports, Welcoming Night, Praise Night)",
-        "Submit space reservation requests for Pitt and CMU venues",
-        "Design promotional graphics and Instagram posts",
-        "Coordinate with DGL team — confirm who is cooking each night",
-        "Coordinate with Praise Team for Praise Night worship",
-        "Finalize food budget and assign purchasers per sub-event",
-        "Plan games, icebreakers, and activities for each night",
-        "Draft Welcome Week announcement",
-      ]},
-      { key: "day_of", label: "Week Of", tasks: [
-        "Send daily reminder posts and announcements",
-        "Confirm food orders and grocery runs for each night",
-        "Confirm all volunteers and point-of-contact per sub-event",
-        "Set up venue for each event (tables, decorations, AV)",
-        "Log new folks at each event for follow-up",
-      ]},
-      { key: "post_event", label: "Post-Week", tasks: [
-        "Compile full list of new folks for DGL follow-up",
-        "Submit all reimbursement forms",
-        "Post recap photos on Instagram",
-        "Send thank-you messages to all volunteers",
-        "CCSF debrief — what worked, what to improve",
-      ]},
-    ],
-    defaultRoles: [
-      { name: "President", notes: "Overall lead — final decision maker, coordinates all sub-events" },
-      { name: "Event Coordinator (Pitt)", notes: "Space reservations, setup/teardown, cleanup crew for Pitt events" },
-      { name: "Event Coordinator (CMU)", notes: "Space reservations, setup/teardown, cleanup crew for CMU events" },
-      { name: "Secretary", notes: "Promotional graphics, Instagram, flyers, slideshow announcements" },
-      { name: "DGL Liaison", notes: "Coordinates with DGL team for dinner cooking rotations" },
-      { name: "Praise Team Liaison", notes: "Coordinates Praise Night worship with Praise Team" },
-    ],
-    extraTabs: ["sub_events"],
-  },
-  coffeehouse: {
-    label: "Coffeehouse", icon: "☕", dot: "var(--warm-tan)", bg: "#FDF6EC", text: "#6B4C1E",
-    budgetCategory: "coffeehouse", canHaveSubEvents: false,
-    description: "Annual talent show — performances, praise, and testimony. Held at Rangos Hall (CMU). ~$123 budget for coffee and snacks.",
-    defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: [
-        "Book Rangos Hall (CMU) and reserve AV equipment",
-        "Open performer sign-ups (music, spoken word, comedy, dance)",
-        "Plan run-of-show: performances → praise set → testimony",
-        "Design flyers and promotional graphics",
-        "Post Instagram promo and reminders",
-        "Coordinate sound check schedule with performers",
-        "Arrange coffee and snacks (budget ~$123)",
-        "Recruit MC and backstage helpers",
-      ]},
-      { key: "day_of", label: "Day-of", tasks: [
-        "AV and stage setup at Rangos Hall",
-        "Sound check per performer — vocals, instruments, backing tracks",
-        "MC briefing and run-of-show walkthrough",
-        "Welcome guests at the door",
-        "Run the show — keep transitions tight",
-        "Cleanup and load-out",
-      ]},
-      { key: "post_event", label: "Post-Event", tasks: [
-        "Submit reimbursement form (coffee/snacks)",
-        "Post photos and recap on Instagram",
-        "Thank all performers and volunteers",
-      ]},
-    ],
-    defaultRoles: [
-      { name: "President", notes: "Oversees performer bookings and run-of-show coordination" },
-      { name: "Secretary", notes: "Flyers, Instagram promo, announcement slides, event photography" },
-      { name: "Event Coordinator", notes: "Rangos Hall booking, AV setup, sound check logistics" },
-      { name: "MC / Emcee", notes: "Hosts the night and keeps the program moving" },
-      { name: "Sound Tech", notes: "PA system, mic levels, backing track playback" },
-      { name: "Food Lead", notes: "Coffee and snacks setup and service" },
-    ],
-    extraTabs: ["acts"],
-  },
-  turkey_bowl: {
-    label: "Turkey Bowl", icon: "🏈", dot: "var(--sage)", bg: "#EEF4F1", text: "#2D5445",
-    budgetCategory: "turkeybowl", canHaveSubEvents: false,
-    description: "Annual flag football tournament in November. Separate men's and women's divisions. Budget ~$1,500–1,700 (shirts are the dominant cost).",
-    defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: [
-        "Reserve field location",
-        "Open sign-ups for men's and women's divisions",
-        "Design and order jerseys/shirts — submit order early (3–4 week lead time, ~$1,500)",
-        "Confirm shirt sizes and names",
-        "Organize teams and brackets for both divisions",
-        "Coordinate food and cookout supplies",
-        "Get equipment: footballs, cones, first aid kit",
-        "Create announcement and promo graphics",
-      ]},
-      { key: "day_of", label: "Day-of", tasks: [
-        "Field setup — cones, boundaries, end zones",
-        "Distribute shirts to players",
-        "Run men's division games",
-        "Run women's division games",
-        "Cookout — grill, serve food",
-        "Award ceremony (if applicable)",
-        "Cleanup",
-      ]},
-      { key: "post_event", label: "Post-Event", tasks: [
-        "Submit reimbursement form (shirts, food)",
-        "Post game photos and results on Instagram",
-        "Archive final brackets and scores",
-      ]},
-    ],
-    defaultRoles: [
-      { name: "Men's Game Commissioner", notes: "Runs men's bracket — rules, scheduling, officiating" },
-      { name: "Women's Game Commissioner", notes: "Runs women's bracket — rules, scheduling, officiating" },
-      { name: "Shirt Coordinator", notes: "Manages jersey design, sizing, ordering — critical lead-time task" },
-      { name: "Equipment Lead", notes: "Footballs, cones, first aid, field markers" },
-      { name: "Food Lead", notes: "Grill, cookout, serving, cleanup" },
-      { name: "Secretary", notes: "Promo graphics, Instagram, event photos" },
-    ],
-    extraTabs: ["teams"],
-  },
-  retreat: {
-    label: "Retreat", icon: "⛺", dot: "var(--body)", bg: "var(--body-bg)", text: "var(--plum)",
-    budgetCategory: "retreat", canHaveSubEvents: false,
-    description: "Overnight or weekend retreat. Retreat leaders run the program; CCSF handles logistics support. Women's: October · Men's: February · EM: March.",
-    defaultPhases: [
-      { key: "pre_event", label: "6 Weeks Out", tasks: [
-        "Confirm retreat dates and type (Women's / Men's / EM)",
-        "Book retreat location and confirm capacity",
-        "Plan transportation — identify drivers, confirm car capacity",
-        "Create sign-up form with payment collection",
-        "Coordinate with retreat leaders on program and session schedule",
-        "Coordinate with Praise Team for worship sessions",
-        "Draft packing list for attendees",
-      ]},
-      { key: "day_of", label: "2 Weeks Out", tasks: [
-        "Confirm headcount and finalize lodge room assignments",
-        "Finalize transportation roster — every rider confirmed with a driver",
-        "Send packing list and logistics info to all attendees",
-        "Purchase supplies, food, and any retreat materials",
-        "Confirm payment collection is complete",
-      ]},
-      { key: "post_event", label: "Post-Retreat", tasks: [
-        "Submit all reimbursement forms (food, supplies, any deposits)",
-        "CCSF and retreat leaders debrief",
-        "Follow up with new folks who attended",
-        "Post photos recap",
-      ]},
-    ],
-    defaultRoles: [
-      { name: "Retreat Lead", notes: "Overall point of contact — final decisions on logistics and program" },
-      { name: "Transportation Coordinator", notes: "Assigns every attendee a driver; confirms car capacities" },
-      { name: "Program Director", notes: "Retreat leaders design and run sessions — CCSF coordinates support" },
-      { name: "Worship Leader", notes: "Leads worship sessions during retreat" },
-      { name: "Treasurer Liaison", notes: "Manages sign-up payments, tracks deposits, submits reimbursements" },
-      { name: "Logistics Lead", notes: "Food, supplies, lodging check-in, and day-of execution" },
-    ],
-    extraTabs: ["transport"],
-  },
-  appreciation_night: {
-    label: "Appreciation Night", icon: "✨", dot: "#C97BB0", bg: "#FAF0F7", text: "#8A3070",
-    budgetCategory: "appreciation_night", canHaveSubEvents: false,
-    description: "SAN (Sisters Appreciation Night) or GAN (Guys Appreciation Night) — both held in February. Led by Event Coordinator. Costs: flowers, food, venue.",
-    defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: [
-        "Reserve venue",
-        "Plan program — activities, performances, speeches",
-        "Order flowers and arrange decorations",
-        "Coordinate food and drinks",
-        "Design and post invitation announcement",
-        "Recruit helpers for setup and service",
-      ]},
-      { key: "day_of", label: "Day-of", tasks: [
-        "Setup decorations, flowers, tables, and lighting",
-        "Welcome guests at the door",
-        "Run the program — MC keeps it on schedule",
-        "Serve food and drinks",
-        "Cleanup",
-      ]},
-      { key: "post_event", label: "Post-Event", tasks: [
-        "Submit reimbursement form (flowers, food, venue)",
-        "Post photos on Instagram",
-        "Thank all volunteers and helpers",
-      ]},
-    ],
-    defaultRoles: [
-      { name: "Event Coordinator (Lead)", notes: "Overall lead — owned by Event Coordinator role on CCSF" },
-      { name: "Decoration Lead", notes: "Flowers, lighting, table setup — sets the atmosphere" },
-      { name: "Food Lead", notes: "Coordinates food and drinks for guests" },
-      { name: "MC / Emcee", notes: "Hosts the night and runs the program" },
-      { name: "Photographer", notes: "Photos and video coverage for Instagram recap" },
-    ],
-    extraTabs: [],
-  },
-  social: {
-    label: "Social", icon: "🎊", dot: "var(--muted-text)", bg: "var(--cream-panel)", text: "var(--body)",
-    budgetCategory: null, canHaveSubEvents: false,
-    description: "Informal social events — Church Picnic, game nights, IM sports, community volunteering (Wilkinsburg Food Pantry), or any hangout.",
-    defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: ["Reserve location or confirm venue", "Coordinate food or activity supplies", "Create announcement or invite"] },
-      { key: "day_of", label: "Day-of", tasks: ["Setup", "Welcome guests", "Run activity or game", "Clean up"] },
-    ],
-    defaultRoles: [
-      { name: "Event Lead", notes: "Point of contact and day-of coordinator" },
-      { name: "Food Coordinator", notes: "Food and drinks logistics" },
-    ],
-    extraTabs: [],
-  },
-  ministry: {
-    label: "Ministry Event", icon: "🙏", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--body)",
-    budgetCategory: null, canHaveSubEvents: false,
-    description: "Prayer Meeting (PM), Bible study, outreach (campus involvement fairs), or service events.",
-    defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: ["Prepare content, set list, or materials", "Create announcement", "Assign roles (worship lead, speaker, host)"] },
-      { key: "day_of", label: "Day-of", tasks: ["Setup space", "Run the event", "Cleanup"] },
-    ],
-    defaultRoles: [
-      { name: "Facilitator", notes: "" },
-      { name: "Worship Lead", notes: "" },
-    ],
-    extraTabs: [],
-  },
-}
+// EVENT_TYPE_CONFIGS now lives in app/home/event-presets.ts (data in
+// event-presets-data.mjs so seed scripts share the exact same playbooks).
+// Kept here: only the consumers.
 
 function getEventConfig(ev: { event_type?: EventType; category?: string }): { label: string; dot: string; bg: string; text: string; icon?: string } {
   if (ev.event_type && EVENT_TYPE_CONFIGS[ev.event_type]) return EVENT_TYPE_CONFIGS[ev.event_type]
@@ -6441,15 +6215,44 @@ export function AddEventModal({
     return t.slice(0, 5)
   }
 
-  const [eventType, setEventType] = useState<EventType>(existing?.event_type ?? "social")
-  const [title, setTitle] = useState(existing?.title ?? "")
-  const [description, setDescription] = useState(existing?.description ?? "")
-  const [location, setLocation] = useState(existing?.location ?? "")
-  const [startDateStr, setStartDateStr] = useState(existing ? parseDateStr(existing.start_date) : "")
-  const [startTimeStr, setStartTimeStr] = useState(existing ? parseTimeStr(existing.start_date) : "09:00")
-  const [endDateStr, setEndDateStr] = useState(existing ? parseDateStr(existing.end_date) : "")
-  const [endTimeStr, setEndTimeStr] = useState(existing ? parseTimeStr(existing.end_date) : "10:00")
-  const [allDay, setAllDay] = useState(existing?.all_day ?? false)
+  // New events open pre-filled from the type's preset defaults — last year's
+  // title/venue/times/description, dated to the next occurrence of last year's
+  // anchor date (event-presets.ts). Switching type re-fills every field the
+  // user hasn't hand-edited (touchedRef); edit mode never prefills.
+  const initialType: EventType = existing?.event_type ?? "social"
+  const initialDefaults = EVENT_TYPE_CONFIGS[initialType].defaults
+  const touchedRef = useRef<{ title?: boolean; description?: boolean; location?: boolean; dates?: boolean }>({})
+
+  const [eventType, setEventType] = useState<EventType>(initialType)
+  const [title, setTitle] = useState(existing?.title ?? initialDefaults.title)
+  const [description, setDescription] = useState(existing?.description ?? initialDefaults.description)
+  const [location, setLocation] = useState(existing?.location ?? initialDefaults.location)
+  const [startDateStr, setStartDateStr] = useState(() =>
+    existing ? parseDateStr(existing.start_date) : nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay))
+  const [startTimeStr, setStartTimeStr] = useState(existing ? parseTimeStr(existing.start_date) : initialDefaults.startTime)
+  const [endDateStr, setEndDateStr] = useState(() =>
+    existing
+      ? parseDateStr(existing.end_date)
+      : addDaysToYMD(nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay), initialDefaults.durationDays - 1))
+  const [endTimeStr, setEndTimeStr] = useState(existing ? parseTimeStr(existing.end_date) : initialDefaults.endTime)
+  const [allDay, setAllDay] = useState(existing?.all_day ?? initialDefaults.allDay)
+
+  // Re-fill untouched fields when the user picks a different event type (new mode only).
+  function applyTypeDefaults(t: EventType) {
+    if (isEditing) return
+    const d = EVENT_TYPE_CONFIGS[t].defaults
+    if (!touchedRef.current.title) setTitle(d.title)
+    if (!touchedRef.current.description) setDescription(d.description)
+    if (!touchedRef.current.location) setLocation(d.location)
+    if (!touchedRef.current.dates) {
+      const start = nextAnchorYMD(d.anchorMonth, d.anchorDay)
+      setStartDateStr(start)
+      setEndDateStr(addDaysToYMD(start, d.durationDays - 1))
+      setStartTimeStr(d.startTime)
+      setEndTimeStr(d.endTime)
+      setAllDay(d.allDay)
+    }
+  }
   // Plan/crunch dates live on the event's event_plans row, edited here in EDIT
   // mode only (a new event's plan is seeded lazily by the overview). Crunch is
   // optional — an empty string saves as null (no crunch phase).
@@ -6650,11 +6453,22 @@ export function AddEventModal({
                 typeCfg.defaultRoles.map(r => ({ event_plan_id: planId, role_name: r.name, notes: r.notes || null, created_by: userId }))
               )
             }
-            const taskRows: { event_plan_id: string; title: string; phase: string; sort_order: number; completed: boolean; created_by: string }[] = []
+            // Preset tasks carry T-minus offsets (event-presets-data.mjs) →
+            // concrete due_dates off the event's start date, past-clamped to
+            // today (same rule as playbook instantiation) so a late-created
+            // event doesn't open with a wall of overdue tasks.
+            const eventYMD = startDateStr
+            const todayYMD = ymdOf(new Date())
+            const taskRows: { event_plan_id: string; title: string; phase: string; due_date: string | null; sort_order: number; completed: boolean; created_by: string }[] = []
             let sortIdx = 0
             for (const phase of typeCfg.defaultPhases) {
-              for (const taskTitle of phase.tasks) {
-                taskRows.push({ event_plan_id: planId, title: taskTitle, phase: phase.key, sort_order: sortIdx++, completed: false, created_by: userId })
+              for (const task of phase.tasks) {
+                let due: string | null = null
+                if (task.off !== null && eventYMD) {
+                  const computed = addDaysToYMD(eventYMD, task.off)
+                  due = computed < todayYMD ? todayYMD : computed
+                }
+                taskRows.push({ event_plan_id: planId, title: task.title, phase: phase.key, due_date: due, sort_order: sortIdx++, completed: false, created_by: userId })
               }
             }
             if (taskRows.length > 0) await supabase.from("event_tasks").insert(taskRows)
@@ -6702,7 +6516,7 @@ export function AddEventModal({
                   return (
                     <button
                       key={t}
-                      onClick={() => setEventType(t)}
+                      onClick={() => { setEventType(t); applyTypeDefaults(t) }}
                       style={{
                         padding: "12px 14px", borderRadius: 12, textAlign: "left", cursor: "pointer",
                         border: selected ? `2px solid ${tcfg.dot}` : "2px solid var(--line)",
@@ -6755,38 +6569,38 @@ export function AddEventModal({
 
           {/* Title */}
           <FormField label="Title *">
-            <Input ref={titleInputRef} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" />
+            <Input ref={titleInputRef} value={title} onChange={(e) => { touchedRef.current.title = true; setTitle(e.target.value) }} placeholder="Event name" />
           </FormField>
 
           {/* Description */}
           <FormField label="Description">
-            <Textarea style={{ minHeight: 80 }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional details…" />
+            <Textarea style={{ minHeight: 80 }} value={description} onChange={(e) => { touchedRef.current.description = true; setDescription(e.target.value) }} placeholder="Optional details…" />
           </FormField>
 
           {/* Location */}
           <FormField label="Location">
-            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Room, building, or address" />
+            <Input value={location} onChange={(e) => { touchedRef.current.location = true; setLocation(e.target.value) }} placeholder="Room, building, or address" />
           </FormField>
 
           {/* All day toggle */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <input type="checkbox" id="allDay" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--plum)", cursor: "pointer" }} />
+            <input type="checkbox" id="allDay" checked={allDay} onChange={(e) => { touchedRef.current.dates = true; setAllDay(e.target.checked) }} style={{ width: 16, height: 16, accentColor: "var(--plum)", cursor: "pointer" }} />
             <label htmlFor="allDay" style={{ fontSize: 14, color: "var(--body)", cursor: "pointer" }}>All day</label>
           </div>
 
           {/* Dates + times */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <FormField label="Start date *">
-              <Input ref={startDateInputRef} type="date" value={startDateStr} onChange={(e) => setStartDateStr(e.target.value)} />
+              <Input ref={startDateInputRef} type="date" value={startDateStr} onChange={(e) => { touchedRef.current.dates = true; setStartDateStr(e.target.value) }} />
             </FormField>
             <FormField label="Start time">
-              <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={startTimeStr} onChange={(e) => setStartTimeStr(e.target.value)} disabled={allDay} />
+              <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={startTimeStr} onChange={(e) => { touchedRef.current.dates = true; setStartTimeStr(e.target.value) }} disabled={allDay} />
             </FormField>
             <FormField label="End date *">
-              <Input ref={endDateInputRef} type="date" value={endDateStr} onChange={(e) => setEndDateStr(e.target.value)} />
+              <Input ref={endDateInputRef} type="date" value={endDateStr} onChange={(e) => { touchedRef.current.dates = true; setEndDateStr(e.target.value) }} />
             </FormField>
             <FormField label="End time">
-              <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={endTimeStr} onChange={(e) => setEndTimeStr(e.target.value)} disabled={allDay} />
+              <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={endTimeStr} onChange={(e) => { touchedRef.current.dates = true; setEndTimeStr(e.target.value) }} disabled={allDay} />
             </FormField>
           </div>
 
@@ -7044,9 +6858,9 @@ export function MinistryCalendar({
           {events.length === 0 ? (
             /* Default placeholder items when calendar isn't seeded yet */
             [
-              { title: "Turkey Bowl", category: "social" as Category, date: "Nov 22" },
-              { title: "Welcome Night", category: "welcoming" as Category, date: "Aug 29" },
-              { title: "Coffeehouse", category: "social" as Category, date: "Nov 7" },
+              { title: "Welcoming Night", category: "welcoming" as Category, date: "Aug 29" },
+              { title: "Coffeehouse", category: "social" as Category, date: "Oct 4" },
+              { title: "Turkeybowl", category: "social" as Category, date: "Nov 7" },
             ].map((item) => {
               const cfg = CATEGORY_CONFIG[item.category]
               return (
@@ -11099,6 +10913,22 @@ export function AddWorkspaceModal({ ministryId, userId, ownedKeys, onClose, onCr
           is_president: !!r.is_president,
         })))
       if (rolesErr) throw rolesErr
+
+      // Seed Resources-tab starter content for roles that ship a guide
+      // (board roles carry their real duty lists — see workspace-presets.ts).
+      // Non-fatal: the workspace is usable without it.
+      const resourceRows = preset.roles
+        .filter((r) => r.resources)
+        .map((r) => ({
+          team_id: team.id,
+          role_name: r.name,
+          summary: r.resources!.summary,
+          responsibilities: r.resources!.responsibilities,
+          created_by: userId,
+          updated_by: userId,
+          updated_at: new Date().toISOString(),
+        }))
+      if (resourceRows.length > 0) await supabase.from("team_role_descriptions").insert(resourceRows)
 
       // If the ministry has team chats enabled, auto-create this team's linked
       // chat now (empty — the president/members are assigned next; each add
