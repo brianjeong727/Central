@@ -572,6 +572,8 @@ export interface EventPlan {
   planning_group_id: string | null
   plan_start_date: string | null
   crunch_date: string | null
+  /** Provenance: set when this plan was instantiated from a playbook (Run Sheet P2). */
+  template_id?: string | null
 }
 
 export interface EventTask {
@@ -587,6 +589,8 @@ export interface EventTask {
   parent_id: string | null
   pinned: boolean
   priority: 'none' | 'med' | 'high'
+  /** Micro-brief carried over from a playbook (Run Sheet P2). */
+  brief?: string | null
 }
 
 
@@ -643,6 +647,43 @@ export interface TransitionNote {
   created_by: string
   created_by_name: string | null
   created_at: string
+}
+
+// Run Sheet P2 — a compiled, reusable event playbook. Per-team, keyed on
+// (ministry_id, team_id, event_type); newest compile replaces last year's.
+export interface EventTemplate {
+  id: string
+  ministry_id: string
+  team_id: string | null
+  event_type: string
+  name: string
+  source_event_plan_id: string | null
+  year_label: string | null
+  extra_notes: unknown[]
+  stats: Record<string, unknown>
+  created_by: string | null
+  created_at: string
+}
+
+export interface TemplateTask {
+  id: string
+  template_id: string
+  title: string
+  phase: 'pre_event' | 'day_of' | 'post_event' | 'followup'
+  offset_days: number | null
+  actual_offset_days: number | null
+  brief: string | null
+  role_hint: string | null
+  parent_id: string | null
+  sort_order: number
+}
+
+export interface TemplateRole {
+  id: string
+  template_id: string
+  role_name: string
+  notes: string | null
+  sort_order: number
 }
 
 export interface TeamRole {
