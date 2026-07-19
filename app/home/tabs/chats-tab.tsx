@@ -1104,6 +1104,17 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // per-member read-receipt fan-out (the O(members²) source) for an on-demand
   // "Seen by N" pill; <30 keep today's live per-member receipts exactly.
   const isLargeRoom = memberCount >= 30
+  // Seed the sender name/avatar caches from the roster SWR (already fetched for
+  // @mentions + read state) so incoming realtime messages from any current member
+  // hit the cache — zero per-message profile queries on the common path. The
+  // one-off profiles fetch in the INSERT handler stays only as a fallback for
+  // non-roster senders (e.g. departed members no longer in group_members).
+  useEffect(() => {
+    for (const m of roster) {
+      profilesCache.current[m.id] = m.name
+      avatarCache.current[m.id] = m.avatarUrl
+    }
+  }, [roster])
   // Polls
   const [showPollCreator, setShowPollCreator] = useState(false)
   const [pollQuestion, setPollQuestion] = useState("")
@@ -1946,14 +1957,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       .channel(`reactions-${groupId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "message_reactions" },
+        { event: "INSERT", schema: "public", table: "message_reactions", filter: `group_id=eq.${groupId}` },
         (payload) => {
           const rx = payload.new as Reaction
-          // The channel receives ALL message_reactions (the table has no group_id
-          // to filter on), so ignore reactions for messages not currently loaded in
-          // THIS chat — otherwise every reaction in every visible chat re-renders us
-          // and grows the map with entries for unloaded messages. Reactions for
-          // messages loaded later (scroll-up) are fetched fresh by mergeReactionsFor.
+          // Server-side filtered to this group's reactions (message_reactions.group_id).
+          // The messagesRef guard stays as defense-in-depth: ignore reactions for
+          // messages not currently loaded in THIS chat (e.g. scroll-up messages not
+          // yet paged in) — otherwise the map grows entries for unloaded messages.
+          // Reactions for later-loaded messages are fetched fresh by mergeReactionsFor.
           if (!messagesRef.current.some((m) => m.id === rx.message_id)) return
           setReactions((prev) => {
             const list = prev[rx.message_id] ?? []
@@ -1973,12 +1984,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       )
       .on(
         "postgres_changes",
-        { event: "DELETE", schema: "public", table: "message_reactions" },
+        { event: "DELETE", schema: "public", table: "message_reactions", filter: `group_id=eq.${groupId}` },
         (payload) => {
           const rx = payload.old as Reaction
           if (!rx.message_id) return
-          // Same scoping as the INSERT handler: skip reactions for messages not
-          // loaded here (avoids re-renders + empty map entries for other chats).
+          // Server-side filtered (needs REPLICA IDENTITY FULL so the old row carries
+          // group_id — handled in the migration). messagesRef guard stays as before:
+          // skip reactions for messages not loaded here (avoids empty map entries).
           if (!messagesRef.current.some((m) => m.id === rx.message_id)) return
           setReactions((prev) => ({
             ...prev,
@@ -2010,15 +2022,17 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // <Composer> calls this on every input change. Stable for the memoized child.
   const onTyping = useCallback((val: string) => {
     if (typingChannelRef.current && val.trim()) {
-      // Throttle the isTyping:true SEND to at most ~1/sec while held — every keystroke
-      // firing a broadcast is needless fan-out at scale. The 2500ms stop-typing reset
-      // timer still refreshes on every keystroke.
-      if (Date.now() - lastTypingSentRef.current >= 1000) {
+      // Throttle the isTyping:true SEND to at most one per 2500ms per user (leading
+      // edge) — every keystroke firing a broadcast is needless fan-out at scale. The
+      // stop-typing reset timer still refreshes on every keystroke so a single
+      // "stopped" fires once the user goes idle for 2500ms.
+      if (Date.now() - lastTypingSentRef.current >= 2500) {
         lastTypingSentRef.current = Date.now()
         typingChannelRef.current.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: true } })
       }
       if (myTypingTimeoutRef.current) clearTimeout(myTypingTimeoutRef.current)
       myTypingTimeoutRef.current = setTimeout(() => {
+        lastTypingSentRef.current = 0
         typingChannelRef.current?.send({ type: "broadcast", event: "typing", payload: { senderId: userId, name: userName, avatarUrl: null, isTyping: false } })
       }, 2500)
     }
@@ -2290,7 +2304,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       }))
       const { data } = await supabase
         .from("message_reactions")
-        .insert({ message_id: messageId, user_id: userId, emoji })
+        // group_id is denormalized onto the row so realtime can server-side filter
+        // the reactions-{groupId} channel; the BEFORE INSERT trigger is only a
+        // fallback for rows inserted without it. We know groupId here, so set it.
+        .insert({ message_id: messageId, user_id: userId, emoji, group_id: groupId })
         .select("id")
         .single()
       if (data) {
