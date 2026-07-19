@@ -87,71 +87,45 @@ export async function autoAddUserToChats(
 
   const settings = (ministry.automation_settings ?? {}) as Record<string, boolean>
   const groupIdsToJoin: string[] = []
-  const namesToJoin: string[] = []
 
-  // Central chat — identified by the `is_central_chat` flag (name-independent),
-  // guaranteed to exist by the DB trigger. New members are always enrolled here
-  // regardless of what the chat is named, unless the automation is turned off.
-  if (settings.auto_central_chat !== false) {
-    const { data: central } = await admin
-      .from("groups")
-      .select("id")
-      .eq("ministry_id", ministryId)
-      .eq("is_central_chat", true)
-      .maybeSingle()
+  // Decide which name-based chats are wanted (grade / staff) before touching the
+  // DB, then resolve central (by flag) + those names in ONE read.
+  const wantCentral = settings.auto_central_chat !== false
+  const namesWanted: string[] = []
+  const className = settings.auto_grade_chats === true && graduationYear ? `Class of ${graduationYear}` : null
+  const staffChatName = settings.auto_staff_chat === true && isStaffRole(userRole) ? `${ministry.name} Staff` : null
+  if (className) namesWanted.push(className)
+  if (staffChatName) namesWanted.push(staffChatName)
+
+  // ONE query resolves the central chat (by the `is_central_chat` flag, name-
+  // independent) AND any wanted grade/staff chats (by name). Church-scoped: all
+  // three are `type='church'`, and this set is small + bounded per ministry.
+  const { data: churchGroups } = await admin
+    .from("groups")
+    .select("id, name, is_central_chat")
+    .eq("ministry_id", ministryId)
+    .eq("type", "church")
+  const groupRows = (churchGroups ?? []) as { id: string; name: string; is_central_chat: boolean }[]
+
+  // Central chat — always enrolled unless the automation is off. Guaranteed to
+  // exist by the DB trigger.
+  if (wantCentral) {
+    const central = groupRows.find((g) => g.is_central_chat)
     if (central) groupIdsToJoin.push(central.id)
   }
 
-  if (settings.auto_grade_chats === true && graduationYear) {
-    const className = `Class of ${graduationYear}`
-    const { data: existingChat } = await admin
-      .from("groups")
-      .select("id")
-      .eq("ministry_id", ministryId)
-      .eq("name", className)
-      .maybeSingle()
-
-    if (!existingChat) {
-      await admin.from("groups").insert({
-        name: className,
-        type: "church",
-        category: "general",
-        ministry_id: ministryId,
-        created_by: ministry.created_by,
-      })
-    }
-    namesToJoin.push(className)
+  // Grade / staff chats: enroll if present, otherwise create the missing ones in
+  // ONE batch insert (every column set on every row — supabase-js multi-row
+  // insert sends explicit nulls for omitted keys; see lessons 2026-07-15).
+  const toCreate: { name: string; type: string; category: string; ministry_id: string; created_by: string }[] = []
+  for (const name of namesWanted) {
+    const existing = groupRows.find((g) => g.name === name)
+    if (existing) groupIdsToJoin.push(existing.id)
+    else toCreate.push({ name, type: "church", category: "general", ministry_id: ministryId, created_by: ministry.created_by })
   }
-
-  if (settings.auto_staff_chat === true && isStaffRole(userRole)) {
-    const staffChatName = `${ministry.name} Staff`
-    const { data: existingStaff } = await admin
-      .from("groups")
-      .select("id")
-      .eq("ministry_id", ministryId)
-      .eq("name", staffChatName)
-      .maybeSingle()
-
-    if (!existingStaff) {
-      await admin.from("groups").insert({
-        name: staffChatName,
-        type: "church",
-        category: "general",
-        ministry_id: ministryId,
-        created_by: ministry.created_by,
-      })
-    }
-    namesToJoin.push(staffChatName)
-  }
-
-  // Resolve the remaining name-based chats (grade / staff) to ids.
-  if (namesToJoin.length > 0) {
-    const { data: groups } = await admin
-      .from("groups")
-      .select("id")
-      .eq("ministry_id", ministryId)
-      .in("name", namesToJoin)
-    for (const g of (groups ?? []) as { id: string }[]) groupIdsToJoin.push(g.id)
+  if (toCreate.length > 0) {
+    const { data: created } = await admin.from("groups").insert(toCreate).select("id")
+    for (const g of (created ?? []) as { id: string }[]) groupIdsToJoin.push(g.id)
   }
 
   if (groupIdsToJoin.length === 0) return
@@ -215,25 +189,40 @@ export async function retroactivelyApplyToggle(
       arr.push(p.id)
       byYear.set(p.graduation_year, arr)
     }
+    if (byYear.size === 0) return { added: 0 }
 
+    // Resolve every "Class of {year}" chat in ONE read, batch-create the missing
+    // ones, then upsert all memberships across all years in ONE upsert.
+    const nameToYear = new Map<string, number>()
+    for (const year of byYear.keys()) nameToYear.set(`Class of ${year}`, year)
+    const classNames = [...nameToYear.keys()]
+
+    const { data: existingChats } = await admin
+      .from("groups").select("id, name").eq("ministry_id", ministryId).in("name", classNames)
+    const nameToChatId = new Map<string, string>(
+      ((existingChats ?? []) as { id: string; name: string }[]).map((g) => [g.name, g.id])
+    )
+
+    const missingNames = classNames.filter((n) => !nameToChatId.has(n))
+    if (missingNames.length > 0) {
+      const { data: createdChats } = await admin
+        .from("groups")
+        .insert(missingNames.map((name) => ({ name, type: "church", category: "general", ministry_id: ministryId, created_by: ministry.created_by })))
+        .select("id, name")
+      for (const g of (createdChats ?? []) as { id: string; name: string }[]) nameToChatId.set(g.name, g.id)
+    }
+
+    const membershipRows: { group_id: string; user_id: string }[] = []
     let totalAdded = 0
-    for (const [year, ids] of byYear) {
-      const className = `Class of ${year}`
-      let { data: chat } = await admin
-        .from("groups").select("id").eq("ministry_id", ministryId).eq("name", className).maybeSingle()
-      if (!chat) {
-        const { data: newChat } = await admin
-          .from("groups")
-          .insert({ name: className, type: "church", category: "general", ministry_id: ministryId, created_by: ministry.created_by })
-          .select("id").single()
-        chat = newChat
-      }
-      if (!chat) continue
-      await admin.from("group_members").upsert(
-        ids.map((id: string) => ({ group_id: chat!.id, user_id: id })),
-        { onConflict: "group_id,user_id", ignoreDuplicates: true }
-      )
+    for (const [name, year] of nameToYear) {
+      const chatId = nameToChatId.get(name)
+      if (!chatId) continue
+      const ids = byYear.get(year) ?? []
+      for (const id of ids) membershipRows.push({ group_id: chatId, user_id: id })
       totalAdded += ids.length
+    }
+    if (membershipRows.length > 0) {
+      await admin.from("group_members").upsert(membershipRows, { onConflict: "group_id,user_id", ignoreDuplicates: true })
     }
     return { added: totalAdded }
   }
@@ -507,46 +496,10 @@ export async function confirmSmallGroupChatsAction(
     return name.split(" ")[0]
   }
 
-  async function upsertChat(chatName: string, memberIds: string[]): Promise<{ result: "created" | "updated" | "error"; groupId: string | null }> {
-    const { data: existing } = await admin
-      .from("groups")
-      .select("id")
-      .eq("ministry_id", ministryId)
-      .eq("name", chatName)
-      .maybeSingle()
-
-    let groupId: string
-
-    if (existing) {
-      groupId = existing.id
-      // Sync members: insert missing, don't remove existing
-      await admin
-        .from("group_members")
-        .upsert(
-          memberIds.map(uid => ({ group_id: groupId, user_id: uid })),
-          { onConflict: "group_id,user_id", ignoreDuplicates: true }
-        )
-      return { result: "updated", groupId }
-    } else {
-      const { data: group, error } = await admin
-        .from("groups")
-        .insert({ name: chatName, type: "church", category: "group", ministry_id: ministryId, created_by: createdBy })
-        .select("id")
-        .single()
-      if (error || !group) return { result: "error", groupId: null }
-      groupId = group.id
-      await admin
-        .from("group_members")
-        .upsert(
-          memberIds.map(uid => ({ group_id: groupId, user_id: uid })),
-          { onConflict: "group_id,user_id", ignoreDuplicates: true }
-        )
-      return { result: "created", groupId }
-    }
-  }
-
-  let created = 0
-  let updated = 0
+  // Phase 1: compute every chat spec (name → members) up front. Individual group
+  // chats also carry the small_group id so we can write chat_group_id back.
+  type ChatSpec = { name: string; members: string[]; writeBackSgId?: string }
+  const specs: ChatSpec[] = []
   const pairedSeen = new Set<string>()
 
   for (const sg of smallGroups as { id: string; leader_id: string | null; paired_group_id: string | null }[]) {
@@ -555,16 +508,11 @@ export async function confirmSmallGroupChatsAction(
     if (!leaderName) continue
 
     // Individual group chat
-    const chatName = `${firstName(leaderName)}'s Group`
-    const members = Array.from(new Set([sg.leader_id, ...(membersByGroup.get(sg.id) ?? [])]))
-    const { result, groupId: chatGroupId } = await upsertChat(chatName, members)
-    if (result === "created") created++
-    else if (result === "updated") updated++
-
-    // Save chat_group_id back to small_groups for bidirectional sync
-    if (chatGroupId) {
-      await admin.from("small_groups").update({ chat_group_id: chatGroupId }).eq("id", sg.id)
-    }
+    specs.push({
+      name: `${firstName(leaderName)}'s Group`,
+      members: Array.from(new Set([sg.leader_id, ...(membersByGroup.get(sg.id) ?? [])])),
+      writeBackSgId: sg.id,
+    })
 
     // Paired group chat (process each pair only once)
     if (!sg.paired_group_id) continue
@@ -577,16 +525,64 @@ export async function confirmSmallGroupChatsAction(
     const pairedLeaderName = profileMap.get(paired.leader_id)
     if (!pairedLeaderName) continue
 
-    const pairedChatName = `${firstName(leaderName)} + ${firstName(pairedLeaderName)}'s Groups`
-    const pairedMembers = Array.from(new Set([
-      sg.leader_id,
-      paired.leader_id,
-      ...(membersByGroup.get(sg.id) ?? []),
-      ...(membersByGroup.get(sg.paired_group_id) ?? []),
-    ]))
-    const { result: pairedResult } = await upsertChat(pairedChatName, pairedMembers)
-    if (pairedResult === "created") created++
-    else if (pairedResult === "updated") updated++
+    specs.push({
+      name: `${firstName(leaderName)} + ${firstName(pairedLeaderName)}'s Groups`,
+      members: Array.from(new Set([
+        sg.leader_id,
+        paired.leader_id,
+        ...(membersByGroup.get(sg.id) ?? []),
+        ...(membersByGroup.get(sg.paired_group_id) ?? []),
+      ])),
+    })
+  }
+
+  if (specs.length === 0) return { created: 0, updated: 0 }
+
+  // Phase 2: resolve all existing chats by name in ONE read.
+  const allNames = [...new Set(specs.map((s) => s.name))]
+  const { data: existingGroups } = await admin
+    .from("groups").select("id, name").eq("ministry_id", ministryId).in("name", allNames)
+  const nameToId = new Map<string, string>(
+    ((existingGroups ?? []) as { id: string; name: string }[]).map((g) => [g.name, g.id])
+  )
+  const preExisting = new Set(nameToId.keys())
+
+  // Phase 3: batch-create the missing chats in ONE insert.
+  const missingNames = allNames.filter((n) => !nameToId.has(n))
+  if (missingNames.length > 0) {
+    const { data: createdGroups, error } = await admin
+      .from("groups")
+      .insert(missingNames.map((name) => ({ name, type: "church", category: "group", ministry_id: ministryId, created_by: createdBy })))
+      .select("id, name")
+    if (error) return { created: 0, updated: 0, error: `Failed to create group chats: ${error.message}` }
+    for (const g of (createdGroups ?? []) as { id: string; name: string }[]) nameToId.set(g.name, g.id)
+  }
+
+  // Phase 4: combine every spec's membership into ONE upsert; collect the
+  // chat_group_id write-backs for the individual chats. Counts mirror the
+  // original sequential upsert — the first spec to touch a name that wasn't in
+  // the DB counts "created", any later spec on that same name counts "updated".
+  let created = 0
+  let updated = 0
+  const seenNames = new Set(preExisting)
+  const membershipRows: { group_id: string; user_id: string }[] = []
+  const writeBacks: { sgId: string; groupId: string }[] = []
+
+  for (const spec of specs) {
+    const groupId = nameToId.get(spec.name)
+    if (!groupId) continue
+    if (seenNames.has(spec.name)) updated++
+    else { created++; seenNames.add(spec.name) }
+    for (const uid of spec.members) membershipRows.push({ group_id: groupId, user_id: uid })
+    if (spec.writeBackSgId) writeBacks.push({ sgId: spec.writeBackSgId, groupId })
+  }
+
+  if (membershipRows.length > 0) {
+    await admin.from("group_members").upsert(membershipRows, { onConflict: "group_id,user_id", ignoreDuplicates: true })
+  }
+  // Bidirectional sync: save chat_group_id back onto each small_groups row.
+  if (writeBacks.length > 0) {
+    await Promise.all(writeBacks.map((w) => admin.from("small_groups").update({ chat_group_id: w.groupId }).eq("id", w.sgId)))
   }
 
   return { created, updated }

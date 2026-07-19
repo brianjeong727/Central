@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
+import Image from "next/image"
 import dynamic from "next/dynamic"
 import useSWR from "swr"
 import { useRouter } from "next/navigation"
@@ -18,6 +19,30 @@ import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, J
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
 import type { Profile, Devotional, Prayer, Verse, NotificationSettings } from "../types"
+
+// Client-side avatar downscale before upload: cap the longest edge at 512px and
+// re-encode JPEG q0.85 so phone-camera multi-MB originals never hit storage/egress.
+// Best-effort — on any decode failure (e.g. HEIC the browser can't paint) the
+// caller falls back to uploading the original file untouched.
+async function downscaleToJpeg(file: File, maxEdge = 512, quality = 0.85): Promise<Blob> {
+  const bitmap = await createImageBitmap(file)
+  try {
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
+    const w = Math.max(1, Math.round(bitmap.width * scale))
+    const h = Math.max(1, Math.round(bitmap.height * scale))
+    const canvas = document.createElement("canvas")
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext("2d")
+    if (!ctx) throw new Error("no 2d context")
+    ctx.drawImage(bitmap, 0, 0, w, h)
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", quality))
+    if (!blob) throw new Error("toBlob failed")
+    return blob
+  } finally {
+    bitmap.close?.()
+  }
+}
 
 // Lazy — RoleDescriptionEditor pulls in @tiptap + yjs; keep that bundle off the
 // Profile tab's chunk until the user actually opens a journal editor.
@@ -1115,9 +1140,21 @@ export function ProfileTab({
     const raw = file.name.split(".").pop()?.toLowerCase()
     const ext = raw && raw !== file.name.toLowerCase() ? raw : "png"
     const fileName = `${userId}.${ext}`
+    // Downscale to a 512px JPEG before upload; on decode failure keep the raw file.
+    // Path stays identical — Supabase serves the stored contentType, so a .png path
+    // holding JPEG bytes resolves correctly.
+    let uploadBody: Blob | File = file
+    let uploadContentType = file.type || "image/png"
+    try {
+      uploadBody = await downscaleToJpeg(file)
+      uploadContentType = "image/jpeg"
+    } catch {
+      uploadBody = file
+      uploadContentType = file.type || "image/png"
+    }
     const { data: uploadData, error } = await supabase.storage
       .from("profile-images")
-      .upload(fileName, file, { upsert: true, contentType: file.type || "image/png" })
+      .upload(fileName, uploadBody, { upsert: true, contentType: uploadContentType })
     if (error) { setAvatarError(error.message); setUploadingAvatar(false); e.target.value = ""; return }
     if (uploadData) {
       const { data: { publicUrl } } = supabase.storage.from("profile-images").getPublicUrl(uploadData.path)
@@ -1284,7 +1321,7 @@ export function ProfileTab({
             <label className="group relative flex-shrink-0" style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
               <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
               {profile.avatar_url
-                ? <img src={profile.avatar_url} alt="Profile" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ? <Image src={profile.avatar_url} alt="Profile" fill sizes="56px" style={{ objectFit: "cover" }} />
                 : <span style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--cream)" }}>{getInitials(profile.name)}</span>
               }
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 35%, transparent)" }}>
@@ -1327,7 +1364,7 @@ export function ProfileTab({
             <label className="group relative flex-shrink-0" style={{ width: 64, height: 64, borderRadius: "999px", background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
               <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
               {profile.avatar_url
-                ? <img src={profile.avatar_url} alt="Profile" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ? <Image src={profile.avatar_url} alt="Profile" fill sizes="64px" style={{ objectFit: "cover" }} />
                 : <span style={{ fontFamily: "var(--serif)", fontSize: 26, color: "var(--cream)" }}>{getInitials(profile.name)}</span>
               }
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 35%, transparent)" }}>

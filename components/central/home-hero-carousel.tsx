@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, CSSProperties, ReactNode, TransitionEvent } from "react"
+import Image from "next/image"
 import { ChevronLeft, ChevronRight, ClipboardList } from "lucide-react"
 import { UpNextEventDetail } from "./up-next-card"
 
@@ -627,11 +628,15 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
     <div ref={boxRef} style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
       {/* card sized to the image's aspect (clamped), centered in the fixed footprint — shows the whole image */}
       <div style={{ position: "relative", width: cardW, height: cardH, flexShrink: 0, borderRadius: "var(--r-hero)", overflow: "hidden", border: "1px solid var(--line-2)", background: PHOTO_BACKDROP }}>
-        <img
+        <Image
           src={imageUrl}
           alt=""
+          fill
+          sizes="600px"
+          // The optimizer preserves aspect ratio, so naturalWidth/naturalHeight
+          // still yields the correct AR used to size the card.
           onLoad={(e) => { const t = e.currentTarget; if (t.naturalWidth && t.naturalHeight) setNaturalAR(t.naturalWidth / t.naturalHeight) }}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
+          style={{ objectFit: "cover", objectPosition: "center", display: "block" }}
         />
       {/* light clamped-color mood ramp — fades out by ~70%, photo reads through */}
       <div style={{ position: "absolute", inset: 0, background: rampBg(c) }} />

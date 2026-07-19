@@ -398,9 +398,12 @@ async function createOnboardingWorkspaces(
     .eq("ministry_id", ministryId)
   if ((count ?? 0) > 0) return
 
-  for (const id of ids) {
+  // Teams are independent of one another — seed them concurrently. Within a team
+  // the roles + resources inserts both depend only on the new team id, so they
+  // run in parallel too. The idempotency guard above already gated the whole set.
+  await Promise.all(ids.map(async (id) => {
     const preset = presetById(id)
-    if (!preset) continue
+    if (!preset) return
     const { data: team, error: teamErr } = await admin
       .from("teams")
       .insert({
@@ -418,17 +421,9 @@ async function createOnboardingWorkspaces(
       })
       .select("id")
       .single()
-    if (teamErr || !team) continue
+    if (teamErr || !team) return
     // Seed the preset's roles (incl. the is_president role). No team_members —
     // the admin assigns the president later from the workspace's settings.
-    await admin.from("team_roles").insert(
-      preset.roles.map((r) => ({
-        team_id: team.id,
-        name: r.name,
-        permissions: r.permissions,
-        is_president: !!r.is_president,
-      }))
-    )
     // Seed Resources-tab starter content for roles that ship a guide
     // (summary + responsibilities — e.g. the board roles' real duties).
     const resourceRows = preset.roles
@@ -442,8 +437,20 @@ async function createOnboardingWorkspaces(
         updated_by: createdBy,
         updated_at: new Date().toISOString(),
       }))
-    if (resourceRows.length > 0) await admin.from("team_role_descriptions").insert(resourceRows)
-  }
+    await Promise.all([
+      admin.from("team_roles").insert(
+        preset.roles.map((r) => ({
+          team_id: team.id,
+          name: r.name,
+          permissions: r.permissions,
+          is_president: !!r.is_president,
+        }))
+      ),
+      resourceRows.length > 0
+        ? admin.from("team_role_descriptions").insert(resourceRows)
+        : Promise.resolve(),
+    ])
+  }))
 }
 
 // Seed a freshly-approved ministry with starter content so the founder's first
@@ -606,19 +613,16 @@ export async function approveMinistry(ministryId: string): Promise<{ error: stri
     .eq("id", ministryId)
     .single()
 
-  // Create the workspaces the admin selected at onboarding, empty (no president).
+  // The three seeding operations below are independent (workspaces/roles,
+  // starter content, ministry_schools) and each keeps its own idempotence guard,
+  // so they run concurrently to cut approval latency.
   const onboardingWorkspaces: string[] = Array.isArray(ministry?.onboarding_workspaces)
     ? ministry!.onboarding_workspaces
     : []
-  if (ministry?.created_by) {
-    await createOnboardingWorkspaces(admin, ministryId, ministry.created_by, onboardingWorkspaces)
-    // Starter content (pinned welcome announcement + "Leaders" chat) — never
-    // fails approval; errors are logged inside and swallowed.
-    await seedStarterContent(admin, ministryId, ministry.name ?? "your ministry", ministry.created_by)
-  }
-
   const unis: string[] = Array.isArray(ministry?.universities) ? ministry.universities : []
-  if (unis.length > 0) {
+
+  const seedSchools = async () => {
+    if (unis.length === 0) return
     // Only insert schools that don't already exist for this ministry
     const { data: existing } = await admin
       .from("ministry_schools")
@@ -637,6 +641,19 @@ export async function approveMinistry(ministryId: string): Promise<{ error: stri
       await admin.from("ministry_schools").insert(toInsert)
     }
   }
+
+  await Promise.all([
+    // Create the workspaces the admin selected at onboarding, empty (no president),
+    // plus starter content (pinned welcome announcement + "Leaders" chat) — the
+    // latter never fails approval; errors are logged inside and swallowed.
+    ministry?.created_by
+      ? Promise.all([
+          createOnboardingWorkspaces(admin, ministryId, ministry.created_by, onboardingWorkspaces),
+          seedStarterContent(admin, ministryId, ministry.name ?? "your ministry", ministry.created_by),
+        ])
+      : Promise.resolve(),
+    seedSchools(),
+  ])
 
   return { error: null }
 }
