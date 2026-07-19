@@ -11,7 +11,7 @@ import {
   ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle, ArrowUpRight,
   FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle,
-  Sparkles, Layers, Bus, Clock, Star, CornerUpLeft, AlertTriangle, PlusCircle,
+  Sparkles, Layers, Bus, Clock, Star, CornerUpLeft, AlertTriangle, PlusCircle, Repeat,
 } from "lucide-react"
 import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
@@ -35,7 +35,9 @@ import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamCh
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
-import { instantiateTemplateAction, runItBackAction, runItBackFromEventAction } from "@/app/actions/event-templates"
+import { instantiateTemplateAction } from "@/app/actions/event-templates"
+import { startNextSeasonAction } from "@/app/actions/season-rollover"
+import { ActionMenu } from "@/components/central/action-menu"
 import { setBlockStatusAction, shiftBlocksAction } from "@/app/actions/event-blocks"
 import { EventCompileModal } from "./event-compile"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
@@ -884,7 +886,7 @@ async function fetchCalendarEventsAndPlans([, ministryId, teamScope]: readonly [
   const supabase = createClient()
   let query = supabase
     .from("calendar_events")
-    .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+    .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
     .eq("ministry_id", ministryId)
     .order("start_date", { ascending: true })
   if (teamScope !== "all") {
@@ -938,6 +940,17 @@ function endedAgoLabel(start: Date, now: Date): string {
 // Agenda/timeline view for a team's Events section (redesign per cdesign handoff).
 // Groups top-level events by month with a spine + node rail; the earliest upcoming
 // event is emphasised as an "up next" callout with an optional sub-events disclosure.
+// The traditions mark — flags a recurring (annually carried-forward) event.
+function RecurringMark({ size = 14 }: { size?: number }) {
+  return (
+    <Repeat
+      role="img"
+      aria-label="Recurring every year"
+      style={{ width: size, height: size, color: "var(--plum)", display: "inline-block", verticalAlign: "baseline", marginLeft: 8, flexShrink: 0, opacity: 0.75 }}
+    />
+  )
+}
+
 function EventsAgendaList({
   events, allEvents, onOpenEvent, canEdit, onDelete, deleteConfirmId, setDeleteConfirmId, deleting, plannedIds,
 }: {
@@ -1028,7 +1041,8 @@ function EventsAgendaList({
         />
       )
     }
-    const pastDescM = [...past].reverse()
+    const archiveViewM = upcoming.length === 0 && past.length > 0
+    const pastDescM = archiveViewM ? [...past] : [...past].reverse()
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         {upcoming.length > 0 && (
@@ -1036,7 +1050,11 @@ function EventsAgendaList({
             {upcoming.map((ev, i) => agendaRow(ev, false, i === upcoming.length - 1))}
           </PocketRowCard>
         )}
-        {past.length > 0 && (
+        {archiveViewM ? (
+          <PocketRowCard>
+            {pastDescM.map((ev, i) => agendaRow(ev, true, i === pastDescM.length - 1))}
+          </PocketRowCard>
+        ) : past.length > 0 && (
           <>
             <button
               onClick={() => setShowPastOverride(v => !(v ?? (upcoming.length === 0)))}
@@ -1154,7 +1172,7 @@ function EventsAgendaList({
           </div>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginTop: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <h3 style={{ fontFamily: "var(--serif)", fontSize: 23, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</h3>
+              <h3 style={{ fontFamily: "var(--serif)", fontSize: 23, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}{ev.recurring && <RecurringMark size={16} />}</h3>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, fontSize: 13, color: "var(--body)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {rangeStr}</span>
                 {ev.location && <>{dot}<span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {ev.location}</span></>}
@@ -1177,7 +1195,7 @@ function EventsAgendaList({
           style={{ display: "flex", alignItems: "center", gap: "var(--space-5)", padding: "17px 20px", borderRadius: "var(--r-card)", background: "var(--cream)", border: `1px solid ${isHovered ? "var(--dashed)" : "var(--line-2)"}`, cursor: "pointer", transition: "border-color 120ms ease" }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+            <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}{ev.recurring && <RecurringMark />}</p>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 13, color: "var(--body)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {dtStr}</span>
               {ev.location && <>{dot}<span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {ev.location}</span></>}
@@ -1215,7 +1233,7 @@ function EventsAgendaList({
               const cd2 = new Date(c.start_date)
               const cTime = c.all_day ? "All day" : cd2.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
               return (
-                <div key={c.id} onClick={e => { e.stopPropagation(); onOpenEvent(c) }} style={{ display: "grid", gridTemplateColumns: "52px 20px 1fr", cursor: "pointer" }}>
+                <div key={c.id} onClick={e => { e.stopPropagation(); onOpenEvent(c) }} style={{ display: "grid", gridTemplateColumns: "52px 20px minmax(0, 1fr)", cursor: "pointer" }}>
                   <div style={{ textAlign: "center", paddingTop: 4 }}>
                     <div style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", lineHeight: 1, letterSpacing: "-0.02em" }}>{cd2.getDate()}</div>
                     <div style={{ ...monoBase, fontSize: 9, color: "var(--muted-text)", marginTop: 2 }}>{cd2.toLocaleDateString("en-US", { month: "short" })}</div>
@@ -1224,7 +1242,7 @@ function EventsAgendaList({
                     <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 2, background: "var(--line-2)", transform: "translateX(-50%)" }} />
                     <div style={{ position: "absolute", left: "50%", top: "50%", width: 7, height: 7, borderRadius: "50%", background: "var(--cream)", border: "2px solid var(--dashed)", transform: "translate(-50%,-50%)", boxSizing: "border-box" }} />
                   </div>
-                  <div style={{ background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "11px 15px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "11px 15px", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", margin: 0, fontFamily: "var(--sans)" }}>{c.title}</p>
                       {c.description && <p style={{ fontSize: 12, color: "var(--body)", margin: "2px 0 0", fontFamily: "var(--sans)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.description}</p>}
@@ -1262,7 +1280,10 @@ function EventsAgendaList({
   })
 
   // ── Past list (reverse-chronological, de-emphasised; no month grouping, no subs) ──
-  const pastDesc = [...past].reverse()
+  // Archive mode (season filter on a finished year): the whole list is "past",
+  // so render it chronologically with no collapse bar — it IS the year's record.
+  const archiveView = upcoming.length === 0 && past.length > 0
+  const pastDesc = archiveView ? [...past] : [...past].reverse()
   const pastNodes: ReactNode[] = pastDesc.map((ev, i) => {
     const d = new Date(ev.start_date)
     const isFirst = i === 0
@@ -1282,7 +1303,7 @@ function EventsAgendaList({
         style={{ display: "flex", alignItems: "center", gap: "var(--space-5)", padding: "17px 20px", borderRadius: "var(--r-card)", background: "var(--cream-2)", border: `1px solid ${isHovered ? "var(--line-2)" : "var(--line)"}`, opacity: isHovered ? 1 : 0.82, cursor: "pointer", transition: "opacity 120ms ease, border-color 120ms ease" }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--body)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--body)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}{ev.recurring && <RecurringMark />}</p>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 13, color: "var(--faint)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {dtStr}</span>
             {ev.location && <>{dot}<span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {ev.location}</span></>}
@@ -1320,7 +1341,9 @@ function EventsAgendaList({
   return (
     <div>
       {upcomingNodes}
-      {past.length > 0 && (
+      {archiveView ? (
+        <div>{pastNodes}</div>
+      ) : past.length > 0 && (
         <>
           <CentralButton
             variant="quiet"
@@ -1488,13 +1511,6 @@ export function StudentOrgTeamHome({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displaySection])
 
-  // Side-effect (was inside the fetcher): notify the parent of the current event list.
-  // Pass the sub-event-excluded list (calEvents) to keep parent consumers consistent
-  // with StudentOrgTeamHome's original filtered dataset.
-  useEffect(() => {
-    if (calData) onCalEventsChange?.(calEvents)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calData])
   // External refresh trigger → revalidate the shared cache.
   useEffect(() => {
     if (refreshSignal) void mutateCal()
@@ -1531,6 +1547,58 @@ export function StudentOrgTeamHome({
   }, [teamId])
 
   const now = new Date()
+
+  // ── Season rollover — filter chips + the "Start next season" flow ──────────
+  // Seasons derive from the events themselves (academic July boundary); the
+  // default view is the latest season that has events, so a freshly-rolled
+  // year takes over the list and past years stay one chip away.
+  const [seasonFilter, setSeasonFilter] = useState<string | null>(null)
+  const [showSeasonConfirm, setShowSeasonConfirm] = useState(false)
+  const [seasonBusy, setSeasonBusy] = useState(false)
+  const [seasonError, setSeasonError] = useState<string | null>(null)
+  const seasons = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of calEvents) set.add(seasonLabelOf(e.start_date.slice(0, 10)))
+    return [...set].sort().reverse()
+  }, [calEvents])
+  const activeSeason = seasonFilter && seasons.includes(seasonFilter) ? seasonFilter : (seasons[0] ?? seasonLabelOf(ymdOf(new Date())))
+  const seasonEvents = useMemo(
+    () => calEvents.filter(e => seasonLabelOf(e.start_date.slice(0, 10)) === activeSeason),
+    [calEvents, activeSeason],
+  )
+  // What "Start next season" will actually copy: the latest season that has
+  // recurring top-level events (independent of the active filter chip).
+  const rolloverSource = useMemo(() => {
+    const rec = calEvents.filter(e => e.recurring && !e.parent_event_id)
+    if (rec.length === 0) return { season: null as string | null, count: 0 }
+    const latest = rec.map(e => seasonLabelOf(e.start_date.slice(0, 10))).sort().reverse()[0]
+    return { season: latest, count: rec.filter(e => seasonLabelOf(e.start_date.slice(0, 10)) === latest).length }
+  }, [calEvents])
+
+  // Notify the parent (sidebar events sub-list) of the current list — the
+  // SEASON-FILTERED set, so a finished year's events leave the sidebar after
+  // "Start next season" (and the sidebar follows the season dropdown).
+  useEffect(() => {
+    if (calData) onCalEventsChange?.(seasonEvents)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calData, seasonEvents])
+
+  async function handleStartNextSeason() {
+    if (!teamId) return
+    setSeasonBusy(true)
+    setSeasonError(null)
+    try {
+      const res = await startNextSeasonAction(teamId)
+      if ("error" in res) { setSeasonError(res.error); return }
+      setShowSeasonConfirm(false)
+      setSeasonFilter(res.season)
+      void mutateCal()
+    } catch (e: unknown) {
+      setSeasonError((e as { message?: string }).message ?? "Couldn't start the season — try again.")
+    } finally {
+      setSeasonBusy(false)
+    }
+  }
 
   async function handleDeleteEvent(evId: string) {
     setDeleting(true)
@@ -1746,20 +1814,66 @@ export function StudentOrgTeamHome({
         {/* PLAN — events list with Plan → links */}
         {displaySection === "Events" && (
           <div>
+            {/* One header row: Events · season chips (browse past years) · rollover CTA · New Event.
+                Seasons derive from the events themselves; default = the latest
+                season that actually has events. flexWrap keeps narrow widths sane. */}
             <ContentHeader
               label="Events"
               style={{ marginBottom: 24 }}
-              action={canEdit && (
-                <ContentActionButton
-                  variant="primary"
-                  icon={<Plus style={{ width: 13, height: 13 }} />}
-                  label="New Event"
-                  onClick={() => setShowAddModal(true)}
-                />
-              )}
+              action={
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", gap: 8 }}>
+                  {seasons.length > 1 && (
+                    <ActionMenu
+                      align="right"
+                      minWidth={140}
+                      items={seasons.map(sn => ({ key: sn, label: sn, onSelect: () => setSeasonFilter(sn) }))}
+                      renderTrigger={({ toggle }) => (
+                        <button
+                          type="button"
+                          onClick={toggle}
+                          aria-label="Season"
+                          style={{
+                            display: "flex", alignItems: "center", gap: 6,
+                            padding: "5px 12px", borderRadius: 9999, cursor: "pointer",
+                            fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.06em",
+                            border: "1.5px solid var(--plum)", background: "var(--plum-tint)",
+                            color: "var(--plum)", fontWeight: 600, whiteSpace: "nowrap",
+                          }}
+                        >
+                          {activeSeason}
+                          <ChevronDown style={{ width: 12, height: 12 }} />
+                        </button>
+                      )}
+                    />
+                  )}
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSeasonConfirm(true)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        padding: "6px 13px", borderRadius: 9999, cursor: "pointer",
+                        border: "1.5px solid var(--line)", background: "var(--cream-panel)",
+                        fontSize: 12.5, fontWeight: 500, color: "var(--plum)", whiteSpace: "nowrap",
+                      }}
+                    >
+                      <Repeat style={{ width: 13, height: 13 }} />
+                      Start next season
+                    </button>
+                  )}
+                  {canEdit && (
+                    <ContentActionButton
+                      variant="primary"
+                      icon={<Plus style={{ width: 13, height: 13 }} />}
+                      label="New Event"
+                      onClick={() => setShowAddModal(true)}
+                    />
+                  )}
+                </div>
+              }
             />
             <EventsAgendaList
-              events={calEvents}
+              events={seasonEvents}
               allEvents={calData?.events ?? []}
               onOpenEvent={onPlanningEventChange}
               canEdit={canEdit}
@@ -1769,6 +1883,29 @@ export function StudentOrgTeamHome({
               deleting={deleting}
               plannedIds={plannedIds}
             />
+            {showSeasonConfirm && (
+              <CentralModal
+                onClose={() => { if (!seasonBusy) setShowSeasonConfirm(false) }}
+                title="Start next season"
+                maxWidth={440}
+                footer={
+                  <>
+                    <CentralButton variant="quiet" size="sm" onClick={() => setShowSeasonConfirm(false)} disabled={seasonBusy}>Cancel</CentralButton>
+                    <CentralButton variant="primary" size="md" onClick={handleStartNextSeason} disabled={seasonBusy || rolloverSource.count === 0}>
+                      {seasonBusy ? "Copying the year…" : "Start season"}
+                    </CentralButton>
+                  </>
+                }
+              >
+                <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.6, margin: 0 }}>
+                  Carries <span style={{ fontWeight: 600, color: "var(--ink)" }}>{rolloverSource.count} recurring {rolloverSource.count === 1 ? "event" : "events"}</span> from {rolloverSource.season ?? activeSeason} into
+                  next season — an exact copy of that year&apos;s plans (checklists, roles, run of show, sub-events) dated to
+                  matching weekdays, with completion reset and every lead unassigned. One-off events stay in their season,
+                  browsable from the season filter. Nothing existing is changed or deleted.
+                </p>
+                {seasonError && <p style={{ fontSize: 13, color: "var(--danger)", marginTop: 12 }}>{seasonError}</p>}
+              </CentralModal>
+            )}
           </div>
         )}
 
@@ -6268,142 +6405,23 @@ export function AddEventModal({
   }
 
 
-  // ── History-first creation: path chooser + the Run-it-back shelf ────────────
-  // A new event starts at a chooser: inherit a past season's playbook (shelf),
-  // take a light quick preset, or build free-form with capability modules.
-  type CreatePath = "shelf" | "quick" | "custom"
-  type ShelfItem = {
-    kind: "template" | "event" // event = past event never compiled (lazy auto-compile on inherit)
-    id: string
-    name: string
-    season: string
-    eventType: EventType
-    taskCount: number | null
-    turnout: number | null
-    sourceDate: string | null // source event start ISO — drives the suggested next date
-  }
+  // ── Creation paths: quick presets or free-form. (Season rollover replaced the
+  // per-event "Run it back" shelf — recurring events carry forward wholesale
+  // via the Events page's "Start next season".)
+  type CreatePath = "quick" | "custom"
   const [createPath, setCreatePath] = useState<CreatePath | null>(isEditing ? "quick" : null)
-  const [shelf, setShelf] = useState<ShelfItem[] | null>(null)
-  const [shelfPick, setShelfPick] = useState<ShelfItem | null>(null)
   const [extras, setExtras] = useState<EventExtraTab[]>([])
+  // The traditions flag — recurring events are what "Start next season" copies forward.
+  const [recurring, setRecurring] = useState<boolean>(existing?.recurring ?? false)
   const QUICK_TYPES: EventType[] = (["social", "ministry"] as EventType[]).filter(t => !excludeTypes?.includes(t))
   // The modal body keeps its scroll position across content swaps — after
-  // scrolling the chooser to reach "Start from scratch", the details form
-  // would otherwise open with the title off-screen. Reset on path change.
+  // scrolling the chooser, the details form would otherwise open with the
+  // title off-screen. Reset on path change.
   const bodyTopRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const scroller = bodyTopRef.current?.parentElement
     if (scroller) scroller.scrollTop = 0
   }, [createPath])
-
-  // Load the shelf: every compiled playbook for this team (or ministry-wide),
-  // plus past events that were never compiled — those inherit via lazy
-  // auto-compile so nobody has to remember the compile step.
-  useEffect(() => {
-    if (isEditing || parentEventId) { setShelf([]); return }
-    let cancelled = false
-    ;(async () => {
-      const { data: tpls } = await supabase
-        .from("event_templates")
-        .select("id, name, year_label, event_type, lineage_key, stats, source_event_plan_id, team_id")
-        .eq("ministry_id", ministryId)
-      const templates = (tpls ?? []).filter(t => !teamId || t.team_id === teamId || t.team_id === null)
-
-      const srcPlanIds = templates.map(t => t.source_event_plan_id).filter(Boolean) as string[]
-      const planToEvent = new Map<string, string>()
-      if (srcPlanIds.length) {
-        const { data: plans } = await supabase.from("event_plans").select("id, calendar_event_id").in("id", srcPlanIds)
-        for (const p of plans ?? []) planToEvent.set(p.id as string, p.calendar_event_id as string)
-      }
-      const srcEventIds = [...planToEvent.values()]
-      const eventDates = new Map<string, string>()
-      if (srcEventIds.length) {
-        const { data: evs } = await supabase.from("calendar_events").select("id, start_date").in("id", srcEventIds)
-        for (const e of evs ?? []) eventDates.set(e.id as string, e.start_date as string)
-      }
-      const items: ShelfItem[] = templates.map(t => {
-        const stats = (t.stats ?? {}) as { task_count?: number | null; actual_turnout?: number | null }
-        const srcEvId = t.source_event_plan_id ? planToEvent.get(t.source_event_plan_id as string) : undefined
-        return {
-          kind: "template" as const, id: t.id as string, name: t.name as string,
-          season: (t.year_label as string | null) ?? "earlier",
-          eventType: (t.event_type as EventType) ?? "social",
-          taskCount: stats.task_count ?? null, turnout: stats.actual_turnout ?? null,
-          sourceDate: srcEvId ? (eventDates.get(srcEvId) ?? null) : null,
-        }
-      })
-
-      // Past, top-level, planned-but-never-compiled events.
-      let pastQ = supabase
-        .from("calendar_events")
-        .select("id, title, start_date, event_type")
-        .eq("ministry_id", ministryId)
-        .is("parent_event_id", null)
-        .lt("start_date", new Date().toISOString())
-      if (teamId) pastQ = pastQ.eq("team_id", teamId)
-      const { data: pastEvs } = await pastQ
-      const pastIds = (pastEvs ?? []).map(e => e.id as string)
-      const withPlan = new Set<string>()
-      if (pastIds.length) {
-        const { data: plans } = await supabase.from("event_plans").select("calendar_event_id").in("calendar_event_id", pastIds)
-        for (const p of plans ?? []) withPlan.add(p.calendar_event_id as string)
-      }
-      const covered = new Set(items.map(i => `${lineageKeyOf(i.name)}|${i.season}`))
-      const pastItems: ShelfItem[] = []
-      for (const e of pastEvs ?? []) {
-        if (!withPlan.has(e.id as string)) continue
-        const key = `${lineageKeyOf(e.title as string)}|${seasonLabelOf((e.start_date as string).slice(0, 10))}`
-        if (covered.has(key)) continue
-        covered.add(key)
-        pastItems.push({
-          kind: "event", id: e.id as string, name: e.title as string,
-          season: seasonLabelOf((e.start_date as string).slice(0, 10)),
-          eventType: (e.event_type as EventType) ?? "social",
-          taskCount: null, turnout: null, sourceDate: e.start_date as string,
-        })
-      }
-      if (cancelled) return
-      setShelf([...items, ...pastItems].sort((a, b) => b.season.localeCompare(a.season) || a.name.localeCompare(b.name)))
-    })()
-    return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  function pickShelfItem(item: ShelfItem) {
-    setShelfPick(item)
-    setGhost(null)
-    if (item.sourceDate) {
-      const d = new Date(item.sourceDate)
-      setStartDateStr(nextAnchorYMD(d.getUTCMonth() + 1, d.getUTCDate()))
-    } else {
-      setStartDateStr(ymdOf(new Date(Date.now() + 14 * 86_400_000)))
-    }
-    setTitle(item.name)
-    setCreatePath("shelf")
-  }
-
-  async function handleRunItBack() {
-    if (!shelfPick) return
-    if (!startDateStr) { setError("Start date is required."); focusInvalidField(startDateInputRef); return }
-    setSaving(true)
-    setError(null)
-    try {
-      const res = shelfPick.kind === "template"
-        ? await runItBackAction(shelfPick.id, startDateStr, title.trim() || undefined)
-        : await runItBackFromEventAction(shelfPick.id, startDateStr, title.trim() || undefined)
-      if ("error" in res) { setError(res.error); return }
-      const { data } = await supabase
-        .from("calendar_events")
-        .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
-        .eq("id", res.eventId)
-        .single()
-      if (data) onSaved(data as CalendarEvent)
-    } catch (e: unknown) {
-      setError((e as { message?: string }).message ?? "Failed to inherit the playbook.")
-    } finally {
-      setSaving(false)
-    }
-  }
   // Plan/crunch dates live on the event's event_plans row, edited here in EDIT
   // mode only (a new event's plan is seeded lazily by the overview). Crunch is
   // optional — an empty string saves as null (no crunch phase).
@@ -6535,9 +6553,10 @@ export function AddEventModal({
             all_day: allDay,
             category: eventTypeToCategory(eventType),
             event_type: eventType,
+            recurring,
           })
           .eq("id", existing.id)
-          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
           .single()
         if (upErr || !data) { setError(upErr?.message ?? "Failed to update event."); setSaving(false); return }
         evData = data as CalendarEvent
@@ -6575,9 +6594,10 @@ export function AddEventModal({
             category: eventTypeToCategory(eventType),
             event_type: eventType,
             parent_event_id: parentEventId ?? null,
+            recurring: parentEventId ? false : recurring,
             created_by: userId,
           })
-          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
           .single()
 
         if (evErr || !data) { setError(evErr?.message ?? "Failed to create event."); setSaving(false); return }
@@ -6657,68 +6677,17 @@ export function AddEventModal({
         <>
           <CentralButton variant="quiet" size="sm" onClick={onClose}>Cancel</CentralButton>
           {(isEditing || createPath !== null) && (
-            <CentralButton variant="primary" size="md" onClick={createPath === "shelf" ? handleRunItBack : handleSave} disabled={saving}>
-              {saving
-                ? (isEditing ? "Saving…" : "Creating…")
-                : isEditing ? "Save changes" : createPath === "shelf" ? "Inherit & create" : "Create event"}
+            <CentralButton variant="primary" size="md" onClick={handleSave} disabled={saving}>
+              {saving ? (isEditing ? "Saving…" : "Creating…") : isEditing ? "Save changes" : "Create event"}
             </CentralButton>
           )}
         </>
       }
     >
         <div ref={bodyTopRef} style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-          {/* ── Path chooser: Run it back (shelf) / quick presets / free-form ── */}
+          {/* ── Path chooser: quick presets / free-form ── */}
           {!isEditing && createPath === null && (
             <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-              {!parentEventId && (
-                <div>
-                  <label style={labelStyle}>Run it back — past seasons</label>
-                  {shelf === null ? (
-                    <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "8px 0 0" }}>Loading past seasons…</p>
-                  ) : shelf.length === 0 ? (
-                    <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "8px 0 0", lineHeight: 1.5 }}>
-                      Nothing on the shelf yet — once an event has run, it appears here so next year&apos;s team can inherit its whole plan in one click.
-                    </p>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 8 }}>
-                      {[...new Set(shelf.map(s => s.season))].map(season => (
-                        <div key={season}>
-                          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.09em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>{season}</p>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                            {shelf.filter(s => s.season === season).map(item => {
-                              const icfg = EVENT_TYPE_CONFIGS[item.eventType] ?? EVENT_TYPE_CONFIGS.social
-                              return (
-                                <button
-                                  key={`${item.kind}:${item.id}`}
-                                  type="button"
-                                  onClick={() => pickShelfItem(item)}
-                                  style={{
-                                    display: "flex", alignItems: "center", gap: 12, padding: "10px 13px",
-                                    borderRadius: 12, border: "1px solid var(--line)", background: "var(--cream-panel)",
-                                    cursor: "pointer", textAlign: "left", transition: "border-color .15s",
-                                  }}
-                                >
-                                  <span style={{ fontSize: 18, flexShrink: 0 }}>{icfg.icon}</span>
-                                  <span style={{ flex: 1, minWidth: 0 }}>
-                                    <span style={{ display: "block", fontSize: 13.5, fontWeight: 500, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
-                                    <span style={{ display: "block", fontSize: 11.5, color: "var(--muted-text)", marginTop: 1 }}>
-                                      {item.kind === "template"
-                                        ? [item.taskCount != null ? `${item.taskCount} tasks` : null, item.turnout != null ? `~${item.turnout} people` : null].filter(Boolean).join(" · ") || "Compiled playbook"
-                                        : "Ran, not compiled yet — inherits as-is"}
-                                    </span>
-                                  </span>
-                                  <span style={{ fontSize: 12, color: "var(--plum)", fontWeight: 500, flexShrink: 0 }}>Run it back →</span>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
               <div>
                 <label style={labelStyle}>Start something new</label>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10, marginTop: 8 }}>
@@ -6762,30 +6731,13 @@ export function AddEventModal({
           {!isEditing && createPath !== null && (
             <button
               type="button"
-              onClick={() => { setCreatePath(null); setShelfPick(null); setError(null) }}
+              onClick={() => { setCreatePath(null); setError(null) }}
               style={{ alignSelf: "flex-start", background: "none", border: "none", padding: 0, fontSize: 12.5, color: "var(--muted-text)", cursor: "pointer" }}
             >
               ← All options
             </button>
           )}
-
-          {/* ── Shelf path: confirm title + date, everything else inherits ── */}
-          {createPath === "shelf" && shelfPick && (
-            <>
-              <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 12.5, color: "var(--body)", lineHeight: 1.55 }}>
-                <span style={{ fontWeight: 500, color: "var(--plum)" }}>Inheriting “{shelfPick.name}” ({shelfPick.season}). </span>
-                Recreates the full plan — every task with dates recomputed around the new date, and every role and lead ready to assign fresh.
-              </div>
-              <FormField label="Title *">
-                <Input ref={titleInputRef} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" />
-              </FormField>
-              <FormField label="Date *">
-                <Input ref={startDateInputRef} type="date" value={startDateStr} onChange={(e) => setStartDateStr(e.target.value)} />
-              </FormField>
-            </>
-          )}
-
-          {createPath !== "shelf" && createPath !== null && (
+          {createPath !== null && (
           <>
           {/* Quick-preset hint */}
           {!isEditing && createPath === "quick" && (cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
@@ -6823,6 +6775,17 @@ export function AddEventModal({
             <input type="checkbox" id="allDay" checked={allDay} onChange={(e) => { touchedRef.current.dates = true; setAllDay(e.target.checked) }} style={{ width: 16, height: 16, accentColor: "var(--plum)", cursor: "pointer" }} />
             <label htmlFor="allDay" style={{ fontSize: 14, color: "var(--body)", cursor: "pointer" }}>All day</label>
           </div>
+
+          {/* Recurring toggle — the traditions flag; sub-events roll with their parent */}
+          {!parentEventId && (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <input type="checkbox" id="recurringEv" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--plum)", cursor: "pointer", marginTop: 2 }} />
+              <label htmlFor="recurringEv" style={{ fontSize: 14, color: "var(--body)", cursor: "pointer", lineHeight: 1.45 }}>
+                Recurring every year
+                <span style={{ display: "block", fontSize: 11.5, color: "var(--muted-text)" }}>Traditions carry into next season when a leader starts it — plan copied, dates matched, leads reset.</span>
+              </label>
+            </div>
+          )}
 
           {/* Dates + times */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -9118,7 +9081,7 @@ function SubEventsTab({
     async function load() {
       const { data } = await supabase
         .from("calendar_events")
-        .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+        .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
         .eq("parent_event_id", parentEvent.id)
         .order("start_date", { ascending: true })
       const rows = (data ?? []) as CalendarEvent[]

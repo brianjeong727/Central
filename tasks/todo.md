@@ -146,3 +146,26 @@ feat/ccsf-event-presets (pushed).
 - Fixtures (both tenants): 40 events (2025-26 completed season incl. Welcoming Night run-of-show
   + 2026-27 upcoming) + 13 compiled "2025–26" shelf playbooks.
 - Visual pass: chooser/shelf, inherit detail, custom-module chips all screenshot-verified.
+
+# Season rollover pivot — 2026-07-18 (same session, ratified over the shelf)
+
+Brian's call: at CCSF every tradition ALWAYS runs back, so per-event inheriting was
+solving a non-problem. Replaced the Run-it-back shelf with season rollover.
+
+- [x] calendar_events.recurring migration (rls-reviewed APPROVE ×2, applied live)
+- [x] startNextSeasonAction — copies latest season's recurring events (+sub-events,
+      plans, tasks, roles, run-of-show blocks) forward one year; same-weekday dates;
+      completion reset; leads unassigned; concurrent copy chains; double-press guard
+      ("season still ahead") + per-lineage dedupe
+- [x] Events page: season filter chips + Start next season (leader-gated, preview
+      confirm); recurring repeat-mark on event rows; shelf removed from New Event
+- [x] Recurring toggle in create/edit modal (sub-events roll via parent)
+- [x] Seed re-cut: 2025-26 completed season only — Brian presses the button himself
+- [x] e2e/season-rollover.spec.ts (6 tests green); full gate: build/lint/hex/server
+      pass, 101 e2e passed (countdown drift + mobile-entry order-flake pre-existing,
+      both pass in isolation)
+
+Bugs caught in-loop: event_tasks.priority CHECK is none|med|high (my copy wrote
+"normal"); spec completion-wait must key on the modal HEADING (button label changes
+while busy); confirm preview must count the ACTION's source season, not the active
+filter chip (E2E tenant's Summer Retreat made 2026–27 the default chip).

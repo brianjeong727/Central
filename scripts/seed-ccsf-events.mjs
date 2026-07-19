@@ -1,8 +1,9 @@
-// Seed the full 2026–27 CCSF event calendar into a sandbox ministry's Student
-// Org Board — every event type preset instantiated on its real date, plus the
-// Welcome Week sub-events (with the Welcoming Night workbook checklist) and the
-// board-role Resources guides. Fixtures for verifying the presets against how
-// 2025–26 actually ran (context/CCSF_CONTEXT.md).
+// Seed the COMPLETED 2025–26 CCSF season into a sandbox ministry's Student Org
+// Board — every traditional event on its real date with its checklist done,
+// recurring flags set, Welcome Week sub-events (incl. the Welcoming Night
+// workbook run-of-show), and the board-role Resources guides. The next season
+// is NOT seeded: pressing "Start next season" on the Events page is the test
+// (it copies the recurring events forward — the exact flow the real board runs).
 //
 //   node --env-file=.env.local scripts/seed-ccsf-events.mjs
 //   node --env-file=.env.local scripts/seed-ccsf-events.mjs --ministry "E2E Sandbox"
@@ -407,6 +408,7 @@ async function seedEvent(ev, { ministryId, teamId, createdBy, parentId = null })
     category: categoryMap[ev.type] ?? "regular",
     event_type: ev.type,
     parent_event_id: parentId,
+    recurring: parentId === null,
     created_by: createdBy,
   }).select("id").single()
   if (evErr) throw new Error(`${ev.title}: ${evErr.message}`)
@@ -451,53 +453,6 @@ async function seedEvent(ev, { ministryId, teamId, createdBy, parentId = null })
     if (error) throw new Error(`${ev.title} roles: ${error.message}`)
   }
   return { eventId: event.id, planId: plan.id, groups, roles }
-}
-
-// Compile a seeded HISTORY event onto the shelf: one event_templates row per
-// (lineage, season) with template_tasks carrying the preset offsets and
-// template_roles carrying the role guides. source_event_plan_id points at the
-// history plan so Run-it-back can copy the real venue/times/duration.
-async function compileToShelf(ev, seeded, { ministryId, teamId, createdBy }) {
-  const stats = {
-    actual_turnout: ev.turnout ?? null,
-    task_count: seeded.groups.reduce((n, g) => n + g.items.length, 0),
-    on_time_pct: 100,
-  }
-  const { data: tpl, error: tplErr } = await db.from("event_templates").insert({
-    ministry_id: ministryId,
-    team_id: teamId,
-    event_type: ev.type,
-    lineage_key: lineageKeyOf(ev.title),
-    name: ev.title,
-    source_event_plan_id: seeded.planId,
-    year_label: seasonLabelOf(ev.date),
-    extra_notes: [],
-    stats,
-    created_by: createdBy,
-  }).select("id").single()
-  if (tplErr) throw new Error(`template ${ev.title}: ${tplErr.message}`)
-
-  let sort = 0
-  const taskRows = []
-  for (const g of seeded.groups) {
-    for (const item of g.items) {
-      taskRows.push({
-        template_id: tpl.id, title: item.title, phase: g.phase,
-        offset_days: item.off, actual_offset_days: item.off,
-        brief: null, role_hint: null, parent_id: null, sort_order: sort++,
-      })
-    }
-  }
-  if (taskRows.length) {
-    const { error } = await db.from("template_tasks").insert(taskRows)
-    if (error) throw new Error(`template tasks ${ev.title}: ${error.message}`)
-  }
-  if (seeded.roles.length) {
-    const { error } = await db.from("template_roles").insert(
-      seeded.roles.map((r, i) => ({ template_id: tpl.id, role_name: r.name, notes: r.notes || null, sort_order: i })),
-    )
-    if (error) throw new Error(`template roles ${ev.title}: ${error.message}`)
-  }
 }
 
 // ── main ─────────────────────────────────────────────────────────────────────
@@ -580,37 +535,18 @@ if (oldEvents?.length) {
   log(`Cleared ${ids.length} previously-seeded events`)
 }
 
-// 4) Seed the 2025–26 HISTORY season (completed) + compile the shelf.
+// 4) Seed the 2025–26 HISTORY season — completed events with recurring flags.
 const seedCtx = { ministryId, teamId, createdBy }
 let eventCount = 0
-let shelfCount = 0
 for (const src of EVENTS) {
   const hist = toHistory(src)
   if (!hist) continue
   const seeded = await seedEvent(hist, seedCtx)
   eventCount++
-  await compileToShelf(hist, seeded, seedCtx)
-  shelfCount++
   for (const sub of hist.subEvents ?? []) {
-    const subSeeded = await seedEvent(sub, { ...seedCtx, parentId: seeded.eventId })
-    eventCount++
-    // Welcoming Night is a shelf entry in its own right — the anchor single event.
-    if (sub.title === "Welcoming Night") {
-      await compileToShelf(sub, subSeeded, seedCtx)
-      shelfCount++
-    }
-  }
-  log(`  ✓ [2025–26] ${hist.title}${hist.subEvents?.length ? ` (+${hist.subEvents.length} sub-events)` : ""}`)
-}
-
-// 5) Seed the 2026–27 upcoming calendar.
-for (const ev of EVENTS) {
-  const seeded = await seedEvent(ev, seedCtx)
-  eventCount++
-  for (const sub of ev.subEvents ?? []) {
     await seedEvent(sub, { ...seedCtx, parentId: seeded.eventId })
     eventCount++
   }
-  log(`  ✓ [2026–27] ${ev.title}${ev.subEvents ? ` (+${ev.subEvents.length} sub-events)` : ""}`)
+  log(`  ✓ [2025–26] ${hist.title}${hist.subEvents?.length ? ` (+${hist.subEvents.length} sub-events)` : ""}`)
 }
-log(`\nSeeded ${eventCount} events + ${shelfCount} shelf playbooks into ${MINISTRY_NAME} / ${BOARD_TEAM_NAME}.`)
+log(`\nSeeded ${eventCount} completed 2025–26 events into ${MINISTRY_NAME} / ${BOARD_TEAM_NAME}. Press \"Start next season\" in the app to roll them into 2026–27.`)

@@ -560,6 +560,8 @@ export interface CalendarEvent {
   linked_announcement_id: string | null
   status: EventStatus
   created_by: string
+  /** The traditions flag — "Start next season" copies recurring events forward. */
+  recurring?: boolean
 }
 
 export interface EventPlan {
