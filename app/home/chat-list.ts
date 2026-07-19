@@ -18,6 +18,7 @@ export type ChatListRow = {
   last_msg_attachment_type: string | null; last_msg_has_poll: boolean | null
   group_category: string | null
   muted: boolean | null; pinned: boolean | null
+  is_central: boolean | null
 }
 
 export async function fetchChatList([, userId, ministryId]: [string, string, string]): Promise<ChatGroup[]> {
@@ -31,17 +32,9 @@ export async function fetchChatList([, userId, ministryId]: [string, string, str
   // and caching `[]`, which poisons every consumer until a manual refresh.
   if (error) throw error
 
-  // The get_chat_list RPC doesn't surface groups.is_central_chat, so resolve the
-  // ministry-wide central chat with one tiny additive lookup (indexed on
-  // ministry_id, returns ≤1 row; RLS-scoped to the caller's memberships). Used
-  // only to flag the solid-plum monogram chip in the mobile Pocket list.
-  const { data: centralRows } = await supabase
-    .from("groups")
-    .select("id")
-    .eq("ministry_id", ministryId)
-    .eq("is_central_chat", true)
-  const centralIds = new Set(((centralRows ?? []) as { id: string }[]).map((r) => r.id))
-
+  // get_chat_list now surfaces groups.is_central_chat directly (row.is_central),
+  // so the previously-required follow-up groups lookup is gone. Used only to flag
+  // the solid-plum monogram chip in the mobile Pocket list.
   const groups = ((data ?? []) as ChatListRow[]).map((row) => ({
     id: row.group_id,
     name: row.group_name,
@@ -54,7 +47,7 @@ export async function fetchChatList([, userId, ministryId]: [string, string, str
     category: (row.group_category ?? null) as ChatGroup["category"],
     muted: row.muted ?? false,
     pinned: row.pinned ?? false,
-    is_central_chat: centralIds.has(row.group_id),
+    is_central_chat: row.is_central ?? false,
   })) as ChatGroup[]
 
   // Sort by most recent message first (nulls last)

@@ -115,6 +115,10 @@ const DRAFT_PILL_STYLE: React.CSSProperties = {
 
 type FilterType = "all" | "events" | "forms" | "pinned"
 
+// Feed page size — the initial announcements query is bounded to this (pinned-first);
+// "Load more" grows the window by another page.
+const FEED_PAGE = 30
+
 const FILTERS: { id: FilterType; label: string }[] = [
   { id: "all", label: "All" },
   { id: "events", label: "Events" },
@@ -773,6 +777,10 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   const [showCreate, setShowCreate] = useState(false)
   const [compact, setCompact] = useState(false)
   const [filter, setFilter] = useState<FilterType>("all")
+  // Feed is bounded to a page (pinned-first) so the initial load never fetches the
+  // full announcement history; "Load more" grows the window by PAGE. keepPreviousData
+  // on the SWR below keeps the current page visible while the larger page fetches.
+  const [feedLimit, setFeedLimit] = useState(FEED_PAGE)
   // Mobile-only Pocket filter (All / Events / Updates) — separate from the desktop
   // FilterType (which also carries forms/pinned). Updates = non-event posts.
   const [mobileFilter, setMobileFilter] = useState<"all" | "events" | "updates">("all")
@@ -820,6 +828,10 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       .order("is_pinned", { ascending: false })
       .order("is_sub_pinned", { ascending: false })
       .order("created_at", { ascending: false })
+      // Bound the feed (pinned-first ordering is preserved by the .order() chain,
+      // so the pinned hero is always inside the first page). "Load more" raises
+      // feedLimit → refetches a larger window.
+      .limit(feedLimit)
 
     if (!isLeaderOrAdmin) {
       const audienceFilter = userGradYear
@@ -901,14 +913,19 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       user_has_responded: formByAnn[ann.id] ? respondedFormIds.has(formByAnn[ann.id]) : false,
     }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, ministryId, isLeaderOrAdmin, userGradYear])
+  }, [userId, ministryId, isLeaderOrAdmin, userGradYear, feedLimit])
 
   // SWR cache: keyed on every param the query branches on, so revisiting the tab
-  // shows cached data instantly while revalidating in the background.
+  // shows cached data instantly while revalidating in the background. feedLimit is
+  // in the key so "Load more" refetches; keepPreviousData holds the current page on
+  // screen while the larger page loads (no flash to skeleton).
   const { data: announcements = [], isLoading: loading, mutate: mutateAnnouncements } = useSWR(
-    ["announcements", ministryId, userId, isLeaderOrAdmin, userGradYear],
-    loadAnnouncements
+    ["announcements", ministryId, userId, isLeaderOrAdmin, userGradYear, feedLimit],
+    loadAnnouncements,
+    { keepPreviousData: true }
   )
+  // A full page came back → there may be more history to load.
+  const hasMoreAnnouncements = announcements.length >= feedLimit
 
   // True toggle: flips going state and count, optimistically updates the attendee
   // list, AND persists to the rsvps table. Used by the desktop RSVP buttons and
@@ -1125,6 +1142,13 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                 ))
               })()}
             </div>
+            {hasMoreAnnouncements && (
+              <div style={{ display: "flex", justifyContent: "center", padding: "16px 0 4px" }}>
+                <CentralButton variant="quiet" onClick={() => setFeedLimit((n) => n + FEED_PAGE)} style={{ padding: "8px 16px", fontSize: 13 }}>
+                  Load more
+                </CentralButton>
+              </div>
+            )}
           </div>
 
           {/* Desktop layout — the toolbar (filter · toggle · create) lives above as an always-visible content header */}
@@ -1284,6 +1308,13 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                     </div>
                   </article>
                 ))}
+              </div>
+            )}
+            {hasMoreAnnouncements && filteredDesktop.length > 0 && (
+              <div className="flex justify-center" style={{ marginTop: 28 }}>
+                <CentralButton variant="secondary" onClick={() => setFeedLimit((n) => n + FEED_PAGE)} style={{ padding: "9px 22px", fontSize: "13px" }}>
+                  Load more
+                </CentralButton>
               </div>
             )}
           </div>
