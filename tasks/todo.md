@@ -169,3 +169,19 @@ Bugs caught in-loop: event_tasks.priority CHECK is none|med|high (my copy wrote
 "normal"); spec completion-wait must key on the modal HEADING (button label changes
 while busy); confirm preview must count the ACTION's source season, not the active
 filter chip (E2E tenant's Summer Retreat made 2026–27 the default chip).
+
+# Meeting Notes v2 (Variant B redesign) — 2026-07-19
+
+cdesign handoff → reconciler (14 SNAP applied · 6 KEEP · 3 UNSURE for Brian) →
+migration (rls APPROVE ×2, applied live) → build → 6-test spec → full gate.
+
+- [x] Schema: meeting_notes + linked_event_id/attendees; agenda + decisions child tables (RLS mirrors parent)
+- [x] New app/home/tabs/meeting-notes.tsx — digest list + Variant B editor (moved out of plan-tab)
+- [x] Real 2025-26 CCSF meeting notes seeded as fixtures (both tenants)
+- [x] e2e/meeting-notes.spec.ts 6/6; full gate: build/lint/hex/server pass, 106 e2e passed
+      (only failure = known countdown fixture drift)
+- Bug found in-loop: SWR deep-compare can't see into Map payloads → revalidations
+  never re-rendered (stale digest counts). Fetcher now returns plain records; the
+  list also revalidates from the surviving instance on visibility (dual-mount swap).
+- UNSURE (Brian to ratify): multi-hue vs uniform-plum avatars · gold decision dots
+  vs plum · 21px vs 19px date numeral. Defaults shipped: uniform plum, gold dots, 19px.

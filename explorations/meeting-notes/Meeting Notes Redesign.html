@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Meeting Notes — Redesign</title>
+<link rel="stylesheet" href="../../styles.css" />
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:var(--cream);-webkit-font-smoothing:antialiased}
+  button{font-family:inherit;cursor:pointer;background:none;border:none;padding:0;color:inherit;font-size:inherit}
+  a{color:inherit;text-decoration:none}
+  a:hover{color:var(--plum)}
+  .app{display:flex;height:100vh;overflow:hidden}
+
+  /* ══ SIDEBAR ══ */
+  .side{width:264px;flex-shrink:0;background:var(--body-bg);border-right:1px solid var(--line);padding:26px 18px;overflow-y:auto}
+  .side .sk{font-family:var(--mono);font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted-text)}
+  .side .st{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-0.02em;margin:6px 0 26px;line-height:1.05}
+  .side .nav{display:flex;flex-direction:column;gap:2px}
+  .side .ni{display:flex;align-items:center;justify-content:space-between;font-size:15px;color:var(--body);padding:9px 12px;border-radius:9px;border-left:2px solid transparent}
+  .side .ni.on{background:var(--ivory);color:var(--ink);font-weight:500;border-left-color:var(--plum)}
+  .side .subnav{display:flex;flex-direction:column;gap:1px;margin:3px 0 6px 6px;padding-left:14px;border-left:1px solid var(--line-2)}
+  .side .sni{font-size:13.5px;color:var(--muted-text);padding:6px 10px;border-radius:7px;display:flex;align-items:center;gap:9px}
+  .side .sni::before{content:"";width:4px;height:4px;border-radius:50%;background:var(--dashed);flex-shrink:0}
+
+  /* ══ MAIN ══ */
+  .main{flex:1;min-width:0;overflow-y:auto}
+  .wrap{max-width:980px;margin:0 auto;padding:30px 48px 90px}
+  .bc{font-size:14px;color:var(--muted-text);display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .bc b{color:var(--ink);font-weight:500}
+  .bc .sl{color:var(--line-2)}
+  .bc button:hover{color:var(--plum)}
+  .titlerow{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-top:22px;padding-bottom:22px;border-bottom:1px solid var(--line)}
+  h1.title{font-family:var(--serif);font-size:40px;font-weight:600;letter-spacing:-0.02em;margin:0;line-height:1}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted-text)}
+  .newbtn{display:inline-flex;align-items:center;gap:8px;background:var(--plum-2);color:var(--cream-on-dark);font-size:14.5px;font-weight:500;border-radius:11px;padding:11px 18px}
+  .newbtn:hover{background:var(--plum)}
+  .newbtn svg{width:15px;height:15px}
+
+  /* ══ LIST VIEW ══ */
+  .listhead{display:flex;align-items:center;justify-content:space-between;margin-top:26px}
+  .searchbox{display:flex;align-items:center;gap:9px;background:var(--cream-2);border:1px solid var(--line-2);border-radius:10px;padding:8px 13px;width:280px;color:var(--muted-text);font-size:13.5px}
+  .searchbox svg{width:14px;height:14px;flex-shrink:0}
+  .mono-count{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted-text)}
+
+  .monthgroup{margin-top:28px}
+  .mhead{display:flex;align-items:baseline;gap:14px;margin-bottom:6px}
+  .mhead .mk{font-family:var(--mono);font-size:11.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--plum);font-weight:600;white-space:nowrap}
+  .mhead .rule{flex:1;height:1px;background:var(--line)}
+  .mhead .mc{font-family:var(--mono);font-size:11px;color:var(--muted-text);white-space:nowrap}
+
+  .row{display:grid;grid-template-columns:52px 1fr auto;gap:16px;align-items:center;padding:13px 10px;border-bottom:1px solid var(--line-3);border-radius:10px;cursor:pointer;transition:background .12s}
+  .row:hover{background:var(--cream-panel)}
+  .row .datecell{text-align:center;line-height:1.05}
+  .row .datecell .dd{font-family:var(--serif);font-size:21px;font-weight:600;color:var(--ink)}
+  .row .datecell .dw{font-family:var(--mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;color:var(--muted-text);margin-top:3px}
+  .row .body{min-width:0}
+  .row .rt{font-size:15.5px;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .rsum{font-size:13px;color:var(--body);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+  .row .rsum .noneyet{color:var(--faint);font-style:italic}
+  .row .meta{display:flex;align-items:center;gap:16px;flex-shrink:0}
+  .tagchip{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--body);background:var(--ivory);border-radius:999px;padding:3px 10px;white-space:nowrap}
+  .tagchip.ev{background:var(--plum-tint);color:var(--plum)}
+  .dcount{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--muted-text);white-space:nowrap}
+  .dcount i{width:6px;height:6px;border-radius:50%;background:var(--gold);flex-shrink:0}
+  .avstack{display:flex}
+  .avstack .av{margin-left:-7px;border:1.5px solid var(--cream)}
+  .avstack .av:first-child{margin-left:0}
+  .av{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:9.5px;font-weight:600;color:var(--cream-on-dark);flex-shrink:0}
+  .av.a1{background:var(--plum)}.av.a2{background:var(--sage)}.av.a3{background:var(--warm-tan)}.av.a4{background:var(--ink)}.av.a5{background:var(--gold)}
+  .row .chev{width:15px;height:15px;color:var(--dashed)}
+  .row:hover .chev{color:var(--muted-text)}
+  .row.draft .rt::after{content:"Draft";font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--warm-tan);border:1px solid var(--line-2);border-radius:999px;padding:2px 8px;margin-left:10px;vertical-align:2px}
+
+  /* ══ EDITOR VIEW ══ */
+  .edmeta{display:flex;align-items:center;gap:18px;margin-top:26px;flex-wrap:wrap}
+  .edmeta .mk{font-family:var(--mono);font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted-text)}
+  .edmeta .who{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--body)}
+  .savedot{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted-text)}
+  .savedot i{width:7px;height:7px;border-radius:50%;background:var(--success)}
+  h1.notetitle{font-family:var(--serif);font-size:38px;font-weight:600;letter-spacing:-0.02em;margin:20px 0 0;line-height:1.1;outline:none}
+  h1.notetitle:empty::before{content:"Untitled meeting";color:var(--faint)}
+
+  .sec{margin-top:34px}
+  .sechead{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+  .sechead .sk{font-family:var(--mono);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--plum);font-weight:600}
+  .sechead .rule{flex:1;height:1px;background:var(--line)}
+  .sechead .hint{font-size:12px;color:var(--faint)}
+
+  .agenda{display:flex;flex-direction:column}
+  .agitem{display:flex;gap:13px;align-items:flex-start;padding:10px 2px;border-bottom:1px solid var(--line-3)}
+  .agitem:last-child{border-bottom:none}
+  .agitem .n{font-family:var(--mono);font-size:11.5px;color:var(--muted-text);width:20px;flex-shrink:0;padding-top:3px}
+  .agitem .txt{flex:1;font-size:15px;line-height:1.5;color:var(--ink)}
+  .agitem .txt .sub{font-size:13px;color:var(--body);margin-top:3px;line-height:1.45}
+  .agitem.donei .txt{color:var(--body)}
+  .agitem.donei .n{color:var(--success)}
+  .addline{display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--faint);padding:10px 2px;cursor:text}
+  .addline:hover{color:var(--muted-text)}
+  .addline svg{width:14px;height:14px}
+
+  /* mentions */
+  .mention{display:inline-flex;align-items:center;gap:5px;font-size:.92em;font-weight:500;background:var(--plum-tint);color:var(--plum);border-radius:7px;padding:1px 7px 2px;cursor:pointer;white-space:nowrap}
+  .mention.person{background:var(--ivory);color:var(--ink)}
+  .mention svg{width:11px;height:11px;opacity:.7}
+  .mention:hover{background:var(--ivory)}
+
+  /* decisions */
+  .decision{display:flex;gap:13px;align-items:flex-start;background:var(--cream-3);border-radius:12px;padding:13px 16px;margin-bottom:9px}
+  .decision .dot{width:8px;height:8px;border-radius:50%;background:var(--gold);flex-shrink:0;margin-top:7px}
+  .decision .txt{flex:1;font-size:14.5px;line-height:1.5}
+  .decision .txt .by{font-size:12.5px;color:var(--muted-text);margin-top:4px}
+
+  /* freeform body */
+  .prose{font-size:15.5px;line-height:1.65;color:var(--ink)}
+  .prose p{margin:0 0 14px}
+  .prose ul{margin:0 0 14px;padding-left:22px}
+  .prose li{margin-bottom:5px}
+  .prose .ph{color:var(--faint)}
+
+  /* handoff whisper — action items live on events now */
+  .whisper{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--body);line-height:1.45;background:var(--cream-2);border:1px solid var(--line-3);border-radius:10px;padding:10px 13px;margin-top:10px}
+  .whisper svg{width:13px;height:13px;color:var(--muted-text);flex-shrink:0;margin-top:1px}
+  .whisper i{font-style:normal;font-weight:500;color:var(--ink)}
+  .whisper button{color:var(--plum);font-weight:500;font-size:12.5px}
+  .whisper button:hover{text-decoration:underline}
+
+  /* mention popover (static demo) */
+  .mpop{position:absolute;width:300px;background:var(--cream);border:1px solid var(--line-2);border-radius:13px;box-shadow:0 10px 32px rgba(19,16,26,.13);padding:8px;z-index:20;display:none}
+  .mpop.show{display:block}
+  .mpop .pt{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted-text);padding:6px 10px 8px}
+  .mrow{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;cursor:pointer}
+  .mrow:hover,.mrow.hl{background:var(--ivory)}
+  .mrow .ic{width:26px;height:26px;border-radius:8px;background:var(--plum-tint);color:var(--plum);display:grid;place-items:center;flex-shrink:0}
+  .mrow .ic svg{width:13px;height:13px}
+  .mrow .nm{flex:1;font-size:13.5px;font-weight:500;color:var(--ink)}
+  .mrow .kind{font-family:var(--mono);font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted-text)}
+
+  /* ══ EXPLORATION CONTROL ══ */
+  .explore{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--cream-on-dark);border-radius:13px;padding:10px 14px;display:flex;align-items:center;gap:14px;box-shadow:0 12px 36px rgba(19,16,26,.28);z-index:40}
+  .explore .xk{font-family:var(--mono);font-size:10px;letter-spacing:1.2px;text-transform:uppercase;opacity:.55;white-space:nowrap}
+  .explore .seg{display:flex;gap:4px;background:rgba(246,244,239,.08);border-radius:9px;padding:3px}
+  .explore .seg button{font-size:12.5px;color:var(--cream-on-dark);opacity:.6;padding:6px 13px;border-radius:7px;white-space:nowrap}
+  .explore .seg button.on{background:var(--cream);color:var(--ink);opacity:1;font-weight:500}
+  @media (max-width:900px){.explore{flex-wrap:wrap;max-width:92vw}}
+
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="sk">Section</div>
+    <div class="st">CCSF Board</div>
+    <nav class="nav">
+      <a class="ni">General</a>
+      <a class="ni on">Meeting Notes</a>
+      <a class="ni">Events <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6l4 4 4-4"></path></svg></a>
+      <div class="subnav">
+        <a class="sni">Welcome Week</a><a class="sni">The FAIR</a><a class="sni">First DGs</a><a class="sni">Coffeehouse</a><a class="sni">Churchwide Picnic</a>
+      </div>
+      <a class="ni">Resources</a>
+      <a class="ni">Groups</a>
+      <a class="ni">Rotations</a>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <!-- ══════════ LIST VIEW ══════════ -->
+    <div class="wrap" id="view-list" data-screen-label="Meeting Notes — List">
+      <div class="bc"><a>Central</a><span class="sl">/</span><a>Workspace</a><span class="sl">/</span><b>CCSF BOARD</b></div>
+      <div class="titlerow">
+        <div>
+          <div class="eyebrow">Meeting Notes</div>
+          <h1 class="title" style="margin-top:8px">CCSF Board</h1>
+        </div>
+        <button class="newbtn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"></path></svg>New note</button>
+      </div>
+
+      <div class="listhead">
+        <div class="searchbox"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"></circle><path d="M13.5 13.5L10.3 10.3"></path></svg>Search notes, decisions, mentions…</div>
+        <div class="mono-count">12 notes · Spring 2026</div>
+      </div>
+
+      <div class="monthgroup">
+        <div class="mhead"><span class="mk">July 2026</span><div class="rule"></div><span class="mc">2 meetings</span></div>
+        <div class="row draft" onclick="openNote()">
+          <div class="datecell"><div class="dd">19</div><div class="dw">Sun</div></div>
+          <div class="body">
+            <div class="rt">Board Meeting — Welcome Week final prep</div>
+            <div class="rsum"><span class="noneyet">No decisions yet — meeting in progress</span></div>
+          </div>
+          <div class="meta">
+            <span class="tagchip ev">Welcome Week</span>
+            <div class="avstack"><span class="av a1">BJ</span><span class="av a2">SK</span><span class="av a3">DL</span></div>
+            <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4l4 4-4 4"></path></svg>
+          </div>
+        </div>
+        <div class="row" onclick="openNote()">
+          <div class="datecell"><div class="dd">05</div><div class="dw">Sun</div></div>
+          <div class="body">
+            <div class="rt">Board Meeting — Budget &amp; fall calendar</div>
+            <div class="rsum">Approved $1,200 for The FAIR · Moved Coffeehouse to Oct 24</div>
+          </div>
+          <div class="meta">
+            <span class="dcount"><i></i>3 decisions</span>
+            <span class="tagchip ev">The FAIR</span>
+            <div class="avstack"><span class="av a1">BJ</span><span class="av a2">SK</span><span class="av a3">DL</span><span class="av a4">JP</span></div>
+            <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4l4 4-4 4"></path></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="monthgroup">
+        <div class="mhead"><span class="mk">June 2026</span><div class="rule"></div><span class="mc">3 meetings</span></div>
+        <div class="row" onclick="openNote()">
+          <div class="datecell"><div class="dd">28</div><div class="dw">Sun</div></div>
+          <div class="body">
+            <div class="rt">Board Meeting — Retreat debrief</div>
+            <div class="rsum">Keep Camp Cedar for next year · Speaker honorarium raised to $500</div>
+          </div>
+          <div class="meta">
+            <span class="dcount"><i></i>2 decisions</span>
+            <span class="tagchip ev">Men's Retreat</span>
+            <div class="avstack"><span class="av a1">BJ</span><span class="av a3">DL</span><span class="av a5">MC</span></div>
+            <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4l4 4-4 4"></path></svg>
+          </div>
+        </div>
+        <div class="row" onclick="openNote()">
+          <div class="datecell"><div class="dd">14</div><div class="dw">Sun</div></div>
+          <div class="body">
+            <div class="rt">Board Meeting — Leadership transitions</div>
+            <div class="rsum">Sarah takes over Groups coordination · New member onboarding doc owned by Josh</div>
+          </div>
+          <div class="meta">
+            <span class="dcount"><i></i>4 decisions</span>
+            <div class="avstack"><span class="av a1">BJ</span><span class="av a2">SK</span><span class="av a4">JP</span></div>
+            <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4l4 4-4 4"></path></svg>
+          </div>
+        </div>
+        <div class="row" onclick="openNote()">
+          <div class="datecell"><div class="dd">07</div><div class="dw">Sun</div></div>
+          <div class="body">
+            <div class="rt">Board Meeting — Summer kickoff</div>
+            <div class="rsum">Weekly cadence through August · Picnic date locked for Aug 15</div>
+          </div>
+          <div class="meta">
+            <span class="dcount"><i></i>2 decisions</span>
+            <span class="tagchip ev">Churchwide Picnic</span>
+            <div class="avstack"><span class="av a1">BJ</span><span class="av a2">SK</span><span class="av a3">DL</span><span class="av a4">JP</span><span class="av a5">MC</span></div>
+            <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4l4 4-4 4"></path></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="monthgroup">
+        <div class="mhead"><span class="mk">May 2026</span><div class="rule"></div><span class="mc">2 meetings</span></div>
+        <div class="row" onclick="openNote()">
+          <div class="datecell"><div class="dd">31</div><div class="dw">Sun</div></div>
+          <div class="body">
+            <div class="rt">Board Meeting — Senior Send-off recap</div>
+            <div class="rsum">SSO format keeps dinner + testimony structure · Photo wall becomes annual</div>
+          </div>
+          <div class="meta">
+            <span class="dcount"><i></i>2 decisions</span>
+            <span class="tagchip ev">Senior Send-off</span>
+            <div class="avstack"><span class="av a1">BJ</span><span class="av a2">SK</span></div>
+            <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4l4 4-4 4"></path></svg>
+          </div>
+        </div>
+        <div class="row" onclick="openNote()">
+          <div class="datecell"><div class="dd">17</div><div class="dw">Sun</div></div>
+          <div class="body">
+            <div class="rt">Board Meeting — End-of-year review</div>
+            <div class="rsum">Attendance up 18% year over year · Two new small groups approved for fall</div>
+          </div>
+          <div class="meta">
+            <span class="dcount"><i></i>3 decisions</span>
+            <div class="avstack"><span class="av a1">BJ</span><span class="av a3">DL</span><span class="av a4">JP</span><span class="av a5">MC</span></div>
+            <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4l4 4-4 4"></path></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════ EDITOR VIEW ══════════ -->
+    <div class="wrap hidden" id="view-editor" data-screen-label="Meeting Notes — Editor">
+      <div class="bc"><a>Central</a><span class="sl">/</span><a>Workspace</a><span class="sl">/</span><button onclick="openList()">CCSF BOARD</button><span class="sl">/</span><button onclick="openList()">Meeting Notes</button><span class="sl">/</span><b>Jul 19</b></div>
+
+      <div class="edmeta">
+        <span class="mk">Sunday · July 19, 2026</span>
+        <span class="who"><span class="avstack"><span class="av a1">BJ</span><span class="av a2">SK</span><span class="av a3">DL</span></span>3 attending</span>
+        <span class="savedot" style="margin-left:auto"><i></i>Saved just now</span>
+      </div>
+
+      <h1 class="notetitle" contenteditable="true">Board Meeting — Welcome Week final prep</h1>
+
+      <!-- ── VARIANT A: Doc-like, structure as optional blocks ── -->
+      <div class="variant" id="var-a">
+        <div class="sec">
+          <div class="prose" contenteditable="true">
+            <p>Quick sync before <span class="mention" contenteditable="false"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3.5" width="11" height="10" rx="2"></rect><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3"></path></svg>Welcome Week</span> kicks off. Full board present except Michelle (traveling).</p>
+            <p>Volunteer signups are at 34 of 40 — <span class="mention person" contenteditable="false">Sarah K.</span> will push in the group chats this week. Signage and name tags are printed and in the storage closet.</p>
+            <ul>
+              <li>Food count confirmed with the caterer for 120</li>
+              <li>Rain plan: move opening night into the gym, <span class="mention person" contenteditable="false">Daniel L.</span> owns the call by Thursday</li>
+            </ul>
+            <p class="ph">Type <b>/</b> for a block — Decision, Agenda, Divider… — or <b>@</b> to mention an event or person.</p>
+          </div>
+          <div class="decision">
+            <span class="dot"></span>
+            <div class="txt">Opening night starts at 7:00 PM, not 6:30 — avoids clashing with the campus shuttle schedule.<div class="by">Decision · added by Brian J.</div></div>
+          </div>
+          <div class="whisper">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5l1.8 4.2 4.5.4-3.4 3 1 4.4L8 11.2l-3.9 2.3 1-4.4-3.4-3 4.5-.4z"></path></svg>
+            <span>Sounds like a task? Tasks for Welcome Week live on the event itself now. <button>Add to Welcome Week planning →</button></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VARIANT B: Hybrid — pinned sections up top, freeform below ── -->
+      <div class="variant hidden" id="var-b">
+        <div class="sec">
+          <div class="sechead"><span class="sk">Agenda</span><div class="rule"></div><span class="hint">check off as you go</span></div>
+          <div class="agenda">
+            <div class="agitem donei"><span class="n">✓</span><div class="txt">Volunteer signup status for <span class="mention" contenteditable="false"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3.5" width="11" height="10" rx="2"></rect><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3"></path></svg>Welcome Week</span><div class="sub">34/40 filled — Sarah pushing in group chats this week</div></div></div>
+            <div class="agitem donei"><span class="n">✓</span><div class="txt">Catering + food count<div class="sub">Confirmed for 120 with Golden Wok</div></div></div>
+            <div class="agitem"><span class="n">3</span><div class="txt">Rain contingency for opening night</div></div>
+            <div class="agitem"><span class="n">4</span><div class="txt">First look at <span class="mention" contenteditable="false"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3.5" width="11" height="10" rx="2"></rect><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3"></path></svg>The FAIR</span> booth plan</div></div>
+            <div class="addline"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"></path></svg>Add agenda item — anyone can add these before the meeting</div>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="sechead"><span class="sk">Decisions</span><div class="rule"></div><span class="hint">searchable across all meetings</span></div>
+          <div class="decision"><span class="dot"></span><div class="txt">Opening night starts at 7:00 PM, not 6:30 — avoids the campus shuttle clash.<div class="by">Re: Welcome Week · Brian J.</div></div></div>
+          <div class="decision"><span class="dot"></span><div class="txt">Rain plan is the gym; <span class="mention person" contenteditable="false">Daniel L.</span> makes the final call by Thursday.<div class="by">Re: Welcome Week · Daniel L.</div></div></div>
+          <div class="whisper">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5l1.8 4.2 4.5.4-3.4 3 1 4.4L8 11.2l-3.9 2.3 1-4.4-3.4-3 4.5-.4z"></path></svg>
+            <span>Both decisions mention <i>Welcome Week</i> — they'll show on the event's page too. Follow-up tasks belong on the event. <button>Open Welcome Week planning →</button></span>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="sechead"><span class="sk">Notes</span><div class="rule"></div></div>
+          <div class="prose" contenteditable="true">
+            <p>Michelle out this week (traveling). Signage and name tags printed, in the storage closet.</p>
+            <p class="ph">Freeform space — type @ to mention events or people…</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VARIANT C: Fully structured ── -->
+      <div class="variant hidden" id="var-c">
+        <div class="sec">
+          <div class="sechead"><span class="sk">01 · Attendance</span><div class="rule"></div></div>
+          <div class="prose"><p><span class="mention person" contenteditable="false">Brian J.</span> <span class="mention person" contenteditable="false">Sarah K.</span> <span class="mention person" contenteditable="false">Daniel L.</span> <span class="mention person" contenteditable="false">Josh P.</span> — absent: Michelle C. (traveling)</p></div>
+        </div>
+        <div class="sec">
+          <div class="sechead"><span class="sk">02 · Agenda</span><div class="rule"></div></div>
+          <div class="agenda">
+            <div class="agitem donei"><span class="n">✓</span><div class="txt">Volunteer signups — 34/40, Sarah pushing this week</div></div>
+            <div class="agitem donei"><span class="n">✓</span><div class="txt">Catering confirmed for 120</div></div>
+            <div class="agitem"><span class="n">3</span><div class="txt">Rain contingency for opening night</div></div>
+          </div>
+        </div>
+        <div class="sec">
+          <div class="sechead"><span class="sk">03 · Discussion</span><div class="rule"></div></div>
+          <div class="prose" contenteditable="true"><p>Shuttle schedule conflicts with a 6:30 start; consensus to shift opening night. Gym is available as rain backup — Daniel confirming with facilities.</p></div>
+        </div>
+        <div class="sec">
+          <div class="sechead"><span class="sk">04 · Decisions</span><div class="rule"></div></div>
+          <div class="decision"><span class="dot"></span><div class="txt">Opening night starts at 7:00 PM.<div class="by">Re: Welcome Week</div></div></div>
+        </div>
+        <div class="sec">
+          <div class="sechead"><span class="sk">05 · Follow-ups</span><div class="rule"></div></div>
+          <div class="whisper">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5l1.8 4.2 4.5.4-3.4 3 1 4.4L8 11.2l-3.9 2.3 1-4.4-3.4-3 4.5-.4z"></path></svg>
+            <span>No action items live here — they belong on event planning. <button>Open Welcome Week planning →</button></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- mention popover demo -->
+      <div class="sec">
+        <div class="sechead"><span class="sk">@ mention</span><div class="rule"></div><span class="hint">what typing @ looks like — static demo</span></div>
+        <div style="position:relative;height:210px">
+          <div class="mpop show" style="left:0;top:0">
+            <div class="pt">Mention — "@wel"</div>
+            <div class="mrow hl"><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3.5" width="11" height="10" rx="2"></rect><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3"></path></svg></span><span class="nm">Welcome Week</span><span class="kind">Event</span></div>
+            <div class="mrow"><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3.5" width="11" height="10" rx="2"></rect><path d="M2.5 6.5h11M5.5 2v3M10.5 2v3"></path></svg></span><span class="nm">Welcome Week — Day 1</span><span class="kind">Sub-event</span></div>
+            <div class="mrow"><span class="ic" style="background:var(--ivory);color:var(--ink)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5.5" r="2.8"></circle><path d="M2.8 13.5c.8-2.6 2.8-4 5.2-4s4.4 1.4 5.2 4"></path></svg></span><span class="nm">Wesley Chan</span><span class="kind">Person</span></div>
+            <div class="mrow"><span class="ic" style="background:var(--cream-3);color:var(--warm-tan)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4.5A1.5 1.5 0 014.5 3h3l1.5 2h4.5A1.5 1.5 0 0115 6.5v5A1.5 1.5 0 0113.5 13h-9A1.5 1.5 0 013 11.5z"></path></svg></span><span class="nm">Welcome packet.pdf</span><span class="kind">Resource</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="explore" id="explorebar">
+  <span class="xk">Editor style</span>
+  <div class="seg">
+    <button class="on" onclick="setVariant('a',this)">A · Doc + blocks</button>
+    <button onclick="setVariant('b',this)">B · Hybrid</button>
+    <button onclick="setVariant('c',this)">C · Structured</button>
+  </div>
+</div>
+
+<script>
+  const listV=document.getElementById('view-list'),edV=document.getElementById('view-editor'),bar=document.getElementById('explorebar'),main=document.querySelector('.main');
+  function openNote(){listV.classList.add('hidden');edV.classList.remove('hidden');bar.style.display='flex';main.scrollTop=0}
+  function openList(){edV.classList.add('hidden');listV.classList.remove('hidden');bar.style.display='none';main.scrollTop=0}
+  function setVariant(k,btn){document.querySelectorAll('.variant').forEach(v=>v.classList.add('hidden'));document.getElementById('var-'+k).classList.remove('hidden');document.querySelectorAll('.explore .seg button').forEach(b=>b.classList.remove('on'));btn.classList.add('on')}
+  bar.style.display='none';
+  document.querySelectorAll('.newbtn')[0].addEventListener('click',openNote);
+</script>
+</body>
+</html>
