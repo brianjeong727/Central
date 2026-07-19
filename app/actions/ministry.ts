@@ -429,6 +429,20 @@ async function createOnboardingWorkspaces(
         is_president: !!r.is_president,
       }))
     )
+    // Seed Resources-tab starter content for roles that ship a guide
+    // (summary + responsibilities — e.g. the board roles' real duties).
+    const resourceRows = preset.roles
+      .filter((r) => r.resources)
+      .map((r) => ({
+        team_id: team.id,
+        role_name: r.name,
+        summary: r.resources!.summary,
+        responsibilities: r.resources!.responsibilities,
+        created_by: createdBy,
+        updated_by: createdBy,
+        updated_at: new Date().toISOString(),
+      }))
+    if (resourceRows.length > 0) await admin.from("team_role_descriptions").insert(resourceRows)
   }
 }
 

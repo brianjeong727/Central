@@ -11,7 +11,7 @@ import {
   ClipboardList, Pencil,
   Shuffle, Download, GripVertical, Loader2, MessageCircle, ArrowUpRight,
   FileText, ExternalLink, CheckCircle2, Circle, Share2, AlertCircle,
-  Sparkles, Layers, Bus, Clock, Star, CornerUpLeft, AlertTriangle, PlusCircle,
+  Sparkles, Layers, Bus, Clock, Star, CornerUpLeft, AlertTriangle, PlusCircle, Repeat,
 } from "lucide-react"
 import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
@@ -36,6 +36,8 @@ import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, t
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
 import { instantiateTemplateAction } from "@/app/actions/event-templates"
+import { startNextSeasonAction } from "@/app/actions/season-rollover"
+import { ActionMenu } from "@/components/central/action-menu"
 import { setBlockStatusAction, shiftBlocksAction } from "@/app/actions/event-blocks"
 import { EventCompileModal } from "./event-compile"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
@@ -52,6 +54,7 @@ import { getReimbursementInbox } from "@/app/actions/receipts"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
+import { EVENT_TYPE_CONFIGS, nextAnchorYMD, addDaysToYMD, ymdOf, lineageKeyOf, seasonLabelOf } from "../event-presets"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventConfirmation, EventBlock,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -883,7 +886,7 @@ async function fetchCalendarEventsAndPlans([, ministryId, teamScope]: readonly [
   const supabase = createClient()
   let query = supabase
     .from("calendar_events")
-    .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+    .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
     .eq("ministry_id", ministryId)
     .order("start_date", { ascending: true })
   if (teamScope !== "all") {
@@ -937,6 +940,17 @@ function endedAgoLabel(start: Date, now: Date): string {
 // Agenda/timeline view for a team's Events section (redesign per cdesign handoff).
 // Groups top-level events by month with a spine + node rail; the earliest upcoming
 // event is emphasised as an "up next" callout with an optional sub-events disclosure.
+// The traditions mark — flags a recurring (annually carried-forward) event.
+function RecurringMark({ size = 14 }: { size?: number }) {
+  return (
+    <Repeat
+      role="img"
+      aria-label="Recurring every year"
+      style={{ width: size, height: size, color: "var(--plum)", display: "inline-block", verticalAlign: "baseline", marginLeft: 8, flexShrink: 0, opacity: 0.75 }}
+    />
+  )
+}
+
 function EventsAgendaList({
   events, allEvents, onOpenEvent, canEdit, onDelete, deleteConfirmId, setDeleteConfirmId, deleting, plannedIds,
 }: {
@@ -1027,7 +1041,8 @@ function EventsAgendaList({
         />
       )
     }
-    const pastDescM = [...past].reverse()
+    const archiveViewM = upcoming.length === 0 && past.length > 0
+    const pastDescM = archiveViewM ? [...past] : [...past].reverse()
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         {upcoming.length > 0 && (
@@ -1035,7 +1050,11 @@ function EventsAgendaList({
             {upcoming.map((ev, i) => agendaRow(ev, false, i === upcoming.length - 1))}
           </PocketRowCard>
         )}
-        {past.length > 0 && (
+        {archiveViewM ? (
+          <PocketRowCard>
+            {pastDescM.map((ev, i) => agendaRow(ev, true, i === pastDescM.length - 1))}
+          </PocketRowCard>
+        ) : past.length > 0 && (
           <>
             <button
               onClick={() => setShowPastOverride(v => !(v ?? (upcoming.length === 0)))}
@@ -1153,7 +1172,7 @@ function EventsAgendaList({
           </div>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginTop: 12 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <h3 style={{ fontFamily: "var(--serif)", fontSize: 23, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</h3>
+              <h3 style={{ fontFamily: "var(--serif)", fontSize: 23, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}{ev.recurring && <RecurringMark size={16} />}</h3>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, fontSize: 13, color: "var(--body)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {rangeStr}</span>
                 {ev.location && <>{dot}<span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {ev.location}</span></>}
@@ -1176,7 +1195,7 @@ function EventsAgendaList({
           style={{ display: "flex", alignItems: "center", gap: "var(--space-5)", padding: "17px 20px", borderRadius: "var(--r-card)", background: "var(--cream)", border: `1px solid ${isHovered ? "var(--dashed)" : "var(--line-2)"}`, cursor: "pointer", transition: "border-color 120ms ease" }}
         >
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+            <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}{ev.recurring && <RecurringMark />}</p>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 13, color: "var(--body)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {dtStr}</span>
               {ev.location && <>{dot}<span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {ev.location}</span></>}
@@ -1214,7 +1233,7 @@ function EventsAgendaList({
               const cd2 = new Date(c.start_date)
               const cTime = c.all_day ? "All day" : cd2.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
               return (
-                <div key={c.id} onClick={e => { e.stopPropagation(); onOpenEvent(c) }} style={{ display: "grid", gridTemplateColumns: "52px 20px 1fr", cursor: "pointer" }}>
+                <div key={c.id} onClick={e => { e.stopPropagation(); onOpenEvent(c) }} style={{ display: "grid", gridTemplateColumns: "52px 20px minmax(0, 1fr)", cursor: "pointer" }}>
                   <div style={{ textAlign: "center", paddingTop: 4 }}>
                     <div style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", lineHeight: 1, letterSpacing: "-0.02em" }}>{cd2.getDate()}</div>
                     <div style={{ ...monoBase, fontSize: 9, color: "var(--muted-text)", marginTop: 2 }}>{cd2.toLocaleDateString("en-US", { month: "short" })}</div>
@@ -1223,7 +1242,7 @@ function EventsAgendaList({
                     <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 2, background: "var(--line-2)", transform: "translateX(-50%)" }} />
                     <div style={{ position: "absolute", left: "50%", top: "50%", width: 7, height: 7, borderRadius: "50%", background: "var(--cream)", border: "2px solid var(--dashed)", transform: "translate(-50%,-50%)", boxSizing: "border-box" }} />
                   </div>
-                  <div style={{ background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "11px 15px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "11px 15px", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", margin: 0, fontFamily: "var(--sans)" }}>{c.title}</p>
                       {c.description && <p style={{ fontSize: 12, color: "var(--body)", margin: "2px 0 0", fontFamily: "var(--sans)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.description}</p>}
@@ -1261,7 +1280,10 @@ function EventsAgendaList({
   })
 
   // ── Past list (reverse-chronological, de-emphasised; no month grouping, no subs) ──
-  const pastDesc = [...past].reverse()
+  // Archive mode (season filter on a finished year): the whole list is "past",
+  // so render it chronologically with no collapse bar — it IS the year's record.
+  const archiveView = upcoming.length === 0 && past.length > 0
+  const pastDesc = archiveView ? [...past] : [...past].reverse()
   const pastNodes: ReactNode[] = pastDesc.map((ev, i) => {
     const d = new Date(ev.start_date)
     const isFirst = i === 0
@@ -1281,7 +1303,7 @@ function EventsAgendaList({
         style={{ display: "flex", alignItems: "center", gap: "var(--space-5)", padding: "17px 20px", borderRadius: "var(--r-card)", background: "var(--cream-2)", border: `1px solid ${isHovered ? "var(--line-2)" : "var(--line)"}`, opacity: isHovered ? 1 : 0.82, cursor: "pointer", transition: "opacity 120ms ease, border-color 120ms ease" }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--body)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+          <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--body)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}{ev.recurring && <RecurringMark />}</p>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 13, color: "var(--faint)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {dtStr}</span>
             {ev.location && <>{dot}<span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {ev.location}</span></>}
@@ -1319,7 +1341,9 @@ function EventsAgendaList({
   return (
     <div>
       {upcomingNodes}
-      {past.length > 0 && (
+      {archiveView ? (
+        <div>{pastNodes}</div>
+      ) : past.length > 0 && (
         <>
           <CentralButton
             variant="quiet"
@@ -1487,13 +1511,6 @@ export function StudentOrgTeamHome({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displaySection])
 
-  // Side-effect (was inside the fetcher): notify the parent of the current event list.
-  // Pass the sub-event-excluded list (calEvents) to keep parent consumers consistent
-  // with StudentOrgTeamHome's original filtered dataset.
-  useEffect(() => {
-    if (calData) onCalEventsChange?.(calEvents)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calData])
   // External refresh trigger → revalidate the shared cache.
   useEffect(() => {
     if (refreshSignal) void mutateCal()
@@ -1530,6 +1547,58 @@ export function StudentOrgTeamHome({
   }, [teamId])
 
   const now = new Date()
+
+  // ── Season rollover — filter chips + the "Start next season" flow ──────────
+  // Seasons derive from the events themselves (academic July boundary); the
+  // default view is the latest season that has events, so a freshly-rolled
+  // year takes over the list and past years stay one chip away.
+  const [seasonFilter, setSeasonFilter] = useState<string | null>(null)
+  const [showSeasonConfirm, setShowSeasonConfirm] = useState(false)
+  const [seasonBusy, setSeasonBusy] = useState(false)
+  const [seasonError, setSeasonError] = useState<string | null>(null)
+  const seasons = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of calEvents) set.add(seasonLabelOf(e.start_date.slice(0, 10)))
+    return [...set].sort().reverse()
+  }, [calEvents])
+  const activeSeason = seasonFilter && seasons.includes(seasonFilter) ? seasonFilter : (seasons[0] ?? seasonLabelOf(ymdOf(new Date())))
+  const seasonEvents = useMemo(
+    () => calEvents.filter(e => seasonLabelOf(e.start_date.slice(0, 10)) === activeSeason),
+    [calEvents, activeSeason],
+  )
+  // What "Start next season" will actually copy: the latest season that has
+  // recurring top-level events (independent of the active filter chip).
+  const rolloverSource = useMemo(() => {
+    const rec = calEvents.filter(e => e.recurring && !e.parent_event_id)
+    if (rec.length === 0) return { season: null as string | null, count: 0 }
+    const latest = rec.map(e => seasonLabelOf(e.start_date.slice(0, 10))).sort().reverse()[0]
+    return { season: latest, count: rec.filter(e => seasonLabelOf(e.start_date.slice(0, 10)) === latest).length }
+  }, [calEvents])
+
+  // Notify the parent (sidebar events sub-list) of the current list — the
+  // SEASON-FILTERED set, so a finished year's events leave the sidebar after
+  // "Start next season" (and the sidebar follows the season dropdown).
+  useEffect(() => {
+    if (calData) onCalEventsChange?.(seasonEvents)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calData, seasonEvents])
+
+  async function handleStartNextSeason() {
+    if (!teamId) return
+    setSeasonBusy(true)
+    setSeasonError(null)
+    try {
+      const res = await startNextSeasonAction(teamId)
+      if ("error" in res) { setSeasonError(res.error); return }
+      setShowSeasonConfirm(false)
+      setSeasonFilter(res.season)
+      void mutateCal()
+    } catch (e: unknown) {
+      setSeasonError((e as { message?: string }).message ?? "Couldn't start the season — try again.")
+    } finally {
+      setSeasonBusy(false)
+    }
+  }
 
   async function handleDeleteEvent(evId: string) {
     setDeleting(true)
@@ -1745,20 +1814,66 @@ export function StudentOrgTeamHome({
         {/* PLAN — events list with Plan → links */}
         {displaySection === "Events" && (
           <div>
+            {/* One header row: Events · season chips (browse past years) · rollover CTA · New Event.
+                Seasons derive from the events themselves; default = the latest
+                season that actually has events. flexWrap keeps narrow widths sane. */}
             <ContentHeader
               label="Events"
               style={{ marginBottom: 24 }}
-              action={canEdit && (
-                <ContentActionButton
-                  variant="primary"
-                  icon={<Plus style={{ width: 13, height: 13 }} />}
-                  label="New Event"
-                  onClick={() => setShowAddModal(true)}
-                />
-              )}
+              action={
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", gap: 8 }}>
+                  {seasons.length > 1 && (
+                    <ActionMenu
+                      align="right"
+                      minWidth={140}
+                      items={seasons.map(sn => ({ key: sn, label: sn, onSelect: () => setSeasonFilter(sn) }))}
+                      renderTrigger={({ toggle }) => (
+                        <button
+                          type="button"
+                          onClick={toggle}
+                          aria-label="Season"
+                          style={{
+                            display: "flex", alignItems: "center", gap: 6,
+                            padding: "5px 12px", borderRadius: 9999, cursor: "pointer",
+                            fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.06em",
+                            border: "1.5px solid var(--plum)", background: "var(--plum-tint)",
+                            color: "var(--plum)", fontWeight: 600, whiteSpace: "nowrap",
+                          }}
+                        >
+                          {activeSeason}
+                          <ChevronDown style={{ width: 12, height: 12 }} />
+                        </button>
+                      )}
+                    />
+                  )}
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSeasonConfirm(true)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        padding: "6px 13px", borderRadius: 9999, cursor: "pointer",
+                        border: "1.5px solid var(--line)", background: "var(--cream-panel)",
+                        fontSize: 12.5, fontWeight: 500, color: "var(--plum)", whiteSpace: "nowrap",
+                      }}
+                    >
+                      <Repeat style={{ width: 13, height: 13 }} />
+                      Start next season
+                    </button>
+                  )}
+                  {canEdit && (
+                    <ContentActionButton
+                      variant="primary"
+                      icon={<Plus style={{ width: 13, height: 13 }} />}
+                      label="New Event"
+                      onClick={() => setShowAddModal(true)}
+                    />
+                  )}
+                </div>
+              }
             />
             <EventsAgendaList
-              events={calEvents}
+              events={seasonEvents}
               allEvents={calData?.events ?? []}
               onOpenEvent={onPlanningEventChange}
               canEdit={canEdit}
@@ -1768,6 +1883,29 @@ export function StudentOrgTeamHome({
               deleting={deleting}
               plannedIds={plannedIds}
             />
+            {showSeasonConfirm && (
+              <CentralModal
+                onClose={() => { if (!seasonBusy) setShowSeasonConfirm(false) }}
+                title="Start next season"
+                maxWidth={440}
+                footer={
+                  <>
+                    <CentralButton variant="quiet" size="sm" onClick={() => setShowSeasonConfirm(false)} disabled={seasonBusy}>Cancel</CentralButton>
+                    <CentralButton variant="primary" size="md" onClick={handleStartNextSeason} disabled={seasonBusy || rolloverSource.count === 0}>
+                      {seasonBusy ? "Copying the year…" : "Start season"}
+                    </CentralButton>
+                  </>
+                }
+              >
+                <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.6, margin: 0 }}>
+                  Carries <span style={{ fontWeight: 600, color: "var(--ink)" }}>{rolloverSource.count} recurring {rolloverSource.count === 1 ? "event" : "events"}</span> from {rolloverSource.season ?? activeSeason} into
+                  next season — an exact copy of that year&apos;s plans (checklists, roles, run of show, sub-events) dated to
+                  matching weekdays, with completion reset and every lead unassigned. One-off events stay in their season,
+                  browsable from the season filter. Nothing existing is changed or deleted.
+                </p>
+                {seasonError && <p style={{ fontSize: 13, color: "var(--danger)", marginTop: 12 }}>{seasonError}</p>}
+              </CentralModal>
+            )}
           </div>
         )}
 
@@ -5945,236 +6083,9 @@ const CATEGORY_CONFIG = {
   regular:   { label: "Regular",   dot: "var(--muted-text)", bg: "var(--plum-tint)", text: "var(--body)" },
 } as const
 
-type EventTypeConfig = {
-  label: string; icon: string; dot: string; bg: string; text: string
-  budgetCategory: string | null; canHaveSubEvents: boolean; description: string
-  defaultPhases: { key: string; label: string; tasks: string[] }[]
-  defaultRoles: { name: string; notes: string }[]
-  extraTabs: EventExtraTab[]
-}
-
-const EVENT_TYPE_CONFIGS: Record<EventType, EventTypeConfig> = {
-  welcome_week: {
-    label: "Welcome Week", icon: "🎉", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--plum)",
-    budgetCategory: "welcoming_week", canHaveSubEvents: true,
-    description: "Multi-day freshman welcome — Popsicle Socials, Game Night, Sports Day, Welcoming Night, Praise Night. Plan in June; reserve all venues in June.",
-    defaultPhases: [
-      { key: "pre_event", label: "June Planning", tasks: [
-        "Reserve venues for all five sub-events (Popsicle Social, Game Night, Sports, Welcoming Night, Praise Night)",
-        "Submit space reservation requests for Pitt and CMU venues",
-        "Design promotional graphics and Instagram posts",
-        "Coordinate with DGL team — confirm who is cooking each night",
-        "Coordinate with Praise Team for Praise Night worship",
-        "Finalize food budget and assign purchasers per sub-event",
-        "Plan games, icebreakers, and activities for each night",
-        "Draft Welcome Week announcement",
-      ]},
-      { key: "day_of", label: "Week Of", tasks: [
-        "Send daily reminder posts and announcements",
-        "Confirm food orders and grocery runs for each night",
-        "Confirm all volunteers and point-of-contact per sub-event",
-        "Set up venue for each event (tables, decorations, AV)",
-        "Log new folks at each event for follow-up",
-      ]},
-      { key: "post_event", label: "Post-Week", tasks: [
-        "Compile full list of new folks for DGL follow-up",
-        "Submit all reimbursement forms",
-        "Post recap photos on Instagram",
-        "Send thank-you messages to all volunteers",
-        "CCSF debrief — what worked, what to improve",
-      ]},
-    ],
-    defaultRoles: [
-      { name: "President", notes: "Overall lead — final decision maker, coordinates all sub-events" },
-      { name: "Event Coordinator (Pitt)", notes: "Space reservations, setup/teardown, cleanup crew for Pitt events" },
-      { name: "Event Coordinator (CMU)", notes: "Space reservations, setup/teardown, cleanup crew for CMU events" },
-      { name: "Secretary", notes: "Promotional graphics, Instagram, flyers, slideshow announcements" },
-      { name: "DGL Liaison", notes: "Coordinates with DGL team for dinner cooking rotations" },
-      { name: "Praise Team Liaison", notes: "Coordinates Praise Night worship with Praise Team" },
-    ],
-    extraTabs: ["sub_events"],
-  },
-  coffeehouse: {
-    label: "Coffeehouse", icon: "☕", dot: "var(--warm-tan)", bg: "#FDF6EC", text: "#6B4C1E",
-    budgetCategory: "coffeehouse", canHaveSubEvents: false,
-    description: "Annual talent show — performances, praise, and testimony. Held at Rangos Hall (CMU). ~$123 budget for coffee and snacks.",
-    defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: [
-        "Book Rangos Hall (CMU) and reserve AV equipment",
-        "Open performer sign-ups (music, spoken word, comedy, dance)",
-        "Plan run-of-show: performances → praise set → testimony",
-        "Design flyers and promotional graphics",
-        "Post Instagram promo and reminders",
-        "Coordinate sound check schedule with performers",
-        "Arrange coffee and snacks (budget ~$123)",
-        "Recruit MC and backstage helpers",
-      ]},
-      { key: "day_of", label: "Day-of", tasks: [
-        "AV and stage setup at Rangos Hall",
-        "Sound check per performer — vocals, instruments, backing tracks",
-        "MC briefing and run-of-show walkthrough",
-        "Welcome guests at the door",
-        "Run the show — keep transitions tight",
-        "Cleanup and load-out",
-      ]},
-      { key: "post_event", label: "Post-Event", tasks: [
-        "Submit reimbursement form (coffee/snacks)",
-        "Post photos and recap on Instagram",
-        "Thank all performers and volunteers",
-      ]},
-    ],
-    defaultRoles: [
-      { name: "President", notes: "Oversees performer bookings and run-of-show coordination" },
-      { name: "Secretary", notes: "Flyers, Instagram promo, announcement slides, event photography" },
-      { name: "Event Coordinator", notes: "Rangos Hall booking, AV setup, sound check logistics" },
-      { name: "MC / Emcee", notes: "Hosts the night and keeps the program moving" },
-      { name: "Sound Tech", notes: "PA system, mic levels, backing track playback" },
-      { name: "Food Lead", notes: "Coffee and snacks setup and service" },
-    ],
-    extraTabs: ["acts"],
-  },
-  turkey_bowl: {
-    label: "Turkey Bowl", icon: "🏈", dot: "var(--sage)", bg: "#EEF4F1", text: "#2D5445",
-    budgetCategory: "turkeybowl", canHaveSubEvents: false,
-    description: "Annual flag football tournament in November. Separate men's and women's divisions. Budget ~$1,500–1,700 (shirts are the dominant cost).",
-    defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: [
-        "Reserve field location",
-        "Open sign-ups for men's and women's divisions",
-        "Design and order jerseys/shirts — submit order early (3–4 week lead time, ~$1,500)",
-        "Confirm shirt sizes and names",
-        "Organize teams and brackets for both divisions",
-        "Coordinate food and cookout supplies",
-        "Get equipment: footballs, cones, first aid kit",
-        "Create announcement and promo graphics",
-      ]},
-      { key: "day_of", label: "Day-of", tasks: [
-        "Field setup — cones, boundaries, end zones",
-        "Distribute shirts to players",
-        "Run men's division games",
-        "Run women's division games",
-        "Cookout — grill, serve food",
-        "Award ceremony (if applicable)",
-        "Cleanup",
-      ]},
-      { key: "post_event", label: "Post-Event", tasks: [
-        "Submit reimbursement form (shirts, food)",
-        "Post game photos and results on Instagram",
-        "Archive final brackets and scores",
-      ]},
-    ],
-    defaultRoles: [
-      { name: "Men's Game Commissioner", notes: "Runs men's bracket — rules, scheduling, officiating" },
-      { name: "Women's Game Commissioner", notes: "Runs women's bracket — rules, scheduling, officiating" },
-      { name: "Shirt Coordinator", notes: "Manages jersey design, sizing, ordering — critical lead-time task" },
-      { name: "Equipment Lead", notes: "Footballs, cones, first aid, field markers" },
-      { name: "Food Lead", notes: "Grill, cookout, serving, cleanup" },
-      { name: "Secretary", notes: "Promo graphics, Instagram, event photos" },
-    ],
-    extraTabs: ["teams"],
-  },
-  retreat: {
-    label: "Retreat", icon: "⛺", dot: "var(--body)", bg: "var(--body-bg)", text: "var(--plum)",
-    budgetCategory: "retreat", canHaveSubEvents: false,
-    description: "Overnight or weekend retreat. Retreat leaders run the program; CCSF handles logistics support. Women's: October · Men's: February · EM: March.",
-    defaultPhases: [
-      { key: "pre_event", label: "6 Weeks Out", tasks: [
-        "Confirm retreat dates and type (Women's / Men's / EM)",
-        "Book retreat location and confirm capacity",
-        "Plan transportation — identify drivers, confirm car capacity",
-        "Create sign-up form with payment collection",
-        "Coordinate with retreat leaders on program and session schedule",
-        "Coordinate with Praise Team for worship sessions",
-        "Draft packing list for attendees",
-      ]},
-      { key: "day_of", label: "2 Weeks Out", tasks: [
-        "Confirm headcount and finalize lodge room assignments",
-        "Finalize transportation roster — every rider confirmed with a driver",
-        "Send packing list and logistics info to all attendees",
-        "Purchase supplies, food, and any retreat materials",
-        "Confirm payment collection is complete",
-      ]},
-      { key: "post_event", label: "Post-Retreat", tasks: [
-        "Submit all reimbursement forms (food, supplies, any deposits)",
-        "CCSF and retreat leaders debrief",
-        "Follow up with new folks who attended",
-        "Post photos recap",
-      ]},
-    ],
-    defaultRoles: [
-      { name: "Retreat Lead", notes: "Overall point of contact — final decisions on logistics and program" },
-      { name: "Transportation Coordinator", notes: "Assigns every attendee a driver; confirms car capacities" },
-      { name: "Program Director", notes: "Retreat leaders design and run sessions — CCSF coordinates support" },
-      { name: "Worship Leader", notes: "Leads worship sessions during retreat" },
-      { name: "Treasurer Liaison", notes: "Manages sign-up payments, tracks deposits, submits reimbursements" },
-      { name: "Logistics Lead", notes: "Food, supplies, lodging check-in, and day-of execution" },
-    ],
-    extraTabs: ["transport"],
-  },
-  appreciation_night: {
-    label: "Appreciation Night", icon: "✨", dot: "#C97BB0", bg: "#FAF0F7", text: "#8A3070",
-    budgetCategory: "appreciation_night", canHaveSubEvents: false,
-    description: "SAN (Sisters Appreciation Night) or GAN (Guys Appreciation Night) — both held in February. Led by Event Coordinator. Costs: flowers, food, venue.",
-    defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: [
-        "Reserve venue",
-        "Plan program — activities, performances, speeches",
-        "Order flowers and arrange decorations",
-        "Coordinate food and drinks",
-        "Design and post invitation announcement",
-        "Recruit helpers for setup and service",
-      ]},
-      { key: "day_of", label: "Day-of", tasks: [
-        "Setup decorations, flowers, tables, and lighting",
-        "Welcome guests at the door",
-        "Run the program — MC keeps it on schedule",
-        "Serve food and drinks",
-        "Cleanup",
-      ]},
-      { key: "post_event", label: "Post-Event", tasks: [
-        "Submit reimbursement form (flowers, food, venue)",
-        "Post photos on Instagram",
-        "Thank all volunteers and helpers",
-      ]},
-    ],
-    defaultRoles: [
-      { name: "Event Coordinator (Lead)", notes: "Overall lead — owned by Event Coordinator role on CCSF" },
-      { name: "Decoration Lead", notes: "Flowers, lighting, table setup — sets the atmosphere" },
-      { name: "Food Lead", notes: "Coordinates food and drinks for guests" },
-      { name: "MC / Emcee", notes: "Hosts the night and runs the program" },
-      { name: "Photographer", notes: "Photos and video coverage for Instagram recap" },
-    ],
-    extraTabs: [],
-  },
-  social: {
-    label: "Social", icon: "🎊", dot: "var(--muted-text)", bg: "var(--cream-panel)", text: "var(--body)",
-    budgetCategory: null, canHaveSubEvents: false,
-    description: "Informal social events — Church Picnic, game nights, IM sports, community volunteering (Wilkinsburg Food Pantry), or any hangout.",
-    defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: ["Reserve location or confirm venue", "Coordinate food or activity supplies", "Create announcement or invite"] },
-      { key: "day_of", label: "Day-of", tasks: ["Setup", "Welcome guests", "Run activity or game", "Clean up"] },
-    ],
-    defaultRoles: [
-      { name: "Event Lead", notes: "Point of contact and day-of coordinator" },
-      { name: "Food Coordinator", notes: "Food and drinks logistics" },
-    ],
-    extraTabs: [],
-  },
-  ministry: {
-    label: "Ministry Event", icon: "🙏", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--body)",
-    budgetCategory: null, canHaveSubEvents: false,
-    description: "Prayer Meeting (PM), Bible study, outreach (campus involvement fairs), or service events.",
-    defaultPhases: [
-      { key: "pre_event", label: "Pre-Event", tasks: ["Prepare content, set list, or materials", "Create announcement", "Assign roles (worship lead, speaker, host)"] },
-      { key: "day_of", label: "Day-of", tasks: ["Setup space", "Run the event", "Cleanup"] },
-    ],
-    defaultRoles: [
-      { name: "Facilitator", notes: "" },
-      { name: "Worship Lead", notes: "" },
-    ],
-    extraTabs: [],
-  },
-}
+// EVENT_TYPE_CONFIGS now lives in app/home/event-presets.ts (data in
+// event-presets-data.mjs so seed scripts share the exact same playbooks).
+// Kept here: only the consumers.
 
 function getEventConfig(ev: { event_type?: EventType; category?: string }): { label: string; dot: string; bg: string; text: string; icon?: string } {
   if (ev.event_type && EVENT_TYPE_CONFIGS[ev.event_type]) return EVENT_TYPE_CONFIGS[ev.event_type]
@@ -6441,15 +6352,76 @@ export function AddEventModal({
     return t.slice(0, 5)
   }
 
-  const [eventType, setEventType] = useState<EventType>(existing?.event_type ?? "social")
-  const [title, setTitle] = useState(existing?.title ?? "")
-  const [description, setDescription] = useState(existing?.description ?? "")
-  const [location, setLocation] = useState(existing?.location ?? "")
-  const [startDateStr, setStartDateStr] = useState(existing ? parseDateStr(existing.start_date) : "")
-  const [startTimeStr, setStartTimeStr] = useState(existing ? parseTimeStr(existing.start_date) : "09:00")
-  const [endDateStr, setEndDateStr] = useState(existing ? parseDateStr(existing.end_date) : "")
-  const [endTimeStr, setEndTimeStr] = useState(existing ? parseTimeStr(existing.end_date) : "10:00")
-  const [allDay, setAllDay] = useState(existing?.all_day ?? false)
+  // New events open pre-filled from the type's preset defaults — last year's
+  // title/venue/times/description, dated to the next occurrence of last year's
+  // anchor date (event-presets.ts). Switching type re-fills every field the
+  // user hasn't hand-edited (touchedRef); edit mode never prefills.
+  const initialType: EventType = existing?.event_type ?? "social"
+  const initialDefaults = EVENT_TYPE_CONFIGS[initialType].defaults
+  const touchedRef = useRef<{ title?: boolean; description?: boolean; location?: boolean; dates?: boolean }>({})
+
+  const [eventType, setEventType] = useState<EventType>(initialType)
+  const [title, setTitle] = useState(existing?.title ?? initialDefaults.title)
+  const [description, setDescription] = useState(existing?.description ?? initialDefaults.description)
+  const [location, setLocation] = useState(existing?.location ?? initialDefaults.location)
+  const [startDateStr, setStartDateStr] = useState(() =>
+    existing ? parseDateStr(existing.start_date) : nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay))
+  const [startTimeStr, setStartTimeStr] = useState(existing ? parseTimeStr(existing.start_date) : initialDefaults.startTime)
+  const [endDateStr, setEndDateStr] = useState(() =>
+    existing
+      ? parseDateStr(existing.end_date)
+      : addDaysToYMD(nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay), initialDefaults.durationDays - 1))
+  const [endTimeStr, setEndTimeStr] = useState(existing ? parseTimeStr(existing.end_date) : initialDefaults.endTime)
+  const [allDay, setAllDay] = useState(existing?.all_day ?? initialDefaults.allDay)
+
+  // Quick presets suggest content as GHOST text (dimmed placeholders) — the
+  // user accepts a field's suggestion with Tab, or types their own. Only the
+  // dates/times are set directly (they're pickers; ghosting doesn't apply).
+  const [ghost, setGhost] = useState<{ title: string; description: string; location: string } | null>(null)
+
+  function applyQuickPreset(t: EventType) {
+    if (isEditing) return
+    const d = EVENT_TYPE_CONFIGS[t].defaults
+    setGhost({ title: d.title, description: d.description, location: d.location })
+    setTitle("")
+    setDescription("")
+    setLocation("")
+    const start = d.relativeDays != null
+      ? ymdOf(new Date(Date.now() + d.relativeDays * 86_400_000))
+      : nextAnchorYMD(d.anchorMonth, d.anchorDay)
+    setStartDateStr(start)
+    setEndDateStr(addDaysToYMD(start, d.durationDays - 1))
+    setStartTimeStr(d.startTime)
+    setEndTimeStr(d.endTime)
+    setAllDay(d.allDay)
+  }
+
+  // Tab accepts a ghost suggestion into an empty field (focus stays put).
+  function ghostTabFill(e: React.KeyboardEvent, value: string, suggestion: string | undefined, set: (v: string) => void) {
+    if (e.key === "Tab" && !e.shiftKey && !value.trim() && suggestion) {
+      e.preventDefault()
+      set(suggestion)
+    }
+  }
+
+
+  // ── Creation paths: quick presets or free-form. (Season rollover replaced the
+  // per-event "Run it back" shelf — recurring events carry forward wholesale
+  // via the Events page's "Start next season".)
+  type CreatePath = "quick" | "custom"
+  const [createPath, setCreatePath] = useState<CreatePath | null>(isEditing ? "quick" : null)
+  const [extras, setExtras] = useState<EventExtraTab[]>([])
+  // The traditions flag — recurring events are what "Start next season" copies forward.
+  const [recurring, setRecurring] = useState<boolean>(existing?.recurring ?? false)
+  const QUICK_TYPES: EventType[] = (["social", "ministry"] as EventType[]).filter(t => !excludeTypes?.includes(t))
+  // The modal body keeps its scroll position across content swaps — after
+  // scrolling the chooser, the details form would otherwise open with the
+  // title off-screen. Reset on path change.
+  const bodyTopRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const scroller = bodyTopRef.current?.parentElement
+    if (scroller) scroller.scrollTop = 0
+  }, [createPath])
   // Plan/crunch dates live on the event's event_plans row, edited here in EDIT
   // mode only (a new event's plan is seeded lazily by the overview). Crunch is
   // optional — an empty string saves as null (no crunch phase).
@@ -6543,7 +6515,6 @@ export function AddEventModal({
     return map[et] ?? "regular"
   }
 
-  const availableTypes = (Object.keys(EVENT_TYPE_CONFIGS) as EventType[]).filter(t => !excludeTypes?.includes(t))
   const cfg = EVENT_TYPE_CONFIGS[eventType]
 
   async function handleSave() {
@@ -6582,9 +6553,10 @@ export function AddEventModal({
             all_day: allDay,
             category: eventTypeToCategory(eventType),
             event_type: eventType,
+            recurring,
           })
           .eq("id", existing.id)
-          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
           .single()
         if (upErr || !data) { setError(upErr?.message ?? "Failed to update event."); setSaving(false); return }
         evData = data as CalendarEvent
@@ -6622,22 +6594,31 @@ export function AddEventModal({
             category: eventTypeToCategory(eventType),
             event_type: eventType,
             parent_event_id: parentEventId ?? null,
+            recurring: parentEventId ? false : recurring,
             created_by: userId,
           })
-          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
           .single()
 
         if (evErr || !data) { setError(evErr?.message ?? "Failed to create event."); setSaving(false); return }
         evData = data as CalendarEvent
 
-        // Auto-create event_plan and seed from template
+        // Auto-create event_plan and seed from template. Custom (free-form) events
+        // persist their capability modules to type_data.extras — the plan hub
+        // unions those with the type's own extra tabs — and start with a BLANK
+        // checklist (no preset seeding): free-form means the leader composes it.
         const { data: planData } = await supabase
           .from("event_plans")
-          .insert({ ministry_id: ministryId, calendar_event_id: evData.id, created_by: userId })
+          .insert({
+            ministry_id: ministryId,
+            calendar_event_id: evData.id,
+            created_by: userId,
+            ...(createPath === "custom" && extras.length > 0 ? { type_data: { extras } } : {}),
+          })
           .select("id")
           .single()
 
-        if (planData) {
+        if (planData && createPath !== "custom") {
           const planId = (planData as { id: string }).id
 
           if (useTemplate && template) {
@@ -6650,11 +6631,22 @@ export function AddEventModal({
                 typeCfg.defaultRoles.map(r => ({ event_plan_id: planId, role_name: r.name, notes: r.notes || null, created_by: userId }))
               )
             }
-            const taskRows: { event_plan_id: string; title: string; phase: string; sort_order: number; completed: boolean; created_by: string }[] = []
+            // Preset tasks carry T-minus offsets (event-presets-data.mjs) →
+            // concrete due_dates off the event's start date, past-clamped to
+            // today (same rule as playbook instantiation) so a late-created
+            // event doesn't open with a wall of overdue tasks.
+            const eventYMD = startDateStr
+            const todayYMD = ymdOf(new Date())
+            const taskRows: { event_plan_id: string; title: string; phase: string; due_date: string | null; sort_order: number; completed: boolean; created_by: string }[] = []
             let sortIdx = 0
             for (const phase of typeCfg.defaultPhases) {
-              for (const taskTitle of phase.tasks) {
-                taskRows.push({ event_plan_id: planId, title: taskTitle, phase: phase.key, sort_order: sortIdx++, completed: false, created_by: userId })
+              for (const task of phase.tasks) {
+                let due: string | null = null
+                if (task.off !== null && eventYMD) {
+                  const computed = addDaysToYMD(eventYMD, task.off)
+                  due = computed < todayYMD ? todayYMD : computed
+                }
+                taskRows.push({ event_plan_id: planId, title: task.title, phase: phase.key, due_date: due, sort_order: sortIdx++, completed: false, created_by: userId })
               }
             }
             if (taskRows.length > 0) await supabase.from("event_tasks").insert(taskRows)
@@ -6684,109 +6676,130 @@ export function AddEventModal({
       footer={
         <>
           <CentralButton variant="quiet" size="sm" onClick={onClose}>Cancel</CentralButton>
-          <CentralButton variant="primary" size="md" onClick={handleSave} disabled={saving}>
-            {saving ? (isEditing ? "Saving…" : "Creating…") : isEditing ? "Save changes" : "Create event"}
-          </CentralButton>
+          {(isEditing || createPath !== null) && (
+            <CentralButton variant="primary" size="md" onClick={handleSave} disabled={saving}>
+              {saving ? (isEditing ? "Saving…" : "Creating…") : isEditing ? "Save changes" : "Create event"}
+            </CentralButton>
+          )}
         </>
       }
     >
-        <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-          {/* Event type picker — only shown when creating */}
-          {!isEditing && (
-            <div>
-              <label style={labelStyle}>Event type</label>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10, marginTop: 8 }}>
-                {availableTypes.map(t => {
-                  const tcfg = EVENT_TYPE_CONFIGS[t]
-                  const selected = eventType === t
-                  return (
-                    <button
-                      key={t}
-                      onClick={() => setEventType(t)}
-                      style={{
-                        padding: "12px 14px", borderRadius: 12, textAlign: "left", cursor: "pointer",
-                        border: selected ? `2px solid ${tcfg.dot}` : "2px solid var(--line)",
-                        background: selected ? tcfg.bg : "var(--cream-panel)",
-                        transition: "border-color 0.15s, background 0.15s",
-                      }}
-                    >
-                      <div style={{ fontSize: 20, marginBottom: 4 }}>{tcfg.icon}</div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: selected ? tcfg.text : "var(--ink)" }}>{tcfg.label}</div>
-                      <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>{tcfg.description}</div>
-                    </button>
-                  )
-                })}
+        <div ref={bodyTopRef} style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          {/* ── Path chooser: quick presets / free-form ── */}
+          {!isEditing && createPath === null && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+              <div>
+                <label style={labelStyle}>Start something new</label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10, marginTop: 8 }}>
+                  {QUICK_TYPES.map(t => {
+                    const tcfg = EVENT_TYPE_CONFIGS[t]
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => { setEventType(t); applyQuickPreset(t); setCreatePath("quick") }}
+                        style={{ padding: "12px 14px", borderRadius: 12, textAlign: "left", cursor: "pointer", border: "2px solid var(--line)", background: "var(--cream-panel)", transition: "border-color 0.15s" }}
+                      >
+                        <div style={{ fontSize: 20, marginBottom: 4 }}>{tcfg.icon}</div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>{t === "social" ? "Quick social" : "Quick gathering"}</div>
+                        <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>
+                          {t === "social" ? "Game night, hangout, picnic — light checklist" : "Prayer night, praise night, kickoff — light checklist"}
+                        </div>
+                      </button>
+                    )
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = ymdOf(new Date(Date.now() + 7 * 86_400_000))
+                      setEventType("social"); setTitle(""); setDescription(""); setLocation("")
+                      setStartDateStr(d); setEndDateStr(d); setStartTimeStr("18:00"); setEndTimeStr("21:00"); setAllDay(false)
+                      setGhost(null); setExtras([]); setCreatePath("custom")
+                    }}
+                    style={{ padding: "12px 14px", borderRadius: 12, textAlign: "left", cursor: "pointer", border: "2px dashed var(--dashed)", background: "var(--cream-panel)" }}
+                  >
+                    <div style={{ fontSize: 20, marginBottom: 4 }}>✏️</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>Start from scratch</div>
+                    <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>Blank plan — pick exactly the pieces it needs (sub-events, acts, transport…)</div>
+                  </button>
+                </div>
               </div>
-              {/* Run Sheet P2 — "Run it back" vs "Start fresh" when a playbook exists for this type */}
-              {template ? (
-                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <button type="button" onClick={() => setUseTemplate(true)}
-                      style={{ padding: "11px 13px", borderRadius: 10, textAlign: "left", cursor: "pointer",
-                        border: useTemplate ? "2px solid var(--plum)" : "2px solid var(--line)",
-                        background: useTemplate ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--cream-panel)" }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: useTemplate ? "var(--plum)" : "var(--ink)" }}>Run it back</div>
-                      <div style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>{template.name}</div>
-                    </button>
-                    <button type="button" onClick={() => setUseTemplate(false)}
-                      style={{ padding: "11px 13px", borderRadius: 10, textAlign: "left", cursor: "pointer",
-                        border: !useTemplate ? "2px solid var(--plum)" : "2px solid var(--line)",
-                        background: !useTemplate ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--cream-panel)" }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: !useTemplate ? "var(--plum)" : "var(--ink)" }}>Start fresh</div>
-                      <div style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>The standard {cfg.label} checklist</div>
-                    </button>
-                  </div>
-                  <div style={{ padding: "10px 13px", background: "var(--ivory)", borderRadius: 10, fontSize: 12, color: "var(--body)", lineHeight: 1.5 }}>
-                    {useTemplate
-                      ? <><span style={{ fontWeight: 500, color: "var(--plum)" }}>Playbook: </span>recreates last time&apos;s tasks &amp; roles, with due dates recomputed from the saved offsets.</>
-                      : <><span style={{ fontWeight: 500, color: "var(--plum)" }}>Pre-seeded: </span>{cfg.defaultRoles.map(r => r.name).join(", ")}{cfg.defaultRoles.length > 0 && cfg.defaultPhases.length > 0 && " · "}{cfg.defaultPhases.reduce((n, p) => n + p.tasks.length, 0)} checklist tasks</>}
-                  </div>
-                </div>
-              ) : (cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
-                <div style={{ marginTop: 12, padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 12, color: "var(--body)" }}>
-                  <span style={{ fontWeight: 500, color: "var(--plum)" }}>Pre-seeded: </span>
-                  {cfg.defaultRoles.map(r => r.name).join(", ")}
-                  {cfg.defaultRoles.length > 0 && cfg.defaultPhases.length > 0 && " · "}
-                  {cfg.defaultPhases.reduce((n, p) => n + p.tasks.length, 0)} checklist tasks across {cfg.defaultPhases.length} phases
-                </div>
-              )}
+            </div>
+          )}
+
+          {/* Back to the chooser from any path (new events only) */}
+          {!isEditing && createPath !== null && (
+            <button
+              type="button"
+              onClick={() => { setCreatePath(null); setError(null) }}
+              style={{ alignSelf: "flex-start", background: "none", border: "none", padding: 0, fontSize: 12.5, color: "var(--muted-text)", cursor: "pointer" }}
+            >
+              ← All options
+            </button>
+          )}
+          {createPath !== null && (
+          <>
+          {/* Quick-preset hint */}
+          {!isEditing && createPath === "quick" && (cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
+            <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 12, color: "var(--body)" }}>
+              <span style={{ fontWeight: 500, color: "var(--plum)" }}>Pre-seeded: </span>
+              {cfg.defaultRoles.map(r => r.name).join(", ")}
+              {cfg.defaultRoles.length > 0 && cfg.defaultPhases.length > 0 && " · "}
+              {cfg.defaultPhases.reduce((n, p) => n + p.tasks.length, 0)} checklist tasks
             </div>
           )}
 
           {/* Title */}
           <FormField label="Title *">
-            <Input ref={titleInputRef} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" />
+            <Input ref={titleInputRef} value={title} onChange={(e) => { touchedRef.current.title = true; setTitle(e.target.value) }}
+              onKeyDown={(e) => ghostTabFill(e, title, ghost?.title, setTitle)}
+              placeholder={createPath === "quick" && ghost ? ghost.title : "Event name"} />
           </FormField>
 
           {/* Description */}
           <FormField label="Description">
-            <Textarea style={{ minHeight: 80 }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional details…" />
+            <Textarea style={{ minHeight: 80 }} value={description} onChange={(e) => { touchedRef.current.description = true; setDescription(e.target.value) }}
+              onKeyDown={(e) => ghostTabFill(e, description, ghost?.description, setDescription)}
+              placeholder={createPath === "quick" && ghost ? ghost.description : "Optional details…"} />
           </FormField>
 
           {/* Location */}
           <FormField label="Location">
-            <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Room, building, or address" />
+            <Input value={location} onChange={(e) => { touchedRef.current.location = true; setLocation(e.target.value) }}
+              onKeyDown={(e) => ghostTabFill(e, location, ghost?.location, setLocation)}
+              placeholder={createPath === "quick" && ghost ? ghost.location : "Room, building, or address"} />
           </FormField>
 
           {/* All day toggle */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <input type="checkbox" id="allDay" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--plum)", cursor: "pointer" }} />
+            <input type="checkbox" id="allDay" checked={allDay} onChange={(e) => { touchedRef.current.dates = true; setAllDay(e.target.checked) }} style={{ width: 16, height: 16, accentColor: "var(--plum)", cursor: "pointer" }} />
             <label htmlFor="allDay" style={{ fontSize: 14, color: "var(--body)", cursor: "pointer" }}>All day</label>
           </div>
+
+          {/* Recurring toggle — the traditions flag; sub-events roll with their parent */}
+          {!parentEventId && (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <input type="checkbox" id="recurringEv" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--plum)", cursor: "pointer", marginTop: 2 }} />
+              <label htmlFor="recurringEv" style={{ fontSize: 14, color: "var(--body)", cursor: "pointer", lineHeight: 1.45 }}>
+                Recurring every year
+                <span style={{ display: "block", fontSize: 11.5, color: "var(--muted-text)" }}>Traditions carry into next season when a leader starts it — plan copied, dates matched, leads reset.</span>
+              </label>
+            </div>
+          )}
 
           {/* Dates + times */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <FormField label="Start date *">
-              <Input ref={startDateInputRef} type="date" value={startDateStr} onChange={(e) => setStartDateStr(e.target.value)} />
+              <Input ref={startDateInputRef} type="date" value={startDateStr} onChange={(e) => { touchedRef.current.dates = true; setStartDateStr(e.target.value) }} />
             </FormField>
             <FormField label="Start time">
-              <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={startTimeStr} onChange={(e) => setStartTimeStr(e.target.value)} disabled={allDay} />
+              <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={startTimeStr} onChange={(e) => { touchedRef.current.dates = true; setStartTimeStr(e.target.value) }} disabled={allDay} />
             </FormField>
             <FormField label="End date *">
-              <Input ref={endDateInputRef} type="date" value={endDateStr} onChange={(e) => setEndDateStr(e.target.value)} />
+              <Input ref={endDateInputRef} type="date" value={endDateStr} onChange={(e) => { touchedRef.current.dates = true; setEndDateStr(e.target.value) }} />
             </FormField>
             <FormField label="End time">
-              <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={endTimeStr} onChange={(e) => setEndTimeStr(e.target.value)} disabled={allDay} />
+              <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={endTimeStr} onChange={(e) => { touchedRef.current.dates = true; setEndTimeStr(e.target.value) }} disabled={allDay} />
             </FormField>
           </div>
 
@@ -6809,6 +6822,45 @@ export function AddEventModal({
                 )}
               </FormField>
             </div>
+          )}
+
+          {/* Free-form capability modules — persisted to the plan's type_data.extras */}
+          {!isEditing && createPath === "custom" && (
+            <div>
+              <label style={labelStyle}>What does this event need?</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                {([
+                  ...(!parentEventId ? [{ key: "sub_events" as EventExtraTab, label: "Sub-events", hint: "nights inside a bigger week" }] : []),
+                  { key: "acts" as EventExtraTab, label: "Performances", hint: "act line-up + sound checks" },
+                  { key: "teams" as EventExtraTab, label: "Teams", hint: "rosters & brackets" },
+                  { key: "transport" as EventExtraTab, label: "Transport", hint: "drivers & cars" },
+                  { key: "program" as EventExtraTab, label: "Program", hint: "run-of-show blocks" },
+                ]).map(m => {
+                  const on = extras.includes(m.key)
+                  return (
+                    <button
+                      key={m.key}
+                      type="button"
+                      onClick={() => setExtras(cur => on ? cur.filter(k => k !== m.key) : [...cur, m.key])}
+                      style={{
+                        padding: "8px 12px", borderRadius: 9999, fontSize: 12.5, cursor: "pointer",
+                        border: on ? "1.5px solid var(--plum)" : "1.5px solid var(--line)",
+                        background: on ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--cream-panel)",
+                        color: on ? "var(--plum)" : "var(--body)", fontWeight: on ? 500 : 400,
+                      }}
+                      title={m.hint}
+                    >
+                      {m.label}
+                    </button>
+                  )
+                })}
+              </div>
+              <p style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 8, lineHeight: 1.5 }}>
+                Starts with a blank checklist — you compose the plan. Modules add their own tabs to the event.
+              </p>
+            </div>
+          )}
+          </>
           )}
 
           {error && <p style={{ fontSize: 13, color: "var(--danger)" }}>{error}</p>}
@@ -7044,9 +7096,9 @@ export function MinistryCalendar({
           {events.length === 0 ? (
             /* Default placeholder items when calendar isn't seeded yet */
             [
-              { title: "Turkey Bowl", category: "social" as Category, date: "Nov 22" },
-              { title: "Welcome Night", category: "welcoming" as Category, date: "Aug 29" },
-              { title: "Coffeehouse", category: "social" as Category, date: "Nov 7" },
+              { title: "Welcoming Night", category: "welcoming" as Category, date: "Aug 29" },
+              { title: "Coffeehouse", category: "social" as Category, date: "Oct 4" },
+              { title: "Turkeybowl", category: "social" as Category, date: "Nov 7" },
             ].map((item) => {
               const cfg = CATEGORY_CONFIG[item.category]
               return (
@@ -7225,14 +7277,18 @@ export function EventPlanWorkspace({
   const isMobile = useIsMobile()
   const cfg = getEventConfig(calendarEvent)
   const typeCfg = EVENT_TYPE_CONFIGS[calendarEvent.event_type] ?? EVENT_TYPE_CONFIGS.social
-  const extraTabs = typeCfg.extraTabs
 
   type ActiveSection = 'overview' | 'checklist' | 'roles' | 'runsheet' | EventExtraTab
   const coreTabs: ActiveSection[] = ['overview', 'checklist', 'roles', 'runsheet']
-  const allValidTabs: ActiveSection[] = [...coreTabs, ...extraTabs]
 
   // Core data state
   const [plan, setPlan] = useState<EventPlan | null>(null)
+
+  // Extra tabs = the type's built-in modules ∪ the plan's free-form modules
+  // (type_data.extras, chosen in the Start-from-scratch creator).
+  const planExtras = ((plan?.type_data as { extras?: EventExtraTab[] } | undefined)?.extras ?? [])
+  const extraTabs: EventExtraTab[] = [...new Set([...typeCfg.extraTabs, ...planExtras])]
+  const allValidTabs: ActiveSection[] = [...coreTabs, ...extraTabs]
   const [tasks, setTasks] = useState<EventTask[]>([])
   const [roles, setRoles] = useState<EventRole[]>([])
   const [members, setMembers] = useState<{ id: string; name: string }[]>([])
@@ -9025,7 +9081,7 @@ function SubEventsTab({
     async function load() {
       const { data } = await supabase
         .from("calendar_events")
-        .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+        .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
         .eq("parent_event_id", parentEvent.id)
         .order("start_date", { ascending: true })
       const rows = (data ?? []) as CalendarEvent[]
@@ -11099,6 +11155,22 @@ export function AddWorkspaceModal({ ministryId, userId, ownedKeys, onClose, onCr
           is_president: !!r.is_president,
         })))
       if (rolesErr) throw rolesErr
+
+      // Seed Resources-tab starter content for roles that ship a guide
+      // (board roles carry their real duty lists — see workspace-presets.ts).
+      // Non-fatal: the workspace is usable without it.
+      const resourceRows = preset.roles
+        .filter((r) => r.resources)
+        .map((r) => ({
+          team_id: team.id,
+          role_name: r.name,
+          summary: r.resources!.summary,
+          responsibilities: r.resources!.responsibilities,
+          created_by: userId,
+          updated_by: userId,
+          updated_at: new Date().toISOString(),
+        }))
+      if (resourceRows.length > 0) await supabase.from("team_role_descriptions").insert(resourceRows)
 
       // If the ministry has team chats enabled, auto-create this team's linked
       // chat now (empty — the president/members are assigned next; each add

@@ -20,6 +20,7 @@
 import { createAdminClient } from "@/lib/supabase-admin"
 import { requireMinistryMember, type AuthzContext } from "@/app/actions/authz"
 import { isLeaderRole } from "@/lib/roles"
+import { lineageKeyOf, seasonLabelOf } from "@/app/home/event-presets"
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
@@ -159,13 +160,18 @@ export async function compileEventTemplateAction(
   const templateName = (curated.name && curated.name.trim()) || (ev.title as string)
   const nowIso = new Date().toISOString()
 
-  // Upsert the template row on (ministry_id, team_id, event_type). Preserve the id when
-  // one exists (keeps event_plans.template_id links intact) and swap its children.
+  // Yearbook upsert: one shelf row per (ministry, team, lineage, season). Re-compiling
+  // the SAME season swaps that row's children in place (id preserved — keeps
+  // event_plans.template_id links intact); a new season adds a new shelf row instead
+  // of replacing last year's.
+  const lineageKey = lineageKeyOf(templateName)
+  const yearLabel = (curated.yearLabel && curated.yearLabel.trim()) || seasonLabelOf(eventDate)
   let existingQuery = admin
     .from("event_templates")
     .select("id, name")
     .eq("ministry_id", ministryId)
-    .eq("event_type", eventType)
+    .eq("lineage_key", lineageKey)
+    .eq("year_label", yearLabel)
   existingQuery = teamId ? existingQuery.eq("team_id", teamId) : existingQuery.is("team_id", null)
   const { data: existing } = await existingQuery.maybeSingle()
 
@@ -176,9 +182,10 @@ export async function compileEventTemplateAction(
     ministry_id: ministryId,
     team_id: teamId,
     event_type: eventType,
+    lineage_key: lineageKey,
     name: templateName,
     source_event_plan_id: eventPlanId,
-    year_label: curated.yearLabel ?? null,
+    year_label: yearLabel,
     extra_notes: curated.extraNotes ?? [],
     stats,
     created_by: ctx.userId,

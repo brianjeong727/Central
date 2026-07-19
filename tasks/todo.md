@@ -115,3 +115,57 @@ Goal: make reload-restoration and nav-click behavior a consistent, enforced SYST
 
 ## Review
 (filled at end)
+
+# History-first event creation ("Run it back" shelf) — 2026-07-18
+
+Ratified: type-picker presets give way to (1) a Run-it-back shelf of historical per-season
+playbooks (one-click inherit — tasks recomputed to the new date, roles unassigned), (2) two
+generic quick presets (small events), (3) a free-form creator with capability modules
+(sub-events / acts / teams / transport / program) instead of a type taxonomy. Foundation =
+feat/ccsf-event-presets (pushed).
+
+- [x] 1. Migration: event_templates yearbook — add lineage_key, drop UNIQUE(ministry,team,event_type),
+      unique on (ministry, team, lineage_key, year_label). rls-reviewer BEFORE + AFTER.
+- [x] 2. Actions: compile keys on lineage + keeps each season; runItBackAction (one-click inherit,
+      meta from source event, offsets→dates); lazy auto-compile for past uncompiled events.
+- [x] 3. UI: AddEventModal → three-path create flow (Run it back / Quick / Custom+modules);
+      extras persist to event_plans.type_data.extras; hub tabs = typeCfg ∪ extras.
+- [x] 4. Seed re-cut: 2025-26 season as completed history + compiled shelf templates; keep
+      2026-27 as this year's calendar. Both tenants.
+- [x] 5. verify.sh --e2e + inherit click-through spec + screenshots.
+- [x] 6. Handoff + push decision.
+
+## Review (2026-07-18, session close)
+- Migration applied live; rls-reviewer APPROVE on both passes (BEFORE flagged the app-lockstep
+  sequencing block — ratified "apply now, ship soon"; AFTER: all 5 probes pass, tenant isolation
+  intact, dedupe index collides correctly). File: supabase/event_templates_lineage_migration.sql.
+- verify.sh full gate: build/lint/hex/server pass; e2e 100 passed. New e2e/run-it-back.spec.ts
+  (4 tests) green. Remaining suite failures are pre-existing environmental: countdown.spec
+  fixture date-drift (its "Auto-DM sent" state aged out — needs run-time-relative dates) and
+  role-gates/compliance order-flakes (pass in isolation).
+- Fixtures (both tenants): 40 events (2025-26 completed season incl. Welcoming Night run-of-show
+  + 2026-27 upcoming) + 13 compiled "2025–26" shelf playbooks.
+- Visual pass: chooser/shelf, inherit detail, custom-module chips all screenshot-verified.
+
+# Season rollover pivot — 2026-07-18 (same session, ratified over the shelf)
+
+Brian's call: at CCSF every tradition ALWAYS runs back, so per-event inheriting was
+solving a non-problem. Replaced the Run-it-back shelf with season rollover.
+
+- [x] calendar_events.recurring migration (rls-reviewed APPROVE ×2, applied live)
+- [x] startNextSeasonAction — copies latest season's recurring events (+sub-events,
+      plans, tasks, roles, run-of-show blocks) forward one year; same-weekday dates;
+      completion reset; leads unassigned; concurrent copy chains; double-press guard
+      ("season still ahead") + per-lineage dedupe
+- [x] Events page: season filter chips + Start next season (leader-gated, preview
+      confirm); recurring repeat-mark on event rows; shelf removed from New Event
+- [x] Recurring toggle in create/edit modal (sub-events roll via parent)
+- [x] Seed re-cut: 2025-26 completed season only — Brian presses the button himself
+- [x] e2e/season-rollover.spec.ts (6 tests green); full gate: build/lint/hex/server
+      pass, 101 e2e passed (countdown drift + mobile-entry order-flake pre-existing,
+      both pass in isolation)
+
+Bugs caught in-loop: event_tasks.priority CHECK is none|med|high (my copy wrote
+"normal"); spec completion-wait must key on the modal HEADING (button label changes
+while busy); confirm preview must count the ACTION's source season, not the active
+filter chip (E2E tenant's Summer Retreat made 2026–27 the default chip).

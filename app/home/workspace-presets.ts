@@ -1,4 +1,5 @@
 import { classifyTeam } from "./team-type"
+import { BOARD_ROLE_RESOURCES } from "./event-presets-data.mjs"
 
 // ─── Workspace presets — single source of truth ──────────────────────────────
 //
@@ -20,6 +21,10 @@ export type WorkspacePresetRole = {
   name: string
   is_president?: boolean
   permissions: string[]
+  // Optional Resources-tab starter content (summary + responsibilities) seeded
+  // into team_role_descriptions when the workspace is created — real role
+  // guides (the board's come from CCSF's transition notes, see CCSF_CONTEXT.md).
+  resources?: { summary: string; responsibilities: string[] }
 }
 
 export type WorkspacePreset = {
@@ -56,10 +61,10 @@ export const WORKSPACE_PRESETS: WorkspacePreset[] = [
     teamType: "standard",
     comingSoon: false,
     roles: [
-      { name: "President", is_president: true, permissions: ["can_plan_events", "can_view_finances", "can_manage_members", "can_track_attendance", "can_manage_team"] },
-      { name: "Secretary", permissions: ["can_plan_events", "can_manage_members", "can_track_attendance"] },
-      { name: "Treasurer", permissions: ["can_view_finances", "can_plan_events"] },
-      { name: "Event Coordinator", permissions: ["can_plan_events", "can_track_attendance"] },
+      { name: "President", is_president: true, permissions: ["can_plan_events", "can_view_finances", "can_manage_members", "can_track_attendance", "can_manage_team"], resources: BOARD_ROLE_RESOURCES["President"] },
+      { name: "Secretary", permissions: ["can_plan_events", "can_manage_members", "can_track_attendance"], resources: BOARD_ROLE_RESOURCES["Secretary"] },
+      { name: "Treasurer", permissions: ["can_view_finances", "can_plan_events"], resources: BOARD_ROLE_RESOURCES["Treasurer"] },
+      { name: "Event Coordinator", permissions: ["can_plan_events", "can_track_attendance"], resources: BOARD_ROLE_RESOURCES["Event Coordinator"] },
     ],
   },
   {

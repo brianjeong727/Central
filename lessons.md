@@ -91,3 +91,8 @@ Running T3–T7 before fixing the `clickSave` timing issue. All of those failure
 - Cascading test failures from timing: +30min
 
 The feature implementation itself (wizard UI + algorithm + server action + DB schema) was on estimate. All the overrun was in testing infrastructure and debugging issues that should have been caught earlier with the schema check rule.
+
+## 2026-07-18 — Event fixtures vs. datetime display
+- calendar_events stores modal-typed times as `+00:00` but every surface renders with local `toLocaleTimeString/DateString` — so ANY seeded fixture (and any modal-created event) displays shifted by the viewer's UTC offset. Seed scripts must write America/New_York-offset timestamps (see seed-ccsf-events.mjs etOffset) until the storage convention is fixed app-wide. KNOWN BUG to fix in a dedicated pass: store/display disagree for user-created events.
+- Static e2e fixtures with "near-today" due dates (countdown.spec's Summer Retreat, seeded ~Jul 16) drift into different badge states as days pass — countdown.spec's "Auto-DM sent" assert broke by 7/18 with zero code change. Fixture due dates need re-anchoring relative to run time, not fixed dates.
+- Playwright has no getByDisplayValue (that's Testing Library) — assert inputs with getByPlaceholder(...).toHaveValue(...).
