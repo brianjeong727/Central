@@ -6,7 +6,7 @@
 // and the Add-Event modal use to turn offsets/anchors into concrete dates.
 
 import type { EventType, EventExtraTab } from "./types"
-import { EVENT_PRESET_DATA, BOARD_ROLE_RESOURCES } from "./event-presets-data.mjs"
+import { EVENT_PRESET_DATA, BOARD_ROLE_RESOURCES, lineageKeyOf as _lineageKeyOf, seasonLabelOf as _seasonLabelOf } from "./event-presets-data.mjs"
 
 // A checklist task with its due-date offset in days relative to the event start
 // (negative = before, 0 = day-of, null = unscheduled).
@@ -22,6 +22,9 @@ export type EventTypeDefaults = {
   durationDays: number // end date = start date + (durationDays - 1)
   anchorMonth: number // 1–12 — last year's real date, projected forward
   anchorDay: number
+  // Quick presets: suggest today+N instead of the annual anchor (a game night
+  // is "next week", not "next September").
+  relativeDays?: number
 }
 
 export type EventTypeConfig = {
@@ -61,3 +64,8 @@ export function nextAnchorYMD(anchorMonth: number, anchorDay: number, minLeadDay
   if (candidate < lead) candidate.setFullYear(candidate.getFullYear() + 1)
   return ymdOf(candidate)
 }
+
+// Lineage + season identity live in event-presets-data.mjs (shared with the
+// seed scripts) — re-exported here with types applied.
+export const lineageKeyOf = _lineageKeyOf as (name: string) => string
+export const seasonLabelOf = _seasonLabelOf as (eventYMD: string) => string

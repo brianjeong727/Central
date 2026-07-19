@@ -35,7 +35,7 @@ import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamCh
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
-import { instantiateTemplateAction } from "@/app/actions/event-templates"
+import { instantiateTemplateAction, runItBackAction, runItBackFromEventAction } from "@/app/actions/event-templates"
 import { setBlockStatusAction, shiftBlocksAction } from "@/app/actions/event-blocks"
 import { EventCompileModal } from "./event-compile"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
@@ -52,7 +52,7 @@ import { getReimbursementInbox } from "@/app/actions/receipts"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
-import { EVENT_TYPE_CONFIGS, nextAnchorYMD, addDaysToYMD, ymdOf } from "../event-presets"
+import { EVENT_TYPE_CONFIGS, nextAnchorYMD, addDaysToYMD, ymdOf, lineageKeyOf, seasonLabelOf } from "../event-presets"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventConfirmation, EventBlock,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -6237,20 +6237,171 @@ export function AddEventModal({
   const [endTimeStr, setEndTimeStr] = useState(existing ? parseTimeStr(existing.end_date) : initialDefaults.endTime)
   const [allDay, setAllDay] = useState(existing?.all_day ?? initialDefaults.allDay)
 
-  // Re-fill untouched fields when the user picks a different event type (new mode only).
-  function applyTypeDefaults(t: EventType) {
+  // Quick presets suggest content as GHOST text (dimmed placeholders) — the
+  // user accepts a field's suggestion with Tab, or types their own. Only the
+  // dates/times are set directly (they're pickers; ghosting doesn't apply).
+  const [ghost, setGhost] = useState<{ title: string; description: string; location: string } | null>(null)
+
+  function applyQuickPreset(t: EventType) {
     if (isEditing) return
     const d = EVENT_TYPE_CONFIGS[t].defaults
-    if (!touchedRef.current.title) setTitle(d.title)
-    if (!touchedRef.current.description) setDescription(d.description)
-    if (!touchedRef.current.location) setLocation(d.location)
-    if (!touchedRef.current.dates) {
-      const start = nextAnchorYMD(d.anchorMonth, d.anchorDay)
-      setStartDateStr(start)
-      setEndDateStr(addDaysToYMD(start, d.durationDays - 1))
-      setStartTimeStr(d.startTime)
-      setEndTimeStr(d.endTime)
-      setAllDay(d.allDay)
+    setGhost({ title: d.title, description: d.description, location: d.location })
+    setTitle("")
+    setDescription("")
+    setLocation("")
+    const start = d.relativeDays != null
+      ? ymdOf(new Date(Date.now() + d.relativeDays * 86_400_000))
+      : nextAnchorYMD(d.anchorMonth, d.anchorDay)
+    setStartDateStr(start)
+    setEndDateStr(addDaysToYMD(start, d.durationDays - 1))
+    setStartTimeStr(d.startTime)
+    setEndTimeStr(d.endTime)
+    setAllDay(d.allDay)
+  }
+
+  // Tab accepts a ghost suggestion into an empty field (focus stays put).
+  function ghostTabFill(e: React.KeyboardEvent, value: string, suggestion: string | undefined, set: (v: string) => void) {
+    if (e.key === "Tab" && !e.shiftKey && !value.trim() && suggestion) {
+      e.preventDefault()
+      set(suggestion)
+    }
+  }
+
+
+  // ── History-first creation: path chooser + the Run-it-back shelf ────────────
+  // A new event starts at a chooser: inherit a past season's playbook (shelf),
+  // take a light quick preset, or build free-form with capability modules.
+  type CreatePath = "shelf" | "quick" | "custom"
+  type ShelfItem = {
+    kind: "template" | "event" // event = past event never compiled (lazy auto-compile on inherit)
+    id: string
+    name: string
+    season: string
+    eventType: EventType
+    taskCount: number | null
+    turnout: number | null
+    sourceDate: string | null // source event start ISO — drives the suggested next date
+  }
+  const [createPath, setCreatePath] = useState<CreatePath | null>(isEditing ? "quick" : null)
+  const [shelf, setShelf] = useState<ShelfItem[] | null>(null)
+  const [shelfPick, setShelfPick] = useState<ShelfItem | null>(null)
+  const [extras, setExtras] = useState<EventExtraTab[]>([])
+  const QUICK_TYPES: EventType[] = (["social", "ministry"] as EventType[]).filter(t => !excludeTypes?.includes(t))
+  // The modal body keeps its scroll position across content swaps — after
+  // scrolling the chooser to reach "Start from scratch", the details form
+  // would otherwise open with the title off-screen. Reset on path change.
+  const bodyTopRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const scroller = bodyTopRef.current?.parentElement
+    if (scroller) scroller.scrollTop = 0
+  }, [createPath])
+
+  // Load the shelf: every compiled playbook for this team (or ministry-wide),
+  // plus past events that were never compiled — those inherit via lazy
+  // auto-compile so nobody has to remember the compile step.
+  useEffect(() => {
+    if (isEditing || parentEventId) { setShelf([]); return }
+    let cancelled = false
+    ;(async () => {
+      const { data: tpls } = await supabase
+        .from("event_templates")
+        .select("id, name, year_label, event_type, lineage_key, stats, source_event_plan_id, team_id")
+        .eq("ministry_id", ministryId)
+      const templates = (tpls ?? []).filter(t => !teamId || t.team_id === teamId || t.team_id === null)
+
+      const srcPlanIds = templates.map(t => t.source_event_plan_id).filter(Boolean) as string[]
+      const planToEvent = new Map<string, string>()
+      if (srcPlanIds.length) {
+        const { data: plans } = await supabase.from("event_plans").select("id, calendar_event_id").in("id", srcPlanIds)
+        for (const p of plans ?? []) planToEvent.set(p.id as string, p.calendar_event_id as string)
+      }
+      const srcEventIds = [...planToEvent.values()]
+      const eventDates = new Map<string, string>()
+      if (srcEventIds.length) {
+        const { data: evs } = await supabase.from("calendar_events").select("id, start_date").in("id", srcEventIds)
+        for (const e of evs ?? []) eventDates.set(e.id as string, e.start_date as string)
+      }
+      const items: ShelfItem[] = templates.map(t => {
+        const stats = (t.stats ?? {}) as { task_count?: number | null; actual_turnout?: number | null }
+        const srcEvId = t.source_event_plan_id ? planToEvent.get(t.source_event_plan_id as string) : undefined
+        return {
+          kind: "template" as const, id: t.id as string, name: t.name as string,
+          season: (t.year_label as string | null) ?? "earlier",
+          eventType: (t.event_type as EventType) ?? "social",
+          taskCount: stats.task_count ?? null, turnout: stats.actual_turnout ?? null,
+          sourceDate: srcEvId ? (eventDates.get(srcEvId) ?? null) : null,
+        }
+      })
+
+      // Past, top-level, planned-but-never-compiled events.
+      let pastQ = supabase
+        .from("calendar_events")
+        .select("id, title, start_date, event_type")
+        .eq("ministry_id", ministryId)
+        .is("parent_event_id", null)
+        .lt("start_date", new Date().toISOString())
+      if (teamId) pastQ = pastQ.eq("team_id", teamId)
+      const { data: pastEvs } = await pastQ
+      const pastIds = (pastEvs ?? []).map(e => e.id as string)
+      const withPlan = new Set<string>()
+      if (pastIds.length) {
+        const { data: plans } = await supabase.from("event_plans").select("calendar_event_id").in("calendar_event_id", pastIds)
+        for (const p of plans ?? []) withPlan.add(p.calendar_event_id as string)
+      }
+      const covered = new Set(items.map(i => `${lineageKeyOf(i.name)}|${i.season}`))
+      const pastItems: ShelfItem[] = []
+      for (const e of pastEvs ?? []) {
+        if (!withPlan.has(e.id as string)) continue
+        const key = `${lineageKeyOf(e.title as string)}|${seasonLabelOf((e.start_date as string).slice(0, 10))}`
+        if (covered.has(key)) continue
+        covered.add(key)
+        pastItems.push({
+          kind: "event", id: e.id as string, name: e.title as string,
+          season: seasonLabelOf((e.start_date as string).slice(0, 10)),
+          eventType: (e.event_type as EventType) ?? "social",
+          taskCount: null, turnout: null, sourceDate: e.start_date as string,
+        })
+      }
+      if (cancelled) return
+      setShelf([...items, ...pastItems].sort((a, b) => b.season.localeCompare(a.season) || a.name.localeCompare(b.name)))
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function pickShelfItem(item: ShelfItem) {
+    setShelfPick(item)
+    setGhost(null)
+    if (item.sourceDate) {
+      const d = new Date(item.sourceDate)
+      setStartDateStr(nextAnchorYMD(d.getUTCMonth() + 1, d.getUTCDate()))
+    } else {
+      setStartDateStr(ymdOf(new Date(Date.now() + 14 * 86_400_000)))
+    }
+    setTitle(item.name)
+    setCreatePath("shelf")
+  }
+
+  async function handleRunItBack() {
+    if (!shelfPick) return
+    if (!startDateStr) { setError("Start date is required."); focusInvalidField(startDateInputRef); return }
+    setSaving(true)
+    setError(null)
+    try {
+      const res = shelfPick.kind === "template"
+        ? await runItBackAction(shelfPick.id, startDateStr, title.trim() || undefined)
+        : await runItBackFromEventAction(shelfPick.id, startDateStr, title.trim() || undefined)
+      if ("error" in res) { setError(res.error); return }
+      const { data } = await supabase
+        .from("calendar_events")
+        .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by")
+        .eq("id", res.eventId)
+        .single()
+      if (data) onSaved(data as CalendarEvent)
+    } catch (e: unknown) {
+      setError((e as { message?: string }).message ?? "Failed to inherit the playbook.")
+    } finally {
+      setSaving(false)
     }
   }
   // Plan/crunch dates live on the event's event_plans row, edited here in EDIT
@@ -6346,7 +6497,6 @@ export function AddEventModal({
     return map[et] ?? "regular"
   }
 
-  const availableTypes = (Object.keys(EVENT_TYPE_CONFIGS) as EventType[]).filter(t => !excludeTypes?.includes(t))
   const cfg = EVENT_TYPE_CONFIGS[eventType]
 
   async function handleSave() {
@@ -6433,14 +6583,22 @@ export function AddEventModal({
         if (evErr || !data) { setError(evErr?.message ?? "Failed to create event."); setSaving(false); return }
         evData = data as CalendarEvent
 
-        // Auto-create event_plan and seed from template
+        // Auto-create event_plan and seed from template. Custom (free-form) events
+        // persist their capability modules to type_data.extras — the plan hub
+        // unions those with the type's own extra tabs — and start with a BLANK
+        // checklist (no preset seeding): free-form means the leader composes it.
         const { data: planData } = await supabase
           .from("event_plans")
-          .insert({ ministry_id: ministryId, calendar_event_id: evData.id, created_by: userId })
+          .insert({
+            ministry_id: ministryId,
+            calendar_event_id: evData.id,
+            created_by: userId,
+            ...(createPath === "custom" && extras.length > 0 ? { type_data: { extras } } : {}),
+          })
           .select("id")
           .single()
 
-        if (planData) {
+        if (planData && createPath !== "custom") {
           const planId = (planData as { id: string }).id
 
           if (useTemplate && template) {
@@ -6498,88 +6656,166 @@ export function AddEventModal({
       footer={
         <>
           <CentralButton variant="quiet" size="sm" onClick={onClose}>Cancel</CentralButton>
-          <CentralButton variant="primary" size="md" onClick={handleSave} disabled={saving}>
-            {saving ? (isEditing ? "Saving…" : "Creating…") : isEditing ? "Save changes" : "Create event"}
-          </CentralButton>
+          {(isEditing || createPath !== null) && (
+            <CentralButton variant="primary" size="md" onClick={createPath === "shelf" ? handleRunItBack : handleSave} disabled={saving}>
+              {saving
+                ? (isEditing ? "Saving…" : "Creating…")
+                : isEditing ? "Save changes" : createPath === "shelf" ? "Inherit & create" : "Create event"}
+            </CentralButton>
+          )}
         </>
       }
     >
-        <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-          {/* Event type picker — only shown when creating */}
-          {!isEditing && (
-            <div>
-              <label style={labelStyle}>Event type</label>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10, marginTop: 8 }}>
-                {availableTypes.map(t => {
-                  const tcfg = EVENT_TYPE_CONFIGS[t]
-                  const selected = eventType === t
-                  return (
-                    <button
-                      key={t}
-                      onClick={() => { setEventType(t); applyTypeDefaults(t) }}
-                      style={{
-                        padding: "12px 14px", borderRadius: 12, textAlign: "left", cursor: "pointer",
-                        border: selected ? `2px solid ${tcfg.dot}` : "2px solid var(--line)",
-                        background: selected ? tcfg.bg : "var(--cream-panel)",
-                        transition: "border-color 0.15s, background 0.15s",
-                      }}
-                    >
-                      <div style={{ fontSize: 20, marginBottom: 4 }}>{tcfg.icon}</div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: selected ? tcfg.text : "var(--ink)" }}>{tcfg.label}</div>
-                      <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>{tcfg.description}</div>
-                    </button>
-                  )
-                })}
-              </div>
-              {/* Run Sheet P2 — "Run it back" vs "Start fresh" when a playbook exists for this type */}
-              {template ? (
-                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <button type="button" onClick={() => setUseTemplate(true)}
-                      style={{ padding: "11px 13px", borderRadius: 10, textAlign: "left", cursor: "pointer",
-                        border: useTemplate ? "2px solid var(--plum)" : "2px solid var(--line)",
-                        background: useTemplate ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--cream-panel)" }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: useTemplate ? "var(--plum)" : "var(--ink)" }}>Run it back</div>
-                      <div style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>{template.name}</div>
-                    </button>
-                    <button type="button" onClick={() => setUseTemplate(false)}
-                      style={{ padding: "11px 13px", borderRadius: 10, textAlign: "left", cursor: "pointer",
-                        border: !useTemplate ? "2px solid var(--plum)" : "2px solid var(--line)",
-                        background: !useTemplate ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--cream-panel)" }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: !useTemplate ? "var(--plum)" : "var(--ink)" }}>Start fresh</div>
-                      <div style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>The standard {cfg.label} checklist</div>
-                    </button>
-                  </div>
-                  <div style={{ padding: "10px 13px", background: "var(--ivory)", borderRadius: 10, fontSize: 12, color: "var(--body)", lineHeight: 1.5 }}>
-                    {useTemplate
-                      ? <><span style={{ fontWeight: 500, color: "var(--plum)" }}>Playbook: </span>recreates last time&apos;s tasks &amp; roles, with due dates recomputed from the saved offsets.</>
-                      : <><span style={{ fontWeight: 500, color: "var(--plum)" }}>Pre-seeded: </span>{cfg.defaultRoles.map(r => r.name).join(", ")}{cfg.defaultRoles.length > 0 && cfg.defaultPhases.length > 0 && " · "}{cfg.defaultPhases.reduce((n, p) => n + p.tasks.length, 0)} checklist tasks</>}
-                  </div>
-                </div>
-              ) : (cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
-                <div style={{ marginTop: 12, padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 12, color: "var(--body)" }}>
-                  <span style={{ fontWeight: 500, color: "var(--plum)" }}>Pre-seeded: </span>
-                  {cfg.defaultRoles.map(r => r.name).join(", ")}
-                  {cfg.defaultRoles.length > 0 && cfg.defaultPhases.length > 0 && " · "}
-                  {cfg.defaultPhases.reduce((n, p) => n + p.tasks.length, 0)} checklist tasks across {cfg.defaultPhases.length} phases
+        <div ref={bodyTopRef} style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          {/* ── Path chooser: Run it back (shelf) / quick presets / free-form ── */}
+          {!isEditing && createPath === null && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+              {!parentEventId && (
+                <div>
+                  <label style={labelStyle}>Run it back — past seasons</label>
+                  {shelf === null ? (
+                    <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "8px 0 0" }}>Loading past seasons…</p>
+                  ) : shelf.length === 0 ? (
+                    <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "8px 0 0", lineHeight: 1.5 }}>
+                      Nothing on the shelf yet — once an event has run, it appears here so next year&apos;s team can inherit its whole plan in one click.
+                    </p>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 8 }}>
+                      {[...new Set(shelf.map(s => s.season))].map(season => (
+                        <div key={season}>
+                          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.09em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>{season}</p>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            {shelf.filter(s => s.season === season).map(item => {
+                              const icfg = EVENT_TYPE_CONFIGS[item.eventType] ?? EVENT_TYPE_CONFIGS.social
+                              return (
+                                <button
+                                  key={`${item.kind}:${item.id}`}
+                                  type="button"
+                                  onClick={() => pickShelfItem(item)}
+                                  style={{
+                                    display: "flex", alignItems: "center", gap: 12, padding: "10px 13px",
+                                    borderRadius: 12, border: "1px solid var(--line)", background: "var(--cream-panel)",
+                                    cursor: "pointer", textAlign: "left", transition: "border-color .15s",
+                                  }}
+                                >
+                                  <span style={{ fontSize: 18, flexShrink: 0 }}>{icfg.icon}</span>
+                                  <span style={{ flex: 1, minWidth: 0 }}>
+                                    <span style={{ display: "block", fontSize: 13.5, fontWeight: 500, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</span>
+                                    <span style={{ display: "block", fontSize: 11.5, color: "var(--muted-text)", marginTop: 1 }}>
+                                      {item.kind === "template"
+                                        ? [item.taskCount != null ? `${item.taskCount} tasks` : null, item.turnout != null ? `~${item.turnout} people` : null].filter(Boolean).join(" · ") || "Compiled playbook"
+                                        : "Ran, not compiled yet — inherits as-is"}
+                                    </span>
+                                  </span>
+                                  <span style={{ fontSize: 12, color: "var(--plum)", fontWeight: 500, flexShrink: 0 }}>Run it back →</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
+
+              <div>
+                <label style={labelStyle}>Start something new</label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10, marginTop: 8 }}>
+                  {QUICK_TYPES.map(t => {
+                    const tcfg = EVENT_TYPE_CONFIGS[t]
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => { setEventType(t); applyQuickPreset(t); setCreatePath("quick") }}
+                        style={{ padding: "12px 14px", borderRadius: 12, textAlign: "left", cursor: "pointer", border: "2px solid var(--line)", background: "var(--cream-panel)", transition: "border-color 0.15s" }}
+                      >
+                        <div style={{ fontSize: 20, marginBottom: 4 }}>{tcfg.icon}</div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>{t === "social" ? "Quick social" : "Quick gathering"}</div>
+                        <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>
+                          {t === "social" ? "Game night, hangout, picnic — light checklist" : "Prayer night, praise night, kickoff — light checklist"}
+                        </div>
+                      </button>
+                    )
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = ymdOf(new Date(Date.now() + 7 * 86_400_000))
+                      setEventType("social"); setTitle(""); setDescription(""); setLocation("")
+                      setStartDateStr(d); setEndDateStr(d); setStartTimeStr("18:00"); setEndTimeStr("21:00"); setAllDay(false)
+                      setGhost(null); setExtras([]); setCreatePath("custom")
+                    }}
+                    style={{ padding: "12px 14px", borderRadius: 12, textAlign: "left", cursor: "pointer", border: "2px dashed var(--dashed)", background: "var(--cream-panel)" }}
+                  >
+                    <div style={{ fontSize: 20, marginBottom: 4 }}>✏️</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>Start from scratch</div>
+                    <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>Blank plan — pick exactly the pieces it needs (sub-events, acts, transport…)</div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Back to the chooser from any path (new events only) */}
+          {!isEditing && createPath !== null && (
+            <button
+              type="button"
+              onClick={() => { setCreatePath(null); setShelfPick(null); setError(null) }}
+              style={{ alignSelf: "flex-start", background: "none", border: "none", padding: 0, fontSize: 12.5, color: "var(--muted-text)", cursor: "pointer" }}
+            >
+              ← All options
+            </button>
+          )}
+
+          {/* ── Shelf path: confirm title + date, everything else inherits ── */}
+          {createPath === "shelf" && shelfPick && (
+            <>
+              <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 12.5, color: "var(--body)", lineHeight: 1.55 }}>
+                <span style={{ fontWeight: 500, color: "var(--plum)" }}>Inheriting “{shelfPick.name}” ({shelfPick.season}). </span>
+                Recreates the full plan — every task with dates recomputed around the new date, and every role and lead ready to assign fresh.
+              </div>
+              <FormField label="Title *">
+                <Input ref={titleInputRef} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" />
+              </FormField>
+              <FormField label="Date *">
+                <Input ref={startDateInputRef} type="date" value={startDateStr} onChange={(e) => setStartDateStr(e.target.value)} />
+              </FormField>
+            </>
+          )}
+
+          {createPath !== "shelf" && createPath !== null && (
+          <>
+          {/* Quick-preset hint */}
+          {!isEditing && createPath === "quick" && (cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
+            <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 12, color: "var(--body)" }}>
+              <span style={{ fontWeight: 500, color: "var(--plum)" }}>Pre-seeded: </span>
+              {cfg.defaultRoles.map(r => r.name).join(", ")}
+              {cfg.defaultRoles.length > 0 && cfg.defaultPhases.length > 0 && " · "}
+              {cfg.defaultPhases.reduce((n, p) => n + p.tasks.length, 0)} checklist tasks
             </div>
           )}
 
           {/* Title */}
           <FormField label="Title *">
-            <Input ref={titleInputRef} value={title} onChange={(e) => { touchedRef.current.title = true; setTitle(e.target.value) }} placeholder="Event name" />
+            <Input ref={titleInputRef} value={title} onChange={(e) => { touchedRef.current.title = true; setTitle(e.target.value) }}
+              onKeyDown={(e) => ghostTabFill(e, title, ghost?.title, setTitle)}
+              placeholder={createPath === "quick" && ghost ? ghost.title : "Event name"} />
           </FormField>
 
           {/* Description */}
           <FormField label="Description">
-            <Textarea style={{ minHeight: 80 }} value={description} onChange={(e) => { touchedRef.current.description = true; setDescription(e.target.value) }} placeholder="Optional details…" />
+            <Textarea style={{ minHeight: 80 }} value={description} onChange={(e) => { touchedRef.current.description = true; setDescription(e.target.value) }}
+              onKeyDown={(e) => ghostTabFill(e, description, ghost?.description, setDescription)}
+              placeholder={createPath === "quick" && ghost ? ghost.description : "Optional details…"} />
           </FormField>
 
           {/* Location */}
           <FormField label="Location">
-            <Input value={location} onChange={(e) => { touchedRef.current.location = true; setLocation(e.target.value) }} placeholder="Room, building, or address" />
+            <Input value={location} onChange={(e) => { touchedRef.current.location = true; setLocation(e.target.value) }}
+              onKeyDown={(e) => ghostTabFill(e, location, ghost?.location, setLocation)}
+              placeholder={createPath === "quick" && ghost ? ghost.location : "Room, building, or address"} />
           </FormField>
 
           {/* All day toggle */}
@@ -6623,6 +6859,45 @@ export function AddEventModal({
                 )}
               </FormField>
             </div>
+          )}
+
+          {/* Free-form capability modules — persisted to the plan's type_data.extras */}
+          {!isEditing && createPath === "custom" && (
+            <div>
+              <label style={labelStyle}>What does this event need?</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                {([
+                  ...(!parentEventId ? [{ key: "sub_events" as EventExtraTab, label: "Sub-events", hint: "nights inside a bigger week" }] : []),
+                  { key: "acts" as EventExtraTab, label: "Performances", hint: "act line-up + sound checks" },
+                  { key: "teams" as EventExtraTab, label: "Teams", hint: "rosters & brackets" },
+                  { key: "transport" as EventExtraTab, label: "Transport", hint: "drivers & cars" },
+                  { key: "program" as EventExtraTab, label: "Program", hint: "run-of-show blocks" },
+                ]).map(m => {
+                  const on = extras.includes(m.key)
+                  return (
+                    <button
+                      key={m.key}
+                      type="button"
+                      onClick={() => setExtras(cur => on ? cur.filter(k => k !== m.key) : [...cur, m.key])}
+                      style={{
+                        padding: "8px 12px", borderRadius: 9999, fontSize: 12.5, cursor: "pointer",
+                        border: on ? "1.5px solid var(--plum)" : "1.5px solid var(--line)",
+                        background: on ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--cream-panel)",
+                        color: on ? "var(--plum)" : "var(--body)", fontWeight: on ? 500 : 400,
+                      }}
+                      title={m.hint}
+                    >
+                      {m.label}
+                    </button>
+                  )
+                })}
+              </div>
+              <p style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 8, lineHeight: 1.5 }}>
+                Starts with a blank checklist — you compose the plan. Modules add their own tabs to the event.
+              </p>
+            </div>
+          )}
+          </>
           )}
 
           {error && <p style={{ fontSize: 13, color: "var(--danger)" }}>{error}</p>}
@@ -7039,14 +7314,18 @@ export function EventPlanWorkspace({
   const isMobile = useIsMobile()
   const cfg = getEventConfig(calendarEvent)
   const typeCfg = EVENT_TYPE_CONFIGS[calendarEvent.event_type] ?? EVENT_TYPE_CONFIGS.social
-  const extraTabs = typeCfg.extraTabs
 
   type ActiveSection = 'overview' | 'checklist' | 'roles' | 'runsheet' | EventExtraTab
   const coreTabs: ActiveSection[] = ['overview', 'checklist', 'roles', 'runsheet']
-  const allValidTabs: ActiveSection[] = [...coreTabs, ...extraTabs]
 
   // Core data state
   const [plan, setPlan] = useState<EventPlan | null>(null)
+
+  // Extra tabs = the type's built-in modules ∪ the plan's free-form modules
+  // (type_data.extras, chosen in the Start-from-scratch creator).
+  const planExtras = ((plan?.type_data as { extras?: EventExtraTab[] } | undefined)?.extras ?? [])
+  const extraTabs: EventExtraTab[] = [...new Set([...typeCfg.extraTabs, ...planExtras])]
+  const allValidTabs: ActiveSection[] = [...coreTabs, ...extraTabs]
   const [tasks, setTasks] = useState<EventTask[]>([])
   const [roles, setRoles] = useState<EventRole[]>([])
   const [members, setMembers] = useState<{ id: string; name: string }[]>([])

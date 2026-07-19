@@ -18,6 +18,28 @@
 // year's title/venue/times/description, with anchorMonth/anchorDay projecting
 // the next occurrence (this year if still ahead, else next year).
 
+// ── Lineage + season identity (yearbook shelf) ───────────────────────────────
+// Shared by the compile/run-it-back server actions, the shelf UI, AND the seed
+// scripts — every consumer must agree on what "the same event" means across
+// years. lineage_key: name lowercased with year noise stripped; season label:
+// academic year with a July boundary ("2025–26").
+export function lineageKeyOf(name) {
+  return (
+    name
+      .toLowerCase()
+      .replace(/['’]\d{2}\b/g, "")                  // '25
+      .replace(/\b20\d{2}\s*[–-]\s*\d{2,4}\b/g, "") // 2025-26 / 2025–2026
+      .replace(/\b20\d{2}\b/g, "")                  // 2026
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "event"
+  )
+}
+export function seasonLabelOf(eventYMD) {
+  const [y, m] = eventYMD.split("-").map(Number)
+  const startYear = m >= 7 ? y : y - 1
+  return `${startYear}–${String((startYear + 1) % 100).padStart(2, "0")}`
+}
+
 export const EVENT_PRESET_DATA = {
   welcome_week: {
     label: "Welcome Week", icon: "🎉", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--plum)",
@@ -32,32 +54,45 @@ export const EVENT_PRESET_DATA = {
       startTime: "09:00", endTime: "21:00", allDay: true, durationDays: 14,
       anchorMonth: 8, anchorDay: 17,
     },
+    // Merged 2026-07-18 with the live "Welcome Week (Roy)" plan the 2026-27
+    // board actually works from — prod wording wins on overlap; distilled
+    // 2025-26 ops items kept where prod had no equivalent.
     defaultPhases: [
       { key: "pre_event", label: "June–July Planning", tasks: [
-        { title: "Reserve church space for Welcoming Night, Praise Night, meetings, DGs, and PMs", off: -60 },
-        { title: "Book Danforth Conference Room for Game Day (goes early in the summer)", off: -60 },
+        { title: "Contact Pastor IN JUNE for Church Space (Praise Night + Welcoming Night)", off: -60 },
+        { title: "Reserve venues for all five sub-events (Popsicle Social, Game Night, Sports, Welcoming Night, Praise Night)", off: -55 },
         { title: "Budget the week with the treasurers — tabling $50/campus, Game Day ~$20, Welcoming Night ~$200–300, socials ~$40", off: -55 },
-        { title: "Plan sub-events and assign a lead pair to each (socials, Game Day, sports, fair, Praise Night, Welcoming Night)", off: -50 },
-        { title: "Design promo — welcoming schedule post, then one story (9:16) + post (3:4) per event", off: -30 },
+        { title: "Plan sub-events and assign a lead pair to each", off: -50 },
+        { title: "Submit space reservation requests for Pitt and CMU venues", off: -30 },
+        { title: "Design promotional graphics and Instagram posts", off: -30 },
+        { title: "Draft Welcome Week announcement", off: -25 },
         { title: "Register for CMU REACH + The FAIR (registration opens in August)", off: -21 },
-        { title: "Coordinate with DGLs on who cooks each night + Praise Team for Praise Night", off: -14 },
+        { title: "Tag-Along People for the Month of August — assign", off: -21 },
+        { title: "Plan games, icebreakers, and activities for each night", off: -18 },
+        { title: "Finalize food budget and assign purchasers per sub-event", off: -14 },
+        { title: "Coordinate with DGL team — confirm who is cooking each night", off: -14 },
+        { title: "Coordinate with Praise Team for Praise Night worship", off: -14 },
         { title: "Recruit volunteers — 20+ for Popsicle Socials, Game Day greeters, Tag-Along drivers", off: -7 },
         { title: "Print the Welcoming Night QR signup, banner, posterboard, and info cards", off: -5 },
-        { title: "Buy supplies — popsicles (~4×20ct/campus), cooler + ice packs, snacks, board games check", off: -3 },
+        { title: "Buy supplies — popsicles (~4×20ct/campus), cooler + ice packs, snacks", off: -3 },
       ]},
       { key: "day_of", label: "Week Of", tasks: [
         { title: "Send daily reminder posts and announcements", off: 0 },
-        { title: "Add every freshman to Central Chat at each event + note headcounts", off: 0 },
+        { title: "Confirm all volunteers and point-of-contact per sub-event", off: 0 },
         { title: "Confirm food orders and grocery runs for each night", off: 0 },
-        { title: "Set up each venue (tables, decor, AV) and assign a door greeter", off: 0 },
-        { title: "Tag-Along volunteers meet 8:15 AM to bring freshmen to first Sunday service", off: 6 },
+        { title: "Set up venue for each event (tables, decorations, AV)", off: 0 },
+        { title: "Log new folks at each event for follow-up", off: 0 },
+        { title: "Add every freshman to Central Chat at each event", off: 0 },
+        { title: "Coordinate with Secretary to outreach online through introduction Instagrams", off: 0 },
         { title: "Welcoming Night signup progress check — chase the form", off: 3 },
+        { title: "Tag-Along volunteers meet 8:15 AM to bring freshmen to first Sunday service", off: 6 },
       ]},
       { key: "post_event", label: "Post-Week", tasks: [
         { title: "Open DG sign-ups (target: all in the week after Welcoming Night) and check the count", off: 14 },
-        { title: "Compile the full new-folks list for DGL follow-up", off: 15 },
+        { title: "Compile full list of new folks for DGL follow-up", off: 15 },
         { title: "Submit all reimbursement forms", off: 16 },
-        { title: "Post recap photos + thank-you messages to volunteers", off: 16 },
+        { title: "Post recap photos on Instagram", off: 16 },
+        { title: "Send thank-you messages to all volunteers", off: 16 },
         { title: "CCSF debrief — what worked, what to improve", off: 20 },
       ]},
     ],
@@ -274,12 +309,14 @@ export const EVENT_PRESET_DATA = {
     description:
       "Social events — Churchwide Picnic, EMKM Field Day, Senior Send-off, game nights, hangouts. Volunteers usually pulled from DGs.",
     defaults: {
-      title: "Churchwide Picnic",
+      // Quick-preset ghost content (dimmed, Tab-to-accept in the modal): a
+      // church game night — the everyday "gather people" event.
+      title: "Game Night",
       description:
-        "Joint EM/KM churchwide picnic — volunteers recruited from DGs, announcement + signup out at least a week ahead. (Reuse this type for Field Day, Senior Send-off, game nights, and hangouts.)",
-      location: "Park (TBD)",
-      startTime: "12:00", endTime: "15:00", allDay: false, durationDays: 1,
-      anchorMonth: 9, anchorDay: 20,
+        "Casual game night to gather the church — board games across a few tables, a Switch on the TV, snacks and drinks. Greeters at the door so nobody stands alone; everyone brings a friend.",
+      location: "Church fellowship hall",
+      startTime: "19:00", endTime: "22:00", allDay: false, durationDays: 1,
+      anchorMonth: 9, anchorDay: 20, relativeDays: 7,
     },
     defaultPhases: [
       { key: "pre_event", label: "Pre-Event", tasks: [
@@ -311,12 +348,13 @@ export const EVENT_PRESET_DATA = {
     description:
       "Praise nights, prayer meetings, DG kickoffs, outreach fairs, evangelism, volunteering. The lock-up checklist rides on every church event.",
     defaults: {
+      // Quick-preset ghost content (dimmed, Tab-to-accept in the modal).
       title: "Praise Night",
       description:
         "Praise + prayer night at church. Reserve the space early, contact the praise leader two weeks out (they usually forget), and remind the DGL president to prep dinner + prayer topics. Whoever closes: lights, stoves, running water, doors.",
       location: "Central Church",
       startTime: "18:00", endTime: "21:00", allDay: false, durationDays: 1,
-      anchorMonth: 8, anchorDay: 28,
+      anchorMonth: 8, anchorDay: 28, relativeDays: 7,
     },
     defaultPhases: [
       { key: "pre_event", label: "Pre-Event", tasks: [

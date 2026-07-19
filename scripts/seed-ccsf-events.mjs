@@ -17,7 +17,7 @@
 
 import { createClient } from "@supabase/supabase-js"
 import ws from "ws"
-import { EVENT_PRESET_DATA, BOARD_ROLE_RESOURCES } from "../app/home/event-presets-data.mjs"
+import { EVENT_PRESET_DATA, BOARD_ROLE_RESOURCES, lineageKeyOf, seasonLabelOf } from "../app/home/event-presets-data.mjs"
 
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -336,6 +336,47 @@ const EVENTS = [
   },
 ]
 
+// ── 2025–26 HISTORY: the season as it actually ran (completed events) ────────
+// Same fixture shapes re-dated to last year's real calendar. These seed as
+// COMPLETED events (every task done at its offset date) and each top-level one
+// (plus Welcoming Night) is compiled onto the SHELF as a "2025–26" playbook —
+// the Run-it-back source for this year's board.
+// 2025-26 reality diffs: only ONE sports day ran; no Women's Retreat yet.
+const HISTORY_DATES = {
+  "Welcome Week": { date: "2025-08-16", endDate: "2025-08-30" },
+  "Popsicle Social (CMU)": { date: "2025-08-19" },
+  "Popsicle Social (Pitt)": { date: "2025-08-20" },
+  "Game Day": { date: "2025-08-25" },
+  "Pitt Involvement Fair": { date: "2025-08-24" },
+  "Sports Day (Pitt)": { date: "2025-08-27" },
+  "Sports Day (CMU)": null, // didn't run in 2025-26
+  "First Praise Night": { date: "2025-08-29" },
+  "Welcoming Night": { date: "2025-08-30" },
+  "The FAIR": { date: "2025-09-03" },
+  "First DGs": { date: "2025-09-05" },
+  "Churchwide Picnic": { date: "2025-09-21" },
+  "Coffeehouse": { date: "2025-09-14" },
+  "Women's Retreat": null, // introduced 2026-27
+  "Girls Turkeybowl": { date: "2025-11-08" },
+  "Guys Turkeybowl": { date: "2025-11-15" },
+  "Men's Retreat": { date: "2026-02-13", endDate: "2026-02-15" },
+  "Guys Appreciation Night (GAN)": { date: "2026-02-21" },
+  "EM Retreat": { date: "2026-03-06", endDate: "2026-03-08" },
+  "EMKM Field Day": { date: "2026-03-28" },
+  "Senior Send-off (SSO)": { date: "2026-04-11" },
+}
+
+// Build the history season from the same EVENTS definitions with re-mapped dates.
+function toHistory(ev) {
+  const h = HISTORY_DATES[ev.title]
+  if (!h) return null
+  const shifted = { ...ev, date: h.date, endDate: h.endDate ?? (ev.endDate ? h.date : undefined) }
+  if (ev.subEvents) {
+    shifted.subEvents = ev.subEvents.map(toHistory).filter(Boolean)
+  }
+  return shifted
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 const log = (...a) => console.log(...a)
 
@@ -409,7 +450,54 @@ async function seedEvent(ev, { ministryId, teamId, createdBy, parentId = null })
     )
     if (error) throw new Error(`${ev.title} roles: ${error.message}`)
   }
-  return event.id
+  return { eventId: event.id, planId: plan.id, groups, roles }
+}
+
+// Compile a seeded HISTORY event onto the shelf: one event_templates row per
+// (lineage, season) with template_tasks carrying the preset offsets and
+// template_roles carrying the role guides. source_event_plan_id points at the
+// history plan so Run-it-back can copy the real venue/times/duration.
+async function compileToShelf(ev, seeded, { ministryId, teamId, createdBy }) {
+  const stats = {
+    actual_turnout: ev.turnout ?? null,
+    task_count: seeded.groups.reduce((n, g) => n + g.items.length, 0),
+    on_time_pct: 100,
+  }
+  const { data: tpl, error: tplErr } = await db.from("event_templates").insert({
+    ministry_id: ministryId,
+    team_id: teamId,
+    event_type: ev.type,
+    lineage_key: lineageKeyOf(ev.title),
+    name: ev.title,
+    source_event_plan_id: seeded.planId,
+    year_label: seasonLabelOf(ev.date),
+    extra_notes: [],
+    stats,
+    created_by: createdBy,
+  }).select("id").single()
+  if (tplErr) throw new Error(`template ${ev.title}: ${tplErr.message}`)
+
+  let sort = 0
+  const taskRows = []
+  for (const g of seeded.groups) {
+    for (const item of g.items) {
+      taskRows.push({
+        template_id: tpl.id, title: item.title, phase: g.phase,
+        offset_days: item.off, actual_offset_days: item.off,
+        brief: null, role_hint: null, parent_id: null, sort_order: sort++,
+      })
+    }
+  }
+  if (taskRows.length) {
+    const { error } = await db.from("template_tasks").insert(taskRows)
+    if (error) throw new Error(`template tasks ${ev.title}: ${error.message}`)
+  }
+  if (seeded.roles.length) {
+    const { error } = await db.from("template_roles").insert(
+      seeded.roles.map((r, i) => ({ template_id: tpl.id, role_name: r.name, notes: r.notes || null, sort_order: i })),
+    )
+    if (error) throw new Error(`template roles ${ev.title}: ${error.message}`)
+  }
 }
 
 // ── main ─────────────────────────────────────────────────────────────────────
@@ -455,11 +543,22 @@ for (const [roleName, guide] of Object.entries(BOARD_ROLE_RESOURCES)) {
 }
 log(`Role guides upserted: ${Object.keys(BOARD_ROLE_RESOURCES).join(", ")}`)
 
-// 3) Wipe previously-seeded fixture events (by title, this team only), children first.
+// 3) Wipe previously-seeded fixtures: shelf templates first, then events (children first).
 const FIXTURE_TITLES = [
   ...EVENTS.map((e) => e.title),
   ...EVENTS.flatMap((e) => (e.subEvents ?? []).map((s) => s.title)),
 ]
+const FIXTURE_LINEAGES = [...new Set(FIXTURE_TITLES.map(lineageKeyOf))]
+const { data: oldTpls } = await db
+  .from("event_templates").select("id")
+  .eq("ministry_id", ministryId).eq("team_id", teamId).in("lineage_key", FIXTURE_LINEAGES)
+if (oldTpls?.length) {
+  const tplIds = oldTpls.map((t) => t.id)
+  await db.from("template_tasks").delete().in("template_id", tplIds)
+  await db.from("template_roles").delete().in("template_id", tplIds)
+  await db.from("event_templates").delete().in("id", tplIds)
+  log(`Cleared ${tplIds.length} previously-seeded shelf templates`)
+}
 const { data: oldEvents } = await db
   .from("calendar_events").select("id, parent_event_id")
   .eq("ministry_id", ministryId).eq("team_id", teamId).in("title", FIXTURE_TITLES)
@@ -481,15 +580,37 @@ if (oldEvents?.length) {
   log(`Cleared ${ids.length} previously-seeded events`)
 }
 
-// 4) Seed everything.
+// 4) Seed the 2025–26 HISTORY season (completed) + compile the shelf.
+const seedCtx = { ministryId, teamId, createdBy }
 let eventCount = 0
+let shelfCount = 0
+for (const src of EVENTS) {
+  const hist = toHistory(src)
+  if (!hist) continue
+  const seeded = await seedEvent(hist, seedCtx)
+  eventCount++
+  await compileToShelf(hist, seeded, seedCtx)
+  shelfCount++
+  for (const sub of hist.subEvents ?? []) {
+    const subSeeded = await seedEvent(sub, { ...seedCtx, parentId: seeded.eventId })
+    eventCount++
+    // Welcoming Night is a shelf entry in its own right — the anchor single event.
+    if (sub.title === "Welcoming Night") {
+      await compileToShelf(sub, subSeeded, seedCtx)
+      shelfCount++
+    }
+  }
+  log(`  ✓ [2025–26] ${hist.title}${hist.subEvents?.length ? ` (+${hist.subEvents.length} sub-events)` : ""}`)
+}
+
+// 5) Seed the 2026–27 upcoming calendar.
 for (const ev of EVENTS) {
-  const id = await seedEvent(ev, { ministryId, teamId, createdBy })
+  const seeded = await seedEvent(ev, seedCtx)
   eventCount++
   for (const sub of ev.subEvents ?? []) {
-    await seedEvent(sub, { ministryId, teamId, createdBy, parentId: id })
+    await seedEvent(sub, { ...seedCtx, parentId: seeded.eventId })
     eventCount++
   }
-  log(`  ✓ ${ev.title}${ev.subEvents ? ` (+${ev.subEvents.length} sub-events)` : ""}`)
+  log(`  ✓ [2026–27] ${ev.title}${ev.subEvents ? ` (+${ev.subEvents.length} sub-events)` : ""}`)
 }
-log(`\nSeeded ${eventCount} events into ${MINISTRY_NAME} / ${BOARD_TEAM_NAME}.`)
+log(`\nSeeded ${eventCount} events + ${shelfCount} shelf playbooks into ${MINISTRY_NAME} / ${BOARD_TEAM_NAME}.`)
