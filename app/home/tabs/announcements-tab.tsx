@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
+import Image from "next/image"
 import useSWR from "swr"
 import { ArrowLeft, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, Pin, PinOff, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
@@ -1389,8 +1390,9 @@ export function AnnouncementCard({ announcement, ministryId, userRole, onRsvpTog
         style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", overflow: "hidden", cursor: "pointer" }}
       >
         {announcement.image_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={announcement.image_url} alt={announcement.title} style={{ width: "100%", height: 144, objectFit: "cover", display: "block" }} />
+          <div style={{ position: "relative", width: "100%", height: 144 }}>
+            <Image src={announcement.image_url} alt={announcement.title} fill sizes="(max-width: 768px) 100vw, 720px" style={{ objectFit: "cover", display: "block" }} />
+          </div>
         )}
         <div style={{ padding: 18 }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
@@ -1771,9 +1773,8 @@ export function AnnouncementDetailView({
         {/* Image banner — full-bleed: negate the shell's horizontal inset and
             top padding so it hugs the edges; keeps its bottom hairline. */}
         {ann.image_url && (
-          <div className="-mx-5 md:-mx-14 -mt-7" style={{ borderBottom: "1px solid var(--line)" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={ann.image_url} alt={ann.title} className="w-full h-48 md:h-[300px] object-cover block" />
+          <div className="-mx-5 md:-mx-14 -mt-7 relative h-48 md:h-[300px]" style={{ borderBottom: "1px solid var(--line)" }}>
+            <Image src={ann.image_url} alt={ann.title} fill sizes="(max-width: 768px) 100vw, 900px" className="object-cover block" />
           </div>
         )}
         {/* Body — single column, or 1.7fr / 1fr when an aside is present.

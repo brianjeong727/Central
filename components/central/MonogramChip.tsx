@@ -1,6 +1,7 @@
 "use client"
 
 import type { CSSProperties } from "react"
+import Image from "next/image"
 import { Users } from "lucide-react"
 
 interface MonogramChipProps {
@@ -17,7 +18,7 @@ interface MonogramChipProps {
 export function MonogramChip({ initials, avatarUrl, className = "", style, title }: MonogramChipProps) {
   return (
     <div
-      className={`flex items-center justify-center flex-shrink-0 ${className}`}
+      className={`relative flex items-center justify-center flex-shrink-0 ${className}`}
       title={title}
       style={{
         ...style,
@@ -28,7 +29,7 @@ export function MonogramChip({ initials, avatarUrl, className = "", style, title
       }}
     >
       {avatarUrl
-        ? <img src={avatarUrl} alt={initials} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+        ? <Image src={avatarUrl} alt={initials} fill sizes="64px" className="object-cover" />
         : (initials && initials.trim())
           ? initials
           : <Users style={{ width: "55%", height: "55%" }} strokeWidth={2} />

@@ -17,6 +17,7 @@ import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "
 import { classifyTeam } from "./team-type"
 import { useNavState, ALL_FOLDED_PARAMS } from "./nav-state"
 import { fetchChatList } from "./chat-list"
+import { subscribeChatTopic } from "./chat-broadcast"
 
 // Components
 import { CommandPalette } from "./components/command-palette"
@@ -546,29 +547,31 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       const teamType: 'standard' | 'dg_praise' | 'one_time' | 'finance' = ['standard','dg_praise','one_time','finance'].includes(rawType) ? rawType as 'standard' | 'dg_praise' | 'one_time' | 'finance' : 'standard'
       return [{ teamId: t.id, teamName: t.name, teamIcon: t.icon, teamDescription: t.description, teamType, roleId: r.id, roleName: r.name, permissions: Array.isArray(r.permissions) ? r.permissions : [], isPresident: !!r.is_president, allowCoPresidency: !!t.allow_co_presidency, allowAdminMembers: !!t.allow_admin_members }]
     })
-    // Which of these teams have a member assigned to their president role.
+    // President assignment + member counts are both keyed off `ids` and independent —
+    // run them in parallel (was two serial round trips).
     const ids = teams.map((t) => t.teamId)
     let presidentSet = new Set<string>()
+    const countMap = new Map<string, number>()
     if (ids.length > 0) {
-      const { data: pres } = await supabase
-        .from("team_members")
-        .select("team_id, team_roles!inner(is_president)")
-        .in("team_id", ids)
-        .eq("team_roles.is_president", true)
-      presidentSet = new Set((pres ?? []).map((r: { team_id: string }) => r.team_id))
-    }
-    for (const t of teams) t.hasPresident = presidentSet.has(t.teamId)
-    // Member counts for each of the user's teams (one query, tallied per team).
-    if (ids.length > 0) {
-      const { data: counts } = await supabase
-        .from("team_members")
-        .select("team_id")
-        .in("team_id", ids)
-      const countMap = new Map<string, number>()
-      for (const r of (counts ?? []) as { team_id: string }[]) {
+      const [presRes, countRes] = await Promise.all([
+        supabase
+          .from("team_members")
+          .select("team_id, team_roles!inner(is_president)")
+          .in("team_id", ids)
+          .eq("team_roles.is_president", true),
+        supabase
+          .from("team_members")
+          .select("team_id")
+          .in("team_id", ids),
+      ])
+      presidentSet = new Set((presRes.data ?? []).map((r: { team_id: string }) => r.team_id))
+      for (const r of (countRes.data ?? []) as { team_id: string }[]) {
         countMap.set(r.team_id, (countMap.get(r.team_id) ?? 0) + 1)
       }
-      for (const t of teams) t.memberCount = countMap.get(t.teamId) ?? 0
+    }
+    for (const t of teams) {
+      t.hasPresident = presidentSet.has(t.teamId)
+      t.memberCount = countMap.get(t.teamId) ?? 0
     }
     setUserTeams(teams)
     setActiveTeamId((prev) => {
@@ -595,14 +598,17 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     const countMap: Record<string, number> = {}
     let presidentSet = new Set<string>()
     if (teamIds.length > 0) {
-      const { data: counts } = await supabase.from("team_members").select("team_id").in("team_id", teamIds)
-      for (const m of counts ?? []) countMap[m.team_id] = (countMap[m.team_id] ?? 0) + 1
-      const { data: pres } = await supabase
-        .from("team_members")
-        .select("team_id, team_roles!inner(is_president)")
-        .in("team_id", teamIds)
-        .eq("team_roles.is_president", true)
-      presidentSet = new Set((pres ?? []).map((r: { team_id: string }) => r.team_id))
+      // Counts + president assignment are independent — run in parallel.
+      const [countsRes, presRes] = await Promise.all([
+        supabase.from("team_members").select("team_id").in("team_id", teamIds),
+        supabase
+          .from("team_members")
+          .select("team_id, team_roles!inner(is_president)")
+          .in("team_id", teamIds)
+          .eq("team_roles.is_president", true),
+      ])
+      for (const m of countsRes.data ?? []) countMap[m.team_id] = (countMap[m.team_id] ?? 0) + 1
+      presidentSet = new Set((presRes.data ?? []).map((r: { team_id: string }) => r.team_id))
     }
     type RawTeam = { id: string; name: string; icon: string | null; description: string | null; created_by: string; team_type: string; allow_co_presidency: boolean | null; admin_access: string | null; allow_admin_members: boolean | null }
     setAllTeams((data as RawTeam[]).map((t) => {
@@ -730,73 +736,77 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   const senderNameCache = useRef(new Map<string, string>())
 
   // Realtime: keep recentChats preview fresh as messages arrive.
-  // Scoped server-side to the user's own groups via a `group_id=in.(...)` filter —
-  // without it every online session wakes + evaluates RLS on every message insert
-  // platform-wide. Uses the FULL membership set (not just recentChats) so a message
-  // in a rarely-active group still bubbles up live.
+  // Joins the private `chat:{gid}` broadcast topic for EACH of the user's groups via
+  // the shared hub (one channel per topic, shared with any open ChatScreen; auth +
+  // postgres_changes fallback live in the hub). We only react to message INSERTs.
+  // Uses the FULL membership set (not just recentChats) so a message in a rarely-active
+  // group still bubbles up live; the topic set re-derives when membership changes.
   useEffect(() => {
     if (!memberGroupKey) return
-    const channel = supabase
-      .channel("home-app-recent-chats")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages", filter: `group_id=in.(${memberGroupKey})` },
-        (payload) => {
-          const msg = payload.new as { group_id: string; content: string; created_at: string; sender_id: string; attachment_type: string | null; poll_id: string | null }
-          // Drive the Messages sidebar live (order, preview, unread badges). This
-          // throttled refetch ALSO refreshes the plain-fetch fallback (chatListData)
-          // from the same RPC result — no separate loadChatList() needed here.
-          refetchChatList()
-          const isOwnMessage = msg.sender_id === userId
-          const applyPreview = (senderName: string) => {
-            setRecentChats((prev) => {
-              const existing = prev.find((c) => c.id === msg.group_id)
-              if (!existing) return prev
-              const updated = prev.map((c) =>
-                c.id === msg.group_id
-                  ? {
-                      ...c,
-                      lastMessage: chatPreviewLabel(msg.content, msg.attachment_type, !!msg.poll_id),
-                      lastMessageSender: senderName,
-                      time: formatRelativeTime(msg.created_at),
-                      _ts: msg.created_at,
-                      unreadCount: isOwnMessage ? c.unreadCount : c.unreadCount + 1,
-                    } as ChatPreview & { _ts: string }
-                  : c
-              )
-              // Re-sort so the updated chat bubbles to the top
-              return [...updated].sort((a, b) => {
-                const ta = (a as ChatPreview & { _ts: string })._ts ?? ""
-                const tb = (b as ChatPreview & { _ts: string })._ts ?? ""
-                return tb.localeCompare(ta)
-              })
-            })
-          }
-          // Resolve the sender name: own message → local profile name (no query);
-          // cache hit → synchronous; cache miss → one profiles select, then cached.
-          if (isOwnMessage) {
-            applyPreview(initialProfile.name)
-          } else {
-            const cached = senderNameCache.current.get(msg.sender_id)
-            if (cached !== undefined) {
-              applyPreview(cached)
-            } else {
-              supabase
-                .from("profiles")
-                .select("name")
-                .eq("id", msg.sender_id)
-                .single()
-                .then(({ data: prof }) => {
-                  if (prof?.name) senderNameCache.current.set(msg.sender_id, prof.name)
-                  applyPreview(prof?.name ?? "")
-                })
-            }
-          }
-        }
-      )
-      .subscribe()
+    const groupIds = memberGroupKey.split(",").filter(Boolean)
+    if (groupIds.length === 0) return
 
-    return () => { supabase.removeChannel(channel) }
+    const handleMessageRecord = (msg: { group_id: string; content: string; created_at: string; sender_id: string; attachment_type: string | null; poll_id: string | null }) => {
+      // Drive the Messages sidebar live (order, preview, unread badges). This
+      // throttled refetch ALSO refreshes the plain-fetch fallback (chatListData)
+      // from the same RPC result — no separate loadChatList() needed here.
+      refetchChatList()
+      const isOwnMessage = msg.sender_id === userId
+      const applyPreview = (senderName: string) => {
+        setRecentChats((prev) => {
+          const existing = prev.find((c) => c.id === msg.group_id)
+          if (!existing) return prev
+          const updated = prev.map((c) =>
+            c.id === msg.group_id
+              ? {
+                  ...c,
+                  lastMessage: chatPreviewLabel(msg.content, msg.attachment_type, !!msg.poll_id),
+                  lastMessageSender: senderName,
+                  time: formatRelativeTime(msg.created_at),
+                  _ts: msg.created_at,
+                  unreadCount: isOwnMessage ? c.unreadCount : c.unreadCount + 1,
+                } as ChatPreview & { _ts: string }
+              : c
+          )
+          // Re-sort so the updated chat bubbles to the top
+          return [...updated].sort((a, b) => {
+            const ta = (a as ChatPreview & { _ts: string })._ts ?? ""
+            const tb = (b as ChatPreview & { _ts: string })._ts ?? ""
+            return tb.localeCompare(ta)
+          })
+        })
+      }
+      // Resolve the sender name: own message → local profile name (no query);
+      // cache hit → synchronous; cache miss → one profiles select, then cached.
+      if (isOwnMessage) {
+        applyPreview(initialProfile.name)
+      } else {
+        const cached = senderNameCache.current.get(msg.sender_id)
+        if (cached !== undefined) {
+          applyPreview(cached)
+        } else {
+          supabase
+            .from("profiles")
+            .select("name")
+            .eq("id", msg.sender_id)
+            .single()
+            .then(({ data: prof }) => {
+              if (prof?.name) senderNameCache.current.set(msg.sender_id, prof.name)
+              applyPreview(prof?.name ?? "")
+            })
+        }
+      }
+    }
+
+    const unsubs = groupIds.map((gid) =>
+      subscribeChatTopic(gid, (e) => {
+        if (e.operation === "INSERT" && e.table === "messages") {
+          handleMessageRecord(e.record as unknown as Parameters<typeof handleMessageRecord>[0])
+        }
+      })
+    )
+
+    return () => { unsubs.forEach((u) => u()) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, memberGroupKey, refetchChatList, initialProfile.name])
 

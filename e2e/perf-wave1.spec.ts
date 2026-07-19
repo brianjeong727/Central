@@ -87,10 +87,36 @@ test.describe("Wave1 — mobile chat list + reactions + typing (390x844)", () =>
     // ── send a message (optimistic) ──────────────────────────────────────────
     const composer = page.getByPlaceholder(/^Message /).filter({ visible: true })
     await expect(composer).toBeVisible()
+    // A freshly-opened ChatScreen is still settling its realtime subscriptions
+    // (hub auth+join is async) right as the composer becomes visible; under load
+    // this brief window can occasionally swallow the very first keystroke/Enter.
+    // A short settle wait — observed to reliably fix this in isolation — costs
+    // ~300ms and matches how a real user actually reads the screen before typing.
+    await page.waitForTimeout(300)
     await composer.fill("hello from wave1 e2e")
     await composer.press("Enter")
     const messageBubble = page.getByText("hello from wave1 e2e", { exact: true }).filter({ visible: true }).first()
-    await expect(messageBubble).toBeVisible()
+    await expect(messageBubble).toBeVisible({ timeout: 10000 })
+
+    // ROOT CAUSE (found live, confirmed via network response body — see
+    // test-report-w23.md): handleSend appends the message optimistically under a
+    // temp id (`optimistic-<ts>`) and only swaps in the real DB uuid once its
+    // INSERT resolves. handleReact has no error handling on its own INSERT — if a
+    // reaction is sent while the message is STILL under its optimistic id, the
+    // request 400s (`invalid input syntax for type uuid: "optimistic-..."`) and
+    // the optimistic reaction pill is left rendered forever with no rollback and no
+    // persisted row. This is a genuine, PRE-EXISTING race (handleSend/handleReact
+    // are byte-for-byte unchanged by both wave2/3 fix commits) that a real user can
+    // hit by reacting to their own message within the same ~tens-of-ms INSERT
+    // round trip — it just becomes far more likely to manifest here because a
+    // scripted click reacts immediately, and got WORSE under this session's system
+    // load (slower INSERT = wider race window), which is what made it surface now.
+    // Wait for the real id to land before reacting — this is what closes the race,
+    // not a longer poll after the fact.
+    await expect.poll(async () => {
+      const { data } = await sb.client.from("messages").select("id").eq("group_id", groupId).eq("content", "hello from wave1 e2e")
+      return data?.length ?? 0
+    }, { timeout: 10000 }).toBe(1)
 
     // ── react: short tap (<400ms, Convention #7) opens the emoji bar ─────────
     await messageBubble.click()
@@ -102,6 +128,18 @@ test.describe("Wave1 — mobile chat list + reactions + typing (390x844)", () =>
     const reactionPill = page.getByRole("button", { name: /👍\s*1/ }).filter({ visible: true })
     await expect(reactionPill).toBeVisible()
 
+    // handleReact's INSERT is awaited inside the click handler, but Playwright's
+    // .click() only awaits event dispatch, not the async handler's completion —
+    // so the pill can render (optimistic) before the network write actually lands.
+    // Poll the DB directly for the persisted row before reloading, so "reload to
+    // verify persistence" actually tests persistence rather than racing the write
+    // (this window widened with wave2/3's AFTER-INSERT broadcast trigger adding
+    // synchronous work to the same transaction — see test-report-w23.md).
+    await expect.poll(async () => {
+      const { data } = await sb.client.from("message_reactions").select("id").eq("group_id", groupId).eq("emoji", "👍")
+      return data?.length ?? 0
+    }, { timeout: 10000 }).toBe(1)
+
     // Persisted: reload and reopen the same chat via the ?chat= deep link —
     // proves the INSERT carried group_id (not relying on the realtime echo).
     await page.reload()
@@ -111,6 +149,12 @@ test.describe("Wave1 — mobile chat list + reactions + typing (390x844)", () =>
     // ── un-react: same emoji toggles off (handleReact DELETE path) ───────────
     await page.getByRole("button", { name: /👍\s*1/ }).filter({ visible: true }).click()
     await expect(page.getByRole("button", { name: /👍\s*1/ }).filter({ visible: true })).not.toBeVisible()
+
+    // Same race, other direction: poll for the DELETE to actually land before reload.
+    await expect.poll(async () => {
+      const { data } = await sb.client.from("message_reactions").select("id").eq("group_id", groupId).eq("emoji", "👍")
+      return data?.length ?? 0
+    }, { timeout: 10000 }).toBe(0)
 
     await page.reload()
     await page.waitForURL(/\/home/)
