@@ -11,11 +11,16 @@ import { isAdminRole } from "@/lib/roles"
 export interface FinanceCapability {
   canApprove: boolean
   canSignOff: boolean
+  // Read-only finance oversight (the finance deacon). canApprove/canSignOff both
+  // imply canView; canView alone (via `can_audit_finances`) grants VIEW only.
+  canView: boolean
 }
 
 // canApprove = member of a team_type='finance' team whose role permissions include
 // `can_view_finances`, OR admin-tier (fallback so it's testable before a Finance
 // team exists). canSignOff = `is_president` on a finance team, OR admin-tier.
+// canView = canApprove || canSignOff || admin-tier || a role granting
+// `can_audit_finances` (read-only oversight — never approve/sign-off/write).
 export async function computeFinanceCapability(
   admin: ReturnType<typeof createAdminClient>,
   ministryId: string,
@@ -23,11 +28,12 @@ export async function computeFinanceCapability(
   role: string,
 ): Promise<FinanceCapability> {
   if (isAdminRole(role)) {
-    return { canApprove: true, canSignOff: true }
+    return { canApprove: true, canSignOff: true, canView: true }
   }
 
   let canApprove = false
   let canSignOff = false
+  let canView = false
 
   const { data: financeTeams } = await admin
     .from("teams")
@@ -43,12 +49,14 @@ export async function computeFinanceCapability(
       .in("team_id", financeTeamIds)
       .eq("user_id", userId)
     for (const row of (memberRows ?? []) as { team_roles: { permissions?: string[]; is_president?: boolean } | null }[]) {
-      if ((row.team_roles?.permissions ?? []).includes("can_view_finances")) canApprove = true
-      if (row.team_roles?.is_president) canSignOff = true
+      const perms = row.team_roles?.permissions ?? []
+      if (perms.includes("can_view_finances")) { canApprove = true; canView = true }
+      if (perms.includes("can_audit_finances")) canView = true
+      if (row.team_roles?.is_president) { canSignOff = true; canView = true }
     }
   }
 
-  return { canApprove, canSignOff }
+  return { canApprove, canSignOff, canView }
 }
 
 // Full identity + capability check for a given ministry. Verifies the caller is
@@ -57,10 +65,10 @@ export async function computeFinanceCapability(
 // ministry doesn't match.
 export async function getFinanceCapability(
   ministryId: string,
-): Promise<{ canApprove: boolean; canSignOff: boolean; authed: boolean }> {
+): Promise<{ canApprove: boolean; canSignOff: boolean; canView: boolean; authed: boolean }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { canApprove: false, canSignOff: false, authed: false }
+  if (!user) return { canApprove: false, canSignOff: false, canView: false, authed: false }
 
   const admin = createAdminClient()
   const { data: profile } = await admin
@@ -69,9 +77,9 @@ export async function getFinanceCapability(
     .eq("id", user.id)
     .maybeSingle()
   if (!profile?.ministry_id || profile.ministry_id !== ministryId) {
-    return { canApprove: false, canSignOff: false, authed: false }
+    return { canApprove: false, canSignOff: false, canView: false, authed: false }
   }
 
   const cap = await computeFinanceCapability(admin, ministryId, user.id, profile.role ?? "")
-  return { canApprove: cap.canApprove, canSignOff: cap.canSignOff, authed: true }
+  return { canApprove: cap.canApprove, canSignOff: cap.canSignOff, canView: cap.canView, authed: true }
 }

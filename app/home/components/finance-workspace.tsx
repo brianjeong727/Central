@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
+import useSWR from "swr"
 import { createClient } from "@/lib/supabase"
 import {
   Plus, X,
@@ -12,9 +13,14 @@ import { useIsMobile } from "../use-is-mobile"
 import { MonogramChip, FilterDropdown, SubpageShell, CentralModal, PocketRowCard, PocketRow, useScrollResetOn } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
-  getReimbursementInbox, approveReceipt, rejectReceipt, signOffReceipt, declineReceipt,
-  type InboxReceipt,
+  getReimbursementInbox,
+  approveAllocation, requestAllocation, rejectAllocation,
+  signOffAllocation, declineAllocation,
+  confirmExternalReimbursed, declineExternalAllocation,
+  setReceiptAllocations,
+  type InboxReceipt, type ReceiptAllocation,
 } from "@/app/actions/receipts"
+import { getFinanceFunds, type FinanceFund } from "@/app/actions/finance-funds"
 import {
   addBudgetEntry, getBudgetEntries, exportBudgetCSV,
 } from "@/app/actions/reimbursements"
@@ -43,12 +49,6 @@ interface DynamicCategory {
 // DG Dinner is the only hardcoded permanent category; all others come from calendar events + custom DB entries
 const DG_DINNER_CATEGORY: DynamicCategory = { value: "DG Dinner", label: "DG Dinner", isPermanent: true }
 
-const FUNDS = [
-  { value: "church", label: "Church" },
-  { value: "cmu", label: "CMU" },
-  { value: "pitt", label: "Pitt" },
-]
-
 // Status-layer tints — derived from Central's semantic accents via the R10 formula
 // (bg = accent 13% on cream, text = accent 65% on ink), never invented traffic-light hexes.
 const WARN_BG = "color-mix(in srgb, var(--gold) 13%, var(--cream))"
@@ -69,9 +69,14 @@ const REIMBURSED_TINT = "var(--plum-tint)"
 export const STATUS_META: Record<string, { label: string; bg: string; text: string }> = {
   pending:    { label: "Pending",    bg: "var(--ivory)",  text: "var(--body)" },
   approved:   { label: "Approved",  bg: SUCCESS_STATUS_BG, text: SUCCESS_STATUS_TEXT },
+  // In-flight external grant application — gold/warn family (distinct from the
+  // success-family approved/reimbursed).
+  requested:  { label: "Requested", bg: WARN_BG,         text: WARN_TEXT },
   rejected:   { label: "Rejected",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
   declined:   { label: "Declined",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
   reimbursed: { label: "Reimbursed",bg: SUCCESS_STATUS_BG, text: SUCCESS_STATUS_TEXT },
+  // Rollup: some sources reimbursed, others terminal — neutral ivory.
+  partial:    { label: "Partial",   bg: "var(--ivory)",  text: "var(--body)" },
   flagged:    { label: "Flagged",   bg: WARN_BG,         text: WARN_TEXT },
 }
 
@@ -94,11 +99,12 @@ const DEFAULT_RECEIPT_CATEGORIES: DynamicCategory[] = [
 ]
 
 export function SubmitReceiptModal({
-  ministryId, limits: limitsProp, categories: categoriesProp, teamId,
+  ministryId, limits: limitsProp, categories: categoriesProp, funds: fundsProp, teamId,
   categoryId, categoryName, categoryFund, onClose, onSubmitted,
 }: {
   ministryId: string; limits?: ReceiptLimit[];
   categories?: DynamicCategory[];
+  funds?: FinanceFund[];
   teamId?: string | null;
   // Category mode: when categoryId is provided the category + fund pickers are
   // hidden and the receipt is filed under the given category (with its inherited
@@ -111,10 +117,12 @@ export function SubmitReceiptModal({
   const supabase = createClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const categoryMode = !!categoryId
-  // When not supplied (called outside FinanceWorkspace), self-fetch limits and
-  // fall back to a default category list.
+  // When not supplied (called outside FinanceWorkspace), self-fetch limits + funds
+  // and fall back to a default category list.
   const [fetchedLimits, setFetchedLimits] = useState<ReceiptLimit[]>([])
+  const [fetchedFunds, setFetchedFunds] = useState<FinanceFund[]>([])
   const limits = limitsProp ?? fetchedLimits
+  const funds = fundsProp ?? fetchedFunds
   const categories = categoriesProp ?? DEFAULT_RECEIPT_CATEGORIES
   useEffect(() => {
     if (limitsProp) return
@@ -122,13 +130,25 @@ export function SubmitReceiptModal({
     getReceiptLimits(ministryId).then(res => { if (active) setFetchedLimits(res.data) })
     return () => { active = false }
   }, [limitsProp, ministryId])
+  useEffect(() => {
+    if (fundsProp) return
+    let active = true
+    getFinanceFunds(ministryId).then(res => { if (active) setFetchedFunds(res.data) })
+    return () => { active = false }
+  }, [fundsProp, ministryId])
   const [category, setCategory] = useState(() => categoryName ?? categories[0]?.value ?? "DG Dinner")
   const [fund, setFund] = useState(categoryFund ?? "church")
+  // Once funds load, snap the fund selection to a real active fund if the current
+  // one isn't in the list (and no category-fixed fund was supplied).
+  useEffect(() => {
+    if (categoryMode || funds.length === 0) return
+    setFund(prev => (funds.some(f => f.slug === prev) ? prev : funds[0].slug))
+  }, [funds, categoryMode])
   const [amount, setAmount] = useState("")
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split("T")[0])
   const [eventName, setEventName] = useState("")
   const [notes, setNotes] = useState("")
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [imageUrls, setImageUrls] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -136,15 +156,31 @@ export function SubmitReceiptModal({
   const numAmount = parseFloat(amount) || 0
   const limit = limits.find(l => l.category === category && l.fund === fund)
   const overLimit = limit && numAmount > 0 && numAmount > limit.max_amount
+  const fundLabelFor = (slug: string) => funds.find(f => f.slug === slug)?.name ?? slug
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]; if (!file) return
+    const files = Array.from(e.target.files ?? []); if (!files.length) return
     setUploading(true)
-    const ext = file.name.split(".").pop() ?? "jpg"
-    const { data, error } = await supabase.storage.from("announcement-images").upload(`receipts/${ministryId}/${Date.now()}.${ext}`, file, { upsert: false })
-    if (!error && data) {
-      const { data: { publicUrl } } = supabase.storage.from("announcement-images").getPublicUrl(data.path)
-      setImageUrl(publicUrl)
+    for (const file of files) {
+      let uploadFile: File | Blob = file
+      let uploadName = file.name
+      // HEIC/HEIF won't render in <img> — convert to JPEG client-side before upload.
+      const isHeic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name)
+      if (isHeic) {
+        try {
+          const heic2any = (await import("heic2any")).default
+          const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 })
+          uploadFile = Array.isArray(converted) ? converted[0] : converted
+          uploadName = file.name.replace(/\.(heic|heif)$/i, ".jpg")
+        } catch { /* fall back to the original file */ }
+      }
+      const ext = uploadName.split(".").pop() ?? "jpg"
+      const path = `receipts/${ministryId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+      const { data, error } = await supabase.storage.from("announcement-images").upload(path, uploadFile, { upsert: false })
+      if (!error && data) {
+        const { data: { publicUrl } } = supabase.storage.from("announcement-images").getPublicUrl(data.path)
+        setImageUrls(prev => [...prev, publicUrl])
+      }
     }
     setUploading(false)
     if (fileRef.current) fileRef.current.value = ""
@@ -153,7 +189,7 @@ export function SubmitReceiptModal({
   async function handleSubmit() {
     if (!amount || numAmount <= 0) { setError("Please enter a valid amount."); return }
     setSubmitting(true); setError(null)
-    const { data, error: err } = await submitReceipt({ ministryId, teamId: teamId ?? null, categoryId: categoryId ?? null, eventName, category: categoryMode ? (categoryName ?? category) : category, fund: categoryMode ? (categoryFund ?? fund) : fund, amount: numAmount, purchaseDate, receiptImageUrl: imageUrl, notes })
+    const { data, error: err } = await submitReceipt({ ministryId, teamId: teamId ?? null, categoryId: categoryId ?? null, eventName, category: categoryMode ? (categoryName ?? category) : category, fund: categoryMode ? (categoryFund ?? fund) : fund, amount: numAmount, purchaseDate, receiptImageUrl: imageUrls[0] ?? null, receiptImageUrls: imageUrls, notes })
     if (err) { setError(err); setSubmitting(false); return }
     if (data) onSubmitted(data)
     onClose()
@@ -171,12 +207,12 @@ export function SubmitReceiptModal({
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {categoryMode ? (
             <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
-              {categoryName} · {FUNDS.find(f => f.value === categoryFund)?.label ?? categoryFund}
+              {categoryName} · {fundLabelFor(categoryFund ?? "")}
             </p>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div><label style={labelStyle}>Category</label><select value={category} onChange={e => setCategory(e.target.value)} style={inputStyle}>{categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
-              <div><label style={labelStyle}>Fund</label><select value={fund} onChange={e => setFund(e.target.value)} style={inputStyle}>{FUNDS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}</select></div>
+              <div><label style={labelStyle}>Suggested fund</label><select value={fund} onChange={e => setFund(e.target.value)} style={inputStyle}>{funds.map(f => <option key={f.id} value={f.slug}>{f.name}</option>)}</select></div>
             </div>
           )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -192,18 +228,27 @@ export function SubmitReceiptModal({
           <div><label style={labelStyle}>Event name (optional)</label><input type="text" placeholder="e.g. Week 3 DG Dinner" value={eventName} onChange={e => setEventName(e.target.value)} style={inputStyle} /></div>
           <div><label style={labelStyle}>Notes (optional)</label><textarea placeholder="What was purchased?" value={notes} onChange={e => setNotes(e.target.value)} rows={2} style={{ ...inputStyle, resize: "none" }} /></div>
           <div>
-            <label style={labelStyle}>Receipt image (optional)</label>
-            <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileUpload} />
-            {imageUrl ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <a href={imageUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: "var(--plum)", fontWeight: 500 }}>View uploaded image</a>
-                <button onClick={() => setImageUrl(null)} style={{ fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer" }}>Remove</button>
+            <label style={labelStyle}>Receipt images (optional)</label>
+            <input ref={fileRef} type="file" accept="image/*,.heic,.heif,application/pdf" multiple className="hidden" onChange={handleFileUpload} />
+            {imageUrls.length > 0 && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                {imageUrls.map((url, i) => (
+                  <div key={url} style={{ position: "relative", width: 64, height: 64, borderRadius: 10, overflow: "hidden", border: "1px solid var(--line)" }}>
+                    <img src={url} alt={`Receipt ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <button
+                      onClick={() => setImageUrls(prev => prev.filter(u => u !== url))}
+                      style={{ position: "absolute", top: 2, right: 2, width: 18, height: 18, borderRadius: 999, background: "var(--veil)", border: "none", color: "var(--cream)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0 }}
+                      aria-label="Remove image"
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 14px", border: "1px dashed var(--dashed)", borderRadius: 10, background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", width: "100%" }}>
-                <Upload size={14} />{uploading ? "Uploading…" : "Upload image"}
-              </button>
             )}
+            <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ display: "flex", alignItems: "center", gap: 7, padding: "10px 14px", border: "1px dashed var(--dashed)", borderRadius: 10, background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", width: "100%" }}>
+              <Upload size={14} />{uploading ? "Uploading…" : imageUrls.length > 0 ? "Add another image" : "Upload images"}
+            </button>
           </div>
           {error && <p style={{ fontSize: 13, color: "var(--danger)" }}>{error}</p>}
         </div>
@@ -221,6 +266,21 @@ export function SubmitReceiptModal({
 
 const FUND_LABELS: Record<string, string> = { church: "Church", cmu: "CMU", pitt: "Pitt", other: "Other" }
 function fundLabel(f?: string) { return f ? (FUND_LABELS[f.toLowerCase()] ?? f) : "" }
+
+// Does this allocation need the current caller's action, given their capability?
+//   canApprove → church-pending / external-pending / external-requested
+//   canSignOff → church-approved
+function allocNeedsAction(a: ReceiptAllocation, canApprove: boolean, canSignOff: boolean): boolean {
+  if (canApprove) {
+    if (a.fund_kind === "church" && a.status === "pending") return true
+    if (a.fund_kind === "external" && (a.status === "pending" || a.status === "requested")) return true
+  }
+  if (canSignOff && a.fund_kind === "church" && a.status === "approved") return true
+  return false
+}
+function receiptNeedsAction(r: InboxReceipt, canApprove: boolean, canSignOff: boolean): boolean {
+  return r.allocations.some(a => allocNeedsAction(a, canApprove, canSignOff))
+}
 
 function FinanceStatusPill({ status }: { status: string }) {
   const m = STATUS_META[status] ?? STATUS_META.pending
@@ -309,10 +369,11 @@ function InboxEmpty({ title, subtitle }: { title: string; subtitle: string }) {
 type InboxFilter = "needs" | "all"
 
 function ReimbursementInbox({
-  ministryId, items, loading, canApprove, canSignOff, readOnly, onRefetch, onDetailOpenChange,
+  ministryId, items, funds, loading, canApprove, canSignOff, readOnly, onRefetch, onDetailOpenChange,
 }: {
   ministryId: string
   items: InboxReceipt[]
+  funds: FinanceFund[]
   loading: boolean
   canApprove: boolean
   canSignOff: boolean
@@ -323,6 +384,9 @@ function ReimbursementInbox({
   const [filter, setFilter] = useState<InboxFilter>("needs")
   const [detail, setDetail] = useState<InboxReceipt | null>(null)
   const isMobile = useIsMobile()
+
+  // Keep the open detail in sync with refetched items (statuses change after actions).
+  const detailLive = detail ? items.find(r => r.id === detail.id) ?? null : null
 
   // Notify the mobile parent whether the detail subpage owns the screen (§2.2b),
   // and always release the flag on unmount (section switch) so the back-row returns.
@@ -335,23 +399,23 @@ function ReimbursementInbox({
   const uiCanApprove = canApprove && !readOnly
   const uiCanSignOff = canSignOff && !readOnly
 
-  const needsAction = items.filter(r =>
-    (uiCanApprove && r.status === "pending") || (uiCanSignOff && r.status === "approved")
-  )
+  const needsAction = items.filter(r => receiptNeedsAction(r, uiCanApprove, uiCanSignOff))
   const shown = filter === "needs" ? needsAction : items
 
   // Detail consumes the surface as an in-content subpage (replaces the inbox list).
   // Rendered FULL-BLEED (no px wrapper) so SubpageShell's px-5 md:px-14 is the only
   // horizontal inset — the surrounding non-detail views supply their own inset below.
-  if (detail) {
+  if (detailLive) {
     return (
       <InboxDetailOverlay
-        receipt={detail}
+        receipt={detailLive}
         ministryId={ministryId}
+        funds={funds}
         canApprove={uiCanApprove}
         canSignOff={uiCanSignOff}
+        canView={readOnly || (!uiCanApprove && !uiCanSignOff)}
         onClose={() => setDetail(null)}
-        onActed={() => { setDetail(null); onRefetch() }}
+        onActed={onRefetch}
       />
     )
   }
@@ -416,26 +480,243 @@ function InboxDetailRow({ label, value }: { label: string; value: React.ReactNod
   )
 }
 
-const INBOX_STATUS_STEPS = ["Submitted", "Approved", "Reimbursed"] as const
+// The per-source status path — church signs off; external is grant-filed.
+function allocSteps(kind: "church" | "external") {
+  return kind === "church"
+    ? (["Submitted", "Approved", "Reimbursed"] as const)
+    : (["Submitted", "Requested", "Reimbursed"] as const)
+}
+function allocReachedIndex(a: ReceiptAllocation): number {
+  if (a.status === "reimbursed") return 2
+  if (a.status === "approved" || a.status === "requested") return 1
+  return 0
+}
 
-function InboxDetailOverlay({
-  receipt: r, ministryId, canApprove, canSignOff, onClose, onActed,
+// One funding-source row inside the split: fund chip · amount · status stepper,
+// plus the per-allocation actions this caller may take (gated by fund kind +
+// status + capability). Optimistic-ish: parent refetches on every completed action.
+function AllocationRow({
+  allocation: a, ministryId, canApprove, canSignOff, onActed,
 }: {
-  receipt: InboxReceipt
+  allocation: ReceiptAllocation
   ministryId: string
   canApprove: boolean
   canSignOff: boolean
+  onActed: () => void
+}) {
+  const isMobile = useIsMobile()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [mode, setMode] = useState<"idle" | "reason">("idle")
+  const [reasonAction, setReasonAction] = useState<null | (() => Promise<{ error: string | null }>)>(null)
+  const [reasonLabel, setReasonLabel] = useState("")
+  const [reason, setReason] = useState("")
+
+  const church = a.fund_kind === "church"
+  const isNegative = a.status === "rejected" || a.status === "declined"
+
+  // Which primary / secondary (destructive) actions this state exposes.
+  const showApprove = canApprove && church && a.status === "pending"
+  const showRequest = canApprove && !church && a.status === "pending"
+  const showSignOff = canSignOff && church && a.status === "approved"
+  const showConfirm = canApprove && !church && a.status === "requested"
+  const hasActions = showApprove || showRequest || showSignOff || showConfirm
+
+  async function run(fn: () => Promise<{ error: string | null }>) {
+    setBusy(true); setError(null)
+    const { error: err } = await fn()
+    if (err) { setError(err); setBusy(false); return }
+    setBusy(false); setMode("idle"); setReason("")
+    onActed()
+  }
+  function startReason(label: string, fn: (reason: string) => Promise<{ error: string | null }>) {
+    setReasonLabel(label)
+    setReasonAction(() => () => fn(reason))
+    setMode("reason")
+  }
+
+  const primaryBtn: React.CSSProperties = {
+    flex: 1, height: 40, background: "var(--plum)", color: "var(--cream)", borderRadius: isMobile ? 999 : 10,
+    border: "none", fontSize: 13.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)",
+  }
+  const secondaryBtn: React.CSSProperties = {
+    flex: 1, height: 40, background: "var(--ivory)", color: "var(--danger)", borderRadius: isMobile ? 999 : 10,
+    border: "1px solid var(--line)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)",
+  }
+
+  const steps = allocSteps(a.fund_kind)
+  const reached = allocReachedIndex(a)
+
+  return (
+    <div style={{ border: "1px solid var(--line)", borderRadius: 12, padding: "14px 16px", background: "var(--cream)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.04em", padding: "3px 9px", borderRadius: 999, background: "var(--plum-tint)", color: "var(--plum)", whiteSpace: "nowrap" }}>
+            {a.fund_name}
+          </span>
+          <span style={{ fontSize: 14, color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>${a.amount.toFixed(2)}</span>
+        </div>
+        <FinanceStatusPill status={a.status} />
+      </div>
+
+      {/* Per-source status path */}
+      {isNegative ? (
+        <div style={{ background: DANGER_ROW_BG, border: `1px solid ${DANGER_TINT_BORDER}`, borderRadius: 10, padding: "10px 12px" }}>
+          <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{STATUS_META[a.status]?.label ?? "Declined"}</p>
+          {a.decision_reason && <p style={{ fontSize: 12.5, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {steps.map((step, i) => {
+            const done = i <= reached
+            return (
+              <div key={step} style={{ display: "flex", alignItems: "center", gap: 8, flex: i < steps.length - 1 ? 1 : 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: done ? "var(--plum)" : "var(--line-2)", flexShrink: 0 }} />
+                  <span style={{ fontSize: 11.5, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
+                </div>
+                {i < steps.length - 1 && <span style={{ flex: 1, height: 1, background: i < reached ? "var(--plum)" : "var(--line)" }} />}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Actions */}
+      {hasActions && (
+        <div style={{ marginTop: 12 }}>
+          {error && <p style={{ fontSize: 12, color: "var(--danger)", margin: "0 0 8px" }}>{error}</p>}
+          {mode === "reason" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <textarea autoFocus placeholder="Reason (optional)" value={reason} onChange={e => setReason(e.target.value)} rows={2} style={{ ...inputStyle, resize: "none" }} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => { setMode("idle"); setReason("") }} disabled={busy} style={{ flex: 1, height: 40, background: "var(--ivory)", color: "var(--body)", borderRadius: isMobile ? 999 : 10, border: "1px solid var(--line)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>Cancel</button>
+                <button onClick={() => reasonAction && run(reasonAction)} disabled={busy} style={{ ...secondaryBtn, opacity: busy ? 0.6 : 1 }}>{busy ? "Saving…" : reasonLabel}</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 8 }}>
+              {showApprove && (
+                <>
+                  <button onClick={() => startReason("Reject", (rsn) => rejectAllocation(a.id, ministryId, rsn))} disabled={busy} style={secondaryBtn}>Reject</button>
+                  <button onClick={() => run(() => approveAllocation(a.id, ministryId))} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>{busy ? "Approving…" : "Approve"}</button>
+                </>
+              )}
+              {showRequest && (
+                <>
+                  <button onClick={() => startReason("Reject", (rsn) => rejectAllocation(a.id, ministryId, rsn))} disabled={busy} style={secondaryBtn}>Reject</button>
+                  <button onClick={() => run(() => requestAllocation(a.id, ministryId))} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>{busy ? "Filing…" : "File grant request"}</button>
+                </>
+              )}
+              {showSignOff && (
+                <>
+                  <button onClick={() => startReason("Decline", (rsn) => declineAllocation(a.id, ministryId, rsn))} disabled={busy} style={secondaryBtn}>Decline</button>
+                  <button onClick={() => run(() => signOffAllocation(a.id, ministryId))} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>{busy ? "Signing off…" : "Sign off"}</button>
+                </>
+              )}
+              {showConfirm && (
+                <>
+                  <button onClick={() => startReason("Decline", (rsn) => declineExternalAllocation(a.id, ministryId, rsn))} disabled={busy} style={secondaryBtn}>Decline</button>
+                  <button onClick={() => run(() => confirmExternalReimbursed(a.id, ministryId))} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>{busy ? "Confirming…" : "Confirm reimbursed"}</button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Compact split editor (treasurer-owned): fund + amount rows, live sum vs total.
+// Only rendered when every allocation is still pending.
+function SplitEditor({
+  receiptId, ministryId, total, funds, current, onCancel, onSaved,
+}: {
+  receiptId: string
+  ministryId: string
+  total: number
+  funds: FinanceFund[]
+  current: ReceiptAllocation[]
+  onCancel: () => void
+  onSaved: () => void
+}) {
+  const [rows, setRows] = useState<{ fundId: string; amount: string }[]>(() =>
+    current.length > 0
+      ? current.map(a => ({ fundId: a.fund_id, amount: String(a.amount) }))
+      : [{ fundId: funds[0]?.id ?? "", amount: String(total) }]
+  )
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const sum = rows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0)
+  const balanced = Math.abs(sum - total) < 0.01
+
+  function setRow(i: number, patch: Partial<{ fundId: string; amount: string }>) {
+    setRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r))
+  }
+
+  async function save() {
+    if (!balanced) { setError("The split must add up to the receipt total."); return }
+    setSaving(true); setError(null)
+    const { error: err } = await setReceiptAllocations(receiptId, ministryId, rows.map(r => ({ fundId: r.fundId, amount: parseFloat(r.amount) || 0 })))
+    if (err) { setError(err); setSaving(false); return }
+    setSaving(false); onSaved()
+  }
+
+  return (
+    <div style={{ border: "1px solid var(--line)", borderRadius: 12, padding: 14, background: "var(--cream)", display: "flex", flexDirection: "column", gap: 10 }}>
+      {rows.map((r, i) => (
+        <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 110px 28px", gap: 8, alignItems: "center" }}>
+          <select value={r.fundId} onChange={e => setRow(i, { fundId: e.target.value })} style={inputStyle}>
+            {funds.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+          <input type="number" min="0" step="0.01" placeholder="0.00" value={r.amount} onChange={e => setRow(i, { amount: e.target.value })} style={inputStyle} />
+          <button
+            onClick={() => setRows(prev => prev.filter((_, idx) => idx !== i))}
+            disabled={rows.length === 1}
+            style={{ background: "none", border: "none", cursor: rows.length === 1 ? "default" : "pointer", color: rows.length === 1 ? "var(--line-2)" : "var(--dashed)", display: "flex", alignItems: "center", justifyContent: "center" }}
+            aria-label="Remove source"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      ))}
+      <button
+        onClick={() => setRows(prev => [...prev, { fundId: funds[0]?.id ?? "", amount: "" }])}
+        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 10px", border: "1px dashed var(--dashed)", borderRadius: 10, background: "transparent", color: "var(--muted-text)", fontSize: 12.5, cursor: "pointer", alignSelf: "flex-start", fontFamily: "var(--sans)" }}
+      >
+        <Plus size={12} /> Add funding source
+      </button>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5 }}>
+        <span style={{ color: "var(--muted-text)" }}>Split total</span>
+        <span style={{ color: balanced ? "var(--ink)" : "var(--danger)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
+          ${sum.toFixed(2)} / ${total.toFixed(2)}
+        </span>
+      </div>
+      {error && <p style={{ fontSize: 12.5, color: "var(--danger)", margin: 0 }}>{error}</p>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={onCancel} disabled={saving} style={{ flex: 1, height: 40, background: "var(--ivory)", color: "var(--body)", borderRadius: 10, border: "1px solid var(--line)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>Cancel</button>
+        <button onClick={save} disabled={saving || !balanced} style={{ flex: 1, height: 40, background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13.5, fontWeight: 500, cursor: "pointer", opacity: saving || !balanced ? 0.6 : 1, fontFamily: "var(--sans)" }}>{saving ? "Saving…" : "Save split"}</button>
+      </div>
+    </div>
+  )
+}
+
+function InboxDetailOverlay({
+  receipt: r, ministryId, funds, canApprove, canSignOff, canView, onClose, onActed,
+}: {
+  receipt: InboxReceipt
+  ministryId: string
+  funds: FinanceFund[]
+  canApprove: boolean
+  canSignOff: boolean
+  canView: boolean
   onClose: () => void
   onActed: () => void
 }) {
-  const [mode, setMode] = useState<"idle" | "reject" | "decline">("idle")
-  const [reason, setReason] = useState("")
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const isMobile = useIsMobile()
-
-  const isNegative = r.status === "rejected" || r.status === "declined"
-  const reachedIndex = r.status === "reimbursed" ? 2 : r.status === "approved" ? 1 : 0
+  const [editSplit, setEditSplit] = useState(false)
 
   const submitterName = r.submitted_by_name ?? "Unknown"
   const initials = (() => {
@@ -443,30 +724,18 @@ function InboxDetailOverlay({
     return (parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toUpperCase()
   })()
 
-  const showApprove = r.status === "pending" && canApprove
-  const showSignOff = r.status === "approved" && canSignOff
-  const hasFooter = showApprove || showSignOff
+  // The split locks once any source has left `pending`.
+  const allPending = r.allocations.length > 0 && r.allocations.every(a => a.status === "pending")
+  const canEditSplit = canApprove && !canView && allPending && funds.length > 0
 
-  async function run(fn: () => Promise<{ error: string | null }>) {
-    setBusy(true); setError(null)
-    const { error: err } = await fn()
-    if (err) { setError(err); setBusy(false); return }
-    onActed()
-  }
-
-  const primaryBtn: React.CSSProperties = {
-    flex: 1, height: 44, background: "var(--plum)", color: "var(--cream)", borderRadius: isMobile ? 999 : 12,
-    border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)",
-  }
-  const secondaryBtn: React.CSSProperties = {
-    flex: 1, height: 44, background: "var(--ivory)", color: "var(--danger)", borderRadius: isMobile ? 999 : 12,
-    border: "1px solid var(--line)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)",
-  }
+  const images = (r.receipt_image_urls && r.receipt_image_urls.length > 0)
+    ? r.receipt_image_urls
+    : (r.receipt_image_url ? [r.receipt_image_url] : [])
 
   return (
     <SubpageShell crumbs={[{ label: "Reimbursements", onClick: onClose }, { label: r.event_name || r.category_name || r.category || "Receipt" }]} width="full">
       <div>
-        {/* Amount + status */}
+        {/* Amount + receipt-level rollup status */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 22 }}>
           <p style={{ fontFamily: "var(--serif)", fontSize: isMobile ? 22 : 34, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.02em" }}>
             ${Number(r.amount).toFixed(2)}
@@ -474,46 +743,53 @@ function InboxDetailOverlay({
           <div style={{ marginTop: 6 }}><FinanceStatusPill status={r.status} /></div>
         </div>
 
-        {/* Status path */}
-        {isNegative ? (
-          <div style={{ background: DANGER_ROW_BG, border: `1px solid ${DANGER_TINT_BORDER}`, borderRadius: 12, padding: "14px 16px", marginBottom: 24 }}>
-            <p style={{ fontSize: 13, fontWeight: 500, color: "var(--danger)", margin: 0 }}>
-              {STATUS_META[r.status]?.label ?? "Declined"}
-            </p>
-            {r.decision_reason && (
-              <p style={{ fontSize: 13, color: "var(--body)", margin: "6px 0 0", lineHeight: 1.5 }}>{r.decision_reason}</p>
+        {/* ── Funding split ── */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+            <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>Funding split</p>
+            {canEditSplit && !editSplit && (
+              <button onClick={() => setEditSplit(true)} style={{ fontSize: 12.5, color: "var(--plum)", fontWeight: 500, background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}>Edit split</button>
             )}
           </div>
-        ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
-            {INBOX_STATUS_STEPS.map((step, i) => {
-              const done = i <= reachedIndex
-              return (
-                <div key={step} style={{ display: "flex", alignItems: "center", gap: 8, flex: i < INBOX_STATUS_STEPS.length - 1 ? 1 : 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: done ? "var(--plum)" : "var(--line-2)", flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
-                  </div>
-                  {i < INBOX_STATUS_STEPS.length - 1 && (
-                    <span style={{ flex: 1, height: 1, background: i < reachedIndex ? "var(--plum)" : "var(--line)" }} />
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
+          {editSplit ? (
+            <SplitEditor
+              receiptId={r.id}
+              ministryId={ministryId}
+              total={Number(r.amount)}
+              funds={funds}
+              current={r.allocations}
+              onCancel={() => setEditSplit(false)}
+              onSaved={() => { setEditSplit(false); onActed() }}
+            />
+          ) : r.allocations.length === 0 ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 16px", border: "1px dashed var(--dashed)", borderRadius: 12, color: "var(--muted-text)" }}>
+              <span style={{ fontSize: 13 }}>No funding sources yet.</span>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {r.allocations.map(a => (
+                <AllocationRow
+                  key={a.id}
+                  allocation={a}
+                  ministryId={ministryId}
+                  canApprove={canApprove && !canView}
+                  canSignOff={canSignOff && !canView}
+                  onActed={onActed}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Details */}
         {isMobile ? (
           <MobileFactsGrid facts={[
-            { label: "Fund", value: fundLabel(r.fund) || "—" },
             { label: "Purchase date", value: r.purchase_date ? new Date(r.purchase_date + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—" },
             { label: "Category", value: r.category_name ?? r.category ?? "—" },
             { label: "Team", value: r.team_name || "—" },
           ]} />
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 22 }}>
-            <InboxDetailRow label="Fund" value={fundLabel(r.fund) || "—"} />
             <InboxDetailRow label="Purchase date" value={r.purchase_date ? new Date(r.purchase_date + "T00:00:00").toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "—"} />
             <InboxDetailRow label="Category" value={r.category_name ?? r.category ?? "—"} />
             <InboxDetailRow label="Team" value={r.team_name || "—"} />
@@ -534,13 +810,19 @@ function InboxDetailOverlay({
           </div>
         )}
 
-        {/* Receipt image */}
+        {/* Receipt images */}
         <div>
-          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 8px" }}>Receipt image</p>
-          {r.receipt_image_url ? (
-            <a href={r.receipt_image_url} target="_blank" rel="noopener noreferrer" style={{ display: "block", borderRadius: 12, overflow: "hidden", border: "1px solid var(--line)", maxWidth: 280 }}>
-              <img src={r.receipt_image_url} alt="Receipt" style={{ width: "100%", display: "block", objectFit: "cover" }} />
-            </a>
+          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 8px" }}>
+            {images.length > 1 ? "Receipt images" : "Receipt image"}
+          </p>
+          {images.length > 0 ? (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {images.map((url, i) => (
+                <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: "block", borderRadius: 12, overflow: "hidden", border: "1px solid var(--line)", width: 180 }}>
+                  <img src={url} alt={`Receipt ${i + 1}`} style={{ width: "100%", display: "block", objectFit: "cover" }} />
+                </a>
+              ))}
+            </div>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "14px 16px", border: "1px dashed var(--dashed)", borderRadius: 12, color: "var(--muted-text)" }}>
               <ImageIcon size={16} />
@@ -549,59 +831,6 @@ function InboxDetailOverlay({
           )}
         </div>
       </div>
-
-      {/* Action footer — role-gated, inline (scrolls with the receipt body) */}
-      {hasFooter && (
-        <div style={{ marginTop: 28, paddingTop: 18, borderTop: "1px solid var(--line)" }}>
-          {error && <p style={{ fontSize: 12.5, color: "var(--danger)", margin: "0 0 10px" }}>{error}</p>}
-
-          {mode === "reject" || mode === "decline" ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <textarea
-                autoFocus
-                placeholder={`Reason for ${mode === "reject" ? "rejecting" : "declining"} (optional)`}
-                value={reason}
-                onChange={e => setReason(e.target.value)}
-                rows={2}
-                style={{ ...inputStyle, resize: "none" }}
-              />
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => { setMode("idle"); setReason("") }} disabled={busy} style={{ flex: 1, height: 44, background: "var(--ivory)", color: "var(--body)", borderRadius: isMobile ? 999 : 12, border: "1px solid var(--line)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>
-                  Cancel
-                </button>
-                <button
-                  onClick={() => run(() => mode === "reject"
-                    ? rejectReceipt(r.id, ministryId, reason)
-                    : declineReceipt(r.id, ministryId, reason))}
-                  disabled={busy}
-                  style={{ ...secondaryBtn, opacity: busy ? 0.6 : 1 }}
-                >
-                  {busy ? "Saving…" : mode === "reject" ? "Reject" : "Decline"}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: "flex", gap: 8 }}>
-              {showApprove && (
-                <>
-                  <button onClick={() => setMode("reject")} disabled={busy} style={secondaryBtn}>Reject</button>
-                  <button onClick={() => run(() => approveReceipt(r.id, ministryId))} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>
-                    {busy ? "Approving…" : "Approve"}
-                  </button>
-                </>
-              )}
-              {showSignOff && (
-                <>
-                  <button onClick={() => setMode("decline")} disabled={busy} style={secondaryBtn}>Decline</button>
-                  <button onClick={() => run(() => signOffReceipt(r.id, ministryId))} disabled={busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>
-                    {busy ? "Signing off…" : "Sign off"}
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </SubpageShell>
   )
 }
@@ -642,6 +871,11 @@ export function FinanceWorkspace({
   useScrollResetOn([section])
 
   const [loading, setLoading] = useState(true)
+
+  // Per-ministry fund list — single source for the inbox split editor + allocation
+  // grid columns (replaces the old hardcoded church/cmu/pitt array).
+  const { data: fundsRes } = useSWR(["finance-funds", ministryId] as const, () => getFinanceFunds(ministryId))
+  const funds = fundsRes?.data ?? []
 
   // Receipt limits (consumed by SubmitReceiptModal callers)
   const [limits, setLimits] = useState<ReceiptLimit[]>([])
@@ -792,6 +1026,7 @@ export function FinanceWorkspace({
             <ReimbursementInbox
               ministryId={ministryId}
               items={inboxItems}
+              funds={funds}
               loading={inboxLoading}
               canApprove={inboxCanApprove}
               canSignOff={inboxCanSignOff}
@@ -810,6 +1045,7 @@ export function FinanceWorkspace({
           <AllocationSection
             ministryId={ministryId}
             canEdit={canManage}
+            funds={funds}
             categories={dynamicCategories}
             onAddCategory={handleAddCategory}
             onDeleteCategory={handleDeleteCategory}
@@ -924,16 +1160,24 @@ function generateYearOptions(): string[] {
 function AllocationSection({
   ministryId,
   canEdit: canEditProp,
+  funds,
   categories,
   onAddCategory,
   onDeleteCategory,
 }: {
   ministryId: string
   canEdit: boolean
+  funds: FinanceFund[]
   categories: DynamicCategory[]
   onAddCategory: (name: string) => Promise<void>
   onDeleteCategory: (name: string) => Promise<void>
 }) {
+  // Dynamic fund columns (slug = the value stored on budget_allocations.fund).
+  // Fall back to a single Church column so the grid still renders pre-seed.
+  const fundCols = funds.length > 0
+    ? funds.map(f => ({ value: f.slug, label: f.name }))
+    : [{ value: "church", label: "Church" }]
+  const allocGridCols = `minmax(120px, 1.4fr) ${fundCols.map(() => "minmax(70px, 1fr)").join(" ")} 84px 78px 90px 28px`
   // Mobile-only Daybreak restyle (ruling B-2): the summary stat cards adopt the
   // 16px --r-pocket-sm radius on mobile via viewport branch; desktop byte-identical.
   const isMobile = useIsMobile()
@@ -1034,7 +1278,7 @@ function AllocationSection({
 
   // Totals
   const totalAllocated = allCategories.reduce((sum, cat) => {
-    return sum + FUNDS.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
+    return sum + fundCols.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
   }, 0)
   const totalSpent = allCategories.reduce((sum, cat) => sum + getActual(cat.value), 0)
   const totalRemaining = totalAllocated - totalSpent
@@ -1118,15 +1362,15 @@ function AllocationSection({
           {/* Allocation table */}
           <div style={{ border: "1px solid var(--line)", borderRadius: 14, overflow: "hidden" }}>
             {/* Table header */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 80px 80px 90px 80px 90px 28px", gap: 0, padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "var(--cream-2)" }}>
-              {["Category", "Church", "CMU", "Pitt", "Total", "Spent", "Remaining", ""].map((h, i) => (
+            <div style={{ display: "grid", gridTemplateColumns: allocGridCols, gap: 0, padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "var(--cream-2)" }}>
+              {["Category", ...fundCols.map(f => f.label), "Total", "Spent", "Remaining", ""].map((h, i) => (
                 <span key={i} style={{ ...monoLabel, display: "block" }}>{h}</span>
               ))}
             </div>
 
             {/* Category rows */}
             {allCategories.map((cat, catIdx) => {
-              const catTotal = FUNDS.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
+              const catTotal = fundCols.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
               const spent = getActual(cat.value)
               const remaining = catTotal - spent
               const rowOver = remaining < 0 && catTotal > 0
@@ -1138,7 +1382,7 @@ function AllocationSection({
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "1fr 100px 80px 80px 90px 80px 90px 28px",
+                      gridTemplateColumns: allocGridCols,
                       gap: 0,
                       padding: "13px 16px",
                       borderTop: catIdx > 0 ? "1px solid var(--line-3)" : "none",
@@ -1188,7 +1432,7 @@ function AllocationSection({
                     </div>
 
                     {/* Fund cells */}
-                    {FUNDS.map(fund => {
+                    {fundCols.map(fund => {
                       const cellKey = getDraftKey(cat.value, fund.value)
                       const isSaving = savingCell === cellKey
                       const draftVal = getDraftValue(cat.value, fund.value)
@@ -1286,9 +1530,9 @@ function AllocationSection({
             })}
 
             {/* Footer totals row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 80px 80px 90px 80px 90px 28px", gap: 0, padding: "12px 16px", borderTop: "1px solid var(--line)", background: "var(--cream-2)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: allocGridCols, gap: 0, padding: "12px 16px", borderTop: "1px solid var(--line)", background: "var(--cream-2)" }}>
               <span style={{ ...monoLabel, fontSize: "11px", color: "var(--body)" }}>Total</span>
-              {FUNDS.map(fund => {
+              {fundCols.map(fund => {
                 const fundTotal = allCategories.reduce((s, cat) => s + getAllocAmount(cat.value, fund.value), 0)
                 return (
                   <span key={fund.value} style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>
@@ -1369,7 +1613,7 @@ function AllocationSection({
           {/* Empty state hint */}
           {totalAllocated === 0 && (
             <p style={{ textAlign: "center", fontSize: 13, color: "var(--muted-text)", marginTop: 20, fontStyle: "italic" }}>
-              No budget set for {fiscalYear} yet. Click any Church, CMU, or Pitt cell to start allocating.
+              No budget set for {fiscalYear} yet. Click any fund cell to start allocating.
             </p>
           )}
           </div>
@@ -1383,7 +1627,7 @@ function AllocationSection({
             ) : (
               <PocketRowCard>
                 {allCategories.map((cat, i) => {
-                  const catTotal = FUNDS.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
+                  const catTotal = fundCols.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
                   const spent = getActual(cat.value)
                   const remaining = catTotal - spent
                   const rowOver = remaining < 0 && catTotal > 0

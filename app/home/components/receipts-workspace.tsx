@@ -150,6 +150,7 @@ export function ReceiptsWorkspace({
       {detail ? (
         <ReceiptDetailOverlay
           receipt={detail.receipt}
+          ministryId={ministryId}
           categoryName={detail.categoryName}
           teamName={detail.teamName}
           onClose={() => setDetail(null)}
@@ -455,20 +456,73 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-const STATUS_STEPS = ["Submitted", "Approved", "Reimbursed"] as const
+// Per-source status path — church signs off; external is grant-filed.
+function memberAllocSteps(kind: "church" | "external") {
+  return kind === "church"
+    ? (["Submitted", "Approved", "Reimbursed"] as const)
+    : (["Submitted", "Requested", "Reimbursed"] as const)
+}
+
+interface MemberAllocation {
+  id: string
+  amount: number
+  status: string
+  decision_reason: string | null
+  fund_name: string
+  fund_kind: "church" | "external"
+}
+
+// A single read-only source row in the member's split view: fund chip · amount ·
+// status pill · per-source stepper. Mirrors the treasurer inbox split, no actions.
+function MemberAllocationRow({ allocation: a }: { allocation: MemberAllocation }) {
+  const isNegative = a.status === "rejected" || a.status === "declined"
+  const steps = memberAllocSteps(a.fund_kind)
+  const reached = a.status === "reimbursed" ? 2 : (a.status === "approved" || a.status === "requested") ? 1 : 0
+  return (
+    <div style={{ border: "1px solid var(--line)", borderRadius: 12, padding: "14px 16px", background: "var(--cream)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+          <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.04em", padding: "3px 9px", borderRadius: 999, background: "var(--plum-tint)", color: "var(--plum)", whiteSpace: "nowrap" }}>{a.fund_name}</span>
+          <span style={{ fontSize: 14, color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>${a.amount.toFixed(2)}</span>
+        </div>
+        <StatusPill status={a.status} />
+      </div>
+      {isNegative ? (
+        <div style={{ background: "var(--cream)", border: "1px solid color-mix(in srgb, var(--danger) 30%, var(--cream))", borderRadius: 10, padding: "10px 12px" }}>
+          <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{STATUS_META[a.status]?.label ?? "Declined"}</p>
+          {a.decision_reason && <p style={{ fontSize: 12.5, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {steps.map((step, i) => {
+            const done = i <= reached
+            return (
+              <div key={step} style={{ display: "flex", alignItems: "center", gap: 8, flex: i < steps.length - 1 ? 1 : 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: done ? "var(--plum)" : "var(--line-2)", flexShrink: 0 }} />
+                  <span style={{ fontSize: 11.5, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
+                </div>
+                {i < steps.length - 1 && <span style={{ flex: 1, height: 1, background: i < reached ? "var(--plum)" : "var(--line)" }} />}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function ReceiptDetailOverlay({
-  receipt, categoryName, teamName, onClose,
+  receipt, ministryId, categoryName, teamName, onClose,
 }: {
   receipt: ReceiptRow
+  ministryId: string
   categoryName: string
   teamName: string
   onClose: () => void
 }) {
   const isMobile = useIsMobile()
-  const isNegative = receipt.status === "rejected" || receipt.status === "declined"
-  // Where the receipt sits on the Submitted → Approved → Reimbursed path.
-  const reachedIndex = receipt.status === "reimbursed" ? 2 : receipt.status === "approved" ? 1 : 0
+  const supabase = createClient()
 
   const submitterName = receipt.submitted_by_name ?? "Unknown"
   const initials = (() => {
@@ -476,10 +530,51 @@ function ReceiptDetailOverlay({
     return (parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2)).toUpperCase()
   })()
 
+  // The per-source split (RLS rfa_select lets the submitter read own-receipt rows).
+  // fund_id is only part of a composite FK, so a PostgREST embed hint fails
+  // silently — resolve fund name + kind via a separate query + Map.
+  const { data: allocations } = useSWR(
+    ["receipt-allocations", receipt.id] as const,
+    async () => {
+      const { data } = await supabase
+        .from("receipt_fund_allocations")
+        .select("id, fund_id, amount, status, decision_reason")
+        .eq("receipt_id", receipt.id)
+        .eq("ministry_id", ministryId)
+        .order("created_at", { ascending: true })
+      const rows = ((data ?? []) as Array<{
+        id: string; fund_id: string; amount: number; status: string; decision_reason: string | null
+      }>)
+      const fundIds = Array.from(new Set(rows.map(r => r.fund_id)))
+      const fundMeta = new Map<string, { name: string; kind: string }>()
+      if (fundIds.length > 0) {
+        const { data: fundRows } = await supabase
+          .from("finance_funds")
+          .select("id, name, kind")
+          .in("id", fundIds)
+          .eq("ministry_id", ministryId)
+        for (const f of ((fundRows ?? []) as { id: string; name: string; kind: string }[])) {
+          fundMeta.set(f.id, { name: f.name, kind: f.kind })
+        }
+      }
+      return rows.map(row => {
+        const f = fundMeta.get(row.fund_id)
+        return {
+          id: row.id,
+          amount: Number(row.amount),
+          status: row.status,
+          decision_reason: row.decision_reason,
+          fund_name: f?.name ?? "",
+          fund_kind: (f?.kind === "church" ? "church" : "external") as "church" | "external",
+        }
+      })
+    },
+  )
+
   return (
     <SubpageShell crumbs={[{ label: categoryName, onClick: onClose }, { label: receipt.event_name || "Receipt" }]} width="full">
       <div>
-        {/* Amount + status */}
+        {/* Amount + rollup status */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 22 }}>
           <p style={{ fontFamily: "var(--serif)", fontSize: isMobile ? 22 : 34, fontWeight: 600, color: "var(--ink)", margin: 0, letterSpacing: "-0.02em" }}>
             ${Number(receipt.amount).toFixed(2)}
@@ -487,46 +582,25 @@ function ReceiptDetailOverlay({
           <div style={{ marginTop: 6 }}><StatusPill status={receipt.status} /></div>
         </div>
 
-        {/* Status path */}
-        {isNegative ? (
-          <div style={{ background: "var(--cream)", border: "1px solid color-mix(in srgb, var(--danger) 30%, var(--cream))", borderRadius: 12, padding: "14px 16px", marginBottom: 24 }}>
-            <p style={{ fontSize: 13, fontWeight: 500, color: "var(--danger)", margin: 0 }}>
-              {STATUS_META[receipt.status]?.label ?? "Declined"}
-            </p>
-            {receipt.decision_reason && (
-              <p style={{ fontSize: 13, color: "var(--body)", margin: "6px 0 0", lineHeight: 1.5 }}>{receipt.decision_reason}</p>
-            )}
-          </div>
-        ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
-            {STATUS_STEPS.map((step, i) => {
-              const done = i <= reachedIndex
-              return (
-                <div key={step} style={{ display: "flex", alignItems: "center", gap: 8, flex: i < STATUS_STEPS.length - 1 ? 1 : 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: done ? "var(--plum)" : "var(--line-2)", flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
-                  </div>
-                  {i < STATUS_STEPS.length - 1 && (
-                    <span style={{ flex: 1, height: 1, background: i < reachedIndex ? "var(--plum)" : "var(--line)" }} />
-                  )}
-                </div>
-              )
-            })}
+        {/* ── Funding split (read-only per-source status) ── */}
+        {allocations && allocations.length > 0 && (
+          <div style={{ marginBottom: 24 }}>
+            <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 10px" }}>Funding split</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {allocations.map(a => <MemberAllocationRow key={a.id} allocation={a} />)}
+            </div>
           </div>
         )}
 
         {/* Details */}
         {isMobile ? (
           <MobileFactsGrid facts={[
-            { label: "Fund", value: fundLabel(receipt.fund) || "—" },
             { label: "Purchase date", value: new Date(receipt.purchase_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) },
             { label: "Category", value: categoryName || "—" },
             { label: "Team", value: teamName || "—" },
           ]} />
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 22 }}>
-            <DetailRow label="Fund" value={fundLabel(receipt.fund)} />
             <DetailRow label="Purchase date" value={new Date(receipt.purchase_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} />
             <DetailRow label="Category" value={categoryName} />
             <DetailRow label="Team" value={teamName || "—"} />

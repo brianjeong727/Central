@@ -76,11 +76,12 @@ export const WORKSPACE_PRESETS: WorkspacePreset[] = [
     teamType: "finance",
     comingSoon: false,
     roles: [
-      // Finance has only President + Member. President (the finance deacon) signs off;
-      // Members (the treasurers + any overseeing admins) operate the workspace and
-      // approve. No other roles by design.
+      // President signs off; Members (treasurers + overseeing admins) operate the
+      // workspace and approve. Finance Deacon is read-only oversight — sees every
+      // receipt + the split but never approves, signs off, or writes.
       { name: "President", is_president: true, permissions: ["can_view_finances"] },
       { name: "Member", is_president: false, permissions: ["can_view_finances"] },
+      { name: "Finance Deacon", is_president: false, permissions: ["can_audit_finances"] },
     ],
   },
   {
