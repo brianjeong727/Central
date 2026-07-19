@@ -723,8 +723,16 @@ export function MeetingNotesSection({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes])
 
+  // Create-on-trigger must fire only when the counter CHANGES while mounted —
+  // never on mount. The section REMOUNTS when swapping between the note-detail
+  // and list render sites (e.g. breadcrumb back), and a mount-fired effect with
+  // a stale non-zero trigger created a fresh note on every navigation.
+  const lastTriggerRef = useRef(startNewTrigger ?? 0)
   useEffect(() => {
-    if (startNewTrigger) createNote()
+    const t = startNewTrigger ?? 0
+    if (t === lastTriggerRef.current) return
+    lastTriggerRef.current = t
+    if (t > 0) createNote()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startNewTrigger])
 
