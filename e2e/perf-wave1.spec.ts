@@ -184,7 +184,9 @@ test.describe("Wave1 — announcements feed bounding + Load more + RSVP (1440x90
     await expect(page.getByRole("heading", { name: "Announcements" }).filter({ visible: true })).toBeVisible()
 
     // Pinned-first: the pinned hero (desktop h2) renders our just-created pinned row.
-    await expect(page.getByText("E2E::wave1-pinned").filter({ visible: true }).first()).toBeVisible()
+    // 15s timeout absorbs a cold dev-server first-paint (route compile + feed SWR) —
+    // the default 5s races the announcements fetch on the suite's first hit here.
+    await expect(page.getByText("E2E::wave1-pinned").filter({ visible: true }).first()).toBeVisible({ timeout: 15000 })
 
     // Load more control present (desktop secondary button; the mobile "Load
     // more" text button also exists in the DOM but is display:none at 1440).
