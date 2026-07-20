@@ -90,7 +90,19 @@ Brian's concern: his Supabase is "connected to my school" and he wants it on per
 
 **Sequencing rule:** if a transfer is needed, **transfer FIRST, then upgrade to Pro** — so the paid plan lands on the org he'll keep, not the school's. All of {plan upgrade, project transfer, email change} **preserve the project ref/URL/keys**, so code + Vercel env stay intact. Only recreating the project would break things.
 
-**OPEN QUESTION for Brian (was pending when session reset):** which situation is he in? He needs to check: (a) what email/login method is on his Supabase *account*, and (b) under Organization → Members, is he the **Owner**? That determines whether it's a 2-min email change or a project transfer. Get this answer before upgrading.
+### ⚠️ OPEN — ASK BRIAN THESE AT SESSION START (he asked to be reminded)
+
+Brian has NOT answered these yet. Ask both before doing any upgrade or transfer — they decide whether the fix is a 2-min email change or a project transfer, and whether he even has permission to upgrade. Supabase has two separate layers: the **account** (his personal login identity) and the **organization** (owns the project + holds billing; members have roles Owner / Administrator / Developer).
+
+**Q1 — What does he log into Supabase with?** A school `.edu` email or a school-managed Google/GitHub account, or a personal one (personal Gmail/GitHub)?
+- *Why:* if the login is school-tied, the school kills that email at graduation and he's locked out **even though the org is named "brianjeong727's Org."** If already personal, he's safe — nothing to do. This is the real graduation risk, not where the project "lives."
+- *How he checks:* top-right avatar → **Account Preferences** → email + connected identities (GitHub/SSO).
+
+**Q2 — In the org's member list, is his account the Owner** (vs. Administrator/Developer)?
+- *Why:* **only an Owner can upgrade the plan to Pro or transfer the project.** If he's not Owner, he can't upgrade himself — ownership must be handed to him first.
+- *How he checks:* org dropdown (top-left) → his org → **Team / Members** tab → his row → Role column should say **Owner**.
+
+**Then act:** Q1 school-tied → switch account email/login to personal before losing school access. Q2 not-Owner → get ownership transferred first. Project under a school-owned org → **Transfer Project first, then upgrade to Pro** (§4 above). Record the answers here once he gives them so this section can be closed.
 
 ---
 
