@@ -54,12 +54,13 @@ The original idea was "200 bots impersonating real members replay a full year of
 Run in this order:
 
 ### Step 1 — Reproduce the board-meeting freeze FIRST (highest value)
-Before building any bot fleet: a **handful of concurrent real sessions** doing what the board did, and confirm today's `perf-wave1` work actually killed the freeze. If it's still broken, 200 bots just say "still broken" with more noise. This is the bug-hunt, not the scale test. **Trace the freeze to the specific query** (unbounded select / missing pagination / O(n²) / subscription loop). *This is the single most valuable thing to do next.*
+**✅ DONE 2026-07-20 — freeze DOES NOT reproduce.** 6 concurrent real Playwright sessions against prod (login → home → announcements → chats → directory → live message fan-out): 0 failures, pages responsive throughout (≤17ms JS roundtrips), solo login 3.1s end-to-end. The perf waves (#208/#210) + Pro compute killed it. Server-side signals all healthy: TTFB ~150ms, 6 parallel `/auth/v1/token` grants 0.3–0.6s each, app queries sub-second. Watch-items logged (not blockers): channel joins 750ms mean under load (publication trim will help), message INSERT hit 800ms mean/4.5s max in one cold window, one transient all-slow window (22–31s page loads) that self-recovered — probe-rig CPU contention (7 local Chromiums) is the dominant confound in concurrent wall-clock numbers. Harness: `scripts/loadtest/load-probe.cjs` + `login-trace.cjs`.
 
 ### Step 2 — Data VOLUME (no bots needed)
-Seed a year's worth of rows — announcements, chats/messages, events, finance history — **directly via SQL through the Supabase MCP**, in minutes. Tests: pagination, unbounded selects, queries fine at 50 rows that die at 5,000. Cheap; do it.
+**✅ DONE 2026-07-20 — volume changes nothing.** Dedicated prod tenant **"Load Test 200"** (`f00d1e57-0000-4000-8000-000000000001`, `is_sandbox=true`, invisible/private): 200 ghost members, 202-member church chat (≥30 → large-room receipt path), 9,000 messages, 150 announcements (12 events, 569 RSVPs), 60 calendar events, ~3k views — seeded via one atomic MCP tx with push/broadcast triggers disabled (playbook pattern). Probe against it ≈ identical to the tiny tenant: announcements 3.8s mean under 6-way load, chats 1.2s, directory 1.5s, sends ~96ms, worst app query (chat-list RPC) 89ms mean. Wave-1 bounded queries hold. Real login users: `loadtest.admin@loadtest.test` / `loadtest.member@loadtest.test` (E2E_PASSWORD; member-tier logins need gender+grad-year set or proxy routes to complete-profile — already set). Fixtures left in place.
 
-### Step 3 — CONCURRENCY burst (the launch-day test)
+### Step 3 — CONCURRENCY burst (the launch-day test) — NEXT UP
+Method refinement from Steps 1–2: browsers don't scale on one machine (7 local Chromiums already dominate wall-clock noise). Do 200 connections with **Node realtime-js websocket clients** (cheap, hundreds per process — the real connection/joins-per-sec test) + **k6/parallel HTTP** for the API hot paths + a **small Playwright fleet (~6)** for real-browser truth. Point it at the "Load Test 200" tenant. Schedule off-hours; watch which Pro cap trips (500 msg/s capped vs 2,500 uncapped).
 200 people active *at once* = about simultaneous **connections**, not historical data. 200 websockets each on multiple channels, 200 sessions hammering home-load + chat paths, RLS per-request, connection pool, Supabase concurrent-realtime caps.
 - Tool: **k6** for API/DB hot paths; a **smaller Playwright fleet** (we already have a Playwright harness from the orchestration overhaul — Phase 1, PR #143) for real browser/websocket behavior.
 - Shape: a 15–30 min burst of the hot loops — login → load home → open chat → send message → react → RSVP. Add a "**everyone opens at service start**" synchronized spike to specifically probe the joins/sec wall.
@@ -105,8 +106,8 @@ Brian's concern: his Supabase is "connected to my school" and he wants it on per
 
 1. ~~Confirm the account/org ownership question~~ **DONE 2026-07-20** (§4 closed: personal GitHub, Owner — no transfer needed; email swap at leisure).
 2. ~~Upgrade the org he'll keep to Pro~~ **DONE 2026-07-20** — org `riqmbdwxufdwiotudrvk` verified `plan: pro` via MCP; project ACTIVE_HEALTHY after upgrade; prod serving. Spend cap left ON (default) — revisit after the §2 Step 3 concurrency test.
-3. **Reproduce + trace the board-meeting freeze** (§2 Step 1) — find the actual query. Highest value.
-4. SQL-seed a year of data volume (§2 Step 2).
-5. Concurrency burst on Pro, off-hours (§2 Step 3).
+3. ~~Reproduce + trace the board-meeting freeze~~ **DONE 2026-07-20 — does not reproduce** (§2 Step 1).
+4. ~~SQL-seed a year of data volume~~ **DONE 2026-07-20 — no volume-sensitive paths found** (§2 Step 2).
+5. Concurrency burst on Pro, off-hours (§2 Step 3) — **the remaining test**; method spec'd in §2 Step 3.
 6. Scripted E2E over governance/finance edge cases (§2 Step 4).
 7. Don't forget the pending publication trim after prod deploy (memory `project_scale_readiness`).
