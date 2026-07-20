@@ -151,6 +151,11 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   const [recentChats, setRecentChats] = useState<ChatPreview[]>(initialRecentChats ?? [])
   const [userTeams, setUserTeams] = useState<UserTeam[]>(initialUserTeams ?? [])
   const [allTeams, setAllTeams] = useState<Team[]>([])
+  // True once the governance team list (allTeams) has been fetched, so the
+  // stale-team-param guard below doesn't reset a valid governed selection during
+  // the async load window. Non-governance admins never load allTeams — the guard
+  // short-circuits on `!isGovernanceAdmin` for them.
+  const [allTeamsLoaded, setAllTeamsLoaded] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialProfile.avatar_url ?? null)
   const [isDesktop, setIsDesktop] = useState(false)
   const [activeQuestion, setActiveQuestion] = useState<CongregationQuestion | null>(initialActiveQuestion ?? null)
@@ -305,6 +310,30 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, userTeams.length, govTeamCount, activeTeamId, canUseReceipts])
+
+  // Stale team-param guard (runs ONCE, at landing). The activeTeamId initializer trusts
+  // a `?team=<id>` verbatim. When that id is not one of your OWN (member) workspaces — a
+  // governed team from an old bookmarked URL, a deleted team, or a switched ministry — it
+  // drops you into a gov-view / MinistryCalendar fallback you never chose, an incoherent
+  // "amalgamation" page (picker-looking sidebar + ministry-titled read-only calendar).
+  // Governed teams are reached intentionally from the picker's Admin-access group, never by
+  // a landing URL. So: honor a member-team (or Receipts) deep-link; otherwise reset to the
+  // clean workspace picker. Only the INITIAL value is validated — in-session picks (incl.
+  // deliberately entering a governed team) are never reset. Waits for the governance list
+  // to settle so the membership check is evaluated against loaded data.
+  const didValidateTeamParamRef = useRef(false)
+  useEffect(() => {
+    if (didValidateTeamParamRef.current) return
+    if (!activeTeamId || activeTeamId === "receipts") { didValidateTeamParamRef.current = true; return }
+    const teamsSettled = !isGovernanceAdmin || allTeamsLoaded
+    if (!teamsSettled) return // wait for allTeams; re-runs when loaded
+    didValidateTeamParamRef.current = true
+    if (!userTeams.some(t => t.teamId === activeTeamId)) {
+      setActiveTeamId(null)
+      setParams({ team: null, ...TEAM_SUBPARAMS })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTeamId, userTeams, isGovernanceAdmin, allTeamsLoaded])
 
   useEffect(() => {
     const gradYear = initialProfile.graduation_year
@@ -632,6 +661,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       const admin_access: 'none' | 'view' | 'write' = ['none','view','write'].includes(rawAccess) ? rawAccess as 'none' | 'view' | 'write' : 'view'
       return { ...t, team_type, allow_co_presidency: !!t.allow_co_presidency, admin_access, allow_admin_members: !!t.allow_admin_members, member_count: countMap[t.id] ?? 0, hasPresident: presidentSet.has(t.id) }
     }))
+    setAllTeamsLoaded(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGovernanceAdmin, ministryId])
 
