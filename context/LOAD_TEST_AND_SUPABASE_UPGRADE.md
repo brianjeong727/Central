@@ -104,7 +104,7 @@ Brian's concern: his Supabase is "connected to my school" and he wants it on per
 ## 5. Recommended next-session order of operations
 
 1. ~~Confirm the account/org ownership question~~ **DONE 2026-07-20** (§4 closed: personal GitHub, Owner — no transfer needed; email swap at leisure).
-2. **Upgrade the org he'll keep to Pro** (required before onboarding day; required before the concurrency test). **UNBLOCKED — Brian's dashboard action.**
+2. ~~Upgrade the org he'll keep to Pro~~ **DONE 2026-07-20** — org `riqmbdwxufdwiotudrvk` verified `plan: pro` via MCP; project ACTIVE_HEALTHY after upgrade; prod serving. Spend cap left ON (default) — revisit after the §2 Step 3 concurrency test.
 3. **Reproduce + trace the board-meeting freeze** (§2 Step 1) — find the actual query. Highest value.
 4. SQL-seed a year of data volume (§2 Step 2).
 5. Concurrency burst on Pro, off-hours (§2 Step 3).
