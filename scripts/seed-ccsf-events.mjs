@@ -550,3 +550,140 @@ for (const src of EVENTS) {
   log(`  ✓ [2025–26] ${hist.title}${hist.subEvents?.length ? ` (+${hist.subEvents.length} sub-events)` : ""}`)
 }
 log(`\nSeeded ${eventCount} completed 2025–26 events into ${MINISTRY_NAME} / ${BOARD_TEAM_NAME}. Press \"Start next season\" in the app to roll them into 2026–27.`)
+
+// ── 6) Meeting notes (v2 structured) — REAL 2025–26 CCSF meeting content ─────
+// Distilled from the actual board meeting notes (context/CCSF_CONTEXT.md).
+// Each note: agenda items (with covered-state), decisions (drive the list
+// digest), attendees (board members), and a linked 2025–26 event.
+const MEETING_NOTES = [
+  {
+    date: "2025-06-21", title: "Board Meeting — Summer kickoff",
+    linkEvent: "Welcome Week",
+    body: "<p>First full board meeting of the summer. Contact-info form going out; reminding everyone to download Messenger. Working toward a universal mailing list for weekly reminders.</p>",
+    agenda: [
+      { text: "Welcoming Night theme + roles", sub: "Aug 23 · ~$300 budget — theme locked by end of July", done: true },
+      { text: "CCSF meeting cadence for the year", sub: "Biweekly, after DG meeting, starting Jun 28", done: true },
+      { text: "Coffeehouse planning kickoff", sub: "Sep 14, 5–7 PM — check AB Tech with Roy & AP", done: true },
+    ],
+    decisions: [
+      "Welcoming Night set for Aug 23 with a ~$300 budget",
+      "Board meets biweekly after the DG meeting, starting Jun 28",
+      "Coffeehouse performance form out Jul 5, closes Aug 5 — groups chosen at the Aug 9 meeting",
+    ],
+  },
+  {
+    date: "2025-08-09", title: "Board Meeting — Welcome Week assignments",
+    linkEvent: "Welcome Week",
+    body: "<p>Divvied event leadership for the fall. P-card signups open mid-August. Pamphlets to hand out during tabling — talk to Juju. Message the chat for volunteers a week before each event.</p>",
+    agenda: [
+      { text: "Welcome Week budget lines", sub: "Tabling $20 · Welcome Night $140 · EM/KM Samgyeopsal dinner $70", done: true },
+      { text: "Event leadership assignments", sub: "Welcoming Night: Kaitlyn & David · Coffeehouse: Derek & Roy · Turkeybowl: Josh Y., Ashley, Kaitlyn", done: true },
+      { text: "Outreach pamphlets + volunteer call", done: true },
+    ],
+    decisions: [
+      "Welcome Week budgets locked — tabling $20, Welcome Night $140, EM/KM dinner $70",
+      "Event leads assigned for every fall event",
+    ],
+  },
+  {
+    date: "2025-09-13", title: "Board Meeting — Coffeehouse week",
+    linkEvent: "Coffeehouse",
+    body: "<p>Final checks the day before Coffeehouse. Banner, post-its, and water on the supply run. EM/KM picnic volunteers being pulled from DGs.</p>",
+    agenda: [
+      { text: "Coffeehouse day-of supplies", sub: "Banner · post-its · water", done: true },
+      { text: "EM/KM picnic volunteers from DGs", done: true },
+      { text: "Praise Night announcement", done: true },
+    ],
+    decisions: [
+      "Picnic announcement + signup goes out tomorrow",
+      "Coffeehouse crews leave the venue by 7 PM",
+    ],
+  },
+  {
+    date: "2025-10-18", title: "Board Meeting — Turkeybowl logistics",
+    linkEvent: "Guys Turkeybowl",
+    body: "<p>Big logistics meeting. Volunteering: outreach sheet with vetted organizations going to DGLs — elders want the whole church involved. Central Chat at 247 of 250 members; weighing Slack/Discord/community chats.</p>",
+    agenda: [
+      { text: "Turkeybowl shirts", sub: "$1,528 for 189 shirts — pricing discussion", done: true },
+      { text: "Awards", sub: "Brian owns", done: true },
+      { text: "Volunteering org list to DGLs", done: true },
+      { text: "Membership Sunday flowers", done: true },
+      { text: "Central Chat capacity", sub: "247/250 on Messenger", done: true },
+    ],
+    decisions: [
+      "Shirts priced at $10 — excess funds water and Gatorade",
+      "CCSF prepares membership flowers, requested through church",
+      "Explore community chats — Messenger is at 247 of 250",
+    ],
+  },
+  {
+    date: "2026-03-21", title: "Board Meeting — Transition planning",
+    linkEvent: null,
+    body: "<p>Start of the handoff. Transition notes doc drafted; forms for next year's CCSF and DGLs going out.</p>",
+    agenda: [
+      { text: "Next year's CCSF + DGL forms", sub: "Close Apr 6", done: true },
+      { text: "Transition notes (roles)", done: true },
+      { text: "Retreat planning roles for next year", done: false },
+    ],
+    decisions: [
+      "CCSF co-plans Men's and EM retreats — retreat leads are one YA + one undergrad",
+      "CCSF + DGL signup forms close April 6",
+    ],
+  },
+]
+
+// Attendees: first few board team members (real profiles in this tenant).
+const { data: boardMembers } = await db
+  .from("team_members").select("user_id").eq("team_id", teamId).limit(5)
+const attendeeIds = (boardMembers ?? []).map((m) => m.user_id)
+
+// Wipe fixture notes by title (children cascade via FK, but delete explicitly).
+const NOTE_TITLES = MEETING_NOTES.map((n) => n.title)
+const { data: oldNotes } = await db
+  .from("meeting_notes").select("id").eq("team_id", teamId).in("title", NOTE_TITLES)
+if (oldNotes?.length) {
+  const noteIds = oldNotes.map((n) => n.id)
+  await db.from("meeting_note_agenda_items").delete().in("note_id", noteIds)
+  await db.from("meeting_note_decisions").delete().in("note_id", noteIds)
+  await db.from("meeting_notes").delete().in("id", noteIds)
+}
+
+// Resolve linked events (2025–26 season rows seeded above).
+async function findEventId(title) {
+  if (!title) return null
+  const { data } = await db
+    .from("calendar_events").select("id")
+    .eq("ministry_id", ministryId).eq("team_id", teamId).eq("title", title)
+    .lt("start_date", "2026-07-01")
+    .order("start_date", { ascending: true }).limit(1).maybeSingle()
+  return data?.id ?? null
+}
+
+const { data: lastNote } = await db
+  .from("meeting_notes").select("note_number").eq("team_id", teamId)
+  .order("note_number", { ascending: false }).limit(1).maybeSingle()
+let noteNum = lastNote?.note_number ?? 0
+
+for (const mn of MEETING_NOTES) {
+  noteNum += 1
+  const { data: note, error: noteErr } = await db.from("meeting_notes").insert({
+    team_id: teamId, note_number: noteNum, date: mn.date, title: mn.title, body: mn.body,
+    linked_event_id: await findEventId(mn.linkEvent),
+    attendees: attendeeIds.slice(0, 3 + (noteNum % 2)),
+    created_by: createdBy,
+  }).select("id").single()
+  if (noteErr) throw new Error(`note ${mn.title}: ${noteErr.message}`)
+  if (mn.agenda.length) {
+    const { error } = await db.from("meeting_note_agenda_items").insert(
+      mn.agenda.map((a, i) => ({ note_id: note.id, text: a.text, sub_text: a.sub ?? null, done: a.done, sort_order: i, created_by: createdBy })),
+    )
+    if (error) throw new Error(`agenda ${mn.title}: ${error.message}`)
+  }
+  if (mn.decisions.length) {
+    const { error } = await db.from("meeting_note_decisions").insert(
+      mn.decisions.map((t, i) => ({ note_id: note.id, text: t, sort_order: i, created_by: createdBy })),
+    )
+    if (error) throw new Error(`decisions ${mn.title}: ${error.message}`)
+  }
+}
+log(`Seeded ${MEETING_NOTES.length} meeting notes (real 2025–26 content) with agenda + decisions.`)

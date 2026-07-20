@@ -762,6 +762,31 @@ export interface MeetingNote {
   created_at: string
   updated_at: string
   updated_by: string | null
+  /** Meeting Notes v2 — the event this meeting was about (digest chip + whisper). */
+  linked_event_id?: string | null
+  /** Meeting Notes v2 — attendee user ids (auto-collected from editors + manual adds). */
+  attendees?: string[]
+}
+
+// Meeting Notes v2 — pinned structured sections (Variant B).
+export interface MeetingAgendaItem {
+  id: string
+  note_id: string
+  text: string
+  sub_text: string | null
+  done: boolean
+  sort_order: number
+  created_by: string
+  created_at: string
+}
+
+export interface MeetingDecision {
+  id: string
+  note_id: string
+  text: string
+  sort_order: number
+  created_by: string
+  created_at: string
 }
 
 export interface PlanTabProps {
