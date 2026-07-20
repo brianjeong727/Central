@@ -230,3 +230,9 @@ The `explorer` subagent is Read/Grep/Glob only — a dispatch prompt telling it 
 
 ## Verify "already fixed" claims against the live publication, not migration greps (2026-07-19)
 The realtime-egress explorer flagged small_groups/dgl_assignments as "probably not published" from grepping migration .sql files — but the live `pg_publication_tables` showed they WERE (added via MCP, no local file). The same live check exposed the real gap: event_blocks subscribed in code but absent from the publication. Publication/trigger/function state applied via MCP leaves no repo artifact — always query the live DB.
+
+## PostgREST embeds break silently when a second FK appears between two tables (2026-07-19)
+`profiles → ministries(status)` embed worked for months, then `ministries.archive_requested_by` added a second FK between the same tables — every unqualified embed now throws PGRST201 (ambiguous). The failure surfaced in NEW code (proxy.ts routing query) written against the old mental model. Rules: always FK-qualify embeds on tables with multiple relationships (`ministries!profiles_ministry_id_fkey(status)`), and never let a routing/auth-path query error fall through to a redirect — degrade to separate queries; an infrastructure error must not route a valid user away.
+
+## Async subscribe paths need a generation guard (2026-07-19)
+Any `await` between "check topic map" and "create+subscribe channel" (e.g. auth before joining a private realtime channel) lets StrictMode double-mount or fast unmount/remount interleave → two live channels on one topic → every event delivered twice. Pattern: store the entry (or pending promise) in the map SYNCHRONOUSLY before awaiting, re-check `map.get(key) === myEntry` after every await, and tear down anything a stale continuation created. Dedup by event id at the handler as defense-in-depth.

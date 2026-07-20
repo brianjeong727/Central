@@ -17,6 +17,7 @@ import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTa
 import { useNavState } from "../nav-state"
 import { InsetHairline } from "@/components/central/hairline"
 import { fetchChatList } from "../chat-list"
+import { subscribeChatTopic } from "../chat-broadcast"
 import { PushSubscribeCard } from "../components/notifications"
 import { MessageRow } from "./message-row"
 import { Composer } from "./composer"
@@ -1846,16 +1847,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     if (!loading) scrollToBottom(false)
   }, [loading, scrollToBottom])
 
-  // Realtime subscription for new messages from others
+  // Realtime — all chat events for this thread flow through the shared private-broadcast
+  // hub (chat:{groupId}): new messages (INSERT), edits + unsends/soft-deletes (UPDATE),
+  // hard deletes (DELETE), and reaction add/remove. The hub keeps ONE private channel per
+  // topic (shared with home-app's recent-chats listener), pushes the user JWT to the
+  // socket, and falls back to postgres_changes on subscribe error. Handlers below are the
+  // same ones the old group-messages-{id} / reactions-{id} channels used.
   useEffect(() => {
-    const channel = supabase
-      .channel(`group-messages-${groupId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages", filter: `group_id=eq.${groupId}` },
-        async (payload) => {
-          const raw = payload.new as { id: string; group_id: string; sender_id: string | null; content: string; created_at: string; reply_to_id: string | null; message_type?: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null; attachment_size?: number | null; poll_id?: string | null }
-
+    const handleIncomingMessage = async (raw: { id: string; group_id: string; sender_id: string | null; content: string; created_at: string; reply_to_id: string | null; message_type?: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null; attachment_size?: number | null; poll_id?: string | null }) => {
           // System messages: just append directly for everyone
           if (raw.message_type === "system") {
             setMessages((prev) => {
@@ -1916,7 +1915,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             attachment_size: raw.attachment_size ?? null,
             poll_id: raw.poll_id ?? null,
           }
-          setMessages((prev) => [...prev, newMsg])
+          // id-based dedup (defense-in-depth): a double-delivered INSERT must never
+          // render twice — mirrors the system-message guard above.
+          setMessages((prev) => prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg])
           if (raw.poll_id) loadPollsData([raw.poll_id])
 
           // Keep last_read_at current as messages arrive so the badge is
@@ -1927,13 +1928,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             .eq("group_id", groupId)
             .eq("user_id", userId)
             .then()
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "messages", filter: `group_id=eq.${groupId}` },
-        (payload) => {
-          const next = payload.new as { id: string; deleted?: boolean; content?: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null; attachment_size?: number | null; is_edited?: boolean; edited_at?: string | null }
+    }
+
+    // Message edit / unsend (soft-delete) — arrives as a messages UPDATE.
+    const handleMessageUpdate = (next: { id: string; deleted?: boolean; content?: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null; attachment_size?: number | null; is_edited?: boolean; edited_at?: string | null }) => {
           setMessages((prev) => prev.map((m) => m.id === next.id
             ? { ...m, deleted: next.deleted ?? m.deleted, content: next.content ?? m.content,
                 attachment_url: next.attachment_url ?? null, attachment_type: next.attachment_type ?? null,
@@ -1943,24 +1941,21 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           if (next.deleted) {
             setReactions((prev) => { const r = { ...prev }; delete r[next.id]; return r })
           }
-        }
-      )
-      .subscribe()
+    }
 
-    return () => { supabase.removeChannel(channel) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId, userId])
+    // Hard message delete (e.g. poll message removal) — arrives as a messages DELETE.
+    // Mark it deleted (matching the sender's optimistic placeholder) rather than
+    // yanking the row, and drop its reactions.
+    const handleMessageDelete = (id: string) => {
+          if (!id) return
+          setMessages((prev) => prev.map((m) => m.id === id
+            ? { ...m, deleted: true, content: "", attachment_url: null, attachment_type: null, attachment_name: null, attachment_size: null, poll_id: null }
+            : m))
+          setReactions((prev) => { const r = { ...prev }; delete r[id]; return r })
+    }
 
-  // Realtime subscription for reaction inserts and deletes
-  useEffect(() => {
-    const channel = supabase
-      .channel(`reactions-${groupId}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "message_reactions", filter: `group_id=eq.${groupId}` },
-        (payload) => {
-          const rx = payload.new as Reaction
-          // Server-side filtered to this group's reactions (message_reactions.group_id).
+    const handleReactionInsert = (rx: Reaction) => {
+          // Filtered server-side to this group's reactions (message_reactions.group_id).
           // The messagesRef guard stays as defense-in-depth: ignore reactions for
           // messages not currently loaded in THIS chat (e.g. scroll-up messages not
           // yet paged in) — otherwise the map grows entries for unloaded messages.
@@ -1980,29 +1975,40 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             if (list.find((r) => r.id === rx.id)) return prev
             return { ...prev, [rx.message_id]: [...list, rx] }
           })
-        }
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "message_reactions", filter: `group_id=eq.${groupId}` },
-        (payload) => {
-          const rx = payload.old as Reaction
+    }
+
+    const handleReactionDelete = (rx: Reaction) => {
           if (!rx.message_id) return
-          // Server-side filtered (needs REPLICA IDENTITY FULL so the old row carries
-          // group_id — handled in the migration). messagesRef guard stays as before:
-          // skip reactions for messages not loaded here (avoids empty map entries).
+          // messagesRef guard as before: skip reactions for messages not loaded here
+          // (avoids empty map entries).
           if (!messagesRef.current.some((m) => m.id === rx.message_id)) return
           setReactions((prev) => ({
             ...prev,
             [rx.message_id]: (prev[rx.message_id] ?? []).filter((r) => r.id !== rx.id),
           }))
-        }
-      )
-      .subscribe()
+    }
 
-    return () => { supabase.removeChannel(channel) }
+    // One hub listener dispatches every broadcast event for this topic.
+    const unsub = subscribeChatTopic(groupId, (e) => {
+      if (e.table === "messages") {
+        if (e.operation === "INSERT") {
+          void handleIncomingMessage(e.record as unknown as Parameters<typeof handleIncomingMessage>[0])
+        } else if (e.operation === "UPDATE") {
+          handleMessageUpdate(e.record as unknown as Parameters<typeof handleMessageUpdate>[0])
+        } else if (e.operation === "DELETE") {
+          handleMessageDelete((e.old_record as { id?: string } | null)?.id ?? "")
+        }
+      } else if (e.table === "message_reactions") {
+        if (e.operation === "INSERT") {
+          handleReactionInsert(e.record as unknown as Reaction)
+        } else if (e.operation === "DELETE") {
+          handleReactionDelete(e.old_record as unknown as Reaction)
+        }
+      }
+    })
+    return unsub
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId])
+  }, [groupId, userId])
 
   // Auto-scroll only when messages are added, not on deletions/edits
   useEffect(() => {
