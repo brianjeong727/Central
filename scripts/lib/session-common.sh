@@ -14,7 +14,7 @@ set -euo pipefail
 # Works from any worktree: the first `git worktree list` entry is always the main checkout.
 _git() { git "$@" 2>/dev/null; }
 
-MAIN_WT="$(_git worktree list --porcelain | awk '/^worktree /{print $2; exit}')"
+MAIN_WT="$(_git worktree list --porcelain | awk '/^worktree /{sub(/^worktree /, ""); print; exit}')"
 PARENT_DIR="$(dirname "$MAIN_WT")"
 REGISTRY="$MAIN_WT/.claude/session-slots.json"
 # Shared across all worktrees (one .git common dir): no commit, no gitignore needed.
