@@ -28,6 +28,7 @@ export interface Profile {
   show_journal_streak?: boolean
   seen_workspace_nav_hint?: boolean
   grad_prompt_dismissed?: boolean
+  compact_sidebar?: boolean
   notification_settings?: NotificationSettings
 }
 
@@ -972,6 +973,9 @@ export interface DesktopSidebarProps {
   planContextContent?: ReactNode
   // When true, hides the cream context panel entirely (icon rail stays); used for full-width picker
   hideSidePanel?: boolean
+  // Persisted user pref (profiles.compact_sidebar): rail-only shell, context panel hidden
+  compact?: boolean
+  onToggleCompact?: () => void
   // Rail brand mark — contextual "back to Plan workspaces" control (picker on Plan
   // for 2+-workspace users; /landing otherwise).
   onLogoClick: () => void

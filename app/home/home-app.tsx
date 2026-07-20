@@ -299,6 +299,19 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // one team. A single-team user drops into their team; a 0-team leader/gov-only user (whose
   // only workspace is Receipts) lands on the Receipts sentinel.
   const didAutoEnterRef = useRef(false)
+
+  // Compact sidebar — persisted per-user pref (profiles.compact_sidebar): rail-only
+  // shell, context panel hidden. Optimistic local state, fire-and-forget write.
+  const [compactSidebar, setCompactSidebar] = useState(!!initialProfile.compact_sidebar)
+  const handleToggleCompactSidebar = () => {
+    const next = !compactSidebar
+    setCompactSidebar(next)
+    supabase.from("profiles").update({ compact_sidebar: next }).eq("id", userId).eq("ministry_id", ministryId).then(() => {})
+  }
+  const hideSidePanel = activeTab === "plan" && !activeTeamId
+  // shell-compact applies on the EFFECTIVE hidden state so the --shell-offset
+  // override also fixes overlay alignment on the full-width plan picker.
+  const panelHidden = compactSidebar || hideSidePanel
   useEffect(() => {
     if (activeTab !== "plan" || activeTeamId || didAutoEnterRef.current) return
     if (userTeams.length === 1 && govTeamCount === 0) {
@@ -1003,7 +1016,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     // contentInset:"never" means the web layer clears the inset). env() = 0 on desktop,
     // so the md: flex/h-screen layout is visually untouched.
     <div
-      className="relative min-h-screen bg-[var(--cream)] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[var(--cream)]"
+      className={`relative min-h-screen bg-[var(--cream)] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[var(--cream)]${panelHidden ? " shell-compact" : ""}`}
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
 
@@ -1054,7 +1067,9 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
           />
         }
         planContextContent={planContextContent}
-        hideSidePanel={activeTab === "plan" && !activeTeamId}
+        hideSidePanel={hideSidePanel}
+        compact={compactSidebar}
+        onToggleCompact={handleToggleCompactSidebar}
         onLogoClick={handleLogoClick}
         showWorkspaceNavHint={showWorkspaceNavHint}
         onDismissNavHint={() => setHintDismissed(true)}

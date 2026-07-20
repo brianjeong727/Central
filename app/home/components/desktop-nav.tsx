@@ -1,7 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Receipt, Waypoints } from "lucide-react"
+import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Receipt, Waypoints, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { PlanLineIcon, sidebarItemStyle } from "./shared"
 import { DirectoryListSkeleton } from "@/components/central"
@@ -109,6 +109,8 @@ export function DesktopSidebar({
   chatPanelContent,
   planContextContent,
   hideSidePanel,
+  compact,
+  onToggleCompact,
   onLogoClick,
   showWorkspaceNavHint,
   onDismissNavHint,
@@ -293,7 +295,7 @@ export function DesktopSidebar({
     <>
       {/* ── Icon Rail ─────────────────────────────────────────────────────── */}
       <div
-        className="hidden md:flex flex-col w-[72px] flex-shrink-0 h-screen items-center py-4 gap-1"
+        className="hidden md:flex flex-col w-[var(--rail-width)] flex-shrink-0 h-screen items-center py-4 gap-1"
         style={{ background: RAIL_BG, borderRight: `1px solid ${LINE}` }}
       >
         {/* Brand mark → contextual "back to Plan workspaces" control. On the Plan tab
@@ -416,6 +418,28 @@ export function DesktopSidebar({
 
         <div className="flex-1" />
 
+        {/* Compact toggle — collapses the context panel to a rail-only shell.
+            Persisted per-user pref (profiles.compact_sidebar); reflects `compact`
+            only, composing with hideSidePanel via OR at the panel render. */}
+        {onToggleCompact && (
+          <button
+            type="button"
+            onClick={onToggleCompact}
+            aria-label={compact ? "Expand sidebar" : "Collapse sidebar"}
+            title={compact ? "Expand sidebar" : "Collapse sidebar"}
+            className="flex items-center justify-center mb-2 flex-shrink-0 transition-colors text-[color-mix(in_srgb,var(--cream-on-dark)_55%,transparent)] hover:text-[var(--cream-on-dark)] hover:bg-[color-mix(in_srgb,var(--cream-on-dark)_12%,transparent)]"
+            style={{
+              width: 36, height: 32,
+              borderRadius: "var(--r-chip)",
+              background: undefined,
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            {compact ? <PanelLeftOpen className="w-[18px] h-[18px]" /> : <PanelLeftClose className="w-[18px] h-[18px]" />}
+          </button>
+        )}
+
         {/* Super-account impersonation chip — in-flow, docked above the avatar (R9). */}
         {superSwitcherSlot && (
           <div className="w-full flex justify-center px-1 mb-2 flex-shrink-0">
@@ -439,8 +463,9 @@ export function DesktopSidebar({
         </div>
       </div>
 
-      {/* ── Context Panel — hidden on picker (no team selected) so main content goes full-width ── */}
-      {!hideSidePanel && <div
+      {/* ── Context Panel — hidden on picker (no team selected) and in compact mode
+          so main content goes full-width ── */}
+      {!(hideSidePanel || compact) && <div
         className="hidden md:flex flex-col w-[var(--sidebar-width)] flex-shrink-0 h-screen"
         style={{ background: activeTab === "chats" ? "var(--cream)" : PANEL_BG, borderRight: `1px solid ${LINE}` }}
       >
