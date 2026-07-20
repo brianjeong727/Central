@@ -90,26 +90,21 @@ Brian's concern: his Supabase is "connected to my school" and he wants it on per
 
 **Sequencing rule:** if a transfer is needed, **transfer FIRST, then upgrade to Pro** — so the paid plan lands on the org he'll keep, not the school's. All of {plan upgrade, project transfer, email change} **preserve the project ref/URL/keys**, so code + Vercel env stay intact. Only recreating the project would break things.
 
-### ⚠️ OPEN — ASK BRIAN THESE AT SESSION START (he asked to be reminded)
+### ✅ CLOSED — answers recorded 2026-07-20
 
-Brian has NOT answered these yet. Ask both before doing any upgrade or transfer — they decide whether the fix is a 2-min email change or a project transfer, and whether he even has permission to upgrade. Supabase has two separate layers: the **account** (his personal login identity) and the **organization** (owns the project + holds billing; members have roles Owner / Administrator / Developer).
+**Q1 — Supabase login:** GitHub OAuth via **`brianjeong727`** — a regular personal github.com account (verified via `gh api user`), NOT school-managed. Only its **primary email is school-tied** (`bjj46@pitt.edu`). So there is no account-ownership risk: Pitt cannot take the GitHub account, and the Supabase identity is bound to the GitHub account, not the email.
+- **Remaining action (before graduation, not blocking anything):** on GitHub → Settings → Emails → add + verify `brianjeong13@gmail.com`, set it as primary; then confirm Supabase → Account Preferences reflects the personal email. 2-minute fix, no project transfer needed.
 
-**Q1 — What does he log into Supabase with?** A school `.edu` email or a school-managed Google/GitHub account, or a personal one (personal Gmail/GitHub)?
-- *Why:* if the login is school-tied, the school kills that email at graduation and he's locked out **even though the org is named "brianjeong727's Org."** If already personal, he's safe — nothing to do. This is the real graduation risk, not where the project "lives."
-- *How he checks:* top-right avatar → **Account Preferences** → email + connected identities (GitHub/SSO).
+**Q2 — Org role:** Brian **is the Owner** of `riqmbdwxufdwiotudrvk` ("brianjeong727's Org"). Clear to upgrade to Pro directly — no ownership handoff, no project transfer (the org is already personal).
 
-**Q2 — In the org's member list, is his account the Owner** (vs. Administrator/Developer)?
-- *Why:* **only an Owner can upgrade the plan to Pro or transfer the project.** If he's not Owner, he can't upgrade himself — ownership must be handed to him first.
-- *How he checks:* org dropdown (top-left) → his org → **Team / Members** tab → his row → Role column should say **Owner**.
-
-**Then act:** Q1 school-tied → switch account email/login to personal before losing school access. Q2 not-Owner → get ownership transferred first. Project under a school-owned org → **Transfer Project first, then upgrade to Pro** (§4 above). Record the answers here once he gives them so this section can be closed.
+**Net sequencing result:** skip the transfer path entirely. Do the GitHub email swap at leisure; **the Pro upgrade is unblocked now** (org → Billing → Upgrade to Pro; Brian's dashboard action — needs a card). Spend-cap call: upgrade with the default cap ON, then let the §2 Step 3 concurrency test show whether messages/sec (500 capped vs 2,500 uncapped) trips; flip the cap OFF before onboarding day if it does.
 
 ---
 
 ## 5. Recommended next-session order of operations
 
-1. Confirm the account/org ownership question (§4 open question) → do email fix or project transfer if needed.
-2. **Upgrade the org he'll keep to Pro** (required before onboarding day; required before the concurrency test).
+1. ~~Confirm the account/org ownership question~~ **DONE 2026-07-20** (§4 closed: personal GitHub, Owner — no transfer needed; email swap at leisure).
+2. **Upgrade the org he'll keep to Pro** (required before onboarding day; required before the concurrency test). **UNBLOCKED — Brian's dashboard action.**
 3. **Reproduce + trace the board-meeting freeze** (§2 Step 1) — find the actual query. Highest value.
 4. SQL-seed a year of data volume (§2 Step 2).
 5. Concurrency burst on Pro, off-hours (§2 Step 3).
