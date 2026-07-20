@@ -183,6 +183,14 @@
   --hero-h: 375px;
 }
 
+/* Compact shell — context panel hidden; rail only. Re-declares BOTH vars because
+   --shell-offset substitutes var() at the :root declaration, so overriding
+   --sidebar-width alone would not recompute the inherited offset. */
+.shell-compact {
+  --sidebar-width: 0px;
+  --shell-offset: calc(var(--rail-width) + 4px);
+}
+
 /* ── Dark mode ───────────────────────────────────────────────────────────── */
 /* NOTE: DESIGN_SYSTEM.md does not define a dark palette. These values are    */
 /* kept structurally intact from the shadcn default so dark-mode-aware        */
