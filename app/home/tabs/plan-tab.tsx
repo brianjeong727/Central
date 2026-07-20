@@ -88,6 +88,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   can_track_attendance: "Track attendance",
   can_plan_events: "Plan events",
   can_view_finances: "View finances",
+  can_audit_finances: "View finances (read-only)",
   can_manage_members: "Manage members",
   can_manage_team: "Manage team",
   can_manage_schedule: "Manage schedule",
@@ -2827,9 +2828,14 @@ export function PlanTab({
   // that decides which workspace renders for the active team.
   const teamKind = classifyTeam(activeTeamFull)
 
-  // Finance write = member with can_view_finances OR governance-write. Read-only under gov-view.
+  // Finance write = member with can_view_finances OR governance-write. Read-only
+  // under gov-view OR a can_audit_finances role (the finance deacon — sees the
+  // inbox + splits but never approves/signs off/writes).
   const financeCanEdit = activeTeamPerms.includes("can_view_finances") || govWrite
-  const financeCanAccess = financeCanEdit || govView
+  const financeCanAudit = activeTeamPerms.includes("can_audit_finances")
+  const financeCanAccess = financeCanEdit || govView || financeCanAudit
+  // Read-only whenever the caller can't edit (gov-view or audit-only).
+  const financeReadOnly = !financeCanEdit
   // Mobile finance hub — awaiting-action count for the Reimbursements row sub.
   // Same server action the inbox section itself uses (capability re-derived
   // server-side; returns empty + no capability for non-approvers). Fetched only
@@ -2842,9 +2848,18 @@ export function PlanTab({
   )
   const financeReimbSub = (() => {
     if (!financeHubInbox || (!financeHubInbox.canApprove && !financeHubInbox.canSignOff)) return "Submitted receipts & approvals"
-    const needs = financeHubInbox.items.filter(r =>
-      (financeHubInbox.canApprove && r.status === "pending") || (financeHubInbox.canSignOff && r.status === "approved")
-    ).length
+    const { canApprove, canSignOff } = financeHubInbox
+    // A receipt needs action if any of its allocations awaits this caller (by fund
+    // kind + status): approver handles church-pending / external-pending|requested;
+    // sign-off handles church-approved.
+    const needs = financeHubInbox.items.filter(r => r.allocations.some(a => {
+      if (canApprove) {
+        if (a.fund_kind === "church" && a.status === "pending") return true
+        if (a.fund_kind === "external" && (a.status === "pending" || a.status === "requested")) return true
+      }
+      if (canSignOff && a.fund_kind === "church" && a.status === "approved") return true
+      return false
+    })).length
     return needs === 0 ? "Inbox · all caught up" : `Inbox · ${needs} awaiting action`
   })()
 
@@ -3204,8 +3219,8 @@ export function PlanTab({
             section={financeSection}
             onSectionChange={setFinanceSection}
             canEditBudget={financeCanEdit}
-            canAccessReimbursements={financeCanEdit}
-            readOnly={govView}
+            canAccessReimbursements={financeCanEdit || financeCanAudit}
+            readOnly={financeReadOnly}
           />
         ) : teamKind === "dgPraise" && activeTeamId && activeTeamAllowed ? (
           <div className="px-14 py-7">
@@ -3457,8 +3472,8 @@ export function PlanTab({
                 onSectionChange={(s) => setFinanceMobileSectionAndUrl(s as FinanceSection)}
                 onDetailOpenChange={setFinanceDetailOpen}
                 canEditBudget={financeCanEdit}
-                canAccessReimbursements={financeCanEdit}
-                readOnly={govView}
+                canAccessReimbursements={financeCanEdit || financeCanAudit}
+                readOnly={financeReadOnly}
               />
             </>
           )}

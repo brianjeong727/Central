@@ -250,10 +250,17 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     ...govTeams.map(t => ({ id: t.id, name: t.name })),
   ]
 
+  // Receipts is a reachable workspace (a sentinel view, not a team) for anyone who can
+  // file/oversee receipts: any team member, any leader-tier, or a governance admin. It
+  // therefore counts as one of the user's Plan workspaces below, so a single-team user
+  // is never trapped in their one team with the Receipts entry out of reach.
+  const canUseReceipts = userTeams.length > 0 || isGovernanceAdmin || isLeaderRole(initialProfile.role)
+
   // Rail brand mark — contextual "back to Plan workspaces" control. On the Plan tab
   // for users with 2+ plan workspaces it returns to the picker; everywhere else it
-  // goes to /landing (its original behavior).
-  const hasMultiWorkspaces = userTeams.length >= 2 || govTeamCount > 0
+  // goes to /landing (its original behavior). Receipts counts as a workspace, so a
+  // 1-team user (team + Receipts) can reach the picker.
+  const hasMultiWorkspaces = userTeams.length + govTeamCount + (canUseReceipts ? 1 : 0) >= 2
   const handleLogoClick = () => {
     if (activeTab === "plan" && hasMultiWorkspaces) {
       setActiveTeamId(null); setParams({ team: null, ...TEAM_SUBPARAMS })
@@ -280,16 +287,23 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [atPicker])
 
-  // Single-team auto-enter: if the user lands on Plan with 1 team and no selection
-  // (e.g. after clicking "← ALL TEAMS"), re-enter immediately via the same handleTeamChange path.
-  // Skip auto-enter when the user also has governance-accessible teams, so the picker
-  // (and its "Admin access" group) stays reachable.
+  // First-visit auto-enter: land the user somewhere useful the FIRST time they open Plan
+  // without a selection. Guarded by a ref so it fires once — after that, returning to the
+  // picker (e.g. via "← All workspaces" to reach Receipts) is NOT re-trapped back into the
+  // one team. A single-team user drops into their team; a 0-team leader/gov-only user (whose
+  // only workspace is Receipts) lands on the Receipts sentinel.
+  const didAutoEnterRef = useRef(false)
   useEffect(() => {
-    if (activeTab === "plan" && userTeams.length === 1 && govTeamCount === 0 && !activeTeamId) {
+    if (activeTab !== "plan" || activeTeamId || didAutoEnterRef.current) return
+    if (userTeams.length === 1 && govTeamCount === 0) {
+      didAutoEnterRef.current = true
       handleTeamChange(userTeams[0].teamId)
+    } else if (userTeams.length === 0 && govTeamCount === 0 && canUseReceipts) {
+      didAutoEnterRef.current = true
+      handleTeamChange("receipts")
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, userTeams.length, govTeamCount, activeTeamId])
+  }, [activeTab, userTeams.length, govTeamCount, activeTeamId, canUseReceipts])
 
   useEffect(() => {
     const gradYear = initialProfile.graduation_year
@@ -933,7 +947,9 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     window.location.assign("/login")
   }
 
-  const showPlanTab = userTeams.length > 0 || isGovernanceAdmin
+  // Leaders reach Plan even with no team membership so the Receipts workspace stays
+  // available to them (they oversee receipts); Receipts is the only surface they'll see.
+  const showPlanTab = userTeams.length > 0 || isGovernanceAdmin || isLeaderOrAdmin
   // Church chat creation: admins/leaders + users with planning, member, or small-group permissions.
   const canCreateChurchChat = isAdmin ||
     userTeams.some(t => {

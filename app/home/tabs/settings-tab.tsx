@@ -23,6 +23,7 @@ import {
 import { updateAutomationSettings, runAnnualClassMaintenance, retroactivelyApplyToggle, archiveToggleChats, backfillTeamChats } from "@/app/actions/auto-chats"
 import { getReceiptLimits, upsertReceiptLimit, deleteReceiptLimit } from "@/app/actions/receipts"
 import type { ReceiptLimit } from "@/app/actions/receipts"
+import { getFinanceFunds, createFinanceFund, updateFinanceFund, type FinanceFund, type FundKind } from "@/app/actions/finance-funds"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
 import type { HomeVerse } from "@/app/actions/home-verses"
 import { updateGovernanceSettings, updateTeamAdminAccess } from "@/app/actions/governance"
@@ -359,6 +360,20 @@ export function SettingsTab({
   const [schoolError, setSchoolError] = useState<string | null>(null)
   const [confirmDeleteSchool, setConfirmDeleteSchool] = useState<{ id: string; name: string } | null>(null)
 
+  // Finance funds (per-ministry configurable). Saved list + a staged working copy
+  // committed on Save (#21). Loaded with inactive included so archived funds show.
+  const [funds, setFunds] = useState<FinanceFund[]>([])
+  type PendingFund = { key: string; id?: string; name: string; kind: FundKind; is_active: boolean }
+  const [pendingFunds, setPendingFunds] = useState<PendingFund[]>([])
+  const [fundsEditing, setFundsEditing] = useState(false)
+  const [savingFunds, setSavingFunds] = useState(false)
+  const [fundsError, setFundsError] = useState<string | null>(null)
+  const activeFunds = funds.filter(f => f.is_active)
+
+  function toPending(list: FinanceFund[]): PendingFund[] {
+    return list.map(f => ({ key: f.id, id: f.id, name: f.name, kind: f.kind, is_active: f.is_active }))
+  }
+
   // Receipt limits
   const [receiptLimits, setReceiptLimits] = useState<ReceiptLimit[]>([])
   const [addingLimit, setAddingLimit] = useState(false)
@@ -447,13 +462,14 @@ export function SettingsTab({
 
   useEffect(() => {
     async function load() {
-      const [{ data: min }, { data: profiles }, { data: schoolRows }, limitsRes, verses, { data: teamRows }, codesRes, { data: givingRow }] = await Promise.all([
+      const [{ data: min }, { data: profiles }, { data: schoolRows }, limitsRes, fundsRes, verses, { data: teamRows }, codesRes, { data: givingRow }] = await Promise.all([
         // invite_code/staff_invite_code are column-revoked for browser clients
         // (Q2 migration) — they load via the admin-scoped getMinistryCodes action.
         supabase.from("ministries").select("name, university, size, is_public, automation_settings, governance_settings, moderation_settings, archive_requested_by, archive_requested_at").eq("id", ministryId).maybeSingle(),
         supabase.from("profiles").select("id, name, email, role, graduation_year").eq("ministry_id", ministryId).is("deleted_at", null).order("name"),
         supabase.from("ministry_schools").select("id, name, abbreviation, sort_order").eq("ministry_id", ministryId).order("sort_order"),
         getReceiptLimits(ministryId),
+        getFinanceFunds(ministryId, { includeInactive: true }),
         getHomeVerses(ministryId),
         supabase.from("teams").select("id, name, team_type, admin_access").eq("ministry_id", ministryId).order("name"),
         getMinistryCodes(ministryId),
@@ -488,6 +504,8 @@ export function SettingsTab({
       setGovTeams((teamRows ?? []).map((t) => ({ id: t.id, name: t.name, team_type: t.team_type ?? null, admin_access: (t.admin_access ?? "view") as "none" | "view" | "write" })))
       setSchools((schoolRows ?? []) as { id: string; name: string; abbreviation: string; sort_order: number }[])
       setReceiptLimits(limitsRes.data)
+      setFunds(fundsRes.data)
+      setPendingFunds(toPending(fundsRes.data))
       setMembers(profiles ?? [])
       setHomeVerses(verses)
       setGivingName(givingRow?.zelle_name ?? "")
@@ -901,6 +919,43 @@ export function SettingsTab({
       setEditingLimitAmount("")
     }
     setSavingLimitEdit(false)
+  }
+
+  // ── Funds management (staged behind Save, #21) ─────────────────────────────
+  function startEditFunds() { setFundsError(null); setPendingFunds(toPending(funds)); setFundsEditing(true) }
+  function cancelEditFunds() { setFundsError(null); setPendingFunds(toPending(funds)); setFundsEditing(false) }
+  function addPendingFund() {
+    setPendingFunds(prev => [...prev, { key: `new-${Date.now()}-${prev.length}`, name: "", kind: "external", is_active: true }])
+  }
+  function patchPendingFund(key: string, patch: Partial<PendingFund>) {
+    setPendingFunds(prev => prev.map(f => f.key === key ? { ...f, ...patch } : f))
+  }
+
+  async function saveFunds() {
+    // Validate: every kept (active) fund needs a name.
+    if (pendingFunds.some(f => f.is_active && !f.name.trim())) { setFundsError("Every fund needs a name."); return }
+    setFundsError(null); setSavingFunds(true)
+    // Commit each diff against the saved list.
+    for (const p of pendingFunds) {
+      if (!p.id) {
+        if (p.name.trim()) await createFinanceFund({ ministryId, name: p.name.trim(), kind: p.kind })
+        continue
+      }
+      const orig = funds.find(f => f.id === p.id)
+      if (!orig) continue
+      const patch: { id: string; ministryId: string; name?: string; kind?: FundKind; isActive?: boolean } = { id: p.id, ministryId }
+      if (p.name.trim() && p.name.trim() !== orig.name) patch.name = p.name.trim()
+      if (p.kind !== orig.kind) patch.kind = p.kind
+      if (p.is_active !== orig.is_active) patch.isActive = p.is_active
+      if (patch.name !== undefined || patch.kind !== undefined || patch.isActive !== undefined) {
+        await updateFinanceFund(patch)
+      }
+    }
+    const { data: fresh } = await getFinanceFunds(ministryId, { includeInactive: true })
+    setFunds(fresh)
+    setPendingFunds(toPending(fresh))
+    setFundsEditing(false)
+    setSavingFunds(false)
   }
 
   // ── Verse handlers ──────────────────────────────────────────────────────────
@@ -2024,6 +2079,63 @@ export function SettingsTab({
                 </div>
               </section>
 
+              {/* Funds */}
+              {isAdmin && (
+                <section>
+                  <div style={{ marginBottom: 20 }}>
+                    <SectionHeader
+                      eyebrow="Funds"
+                      title="Funding sources"
+                      titleSize={20}
+                      action={fundsEditing
+                        ? <CentralButton variant="create" size="sm" onClick={addPendingFund} style={{ flexShrink: 0 }}>+ Add fund</CentralButton>
+                        : <CentralButton variant="secondary" size="sm" onClick={startEditFunds} style={{ flexShrink: 0 }}>Edit</CentralButton>}
+                    />
+                    <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>The funding sources a reimbursement can be split across. <strong style={{ fontWeight: 500 }}>Church</strong> funds go through president sign-off; <strong style={{ fontWeight: 500 }}>external</strong> funds (e.g. a university grant) are filed with the grant body. Archived funds stay on past receipts but drop out of new ones.</p>
+                  </div>
+                  <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
+                    {(fundsEditing ? pendingFunds : toPending(funds)).length === 0 && (
+                      <div style={{ padding: "20px 22px" }}><p style={{ fontSize: 13, color: "var(--muted-text)" }}>No funds yet. {fundsEditing ? "Add a fund above." : "Edit to add one."}</p></div>
+                    )}
+                    {(fundsEditing ? pendingFunds : toPending(funds)).map((f, i, arr) => (
+                      <div key={f.key} style={{ display: "grid", gridTemplateColumns: fundsEditing ? "1.6fr 1fr auto" : "1.6fr 1fr auto", alignItems: "center", gap: 18, padding: "16px 22px", borderBottom: i < arr.length - 1 ? "1px solid var(--line-3)" : "none", opacity: f.is_active ? 1 : 0.55 }}>
+                        {fundsEditing ? (
+                          <input
+                            type="text"
+                            placeholder="Fund name"
+                            value={f.name}
+                            onChange={e => patchPendingFund(f.key, { name: e.target.value })}
+                            style={{ padding: "6px 10px", border: "1px solid var(--line-2)", borderRadius: 8, fontSize: 13.5, fontFamily: "inherit", background: "var(--cream)", outline: "none", width: "100%" }}
+                          />
+                        ) : (
+                          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{f.name}{!f.is_active && <span style={{ marginLeft: 8, fontSize: 12, color: "var(--muted-text)", fontWeight: 400 }}>· Archived</span>}</div>
+                        )}
+                        {fundsEditing ? (
+                          <select value={f.kind} onChange={e => patchPendingFund(f.key, { kind: e.target.value as FundKind })} style={{ padding: "6px 10px", border: "1px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "var(--cream)", outline: "none" }}>
+                            <option value="church">Church</option>
+                            <option value="external">External</option>
+                          </select>
+                        ) : (
+                          <div style={{ fontSize: 13, color: "var(--muted-text)", textTransform: "capitalize" }}>{f.kind}</div>
+                        )}
+                        {fundsEditing ? (
+                          <button onClick={() => patchPendingFund(f.key, { is_active: !f.is_active })} style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: f.is_active ? "var(--danger)" : "var(--plum)", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>
+                            {f.is_active ? "Archive" : "Restore"}
+                          </button>
+                        ) : <span />}
+                      </div>
+                    ))}
+                  </div>
+                  {fundsError && <p style={{ marginTop: 10, fontSize: 12.5, color: "var(--danger)" }}>{fundsError}</p>}
+                  {fundsEditing && (
+                    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+                      <button onClick={cancelEditFunds} disabled={savingFunds} style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--line-2)", borderRadius: 10, fontSize: 13, fontWeight: 500, color: "var(--body)", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                      <CentralButton variant="primary" onClick={saveFunds} disabled={savingFunds} style={{ padding: "8px 18px", borderRadius: 10, fontSize: 13 }}>{savingFunds ? "Saving…" : "Save changes"}</CentralButton>
+                    </div>
+                  )}
+                </section>
+              )}
+
               {/* Receipt limits */}
               {isAdmin && (
                 <section>
@@ -2035,7 +2147,7 @@ export function SettingsTab({
                     {receiptLimits.length === 0 && !addingLimit && <div style={{ padding: "20px 22px" }}><p style={{ fontSize: 13, color: "var(--muted-text)" }}>No limits set. Add a limit to flag over-budget receipts.</p></div>}
                     {receiptLimits.map((l, i) => {
                       const catLabel = { dg_dinner: "DG Dinner", welcoming_week: "Welcoming Week", coffeehouse: "Coffeehouse", turkeybowl: "Turkey Bowl", supplies: "Supplies", other: "Other" }[l.category] ?? l.category
-                      const fundLabel = { church: "Church", cmu: "CMU", pitt: "Pitt" }[l.fund] ?? l.fund
+                      const fundLabel = funds.find(f => f.slug === l.fund)?.name ?? l.fund
                       return (
                         <div key={l.id} style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr auto auto", alignItems: "center", gap: 18, padding: "16px 22px", borderBottom: i < receiptLimits.length - 1 ? "1px solid var(--line-3)" : "none" }}>
                           <div>
@@ -2081,7 +2193,7 @@ export function SettingsTab({
                             {[["dg_dinner","DG Dinner"],["welcoming_week","Welcoming Week"],["coffeehouse","Coffeehouse"],["turkeybowl","Turkey Bowl"],["supplies","Supplies"],["other","Other"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
                           </select>
                           <select value={newLimitFund} onChange={e => setNewLimitFund(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "var(--cream)", outline: "none" }}>
-                            {[["church","Church"],["cmu","CMU"],["pitt","Pitt"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+                            {(activeFunds.length > 0 ? activeFunds.map(f => [f.slug, f.name] as [string, string]) : [["church","Church"] as [string, string]]).map(([v,l]) => <option key={v} value={v}>{l}</option>)}
                           </select>
                           <input type="number" min="0" step="1" placeholder="$" value={newLimitAmount} onChange={e => setNewLimitAmount(e.target.value)} style={{ padding: "7px 10px", border: "1.5px solid var(--line-2)", borderRadius: 8, fontSize: 13, fontFamily: "inherit", background: "var(--cream)", outline: "none" }} />
                         </div>
