@@ -417,7 +417,7 @@ The push dispatch route (`app/api/push/dispatch/route.ts`) gained 3 cron/action-
 `congregation_questions`, `congregation_responses`
 
 **Finance**
-`budget_categories`, `budget_entries`, `ministry_budgets`, `receipt_categories` (per-team), `receipts` (+ `team_id`/`category_id`/`signed_off_*`/`decision_reason`), `receipt_limits`, `ministry_giving`. (`reimbursement_forms` = the **retired** DG-dinner flow — code removed, table orphaned, data kept.)
+`budget_categories`, `budget_entries` (+ `fund` slug and `receipt_allocation_id` — UNIQUE, same-ministry composite FK → `receipt_fund_allocations`; the reimbursed-split→ledger "posted to budget" bridge. Allocation Spent aggregates ledger entries per (category, fund) over the Jun 1–May 31 fiscal window), `ministry_budgets`, `finance_funds` (per-ministry funding sources — Church/Pitt/CMU for Central; drives allocation grid columns AND reimbursement splits), `receipt_categories` (per-team; deletable — `receipts.category_id` is ON DELETE SET NULL), `receipts` (+ `team_id`/`category_id`/`signed_off_*`/`decision_reason`; `status` = bottleneck rollup of its splits: pending → approved → requested; reimbursed/rejected/partial when terminal), `receipt_fund_allocations` (per-fund splits, each with its own lifecycle + `reviewed_at`/`signed_off_at` dates), `receipt_limits`, `ministry_giving`. (`reimbursement_forms` = the **retired** DG-dinner flow — code removed, table orphaned, data kept.)
 
 **Team management**
 `meeting_notes`, `team_role_links`, `team_role_descriptions`
