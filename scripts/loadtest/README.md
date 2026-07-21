@@ -51,3 +51,23 @@ prints explicit ABORT guidance when a real tenant degrades.
 
 DB-side snapshots (before/after, via Supabase MCP): `pg_stat_statements_reset()`,
 top statements, `pg_stat_activity` samples, realtime logs.
+
+## Which metrics to trust (co-location caveat — learned in the 20-conn dry run)
+
+Running the socket fleet + sender + http-burst on ONE machine means they share one
+undici connection pool. At 20 connections the **realtime path stayed instant**
+(join p95 628ms, 1800/1800 delivered, 0 loss) while **every HTTP call read 12–15s
+p95** — that's client-side pool queueing on the test box, NOT the server (the server
+processed the inserts and broadcast them in ~4ms; only the HTTP *ack* was queued
+locally). So:
+
+- **Trust from one machine:** channel-join success/latency, delivery loss, delivery
+  latency (ack→recv), fallback engagements, socket disconnects.
+- **Do NOT trust from a co-located rig:** insert-ack latency, `http-burst` p95s.
+  For the authoritative server-side answer use **`pg_stat_statements` via MCP**
+  (true server execution time) + the **canary** (separate tenant/pool) + the ~6
+  **Playwright browsers**. For real client-side HTTP p95 at scale, run `http-burst.cjs`
+  and `sender.cjs` from a SEPARATE box during Phase D.
+- The `last_read_at` write amplification is real regardless (450 writes from 5 open
+  clients over 90 messages) — it's the debounce follow-up; on launch day the writes
+  hit the DB from 200 separate devices (no shared-pool inflation, but same DB load).

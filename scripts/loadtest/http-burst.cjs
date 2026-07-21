@@ -23,7 +23,11 @@ async function timed(out, kind, fn) {
   const t0 = Date.now()
   try {
     const res = await fn()
-    out.log({ ev: "http", kind, ms: Date.now() - t0, status: res.status, ok: res.ok })
+    // redirect:"manual" surfaces a 3xx as status 0 (opaqueredirect) or the real 3xx —
+    // both are healthy for the Next-tier probes (/home → auth redirect is EXPECTED).
+    // Treat <400 (and opaque 0) as ok; only 4xx/5xx are failures.
+    const ok = res.status === 0 || (res.status >= 200 && res.status < 400)
+    out.log({ ev: "http", kind, ms: Date.now() - t0, status: res.status, ok })
     if (res.status === 429 || res.status === 503) console.error(`[http] ${kind} → ${res.status} (tripwire!)`)
   } catch (e) {
     out.log({ ev: "http", kind, ms: Date.now() - t0, ok: false, err: String(e.message).slice(0, 120) })

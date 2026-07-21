@@ -115,10 +115,14 @@ const RUN_ID = String(flag("--run-id", `run${Date.now()}`))
 
   function shutdown(code) {
     for (const { proc } of workers.values()) { try { proc.send({ type: "shutdown" }) } catch { /* */ } }
-    setTimeout(() => {
+    // Exit as soon as every worker process has actually exited (sockets closed),
+    // with a hard 8s SIGKILL backstop so a wedged worker can never hang teardown.
+    const finish = () => { out.close(); process.exit(code) }
+    const poll = setInterval(() => { if (workers.size === 0) { clearInterval(poll); clearTimeout(hard); finish() } }, 250)
+    const hard = setTimeout(() => {
+      clearInterval(poll)
       for (const { proc } of workers.values()) { try { proc.kill("SIGKILL") } catch { /* */ } }
-      out.close()
-      process.exit(code)
+      finish()
     }, 8000)
   }
   process.on("SIGINT", () => { console.log("\n[fleet] SIGINT — tearing down"); out.log({ ev: "sigint" }); shutdown(130) })
