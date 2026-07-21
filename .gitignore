@@ -59,3 +59,7 @@ next-env.d.ts
 # Throwaway App Store submission checklists (local only)
 APPSTORE_SUBMISSION_STEPS.md
 APPSTORE_SUBMISSION_STEPS.html
+
+# load-test harness artifacts (tokens are credentials, logs are bulky)
+scripts/loadtest/.tokens.json
+scripts/loadtest/logs/
