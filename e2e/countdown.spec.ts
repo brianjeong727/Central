@@ -3,7 +3,7 @@
 // Countdown REPLACED the old Checklist tab: the same event_tasks data
 // re-presented as a T-minus timeline with three augmentations — trigger badges
 // (nudge state), playbook whispers (event_tasks.brief), and load-aware reassign
-// — plus a right rail (Readiness · Fires next · Load this month). The day-of
+// — plus a right rail (Readiness · Reminder schedule · Load this month). The day-of
 // "Run of show" tab was renamed "Showtime". New file app/home/tabs/countdown-tab.tsx,
 // wired into app/home/tabs/plan-tab.tsx.
 //
@@ -120,11 +120,11 @@ test.describe("Countdown tab (feat/run-sheet-countdown)", () => {
     // ── Playbook whisper (event_tasks.brief on a cream-3 callout) ──
     await expect(page.getByText(/severe allergy surfaced on-site/).first()).toBeVisible()
 
-    // ── Right rail: Readiness · Fires next · Load this month (scope to the <aside>) ──
+    // ── Right rail: Readiness · Reminder schedule · Load this month (scope to the <aside>) ──
     const rail = page.getByRole("complementary")
     await expect(rail.getByText("Readiness")).toBeVisible()
     await expect(rail.getByText("2 of 8 done")).toBeVisible()
-    await expect(rail.getByText(/Fires next/)).toBeVisible()
+    await expect(rail.getByText(/Reminder schedule/)).toBeVisible()
     const loadCard = rail.locator("div").filter({ hasText: /^Load this month/ }).last()
     await expect(loadCard).toBeVisible()
     await expect(loadCard.getByText("E2E Admin").first()).toBeVisible() // sole load row → top

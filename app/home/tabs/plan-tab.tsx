@@ -7864,7 +7864,7 @@ export function EventPlanWorkspace({
             {aug?.reassign}
           </span>
         )}
-        {/* hover actions — two-step delete confirm (§14) takes over the cluster */}
+        {/* hover kebab (Convention #20) — two-step delete confirm (§14) takes over in place */}
         {canEdit && (
           inDeleteConfirm ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8, opacity: 1, flexShrink: 0 }} onMouseDown={(e) => e.stopPropagation()}>
@@ -7887,20 +7887,26 @@ export function EventPlanWorkspace({
               </button>
             </div>
           ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, opacity: hovered ? 1 : 0, transition: "opacity .12s ease", flexShrink: 0 }}>
-              {isChild ? (
-                <IconButton dim={24} onClick={(e) => { e.stopPropagation(); promoteTask(task) }} title="Promote to standalone task"><CornerUpLeft style={{ width: 14, height: 14 }} /></IconButton>
-              ) : (
-                <>
-                  <IconButton dim={24} onClick={(e) => { e.stopPropagation(); togglePin(task) }} title={task.pinned ? "Unpin" : "Pin to top"} style={task.pinned ? { color: "var(--plum)" } : undefined}>
-                    <Star style={{ width: 14, height: 14, fill: task.pinned ? "currentColor" : "none" }} />
+            <ActionMenu
+              triggerLabel="Task actions"
+              renderTrigger={({ open, toggle }) => (
+                <span style={{ display: "inline-flex", flexShrink: 0, opacity: hovered || open ? 1 : 0, transition: "opacity .12s ease" }}>
+                  <IconButton dim={24} onClick={toggle} title="Task actions" style={open ? { color: "var(--plum)" } : undefined}>
+                    <MoreHorizontal style={{ width: 15, height: 15 }} />
                   </IconButton>
-                  <IconButton dim={24} onClick={(e) => { e.stopPropagation(); setCollapsedTasks((prev) => { const n = new Set(prev); n.delete(task.id); return n }); setChildTitle(""); setAddingChildFor(task.id) }} title="Add subtask"><Plus style={{ width: 15, height: 15 }} /></IconButton>
-                </>
+                </span>
               )}
-              <IconButton dim={24} onClick={(e) => { e.stopPropagation(); startEditTask(task) }} title="Edit"><Pencil style={{ width: 14, height: 14 }} /></IconButton>
-              <IconButton dim={24} onClick={(e) => { e.stopPropagation(); setEditingTaskId(null); setConfirmDeleteTaskId(task.id) }} title="Delete"><Trash2 style={{ width: 14, height: 14 }} /></IconButton>
-            </div>
+              items={[
+                ...(isChild
+                  ? [{ key: "promote", label: "Promote to standalone", icon: <CornerUpLeft style={{ width: 14, height: 14 }} />, onSelect: () => promoteTask(task) }]
+                  : [
+                      { key: "pin", label: task.pinned ? "Unpin" : "Pin to top", icon: <Star style={{ width: 14, height: 14, fill: task.pinned ? "currentColor" : "none" }} />, onSelect: () => togglePin(task) },
+                      { key: "subtask", label: "Add subtask", icon: <Plus style={{ width: 14, height: 14 }} />, onSelect: () => { setCollapsedTasks((prev) => { const n = new Set(prev); n.delete(task.id); return n }); setChildTitle(""); setAddingChildFor(task.id) } },
+                    ]),
+                { key: "edit", label: "Edit", icon: <Pencil style={{ width: 14, height: 14 }} />, onSelect: () => startEditTask(task) },
+                { key: "delete", label: "Delete", tone: "danger" as const, icon: <Trash2 style={{ width: 14, height: 14 }} />, onSelect: () => { setEditingTaskId(null); setConfirmDeleteTaskId(task.id) } },
+              ]}
+            />
           )
         )}
       </div>
