@@ -52,7 +52,7 @@ import { PageTitle } from "@/components/central/page-title"
 import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
 import { FinanceWorkspace, MobileFactsGrid, type FinanceSection } from "../components/finance-workspace"
 import { MobilePocketHub } from "../components/mobile-pocket-hub"
-import { getReimbursementInbox } from "@/app/actions/receipts"
+import { getReimbursementInbox, getPendingReceiptCount } from "@/app/actions/receipts"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
@@ -2432,7 +2432,7 @@ export function PlanTab({
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [showEditEvent, setShowEditEvent] = useState(false)
   // Finance section is lifted to home-app (drives the sidebar nav on desktop) and synced to ?fsec.
-  const financeSection = (financeSectionProp ?? "reimbursements") as FinanceSection
+  const financeSection = (financeSectionProp ?? "allocation") as FinanceSection
   const setFinanceSection = (s: FinanceSection) => onFinanceSectionChange?.(s)
   const [studentOrgRefreshSignal, setStudentOrgRefreshSignal] = useState(0)
   function getPickerSectionCount(team: UserTeam): number {
@@ -3476,9 +3476,11 @@ export function SmallGroupSectionNav({
 // Vertical sidebar nav for the Finance Team workspace on desktop.
 // Renders in place of the flat team list in DesktopSidebar when a finance team is active.
 export function FinanceSectionNav({
+  ministryId,
   active,
   onChange,
 }: {
+  ministryId: string
   active: string
   onChange: (s: string) => void
 }) {
@@ -3487,6 +3489,14 @@ export function FinanceSectionNav({
     { key: "budget", label: "Budget" },
     { key: "allocation", label: "Allocation" },
   ]
+  // Live pending-receipt count for the Reimbursements badge. Shares its SWR key
+  // with FinanceWorkspace, which revalidates it after approve/undo so the badge
+  // stays in sync. Finance capability is re-derived server-side (0 for non-finance).
+  const { data: pendingRes } = useSWR(
+    ["finance-pending-count", ministryId] as const,
+    () => getPendingReceiptCount(ministryId),
+  )
+  const pending = pendingRes?.count ?? 0
   return (
     <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
       {sections.map(s => (
@@ -3496,6 +3506,18 @@ export function FinanceSectionNav({
           onClick={() => onChange(s.key)}
         >
           <span style={{ flex: 1 }}>{s.label}</span>
+          {s.key === "reimbursements" && pending > 0 && (
+            <span
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999,
+                background: "var(--plum-2)", color: "var(--cream-on-dark)",
+                fontSize: 12, fontWeight: 500, fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {pending}
+            </span>
+          )}
         </button>
       ))}
     </div>
