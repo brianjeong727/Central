@@ -1,32 +1,42 @@
-// Regression coverage for the fund-aware Budget ledger's reimbursement->budget
-// bridge (Finance Overhaul — fund-aware ledger). Seeds its own Finance team + a
-// church-fund reimbursed split directly via sb.client (bypassing the full
-// approve/sign-off UI flow, which is covered by finance-split-allocations.spec.ts),
-// then exercises the "Add to budget" affordance end-to-end: click -> pick
-// category -> post -> optimistic "In budget" flip -> DB row lands with the
-// right fund/receipt_allocation_id/source -> re-post is impossible (button
-// gone, even after reload) -> the Budget ledger renders the fund pill -> the
-// Allocation overview cards render a per-fund subline.
+// Regression coverage for the fund-aware Budget ledger's approve-time post-to-budget
+// bridge (Finance Workspace Redesign — U1/U5). Seeds its own Finance team + three
+// receipt fixtures directly via sb.client (bypassing the full approve/sign-off UI
+// flow, which is covered by finance-split-allocations.spec.ts):
+//   A) a fresh single-split PENDING church receipt — exercises the new one-motion
+//      quick-Approve -> category confirm -> post -> Undo flow (U1).
+//   B) a PRE-EXISTING reimbursed, un-posted split — exercises the U5 fallback
+//      "Add to budget" affordance (the only surviving case for it).
+//   C) a single-source church split walked straight to "approved" (never
+//      reimbursed) — the granular-rollup probe.
 import { test, expect } from "@playwright/test"
 import { adminState, sandbox, E2E_PREFIX } from "./fixtures"
 
 // Set FUND_SHOT_DIR to capture layout-sanity screenshots on the final green pass.
 const SHOT_DIR = process.env.FUND_SHOT_DIR
 
-test.describe("fund-aware budget ledger — reimbursement post-to-budget bridge", () => {
+test.describe("fund-aware budget ledger — approve-time post-to-budget bridge", () => {
   test.use({ storageState: adminState, viewport: { width: 1440, height: 900 } })
 
   let financeTeamId = ""
   let churchFundId = ""
   let churchFundSlug = "church"
-  let receiptId = ""
-  let allocationId = ""
-  const SUBMITTER = "E2E Budget Post Probe"
-  const EVENT_NAME = `${E2E_PREFIX}Budget Post Probe`
-  const AMOUNT = 88.42
 
-  // Granular-status fixtures (a single-source church split walked straight to
-  // "approved" — never reimbursed — so the receipt-level rollup should mirror
+  // Fixture A — fresh single-split pending church receipt (quick-Approve eligible).
+  let quickReceiptId = ""
+  let quickAllocationId = ""
+  const QUICK_SUBMITTER = "E2E Quick Approve Probe"
+  const QUICK_EVENT_NAME = `${E2E_PREFIX}Quick Approve Probe`
+  const QUICK_AMOUNT = 88.42
+
+  // Fixture B — already reimbursed, never posted (U5 fallback).
+  let fallbackReceiptId = ""
+  let fallbackAllocationId = ""
+  const FALLBACK_SUBMITTER = "E2E Fallback Post Probe"
+  const FALLBACK_EVENT_NAME = `${E2E_PREFIX}Fallback Post Probe`
+  const FALLBACK_AMOUNT = 52.10
+
+  // Fixture C — granular-status probe (single-source church split walked straight
+  // to "approved" — never reimbursed — so the receipt-level rollup should mirror
   // it exactly: "Approved", not the old collapsed "Pending").
   let approvedReceiptId = ""
   let approvedAllocationId = ""
@@ -38,7 +48,6 @@ test.describe("fund-aware budget ledger — reimbursement post-to-budget bridge"
   // Delete-category fixtures. Categories A/B are created THROUGH THE UI in the
   // test itself; these hold the ids resolved afterwards (for the orphaned-receipt
   // DB assertion + defensive afterAll cleanup).
-  let categoryBId = ""
   let categoryOrphanReceiptId = ""
   const CATEGORY_A_NAME = `${E2E_PREFIX}Probe Category A`
   const CATEGORY_B_NAME = `${E2E_PREFIX}Probe Category B`
@@ -75,36 +84,51 @@ test.describe("fund-aware budget ledger — reimbursement post-to-budget bridge"
       churchFundId = cf.id
     }
 
-    // Seed a receipt that is ALREADY fully reimbursed (direct status write —
-    // the approve/sign-off UI lifecycle itself is covered by
-    // finance-split-allocations.spec.ts; this spec's job is the post-to-budget
-    // bridge on top of a reimbursed split).
-    const { data: receipt, error: rce } = await sb.client
+    // Fixture A — fresh pending, single church split.
+    const { data: quickReceipt, error: qre } = await sb.client
       .from("receipts")
       .insert({
         ministry_id: sb.ministryId, team_id: financeTeamId, submitted_by: adminId,
-        submitted_by_name: SUBMITTER, event_name: EVENT_NAME,
-        category: "Supplies", fund: "church", amount: AMOUNT,
+        submitted_by_name: QUICK_SUBMITTER, event_name: QUICK_EVENT_NAME,
+        category: "Supplies", fund: "church", amount: QUICK_AMOUNT,
+        purchase_date: "2026-07-01", status: "pending",
+      })
+      .select().single()
+    if (qre) throw qre
+    quickReceiptId = quickReceipt.id
+
+    const { data: quickAlloc, error: qae } = await sb.client
+      .from("receipt_fund_allocations")
+      .insert({ receipt_id: quickReceiptId, ministry_id: sb.ministryId, fund_id: churchFundId, amount: QUICK_AMOUNT, status: "pending" })
+      .select().single()
+    if (qae) throw qae
+    quickAllocationId = quickAlloc.id
+
+    // Fixture B — already reimbursed, never posted.
+    const { data: fallbackReceipt, error: fre } = await sb.client
+      .from("receipts")
+      .insert({
+        ministry_id: sb.ministryId, team_id: financeTeamId, submitted_by: adminId,
+        submitted_by_name: FALLBACK_SUBMITTER, event_name: FALLBACK_EVENT_NAME,
+        category: "Supplies", fund: "church", amount: FALLBACK_AMOUNT,
         purchase_date: "2026-07-01", status: "reimbursed",
       })
       .select().single()
-    if (rce) throw rce
-    receiptId = receipt.id
+    if (fre) throw fre
+    fallbackReceiptId = fallbackReceipt.id
 
-    const { data: alloc, error: ae } = await sb.client
+    const { data: fallbackAlloc, error: fae } = await sb.client
       .from("receipt_fund_allocations")
       .insert({
-        receipt_id: receiptId, ministry_id: sb.ministryId, fund_id: churchFundId, amount: AMOUNT,
+        receipt_id: fallbackReceiptId, ministry_id: sb.ministryId, fund_id: churchFundId, amount: FALLBACK_AMOUNT,
         status: "reimbursed", reviewed_by: adminId, reviewed_at: new Date().toISOString(),
         signed_off_by: adminId, signed_off_at: new Date().toISOString(),
       })
       .select().single()
-    if (ae) throw ae
-    allocationId = alloc.id
+    if (fae) throw fae
+    fallbackAllocationId = fallbackAlloc.id
 
-    // Second receipt: single church split walked straight to "approved" (never
-    // reimbursed) — exercises the granular rollup (receipt.status should mirror
-    // the split exactly, not collapse to "pending").
+    // Fixture C — single church split walked straight to "approved" (never reimbursed).
     const { data: approvedReceipt, error: pre } = await sb.client
       .from("receipts")
       .insert({
@@ -130,11 +154,16 @@ test.describe("fund-aware budget ledger — reimbursement post-to-budget bridge"
 
   test.afterAll(async () => {
     const sb = sandbox()
-    if (allocationId) {
-      await sb.client.from("budget_entries").delete().eq("receipt_allocation_id", allocationId)
-      await sb.client.from("receipt_fund_allocations").delete().eq("id", allocationId)
+    if (quickAllocationId) {
+      await sb.client.from("budget_entries").delete().eq("receipt_allocation_id", quickAllocationId)
+      await sb.client.from("receipt_fund_allocations").delete().eq("id", quickAllocationId)
     }
-    if (receiptId) await sb.client.from("receipts").delete().eq("id", receiptId)
+    if (quickReceiptId) await sb.client.from("receipts").delete().eq("id", quickReceiptId)
+    if (fallbackAllocationId) {
+      await sb.client.from("budget_entries").delete().eq("receipt_allocation_id", fallbackAllocationId)
+      await sb.client.from("receipt_fund_allocations").delete().eq("id", fallbackAllocationId)
+    }
+    if (fallbackReceiptId) await sb.client.from("receipts").delete().eq("id", fallbackReceiptId)
     if (approvedAllocationId) await sb.client.from("receipt_fund_allocations").delete().eq("id", approvedAllocationId)
     if (approvedReceiptId) await sb.client.from("receipts").delete().eq("id", approvedReceiptId)
     if (categoryOrphanReceiptId) await sb.client.from("receipts").delete().eq("id", categoryOrphanReceiptId)
@@ -149,10 +178,96 @@ test.describe("fund-aware budget ledger — reimbursement post-to-budget bridge"
     }
   })
 
-  test("reimbursed split posts to the budget ledger, is idempotent, and shows fund attribution in Budget + Allocation", async ({ page }) => {
+  test("quick Approve on the row opens a category confirm, posts to the ledger in one motion, and Undo fully reverts it", async ({ page }) => {
     const sb = sandbox()
 
-    await page.goto(`/home?tab=plan&team=${financeTeamId}`)
+    // Default finance landing is now Allocation (U-deliverable 1) — deep-link to
+    // Reimbursements explicitly.
+    await page.goto(`/home?tab=plan&team=${financeTeamId}&fsec=reimbursements`)
+    await expect(page.getByText("Reimbursements inbox")).toBeVisible({ timeout: 15000 })
+
+    // The fresh single-split pending church receipt surfaces under Needs action
+    // with a quick Approve button (not a chevron-to-detail affordance). Rows now
+    // render "Name · Team" on one combined line (deliverable 5), so anchor on the
+    // (unique, single-text-node) dollar amount rather than the submitter name —
+    // the same technique finance-split-allocations.spec.ts already relies on.
+    // ancestor::div[1] is the row's own flex container (name/fund-pills/amount/
+    // status/action — the same div that hosts this row's Approve button).
+    const quickAmount = page.getByText(`$${QUICK_AMOUNT.toFixed(2)}`, { exact: true })
+    await expect(quickAmount).toBeVisible({ timeout: 15000 })
+    const quickRow = quickAmount.locator("xpath=ancestor::div[1]")
+    await expect(quickRow.getByRole("button", { name: "Approve" })).toBeVisible()
+    if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/0-inbox-polished-row.png` })
+
+    // ── Quick Approve: inline category confirm (pre-matched, then explicitly set) ──
+    await quickRow.getByRole("button", { name: "Approve" }).click()
+    const categorySelect = page.locator("select")
+    await expect(categorySelect).toBeVisible()
+    await categorySelect.selectOption({ label: "DG Dinner" })
+    if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/1-quick-approve-category-confirm.png` })
+    await page.getByRole("button", { name: "Approve & post" }).click()
+
+    // One motion: optimistic status flip to Approved + the Undo toast, in the
+    // same click.
+    await expect(quickRow.getByText("Approved", { exact: true })).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText("Approved · added to budget ledger")).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole("button", { name: "Undo" })).toBeVisible()
+    if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/2-undo-toast.png` })
+
+    // ── DB assertion: the split is approved and posted to the ledger ─────────
+    await expect(async () => {
+      const { data: allocRows } = await sb.client.from("receipt_fund_allocations").select("status").eq("id", quickAllocationId)
+      expect(allocRows?.[0]?.status).toBe("approved")
+      const { data } = await sb.client.from("budget_entries").select("*").eq("receipt_allocation_id", quickAllocationId)
+      expect(data?.length).toBe(1)
+      const row = data![0] as { fund: string; source: string; amount: number; category: string; receipt_allocation_id: string }
+      expect(row.fund).toBe(churchFundSlug)
+      expect(row.source).toBe("reimbursement")
+      expect(row.receipt_allocation_id).toBe(quickAllocationId)
+      expect(row.category).toBe("DG Dinner")
+      expect(Number(row.amount)).toBeCloseTo(QUICK_AMOUNT, 2)
+    }).toPass({ timeout: 10000 })
+
+    // ── Undo: reverts the split to pending and deletes the ledger row ────────
+    await page.getByRole("button", { name: "Undo" }).click()
+    await expect(quickRow.getByText("Pending", { exact: true })).toBeVisible({ timeout: 15000 })
+    await expect(quickRow.getByRole("button", { name: "Approve" })).toBeVisible({ timeout: 15000 })
+    if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/2b-after-undo-back-to-pending.png` })
+
+    await expect(async () => {
+      const { data: allocRows } = await sb.client.from("receipt_fund_allocations").select("status").eq("id", quickAllocationId)
+      expect(allocRows?.[0]?.status).toBe("pending")
+      const { data } = await sb.client.from("budget_entries").select("id").eq("receipt_allocation_id", quickAllocationId)
+      expect(data?.length ?? 0).toBe(0)
+    }).toPass({ timeout: 10000 })
+
+    // ── Re-approve (proves Undo left the split cleanly re-approvable), leave it
+    //    posted this time, and confirm the ledger row renders correctly. ───────
+    await quickRow.getByRole("button", { name: "Approve" }).click()
+    await expect(categorySelect).toBeVisible()
+    await categorySelect.selectOption({ label: "DG Dinner" })
+    await page.getByRole("button", { name: "Approve & post" }).click()
+    // Wait for the Undo toast (only fires once the ledger POST has actually
+    // completed server-side) — waiting on the optimistic "Approved" text alone
+    // races the navigation below against the still-in-flight post request.
+    await expect(page.getByText("Approved · added to budget ledger")).toBeVisible({ timeout: 15000 })
+    await expect(quickRow.getByText("Approved", { exact: true })).toBeVisible()
+
+    await page.goto(`/home?tab=plan&team=${financeTeamId}&fsec=budget`)
+    await expect(page.getByText("Expense ledger", { exact: true })).toBeVisible({ timeout: 15000 })
+    const ledgerDesc = page.getByText(QUICK_EVENT_NAME)
+    await expect(ledgerDesc).toBeVisible({ timeout: 15000 })
+    const ledgerRow = ledgerDesc.locator("xpath=ancestor::div[1]")
+    await expect(ledgerRow.getByText("Church", { exact: true })).toBeVisible()
+    await expect(ledgerRow.getByText(`$${QUICK_AMOUNT.toFixed(2)}`, { exact: true })).toBeVisible()
+    await expect(ledgerRow.getByText("Reimbursement", { exact: true })).toBeVisible()
+    if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/3-budget-ledger-posted-row.png` })
+  })
+
+  test("U5 fallback: 'Add to budget' still posts a pre-existing reimbursed, un-posted split", async ({ page }) => {
+    const sb = sandbox()
+
+    await page.goto(`/home?tab=plan&team=${financeTeamId}&fsec=reimbursements`)
     await expect(page.getByText("Reimbursements inbox")).toBeVisible({ timeout: 15000 })
 
     // The seeded receipt is already fully reimbursed → it doesn't "need action" —
@@ -160,11 +275,14 @@ test.describe("fund-aware budget ledger — reimbursement post-to-budget bridge"
     await page.getByRole("button", { name: /Needs action/ }).click()
     await page.getByRole("menuitemradio", { name: "All" }).click()
 
-    const row = page.getByText(SUBMITTER, { exact: true })
+    // Anchor on the (unique) dollar amount — rows now render "Name · Team" on one
+    // combined line, so an exact submitter-name match no longer resolves.
+    const fallbackAmount = page.getByText(`$${FALLBACK_AMOUNT.toFixed(2)}`, { exact: true })
+    const row = fallbackAmount.locator("xpath=ancestor::div[1]")
     await expect(row).toBeVisible({ timeout: 15000 })
     await row.click()
 
-    await expect(page.getByText(`$${AMOUNT.toFixed(2)}`).first()).toBeVisible()
+    await expect(page.getByText(`$${FALLBACK_AMOUNT.toFixed(2)}`).first()).toBeVisible()
     await expect(page.getByText("Reimbursed", { exact: true }).first()).toBeVisible()
 
     // Not yet posted — the ghost "Add to budget" affordance shows, not the check.
@@ -176,27 +294,25 @@ test.describe("fund-aware budget ledger — reimbursement post-to-budget bridge"
     const categorySelect = page.locator("select")
     await expect(categorySelect).toBeVisible()
     await categorySelect.selectOption({ label: "DG Dinner" })
-    if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/1-post-category-picker.png` })
     await page.getByRole("button", { name: "Add to budget" }).click()
 
     // Optimistic flip -> "In budget" check; the button is gone.
     await expect(page.getByText("In budget")).toBeVisible({ timeout: 15000 })
     await expect(page.getByRole("button", { name: "Add to budget" })).toHaveCount(0)
-    if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/2-reimbursement-in-budget.png` })
 
     // ── DB assertion: exactly one budget_entries row, correctly attributed ───
     await expect(async () => {
       const { data } = await sb.client
         .from("budget_entries")
         .select("*")
-        .eq("receipt_allocation_id", allocationId)
+        .eq("receipt_allocation_id", fallbackAllocationId)
       expect(data?.length).toBe(1)
       const row = data![0] as { fund: string; source: string; amount: number; category: string; receipt_allocation_id: string }
       expect(row.fund).toBe(churchFundSlug)
       expect(row.source).toBe("reimbursement")
-      expect(row.receipt_allocation_id).toBe(allocationId)
+      expect(row.receipt_allocation_id).toBe(fallbackAllocationId)
       expect(row.category).toBe("DG Dinner")
-      expect(Number(row.amount)).toBeCloseTo(AMOUNT, 2)
+      expect(Number(row.amount)).toBeCloseTo(FALLBACK_AMOUNT, 2)
     }).toPass({ timeout: 10000 })
 
     // ── Re-post is impossible: reload, the check persists, the button never
@@ -205,37 +321,21 @@ test.describe("fund-aware budget ledger — reimbursement post-to-budget bridge"
     await expect(page.getByText("Reimbursements inbox")).toBeVisible({ timeout: 15000 })
     await page.getByRole("button", { name: /^Needs action/ }).click()
     await page.getByRole("menuitemradio", { name: "All" }).click()
-    await page.getByText(SUBMITTER, { exact: true }).click()
+    await page.getByText(`$${FALLBACK_AMOUNT.toFixed(2)}`, { exact: true }).locator("xpath=ancestor::div[1]").click()
     await expect(page.getByText("In budget")).toBeVisible({ timeout: 15000 })
     await expect(page.getByRole("button", { name: "Add to budget" })).toHaveCount(0)
-
-    // ── Budget section: the ledger row shows the Church fund pill ────────────
-    await page.goto(`/home?tab=plan&team=${financeTeamId}&fsec=budget`)
-    await expect(page.getByText("Expense ledger", { exact: true })).toBeVisible({ timeout: 15000 })
-    // Scope to the ledger row by its (unique) description text, not the amount —
-    // the category-summary pill above the ledger also renders "$88.42" for this
-    // category's running total, so an amount-only locator is ambiguous.
-    const ledgerDesc = page.getByText(EVENT_NAME)
-    await expect(ledgerDesc).toBeVisible({ timeout: 15000 })
-    const ledgerRow = ledgerDesc.locator("xpath=ancestor::div[1]")
-    await expect(ledgerRow.getByText("Church", { exact: true })).toBeVisible()
-    await expect(ledgerRow.getByText(`$${AMOUNT.toFixed(2)}`, { exact: true })).toBeVisible()
-    if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/3-budget-ledger-fund-pill.png` })
-
-    // ── Allocation overview: the stat cards render a per-fund subline ────────
-    await page.goto(`/home?tab=plan&team=${financeTeamId}&fsec=allocation`)
-    await expect(page.getByText("Annual Allocation")).toBeVisible({ timeout: 15000 })
-    await expect(page.getByText(/Church \$[\d,]+/).first()).toBeVisible({ timeout: 15000 })
-    if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/4-allocation-per-fund-subline.png` })
   })
 
   test("granular status: an approved-only split shows an Approved chip (not Pending) with the approval date on the rail", async ({ page }) => {
-    await page.goto(`/home?tab=plan&team=${financeTeamId}`)
+    await page.goto(`/home?tab=plan&team=${financeTeamId}&fsec=reimbursements`)
     await expect(page.getByText("Reimbursements inbox")).toBeVisible({ timeout: 15000 })
 
     // Needs-action (default filter): church-approved needs the president's
-    // sign-off, so this row surfaces without switching filters.
-    const row = page.locator("button", { hasText: APPROVED_SUBMITTER })
+    // sign-off, so this row surfaces without switching filters. The row's root
+    // is a plain div (not a button — deliverable 5's redesign dropped the old
+    // button-per-row wrapper), so anchor on the (unique) dollar amount instead.
+    const approvedAmount = page.getByText(`$${APPROVED_AMOUNT.toFixed(2)}`, { exact: true })
+    const row = approvedAmount.locator("xpath=ancestor::div[1]")
     await expect(row).toBeVisible({ timeout: 15000 })
     await expect(row.getByText("Approved", { exact: true })).toBeVisible()
     await expect(row.getByText("Pending")).toHaveCount(0)
@@ -282,7 +382,7 @@ test.describe("fund-aware budget ledger — reimbursement post-to-budget bridge"
     const adminId = await sb.adminUserId()
     const { data: catB } = await sb.client
       .from("receipt_categories").select("id").eq("team_id", financeTeamId).eq("name", CATEGORY_B_NAME).single()
-    categoryBId = (catB as { id: string }).id
+    const categoryBId = (catB as { id: string }).id
     const { data: orphanReceipt, error: ore } = await sb.client
       .from("receipts")
       .insert({
