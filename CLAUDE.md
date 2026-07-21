@@ -346,7 +346,7 @@ HomeApp (root — owns all global state)
 | `typing-{groupId}` | — | broadcast | `ChatScreen` (typing indicator) |
 
 ### Push dispatch — Run Sheet events (P1)
-The push dispatch route (`app/api/push/dispatch/route.ts`) gained 3 cron/action-driven resolvers: `task_due` (table `event_tasks`), `confirm_request` + `confirm_escalation` (table `event_confirmations`). `task_due`/`confirm_request` gate on the new `NotificationSettings.deadlines` pref (default on); `confirm_escalation` rides the existing `activity` pref. Fired by `run_sheet_tick()` (see Schema → Run Sheet) and the `event-confirmations.ts` actions (immediate delivery on manual request). ⚠️ The cron that drives these (`cron.schedule('run-sheet-tick', …)`) is applied ONLY after prod deploys the resolvers — scheduling it against a route without them mis-maps `task_due` onto the legacy `task_assigned` resolver.
+The push dispatch route (`app/api/push/dispatch/route.ts`) gained 3 cron/action-driven resolvers: `task_due` (table `event_tasks`), `confirm_request` + `confirm_escalation` (table `event_confirmations`). `task_due`/`confirm_request` gate on the new `NotificationSettings.deadlines` pref (default on); `confirm_escalation` rides the existing `activity` pref. Fired by `run_sheet_tick()` (see Schema → Run Sheet) and the `event-confirmations.ts` actions (immediate delivery on manual request). The driving cron is live: `run-sheet-tick` (job 9, `5 * * * *`, scheduled 2026-07-21) — `run_sheet_tick()` self-gates to the 9–10am PT window.
 
 ### Supabase project
 - Project ID: `wgqpnilaokfipocsugqo`
