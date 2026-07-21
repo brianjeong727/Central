@@ -6,7 +6,7 @@
 // — computed from each task's due_date vs the event's start_date in America/
 // Los_Angeles — and adds three augmentations: trigger badges (nudge state), playbook
 // whispers (event_tasks.brief), and load-aware reassign; plus a right rail
-// (Readiness · Fires next · Load this month).
+// (Readiness · Reminder schedule · Load this month).
 //
 // This file is PRESENTATIONAL + PURE HELPERS only. All task CRUD stays in
 // EventPlanWorkspace (plan-tab.tsx); the closure-bound row machinery (renderTaskTree)
@@ -486,11 +486,11 @@ function ReadinessCard({ done, total }: { done: number; total: number }) {
   )
 }
 
-// "Fires next — no one has to remember" (K9): armed auto-fires sorted by fire date.
+// "Reminder schedule" (K9): armed auto-fires sorted by fire date.
 function FiresNextCard({ queue }: { queue: { task: EventTask; fireYMD: string; copy: string }[] }) {
   return railCard(
     <>
-      <p style={{ ...MONO_STYLE, margin: 0 }}>Fires next — no one has to remember</p>
+      <p style={{ ...MONO_STYLE, margin: 0 }}>Reminder schedule</p>
       {queue.length === 0 ? (
         <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", marginTop: 12 }}>Nothing armed right now.</p>
       ) : (
@@ -705,7 +705,7 @@ export function CountdownTab(props: CountdownTabProps) {
         </div>
         {firesNext.length > 0 && (
           <div style={{ background: "var(--ivory)", borderRadius: 16, padding: "12px 16px", margin: "0 0 20px" }}>
-            <p style={{ ...MONO_STYLE, margin: 0 }}>Fires next</p>
+            <p style={{ ...MONO_STYLE, margin: 0 }}>Reminder schedule</p>
             <p style={{ fontSize: 13, color: "var(--ink)", marginTop: 6 }}>
               <span style={{ color: "var(--plum)" }}>{firesNext.length}</span> auto-DM{firesNext.length > 1 ? "s" : ""} queued — next {weekday(firesNext[0].fireYMD)}.
             </p>
