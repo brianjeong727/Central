@@ -39,6 +39,15 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // ── CommonJS tooling scripts: .cjs means require() by definition ─────────────
+  // Node utility scripts (load-test harness, probes) are CommonJS on purpose so
+  // they run outside the Next bundler; the ESM-import rule doesn't apply to them.
+  {
+    files: ["**/*.cjs"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
   // ── LEAF rule: components/central must not import from app/ ──────────────────
   // Mechanizes the CLAUDE.md Key Files invariant (central is a design-system
   // leaf; app/ depends on it, never the reverse). Any new app/ import here fails.

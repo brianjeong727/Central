@@ -20,8 +20,13 @@
 // all of them — new messages (INSERT), edits + unsends/soft-deletes (UPDATE), hard
 // message deletes (DELETE), and reaction add/remove.
 //
-// Fallback: if a private subscribe errors (auth/RLS during rollout), the hub falls
-// back to a postgres_changes subscription for that one topic and logs once.
+// Fallback: if a private subscribe errors (auth/RLS during rollout, flaky network),
+// the hub falls back to a postgres_changes subscription for that one topic and logs
+// once — and keeps RETRYING the private broadcast channel with capped exponential
+// backoff (2s → 60s, forever). On a successful re-subscribe the fallback is torn
+// down. Without the retry, one join timeout would pin the client to postgres_changes
+// permanently — which becomes a silently dead chat once messages/message_reactions
+// are dropped from the publication (the planned trim).
 // TODO(post-trim): remove the fallback once messages/message_reactions are dropped
 // from the postgres_changes publication (conductor owns that deploy step).
 
@@ -46,9 +51,19 @@ type TopicEntry = {
   fallback: RealtimeChannelLike | null
   listeners: Set<Listener>
   mode: "broadcast" | "fallback"
+  retryTimer: ReturnType<typeof setTimeout> | null
+  retryAttempt: number
 }
 
 const topics = new Map<string, TopicEntry>()
+
+// Mode-transition counters — read by debugging/load-test tooling to prove the
+// broadcast path holds (a fallback engagement at scale gates the publication trim).
+let fallbackEngagements = 0
+let broadcastRecoveries = 0
+export function chatBroadcastStats() {
+  return { fallbackEngagements, broadcastRecoveries, activeTopics: topics.size }
+}
 
 // The last access token pushed to the realtime socket. supabase-js re-auths the
 // socket automatically on TOKEN_REFRESHED / SIGNED_IN (SupabaseClient wires
@@ -101,17 +116,64 @@ function startBroadcast(supabase: SupabaseLike, groupId: string, entry: TopicEnt
     .subscribe((status) => {
       // Ignore callbacks from a channel whose entry has since been replaced/torn down.
       if (topics.get(groupId) !== entry) return
-      if ((status === "CHANNEL_ERROR" || status === "TIMED_OUT") && entry.mode === "broadcast") {
-        console.warn(`[chat-broadcast] chat:${groupId} broadcast failed (${status}) — falling back to postgres_changes`)
-        entry.mode = "fallback"
+      if (status === "SUBSCRIBED") {
+        // Healthy broadcast. Cancel any pending retry and, if we got here via a
+        // retry, retire the fallback.
+        if (entry.retryTimer) {
+          clearTimeout(entry.retryTimer)
+          entry.retryTimer = null
+        }
+        if (entry.fallback) {
+          supabase.removeChannel(entry.fallback)
+          entry.fallback = null
+          broadcastRecoveries++
+          console.info(`[chat-broadcast] chat:${groupId} broadcast recovered — fallback retired`)
+        }
+        entry.mode = "broadcast"
+        entry.retryAttempt = 0
+        return
+      }
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         if (entry.channel) {
           supabase.removeChannel(entry.channel)
           entry.channel = null
         }
-        if (entry.listeners.size > 0) startFallback(supabase, groupId, entry)
+        if (entry.mode === "broadcast") {
+          // First failure for this topic: engage the fallback so no events are missed.
+          console.warn(`[chat-broadcast] chat:${groupId} broadcast failed (${status}) — falling back to postgres_changes, will retry broadcast`)
+          entry.mode = "fallback"
+          fallbackEngagements++
+          if (entry.listeners.size > 0) startFallback(supabase, groupId, entry)
+        }
+        // Whether first failure or a failed retry: keep trying the private channel.
+        scheduleBroadcastRetry(supabase, groupId, entry)
       }
     })
   entry.channel = channel
+}
+
+// Capped exponential backoff (2s, 4s, 8s, … 60s), retrying forever while listeners
+// remain. Guards mirror the initial-subscribe generation guard so a torn-down or
+// replaced entry never resurrects a channel.
+function scheduleBroadcastRetry(supabase: SupabaseLike, groupId: string, entry: TopicEntry) {
+  if (entry.retryTimer) return
+  const delay = Math.min(2000 * 2 ** entry.retryAttempt, 60_000)
+  entry.retryAttempt++
+  entry.retryTimer = setTimeout(() => {
+    entry.retryTimer = null
+    void (async () => {
+      if (topics.get(groupId) !== entry) return
+      if (entry.listeners.size === 0) return
+      if (entry.channel) return // something else already restarted it
+      const authed = await ensureRealtimeAuth(supabase)
+      if (topics.get(groupId) !== entry || entry.listeners.size === 0 || entry.channel) return
+      if (!authed) {
+        scheduleBroadcastRetry(supabase, groupId, entry)
+        return
+      }
+      startBroadcast(supabase, groupId, entry)
+    })()
+  }, delay)
 }
 
 function startFallback(supabase: SupabaseLike, groupId: string, entry: TopicEntry) {
@@ -162,7 +224,7 @@ export function subscribeChatTopic(groupId: string, listener: Listener): () => v
     // stale continuation (from a torn-down/replaced entry after a rapid unsubscribe→
     // resubscribe — StrictMode double-mount, fast chat switching) becomes a no-op and
     // never attaches a duplicate channel.
-    const createdEntry: TopicEntry = { channel: null, fallback: null, listeners: new Set(), mode: "broadcast" }
+    const createdEntry: TopicEntry = { channel: null, fallback: null, listeners: new Set(), mode: "broadcast", retryTimer: null, retryAttempt: 0 }
     entry = createdEntry
     topics.set(groupId, createdEntry)
     // Auth is async (getSession); create the channel only after the socket carries
@@ -175,8 +237,12 @@ export function subscribeChatTopic(groupId: string, listener: Listener): () => v
       if (createdEntry.listeners.size === 0) return
       if (createdEntry.channel || createdEntry.fallback) return
       if (!authed) {
+        // No session yet (e.g. cookie recovery race) — serve via fallback and keep
+        // retrying broadcast; the session usually appears moments later.
         createdEntry.mode = "fallback"
+        fallbackEngagements++
         startFallback(supabase, groupId, createdEntry)
+        scheduleBroadcastRetry(supabase, groupId, createdEntry)
         return
       }
       startBroadcast(supabase, groupId, createdEntry)
@@ -189,6 +255,10 @@ export function subscribeChatTopic(groupId: string, listener: Listener): () => v
     if (!e) return
     e.listeners.delete(listener)
     if (e.listeners.size === 0) {
+      if (e.retryTimer) {
+        clearTimeout(e.retryTimer)
+        e.retryTimer = null
+      }
       if (e.channel) supabase.removeChannel(e.channel)
       if (e.fallback) supabase.removeChannel(e.fallback)
       topics.delete(groupId)
