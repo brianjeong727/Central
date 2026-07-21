@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase-admin"
 import { computeFinanceCapability } from "./finance-auth"
 import { requireTeamMemberOrAdmin, requireSameMinistry } from "./authz"
 import { isAdminRole } from "@/lib/roles"
+import type { BudgetEntry } from "./reimbursements"
 
 export interface ReceiptLimit {
   id: string
@@ -52,6 +53,9 @@ export interface ReceiptAllocation {
   reviewed_at: string | null
   signed_off_at: string | null
   decision_reason: string | null
+  // True once this reimbursed split has been posted to the budget ledger
+  // (a budget_entries row references it via receipt_allocation_id).
+  postedToBudget: boolean
 }
 
 // Resolve a fund string/id hint to a finance_funds.id for the ministry. Falls
@@ -165,9 +169,13 @@ export async function submitReceipt(params: {
 }
 
 // Recompute the receipt-level DERIVED rollup from its allocation statuses. Call
-// at the end of every allocation write. reimbursed if all reimbursed; else
-// rejected if all terminal-negative; else pending if any still in-flight; else a
-// mix of reimbursed + terminal → partial.
+// at the end of every allocation write. All reimbursed → reimbursed; all
+// terminal-negative → rejected; otherwise surface the BOTTLENECK stage among the
+// non-terminal splits (any pending → pending; else any approved → approved; else
+// requested) so entry views show the real intermediate stage instead of a
+// collapsed "pending". Single-split receipts (the norm) mirror their split
+// exactly. A mix of reimbursed + terminal-negative with nothing in flight stays
+// 'partial'.
 async function recomputeReceiptStatus(
   admin: ReturnType<typeof createAdminClient>,
   receiptId: string,
@@ -184,8 +192,13 @@ async function recomputeReceiptStatus(
   if (statuses.length > 0) {
     if (statuses.every(s => s === "reimbursed")) rollup = "reimbursed"
     else if (statuses.every(s => s === "rejected" || s === "declined")) rollup = "rejected"
-    else if (statuses.some(s => s === "pending" || s === "approved" || s === "requested")) rollup = "pending"
-    else rollup = "partial"
+    else {
+      const nonTerminal = statuses.filter(s => s === "pending" || s === "approved" || s === "requested")
+      if (nonTerminal.length === 0) rollup = "partial" // only reimbursed + terminal-negative remain
+      else if (nonTerminal.includes("pending")) rollup = "pending"
+      else if (nonTerminal.includes("approved")) rollup = "approved"
+      else rollup = "requested"
+    }
   }
 
   await admin.from("receipts").update({ status: rollup }).eq("id", receiptId).eq("ministry_id", ministryId)
@@ -308,6 +321,22 @@ export async function getReimbursementInbox(
       }
     }
 
+    // Posted-to-budget state: which of these allocations already have a
+    // budget_entries row (separate query on receipt_allocation_id — NOT a
+    // PostgREST embed — ministry-scoped, this file's established pattern).
+    const allocIds = allocData.map(a => a.id)
+    const postedAllocIds = new Set<string>()
+    if (allocIds.length > 0) {
+      const { data: postedRows } = await admin
+        .from("budget_entries")
+        .select("receipt_allocation_id")
+        .eq("ministry_id", ministryId)
+        .in("receipt_allocation_id", allocIds)
+      for (const p of (postedRows ?? []) as { receipt_allocation_id: string | null }[]) {
+        if (p.receipt_allocation_id) postedAllocIds.add(p.receipt_allocation_id)
+      }
+    }
+
     for (const a of allocData) {
       const fund = fundMeta.get(a.fund_id)
       const alloc: ReceiptAllocation = {
@@ -321,6 +350,7 @@ export async function getReimbursementInbox(
         reviewed_at: a.reviewed_at,
         signed_off_at: a.signed_off_at,
         decision_reason: a.decision_reason,
+        postedToBudget: postedAllocIds.has(a.id),
       }
       const list = allocsByReceipt.get(a.receipt_id) ?? []
       list.push(alloc)
@@ -551,6 +581,80 @@ export async function setReceiptAllocations(
 
   await recomputeReceiptStatus(admin, receiptId, ministryId)
   return { error: null }
+}
+
+// ── Post a reimbursed split to the budget ledger ─────────────────────────────
+// The treasurer-driven bridge: a single reimbursed allocation becomes ONE
+// budget_entries row (source='reimbursement', receipt_allocation_id = split id).
+// The UNIQUE constraint on receipt_allocation_id makes this idempotent — a second
+// post surfaces a friendly "already posted" error. Amount / fund / date /
+// description are DERIVED server-side from the split + its receipt (the caller
+// only chooses the budget category). Inserted via the user client so the
+// budget_entries INSERT RLS (admin/leader OR finance permission) is the real gate;
+// the ministry check here is defense-in-depth (Convention #8).
+export async function postAllocationToBudget(
+  allocationId: string,
+  ministryId: string,
+  category: string,
+): Promise<{ data: BudgetEntry | null; error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: null, error: "Not authenticated" }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("ministry_id")
+    .eq("id", user.id)
+    .maybeSingle()
+  if (!profile?.ministry_id || profile.ministry_id !== ministryId) return { data: null, error: "Not authorized" }
+
+  if (!category.trim()) return { data: null, error: "Please choose a budget category." }
+
+  const admin = createAdminClient()
+
+  // Fetch the split and verify it belongs to this ministry and is reimbursed.
+  const { data: alloc } = await admin
+    .from("receipt_fund_allocations")
+    .select("id, receipt_id, ministry_id, fund_id, amount, status")
+    .eq("id", allocationId)
+    .eq("ministry_id", ministryId)
+    .maybeSingle<AllocRow & { amount: number }>()
+  if (!alloc) return { data: null, error: "Allocation not found." }
+  if (alloc.ministry_id !== ministryId) return { data: null, error: "Not authorized" }
+  if (alloc.status !== "reimbursed") return { data: null, error: "Only reimbursed splits can be posted to the budget." }
+
+  // Derive fund slug + the receipt's purchase date / event name / submitter.
+  const [{ data: fundRow }, { data: receipt }] = await Promise.all([
+    admin.from("finance_funds").select("slug").eq("id", alloc.fund_id).eq("ministry_id", ministryId).maybeSingle<{ slug: string }>(),
+    admin.from("receipts").select("event_name, purchase_date, submitted_by_name").eq("id", alloc.receipt_id).eq("ministry_id", ministryId).maybeSingle<{ event_name: string | null; purchase_date: string; submitted_by_name: string | null }>(),
+  ])
+  if (!receipt) return { data: null, error: "Receipt not found." }
+
+  const descParts = [receipt.event_name?.trim(), receipt.submitted_by_name?.trim()].filter(Boolean)
+  const description = descParts.length ? descParts.join(" · ") : null
+
+  const { data, error } = await supabase
+    .from("budget_entries")
+    .insert({
+      ministry_id: ministryId,
+      entry_date: receipt.purchase_date,
+      category: category.trim(),
+      description,
+      amount: Number(alloc.amount),
+      source: "reimbursement",
+      fund: fundRow?.slug ?? null,
+      receipt_allocation_id: alloc.id,
+      created_by: user.id,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    // Unique violation on receipt_allocation_id → already posted (idempotent).
+    if (error.code === "23505") return { data: null, error: "This split is already in the budget." }
+    return { data: null, error: error.message }
+  }
+  return { data: data as BudgetEntry, error: null }
 }
 
 export interface SubmittedReceipt {

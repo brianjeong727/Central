@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react"
 import useSWR from "swr"
-import { Plus, Image as ImageIcon, Settings, Receipt } from "lucide-react"
-import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, SubpageShell, CentralModal, ContentActionButton, PocketChip, PocketFilterChip, PocketKicker, PocketRoundButton, useScrollResetOn } from "@/components/central"
+import { Plus, Trash2, Image as ImageIcon, Settings, Receipt } from "lucide-react"
+import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, SubpageShell, CentralModal, ContentActionButton, ActionMenu, ConfirmDialog, PocketChip, PocketFilterChip, PocketKicker, PocketRoundButton, useScrollResetOn } from "@/components/central"
 import { EmptyState } from "./shared"
 import { MobilePocketHub, PocketHubChrome } from "./mobile-pocket-hub"
 import { useIsMobile } from "../use-is-mobile"
@@ -12,6 +12,7 @@ import { SubmitReceiptModal, STATUS_META, MobileFactsGrid } from "./finance-work
 import {
   listReceiptCategories,
   createReceiptCategory,
+  deleteReceiptCategory,
   type ReceiptCategory,
 } from "@/app/actions/receipt-categories"
 
@@ -92,6 +93,9 @@ export function ReceiptsWorkspace({
   const [categories, setCategories] = useState<ReceiptCategory[]>([])
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [showAddCategory, setShowAddCategory] = useState(false)
+  // Delete-category confirm (destructive → ConfirmDialog, CLAUDE.md #10).
+  const [confirmDeleteCat, setConfirmDeleteCat] = useState<ReceiptCategory | null>(null)
+  const [deletingCat, setDeletingCat] = useState(false)
   // Owns the read-only receipt detail subpage (lifted out of CategoryContent so it
   // can render full-bleed, outside the padded content region — no double inset).
   const [detail, setDetail] = useState<{ receipt: ReceiptRow; categoryName: string; teamName: string } | null>(null)
@@ -119,6 +123,27 @@ export function ReceiptsWorkspace({
     setShowAddCategory(false)
     setCategories(prev => [...prev, cat])
     setActiveCategoryId(cat.id)
+  }
+
+  // Optimistic delete: drop the category (and fall back to the first remaining as
+  // the active subtab, matching the zero-category empty state), revert on error.
+  // receipts.category_id is ON DELETE SET NULL, so filed receipts survive unlinked.
+  async function handleConfirmDeleteCategory() {
+    const cat = confirmDeleteCat
+    if (!cat) return
+    setDeletingCat(true)
+    const prevCategories = categories
+    const prevActive = activeCategoryId
+    const remaining = categories.filter(c => c.id !== cat.id)
+    setCategories(remaining)
+    if (activeCategoryId === cat.id) setActiveCategoryId(remaining[0]?.id ?? null)
+    const { error } = await deleteReceiptCategory(cat.id, ministryId)
+    setDeletingCat(false)
+    if (error) {
+      setCategories(prevCategories)
+      setActiveCategoryId(prevActive)
+    }
+    setConfirmDeleteCat(null)
   }
 
   return (
@@ -278,6 +303,7 @@ export function ReceiptsWorkspace({
             teamId={teamId!}
             category={activeCategory}
             onOpenDetail={(receipt) => setDetail({ receipt, categoryName: activeCategory.name, teamName: activeTeam?.name ?? "" })}
+            onRequestDelete={() => setConfirmDeleteCat(activeCategory)}
           />
         ) : null}
       </div>
@@ -292,6 +318,17 @@ export function ReceiptsWorkspace({
       )}
       </>
       )}
+
+      {/* Destructive confirm (CLAUDE.md #10) — honest consequence copy. */}
+      <ConfirmDialog
+        open={!!confirmDeleteCat}
+        title="Delete category?"
+        message={<>Receipts filed under &ldquo;{confirmDeleteCat?.name}&rdquo; keep their records but lose this label.</>}
+        confirmLabel="Delete category"
+        loading={deletingCat}
+        onConfirm={handleConfirmDeleteCategory}
+        onClose={() => { if (!deletingCat) setConfirmDeleteCat(null) }}
+      />
     </>
   )
 }
@@ -323,13 +360,14 @@ function fundLabel(fund?: string) {
 }
 
 function CategoryContent({
-  ministryId, userId, teamId, category, onOpenDetail,
+  ministryId, userId, teamId, category, onOpenDetail, onRequestDelete,
 }: {
   ministryId: string
   userId: string
   teamId: string
   category: ReceiptCategory
   onOpenDetail: (receipt: ReceiptRow) => void
+  onRequestDelete: () => void
 }) {
   const supabase = createClient()
   const isMobile = useIsMobile()
@@ -367,7 +405,22 @@ function CategoryContent({
           canonical header-action pattern (CTA never inside the empty state). */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 18 }}>
         {eyebrow}
-        {submitButton}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {submitButton}
+          {/* Category actions kebab (Convention #20 ActionMenu) — delete routes
+              through the ConfirmDialog owned by the parent. Same gate as create
+              (any team member; RLS enforces membership). */}
+          <ActionMenu
+            triggerLabel="Category actions"
+            items={[{
+              key: "delete",
+              label: "Delete category",
+              tone: "danger",
+              icon: <Trash2 style={{ width: 14, height: 14 }} />,
+              onSelect: onRequestDelete,
+            }]}
+          />
+        </div>
       </div>
       {loading ? null : receipts.length === 0 ? (
         <EmptyState
@@ -470,6 +523,25 @@ interface MemberAllocation {
   decision_reason: string | null
   fund_name: string
   fund_kind: "church" | "external"
+  reviewed_at: string | null
+  requested_at: string | null
+  signed_off_at: string | null
+}
+
+// Short "Jul 18" formatter + the date reached at each lifecycle node (node 1 =
+// Approved/Requested, node 2 = Reimbursed) — mirrors the treasurer inbox rail.
+function fmtStepDate(iso: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  return isNaN(d.getTime()) ? null : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+function memberNodeDate(a: MemberAllocation, i: number): string | null {
+  if (i === 1) return fmtStepDate(a.fund_kind === "church" ? a.reviewed_at : (a.requested_at ?? a.reviewed_at))
+  if (i === 2) return fmtStepDate(a.signed_off_at)
+  return null
+}
+const memberStepDateStyle: React.CSSProperties = {
+  fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.04em", color: "var(--muted-text)", whiteSpace: "nowrap",
 }
 
 // A single read-only source row in the member's split view: fund chip · amount ·
@@ -496,11 +568,15 @@ function MemberAllocationRow({ allocation: a }: { allocation: MemberAllocation }
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {steps.map((step, i) => {
             const done = i <= reached
+            const nodeDate = done ? memberNodeDate(a, i) : null
             return (
               <div key={step} style={{ display: "flex", alignItems: "center", gap: 8, flex: i < steps.length - 1 ? 1 : 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ width: 7, height: 7, borderRadius: "50%", background: done ? "var(--plum)" : "var(--line-2)", flexShrink: 0 }} />
-                  <span style={{ fontSize: 11.5, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
+                    {nodeDate && <span style={memberStepDateStyle}>{nodeDate}</span>}
+                  </div>
                 </div>
                 {i < steps.length - 1 && <span style={{ flex: 1, height: 1, background: i < reached ? "var(--plum)" : "var(--line)" }} />}
               </div>
@@ -538,12 +614,13 @@ function ReceiptDetailOverlay({
     async () => {
       const { data } = await supabase
         .from("receipt_fund_allocations")
-        .select("id, fund_id, amount, status, decision_reason")
+        .select("id, fund_id, amount, status, decision_reason, reviewed_at, requested_at, signed_off_at")
         .eq("receipt_id", receipt.id)
         .eq("ministry_id", ministryId)
         .order("created_at", { ascending: true })
       const rows = ((data ?? []) as Array<{
         id: string; fund_id: string; amount: number; status: string; decision_reason: string | null
+        reviewed_at: string | null; requested_at: string | null; signed_off_at: string | null
       }>)
       const fundIds = Array.from(new Set(rows.map(r => r.fund_id)))
       const fundMeta = new Map<string, { name: string; kind: string }>()
@@ -566,6 +643,9 @@ function ReceiptDetailOverlay({
           decision_reason: row.decision_reason,
           fund_name: f?.name ?? "",
           fund_kind: (f?.kind === "church" ? "church" : "external") as "church" | "external",
+          reviewed_at: row.reviewed_at,
+          requested_at: row.requested_at,
+          signed_off_at: row.signed_off_at,
         }
       })
     },

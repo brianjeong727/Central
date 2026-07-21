@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import useSWR from "swr"
 import { createClient } from "@/lib/supabase"
 import {
-  Plus, X,
+  Plus, X, Check,
   Upload, Download, DollarSign, AlertTriangle,
   ImageIcon, Inbox,
 } from "lucide-react"
@@ -17,7 +17,7 @@ import {
   approveAllocation, requestAllocation, rejectAllocation,
   signOffAllocation, declineAllocation,
   confirmExternalReimbursed, declineExternalAllocation,
-  setReceiptAllocations,
+  setReceiptAllocations, postAllocationToBudget,
   type InboxReceipt, type ReceiptAllocation,
 } from "@/app/actions/receipts"
 import { getFinanceFunds, type FinanceFund } from "@/app/actions/finance-funds"
@@ -370,11 +370,12 @@ function InboxEmpty({ title, subtitle }: { title: string; subtitle: string }) {
 type InboxFilter = "needs" | "all"
 
 function ReimbursementInbox({
-  ministryId, items, funds, loading, canApprove, canSignOff, readOnly, onRefetch, onDetailOpenChange,
+  ministryId, items, funds, categories, loading, canApprove, canSignOff, readOnly, onRefetch, onDetailOpenChange,
 }: {
   ministryId: string
   items: InboxReceipt[]
   funds: FinanceFund[]
+  categories: DynamicCategory[]
   loading: boolean
   canApprove: boolean
   canSignOff: boolean
@@ -412,6 +413,7 @@ function ReimbursementInbox({
         receipt={detailLive}
         ministryId={ministryId}
         funds={funds}
+        categories={categories}
         canApprove={uiCanApprove}
         canSignOff={uiCanSignOff}
         canView={readOnly || (!uiCanApprove && !uiCanSignOff)}
@@ -493,14 +495,34 @@ function allocReachedIndex(a: ReceiptAllocation): number {
   return 0
 }
 
+// Short "Jul 18" formatter for lifecycle-node dates (accepts a timestamptz).
+function fmtStepDate(iso: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  return isNaN(d.getTime()) ? null : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+// The date reached at each lifecycle node: node 1 = Approved (church → reviewed_at)
+// / Requested (external → requested_at), node 2 = Reimbursed (signed_off_at).
+function allocNodeDate(a: ReceiptAllocation, i: number): string | null {
+  if (i === 1) return fmtStepDate(a.fund_kind === "church" ? a.reviewed_at : (a.requested_at ?? a.reviewed_at))
+  if (i === 2) return fmtStepDate(a.signed_off_at)
+  return null
+}
+// Small mono date rendered beneath a lifecycle-node label.
+const stepDateStyle: React.CSSProperties = {
+  fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.04em", color: "var(--muted-text)", whiteSpace: "nowrap",
+}
+
 // One funding-source row inside the split: fund chip · amount · status stepper,
 // plus the per-allocation actions this caller may take (gated by fund kind +
 // status + capability). Optimistic-ish: parent refetches on every completed action.
 function AllocationRow({
-  allocation: a, ministryId, canApprove, canSignOff, onActed,
+  allocation: a, ministryId, categories, eventName, canApprove, canSignOff, onActed,
 }: {
   allocation: ReceiptAllocation
   ministryId: string
+  categories: DynamicCategory[]
+  eventName: string | null
   canApprove: boolean
   canSignOff: boolean
   onActed: () => void
@@ -508,10 +530,35 @@ function AllocationRow({
   const isMobile = useIsMobile()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<"idle" | "reason">("idle")
+  const [mode, setMode] = useState<"idle" | "reason" | "post">("idle")
   const [reasonAction, setReasonAction] = useState<null | (() => Promise<{ error: string | null }>)>(null)
   const [reasonLabel, setReasonLabel] = useState("")
   const [reason, setReason] = useState("")
+
+  // Post-to-budget (reimbursed splits only): category pick → optimistic flip.
+  const [postCategory, setPostCategory] = useState("")
+  const [postBusy, setPostBusy] = useState(false)
+  const [postError, setPostError] = useState<string | null>(null)
+  const [optimisticPosted, setOptimisticPosted] = useState(false)
+  const isPosted = a.postedToBudget || optimisticPosted
+  const canPostToBudget = canApprove && a.status === "reimbursed"
+
+  function startPost() {
+    // Pre-select the category matching the receipt's event name exactly, else first.
+    const match = eventName ? categories.find(c => c.value === eventName) : undefined
+    setPostCategory(match?.value ?? categories[0]?.value ?? "")
+    setPostError(null)
+    setMode("post")
+  }
+  async function confirmPost() {
+    if (!postCategory) { setPostError("Please choose a category."); return }
+    setPostBusy(true); setPostError(null)
+    setOptimisticPosted(true) // optimistic flip to "In budget ✓"
+    const { error: err } = await postAllocationToBudget(a.id, ministryId, postCategory)
+    if (err) { setOptimisticPosted(false); setPostError(err); setPostBusy(false); return }
+    setPostBusy(false); setMode("idle")
+    onActed()
+  }
 
   const church = a.fund_kind === "church"
   const isNegative = a.status === "rejected" || a.status === "declined"
@@ -570,11 +617,15 @@ function AllocationRow({
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {steps.map((step, i) => {
             const done = i <= reached
+            const nodeDate = done ? allocNodeDate(a, i) : null
             return (
               <div key={step} style={{ display: "flex", alignItems: "center", gap: 8, flex: i < steps.length - 1 ? 1 : 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ width: 7, height: 7, borderRadius: "50%", background: done ? "var(--plum)" : "var(--line-2)", flexShrink: 0 }} />
-                  <span style={{ fontSize: 11.5, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
+                    {nodeDate && <span style={stepDateStyle}>{nodeDate}</span>}
+                  </div>
                 </div>
                 {i < steps.length - 1 && <span style={{ flex: 1, height: 1, background: i < reached ? "var(--plum)" : "var(--line)" }} />}
               </div>
@@ -622,6 +673,34 @@ function AllocationRow({
                 </>
               )}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Post to budget — reimbursed splits only. Posted → quiet "In budget"
+          check; else the treasurer gets an "Add to budget" affordance + category
+          picker. Non-approvers see the posted check but never the button. */}
+      {a.status === "reimbursed" && (isPosted || canPostToBudget) && (
+        <div style={{ marginTop: 12 }}>
+          {isPosted ? (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 500, color: SUCCESS_STATUS_TEXT }}>
+              <Check size={13} /> In budget
+            </span>
+          ) : mode === "post" ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {postError && <p style={{ fontSize: 12, color: "var(--danger)", margin: 0 }}>{postError}</p>}
+              <select autoFocus value={postCategory} onChange={e => setPostCategory(e.target.value)} style={inputStyle}>
+                {categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => { setMode("idle"); setPostError(null) }} disabled={postBusy} style={{ flex: 1, height: 40, background: "var(--ivory)", color: "var(--body)", borderRadius: isMobile ? 999 : 10, border: "1px solid var(--line)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>Cancel</button>
+                <button onClick={confirmPost} disabled={postBusy || !postCategory} style={{ ...primaryBtn, opacity: postBusy || !postCategory ? 0.6 : 1 }}>{postBusy ? "Adding…" : "Add to budget"}</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={startPost} style={{ fontSize: 12.5, fontWeight: 500, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)", padding: 0 }}>
+              Add to budget
+            </button>
           )}
         </div>
       )}
@@ -705,11 +784,12 @@ function SplitEditor({
 }
 
 function InboxDetailOverlay({
-  receipt: r, ministryId, funds, canApprove, canSignOff, canView, onClose, onActed,
+  receipt: r, ministryId, funds, categories, canApprove, canSignOff, canView, onClose, onActed,
 }: {
   receipt: InboxReceipt
   ministryId: string
   funds: FinanceFund[]
+  categories: DynamicCategory[]
   canApprove: boolean
   canSignOff: boolean
   canView: boolean
@@ -773,6 +853,8 @@ function InboxDetailOverlay({
                   key={a.id}
                   allocation={a}
                   ministryId={ministryId}
+                  categories={categories}
+                  eventName={r.event_name}
                   canApprove={canApprove && !canView}
                   canSignOff={canSignOff && !canView}
                   onActed={onActed}
@@ -918,8 +1000,16 @@ export function FinanceWorkspace({
   const [entryCategory, setEntryCategory] = useState("DG Dinner")
   const [entryDescription, setEntryDescription] = useState("")
   const [entryAmount, setEntryAmount] = useState("")
+  const [entryFund, setEntryFund] = useState("church")
   const [addingEntry, setAddingEntry] = useState(false)
   const [budgetExporting, setBudgetExporting] = useState(false)
+
+  // Snap the add-entry fund to a real active fund once they load (default church).
+  useEffect(() => {
+    if (funds.length === 0) return
+    setEntryFund(prev => funds.some(f => f.slug === prev) ? prev : (funds.find(f => f.slug === "church")?.slug ?? funds[0].slug))
+  }, [funds])
+  const fundNameFor = (slug: string | null) => slug ? (funds.find(f => f.slug === slug)?.name ?? slug) : null
 
   // Access vs. edit. Gov-view (readOnly) may VIEW any section but mutates nothing.
   const reimbAccess = canAccessReimbursements || readOnly
@@ -987,7 +1077,7 @@ export function FinanceWorkspace({
   async function handleAddBudgetEntry() {
     const amt = parseFloat(entryAmount); if (!amt || amt <= 0) return
     setAddingEntry(true)
-    const { data } = await addBudgetEntry({ ministryId, category: entryCategory, description: entryDescription.trim(), amount: amt, entryDate })
+    const { data } = await addBudgetEntry({ ministryId, category: entryCategory, description: entryDescription.trim(), amount: amt, entryDate, fund: entryFund || null })
     if (data) setBudgetEntries(prev => [data, ...prev])
     setEntryDate(new Date().toISOString().split("T")[0]); setEntryCategory("other"); setEntryDescription(""); setEntryAmount("")
     setShowAddEntry(false); setAddingEntry(false)
@@ -1028,6 +1118,7 @@ export function FinanceWorkspace({
               ministryId={ministryId}
               items={inboxItems}
               funds={funds}
+              categories={dynamicCategories}
               loading={inboxLoading}
               canApprove={inboxCanApprove}
               canSignOff={inboxCanSignOff}
@@ -1074,9 +1165,10 @@ export function FinanceWorkspace({
           {canManage && showAddEntry && (
             <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, padding: "16px", marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
               <p style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>New manual entry</p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                 <div><label style={labelStyle}>Date</label><input type="date" value={entryDate} onChange={e => setEntryDate(e.target.value)} style={inputStyle} /></div>
                 <div><label style={labelStyle}>Category</label><select value={entryCategory} onChange={e => setEntryCategory(e.target.value)} style={inputStyle}>{dynamicCategories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
+                <div><label style={labelStyle}>Fund</label><select value={entryFund} onChange={e => setEntryFund(e.target.value)} style={inputStyle}>{funds.map(f => <option key={f.id} value={f.slug}>{f.name}</option>)}</select></div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 10 }}>
                 <div><label style={labelStyle}>Description</label><input type="text" placeholder="What was this expense for?" value={entryDescription} onChange={e => setEntryDescription(e.target.value)} style={inputStyle} /></div>
@@ -1110,34 +1202,47 @@ export function FinanceWorkspace({
             </div>
           ) : isMobile ? (
             <PocketRowCard>
-              {budgetEntries.map((e, i) => (
+              {budgetEntries.map((e, i) => {
+                const fName = fundNameFor(e.fund)
+                return (
                 <MobileDataRow
                   key={e.id}
                   title={e.description || "—"}
-                  sub={`${new Date(e.entry_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${e.category}`}
+                  sub={`${new Date(e.entry_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${e.category}${fName ? ` · ${fName}` : ""}`}
                   right={`$${Number(e.amount).toFixed(2)}`}
                   isLast={i === budgetEntries.length - 1}
                 />
-              ))}
+                )
+              })}
             </PocketRowCard>
           ) : (
             <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 130px 90px 80px", gap: 8, padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "var(--cream)" }}>
-                {["Date", "Description", "Category", "Amount", "Source"].map(h => (
+              <div style={{ display: "grid", gridTemplateColumns: "90px 1fr 120px 96px 84px 76px", gap: 8, padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "var(--cream)" }}>
+                {["Date", "Description", "Category", "Fund", "Amount", "Source"].map(h => (
                   <span key={h} style={{ fontSize: 10, fontWeight: 400, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{h}</span>
                 ))}
               </div>
-              {budgetEntries.map((e, i) => (
-                <div key={e.id} style={{ display: "grid", gridTemplateColumns: "90px 1fr 130px 90px 80px", gap: 8, padding: "12px 16px", borderTop: i > 0 ? "1px solid var(--line-3)" : "none", alignItems: "center" }}>
+              {budgetEntries.map((e, i) => {
+                const fName = fundNameFor(e.fund)
+                return (
+                <div key={e.id} style={{ display: "grid", gridTemplateColumns: "90px 1fr 120px 96px 84px 76px", gap: 8, padding: "12px 16px", borderTop: i > 0 ? "1px solid var(--line-3)" : "none", alignItems: "center" }}>
                   <span style={{ fontSize: 12.5, color: "var(--body)" }}>{new Date(e.entry_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                   <span style={{ fontSize: 13, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.description ?? "—"}</span>
                   <span style={{ fontSize: 12.5, color: "var(--body)" }}>{e.category}</span>
+                  <span>
+                    {fName ? (
+                      <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 999, background: "var(--ivory)", color: "var(--body)", display: "inline-block", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fName}</span>
+                    ) : (
+                      <span style={{ fontSize: 13, color: "var(--faint)" }}>—</span>
+                    )}
+                  </span>
                   <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>${Number(e.amount).toFixed(2)}</span>
                   <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.06em", padding: "3px 7px", borderRadius: 999, textTransform: "uppercase", background: e.source === "reimbursement" ? REIMBURSED_TINT : "var(--ivory)", color: e.source === "reimbursement" ? "var(--plum)" : "var(--body)", display: "inline-block" }}>
                     {e.source === "reimbursement" ? "Auto" : "Manual"}
                   </span>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -1228,7 +1333,8 @@ function AllocationSection({
   }
 
   function getActual(category: string): number {
-    return actuals.find(a => a.category === category)?.total_spent ?? 0
+    // actuals is now per (category, fund) — a category total sums its fund rows.
+    return actuals.filter(a => a.category === category).reduce((s, a) => s + a.total_spent, 0)
   }
 
   function getDraftKey(category: string, fund: string) {
@@ -1281,6 +1387,39 @@ function AllocationSection({
   const pct = totalAllocated > 0 ? Math.min(100, (totalSpent / totalAllocated) * 100) : 0
   const overBudget = totalRemaining < 0
 
+  // Per-fund breakdown for the three overview cards. Budgeted comes from the
+  // allocations grid, Spent from the new per-fund actuals (legacy null-fund spend
+  // is excluded from the fund sublines but still counts into the totals above).
+  const budgetedByFund: Record<string, number> = {}
+  for (const al of allocations) budgetedByFund[al.fund] = (budgetedByFund[al.fund] ?? 0) + Number(al.allocated_amount)
+  const spentByFund: Record<string, number> = {}
+  for (const a of actuals) { if (a.fund) spentByFund[a.fund] = (spentByFund[a.fund] ?? 0) + a.total_spent }
+  const money = (n: number) => `$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+  const signedMoney = (n: number) => `${n < 0 ? "-" : ""}${money(n)}`
+  // Build "Church $X · Pitt $Y" over the active funds; `pick` selects the metric
+  // per fund and `keep` decides which funds appear.
+  function fundSubline(pick: (slug: string) => number, keep: (slug: string) => boolean, signed = false): string {
+    return fundCols
+      .filter(f => keep(f.value))
+      .map(f => `${f.label} ${signed ? signedMoney(pick(f.value)) : money(pick(f.value))}`)
+      .join(" · ")
+  }
+  const budgetedSub = fundSubline(s => budgetedByFund[s] ?? 0, s => (budgetedByFund[s] ?? 0) > 0)
+  // Spend on legacy null-fund entries isn't in spentByFund but IS in the headline
+  // total — surface it as a quiet trailing "Unattributed $X" so the subline sums to
+  // the big number. Total spent minus the per-fund attributed spend.
+  const attributedSpent = Object.values(spentByFund).reduce((s, v) => s + v, 0)
+  const unattributedSpent = totalSpent - attributedSpent
+  const spentSub = [
+    fundSubline(s => spentByFund[s] ?? 0, s => (spentByFund[s] ?? 0) > 0),
+    unattributedSpent > 0.005 ? `Unattributed ${money(unattributedSpent)}` : "",
+  ].filter(Boolean).join(" · ")
+  const remainingSub = fundSubline(
+    s => (budgetedByFund[s] ?? 0) - (spentByFund[s] ?? 0),
+    s => (budgetedByFund[s] ?? 0) > 0 || (spentByFund[s] ?? 0) > 0,
+    true,
+  )
+
   const monoLabel: React.CSSProperties = {
     fontFamily: "var(--mono)",
     fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--faint)",
@@ -1314,9 +1453,11 @@ function AllocationSection({
           {/* Summary stat cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }} className="max-md:!grid-cols-1">
             {[
-              { label: "Total Budgeted", value: totalAllocated, sub: "across all funds" },
-              { label: "Total Spent", value: totalSpent, sub: "this fiscal year" },
-              { label: "Remaining", value: totalRemaining, sub: overBudget ? "over budget" : "available", danger: overBudget },
+              // Drop the "across all funds" caption once the explicit per-fund
+              // enumeration renders (multi-fund) — it sits right above it.
+              { label: "Total Budgeted", value: totalAllocated, sub: funds.length > 1 ? "" : "across all funds", fundSub: budgetedSub },
+              { label: "Total Spent", value: totalSpent, sub: "this fiscal year", fundSub: spentSub },
+              { label: "Remaining", value: totalRemaining, sub: overBudget ? "over budget" : "available", danger: overBudget, fundSub: remainingSub },
             ].map(card => (
               <div
                 key={card.label}
@@ -1329,12 +1470,19 @@ function AllocationSection({
                 <p style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>
                   {card.label}
                 </p>
-                <p style={{ fontFamily: "var(--serif)", fontSize: 27, letterSpacing: -0.4, color: card.danger ? "var(--danger)" : "var(--ink)", margin: "8px 0 0" }}>
+                <p style={{ fontFamily: "var(--serif)", fontSize: 27, fontWeight: 400, letterSpacing: -0.4, color: card.danger ? "var(--danger)" : "var(--ink)", margin: "8px 0 0" }}>
                   ${Math.abs(card.value).toFixed(2)}
                 </p>
-                <p style={{ fontSize: 13, color: card.danger ? "var(--danger)" : "var(--muted-text)", marginTop: 4 }}>
-                  {card.danger && card.value < 0 ? `$${Math.abs(card.value).toFixed(2)} over · ` : ""}{card.sub}
-                </p>
+                {(card.sub || (card.danger && card.value < 0)) && (
+                  <p style={{ fontSize: 13, color: card.danger ? "var(--danger)" : "var(--muted-text)", marginTop: 4 }}>
+                    {card.danger && card.value < 0 ? `$${Math.abs(card.value).toFixed(2)} over · ` : ""}{card.sub}
+                  </p>
+                )}
+                {card.fundSub && (
+                  <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.45 }}>
+                    {card.fundSub}
+                  </p>
+                )}
               </div>
             ))}
           </div>
