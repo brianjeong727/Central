@@ -26,14 +26,15 @@ import {
 } from "@/app/actions/reimbursements"
 import {
   getBudgetAllocations, getCategoryActuals, upsertBudgetAllocation,
-  getBudgetCategories, addBudgetCategory, deleteBudgetCategory,
+  getAllocationYears, getBudgetCategories, addBudgetCategory, deleteBudgetCategory,
   type BudgetAllocation, type CategoryActual,
 } from "@/app/actions/budget-planning"
 
 function currentFiscalYear(): string {
   const now = new Date()
   const y = now.getFullYear()
-  return now.getMonth() >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`
+  // Fiscal year runs Jun 1 – May 31; rolls to the next pair on June 1.
+  return now.getMonth() >= 5 ? `${y}-${y + 1}` : `${y - 1}-${y}`
 }
 import type { Receipt as ReceiptType, ReceiptLimit } from "@/app/actions/receipts"
 import type { BudgetEntry } from "@/app/actions/reimbursements"
@@ -1147,16 +1148,6 @@ export function FinanceWorkspace({
 
 // ── AllocationSection ──────────────────────────────────────────────────────────
 
-function generateYearOptions(): string[] {
-  const fy = currentFiscalYear()
-  const [startYear] = fy.split("-").map(Number)
-  return [
-    `${startYear}-${startYear + 1}`,
-    `${startYear + 1}-${startYear + 2}`,
-    `${startYear + 2}-${startYear + 3}`,
-  ]
-}
-
 function AllocationSection({
   ministryId,
   canEdit: canEditProp,
@@ -1198,8 +1189,13 @@ function AllocationSection({
   const [deletingCategory, setDeletingCategory] = useState<string | null>(null)
   const [confirmDeleteCategory, setConfirmDeleteCategory] = useState<string | null>(null)
 
-  const yearOptions = generateYearOptions()
+  // Historical allocation years + the current one — never future years.
+  const [yearOptions, setYearOptions] = useState<string[]>([currentFiscalYear()])
   const canEdit = canEditProp
+
+  useEffect(() => {
+    getAllocationYears(ministryId).then(({ data }) => setYearOptions(data))
+  }, [ministryId])
 
   // Include any orphaned categories that have allocations but aren't in the dynamic list
   const allocatedCategories = Array.from(new Set(allocations.map(a => a.category)))

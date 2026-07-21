@@ -22,16 +22,33 @@ export interface CategoryActual {
 function currentFiscalYear(): string {
   const now = new Date()
   const y = now.getFullYear()
-  // Academic year: Aug–Jul. Month >= 7 (0-indexed Aug) → current/next year
-  return now.getMonth() >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`
+  // Fiscal year runs Jun 1 – May 31; on June 1 the label rolls to the next pair.
+  // Month >= 5 (0-indexed June) → the year that just started.
+  return now.getMonth() >= 5 ? `${y}-${y + 1}` : `${y - 1}-${y}`
 }
 
 function fiscalYearToDateRange(fiscalYear: string): { start: string; end: string } {
   const [startYear, endYear] = fiscalYear.split("-").map(Number)
   return {
-    start: `${startYear}-08-01`,
-    end:   `${endYear}-07-31`,
+    start: `${startYear}-06-01`,
+    end:   `${endYear}-05-31`,
   }
+}
+
+// Historical allocation years (any year with ministry_budgets rows) + the current
+// fiscal year — never future years. Sorted ascending; the current year is last.
+export async function getAllocationYears(
+  ministryId: string,
+): Promise<{ data: string[]; error: string | null }> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("ministry_budgets")
+    .select("fiscal_year")
+    .eq("ministry_id", ministryId)
+  if (error) return { data: [currentFiscalYear()], error: error.message }
+  const years = new Set((data ?? []).map((r) => (r as { fiscal_year: string }).fiscal_year))
+  years.add(currentFiscalYear())
+  return { data: Array.from(years).sort(), error: null }
 }
 
 export async function getBudgetAllocations(

@@ -22,7 +22,8 @@ import { useSubpageCrumbs, useBreadcrumbExtra } from "../breadcrumb-context"
 function currentFiscalYear(): string {
   const now = new Date()
   const y = now.getFullYear()
-  return now.getMonth() >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`
+  // Fiscal year runs Jun 1 – May 31; rolls to the next pair on June 1.
+  return now.getMonth() >= 5 ? `${y}-${y + 1}` : `${y - 1}-${y}`
 }
 import { runAlgorithm, runSmallGroupAlgorithm, type PoolPerson, type GeneratedGroup, type PrevPairing, type DGLLeader, type SGGeneratedGroup } from "@/lib/group-algorithm"
 import {
