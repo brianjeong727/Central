@@ -1842,10 +1842,10 @@ function AllocationSection({
                                     // shows the raw draft. handleCellBlur commits + drops the draft.
                                     value={cellKey in drafts ? draftVal : (displayAmt > 0 ? displayAmt.toFixed(2) : "")}
                                     onChange={e => setDrafts(prev => ({ ...prev, [cellKey]: e.target.value }))}
-                                    onFocus={e => {
-                                      if (!(cellKey in drafts)) setDrafts(prev => ({ ...prev, [cellKey]: displayAmt > 0 ? String(displayAmt) : "" }))
-                                      e.target.select()
-                                    }}
+                                    // No draft-seeding on focus — a state write here races the
+                                    // controlled value against fast input (autofill, e2e fill) and
+                                    // can concatenate old+new. select() alone gives replace-on-type.
+                                    onFocus={e => e.target.select()}
                                     onBlur={() => handleCellBlur(cat.value, fund.value)}
                                     placeholder="0"
                                     disabled={isSaving}

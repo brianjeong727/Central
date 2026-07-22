@@ -233,9 +233,10 @@ test.describe("finance workspace redesign — Allocation surface + inbox gating 
     // "spent $X" captions.
     const perFundInputs = outerRow.locator('input[type="number"]')
     await expect(perFundInputs).toHaveCount(3)
-    await expect(perFundInputs.nth(0)).toHaveValue("100")
-    await expect(perFundInputs.nth(1)).toHaveValue("50")
-    await expect(perFundInputs.nth(2)).toHaveValue("40")
+    // Money inputs snap to cents at rest ("100" → "100.00").
+    await expect(perFundInputs.nth(0)).toHaveValue("100.00")
+    await expect(perFundInputs.nth(1)).toHaveValue("50.00")
+    await expect(perFundInputs.nth(2)).toHaveValue("40.00")
     await expect(outerRow.getByText("spent $130.00")).toBeVisible()
     await expect(outerRow.getByText("spent $20.00")).toBeVisible()
     await expect(outerRow.getByText("spent $0.00")).toBeVisible()
@@ -261,7 +262,7 @@ test.describe("finance workspace redesign — Allocation surface + inbox gating 
     const catLabel2 = page.getByText(CATEGORY_NAME, { exact: true }).first()
     await expect(catLabel2).toBeVisible({ timeout: 15000 })
     await catLabel2.locator("xpath=ancestor::div[2]").getByRole("button", { name: "Expand fund split" }).click()
-    await expect(catLabel2.locator("xpath=ancestor::div[3]").locator('input[type="number"]').first()).toHaveValue("120", { timeout: 10000 })
+    await expect(catLabel2.locator("xpath=ancestor::div[3]").locator('input[type="number"]').first()).toHaveValue("120.00", { timeout: 10000 })
   })
 
   test("Budget ledger category filter chips filter the ledger to that category's rows", async ({ page }) => {
