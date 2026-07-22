@@ -3163,9 +3163,9 @@ export function PlanTab({
                 groups={[{
                   label: "Sections",
                   rows: [
-                    { iconKey: "clipboard", title: "Reimbursements", subtitle: financeReimbSub, onClick: () => setFinanceMobileSectionAndUrl("reimbursements") },
-                    { iconKey: "dollar", title: "Budget", subtitle: "Expense ledger & category totals", onClick: () => setFinanceMobileSectionAndUrl("budget") },
                     { iconKey: "sliders", title: "Allocation", subtitle: "Plan the fiscal year's budget", onClick: () => setFinanceMobileSectionAndUrl("allocation") },
+                    { iconKey: "dollar", title: "Budget", subtitle: "Expense ledger & category totals", onClick: () => setFinanceMobileSectionAndUrl("budget") },
+                    { iconKey: "clipboard", title: "Reimbursements", subtitle: financeReimbSub, onClick: () => setFinanceMobileSectionAndUrl("reimbursements") },
                   ],
                 }]}
               />
@@ -3484,10 +3484,12 @@ export function FinanceSectionNav({
   active: string
   onChange: (s: string) => void
 }) {
+  // Allocation-first (matches Allocation-as-landing + the prototype): Allocation,
+  // Budget, Reimbursements top-to-bottom.
   const sections = [
-    { key: "reimbursements", label: "Reimbursements" },
-    { key: "budget", label: "Budget" },
     { key: "allocation", label: "Allocation" },
+    { key: "budget", label: "Budget" },
+    { key: "reimbursements", label: "Reimbursements" },
   ]
   // Live pending-receipt count for the Reimbursements badge. Shares its SWR key
   // with FinanceWorkspace, which revalidates it after approve/undo so the badge

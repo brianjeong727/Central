@@ -1,5 +1,17 @@
 export const REACTION_EMOJIS = ["👍", "❤️", "😂", "🙏", "🔥", "😮"]
 
+// Normalize a typed dollar amount on blur / Enter-commit: "7" → "7.00", "7.7" →
+// "7.70". Empty stays empty (never force "0.00" onto a blank field). Negative /
+// non-numeric clamps to ">= 0" (Math.max(0, …).toFixed(2)). Call this ONLY on
+// blur — never mid-typing, so the user isn't fought while entering a value.
+export function normalizeMoneyInput(raw: string): string {
+  const trimmed = raw.trim()
+  if (trimmed === "") return ""
+  const n = parseFloat(trimmed)
+  if (isNaN(n)) return ""
+  return Math.max(0, n).toFixed(2)
+}
+
 export function getInitials(name: string): string {
   return name
     .split(" ")

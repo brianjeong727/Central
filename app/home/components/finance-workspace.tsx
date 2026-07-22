@@ -9,6 +9,7 @@ import {
   ImageIcon, Inbox,
 } from "lucide-react"
 import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
+import { normalizeMoneyInput } from "../utils"
 import { useIsMobile } from "../use-is-mobile"
 import { MonogramChip, FilterDropdown, FilterChip, CentralButton, SubpageShell, CentralModal, PocketRowCard, PocketRow, Toast, useScrollResetOn } from "@/components/central"
 import {
@@ -238,7 +239,7 @@ export function SubmitReceiptModal({
             </div>
           )}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <div><label style={labelStyle}>Amount ($)</label><input type="number" min="0" step="0.01" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} style={inputStyle} /></div>
+            <div><label style={labelStyle}>Amount ($)</label><input type="number" min="0" step="0.01" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} onBlur={() => setAmount(normalizeMoneyInput(amount))} style={inputStyle} /></div>
             <div><label style={labelStyle}>Purchase date</label><input type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} style={inputStyle} /></div>
           </div>
           {overLimit && (
@@ -896,7 +897,7 @@ function SplitEditor({
           <select value={r.fundId} onChange={e => setRow(i, { fundId: e.target.value })} style={inputStyle}>
             {funds.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
           </select>
-          <input type="number" min="0" step="0.01" placeholder="0.00" value={r.amount} onChange={e => setRow(i, { amount: e.target.value })} style={inputStyle} />
+          <input type="number" min="0" step="0.01" placeholder="0.00" value={r.amount} onChange={e => setRow(i, { amount: e.target.value })} onBlur={() => setRow(i, { amount: normalizeMoneyInput(r.amount) })} style={inputStyle} />
           <button
             onClick={() => setRows(prev => prev.filter((_, idx) => idx !== i))}
             disabled={rows.length === 1}
@@ -1378,7 +1379,7 @@ export function FinanceWorkspace({
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 10 }}>
                 <div><label style={labelStyle}>Description</label><input type="text" placeholder="What was this expense for?" value={entryDescription} onChange={e => setEntryDescription(e.target.value)} style={inputStyle} /></div>
-                <div><label style={labelStyle}>Amount ($)</label><input type="number" min="0" step="0.01" placeholder="0.00" value={entryAmount} onChange={e => setEntryAmount(e.target.value)} style={inputStyle} /></div>
+                <div><label style={labelStyle}>Amount ($)</label><input type="number" min="0" step="0.01" placeholder="0.00" value={entryAmount} onChange={e => setEntryAmount(e.target.value)} onBlur={() => setEntryAmount(normalizeMoneyInput(entryAmount))} style={inputStyle} /></div>
               </div>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                 <button onClick={() => setShowAddEntry(false)} style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--line)", borderRadius: 10, fontSize: 13, color: "var(--body)", cursor: "pointer" }}>Cancel</button>
@@ -1837,7 +1838,9 @@ function AllocationSection({
                                     type="number"
                                     min={0}
                                     step={0.01}
-                                    value={cellKey in drafts ? draftVal : (displayAmt > 0 ? String(displayAmt) : "")}
+                                    // At rest (no draft) the saved amount snaps to 2 decimals; typing
+                                    // shows the raw draft. handleCellBlur commits + drops the draft.
+                                    value={cellKey in drafts ? draftVal : (displayAmt > 0 ? displayAmt.toFixed(2) : "")}
                                     onChange={e => setDrafts(prev => ({ ...prev, [cellKey]: e.target.value }))}
                                     onFocus={e => {
                                       if (!(cellKey in drafts)) setDrafts(prev => ({ ...prev, [cellKey]: displayAmt > 0 ? String(displayAmt) : "" }))
