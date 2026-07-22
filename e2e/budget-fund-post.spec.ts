@@ -45,6 +45,19 @@ test.describe("fund-aware budget ledger — approve-time post-to-budget bridge",
   const APPROVED_AMOUNT = 41.00
   const reviewedAt = new Date()
 
+  // Fixture D — decline-after-post probe: a dedicated, uniquely-named budget
+  // category (so its ledger chip total is deterministic — no shared "DG Dinner"
+  // noise from the other fixtures in this file) + a fresh single-split pending
+  // church receipt. Exercises: approve+post -> Decline (reason flow) -> the
+  // linked budget_entries row is deleted and the category's ledger spend drops
+  // to zero (post-review fix: declineAllocation now deletes the posted entry).
+  let declineReceiptId = ""
+  let declineAllocationId = ""
+  const DECLINE_SUBMITTER = "E2E Decline After Post Probe"
+  const DECLINE_EVENT_NAME = `${E2E_PREFIX}Decline After Post Probe`
+  const DECLINE_CATEGORY_NAME = `${E2E_PREFIX}Decline Post Probe Category`
+  const DECLINE_AMOUNT = 33.00
+
   // Delete-category fixtures. Categories A/B are created THROUGH THE UI in the
   // test itself; these hold the ids resolved afterwards (for the orphaned-receipt
   // DB assertion + defensive afterAll cleanup).
@@ -150,6 +163,28 @@ test.describe("fund-aware budget ledger — approve-time post-to-budget bridge",
       .select().single()
     if (pae) throw pae
     approvedAllocationId = approvedAlloc.id
+
+    // Fixture D — dedicated category + a fresh pending single-split church receipt.
+    await sb.client.from("budget_categories").insert({ ministry_id: sb.ministryId, name: DECLINE_CATEGORY_NAME, created_by: adminId })
+
+    const { data: declineReceipt, error: dre } = await sb.client
+      .from("receipts")
+      .insert({
+        ministry_id: sb.ministryId, team_id: financeTeamId, submitted_by: adminId,
+        submitted_by_name: DECLINE_SUBMITTER, event_name: DECLINE_EVENT_NAME,
+        category: "Supplies", fund: "church", amount: DECLINE_AMOUNT,
+        purchase_date: "2026-07-08", status: "pending",
+      })
+      .select().single()
+    if (dre) throw dre
+    declineReceiptId = declineReceipt.id
+
+    const { data: declineAlloc, error: dae } = await sb.client
+      .from("receipt_fund_allocations")
+      .insert({ receipt_id: declineReceiptId, ministry_id: sb.ministryId, fund_id: churchFundId, amount: DECLINE_AMOUNT, status: "pending" })
+      .select().single()
+    if (dae) throw dae
+    declineAllocationId = declineAlloc.id
   })
 
   test.afterAll(async () => {
@@ -166,6 +201,12 @@ test.describe("fund-aware budget ledger — approve-time post-to-budget bridge",
     if (fallbackReceiptId) await sb.client.from("receipts").delete().eq("id", fallbackReceiptId)
     if (approvedAllocationId) await sb.client.from("receipt_fund_allocations").delete().eq("id", approvedAllocationId)
     if (approvedReceiptId) await sb.client.from("receipts").delete().eq("id", approvedReceiptId)
+    if (declineAllocationId) {
+      await sb.client.from("budget_entries").delete().eq("receipt_allocation_id", declineAllocationId)
+      await sb.client.from("receipt_fund_allocations").delete().eq("id", declineAllocationId)
+    }
+    if (declineReceiptId) await sb.client.from("receipts").delete().eq("id", declineReceiptId)
+    await sb.client.from("budget_categories").delete().eq("ministry_id", sb.ministryId).eq("name", DECLINE_CATEGORY_NAME)
     if (categoryOrphanReceiptId) await sb.client.from("receipts").delete().eq("id", categoryOrphanReceiptId)
     // Defensive: the test deletes category B through the UI and category A is left
     // for the fallback assertion — clean up whatever's left by name, in case a
@@ -418,5 +459,58 @@ test.describe("fund-aware budget ledger — approve-time post-to-budget bridge",
       const { data } = await sb.client.from("receipts").select("category_id").eq("id", categoryOrphanReceiptId).single()
       expect((data as { category_id: string | null } | null)?.category_id).toBeNull()
     }).toPass({ timeout: 10000 })
+  })
+
+  test("declining an already-posted split deletes its ledger entry and the category's spend drops", async ({ page }) => {
+    const sb = sandbox()
+
+    await page.goto(`/home?tab=plan&team=${financeTeamId}&fsec=reimbursements`)
+    await expect(page.getByText("Reimbursements inbox")).toBeVisible({ timeout: 15000 })
+
+    // ── Quick Approve into our dedicated (uniquely-named) category → posts ──
+    const declineAmountText = page.getByText(`$${DECLINE_AMOUNT.toFixed(2)}`, { exact: true })
+    await expect(declineAmountText).toBeVisible({ timeout: 15000 })
+    const declineRow = declineAmountText.locator("xpath=ancestor::div[1]")
+    await declineRow.getByRole("button", { name: "Approve" }).click()
+    await page.locator("select").selectOption({ label: DECLINE_CATEGORY_NAME })
+    await page.getByRole("button", { name: "Approve & post" }).click()
+    await expect(page.getByText("Approved · added to budget ledger")).toBeVisible({ timeout: 15000 })
+
+    await expect(async () => {
+      const { data } = await sb.client.from("budget_entries").select("*").eq("receipt_allocation_id", declineAllocationId)
+      expect(data?.length).toBe(1)
+      expect((data![0] as { category: string }).category).toBe(DECLINE_CATEGORY_NAME)
+    }).toPass({ timeout: 10000 })
+
+    // ── Ledger shows the posted spend under our dedicated category chip ──────
+    await page.goto(`/home?tab=plan&team=${financeTeamId}&fsec=budget`)
+    await expect(page.getByText("Expense ledger", { exact: true })).toBeVisible({ timeout: 15000 })
+    await expect(page.locator("button").filter({ hasText: DECLINE_CATEGORY_NAME })).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText(DECLINE_EVENT_NAME)).toBeVisible()
+
+    // ── Decline the now-approved split from the detail (reason flow) ────────
+    await page.goto(`/home?tab=plan&team=${financeTeamId}&fsec=reimbursements`)
+    await expect(page.getByText("Reimbursements inbox")).toBeVisible({ timeout: 15000 })
+    // The row is no longer quick-approvable (status moved off 'pending') — it
+    // now opens the detail via the chevron affordance instead.
+    await declineRow.click()
+    await expect(page.getByText(`$${DECLINE_AMOUNT.toFixed(2)}`).first()).toBeVisible({ timeout: 15000 })
+    await expect(page.getByRole("button", { name: "Decline" })).toBeVisible({ timeout: 15000 })
+    await page.getByRole("button", { name: "Decline" }).click()
+    await page.getByPlaceholder("Reason (optional)").fill("Duplicate submission")
+    await page.getByRole("button", { name: "Decline" }).click()
+    await expect(page.getByText("Declined", { exact: true }).first()).toBeVisible({ timeout: 15000 })
+
+    // ── DB assertion: the linked ledger entry is gone ────────────────────────
+    await expect(async () => {
+      const { data } = await sb.client.from("budget_entries").select("id").eq("receipt_allocation_id", declineAllocationId)
+      expect(data?.length ?? 0).toBe(0)
+    }).toPass({ timeout: 10000 })
+
+    // ── Spent drops accordingly: the ledger row and its category chip vanish ──
+    await page.goto(`/home?tab=plan&team=${financeTeamId}&fsec=budget`)
+    await expect(page.getByText("Expense ledger", { exact: true })).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText(DECLINE_EVENT_NAME)).toHaveCount(0, { timeout: 15000 })
+    await expect(page.locator("button").filter({ hasText: DECLINE_CATEGORY_NAME })).toHaveCount(0)
   })
 })
