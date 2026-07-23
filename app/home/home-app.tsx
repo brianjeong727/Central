@@ -17,6 +17,7 @@ import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "
 import { classifyTeam } from "./team-type"
 import { useNavState, ALL_FOLDED_PARAMS } from "./nav-state"
 import { fetchChatList } from "./chat-list"
+import { useMinistryPresence } from "./use-presence"
 import { subscribeChatTopic } from "./chat-broadcast"
 
 // Components
@@ -109,6 +110,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [userId, refreshMemberGroups])
+
+  // Who's online ministry-wide (ephemeral realtime presence) — drives the
+  // Directory online dots. This session tracks itself just by being open.
+  const onlineUserIds = useMinistryPresence(ministryId, userId)
 
   const validTabs: Tab[] = ["home", "announcements", "chats", "plan", "directory", "give", "profile", "settings", "forms", "congregation", "network"]
   const TAB_ALIASES: Record<string, Tab> = { you: "profile" }
@@ -1054,6 +1059,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         directoryCurrentUserId={userId}
         directorySelectedMemberId={selectedDirectoryMember?.id ?? activeMemberId}
         directoryInitialMemberId={activeMemberId}
+        directoryOnlineUserIds={onlineUserIds}
         onDirectoryMemberSelect={handleDirectoryMemberSelect}
         chatPanelContent={
           <ChatListPanel
@@ -1264,6 +1270,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 ministryName={ministryName}
                 initialMemberId={activeMemberId ?? undefined}
                 selectedMember={selectedDirectoryMember}
+                onlineUserIds={onlineUserIds}
                 onMemberSelect={handleMemberSelect}
                 onBack={() => handleNavClick("chats")}
                 onOpenChat={handleOpenChat}

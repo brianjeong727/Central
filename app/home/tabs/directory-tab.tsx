@@ -137,12 +137,14 @@ export function DirectoryMemberListPanel({
   currentUserId,
   selectedId,
   initialMemberId,
+  onlineUserIds,
   onSelect,
 }: {
   ministryId: string
   currentUserId: string
   selectedId: string | null | undefined
   initialMemberId?: string | null
+  onlineUserIds?: Set<string>
   onSelect: (member: DirectoryMember) => void
 }) {
   const supabase = createClient()
@@ -222,6 +224,8 @@ export function DirectoryMemberListPanel({
                   avatarUrl={member.avatar_url}
                   className="w-8 h-8"
                   style={{ fontFamily: "var(--serif)", fontSize: 12, fontWeight: 400 }}
+                  online={onlineUserIds?.has(member.id)}
+                  dotSize={9}
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-medium truncate leading-tight" style={{ color: isActive ? "var(--plum)" : "var(--ink)" }}>
@@ -252,6 +256,7 @@ export function DirectoryTab({
   ministryName,
   initialMemberId,
   selectedMember,
+  onlineUserIds,
   onMemberSelect,
   onOpenChat,
   onBack,
@@ -262,6 +267,7 @@ export function DirectoryTab({
   ministryName: string
   initialMemberId?: string
   selectedMember?: DirectoryMember | null
+  onlineUserIds?: Set<string>
   onMemberSelect?: (id: string | null) => void
   onOpenChat: (id: string, name: string, type?: string) => void
   onBack?: () => void
@@ -309,6 +315,7 @@ export function DirectoryTab({
               ministryId={ministryId}
               currentUserId={currentUserId}
               currentUserName={currentUserName}
+              online={onlineUserIds?.has(selectedMember.id)}
               onOpenChat={onOpenChat}
             />
           ) : (
@@ -374,7 +381,7 @@ export function DirectoryTab({
               {mobileFiltered.map((member, i) => (
                 <PocketRow
                   key={member.id}
-                  leading={<MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10" style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 500 }} />}
+                  leading={<MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10" style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 500 }} online={onlineUserIds?.has(member.id)} dotSize={10} dotRing="var(--ivory)" />}
                   title={member.name}
                   titleAccessory={
                     <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
@@ -402,6 +409,7 @@ export function DirectoryTab({
             ministryId={ministryId}
             currentUserId={currentUserId}
             currentUserName={currentUserName}
+            online={onlineUserIds?.has(mobileSelected.id)}
             onClose={() => setMobileSelected(null)}
             onOpenChat={(id, name) => {
               setMobileSelected(null)
@@ -416,11 +424,12 @@ export function DirectoryTab({
 
 // ── Desktop inline detail panel ─────────────────────────────────────────────
 
-function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName, onOpenChat }: {
+function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName, online, onOpenChat }: {
   member: DirectoryMember
   ministryId: string
   currentUserId: string
   currentUserName: string
+  online?: boolean
   onOpenChat: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
@@ -483,16 +492,19 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
 
   return (
     <div className="flex flex-col items-center px-16 py-16">
-      {/* Avatar */}
+      {/* Avatar — bottom margin lives on the heading below, not the chip, so the
+          presence-dot wrapper's percentage geometry tracks the circle exactly */}
       <MonogramChip
         initials={getInitials(member.name)}
         avatarUrl={member.avatar_url}
         className="flex-shrink-0"
-        style={{ width: 120, height: 120, marginBottom: 28, fontFamily: "var(--serif)", fontSize: 40, fontWeight: 400 }}
+        style={{ width: 120, height: 120, fontFamily: "var(--serif)", fontSize: 40, fontWeight: 400 }}
+        online={online}
+        dotSize={16}
       />
 
       {/* Member name — prominent heading in the detail body */}
-      <h2 style={{ fontFamily: "var(--serif)", fontSize: 36, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 10px", lineHeight: 1.1, textAlign: "center" }}>
+      <h2 style={{ fontFamily: "var(--serif)", fontSize: 36, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", margin: "28px 0 10px", lineHeight: 1.1, textAlign: "center" }}>
         {member.name}
       </h2>
 
@@ -588,6 +600,7 @@ export function MemberSheet({
   ministryId,
   currentUserId,
   currentUserName,
+  online,
   onClose,
   onOpenChat,
 }: {
@@ -595,6 +608,7 @@ export function MemberSheet({
   ministryId: string
   currentUserId: string
   currentUserName: string
+  online?: boolean
   onClose: () => void
   onOpenChat: (id: string, name: string, type?: string) => void
 }) {
@@ -664,6 +678,9 @@ export function MemberSheet({
                 avatarUrl={member.avatar_url}
                 className="flex-shrink-0"
                 style={{ width: 56, height: 56, fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500 }}
+                online={online}
+                dotSize={12}
+                dotRing="var(--ivory)"
               />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h1 style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", margin: 0, lineHeight: 1.15 }}>{member.name}</h1>

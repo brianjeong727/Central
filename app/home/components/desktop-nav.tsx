@@ -105,7 +105,7 @@ export function DesktopSidebar({
   isTreasurer, isDGL,
   canCreateTeam, userId,
   directoryMinistryId, directoryCurrentUserId,
-  directorySelectedMemberId, directoryInitialMemberId, onDirectoryMemberSelect,
+  directorySelectedMemberId, directoryInitialMemberId, directoryOnlineUserIds, onDirectoryMemberSelect,
   chatPanelContent,
   planContextContent,
   hideSidePanel,
@@ -217,6 +217,7 @@ export function DesktopSidebar({
           currentUserId={directoryCurrentUserId}
           selectedId={directorySelectedMemberId}
           initialMemberId={directoryInitialMemberId}
+          onlineUserIds={directoryOnlineUserIds}
           onSelect={onDirectoryMemberSelect}
         />
       )
