@@ -415,6 +415,15 @@
   50%      { box-shadow: 0 0 0 5px color-mix(in srgb, var(--plum) 0%, transparent); }
 }
 .greeting-dot-breathe { animation: greeting-dot-breathe 3.4s var(--ease-in-out) infinite; }
+
+/* ── Presence (online) dot ────────────────────────────────────────────────────
+   The --success dot on MonogramChip (`online` prop) — same breathe grammar as
+   the greeting dot, sage ring instead of plum. */
+@keyframes presence-dot-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 45%, transparent); }
+  50%      { box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 0%, transparent); }
+}
+.presence-dot-breathe { animation: presence-dot-breathe 3.4s var(--ease-in-out) infinite; }
 @media (prefers-reduced-motion: reduce) {
   .greeting-sheen {
     animation: none;
@@ -426,6 +435,7 @@
   }
   .greeting-sheen-plum { color: var(--plum); -webkit-text-fill-color: var(--plum); font-style: italic; }
   .greeting-dot-breathe { animation: none; }
+  .presence-dot-breathe { animation: none; }
 }
 
 /* ── Pastor Pulse hero slide (PulseSlideCard) ────────────────────────────────

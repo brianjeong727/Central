@@ -966,6 +966,7 @@ export interface DesktopSidebarProps {
   directoryCurrentUserId?: string
   directorySelectedMemberId?: string | null
   directoryInitialMemberId?: string | null
+  directoryOnlineUserIds?: Set<string>
   onDirectoryMemberSelect?: (member: DirectoryMember) => void
   // Chat panel
   chatPanelContent?: ReactNode
