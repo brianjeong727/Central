@@ -3,24 +3,30 @@
 > Living record of the iOS App Store submission for Central. Captures the demo
 > account, the build config, every App Store Connect field value, the compliance
 > work already shipped, and the exact status/blockers as of the last update.
-> **Last updated: 2026-07-16.**
+> **Last updated: 2026-07-23.**
 
 ---
 
 ## 0. TL;DR status
 
-- **Code side: DONE and merged to `main`** (PR #188, commit `22cfa42`, 2026-07-16).
+- **Submitted 2026-07-16 → REJECTED 2026-07-23** (7 days in first review — normal for a first submission).
+  - **Guideline 2.3.6 (Accurate Metadata) only.** The Age Rating questionnaire declared
+    "In-App Controls" under Age Assurance; the app has no parental-controls / age-assurance
+    feature (confirmed against the codebase — grade/grad-year fields and admin moderation
+    don't qualify), so the reviewer couldn't find it.
+  - **Fix (metadata-only, Brian's side):** App Store Connect → App Information → Age Rating →
+    set **Age Assurance = "None"** → reply in the Resolution Center → resubmit.
+    **Build 1 stays attached — no new archive, no build bump.**
+  - Review details: Submission ID `d1eabd45-b6f9-4c04-a584-24ddfa153a23`, reviewed on
+    iPad Air 11-inch (M3) — i.e. they installed and ran the iPhone build in compatibility
+    mode; no complaints about sign-in, demo account, UGC, or 4.2 minimal functionality.
+- **Code side: DONE and merged to `main`** (PR #188, commit `22cfa42`, 2026-07-16). Nothing code-side needed for the resubmission.
 - **Build uploaded:** Build `1`, version `1.0`, attached to the ASC version page.
 - **Demo tenant:** live in prod, seeded and screenshot-ready.
-- **Remaining before hitting "Add for Review"** (all in App Store Connect UI, Brian's side):
-  1. ⚠️ **App Review → Sign-In credentials are EMPTY** — must fill (most common fast-rejection cause).
-  2. **App Information → Category** = Lifestyle (was unset).
-  3. **App Information → Content Rights** = "does not use third-party content."
-  4. **App Privacy** — edits made, must be **Published**.
-  5. (optional) Pricing → uncheck Apple Silicon Mac + Apple Vision Pro availability.
 - **DSA** trader declaration: done → **"not a trader"** (EU excluded; 175 countries available).
 
-Review timeline expectation: earliest same-day/overnight, typically **24–48h**.
+Re-review timeline expectation: resubmissions after a metadata rejection are usually much
+faster than the first pass — often same-day to 48h.
 
 ---
 
@@ -204,7 +210,11 @@ tracking ⇒ every purpose is **App Functionality**. Answer **No** to all tracki
 
 - **Category:** Lifestyle (primary) + Social Networking (secondary).
 - **Content Rights:** "does not contain, show, or access third-party content."
-- **Age Rating:** completed → ~13+ (UGC = yes with moderation/reporting; no unrestricted web). ✅
+- **Age Rating:** completed → ~13+ (UGC = yes with moderation/reporting; no unrestricted web).
+  ⚠️ Caused the 2026-07-23 rejection: **Age Assurance / In-App Controls must be "None"**
+  (the app has no parental controls or age-verification feature — don't re-declare it on
+  future questionnaire edits unless such a feature actually ships). The 13+/UGC answers are
+  accurate and stay.
 - **Encryption docs:** none needed (plist flag handles it). ✅
 - **Digital Services Act (DSA):** declared **"not a trader"** → app excluded from EU,
   home address NOT published, **175 countries available**. (Trader path would publish
