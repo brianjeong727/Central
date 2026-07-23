@@ -2,9 +2,10 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
-import { computeFinanceCapability } from "./finance-auth"
+import { computeFinanceCapability, getFinanceCapability } from "./finance-auth"
 import { requireTeamMemberOrAdmin, requireSameMinistry } from "./authz"
 import { isAdminRole } from "@/lib/roles"
+import type { BudgetEntry } from "./reimbursements"
 
 export interface ReceiptLimit {
   id: string
@@ -52,6 +53,9 @@ export interface ReceiptAllocation {
   reviewed_at: string | null
   signed_off_at: string | null
   decision_reason: string | null
+  // True once this reimbursed split has been posted to the budget ledger
+  // (a budget_entries row references it via receipt_allocation_id).
+  postedToBudget: boolean
 }
 
 // Resolve a fund string/id hint to a finance_funds.id for the ministry. Falls
@@ -165,9 +169,13 @@ export async function submitReceipt(params: {
 }
 
 // Recompute the receipt-level DERIVED rollup from its allocation statuses. Call
-// at the end of every allocation write. reimbursed if all reimbursed; else
-// rejected if all terminal-negative; else pending if any still in-flight; else a
-// mix of reimbursed + terminal → partial.
+// at the end of every allocation write. All reimbursed → reimbursed; all
+// terminal-negative → rejected; otherwise surface the BOTTLENECK stage among the
+// non-terminal splits (any pending → pending; else any approved → approved; else
+// requested) so entry views show the real intermediate stage instead of a
+// collapsed "pending". Single-split receipts (the norm) mirror their split
+// exactly. A mix of reimbursed + terminal-negative with nothing in flight stays
+// 'partial'.
 async function recomputeReceiptStatus(
   admin: ReturnType<typeof createAdminClient>,
   receiptId: string,
@@ -184,8 +192,13 @@ async function recomputeReceiptStatus(
   if (statuses.length > 0) {
     if (statuses.every(s => s === "reimbursed")) rollup = "reimbursed"
     else if (statuses.every(s => s === "rejected" || s === "declined")) rollup = "rejected"
-    else if (statuses.some(s => s === "pending" || s === "approved" || s === "requested")) rollup = "pending"
-    else rollup = "partial"
+    else {
+      const nonTerminal = statuses.filter(s => s === "pending" || s === "approved" || s === "requested")
+      if (nonTerminal.length === 0) rollup = "partial" // only reimbursed + terminal-negative remain
+      else if (nonTerminal.includes("pending")) rollup = "pending"
+      else if (nonTerminal.includes("approved")) rollup = "approved"
+      else rollup = "requested"
+    }
   }
 
   await admin.from("receipts").update({ status: rollup }).eq("id", receiptId).eq("ministry_id", ministryId)
@@ -308,6 +321,22 @@ export async function getReimbursementInbox(
       }
     }
 
+    // Posted-to-budget state: which of these allocations already have a
+    // budget_entries row (separate query on receipt_allocation_id — NOT a
+    // PostgREST embed — ministry-scoped, this file's established pattern).
+    const allocIds = allocData.map(a => a.id)
+    const postedAllocIds = new Set<string>()
+    if (allocIds.length > 0) {
+      const { data: postedRows } = await admin
+        .from("budget_entries")
+        .select("receipt_allocation_id")
+        .eq("ministry_id", ministryId)
+        .in("receipt_allocation_id", allocIds)
+      for (const p of (postedRows ?? []) as { receipt_allocation_id: string | null }[]) {
+        if (p.receipt_allocation_id) postedAllocIds.add(p.receipt_allocation_id)
+      }
+    }
+
     for (const a of allocData) {
       const fund = fundMeta.get(a.fund_id)
       const alloc: ReceiptAllocation = {
@@ -321,6 +350,7 @@ export async function getReimbursementInbox(
         reviewed_at: a.reviewed_at,
         signed_off_at: a.signed_off_at,
         decision_reason: a.decision_reason,
+        postedToBudget: postedAllocIds.has(a.id),
       }
       const list = allocsByReceipt.get(a.receipt_id) ?? []
       list.push(alloc)
@@ -463,10 +493,22 @@ export async function signOffAllocation(allocationId: string, ministryId: string
 
 // church: approved → declined (president, terminal).
 export async function declineAllocation(allocationId: string, ministryId: string, reason?: string): Promise<{ error: string | null }> {
-  return transitionAllocation({
+  const res = await transitionAllocation({
     allocationId, ministryId, need: "signoff", requireKind: "church", from: "approved",
     patch: (uid) => ({ status: "declined", signed_off_by: uid, signed_off_at: new Date().toISOString(), decision_reason: reason?.trim() || null }),
   })
+  if (res.error) return res
+  // A declined split must not leave 'Reimbursement' spend stranded in the ledger:
+  // an approve-time auto-post (U1) already created a budget_entries row, so drop it
+  // now. Admin client mirrors the decline pattern's own privilege (budget_entries
+  // DELETE RLS is admin/leader-only; capability was already verified inside
+  // transitionAllocation → authorizeFinanceAction). Recompute already ran there.
+  await createAdminClient()
+    .from("budget_entries")
+    .delete()
+    .eq("receipt_allocation_id", allocationId)
+    .eq("ministry_id", ministryId)
+  return res
 }
 
 // external: requested → reimbursed (treasurer confirms the grant paid out).
@@ -479,10 +521,19 @@ export async function confirmExternalReimbursed(allocationId: string, ministryId
 
 // external: requested → declined (grant denied, terminal).
 export async function declineExternalAllocation(allocationId: string, ministryId: string, reason?: string): Promise<{ error: string | null }> {
-  return transitionAllocation({
+  const res = await transitionAllocation({
     allocationId, ministryId, need: "approve", requireKind: "external", from: "requested",
     patch: (uid) => ({ status: "declined", decision_reason: reason?.trim() || null }),
   })
+  if (res.error) return res
+  // Same reason as declineAllocation: a split posted at 'requested' (postable status)
+  // must not leave stranded 'Reimbursement' spend in the ledger once it's declined.
+  await createAdminClient()
+    .from("budget_entries")
+    .delete()
+    .eq("receipt_allocation_id", allocationId)
+    .eq("ministry_id", ministryId)
+  return res
 }
 
 // ── Split editing (treasurer-owned) ──────────────────────────────────────────
@@ -551,6 +602,165 @@ export async function setReceiptAllocations(
 
   await recomputeReceiptStatus(admin, receiptId, ministryId)
   return { error: null }
+}
+
+// Splits that may be posted to the budget ledger. Approve-time auto-post (U1)
+// posts a church split at 'approved'; an external split can post at 'requested';
+// the legacy fallback still posts 'reimbursed' splits. All three are terminal-
+// enough that the spend is real.
+const POSTABLE_STATUSES = new Set(["approved", "requested", "reimbursed"])
+
+// ── Post an approved/reimbursed split to the budget ledger ───────────────────
+// The treasurer-driven bridge: a single approved (or reimbursed) allocation becomes
+// ONE budget_entries row (source='reimbursement', receipt_allocation_id = split id).
+// The UNIQUE constraint on receipt_allocation_id makes this idempotent — a second
+// post surfaces a friendly "already posted" error. Amount / fund / date /
+// description are DERIVED server-side from the split + its receipt (the caller
+// only chooses the budget category). Inserted via the user client so the
+// budget_entries INSERT RLS (admin/leader OR finance permission) is the real gate;
+// the ministry check here is defense-in-depth (Convention #8).
+export async function postAllocationToBudget(
+  allocationId: string,
+  ministryId: string,
+  category: string,
+): Promise<{ data: BudgetEntry | null; error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: null, error: "Not authenticated" }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("ministry_id")
+    .eq("id", user.id)
+    .maybeSingle()
+  if (!profile?.ministry_id || profile.ministry_id !== ministryId) return { data: null, error: "Not authorized" }
+
+  if (!category.trim()) return { data: null, error: "Please choose a budget category." }
+
+  const admin = createAdminClient()
+
+  // Fetch the split and verify it belongs to this ministry and is reimbursed.
+  const { data: alloc } = await admin
+    .from("receipt_fund_allocations")
+    .select("id, receipt_id, ministry_id, fund_id, amount, status")
+    .eq("id", allocationId)
+    .eq("ministry_id", ministryId)
+    .maybeSingle<AllocRow & { amount: number }>()
+  if (!alloc) return { data: null, error: "Allocation not found." }
+  if (alloc.ministry_id !== ministryId) return { data: null, error: "Not authorized" }
+  if (!POSTABLE_STATUSES.has(alloc.status)) return { data: null, error: "Only approved or reimbursed splits can be posted to the budget." }
+
+  // Derive fund slug + the receipt's purchase date / event name / submitter.
+  const [{ data: fundRow }, { data: receipt }] = await Promise.all([
+    admin.from("finance_funds").select("slug").eq("id", alloc.fund_id).eq("ministry_id", ministryId).maybeSingle<{ slug: string }>(),
+    admin.from("receipts").select("event_name, purchase_date, submitted_by_name").eq("id", alloc.receipt_id).eq("ministry_id", ministryId).maybeSingle<{ event_name: string | null; purchase_date: string; submitted_by_name: string | null }>(),
+  ])
+  if (!receipt) return { data: null, error: "Receipt not found." }
+
+  const descParts = [receipt.event_name?.trim(), receipt.submitted_by_name?.trim()].filter(Boolean)
+  const description = descParts.length ? descParts.join(" · ") : null
+
+  const { data, error } = await supabase
+    .from("budget_entries")
+    .insert({
+      ministry_id: ministryId,
+      entry_date: receipt.purchase_date,
+      category: category.trim(),
+      description,
+      amount: Number(alloc.amount),
+      source: "reimbursement",
+      fund: fundRow?.slug ?? null,
+      receipt_allocation_id: alloc.id,
+      created_by: user.id,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    // Unique violation on receipt_allocation_id → already posted (idempotent).
+    if (error.code === "23505") return { data: null, error: "This split is already in the budget." }
+    return { data: null, error: error.message }
+  }
+  return { data: data as BudgetEntry, error: null }
+}
+
+// ── Undo an approve-and-post (U1) ────────────────────────────────────────────
+// Reverses the one-motion Approve → post: deletes the budget_entries row linked to
+// the split and resets the split from 'approved' back to 'pending'. Only valid
+// while the split is still 'approved' (nothing downstream has happened). Uses the
+// admin client AFTER the finance-capability check because budget_entries DELETE RLS
+// is admin/leader-only — a treasurer who is not admin/leader would be RLS-blocked
+// on the user client (mirrors upsertBudgetAllocation's admin-after-check pattern).
+export async function undoApproveAndPost(
+  allocationId: string,
+  ministryId: string,
+): Promise<{ error: string | null }> {
+  const cap = await getFinanceCapability(ministryId)
+  if (!cap.authed || !cap.canApprove) return { error: "Not authorized" }
+
+  const admin = createAdminClient()
+  const { data: alloc } = await admin
+    .from("receipt_fund_allocations")
+    .select("id, receipt_id, ministry_id, status")
+    .eq("id", allocationId)
+    .eq("ministry_id", ministryId)
+    .maybeSingle<{ id: string; receipt_id: string; ministry_id: string; status: string }>()
+  if (!alloc) return { error: "Allocation not found." }
+  if (alloc.status !== "approved") return { error: "This split can no longer be undone." }
+
+  // Reset the split to pending FIRST, status-guarded on 'approved'. If a concurrent
+  // sign-off already moved it to 'reimbursed' the guard matches zero rows and we
+  // bail WITHOUT touching the ledger — so a reimbursed split is never stranded
+  // entry-less (the delete only runs once we've won the status race).
+  const { data: updated, error: updErr } = await admin
+    .from("receipt_fund_allocations")
+    .update({ status: "pending", reviewed_by: null, reviewed_at: null })
+    .eq("id", allocationId)
+    .eq("ministry_id", ministryId)
+    .eq("status", "approved")
+    .select("id")
+  if (updErr) return { error: updErr.message }
+  if (!updated || updated.length === 0) return { error: "This split can no longer be undone." }
+
+  // Now that we own the transition, delete the linked budget entry (admin client —
+  // see note above).
+  const { error: delErr } = await admin
+    .from("budget_entries")
+    .delete()
+    .eq("ministry_id", ministryId)
+    .eq("receipt_allocation_id", allocationId)
+  if (delErr) return { error: delErr.message }
+
+  await recomputeReceiptStatus(admin, alloc.receipt_id, ministryId)
+  return { error: null }
+}
+
+// Cheap head-count of pending standalone receipts for the Reimbursements nav badge.
+// Gated on finance capability (returns 0 for non-finance callers) so the count never
+// leaks; scoped to the ministry's standalone (non-form-linked) receipts.
+export async function getPendingReceiptCount(ministryId: string): Promise<{ count: number }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { count: 0 }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("ministry_id, role")
+    .eq("id", user.id)
+    .maybeSingle()
+  if (!profile?.ministry_id || profile.ministry_id !== ministryId) return { count: 0 }
+
+  const admin = createAdminClient()
+  const { canApprove, canSignOff, canView } = await computeFinanceCapability(admin, ministryId, user.id, profile.role ?? "")
+  if (!canApprove && !canSignOff && !canView) return { count: 0 }
+
+  const { count } = await admin
+    .from("receipts")
+    .select("id", { count: "exact", head: true })
+    .eq("ministry_id", ministryId)
+    .is("reimbursement_form_id", null)
+    .eq("status", "pending")
+  return { count: count ?? 0 }
 }
 
 export interface SubmittedReceipt {

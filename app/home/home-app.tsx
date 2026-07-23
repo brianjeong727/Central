@@ -427,13 +427,15 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // Finance Team section state — lifted here so it drives the sidebar nav (not a content strip)
   const validFinanceSections = ["reimbursements", "budget", "allocation"] as const
   const initialFinanceSection = searchParams.get("fsec")
+  // Finance workspace lands on Allocation by default; an explicit ?fsec deep-link
+  // (reimbursements/budget) is respected. Allocation is the param-less default.
   const [financeTeamSection, setFinanceTeamSection] = useState<string>(
-    initialFinanceSection && (validFinanceSections as readonly string[]).includes(initialFinanceSection) ? initialFinanceSection : "reimbursements"
+    initialFinanceSection && (validFinanceSections as readonly string[]).includes(initialFinanceSection) ? initialFinanceSection : "allocation"
   )
 
   function handleFinanceSectionChange(s: string) {
     setFinanceTeamSection(s)
-    replaceParam("fsec", s === "reimbursements" ? null : s)
+    replaceParam("fsec", s === "allocation" ? null : s)
     bumpCloseSubpage()
   }
 
@@ -492,6 +494,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     />
   ) : isFinanceActive ? (
     <FinanceSectionNav
+      ministryId={ministryId}
       active={financeTeamSection}
       onChange={handleFinanceSectionChange}
     />

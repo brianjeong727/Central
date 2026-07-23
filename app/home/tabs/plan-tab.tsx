@@ -22,7 +22,8 @@ import { useSubpageCrumbs, useBreadcrumbExtra } from "../breadcrumb-context"
 function currentFiscalYear(): string {
   const now = new Date()
   const y = now.getFullYear()
-  return now.getMonth() >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`
+  // Fiscal year runs Jun 1 – May 31; rolls to the next pair on June 1.
+  return now.getMonth() >= 5 ? `${y}-${y + 1}` : `${y - 1}-${y}`
 }
 import { runAlgorithm, runSmallGroupAlgorithm, type PoolPerson, type GeneratedGroup, type PrevPairing, type DGLLeader, type SGGeneratedGroup } from "@/lib/group-algorithm"
 import {
@@ -51,7 +52,7 @@ import { PageTitle } from "@/components/central/page-title"
 import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
 import { FinanceWorkspace, MobileFactsGrid, type FinanceSection } from "../components/finance-workspace"
 import { MobilePocketHub } from "../components/mobile-pocket-hub"
-import { getReimbursementInbox } from "@/app/actions/receipts"
+import { getReimbursementInbox, getPendingReceiptCount } from "@/app/actions/receipts"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
@@ -2431,7 +2432,7 @@ export function PlanTab({
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
   const [showEditEvent, setShowEditEvent] = useState(false)
   // Finance section is lifted to home-app (drives the sidebar nav on desktop) and synced to ?fsec.
-  const financeSection = (financeSectionProp ?? "reimbursements") as FinanceSection
+  const financeSection = (financeSectionProp ?? "allocation") as FinanceSection
   const setFinanceSection = (s: FinanceSection) => onFinanceSectionChange?.(s)
   const [studentOrgRefreshSignal, setStudentOrgRefreshSignal] = useState(0)
   function getPickerSectionCount(team: UserTeam): number {
@@ -3162,9 +3163,9 @@ export function PlanTab({
                 groups={[{
                   label: "Sections",
                   rows: [
-                    { iconKey: "clipboard", title: "Reimbursements", subtitle: financeReimbSub, onClick: () => setFinanceMobileSectionAndUrl("reimbursements") },
-                    { iconKey: "dollar", title: "Budget", subtitle: "Expense ledger & category totals", onClick: () => setFinanceMobileSectionAndUrl("budget") },
                     { iconKey: "sliders", title: "Allocation", subtitle: "Plan the fiscal year's budget", onClick: () => setFinanceMobileSectionAndUrl("allocation") },
+                    { iconKey: "dollar", title: "Budget", subtitle: "Expense ledger & category totals", onClick: () => setFinanceMobileSectionAndUrl("budget") },
+                    { iconKey: "clipboard", title: "Reimbursements", subtitle: financeReimbSub, onClick: () => setFinanceMobileSectionAndUrl("reimbursements") },
                   ],
                 }]}
               />
@@ -3475,17 +3476,29 @@ export function SmallGroupSectionNav({
 // Vertical sidebar nav for the Finance Team workspace on desktop.
 // Renders in place of the flat team list in DesktopSidebar when a finance team is active.
 export function FinanceSectionNav({
+  ministryId,
   active,
   onChange,
 }: {
+  ministryId: string
   active: string
   onChange: (s: string) => void
 }) {
+  // Allocation-first (matches Allocation-as-landing + the prototype): Allocation,
+  // Budget, Reimbursements top-to-bottom.
   const sections = [
-    { key: "reimbursements", label: "Reimbursements" },
-    { key: "budget", label: "Budget" },
     { key: "allocation", label: "Allocation" },
+    { key: "budget", label: "Budget" },
+    { key: "reimbursements", label: "Reimbursements" },
   ]
+  // Live pending-receipt count for the Reimbursements badge. Shares its SWR key
+  // with FinanceWorkspace, which revalidates it after approve/undo so the badge
+  // stays in sync. Finance capability is re-derived server-side (0 for non-finance).
+  const { data: pendingRes } = useSWR(
+    ["finance-pending-count", ministryId] as const,
+    () => getPendingReceiptCount(ministryId),
+  )
+  const pending = pendingRes?.count ?? 0
   return (
     <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
       {sections.map(s => (
@@ -3495,6 +3508,18 @@ export function FinanceSectionNav({
           onClick={() => onChange(s.key)}
         >
           <span style={{ flex: 1 }}>{s.label}</span>
+          {s.key === "reimbursements" && pending > 0 && (
+            <span
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999,
+                background: "var(--plum-2)", color: "var(--cream-on-dark)",
+                fontSize: 12, fontWeight: 500, fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {pending}
+            </span>
+          )}
         </button>
       ))}
     </div>

@@ -85,6 +85,11 @@ test.describe("finance overhaul P1 — split allocations", () => {
   test.afterAll(async () => {
     const sb = sandbox()
     if (receiptId) {
+      // The church split now posts to the budget ledger at approve-time (U1) —
+      // clean up its budget_entries row before deleting the allocation/receipt.
+      const { data: allocs } = await sb.client.from("receipt_fund_allocations").select("id").eq("receipt_id", receiptId)
+      const allocIds = ((allocs ?? []) as { id: string }[]).map(a => a.id)
+      if (allocIds.length) await sb.client.from("budget_entries").delete().in("receipt_allocation_id", allocIds)
       await sb.client.from("receipt_fund_allocations").delete().eq("receipt_id", receiptId)
       await sb.client.from("receipts").delete().eq("id", receiptId)
     }
@@ -97,12 +102,14 @@ test.describe("finance overhaul P1 — split allocations", () => {
   })
 
   test("reimbursements inbox surfaces the split; full edit-split -> approve -> sign-off -> request -> reimburse lifecycle", async ({ page }) => {
-    await page.goto(`/home?tab=plan&team=${financeTeamId}`)
+    await page.goto(`/home?tab=plan&team=${financeTeamId}&fsec=reimbursements`)
     await expect(page.getByText("Reimbursements inbox")).toBeVisible({ timeout: 15000 })
 
     // The seeded pending Church allocation surfaces under "Needs action" (default
-    // filter) — admin canApprove, church-pending needs approval.
-    const row = page.getByText("E2E Submitter", { exact: true })
+    // filter) — admin canApprove, church-pending needs approval. Rows now render
+    // "Name · Team" on one combined line (deliverable 5), so anchor on the
+    // (unique, single-text-node) dollar amount rather than the submitter name.
+    const row = page.getByText("$111.17", { exact: true }).locator("xpath=ancestor::div[1]")
     await expect(row).toBeVisible({ timeout: 15000 })
     if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/1-needs-action-row.png` })
     await row.click()
@@ -156,13 +163,23 @@ test.describe("finance overhaul P1 — split allocations", () => {
     const churchCard = churchAmount.locator("xpath=ancestor::div[3]")
     const cmuCard = cmuAmount.locator("xpath=ancestor::div[3]")
 
-    // ── Approve the Church allocation (treasurer), then sign off (president) ──
+    // ── Approve the Church allocation: one motion (U1) — a category confirm
+    //    (pre-matched, then explicitly set) -> approve + post to the ledger. ───
     await churchCard.getByRole("button", { name: "Approve" }).click()
+    const churchCategorySelect = churchCard.locator("select")
+    await expect(churchCategorySelect).toBeVisible()
+    await churchCategorySelect.selectOption({ label: "DG Dinner" })
+    if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/4b-church-approve-category-confirm.png` })
+    await churchCard.getByRole("button", { name: "Approve & post" }).click()
     await expect(churchCard.getByRole("button", { name: "Reject" })).toHaveCount(0, { timeout: 10000 })
-    await expect(churchCard.getByRole("button", { name: "Sign off" })).toBeVisible()
+    await expect(churchCard.getByRole("button", { name: "Sign off" })).toBeVisible({ timeout: 15000 })
     await churchCard.getByRole("button", { name: "Sign off" }).click()
     await expect(churchCard.getByRole("button", { name: "Decline" })).toHaveCount(0, { timeout: 10000 })
     await expect(churchCard.getByText("Reimbursed", { exact: true }).first()).toBeVisible()
+    // U5: a fresh church approval posts at approve-time — no fallback "Add to
+    // budget" ghost affordance ever shows for it; it's already "In budget".
+    await expect(churchCard.getByText("In budget")).toBeVisible({ timeout: 10000 })
+    await expect(churchCard.getByRole("button", { name: "Add to budget" })).toHaveCount(0)
     if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/5-church-reimbursed.png` })
 
     // ── External (CMU) allocation: File grant request → Confirm reimbursed ───
@@ -171,6 +188,9 @@ test.describe("finance overhaul P1 — split allocations", () => {
     await expect(cmuCard.getByRole("button", { name: "Confirm reimbursed" })).toBeVisible()
     await cmuCard.getByRole("button", { name: "Confirm reimbursed" }).click()
     await expect(cmuCard.getByRole("button", { name: "Decline" })).toHaveCount(0, { timeout: 10000 })
+    // External funds don't route through the approve->post motion — U5's
+    // fallback "Add to budget" affordance still shows for them.
+    await expect(cmuCard.getByRole("button", { name: "Add to budget" })).toBeVisible({ timeout: 10000 })
     if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/6-both-sources-reimbursed.png` })
 
     // ── Settings → Funds section (independent of the broken join — uses

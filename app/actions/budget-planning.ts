@@ -14,24 +14,45 @@ export interface BudgetAllocation {
   notes: string | null
 }
 
+// One row per (category, fund). `fund` is the slug stored on budget_entries, or
+// null for legacy entries with no fund attributed. Consumers that want a
+// category-level total sum across all funds for that category.
 export interface CategoryActual {
   category: string
+  fund: string | null
   total_spent: number
 }
 
 function currentFiscalYear(): string {
   const now = new Date()
   const y = now.getFullYear()
-  // Academic year: Aug–Jul. Month >= 7 (0-indexed Aug) → current/next year
-  return now.getMonth() >= 7 ? `${y}-${y + 1}` : `${y - 1}-${y}`
+  // Fiscal year runs Jun 1 – May 31; on June 1 the label rolls to the next pair.
+  // Month >= 5 (0-indexed June) → the year that just started.
+  return now.getMonth() >= 5 ? `${y}-${y + 1}` : `${y - 1}-${y}`
 }
 
 function fiscalYearToDateRange(fiscalYear: string): { start: string; end: string } {
   const [startYear, endYear] = fiscalYear.split("-").map(Number)
   return {
-    start: `${startYear}-08-01`,
-    end:   `${endYear}-07-31`,
+    start: `${startYear}-06-01`,
+    end:   `${endYear}-05-31`,
   }
+}
+
+// Historical allocation years (any year with ministry_budgets rows) + the current
+// fiscal year — never future years. Sorted ascending; the current year is last.
+export async function getAllocationYears(
+  ministryId: string,
+): Promise<{ data: string[]; error: string | null }> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("ministry_budgets")
+    .select("fiscal_year")
+    .eq("ministry_id", ministryId)
+  if (error) return { data: [currentFiscalYear()], error: error.message }
+  const years = new Set((data ?? []).map((r) => (r as { fiscal_year: string }).fiscal_year))
+  years.add(currentFiscalYear())
+  return { data: Array.from(years).sort(), error: null }
 }
 
 export async function getBudgetAllocations(
@@ -97,23 +118,27 @@ export async function getCategoryActuals(
 
   const { data, error } = await supabase
     .from("budget_entries")
-    .select("category, amount")
+    .select("category, amount, fund")
     .eq("ministry_id", ministryId)
     .gte("entry_date", start)
     .lte("entry_date", end)
 
   if (error) return { data: [], error: error.message }
 
-  // Aggregate by category client-side (Supabase JS doesn't expose GROUP BY cleanly)
-  const totals = new Map<string, number>()
-  for (const row of (data ?? []) as { category: string; amount: number }[]) {
-    totals.set(row.category, (totals.get(row.category) ?? 0) + Number(row.amount))
+  // Aggregate by (category, fund) client-side (Supabase JS doesn't expose GROUP BY
+  // cleanly). A category-level total is the sum across its fund rows; per-fund
+  // rows drive the overview's fund breakdown (legacy null-fund rows still count
+  // into the category total but carry no fund).
+  const totals = new Map<string, CategoryActual>()
+  for (const row of (data ?? []) as { category: string; amount: number; fund: string | null }[]) {
+    const fund = row.fund ?? null
+    const key = `${row.category}::${fund ?? ""}`
+    const cur = totals.get(key) ?? { category: row.category, fund, total_spent: 0 }
+    cur.total_spent += Number(row.amount)
+    totals.set(key, cur)
   }
 
-  return {
-    data: Array.from(totals.entries()).map(([category, total_spent]) => ({ category, total_spent })),
-    error: null,
-  }
+  return { data: Array.from(totals.values()), error: null }
 }
 
 export interface BudgetCategory {
