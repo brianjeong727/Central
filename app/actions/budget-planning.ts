@@ -14,8 +14,12 @@ export interface BudgetAllocation {
   notes: string | null
 }
 
+// One row per (category, fund). `fund` is the slug stored on budget_entries, or
+// null for legacy entries with no fund attributed. Consumers that want a
+// category-level total sum across all funds for that category.
 export interface CategoryActual {
   category: string
+  fund: string | null
   total_spent: number
 }
 
@@ -114,23 +118,27 @@ export async function getCategoryActuals(
 
   const { data, error } = await supabase
     .from("budget_entries")
-    .select("category, amount")
+    .select("category, amount, fund")
     .eq("ministry_id", ministryId)
     .gte("entry_date", start)
     .lte("entry_date", end)
 
   if (error) return { data: [], error: error.message }
 
-  // Aggregate by category client-side (Supabase JS doesn't expose GROUP BY cleanly)
-  const totals = new Map<string, number>()
-  for (const row of (data ?? []) as { category: string; amount: number }[]) {
-    totals.set(row.category, (totals.get(row.category) ?? 0) + Number(row.amount))
+  // Aggregate by (category, fund) client-side (Supabase JS doesn't expose GROUP BY
+  // cleanly). A category-level total is the sum across its fund rows; per-fund
+  // rows drive the overview's fund breakdown (legacy null-fund rows still count
+  // into the category total but carry no fund).
+  const totals = new Map<string, CategoryActual>()
+  for (const row of (data ?? []) as { category: string; amount: number; fund: string | null }[]) {
+    const fund = row.fund ?? null
+    const key = `${row.category}::${fund ?? ""}`
+    const cur = totals.get(key) ?? { category: row.category, fund, total_spent: 0 }
+    cur.total_spent += Number(row.amount)
+    totals.set(key, cur)
   }
 
-  return {
-    data: Array.from(totals.entries()).map(([category, total_spent]) => ({ category, total_spent })),
-    error: null,
-  }
+  return { data: Array.from(totals.values()), error: null }
 }
 
 export interface BudgetCategory {
