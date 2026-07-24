@@ -10,7 +10,7 @@ import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
@@ -343,7 +343,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
           <button
             onClick={handleCreate}
             disabled={creating || !effectiveName.trim()}
-            className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-semibold rounded-full active:scale-[0.97] transition-[transform,background-color] duration-150 text-[15px] tracking-wide"
+            className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-[0.45] md:disabled:opacity-50 text-white font-semibold rounded-full active:scale-[0.97] transition-[transform,background-color] duration-150 text-[15px] tracking-wide"
             style={{ minHeight: 50 }}
           >
             {creating ? "Creating…" : isDM ? `Message ${selectedMembers[0]?.name.split(" ")[0]}` : `Create Chat${selectedMembers.length > 0 ? ` · ${selectedMembers.length + 1} members` : ""}`}
@@ -413,6 +413,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const [pinned, setPinned] = useState(false)
   const [pendingMuted, setPendingMuted] = useState(false)
   const [pendingPinned, setPendingPinned] = useState(false)
+  // Church-chat SECTION ("Presets + reassign"): baseline mirrors groups.category,
+  // pendingCategory is staged like mute/pin and committed on the same Save bar.
+  const [category, setCategory] = useState<ChurchSection>("general")
+  const [pendingCategory, setPendingCategory] = useState<ChurchSection>("general")
   const [savingPrefs, setSavingPrefs] = useState(false)
   const [prefError, setPrefError] = useState<string | null>(null)
   const prefsSeeded = useRef(false)
@@ -445,7 +449,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const { data: settingsData, mutate: mutateSettings } = useSWR(
     groupId ? ["group-settings", groupId] : null,
     async () => {
-      const [{ data }, { data: prefData }] = await Promise.all([
+      const [{ data }, { data: prefData }, { data: groupRow }] = await Promise.all([
         supabase
           .from("group_members")
           .select("user_id, profiles!user_id(name, role, graduation_year, avatar_url)")
@@ -455,6 +459,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           .select("muted, pinned")
           .eq("group_id", groupId)
           .eq("user_id", userId)
+          .maybeSingle(),
+        supabase
+          .from("groups")
+          .select("category")
+          .eq("id", groupId)
           .maybeSingle(),
       ])
       const mapped: GroupMember[] = (data ?? []).map((m: {
@@ -470,7 +479,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           avatar_url: p?.avatar_url ?? null,
         }
       })
-      return { members: mapped, pref: (prefData as { muted: boolean | null; pinned: boolean | null } | null) ?? null }
+      const cat = (groupRow as { category: string | null } | null)?.category
+      const category: ChurchSection = cat === "team" ? "team" : cat === "group" ? "group" : "general"
+      return { members: mapped, pref: (prefData as { muted: boolean | null; pinned: boolean | null } | null) ?? null, category }
     }
   )
   const loading = !settingsData
@@ -484,10 +495,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     setMembers(settingsData.members)
     setMuted(settingsData.pref?.muted ?? false)
     setPinned(settingsData.pref?.pinned ?? false)
+    setCategory(settingsData.category)
     if (!prefsSeeded.current) {
       prefsSeeded.current = true
       setPendingMuted(settingsData.pref?.muted ?? false)
       setPendingPinned(settingsData.pref?.pinned ?? false)
+      setPendingCategory(settingsData.category)
     }
   }, [settingsData])
 
@@ -518,7 +531,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
   // ── Chat prefs (mute/pin): stage locally, commit on Save. Member changes still
   //    persist immediately (optimistic + rollback); only prefs are staged. ──
-  const prefsDirty = pendingMuted !== muted || pendingPinned !== pinned
+  const canReassignSection = isChurch && canManage && !isCentralChat
+  const prefsDirty = pendingMuted !== muted || pendingPinned !== pinned || (canReassignSection && pendingCategory !== category)
 
   // Patch the shared chat-list SWR cache so the list's muted/pinned indicators +
   // pinned-float + muted-badge-suppression react instantly (Convention #4), the
@@ -534,33 +548,52 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   function handleCancelPrefs() {
     setPendingMuted(muted)
     setPendingPinned(pinned)
+    setPendingCategory(category)
     setPrefError(null)
   }
 
   async function handleSavePrefs() {
     const mutedChanged = pendingMuted !== muted
     const pinnedChanged = pendingPinned !== pinned
-    if (!mutedChanged && !pinnedChanged) return
+    const categoryChanged = canReassignSection && pendingCategory !== category
+    if (!mutedChanged && !pinnedChanged && !categoryChanged) return
     setSavingPrefs(true)
     setPrefError(null)
-    const update: { muted?: boolean; pinned?: boolean } = {}
-    if (mutedChanged) update.muted = pendingMuted
-    if (pinnedChanged) update.pinned = pendingPinned
-    // Optimistic global patch, then commit only the changed values.
-    patchChatListPref(update)
-    const { error: err } = await supabase.from("group_members").update(update).eq("group_id", groupId).eq("user_id", userId)
+    // Per-user prefs live on group_members; the SECTION lives on groups. Patch the
+    // shared chat-list cache optimistically (category re-buckets the list instantly),
+    // then commit each changed store. Any failure rolls cache + pending back.
+    const memberUpdate: { muted?: boolean; pinned?: boolean } = {}
+    if (mutedChanged) memberUpdate.muted = pendingMuted
+    if (pinnedChanged) memberUpdate.pinned = pendingPinned
+    patchChatListPref({ ...memberUpdate, ...(categoryChanged ? { category: pendingCategory } : {}) })
+    let err: { message: string } | null = null
+    if (mutedChanged || pinnedChanged) {
+      const res = await supabase.from("group_members").update(memberUpdate).eq("group_id", groupId).eq("user_id", userId)
+      err = res.error
+    }
+    if (!err && categoryChanged) {
+      const res = await supabase.from("groups").update({ category: pendingCategory }).eq("id", groupId).eq("ministry_id", ministryId)
+      err = res.error
+    }
     if (err) {
       // Roll the cache + pending back to the saved baseline.
-      patchChatListPref({ muted, pinned })
+      patchChatListPref({ muted, pinned, category })
       setPendingMuted(muted)
       setPendingPinned(pinned)
+      setPendingCategory(category)
       setPrefError("Couldn't save. Please try again.")
       setSavingPrefs(false)
       return
     }
+    // Post a system note for a section move (mirrors handleRename's system message).
+    if (categoryChanged) {
+      const label = CHURCH_SECTION_DEFS.find((s) => s.key === pendingCategory)?.label ?? "General"
+      await supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `Chat moved to ${label}`, message_type: "system" })
+    }
     setMuted(pendingMuted)
     setPinned(pendingPinned)
-    mutateSettings((cur) => cur ? { ...cur, pref: { muted: pendingMuted, pinned: pendingPinned } } : cur, { revalidate: false })
+    setCategory(pendingCategory)
+    mutateSettings((cur) => cur ? { ...cur, pref: { muted: pendingMuted, pinned: pendingPinned }, category: pendingCategory } : cur, { revalidate: false })
     setSavingPrefs(false)
   }
 
@@ -640,6 +673,16 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const crumbs: Crumb[] = showAddMembers
     ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) } }, { label: "Add members" }]
     : [{ label: displayGroupName, onClick: onBack }, { label: "Settings" }]
+
+  // Mobile role tag (Pocket §4): plum "role" pill for admin/leader tier, hairline
+  // "outline" for visitor, tonal "default" otherwise. Label via the same roleLabel
+  // aliasing as the desktop badge (keeps the super-account "Super" alias).
+  function pocketRoleVariant(role: string): "default" | "role" | "outline" {
+    const r = role.toLowerCase()
+    if (isChatManageRole(r)) return "role"
+    if (r === "visitor") return "outline"
+    return "default"
+  }
 
   function roleBadge(role: string, size: "sm" | "md", personId?: string | null) {
     const r = role.toLowerCase()
@@ -733,8 +776,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         <>
         {/* Mobile (SubpageShell title is desktop-only, so mobile keeps its own header) */}
         <div className="md:hidden">
-          <div className="flex items-center gap-4 mb-6" style={{ paddingTop: 4 }}>
-            <MonogramChip initials={getInitials(displayGroupName)} className="w-12 h-12 font-medium text-[14px]" />
+          <div className="flex items-center gap-3.5 mb-7" style={{ paddingTop: 4 }}>
+            <MonogramChip initials={getInitials(displayGroupName)} className="w-14 h-14 font-medium text-[18px]" />
             <div className="flex-1 min-w-0">
               {renaming ? (
                 <input
@@ -743,25 +786,26 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") handleRename(); if (e.key === "Escape") { setRenaming(false); setNewName(displayGroupName) } }}
                   onBlur={handleRename}
-                  className="text-[17px] font-medium bg-transparent outline-none border-none w-full"
-                  style={{ color: "var(--ink)", borderBottom: "1px solid var(--line-2)", padding: 0 }}
+                  className="text-[19px] font-semibold bg-transparent outline-none border-none w-full"
+                  style={{ color: "var(--ink)", letterSpacing: "-0.01em", borderBottom: "1px solid var(--line-2)", padding: 0 }}
                 />
               ) : (
                 <div className="group flex items-center gap-1.5" style={{ cursor: canManage && !isCentralChat ? "text" : "default" }} onClick={canManage && !isCentralChat ? () => { setRenaming(true); setNewName(displayGroupName) } : undefined}>
-                  <h2 className="text-[17px] font-medium truncate" style={{ color: "var(--ink)" }}>{displayGroupName}</h2>
-                  {canManage && !isCentralChat && <Pencil style={{ width: 12, height: 12, color: "var(--muted-text)", flexShrink: 0 }} />}
+                  <h2 className="text-[19px] font-semibold truncate" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>{displayGroupName}</h2>
+                  {canManage && !isCentralChat && <Pencil style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />}
                 </div>
               )}
-              <p className="text-[12px] mt-0.5" style={{ color: "var(--muted-text)" }}>{typeLabel} · {members.length} member{members.length !== 1 ? "s" : ""}</p>
+              <p className="text-[13.5px] mt-0.5" style={{ color: "var(--muted-text)" }}>{typeLabel} · {members.length} member{members.length !== 1 ? "s" : ""}</p>
             </div>
           </div>
 
-          <div className="flex items-center justify-between mb-3">
-            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Members</span>
-            {canManage && (
-              <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="text-[12px] font-medium" style={{ color: "var(--plum)" }}>+ Add</button>
-            )}
-          </div>
+          <PocketKicker
+            label="Members"
+            style={{ margin: "0 4px 12px" }}
+            action={canManage ? (
+              <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="text-[13.5px] font-semibold" style={{ color: "var(--plum)", fontFamily: "var(--serif)" }}>+ Add</button>
+            ) : undefined}
+          />
           {loading ? <Spinner /> : (
             /* Borderless tonal rows-card (Pocket grammar): one --ivory surface at
                --r-pocket, rows divided by the --line-3 hairline. */
@@ -782,8 +826,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                         <p className="text-[15px] font-semibold truncate" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>{member.name}</p>
                         {member.user_id === userId && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
                       </div>
-                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        {member.role && roleBadge(member.role, "sm", member.user_id)}
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {member.role && <PocketTag label={roleLabel(member.role, member.user_id)} variant={pocketRoleVariant(member.role)} />}
                         {member.graduation_year && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
                       </div>
                     </div>
@@ -808,24 +852,55 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             </div>
           )}
           {isChurch && canManage && (
-            <p className="mb-6" style={{ fontSize: 11, color: "var(--muted-text)", lineHeight: 1.5 }}>Member changes sync to the small group home page if this chat is linked to a group.</p>
+            <p className="mb-6" style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.55 }}>Member changes sync to the small group home page if this chat is linked to a group.</p>
           )}
           {isCentralChat && (
-            <p className="text-[12px] mb-6" style={{ color: "var(--muted-text)", lineHeight: 1.5 }}>Your ministry&apos;s main chat. Everyone is automatically a member — it can&apos;t be renamed, archived, or deleted.</p>
+            <p className="mb-6" style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.55 }}>Your ministry&apos;s main chat. Everyone is automatically a member — it can&apos;t be renamed, archived, or deleted.</p>
           )}
 
-          {/* Preferences — mobile (staged; commits on Save, never on toggle) */}
+          {/* Section — church chats can be moved between General / Groups / Teams
+              after creation (staged; commits on the shared Save bar). Locked for the
+              ministry chat (stays General, same rationale as archive). */}
+          {canReassignSection && !loading && (
+            <div className="mb-6">
+              <PocketKicker label="Section" style={{ margin: "0 4px 12px" }} />
+              <div className="flex flex-wrap gap-2">
+                {CHURCH_SECTION_DEFS.map(({ key, label }) => (
+                  <PocketFilterChip key={key} label={label} active={pendingCategory === key} onClick={() => setPendingCategory(key)} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Preferences — mobile (staged; commits on Save, never on toggle — the
+              existing per-user pref write semantics are preserved). Pocket §4:
+              mono kicker + tonal row-card with 46×28 PocketSwitch rows. */}
           {!loading && (
             <div className="mb-6">
-              <div className="mb-3">
-                <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--ink)" }}>Preferences</span>
-              </div>
-              <ChatPrefsCard pendingMuted={pendingMuted} pendingPinned={pendingPinned} onToggleMuted={() => setPendingMuted((v) => !v)} onTogglePinned={() => setPendingPinned((v) => !v)} />
+              <PocketKicker label="Preferences" style={{ margin: "0 4px 12px" }} />
+              <PocketRowCard>
+                <div className="flex items-center gap-3.5" style={{ padding: "13px 0", borderBottom: "1px solid var(--line-3)" }}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14.5px] font-semibold" style={{ color: "var(--ink)" }}>Mute notifications</p>
+                    <p className="text-[13px] mt-0.5" style={{ color: "var(--muted-text)" }}>Stay in the chat. Just stop the buzz.</p>
+                  </div>
+                  <PocketSwitch checked={pendingMuted} onChange={() => setPendingMuted((v) => !v)} ariaLabel="Mute notifications" />
+                </div>
+                <div className="flex items-center gap-3.5" style={{ padding: "13px 0" }}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14.5px] font-semibold" style={{ color: "var(--ink)" }}>Pin to top of chats</p>
+                    <p className="text-[13px] mt-0.5" style={{ color: "var(--muted-text)" }}>Keeps it above the fold.</p>
+                  </div>
+                  <PocketSwitch checked={pendingPinned} onChange={() => setPendingPinned((v) => !v)} ariaLabel="Pin to top of chats" />
+                </div>
+              </PocketRowCard>
               {prefsDirty && (
-                <div className="flex flex-col gap-2 mt-3">
-                  {prefError && <p className="text-[12px]" style={{ color: "var(--danger)" }}>{prefError}</p>}
-                  <button onClick={handleSavePrefs} disabled={savingPrefs} className="w-full py-3.5 rounded-xl font-medium text-[13px]" style={{ background: "var(--plum)", color: "var(--cream)", opacity: savingPrefs ? 0.6 : 1 }}>{savingPrefs ? "Saving…" : "Save changes"}</button>
-                  <button onClick={handleCancelPrefs} disabled={savingPrefs} className="w-full py-3.5 rounded-xl font-medium text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Cancel</button>
+                <div className="flex items-center gap-2 mt-3">
+                  {prefError && <p className="text-[12px] mr-auto" style={{ color: "var(--danger)" }}>{prefError}</p>}
+                  <div className={`flex gap-2${prefError ? "" : " ml-auto"}`}>
+                    <PocketButton variant="quiet" surface="page" compact onClick={handleCancelPrefs} disabled={savingPrefs}>Cancel</PocketButton>
+                    <PocketButton variant="primary" compact onClick={handleSavePrefs} disabled={savingPrefs}>{savingPrefs ? "Saving…" : "Save changes"}</PocketButton>
+                  </div>
                 </div>
               )}
             </div>
@@ -870,6 +945,24 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                 <p style={{ color: "var(--body)", fontSize: 14, marginTop: 6 }}>{members.length} {members.length === 1 ? "member" : "members"}</p>
               </div>
             </div>
+
+            {/* Section — church chats can be reassigned between General / Groups /
+                Teams after creation (staged; commits on the shared Save bar). Locked
+                for the ministry chat, same rationale as archive. Desktop uses the
+                canonical exclusive-filter SegmentedControl (R4). */}
+            {canReassignSection && (
+              <>
+                <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Section</p>
+                <div style={{ marginBottom: 28 }}>
+                  <SegmentedControl
+                    aria-label="Chat section"
+                    options={CHURCH_SECTION_DEFS.map(({ key, label }) => ({ id: key, label }))}
+                    value={pendingCategory}
+                    onChange={(v) => setPendingCategory(v as ChurchSection)}
+                  />
+                </div>
+              </>
+            )}
 
             {/* Preferences — staged; toggles edit pending state, committed on Save */}
             <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Preferences</p>
@@ -2437,15 +2530,16 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
               </button>
             )}
-            {/* Group avatar */}
+            {/* Group avatar — 40px on mobile (Pocket chat header), 32px on the
+                shared desktop inline panel (md: override keeps desktop untouched). */}
             <MonogramChip
               initials={getInitials(displayName)}
-              className="w-8 h-8"
+              className="w-10 h-10 md:w-8 md:h-8"
               style={{ fontFamily: "var(--serif)", fontSize: 13 }}
             />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="truncate leading-none" style={{ fontFamily: "var(--serif)", fontSize: "16px", color: "var(--ink)", letterSpacing: "-0.01em" }}>{displayName}</h2>
+                <h2 className="truncate leading-none text-[17px] font-semibold md:text-[16px] md:font-normal" style={{ fontFamily: "var(--serif)", color: "var(--ink)", letterSpacing: "-0.01em" }}>{displayName}</h2>
                 <div className="hidden md:flex items-center flex-shrink-0">
                   {memberFirstNames.slice(0, 4).map((name, i) => (
                     <span
