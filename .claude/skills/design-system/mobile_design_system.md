@@ -1,212 +1,166 @@
-# Central — Mobile Design System
+# Central — Mobile Design System v2 ("Pocket Daybreak, ratified")
 
-The companion spec to `web_design_system.md` for **phone-width surfaces** (≤430px). Canonical reference implementation: `explorations/mobile/v2/Mobile Prototype.html` ("Pocket Daybreak" direction, ratified July 2026). When a mobile decision isn't covered here, open that file and replicate — do not fall back to the desktop spec's layout rules.
+The companion contract to `web_design_system.md` for **phone-width surfaces** (`md:hidden`, ≤430px). Supersedes the v1 mobile spec. Same DNA — cream surfaces, Bricolage Grotesque, plum as a surgical accent, tonal borderless cards — with every v1 open item ruled and every drift pattern in the shipped build corrected.
 
----
+Reconciled for adoption from the cdesign source ("Pocket Daybreak v2") against the live codebase (2026-07-23). Where a value below differs from the raw cdesign prototype, the codebase value wins — those are noted inline as SNAP corrections.
 
-## 0. Why this doc exists
-
-The desktop spec describes a three-column workspace with breadcrumbs, sidebars, underline tab strips, and 44px page titles. **None of that exists on mobile.** Every past mobile failure came from smooshing the desktop shell into 430px: horizontally-scrolling tab strips, `← All workspaces` pills stacked on `← Team` pills stacked on tabs, calendar grids at phone width, 6-level headers before content.
-
-**Mobile north star: "Glance and act."** Mobile Central is a pocket companion — check what's next, read the announcement, reply to the cell chat, tick a checklist item. Deep planning stays on desktop. This doc gives every surface a *readable, thumb-reachable* form, not a miniaturized one.
-
-What carries over from desktop unchanged: **voice (§0, §6), color meaning, type family (Bricolage Grotesque), plum-as-surgical-accent, restraint.** What this doc replaces: shell, navigation, headers, cards, and component sizes.
+**Mobile north star: "Glance and act."** Mobile Central is a pocket companion — check what's next, read the announcement, reply to the cell chat, tick a checklist item. Deep planning stays on desktop. Every surface gets a *readable, thumb-reachable* form, not a miniaturized desktop one. When a mobile decision isn't covered here, replicate the ratified prototype — never fall back to the desktop shell's layout rules.
 
 ---
 
-## 1. Foundation deltas from desktop
+## 0. Rulings on v1 open items
 
-### 1.1 Surfaces — tonal, not hairline
+1. **Home card language — RULED: tonal borderless.** Home uses the same `--ivory` borderless cards as every other screen. The `--cream-panel` + hairline-border treatment is retired **on mobile** (desktop keeps `--cream-panel`; the web contract is unchanged). One card grammar, no exceptions.
+2. **Calendar at phone width — RULED: improved month grid.** A compact month grid is allowed (it earns its place for planners) but only in this form: 7-col grid, 40px day cells, event days marked with a 5px plum dot (never text inside cells), selected day = plum circle, and a **day agenda list directly below the grid** that updates on tap. Event titles never render inside grid cells.
+3. **Back navigation — RULED: one chrome chevron, ever.** No back-pills, no stacked returns. The chevron goes one level up the hierarchy.
 
-Desktop separates cards from the page with 1px hairline borders on a shared cream. Mobile uses **tonal separation: borderless cards one cream-step darker than the page.** No borders, no shadows.
+---
 
-| Token | Hex | Use |
+## 1. Corrections to the shipped build (drift the prototype fixes)
+
+- **No two-header screens.** Forms, Network, Give, Directory, Profile, and Church Settings shipped an eyebrow + 34–40px page title *below* the chrome. Corrected: the screen title lives in the single chrome row (22/600), full stop.
+- **Empty states** use the quiet form: 52px ivory chip with a stroked icon, 15/500 title, 13 muted sentence. Copy is descriptive ("No forms yet. Create one and attach it to an announcement."), never "Nothing here yet". Reuse `EmptyState variant="quiet"` (`app/home/components/shared.tsx`) — do NOT build a parallel mobile empty-state component.
+- **Meeting-notes list header** shipped title + search + create fighting in one row and wrapping. Corrected: title row (title + plum "+"), search field on its own line below.
+- **Event Overview cards** shipped one-word-per-line wrapping. Corrected: row layout = icon chip · text block (flex:1) · meta · chevron; meta never squeezes the title column.
+- **Facts grid** is a true 2-col `auto 1fr` grid (mono 9.5px keys, 14/500 values), replacing the loose label/value rows on event detail.
+- **Disabled primary** = plum at 45% opacity (the shipped washed-lilac reads as a secondary style).
+- **Danger zone** is a section with a red mono eyebrow and outline-only destructive buttons — never filled red.
+
+---
+
+## 2. Foundation
+
+### Terminology
+
+- **"serif"** in this doc ≡ `var(--serif)`, which resolves to **Bricolage Grotesque** in its display role (`app/globals.css`). There is NO second typeface on mobile — "serif" names the display voice (larger sizes, tighter tracking, 600 weight), never an actual serif font.
+- **muted text** ≡ `var(--muted-text)` (`#8A8497`). Never `var(--muted)` — that is the shadcn ivory **surface** alias.
+
+### Tokens (all live in `app/globals.css` — never inline a hex on mobile)
+
+| Token | Value | Role |
 |---|---|---|
-| `--cream` | `#FDFCF8` | Page background (body AND phone frame) |
-| `--ivory` | `#F1ECDE` (prototype `#F3EDDF` maps to it) | All cards, action tiles, ghost buttons, chips-off, search field |
-| `--line-2` | `#E9E1CC` | Icon chips, tags, switch-off track, progress track — one step darker again |
-| `--plum` | `#3E1540` | Hero card fill, primary buttons, active states, dots |
-| `--plum2` | `#2D0F2E` | Pill nav bar fill |
-| `--ink` `#13101A` / `--body` `#5A5466` / `--muted` `#8A8497` / `--faint` `#A09A8C` | | Text steps, same as desktop |
-| `--line-3` | `#EFE9DA` | Row dividers *inside* cards — the only hairline on mobile |
-| `--danger` | `#A03B2E` | Destructive text/outline only |
+| `--cream` | `#FDFCF8` | page background |
+| `--ivory` | `#F1ECDE` | cards, quiet buttons on page, chips-off |
+| `--pocket-track` | `#E9E1CC` | **mobile chip / progress-track / icon-chip FILL** (warmer than `--line-2`; the Pocket surfaces repoint here) |
+| `--line-2` | `#E2DDCF` | hairline / stroke / drag-pill / tag outline (border use, NOT fill) |
+| `--line-3` | `#EFE9DA` | in-card dividers (the only in-card hairline) |
+| `--plum` | `#3E1540` | accent, hero, active fchip, filled create |
+| `--plum-2` | `#2D0F2E` | floating nav pill |
+| `--ink` | `#13101A` | primary text, reading bodies |
+| `--body` | `#5A5466` | secondary text |
+| `--muted-text` | `#8A8497` | meta, kickers |
+| `--faint` | `#A09A8C` | stamps, placeholders, unset `—` |
+| `--danger` | `#9F3030` | destructive **text/outline only**, never a fill (shipped value kept; v2's `#A03B2E` amended down) |
+| `--sage` | `#5B7A6C` | "online" presence dot (shipped value kept; v2's `#5F7A5A` amended) |
+| `--gold` | `#D4A45C` | readiness "needs-attention" dot (desktop readiness parity) |
+| `--veil` | `≡ rgba(19,16,26,.55)` | sheet / modal ink backdrop |
+| `--cream-on-dark` | `#F6F4EF` | cream text/fill on plum surfaces |
 
-**Do not:** put 1px borders around cards (desktop pattern). Do not use pure white. Do not add shadows except the pill nav's single ambient shadow.
+### Type (Bricolage Grotesque only)
 
-### 1.2 Type scale (mobile tiers)
+chrome title 22/600 (20 when sharing the row with 2 actions) · card headline 21/600 · sub-headline 18/600 · row title 15/600 · body 14–15.5/400 · meta 13 muted · stamp 11 faint · **kicker 10 mono +1.4px uppercase muted** above every section · tag 9 mono +1px uppercase. Reading bodies (announcement detail, chat) 15.5–17 serif. **Stat numbers 22 serif 600** (mobile carve-out — desktop numeric serif is 400; ratified for mobile).
 
-Same family (Bricolage Grotesque serif role + mono for eyebrows), compressed scale:
+### Shape & spacing
 
-| Role | Size / weight | Use |
-|---|---|---|
-| Screen title | 22 / 600, -0.02em | In the chrome row — the ONLY title tier (20px when sharing the row with 2+ actions) |
-| Card headline | 21 / 600 | Hero card, announcement card titles |
-| Sub-headline | 18 / 600 | Workspace card names |
-| Row title | 15 / 600 | List row primary text |
-| Body | 14–15.5 / 400 | Reading text, inputs |
-| Meta | 13 / 400, `--muted` | Secondary line in rows/cards |
-| Time/stamp | 11 / 400, `--faint` | Timestamps |
-| Eyebrow | 10 mono, +1.4px, uppercase, `--muted` | Section labels — required above every section |
-| Tag | 9 mono, +1px, uppercase | Role badges, count pills |
-
-**No 28px+ type on mobile** except stat numbers (22 serif). The desktop 44px H1 tier does not exist here.
-
-### 1.3 Shape & spacing
-- Radii: 20 (cards, action tiles — `--r-pocket`), 16 (search, stats, composer — `--r-pocket-sm`), 14 (icon chips), 7 (checkbox — `--r-check`), 999 (buttons, chips, nav, avatars, switches).
-- Screen padding: 20px sides. Card padding: 18 (default), 20 (hero), `6px 18px` (cards holding rows).
-- Section rhythm: eyebrow kicker at 24px above, card 10–14px below it.
-- **Hit targets ≥44px** for all primary actions; 34px minimum for chrome icon buttons.
+radius: `--r-pocket` 20 cards · `--r-pocket-sm` 16 search/stats/composer · `--r-callout` 14 icon chips · 12 grid day cells · `--r-check` 7 checkbox · 999 pills/nav/avatars. Screen padding 20. Card padding 18 (20 hero, 6×18 row-cards). Hit targets ≥44 (34 chrome icons — ratified exception).
 
 ---
 
-## 2. Shell
+## 3. Shell
 
-### 2.1 Anatomy of every screen
 ```
-[ safe-area inset — env(safe-area-inset-top); no rendered status bar ]
-[ chrome row: (back?) title ....... actions / avatar ]
-[ .scroll — the one scrolling region, 110px bottom pad ]
-[ floating pill nav, bottom calc(env(safe-area-inset-bottom) + 14px), overlaying scroll ]
+[ safe-area top ]
+[ chrome row: (chevron) title ....... 0–2 actions · avatar ]
+[ .scroll — sole scroll region, ~120px bottom pad ]
+[ floating plum pill nav — hidden on composers, chat screen, sheets ]
 ```
-- **One header row, ever.** The screen title lives IN the chrome row next to its actions. No breadcrumbs, no eyebrow-over-H1 block, no second header strip.
-- **Chrome row contents:** optional back chevron (left, 34px, plum) · title (flex:1) · 0–2 icon actions · avatar (34px plum circle → Profile). Max two actions; more collapses to one.
-- The scroll region is the only scrolling element; nav floats over it.
 
-### 2.2 Floating pill nav
-Dark plum (`--plum2`) rounded-full bar, centered, `bottom: calc(env(safe-area-inset-bottom) + 14px)`, 4 tabs: **Home · Chats · Announcements · Workspace** (shipped order + ratified naming; "News" was the prototype's placeholder for the Announcements tab). Active tab = cream circle with plum icon. Single soft shadow via the tokenized `--shadow-nav` (the one sanctioned mobile shadow).
-
-- Sub-screens keep their **parent tab highlighted** (a workspace detail screen still lights Workspace).
-- Hidden on full-screen composers (e.g. New announcement).
-- Profile and Directory are NOT tabs — reached via avatar (any screen) and the person icon on Chats.
-
-### 2.2b Full-bleed subpages consume the screen (ratified 2026-07-15)
-Any surface reached by **in-page navigation** — a settings page, a detail view, a drilled hub section — replaces the parent screen ENTIRELY. The parent's chrome row (title + actions + avatar) must NOT remain above it; the subpage's own single chrome row (back chevron + its title, e.g. via `SubpageShell`) is the only header. A parent chrome row stacked over a subpage header is the §5.6 two-header failure by another route. (Example violation: team Settings rendering under the "Workspace" chrome row.)
-
-### 2.2c Scroll & zoom discipline (ratified 2026-07-15)
-- **Every navigation starts at the top.** Tab changes, hub drills, subpage opens/closes, and section swaps must reset scroll to (0,0) — never inherit the previous surface's offset. Enforced via the shared `useScrollResetOn` hook (`components/central`) wired at every surface-swapping state change, plus `SubpageShell` on mount/crumb change. New surface-swapping state ⇒ wire the hook; an e2e assertion guards the tab-change case. (Exception: `ChatScreen`'s message list owns its own scroll-to-bottom.)
-- **No focus/tap zoom, ever.** `app/layout.tsx` sets viewport `maximumScale: 1` (suppresses iOS input auto-zoom; pinch-zoom stays available — do NOT add `userScalable: false`) and `globals.css` applies `touch-action: manipulation` to all interactive elements (kills double-tap zoom + tap delay). Never remove either; prefer ≥16px input font where the design allows as belt-and-suspenders.
-
-### 2.3 Navigation model — hub-and-spoke, never tab strips
-- Deep content = **push a new screen with a back chevron**, not a tab. Workspace → workspace hub → its four screens, each with one clear back.
-- **Never a horizontally-scrolling tab strip.** If desktop has 6+ tabs (General / Meeting Notes / Events / Resources / Groups / Rotations), mobile renders them as a **grouped row list on the hub screen** — tappable rows with icon chip, name, one-line status, chevron.
-- **2–3 exclusive filters** → segmented `fchip` pills row (Church | My chats; Reimbursements | Budget | Allocation). 4+ options or view navigation → separate screens or stacked sections instead.
-- Back chevrons go one level up the hierarchy (event → hub → list), not browser-history.
+- **Nav:** 4 tabs — Home · Chats · Announcements (bell) · Workspace (clipboard). Active = cream circle + plum icon. Parent tab stays lit on every pushed screen. `--shadow-nav` is the **one** ambient shadow allowed anywhere on mobile.
+- **Avatar** (34 plum circle) sits in the chrome on tab roots → Profile. Sub-screens drop the avatar and show the back chevron instead.
+- **Full-bleed subpages** replace the parent screen entirely; their own chrome is the only header. Every navigation resets scroll to top.
+- **Single chrome-row header — no two-header screens.** A screen title never appears twice.
+- **Hub-and-spoke:** desktop tab strips become **hub rows** (icon chip · 15/600 title · 13 muted status · chevron) grouped under kickers. Exclusive filters ≤3 → segmented `fchip` pills; 4+ → screens.
+- **Chrome-row "+" creates are a mobile carve-out from desktop Convention #15.** On mobile the screen's single create is a plum-filled ghost in the chrome row (or a body plum "+" for list headers). The desktop "creates never live in the header" rule does NOT govern mobile.
 
 ---
 
-## 3. Components
+## 4. Components (the Pocket family)
 
-### 3.0 Component inventory — build with these, never re-inline
+All mobile primitives are named `Pocket*` and live in `components/central/pocket.tsx` (leaf — no `app/` imports) with the chrome-row composers (`PocketHeader`, `PocketChrome`) in `app/home/components/pocket-header.tsx`. **Do not create a `components/central/mobile/` directory or a `Mobile*` family** — extend the Pocket family. Desktop primitives (`FilterChip`, `SegmentedControl`, bordered `CentralCard`) are NOT reused on mobile.
 
-The grammar below is CODE, not just spec. Every pattern has a shared component; hand-rolling one inline is drift (the pre-extraction codebase had the filter chip written three separate times).
+### Component inventory
 
-| Pattern | Component | Import |
+| Role | Component | Status |
 |---|---|---|
-| Section kicker (mono 10px label + optional inline action) | `PocketKicker` / `POCKET_KICKER_STYLE` | `@/components/central` |
-| Tonal card | `PocketCard` | `@/components/central` |
-| Row-list card (`6px 18px`) | `PocketRowCard` | `@/components/central` |
-| Universal list row | `PocketRow` | `@/components/central` |
-| Exclusive filter pill (`fchip`) | `PocketFilterChip` | `@/components/central` |
-| Plum hero card | `PocketHeroCard` | `@/components/central` |
-| 4px progress bar (ivory or on-plum) | `PocketProgress` | `@/components/central` |
-| Dashed add-affordance | `PocketDashedButton` | `@/components/central` |
-| "← Section" return row | `PocketBackRow` | `@/components/central` |
-| 40px squircle letter chip | `PocketChip` | `@/components/central` |
-| 34px round chrome action (ghost/plum) | `PocketRoundButton` | `@/components/central` |
-| Chrome row (title + action + avatar) | `PocketChrome` | `app/home/components/pocket-header` |
-| Home brand chrome (logo + ministry name + avatar) | `PocketHeader` | `app/home/components/pocket-header` |
-| Scroll-snap up-next carousel + dots | `PocketUpNext` | `app/home/components/pocket-up-next` |
-| Floating pill nav | `BottomNav` | `components/ui/bottom-nav` |
-| Empty state | `EmptyState` (quiet variant) | `app/home/components/shared` |
+| Chrome row (0–2 actions, avatar, back chevron) | `PocketChrome` | shipped (+ v2 `action2`/`back`/`hideAvatar` slots) |
+| Home brand chrome | `PocketHeader` | shipped |
+| Tonal card / row-card | `PocketCard` / `PocketRowCard` | shipped |
+| Universal list row | `PocketRow` | shipped |
+| Section kicker | `PocketKicker` / `POCKET_KICKER_STYLE` | shipped |
+| Exclusive-filter pill | `PocketFilterChip` | shipped |
+| Filter chip rail wrapper | `PocketFilterChipRow` | **new** |
+| Plum hero (≤1/screen) | `PocketHeroCard` | shipped |
+| Progress bar | `PocketProgress` | shipped |
+| Dashed add-affordance | `PocketDashedButton` | shipped |
+| 40px icon/monogram chip | `PocketChip` | shipped (radius tokenized `--r-callout`) |
+| 34px round chrome action | `PocketRoundButton` | shipped |
+| Up-next carousel | `PocketUpNext` | shipped |
+| Back-row ("← Section") | `PocketBackRow` | shipped |
+| Pill nav | `BottomNav` (`components/ui/bottom-nav.tsx`) | shipped |
+| Empty state | `EmptyState variant="quiet"` | reuse (not Pocket) |
+| Bottom sheet | `PocketSheet` | **new** |
+| Pill button (primary/quiet/destructiveOutline) | `PocketButton` | **new** |
+| Facts grid | `PocketFactsGrid` | **new** |
+| Stat card | `PocketStatCard` | **new** |
+| Settings switch 46×28 | `PocketSwitch` | **new** |
+| Search field | `PocketSearchField` | **new** |
+| Mono 9px tag | `PocketTag` | **new** |
 
-Type note: the mobile kicker is **10px / +1.4px** (`POCKET_KICKER_STYLE`). `EYEBROW_STYLE` (11px) is the desktop eyebrow — Home's date line and in-card eyebrows use it; section kickers on mobile use the 10px pocket tier. Don't flatten the two.
+### Component contracts
 
-### 3.1 Cards
-- **Standard card:** `--ivory`, radius 20, no border. Full-width block. Tappable cards are `<button>` with left-aligned text.
-- **Row-list card:** standard card at `padding: 6px 18px` holding `.row` items divided by 1px `--line3` (none on last).
-- **Hero card (plum):** `--plum` fill, cream text, translucent-cream meta (`rgba(253,252,248,.6–.68)`). **At most ONE per screen** event on Home, the current event on a workspace hub. Buttons inside invert: primary = cream bg / plum text; quiet = `rgba(253,252,248,.14)` cream text. Progress bars on plum: track `rgba(253,252,248,.2)`, fill cream.
-- **Stat card:** `--ivory`, radius 16, mono eyebrow (9px) + serif 22/600 number + 11.5px muted sub-label. Stack vertically or `grid2`; never desktop's 40px numbers.
-
-### 3.2 List row
-`flex, gap 12, padding 13px 0`: optional 40px icon chip (radius 14, `--line-2`, plum initial; `.solid` = plum bg/cream) · text block (15/600 title + 13 muted one-line-ellipsis sub) · right meta (11px time, 8px plum unread dot, or chevron `--faint`). Rows are the universal list unit — chats, announcements-on-home, directory members, hub sections, checklist tasks.
-
-### 3.3 Buttons
-- **Primary:** plum fill, cream text, radius 999, min-height 42 (36 compact in chrome), 13.5/600.
-- **Quiet:** cream (`--cream`) fill on cards / `--ivory` on page, plum text.
-- **Ghost icon:** 34px circle, `--ivory`, for chrome actions. A plum-filled variant marks the screen's single create action (the "+" on the Announcements feed).
-- **Destructive:** outline `var(--danger)` (reduced opacity), text `var(--danger)`, never filled (no new color — destructive text/outline uses `var(--danger)`).
-- **Dashed add:** full-width dashed 1.5px border, radius 20, plum label — "Add workspace", attachment slots.
-- One plum-filled CREATE action per screen (hero primary OR chrome create, not both fighting); in-card RSVP pills don't count.
-
-### 3.4 Segmented filter chips (`fchip`)
-Radius-999 pills: off = `--ivory` bg / `--body`; on = plum fill / cream / 600. Used for exclusive filters (≤3 short options) and multi-select audience pickers on compose. *(Mobile keeps the solid-plum on-state — the tonal surfaces need the stronger signal; the desktop plum-tint grammar reads as unselected here.)*
-
-### 3.5 Sections (`sect` / kicker)
-- **Kicker:** eyebrow (+ optional quiet "See all ›" 12.5px muted) above each card group.
-- **Form sections:** 1px `--line3` top border, 18px top margin, eyebrow, then controls — compose screen pattern.
-
-### 3.6 Form controls
-- **Headline input:** borderless serif 21/600, page bg. **Body textarea:** borderless serif 15.5/1.55, min-height 170. (Mobile compose = single column; desktop's 320px settings rail becomes stacked `sect` groups below the body.)
-- **Switch:** 46×28 track (`--line-2` → plum), 22px cream thumb, paired 14.5/600 label + 13 muted description.
-- **Checkbox:** 22px, radius 7 (`--r-check`), 1.5px line border → plum fill + cream check. Whole row is the tap target.
-- **Search:** `--ivory` pill, radius 16, 12×16 padding, icon + borderless input.
-
-### 3.7 Tags & badges
-Mono 9px uppercase radius-999: default `--line-2`/`--body` ("You", counts); plum fill/cream for roles (Super, Pastor). Count pills on phase headers use the same treatment.
-
-### 3.8 Empty / placeholder
-Shipped form: the shared `EmptyState` (quiet variant) — centered stroked icon in a 52px ivory chip, 15/500 title, 13 muted sentence. Copy is descriptive, may name the create action, never contains the button (same rule as desktop §4.19). The dashed-card treatment is reserved for **add-affordances** (`PocketDashedButton`), not empties.
-
-### 3.9 Carousel
-Horizontal scroll-snap row breaking out of screen padding (`margin: 0 -20px; padding: 0 20px`), cards at 82% width. For peer content of the same kind (upcoming events). Never for navigation.
+- **Card** — ivory `--r-pocket` (20) borderless; **row-card** `6px 18px` with `--line-3` dividers. **Hero** plum, cream text, ≤1/screen; hero buttons invert (cream/plum primary, `rgba(cream,.14)` quiet).
+- **Row** — flex gap 12, pad 13 0; 40px icon chip `--r-callout` (14) filled `--pocket-track` (plum stroke icon or initial; `.solid` → plum/cream); title 15/600 + 13 muted 1-line-ellipsis sub; right column = 11 faint meta / 8px plum unread dot / faint chevron. Meta never squeezes the title column.
+- **Buttons** (`PocketButton`) — pill r999, minHeight 42 (36 compact for the chrome row), 13.5/600. Variants: **primary** plum/cream (disabled = 45% opacity plum, never washed-lilac); **quiet** plum text on a tonal fill — `surface="card"` → cream fill, `surface="page"` → ivory fill; **destructiveOutline** = 1.5px `--danger` border + danger text on transparent, NEVER filled. Ghost-icon creates use `PocketRoundButton variant="plum"` (the screen's ONE plum-filled create).
+- **fchip** (`PocketFilterChip`) — r999, off ivory/body, **on solid plum/cream/600** (mobile carve-out; desktop segmented controls do not fill). Wrap ≤3 exclusive options in `PocketFilterChipRow`; 4+ options become screens.
+- **Forms** — label = kicker; input ivory `--r-pocket-sm` (16) pad 14×16 borderless 15.5; headline input serif 21/600 on the page bg. **Switch** (`PocketSwitch`) 46×28, `--pocket-track` off → plum on, 22px cream thumb, ≥44 hit box. Checkbox 22 `--r-check` (7) 1.5px → plum. **Search** (`PocketSearchField`) ivory pill r16, leading search glyph + borderless input, faint placeholder.
+- **Tags** (`PocketTag`) — mono 9 uppercase r999. `default` = `--pocket-track` bg / body text; `role` = plum/cream (ADMIN, LEADER); `outline` = 1px `--line-2` border for VISITOR.
+- **Stat card** (`PocketStatCard`) — ivory r16, mono 9 kicker, serif 22/600 number, 11.5 muted sub.
+- **Facts grid** (`PocketFactsGrid`) — 2-col `auto 1fr`, rows gap 12; keys mono 9.5 uppercase muted; values 14/500 ink; unset value = `—` faint.
+- **Progress** (`PocketProgress`) — 4px track `--pocket-track`, plum fill; `onPlum` → track `rgba(cream,.2)`, cream fill.
+- **Empty state** — centered, 52px ivory chip r16 + stroked icon, 15/500 title, 13 muted descriptive sentence. Dashed border is reserved for add-affordances (`PocketDashedButton`), never empty states.
+- **Sheet** (`PocketSheet`) — creation/config only (poll composer, new-event picker). Ink `--veil` backdrop, cream panel `--r-pocket` top corners, 40×4 drag pill (`--line-2`), title 21/600 + 34px ivory close circle, safe-area bottom padding. **z = 200 (modal tier)** — pass `zIndex` (e.g. 210) only to stack over an already-open modal. Animation: `sheetUp` 240ms `cubic-bezier(0.23,1,0.32,1)` + veil fade 180ms, both suppressed under `prefers-reduced-motion`. Closes on Escape and veil tap. This is a NEW pattern — it does NOT replace `ActionMenu` (Convention #20) for dropdowns/kebabs.
+- **Chat** — date chip mono 11 italic; incoming = ivory bubble r18 (4 at the tail) + 26px avatar + name/time row; outgoing = plum bubble, cream text, right. Composer = attach ghost · GIF pill · poll ghost · ivory pill input · 44px plum send circle.
+- **Month grid** — ruled form only (see §0.2).
+- **Carousel** (`PocketUpNext`) — scroll-snap, -20px bleed, 82% cards, dots (plum active). Manual only.
 
 ---
 
-## 4. Screen recipes
+## 5. Screen recipes (deltas from v1)
 
-- **Home:** date eyebrow → "Featured" hero carousel (`PocketUpNext`) → serif-titled previews (Announcements, Chats — serif 19/600 section title + quiet "See all ›", 2 rows each; Home's digest sections use serif titles, not mono kickers) → Quick action grid (2-up tiles: Give + first team) → verse (plum-tint card: "Today's verse" eyebrow, italic 17 serif, mono ref). Home is a digest of every tab; each block links into its tab.
-- **Feed (Announcements):** filter chips → stack of full-width cards (eyebrow · 21px headline · 2-line body · optional RSVP row). Create = plum ghost "+" in chrome → full-screen compose.
-- **Compose (full-screen):** chrome = back + title + Save draft (quiet) + Publish (primary, compact); nav hidden; headline input, body textarea, then `sect` groups (audience chips, switches, attachment, form).
-- **Chats:** segmented Church | My chats. Church = room groups (General / Groups / Teams — the real church-chat categories), each with an eyebrow + inline "+" (leader-only create). My chats = flat row card, single "+" on the filter row. Directory via the person icon in the chrome.
-- **Workspace (hub-and-spoke):** list screen (Your workspaces / view-only cards) → hub screen (hero current event + grouped section rows) → detail screens (event: facts grid + readiness + jump-into-planning rows; checklist: phase-grouped tap-to-toggle rows). Desktop's tab strips ALWAYS become hub rows.
-- **Profile:** identity card (56px avatar, name, email, role tag, Edit) → shared details → journal rows → danger zone (`sect` with red eyebrow, outline Leave + quiet Sign out).
-
-**Facts grid** (event detail): 2-col `auto 1fr` grid, mono 9.5px keys + 14/500 values, unset = `—` faint. Replaces desktop's identity header fact list.
-
----
-
-## 5. Do not (mobile-specific)
-
-1. **No desktop shell parts:** no breadcrumbs, no sidebar, no icon rail, no verse-in-sidebar (verse lives on Home), no ⌘K search.
-2. **No horizontally-scrolling tab strips.** The #1 legacy failure. Hub rows or segmented chips instead.
-3. **No stacked back-pills** (`← All workspaces` + `← Team`). One back chevron in the chrome handles the rest.
-4. **No calendar grids at phone width.** Agenda lists / "up next" cards instead.
-5. **No hairline-bordered white/cream cards** — tonal `--ivory` only.
-6. **No two-header screens** (title block below a chrome row). Title lives in the chrome.
-7. **No desktop type sizes.** 22px max chrome, 21px max in-card.
-8. **No tables.** Every table becomes a row list (Allocation categories → rows with meta line).
-9. **No hover-dependent affordances.** Everything discoverable by sight or tap.
-10. Everything in desktop §8 still applies where relevant (no gradients, no drop shadows beyond the nav, no traffic-light hexes, no emoji icons, no window.confirm, weight 600 for headings only — mobile carve-out: 600 row/card titles are ratified mobile language, see the type scale above).
+- **Home** — chrome = ring-cross + ministry name + avatar → date kicker → setup-checklist card (dismissible, admin) → FEATURED kicker + hero carousel → serif 19/600 "Announcements"/"Chats" digests (2 rows + See all) → quick grid (Give + first team) → verse card (ivory, italic serif 17, mono ref).
+- **Announcements** — title chrome + plum "+" ghost · fchips All/Events/Updates · full-width cards (kicker date · 21 headline · 2-line body · RSVP pill + count). Detail: body serif 17, EVENT facts card, RSVP primary + going chips, POSTED card. Compose: full-screen, nav hidden, Save-draft quiet + Publish primary (compact), headline input, body textarea, AUDIENCE chips, OPTIONS switch, ATTACHMENT dashed, FORM note.
+- **Chats** — Church|My-chats fchips; Church = kicker groups (GENERAL/GROUPS/TEAMS) each with a leader "+"; rows show pin/mute glyphs + unread dot. Chat screen: no nav; header back + 40 avatar + name + members + search/settings ghosts. Settings: single "Chat settings" chrome; members row-card with role tags; prefs switches; footnotes 13 muted.
+- **Workspace** — tab root = workspace list (optional hero current-event card) → team hub (PLANNING: Events/Meeting notes/Calendar · MINISTRY: Resources/Groups/Rotations) → detail screens. Events list: title + season ghost + New-event primary; date-chip rows. New event = sheet with template cards (emoji 28 + 15/600 + 12.5 muted) + dashed start-from-scratch. Event detail: facts grid → readiness bar → JUMP-INTO-PLANNING hub rows (Overview/Countdown/Roles & Leads/Showtime with live meta). Countdown: progress header, phase kickers, tap-to-toggle checkbox rows + assignee tag. Meeting notes: title + plum "+", search below, rows. Note detail: date kicker + attendee/link dashed chips, serif 26 title, AGENDA/DECISIONS/NOTES sections with + rows. Calendar: ruled month grid + day agenda. Resources: President|Member fchips, role card (serif intro + RESPONSIBILITIES bullets), RELEVANT LINKS + add. Groups: saved-grouping card → detail with group cards (name + count tag + member rows). Rotations: semester pill, kicker + "n of 7 filled" tag, progress, slot rows (SUN date / holder or ⊕ Open; your slot = plum outline + solid chip). Team settings: Roles cards w/ permission chips, Leadership switches, Members rows + role dropdown, danger row.
+- **Directory** (via person ghost on Chats) — search, count kicker, rows (avatar + online dot, role tag, class, chevron). Member: identity card (56 avatar, LEADER tag, class, Send-Message primary + kebab) → CONTACT facts card.
+- **Give** — single chrome; verse kicker; OFFERING card = recipient + Zelle fields + Save primary; member view = recipient card + copy.
+- **Profile** — identity card (56 avatar, name 21, role tag, email 13, Edit quiet) → ABOUT/FAITH/PRAYER cards (or quiet empty) → NOTIFICATIONS switch rows + Smart select → ACCOUNT & SUPPORT rows → Sign-out quiet → DANGER ZONE red kicker, outline Leave + Delete. Edit: Cancel/Save chrome, kicker field groups, OPTIONAL tags.
+- **Church Settings** (admin, via Home gear) — hub kickers MINISTRY/OPERATIONS/RECORDS with 8 rows. Subpages single chrome ("← Settings" + title): General (identity card, discovery switch, schools, offering); People (fchips w/ counts, search, member rows + role pills + kebab); Governance (master-switch card, TEAM ACCESS legend, per-team None|View|Write segmented); Automations (2-col switch cards); Chat moderation (master switch, BEHAVIOR/STRICTNESS/SCOPE fchip groups + explainer sentences); Reports (empty shield state); Workspace (invite-code card + copy/regenerate, calendar-sync card, funding); Audit log (dashed empty or stamp rows).
+- **Forms** — single chrome + plum "+", empty state or rows.
+- **Network** — single chrome, COMING SOON card (icon ring, kicker, 21 headline, body).
+- **Auth** — landing = brand row, verse kicker + serif 34 quote hero, body, Register primary, "Why we build ↓"; login/signup/reset = back chevron, kicker + serif 30 title + sentence, kicker-labeled ivory fields, primary, quiet swap link; choose ministry = Browse|Invite-code fchips, ministry rows + Code pill, or code field + Join.
 
 ---
 
-## 6. Checklist — "is this Central mobile?"
+## 6. Checklist
 
-- [ ] One chrome row, title inside it, avatar → profile?
-- [ ] Tonal borderless cards on `--cream`?
-- [ ] Floating plum pill nav with parent tab lit on sub-screens?
-- [ ] Deep content pushed as screens with back chevrons — zero tab strips?
-- [ ] Mono eyebrow above every section?
-- [ ] ≤1 plum hero card and ≤1 plum-filled action per screen?
-- [ ] All primary tap targets ≥44px?
-- [ ] Desktop content translated (hub rows, agenda lists, row lists) — not shrunk?
-
-If any box is unchecked, it's a desktop smoosh — go back.
-
----
-
-## Open items (ruled separately)
-
-1. Calendar-grids-at-phone-width rule vs the shipped mobile `MinistryCalendar` for standard teams — agenda-list replacement pending Brian's ruling.
-2. "← All workspaces" back pill vs the one-chrome-chevron rule — pending the Scope-B hub landing.
-3. Home's digest cards (announcement/chat previews, quick tiles, `PocketEventCard`, verse) ship as `--cream-panel` + 1px `--line` border — conflicting with §1.1/§5.5 tonal-borderless. Home is a ratified model page, so the conflict stands unresolved; **stale-page redesigns use tonal `--ivory` borderless** until Brian rules on Home's card language.
+- No two-header screens anywhere (including Give/Forms/Network/Profile/Settings).
+- Empty states quiet-form with descriptive copy (`EmptyState variant="quiet"`), never "Nothing here yet".
+- Calendar only in the ruled grid + agenda form.
+- Facts grids true 2-col.
+- One plum-filled create per screen.
+- Disabled primary = 45% plum.
+- Destructive never filled — outline/text only, always `--danger`.
+- Every mobile fill uses a token from `app/globals.css` — chips/tracks/icon-chips are `--pocket-track`, never an inline hex, never `--line-2` as a fill.
+- Bottom sheets are `PocketSheet` (z 200); dropdowns/kebabs stay `ActionMenu` (Convention #20).
+- All mobile primitives are `Pocket*` in `components/central/pocket.tsx` (leaf) — no `components/central/mobile/` dir, no `Mobile*` family.
+</content>
