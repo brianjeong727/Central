@@ -211,6 +211,9 @@ export function FeaturedHeroCard({
   // Actions — RSVP as the hero-invert primary (cream fill / plum text), the details
   // click-through as an on-dark ghost. Built at the call site (CentralButton has no
   // on-dark variant; the frame's .btn.invert / .btn.on-dark-ghost equivalents).
+  // Mobile hero buttons follow the ratified Daybreak form (pill r999, serif
+  // 13.5/600): the cream-fill primary is "See event" (details), the quiet
+  // rgba-cream is RSVP — inverting the desktop emphasis. Desktop is untouched.
   const rsvpBtn =
     isEvent && onRsvp ? (
       <button
@@ -218,18 +221,21 @@ export function FeaturedHeroCard({
         onClick={onRsvp}
         disabled={rsvping}
         style={{
-          background: userHasRsvped ? "color-mix(in srgb, var(--cream-on-dark) 18%, transparent)" : "var(--cream)",
-          color: "var(--cream-on-dark)",
           border: "none",
-          borderRadius: "var(--r-input)",
-          padding: "var(--space-4) var(--space-7)",
-          fontSize: 14,
-          fontWeight: 500,
-          fontFamily: "var(--sans)",
+          borderRadius: mobile ? 999 : "var(--r-input)",
+          padding: mobile ? "11px 18px" : "var(--space-4) var(--space-7)",
+          fontFamily: mobile ? "var(--serif)" : "var(--sans)",
+          fontSize: mobile ? 13.5 : 14,
+          fontWeight: mobile ? 600 : 500,
           cursor: rsvping ? "default" : "pointer",
           opacity: rsvping ? 0.5 : 1,
           whiteSpace: "nowrap",
-          ...(userHasRsvped ? {} : { color: "var(--plum)" }),
+          ...(mobile
+            ? { background: "color-mix(in srgb, var(--cream) 14%, transparent)", color: "var(--cream-on-dark)" }
+            : {
+                background: userHasRsvped ? "color-mix(in srgb, var(--cream-on-dark) 18%, transparent)" : "var(--cream)",
+                color: userHasRsvped ? "var(--cream-on-dark)" : "var(--plum)",
+              }),
         }}
       >
         {userHasRsvped ? "Going ✓" : "RSVP"}
@@ -241,19 +247,23 @@ export function FeaturedHeroCard({
       type="button"
       onClick={onDetails}
       style={{
-        background: "transparent",
-        color: "var(--cream-on-dark)",
-        border: "1px solid color-mix(in srgb, var(--cream-on-dark) 25%, transparent)",
-        borderRadius: "var(--r-input)",
-        padding: "var(--space-4) var(--space-7)",
-        fontSize: 14,
-        fontWeight: 500,
-        fontFamily: "var(--sans)",
+        borderRadius: mobile ? 999 : "var(--r-input)",
+        padding: mobile ? "11px 18px" : "var(--space-4) var(--space-7)",
+        fontFamily: mobile ? "var(--serif)" : "var(--sans)",
+        fontSize: mobile ? 13.5 : 14,
+        fontWeight: mobile ? 600 : 500,
         cursor: "pointer",
         whiteSpace: "nowrap",
+        ...(mobile
+          ? { background: "var(--cream)", color: "var(--plum)", border: "none" }
+          : {
+              background: "transparent",
+              color: "var(--cream-on-dark)",
+              border: "1px solid color-mix(in srgb, var(--cream-on-dark) 25%, transparent)",
+            }),
       }}
     >
-      {isEvent ? "See details" : "See announcement"}
+      {mobile ? (isEvent ? "See event" : "See announcement") : isEvent ? "See details" : "See announcement"}
     </button>
   ) : null
 
@@ -408,8 +418,8 @@ export function FeaturedHeroCard({
       )}
       {(rsvpBtn || detailsBtn) && (
         <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-8)", flexWrap: "wrap", alignItems: "center" }}>
-          {rsvpBtn}
-          {detailsBtn}
+          {mobile ? detailsBtn : rsvpBtn}
+          {mobile ? rsvpBtn : detailsBtn}
           {isEvent && rsvpCount > 0 && (
             <span style={{ fontSize: 12, fontWeight: 500, color: monoMicro }}>
               {rsvpCount} going
@@ -436,7 +446,7 @@ export function FeaturedHeroCard({
           position: "relative",
           overflow: "hidden",
           background: "var(--plum)",
-          borderRadius: "var(--r-hero)",
+          borderRadius: "var(--r-pocket)",
           boxSizing: "border-box",
           width: "100%",
           padding: "var(--space-8)",
