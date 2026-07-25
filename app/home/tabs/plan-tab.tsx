@@ -49,9 +49,10 @@ import { useIsMobile } from "../use-is-mobile"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, PocketRoundButton, PocketButton, PocketSearchField, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
 import { FinanceWorkspace, MobileFactsGrid, type FinanceSection } from "../components/finance-workspace"
-import { MobilePocketHub } from "../components/mobile-pocket-hub"
+import { MobilePocketHub, PocketHubChrome } from "../components/mobile-pocket-hub"
+import { teamIconKey } from "../workspace-presets"
 import { getReimbursementInbox, getPendingReceiptCount } from "@/app/actions/receipts"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
@@ -1174,8 +1175,10 @@ export function StudentOrgTeamHome({
   // previous team never renders as the active tab.
   useEffect(() => { setResourcesRole(null) }, [teamId])
 
-  // Groups tab — trigger wizard from header button
+  // Groups tab — trigger wizard from header button; track detail-open so the
+  // mobile Groups chrome yields to the saved-grouping detail (no two-header).
   const [groupGenerateTrigger, setGroupGenerateTrigger] = useState(0)
+  const [groupsDetailOpen, setGroupsDetailOpen] = useState(false)
   // Notes tab — trigger createNote from header button; search lives in the
   // header row (one-row fold, same treatment as the Events header).
   const [notesTrigger, setNotesTrigger] = useState(0)
@@ -1416,14 +1419,10 @@ export function StudentOrgTeamHome({
   return (
     <>
     <div>
-      {/* Mobile hub back row (ruling B-1) — the strip nav is replaced by the hub;
-          a drilled-in section shows a back-to-hub row. Desktop uses sidebar nav.
-          Suppressed for the note detail (§2.2b): MeetingNotesSection early-returns
-          its own SubpageShell chrome, so a hub back-row here would stack a second
-          back over the subpage header. */}
-      {!isDesktopView && displaySection !== "Hub" && !meetingNoteOpen && (
-        <MobileHubBackRow label={teamName} onBack={() => setTeamTabAndUrl("Hub")} />
-      )}
+      {/* Mobile drilled-in sections carry their OWN single chrome row (§2.1 —
+          "← {Section}" title + the section create), rendered per-section below;
+          no team-name back-row stacks above them. The note detail (§2.2b)
+          early-returns its own SubpageShell chrome. */}
 
       {/* Desktop object header — workspace name + settings gear only.
           Per-section titles + creates now live in each section body (Zone C). */}
@@ -1479,7 +1478,9 @@ export function StudentOrgTeamHome({
         {/* GENERAL — calendar full-width + meeting notes */}
         {displaySection === "General" && (
           <div>
-            <ContentHeader label="General" style={{ marginBottom: 24 }} />
+            {isDesktopView
+              ? <ContentHeader label="General" style={{ marginBottom: 24 }} />
+              : <PocketHubChrome title="Calendar" onBack={() => setTeamTabAndUrl("Hub")} />}
             <section>
               {calLoading ? (
                 <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
@@ -1492,10 +1493,12 @@ export function StudentOrgTeamHome({
                 />
               )}
 
-              <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted-text)", display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: 99, background: "var(--plum)" }} />
-                Click any event to open its plan — no modal in between.
-              </p>
+              {isDesktopView && (
+                <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted-text)", display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: 99, background: "var(--plum)" }} />
+                  Click any event to open its plan — no modal in between.
+                </p>
+              )}
             </section>
           </div>
         )}
@@ -1503,32 +1506,48 @@ export function StudentOrgTeamHome({
         {/* NOTES — meeting notes timeline */}
         {displaySection === "Meeting Notes" && (
           <div>
-            {/* One header row: Meeting Notes · search · New note (Events-header fold). */}
-            <ContentHeader
-              label="Meeting Notes"
-              style={{ marginBottom: 24 }}
-              action={
-                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", gap: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--cream-2)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "7px 14px", width: 250 }}>
-                    <Search style={{ width: 14, height: 14, color: "var(--muted-text)", flexShrink: 0 }} />
-                    <input
-                      value={notesQuery}
-                      onChange={e => setNotesQuery(e.target.value)}
-                      placeholder="Search notes & decisions…"
-                      style={{ flex: 1, minWidth: 0, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--ink)", fontFamily: "var(--sans)" }}
-                    />
+            {/* Desktop: one header row (Meeting Notes · search · New note). Mobile
+                (§1 corrections): chrome title + plum "+", search on its own line. */}
+            {isDesktopView ? (
+              <ContentHeader
+                label="Meeting Notes"
+                style={{ marginBottom: 24 }}
+                action={
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", gap: 10 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 9, background: "var(--cream-2)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "7px 14px", width: 250 }}>
+                      <Search style={{ width: 14, height: 14, color: "var(--muted-text)", flexShrink: 0 }} />
+                      <input
+                        value={notesQuery}
+                        onChange={e => setNotesQuery(e.target.value)}
+                        placeholder="Search notes & decisions…"
+                        style={{ flex: 1, minWidth: 0, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--ink)", fontFamily: "var(--sans)" }}
+                      />
+                    </div>
+                    {canEdit && (
+                      <ContentActionButton
+                        variant="primary"
+                        icon={<Plus style={{ width: 13, height: 13 }} />}
+                        label="New note"
+                        onClick={() => setNotesTrigger(t => t + 1)}
+                      />
+                    )}
                   </div>
-                  {canEdit && (
-                    <ContentActionButton
-                      variant="primary"
-                      icon={<Plus style={{ width: 13, height: 13 }} />}
-                      label="New note"
-                      onClick={() => setNotesTrigger(t => t + 1)}
-                    />
-                  )}
-                </div>
-              }
-            />
+                }
+              />
+            ) : (
+              <>
+                <PocketHubChrome
+                  title="Meeting notes"
+                  onBack={() => setTeamTabAndUrl("Hub")}
+                  action={canEdit ? (
+                    <PocketRoundButton variant="plum" ariaLabel="New note" onClick={() => setNotesTrigger(t => t + 1)}>
+                      <Plus style={{ width: 18, height: 18 }} />
+                    </PocketRoundButton>
+                  ) : undefined}
+                />
+                <PocketSearchField value={notesQuery} onChange={setNotesQuery} placeholder="Search notes & decisions…" style={{ marginBottom: 20 }} />
+              </>
+            )}
             <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} openNoteId={openNoteId} onOpenNote={setOpenNoteAndUrl}
               query={notesQuery} onOpenEvent={(eventId) => { void openLinkedEvent(eventId) }} />
           </div>
@@ -1537,9 +1556,48 @@ export function StudentOrgTeamHome({
         {/* PLAN — events list with Plan → links */}
         {displaySection === "Events" && (
           <div>
-            {/* One header row: Events · season chips (browse past years) · rollover CTA · New Event.
+            {/* Mobile (§Workspace recipe): chrome "← Events" + plum "+"; the season
+                selector + "Start next season" ghost sit on their own line below.
+                The plum "+" opens the new-event template sheet. */}
+            {!isDesktopView && (
+              <>
+                <PocketHubChrome
+                  title="Events"
+                  onBack={() => setTeamTabAndUrl("Hub")}
+                  action={canEdit ? (
+                    <PocketRoundButton variant="plum" ariaLabel="New event" onClick={() => setShowAddModal(true)}>
+                      <Plus style={{ width: 18, height: 18 }} />
+                    </PocketRoundButton>
+                  ) : undefined}
+                />
+                {(seasons.length > 1 || canEdit) && (
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
+                    {seasons.length > 1 && (
+                      <ActionMenu
+                        align="left"
+                        minWidth={140}
+                        items={seasons.map(sn => ({ key: sn, label: sn, onSelect: () => setSeasonFilter(sn) }))}
+                        renderTrigger={({ toggle }) => (
+                          <button type="button" onClick={toggle} aria-label="Season" style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 999, cursor: "pointer", fontFamily: "var(--serif)", fontSize: 13, fontWeight: 600, border: "none", background: "var(--ivory)", color: "var(--plum)", whiteSpace: "nowrap" }}>
+                            {activeSeason}
+                            <ChevronDown style={{ width: 13, height: 13 }} />
+                          </button>
+                        )}
+                      />
+                    )}
+                    {canEdit && (
+                      <PocketButton variant="quiet" surface="page" onClick={() => setShowSeasonConfirm(true)}>
+                        <Repeat style={{ width: 14, height: 14 }} /> Start next season
+                      </PocketButton>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+            {/* Desktop: one header row: Events · season chips (browse past years) · rollover CTA · New Event.
                 Seasons derive from the events themselves; default = the latest
                 season that actually has events. flexWrap keeps narrow widths sane. */}
+            {isDesktopView && (
             <ContentHeader
               label="Events"
               style={{ marginBottom: 24 }}
@@ -1595,6 +1653,7 @@ export function StudentOrgTeamHome({
                 </div>
               }
             />
+            )}
             <EventsAgendaList
               events={seasonEvents}
               allEvents={calData?.events ?? []}
@@ -1635,16 +1694,21 @@ export function StudentOrgTeamHome({
         {/* RESOURCES — role links/docs */}
         {displaySection === "Resources" && (
           <div>
-            {/* Header + role sub-strip render once for both breakpoints. */}
-            <ContentHeader
-              label="Resources"
-              style={{ marginBottom: 24 }}
-              action={userRosterRole && (
-                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--plum)", background: "var(--plum-tint)", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}>
-                  {userRosterRole}
-                </span>
-              )}
-            />
+            {/* Desktop: header carries the viewer's role pill. Mobile (§Workspace
+                recipe): chrome "← Resources"; the role fchips below carry role context. */}
+            {isDesktopView ? (
+              <ContentHeader
+                label="Resources"
+                style={{ marginBottom: 24 }}
+                action={userRosterRole && (
+                  <span style={{ fontSize: 11, fontWeight: 500, color: "var(--plum)", background: "var(--plum-tint)", borderRadius: 9999, padding: "4px 10px", letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", flexShrink: 0 }}>
+                    {userRosterRole}
+                  </span>
+                )}
+              />
+            ) : (
+              <PocketHubChrome title="Resources" onBack={() => setTeamTabAndUrl("Hub")} />
+            )}
             {resourcesRoles.length > 0 && (
               isDesktopView ? (
                 <div style={{ marginBottom: 22 }}>
@@ -1675,42 +1739,67 @@ export function StudentOrgTeamHome({
         {/* GROUPS — group generator */}
         {displaySection === "Groups" && (
           <div>
-            <ContentHeader
-              label="Groups"
-              style={{ marginBottom: 24 }}
-              action={canEdit && (
-                <ContentActionButton
-                  variant="primary"
-                  icon={<Plus style={{ width: 13, height: 13 }} />}
-                  label="Generate groups"
-                  onClick={() => setGroupGenerateTrigger(t => t + 1)}
-                />
-              )}
-            />
+            {isDesktopView ? (
+              <ContentHeader
+                label="Groups"
+                style={{ marginBottom: 24 }}
+                action={canEdit && (
+                  <ContentActionButton
+                    variant="primary"
+                    icon={<Plus style={{ width: 13, height: 13 }} />}
+                    label="Generate groups"
+                    onClick={() => setGroupGenerateTrigger(t => t + 1)}
+                  />
+                )}
+              />
+            ) : !groupsDetailOpen && (
+              <PocketHubChrome
+                title="Groups"
+                onBack={() => setTeamTabAndUrl("Hub")}
+                action={canEdit ? (
+                  <PocketButton compact onClick={() => setGroupGenerateTrigger(t => t + 1)}>
+                    <Plus style={{ width: 15, height: 15 }} /> Generate
+                  </PocketButton>
+                ) : undefined}
+              />
+            )}
             <GroupsTab
               teamId={teamId}
               ministryId={ministryId}
               userId={userId}
               canEdit={canEdit}
               generateTrigger={groupGenerateTrigger}
+              onDetailOpenChange={setGroupsDetailOpen}
             />
           </div>
         )}
 
         {displaySection === "Rotations" && teamId && (
           <div>
-            <ContentHeader
-              label="Rotations"
-              style={{ marginBottom: 24 }}
-              action={canEdit && (
-                <ContentActionButton
-                  variant="primary"
-                  icon={<Plus style={{ width: 13, height: 13 }} />}
-                  label="New semester"
-                  onClick={() => setRotationNewSemesterTrigger(t => t + 1)}
-                />
-              )}
-            />
+            {isDesktopView ? (
+              <ContentHeader
+                label="Rotations"
+                style={{ marginBottom: 24 }}
+                action={canEdit && (
+                  <ContentActionButton
+                    variant="primary"
+                    icon={<Plus style={{ width: 13, height: 13 }} />}
+                    label="New semester"
+                    onClick={() => setRotationNewSemesterTrigger(t => t + 1)}
+                  />
+                )}
+              />
+            ) : (
+              <PocketHubChrome
+                title="Rotations"
+                onBack={() => setTeamTabAndUrl("Hub")}
+                action={canEdit ? (
+                  <PocketButton compact onClick={() => setRotationNewSemesterTrigger(t => t + 1)}>
+                    <Plus style={{ width: 15, height: 15 }} /> New semester
+                  </PocketButton>
+                ) : undefined}
+              />
+            )}
             <RotationsTab
               teamId={teamId}
               ministryId={ministryId}
@@ -2334,8 +2423,11 @@ function MobileHubBackRow({ label, onBack }: { label: string; onBack: () => void
 // monogram + name (18/600) + role·members meta, and (ruling #3) a real progress
 // bar for the team's next upcoming event. Whole body taps to enter the workspace;
 // the quiet gear (kept from 6e6a01c) opens team settings for those who can manage.
-function MobileWsRow({ letter, name, sub, progress, onEnter, onManage }: {
+function MobileWsRow({ letter, iconKey, name, sub, progress, onEnter, onManage }: {
   letter: string
+  // Preferred: a PlanLineIcon glyph key (via teamIconKey) — NEVER raw teams.icon
+  // emoji (ruling #7). Falls back to the letter monogram when absent (Receipts).
+  iconKey?: string
   name: string
   sub?: string
   progress?: { done: number; total: number; nextDate: string }
@@ -2347,7 +2439,9 @@ function MobileWsRow({ letter, name, sub, progress, onEnter, onManage }: {
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
         <button onClick={onEnter} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 14, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
-            <PocketChip letter={letter} />
+            {iconKey
+              ? <PlanLineIcon iconKey={iconKey} size={40} radius={14} bg="var(--pocket-track)" fg="var(--plum)" />
+              : <PocketChip letter={letter} />}
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{ display: "block", fontFamily: "var(--serif)", fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
               {sub && <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2 }}>{sub}</span>}
@@ -3069,6 +3163,7 @@ export function PlanTab({
                     <MobileWsRow
                       key={t.teamId}
                       letter={t.teamName.charAt(0).toUpperCase()}
+                      iconKey={teamIconKey({ team_type: t.teamType, name: t.teamName })}
                       name={t.teamName}
                       sub={members ? `${role} · ${members}` : role}
                       progress={teamProgress?.[t.teamId]}
@@ -3080,6 +3175,7 @@ export function PlanTab({
                 {/* Receipts — a shared surface across your teams (not a team itself). */}
                 <MobileWsRow
                   letter="R"
+                  iconKey="dollar"
                   name="Receipts"
                   sub={`${receiptsTeams.length} team${receiptsTeams.length === 1 ? "" : "s"}`}
                   onEnter={() => onTeamSelect?.("receipts")}
@@ -3090,12 +3186,13 @@ export function PlanTab({
               </div>
               {govTeams.length > 0 && (
                 <>
-                  <PocketKicker label="Admin access · view only" style={{ margin: "26px 4px 0" }} />
+                  <PocketKicker label="View only" style={{ margin: "26px 4px 0" }} />
                   <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 14 }}>
                     {govTeams.map(t => (
                       <MobileWsRow
                         key={t.id}
                         letter={t.name.charAt(0).toUpperCase()}
+                        iconKey={teamIconKey({ team_type: t.team_type, name: t.name })}
                         name={t.name}
                         sub={`${t.member_count} member${t.member_count === 1 ? "" : "s"}`}
                         progress={teamProgress?.[t.id]}
@@ -5854,6 +5951,111 @@ function getEventConfig(ev: { event_type?: EventType; category?: string }): { la
   return CATEGORY_CONFIG[cat] ?? CATEGORY_CONFIG.regular
 }
 
+// Mobile ruled month grid (Pocket Daybreak v2 §0.2): 7-col grid, ~40px cells,
+// a 5px plum dot on event days (never a title), plum selected-day circle, and a
+// day-agenda list below that updates on tap. Tapping an agenda event opens its
+// plan directly (no modal in between).
+function MonthGridMobile({
+  cells, year, month, monthLabel, isToday, eventsOnDay, onMonthChange, onSelectEvent,
+}: {
+  cells: (number | null)[]
+  year: number
+  month: number
+  monthLabel: string
+  isToday: (day: number) => boolean
+  eventsOnDay: (day: number) => CalendarEvent[]
+  onMonthChange: (d: Date) => void
+  onSelectEvent: (e: CalendarEvent) => void
+}) {
+  const todayInMonth = cells.find(d => d != null && isToday(d)) as number | undefined
+  // Selection resets to null when the month changes (the nav buttons clear it),
+  // so a previously selected number never dangles onto the new month.
+  const [selectedDay, setSelectedDay] = useState<number | null>(todayInMonth ?? null)
+  const roundNav: React.CSSProperties = {
+    width: 34, height: 34, borderRadius: 999, border: "none", background: "var(--ivory)",
+    display: "grid", placeItems: "center", cursor: "pointer", color: "var(--body)", flexShrink: 0,
+  }
+  const agendaEvents = selectedDay != null ? eventsOnDay(selectedDay) : []
+  const selectedLabel = selectedDay != null
+    ? new Date(year, month, selectedDay).toLocaleDateString("en-US", { month: "long", day: "numeric" }).toUpperCase()
+    : null
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+        <button aria-label="Previous month" onClick={() => { onMonthChange(new Date(year, month - 1, 1)); setSelectedDay(null) }} style={roundNav}>
+          <ChevronLeft style={{ width: 16, height: 16 }} />
+        </button>
+        <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)" }}>{monthLabel}</span>
+        <button aria-label="Next month" onClick={() => { onMonthChange(new Date(year, month + 1, 1)); setSelectedDay(null) }} style={roundNav}>
+          <ChevronRight style={{ width: 16, height: 16 }} />
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 6 }}>
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
+          <div key={d} style={{ ...POCKET_KICKER_STYLE, textAlign: "center" }}>{d.slice(0, 3).toUpperCase()}</div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", rowGap: 2 }}>
+        {cells.map((day, idx) => {
+          if (day == null) return <div key={idx} />
+          const has = eventsOnDay(day).length > 0
+          const selected = selectedDay === day
+          return (
+            <button
+              key={idx}
+              onClick={() => setSelectedDay(day)}
+              style={{ display: "grid", placeItems: "center", background: "none", border: "none", cursor: "pointer", padding: "3px 0" }}
+            >
+              <span style={{
+                position: "relative", width: 40, height: 40, borderRadius: 999,
+                display: "grid", placeItems: "center",
+                background: selected ? "var(--plum)" : "transparent",
+                color: selected ? "var(--cream-on-dark)" : isToday(day) ? "var(--plum)" : "var(--ink)",
+                fontSize: 15, fontWeight: selected || isToday(day) ? 600 : 400,
+              }}>
+                {day}
+                {has && (
+                  <span style={{ position: "absolute", bottom: 4, width: 5, height: 5, borderRadius: 999, background: selected ? "var(--cream-on-dark)" : "var(--plum)" }} />
+                )}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div style={{ marginTop: 22 }}>
+        {selectedLabel && <PocketKicker label={selectedLabel} />}
+        {agendaEvents.length > 0 ? (
+          <PocketRowCard>
+            {agendaEvents.map((ev, i) => {
+              const start = new Date(ev.start_date)
+              const timeStr = ev.all_day ? "All day" : start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              return (
+                <PocketRow
+                  key={ev.id}
+                  title={ev.title}
+                  sub={[timeStr, ev.location].filter(Boolean).join(" · ")}
+                  chevron
+                  isLast={i === agendaEvents.length - 1}
+                  onClick={() => onSelectEvent(ev)}
+                />
+              )
+            })}
+          </PocketRowCard>
+        ) : (
+          <EmptyState variant="quiet" icon={<Calendar style={{ width: 22, height: 22 }} />} title="Nothing scheduled" subtitle="Tap a marked day to see its events." />
+        )}
+        <p style={{ marginTop: 16, fontSize: 12.5, color: "var(--muted-text)", textAlign: "center" }}>
+          Tap any event to open its plan — no modal in between.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export function MonthGrid({
   events,
   currentMonth,
@@ -5865,6 +6067,7 @@ export function MonthGrid({
   onMonthChange: (d: Date) => void
   onSelectEvent: (e: CalendarEvent) => void
 }) {
+  const isMobileGrid = useIsMobile()
   const year = currentMonth.getFullYear()
   const month = currentMonth.getMonth()
   const firstDayOfWeek = new Date(year, month, 1).getDay()
@@ -5888,6 +6091,24 @@ export function MonthGrid({
   }
 
   const monthLabel = currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+
+  // ── Mobile: ruled month grid (v2 §0.2) — dots-only cells + a day-agenda list
+  // below. Never renders event titles inside cells; tapping a marked day fills
+  // the agenda, tapping an agenda event opens its plan (no modal).
+  if (isMobileGrid) {
+    return (
+      <MonthGridMobile
+        cells={cells}
+        year={year}
+        month={month}
+        monthLabel={monthLabel}
+        isToday={isToday}
+        eventsOnDay={eventsOnDay}
+        onMonthChange={onMonthChange}
+        onSelectEvent={onSelectEvent}
+      />
+    )
+  }
 
   return (
     <div>
@@ -9582,13 +9803,16 @@ type GroupSessionRecord = {
 }
 
 function GroupsTab({
-  teamId, ministryId, userId, canEdit, generateTrigger,
+  teamId, ministryId, userId, canEdit, generateTrigger, onDetailOpenChange,
 }: {
   teamId: string | null
   ministryId: string
   userId: string
   canEdit: boolean
   generateTrigger?: number
+  // Reports when the saved-grouping detail owns the screen so the mobile parent
+  // suppresses its own Groups chrome (§ no two-header).
+  onDetailOpenChange?: (open: boolean) => void
 }) {
   const supabase = createClient()
   const isMobile = useIsMobile()
@@ -9601,6 +9825,7 @@ function GroupsTab({
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- parent trigger-counter opens the wizard (Convention #15 pattern); behavior-preserving, restructure deferred
   useEffect(() => { if (generateTrigger) setShowWizard(true) }, [generateTrigger])
+  useEffect(() => { onDetailOpenChange?.(!!viewSession) }, [viewSession, onDetailOpenChange])
 
   const mono: React.CSSProperties = EYEBROW_STYLE
 
@@ -9778,6 +10003,7 @@ function GroupsTab({
 
 function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; onBack: () => void }) {
   const supabase = createClient()
+  const isMobile = useIsMobile()
   const [groups, setGroups] = useState<{ id: string; name: string; order_index: number; members: { id: string; name: string; graduation_year: number | null; role: string }[] }[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -9836,19 +10062,36 @@ function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; on
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 24 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={mono}>Saved grouping</p>
-          <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, fontWeight: 600, margin: "4px 0 0", letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1 }}>{session.name}</h2>
+      {/* Mobile (§Workspace recipe): single chrome "← {grouping}" + CSV ghost —
+          the parent Groups chrome is suppressed while this detail is open. */}
+      {isMobile ? (
+        <PocketHubChrome
+          title={session.name.replace(/^E2E::/, "")}
+          onBack={onBack}
+          action={
+            <button
+              onClick={exportCSV}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 14px", borderRadius: 999, border: "none", background: "var(--ivory)", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "var(--serif)" }}
+            >
+              <Download style={{ width: 14, height: 14 }} /> CSV
+            </button>
+          }
+        />
+      ) : (
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginBottom: 24 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={mono}>Saved grouping</p>
+            <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, fontWeight: 600, margin: "4px 0 0", letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1 }}>{session.name}</h2>
+          </div>
+          <button
+            onClick={exportCSV}
+            style={{ padding: "8px 16px", border: "1px solid var(--line-2)", borderRadius: 8, background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}
+          >
+            <Download style={{ width: 13, height: 13 }} />
+            Export CSV
+          </button>
         </div>
-        <button
-          onClick={exportCSV}
-          style={{ padding: "8px 16px", border: "1px solid var(--line-2)", borderRadius: 8, background: "transparent", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}
-        >
-          <Download style={{ width: 13, height: 13 }} />
-          Export CSV
-        </button>
-      </div>
+      )}
       <p style={{ fontSize: 13, color: "var(--muted-text)", marginBottom: 24 }}>
         {groups.length} groups · {totalPeople} people · Created {new Date(session.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
       </p>
