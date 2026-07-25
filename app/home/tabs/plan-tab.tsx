@@ -32,7 +32,7 @@ import {
 import { confirmSmallGroupsAction, deleteSmallGroupAssignmentsAction } from "@/app/actions/generate-groups"
 import { SLOTS, type DGLSlot, type ProposedAssignment } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks, getSemesterDates, getSemesterOptions, type DGLAvailSlot } from "@/app/actions/dgl-utils"
-import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamChatAction, createEventPlanningChatAction, syncTeamChat } from "@/app/actions/auto-chats"
+import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamChatAction, createEventPlanningChatAction, syncEventPlanningChat, syncTeamChat } from "@/app/actions/auto-chats"
 import { confirmDGLRosterAction, handleRosterRenewalAction, type RosterMember, type RosterStatus } from "@/app/actions/dgl-roster"
 import { finalizeBibleStudyAction, savePastorNotesAction } from "@/app/actions/bible-study"
 import { elevateToLeader } from "@/app/actions/ministry"
@@ -49,7 +49,7 @@ import { useIsMobile } from "../use-is-mobile"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, PocketRoundButton, PocketButton, PocketSearchField, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, PocketRoundButton, PocketButton, PocketSheet, PocketSearchField, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
 import { FinanceWorkspace, MobileFactsGrid, type FinanceSection } from "../components/finance-workspace"
 import { MobilePocketHub, PocketHubChrome } from "../components/mobile-pocket-hub"
 import { teamIconKey } from "../workspace-presets"
@@ -7305,7 +7305,13 @@ export function EventPlanWorkspace({
 
   // Planning chat state
   const [planningGroupId, setPlanningGroupId] = useState<string | null>(null)
+  const [planCreatedBy, setPlanCreatedBy] = useState<string | null>(null)
+  // Current member ids of the planning chat (for stale detection). RLS lets only a
+  // member of the chat read these rows; a planner not in the chat sees an empty set,
+  // which reads as 'stale' — a safe default (Update is idempotent + authz-gated).
+  const [planChatMemberIds, setPlanChatMemberIds] = useState<string[]>([])
   const [creatingPlanChat, setCreatingPlanChat] = useState(false)
+  const [planChatConfirmOpen, setPlanChatConfirmOpen] = useState(false)
   const [planChatError, setPlanChatError] = useState<string | null>(null)
   const [compileOpen, setCompileOpen] = useState(false)  // Run Sheet P2 — compile-playbook modal
   const [loading, setLoading] = useState(true)
@@ -7437,6 +7443,65 @@ export function EventPlanWorkspace({
     if (!("error" in res)) await reloadConfirmations(plan.id)
   }
 
+  // Planning-chat button state (mobile + desktop share this):
+  //   'none'   — no chat yet
+  //   'synced' — chat exists and its members match the current roster assignees
+  //   'stale'  — chat exists but the roster changed (an assignee is missing, or a
+  //              member is no longer on any role). The plan creator + the viewer are
+  //              always kept in the chat by the sync action, so they never read as
+  //              "extra" (else the chat would be permanently stale). Recomputes live
+  //              as roles are assigned/reassigned/unassigned.
+  const planChatState: 'none' | 'synced' | 'stale' = useMemo(() => {
+    if (!planningGroupId) return 'none'
+    const rosterIds = roles.filter(r => r.assigned_to).map(r => r.assigned_to as string)
+    const rosterSet = new Set(rosterIds)
+    const chatSet = new Set(planChatMemberIds)
+    const kept = new Set([planCreatedBy, userId].filter(Boolean) as string[])
+    const missing = rosterIds.some(id => !chatSet.has(id))
+    const extra = [...chatSet].some(id => !rosterSet.has(id) && !kept.has(id))
+    return (missing || extra) ? 'stale' : 'synced'
+  }, [planningGroupId, roles, planChatMemberIds, planCreatedBy, userId])
+
+  // Who would be added / removed on a sync (drives the confirm surfaces). Names come
+  // from the ministry member list (`members`) unioned with role-assignees.
+  const planChatDelta = useMemo(() => {
+    const nameOf = (id: string) =>
+      assigneePool.find(p => p.id === id)?.name ?? members.find(m => m.id === id)?.name ?? "Someone"
+    const rosterIds = roles.filter(r => r.assigned_to).map(r => r.assigned_to as string)
+    const rosterSet = new Set(rosterIds)
+    const chatSet = new Set(planChatMemberIds)
+    const kept = new Set([planCreatedBy, userId].filter(Boolean) as string[])
+    const added = rosterIds.filter(id => !chatSet.has(id)).map(id => ({ id, name: nameOf(id) }))
+    const removed = [...chatSet].filter(id => !rosterSet.has(id) && !kept.has(id)).map(id => ({ id, name: nameOf(id) }))
+    const all = [...new Set(rosterIds)].map(id => ({ id, name: nameOf(id) }))
+    return { added, removed, all }
+  }, [roles, planChatMemberIds, planCreatedBy, userId, assigneePool, members])
+
+  async function handleSyncPlanningChat() {
+    if (!plan || creatingPlanChat) return
+    setCreatingPlanChat(true)
+    setPlanChatError(null)
+    const result = await syncEventPlanningChat(plan.id, ministryId)
+    setCreatingPlanChat(false)
+    setPlanChatConfirmOpen(false)
+    if (result.error) { setPlanChatError(result.error); return }
+    // Re-read membership so the button settles to 'synced'.
+    if (result.groupId) {
+      const { data: gm } = await supabase.from("group_members").select("user_id").eq("group_id", result.groupId)
+      setPlanChatMemberIds((gm ?? []).map((r: { user_id: string }) => r.user_id))
+    }
+  }
+
+  // Tap handler for the 3-state button. synced → open the chat; none/stale → confirm.
+  function handlePlanChatTap() {
+    if (planChatState === 'synced' && planningGroupId) {
+      onOpenChat?.(planningGroupId, `${calendarEvent.title} Planning`)
+      return
+    }
+    setPlanChatError(null)
+    setPlanChatConfirmOpen(true)
+  }
+
   // Transition Notes UI retired (Run Sheet P2) — the transition_notes table remains as a
   // dark archive; its content now surfaces as brief candidates in the compile-playbook modal.
 
@@ -7484,7 +7549,16 @@ export function EventPlanWorkspace({
       setCrunchDate(cd ?? "")
 
       setPlan(planData as EventPlan)
-      setPlanningGroupId((planData as EventPlan).planning_group_id ?? null)
+      const pgid = (planData as EventPlan).planning_group_id ?? null
+      setPlanningGroupId(pgid)
+      setPlanCreatedBy((planData as { created_by?: string | null }).created_by ?? null)
+      // Load the planning chat's current membership for stale detection.
+      if (pgid) {
+        const { data: gm } = await supabase.from("group_members").select("user_id").eq("group_id", pgid)
+        setPlanChatMemberIds((gm ?? []).map((r: { user_id: string }) => r.user_id))
+      } else {
+        setPlanChatMemberIds([])
+      }
       setTurnout(planData.expected_turnout != null ? String(planData.expected_turnout) : "")
       setBudget(planData.budget_allocated != null ? String(planData.budget_allocated) : "")
       setOverviewNotes(planData.overview_notes ?? "")
@@ -7868,8 +7942,12 @@ export function EventPlanWorkspace({
     setPlanChatError(null)
     const result = await createEventPlanningChatAction(plan.id, calendarEvent.title, assignedIds, userId, ministryId)
     setCreatingPlanChat(false)
+    setPlanChatConfirmOpen(false)
     if (result.error || !result.groupId) { setPlanChatError(result.error ?? "Failed to create chat."); return }
     setPlanningGroupId(result.groupId)
+    // Read back membership so the button settles to 'synced' rather than flashing stale.
+    const { data: gm } = await supabase.from("group_members").select("user_id").eq("group_id", result.groupId)
+    setPlanChatMemberIds((gm ?? []).map((r: { user_id: string }) => r.user_id))
     onOpenChat?.(result.groupId, `${calendarEvent.title} Planning`)
   }
 
@@ -8740,6 +8818,41 @@ export function EventPlanWorkspace({
               const covered = roles.filter(r => r.assigned_to)
               const iconBtnBase: React.CSSProperties = { background: "none", border: "none", padding: 3, borderRadius: 6, cursor: "pointer", display: "grid", placeItems: "center", color: "var(--faint)" }
 
+              // ── 3-state planning-chat icon button (mobile + desktop share this) ──
+              // none → ivory chip / plum icon; synced → +sage dot; stale → plum-filled
+              // chip / cream icon / danger dot. Tap: synced opens the chat, else opens
+              // the confirm surface. Disabled only while a chat doesn't exist and no
+              // role is assigned yet (nothing to plan), or while a write is in flight.
+              const pcStale = planChatState === 'stale'
+              const pcDisabled = (planChatState === 'none' && covered.length === 0) || creatingPlanChat
+              const pcTip = planChatState === 'none' ? "Create planning chat"
+                : pcStale ? "Roster changed — update chat" : "Open planning chat"
+              const planChatBtn = canEdit ? (
+                <button
+                  onClick={handlePlanChatTap}
+                  disabled={pcDisabled}
+                  aria-label={pcTip}
+                  title={planChatState === 'none' && covered.length === 0 ? "Assign roles first" : pcTip}
+                  style={{
+                    position: "relative", width: 34, height: 34, borderRadius: 999, flexShrink: 0,
+                    display: "grid", placeItems: "center", border: "none",
+                    cursor: pcDisabled ? "default" : "pointer", opacity: pcDisabled ? 0.5 : 1,
+                    background: pcStale ? "var(--plum)" : "var(--ivory)",
+                    color: pcStale ? "var(--cream-on-dark)" : "var(--plum)",
+                    transition: "background var(--dur-fast)",
+                  }}
+                >
+                  <MessageCircle style={{ width: 16, height: 16 }} />
+                  {planChatState !== 'none' && (
+                    <span style={{
+                      position: "absolute", top: 0, right: 0, width: 10, height: 10, borderRadius: 999,
+                      background: pcStale ? "var(--danger)" : "var(--sage)",
+                      border: "2px solid var(--cream)",
+                    }} />
+                  )}
+                </button>
+              ) : null
+
               const GroupHeader = ({ label, count, allSet }: { label: string; count?: number; allSet?: boolean }) => (
                 <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "28px 0 4px" }}>
                   <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{label}</span>
@@ -8861,23 +8974,7 @@ export function EventPlanWorkspace({
                   title="Roles"
                   action={canEdit ? (
                     <>
-                      {planningGroupId ? (
-                        <ContentActionButton
-                          variant="ghost"
-                          icon={<MessageCircle style={{ width: 14, height: 14 }} />}
-                          label="Open planning chat"
-                          onClick={() => onOpenChat?.(planningGroupId, `${calendarEvent.title} Planning`)}
-                        />
-                      ) : (
-                        <ContentActionButton
-                          variant="ghost"
-                          icon={<MessageCircle style={{ width: 14, height: 14 }} />}
-                          label={creatingPlanChat ? "Creating…" : "Create planning chat"}
-                          onClick={handleCreatePlanningChat}
-                          disabled={creatingPlanChat || covered.length === 0}
-                          title={covered.length === 0 ? "Assign roles first" : "Create a group chat with all role holders"}
-                        />
-                      )}
+                      {planChatBtn}
                       {covered.length > 0 && (
                         <ContentActionButton
                           variant="ghost"
@@ -8900,6 +8997,78 @@ export function EventPlanWorkspace({
                   ) : undefined}
                 />
                 {planChatError && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{planChatError}</p>}
+
+                {/* Planning-chat confirm surface — mobile PocketSheet / desktop ConfirmDialog.
+                    Both spell out WHO is added/removed (never a bare "are you sure"). */}
+                {planChatConfirmOpen && (() => {
+                  const isCreate = planChatState === 'none'
+                  const title = isCreate ? "Create planning chat?" : "Update planning chat?"
+                  const cta = isCreate ? "Create chat" : "Update chat"
+                  const body = isCreate
+                    ? "Opens a group chat with everyone assigned to a role on this event, plus you. Reassign a role later and you can sync the chat to match the roster."
+                    : "The roster changed since this chat was created. Updating adds new assignees and removes anyone no longer on a role."
+                  const run = isCreate ? handleCreatePlanningChat : handleSyncPlanningChat
+                  const ini = (n: string) => n.split(/\s+/).filter(Boolean).map(w => w[0]).slice(0, 2).join("").toUpperCase()
+                  const createMembers = [{ id: "__you", name: "You" }, ...planChatDelta.all]
+
+                  const chip = (m: { id: string; name: string }, sign?: "+" | "−") => (
+                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--ivory)", borderRadius: 999, padding: "6px 14px 6px 6px" }}>
+                      <div style={{ width: 26, height: 26, borderRadius: 999, background: "var(--plum)", color: "var(--cream-on-dark)", display: "grid", placeItems: "center", fontSize: 10.5, fontWeight: 600 }}>{ini(m.name)}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{sign ? `${sign} ` : ""}{m.name}</div>
+                    </div>
+                  )
+                  const monoLabel = (t: string) => (
+                    <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", color: "var(--muted-text)", marginTop: 18, textTransform: "uppercase" }}>{t}</div>
+                  )
+                  const chipRow = (kids: React.ReactNode) => (
+                    <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>{kids}</div>
+                  )
+
+                  const memberBlocks = isCreate ? (
+                    <>
+                      {monoLabel("Members")}
+                      {chipRow(createMembers.map(m => chip(m)))}
+                    </>
+                  ) : (
+                    <>
+                      {planChatDelta.added.length > 0 && <>{monoLabel("Adding")}{chipRow(planChatDelta.added.map(m => chip(m, "+")))}</>}
+                      {planChatDelta.removed.length > 0 && <>{monoLabel("Removing")}{chipRow(planChatDelta.removed.map(m => chip(m, "−")))}</>}
+                      {planChatDelta.added.length === 0 && planChatDelta.removed.length === 0 && (
+                        <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 14 }}>The chat already matches the roster.</p>
+                      )}
+                    </>
+                  )
+
+                  if (isMobile) {
+                    return (
+                      <PocketSheet title={title} onClose={() => setPlanChatConfirmOpen(false)}>
+                        <p style={{ fontSize: 14.5, lineHeight: 1.6, color: "var(--body)", margin: 0 }}>{body}</p>
+                        {memberBlocks}
+                        <PocketButton onClick={run} disabled={creatingPlanChat} style={{ width: "100%", marginTop: 22 }}>
+                          {creatingPlanChat ? "…" : cta}
+                        </PocketButton>
+                        <button onClick={() => setPlanChatConfirmOpen(false)} style={{ width: "100%", border: "none", background: "none", color: "var(--body)", fontSize: 14, fontWeight: 600, padding: 13, cursor: "pointer", marginTop: 4 }}>Cancel</button>
+                      </PocketSheet>
+                    )
+                  }
+                  return createPortal(
+                    <CentralModal
+                      title={title}
+                      maxWidth={440}
+                      onClose={() => setPlanChatConfirmOpen(false)}
+                      footer={
+                        <>
+                          <CentralButton variant="secondary" size="md" onClick={() => setPlanChatConfirmOpen(false)} disabled={creatingPlanChat}>Cancel</CentralButton>
+                          <CentralButton variant="primary" size="md" onClick={run} disabled={creatingPlanChat}>{creatingPlanChat ? "…" : cta}</CentralButton>
+                        </>
+                      }
+                    >
+                      <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>{body}</p>
+                      {memberBlocks}
+                    </CentralModal>,
+                    document.body,
+                  )
+                })()}
 
                 {/* Inline add-role form */}
                 {canEdit && showAddRole && (

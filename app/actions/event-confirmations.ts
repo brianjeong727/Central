@@ -14,41 +14,20 @@
 // caller-supplied id. Role gates go through lib/roles.ts predicates.
 
 import { createAdminClient } from "@/lib/supabase-admin"
-import { requireMinistryMember, type AuthzContext } from "@/app/actions/authz"
-import { isLeaderRole } from "@/lib/roles"
+import { requireMinistryMember, requirePlanPlanner, type AuthzContext } from "@/app/actions/authz"
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
-// Authorize a caller against a specific event plan. Mirrors the event_confirmations INSERT
-// RLS: same ministry AND (admin-tier/leader OR holds can_plan_events on any team role).
+// Authorize a caller against a specific event plan. Delegates to the canonical
+// requirePlanPlanner gate (authz.ts) — same ministry AND (admin-tier/leader OR
+// holds can_plan_events on any team role) — so this and the planning-chat actions
+// share one source of truth and can never drift.
 async function authorizePlan(
   eventPlanId: string,
 ): Promise<{ ctx: AuthzContext; ministryId: string } | { error: string }> {
-  const ctx = await requireMinistryMember()
-  if (ctx.error !== null) return { error: ctx.error }
-
-  const admin = createAdminClient()
-  const { data: plan } = await admin
-    .from("event_plans")
-    .select("id, ministry_id")
-    .eq("id", eventPlanId)
-    .maybeSingle()
-  if (!plan || plan.ministry_id !== ctx.ministryId) return { error: "Not authorized." }
-
-  if (isLeaderRole(ctx.role)) return { ctx, ministryId: plan.ministry_id }
-
-  // can_plan_events on any of the caller's team roles (verbatim mirror of the write RLS,
-  // which is not plan-scoped — the same-ministry check above provides tenant isolation).
-  const { data: memberships } = await admin
-    .from("team_members")
-    .select("id, team_roles!role_id(permissions)")
-    .eq("user_id", ctx.userId)
-  const canPlan = ((memberships ?? []) as { team_roles: { permissions?: string[] } | null }[]).some(
-    (m) => (m.team_roles?.permissions ?? []).includes("can_plan_events"),
-  )
-  if (canPlan) return { ctx, ministryId: plan.ministry_id }
-
-  return { error: "Not authorized." }
+  const res = await requirePlanPlanner(eventPlanId)
+  if (res.error !== null) return { error: res.error }
+  return { ctx: res, ministryId: res.ministryId }
 }
 
 // Claim a ledger offset; returns true only if the row was freshly inserted (not a conflict).

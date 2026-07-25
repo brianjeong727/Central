@@ -10,7 +10,7 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
-import { isAdminRole } from "@/lib/roles"
+import { isAdminRole, isLeaderRole } from "@/lib/roles"
 
 export type AuthzContext = { userId: string; ministryId: string; role: string; error: null }
 export type AuthzFailure = { userId: null; ministryId: null; role: null; error: string }
@@ -83,4 +83,38 @@ export async function requireTeamMemberOrAdmin(teamId: string): Promise<AuthzRes
   if (!member) return deny("Not authorized.")
 
   return ctx
+}
+
+// Caller may PLAN a specific event: belongs to the plan's ministry AND is
+// leader/admin-tier OR holds `can_plan_events` on any of their team roles.
+// This is the single source of truth for "can plan this event" — it mirrors the
+// event_confirmations INSERT RLS and the plan-tab `canEdit` gate, and is shared
+// by the confirmation actions (event-confirmations.ts) and the planning-chat
+// actions (auto-chats.ts) so a legit planner is never blocked by one but not the
+// other. The `can_plan_events` arm is not plan-scoped (verbatim mirror of the
+// write RLS); the same-ministry check above provides tenant isolation.
+export async function requirePlanPlanner(eventPlanId: string): Promise<AuthzResult> {
+  const ctx = await requireMinistryMember()
+  if (ctx.error !== null) return ctx
+
+  const admin = createAdminClient()
+  const { data: plan } = await admin
+    .from("event_plans")
+    .select("ministry_id")
+    .eq("id", eventPlanId)
+    .maybeSingle()
+  if (!plan || plan.ministry_id !== ctx.ministryId) return deny("Not authorized.")
+
+  if (isLeaderRole(ctx.role)) return ctx
+
+  const { data: memberships } = await admin
+    .from("team_members")
+    .select("id, team_roles!role_id(permissions)")
+    .eq("user_id", ctx.userId)
+  const canPlan = ((memberships ?? []) as { team_roles: { permissions?: string[] } | null }[]).some(
+    (m) => (m.team_roles?.permissions ?? []).includes("can_plan_events"),
+  )
+  if (canPlan) return ctx
+
+  return deny("Not authorized.")
 }
