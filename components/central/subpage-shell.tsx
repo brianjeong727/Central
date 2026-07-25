@@ -14,6 +14,7 @@ import { ArrowLeft } from "lucide-react"
 import { InsetHairline } from "./hairline"
 import { PageTitle } from "./page-title"
 import { useScrollResetOn } from "./scroll-reset"
+import { useEdgeSwipeBack } from "./use-edge-swipe-back"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ context hook); flagged Phase 2, refactor pending
 import { useSubpageCrumbs } from "@/app/home/breadcrumb-context"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ type import); flagged Phase 2, refactor pending
@@ -38,8 +39,11 @@ export function SubpageShell({ crumbs, title, width = "full", maxWidth = 820, ch
   // 34px plum chevron + the subpage title (serif 20/600). When no title is
   // passed, the row falls back to the PocketBackRow grammar ("← Parent").
   const back = [...crumbs].reverse().find(c => c.onClick)
+  // Mobile: edge-swipe from the left mirrors the chrome chevron (§0.3). Inert on
+  // desktop (coarse-pointer gated inside the hook).
+  const swipeRef = useEdgeSwipeBack<HTMLDivElement>(back?.onClick)
   return (
-    <div className="md:flex md:flex-col md:h-full md:overflow-hidden" style={{ background: "var(--cream)" }}>
+    <div ref={swipeRef} className="md:flex md:flex-col md:h-full md:overflow-hidden" style={{ background: "var(--cream)" }}>
       {(back || title) && (
         // md:hidden must win on desktop — keep `display` in the class, NOT inline
         // (an inline `display` would override md:hidden and leak onto desktop).
