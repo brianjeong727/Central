@@ -7,14 +7,20 @@ interface SectionHeaderProps {
   titleSize?: number
   action?: ReactNode
   style?: CSSProperties
+  // Mobile-only opt-in (mobile design system §1): drop the serif title on phone
+  // width so a section is labelled by its eyebrow-as-kicker + action, never a
+  // 20px title that restates the drilled-in Pocket chrome. `md:` restores the
+  // title → DESKTOP RENDERING IS BYTE-IDENTICAL. Used only by settings subpages.
+  hideTitleOnMobile?: boolean
 }
 
-export function SectionHeader({ eyebrow, title, titleSize = 28, action, style }: SectionHeaderProps) {
+export function SectionHeader({ eyebrow, title, titleSize = 28, action, style, hideTitleOnMobile = false }: SectionHeaderProps) {
   return (
     <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", ...style }}>
       <div>
         {eyebrow && <div style={EYEBROW_STYLE}>{eyebrow}</div>}
         <h2
+          className={hideTitleOnMobile ? "hidden md:block" : undefined}
           style={{
             fontFamily: "var(--serif)",
             fontSize: titleSize,

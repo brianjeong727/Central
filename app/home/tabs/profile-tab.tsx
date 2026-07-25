@@ -5,9 +5,9 @@ import Image from "next/image"
 import dynamic from "next/dynamic"
 import useSWR from "swr"
 import { useRouter } from "next/navigation"
-import { ChevronRight, ChevronDown, X, Check, Camera, Pencil, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings, LogOut } from "lucide-react"
+import { ChevronRight, ChevronDown, X, Check, Camera, Pencil, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings, LogOut, User as UserIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { MONO_STYLE, RingCrossLogo, EmptyState } from "../components/shared"
+import { MONO_STYLE, EmptyState } from "../components/shared"
 import { getInitials } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getHomeVerses } from "@/app/actions/home-verses"
@@ -15,7 +15,8 @@ import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { deleteMyAccount } from "@/app/actions/delete-account"
 import { unblockUser } from "@/app/actions/blocks"
 import { useBlocks } from "../use-blocks"
-import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, MonogramChip, PocketFilterChip } from "@/components/central"
+import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, MonogramChip, PocketFilterChip, PocketCard, PocketButton, PocketTag } from "@/components/central"
+import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
 import type { Profile, Devotional, Prayer, Verse, NotificationSettings } from "../types"
@@ -1022,6 +1023,7 @@ export function ProfileTab({
   onAvatarChange,
   activeSection,
   onSectionChange,
+  onBack,
 }: {
   userId: string
   initialProfile: Profile
@@ -1032,6 +1034,7 @@ export function ProfileTab({
   onAvatarChange?: (url: string) => void
   activeSection: "spiritual-profile" | "journal"
   onSectionChange: (s: "spiritual-profile" | "journal") => void
+  onBack?: () => void
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -1255,10 +1258,19 @@ export function ProfileTab({
         )}
 
         {!editing && !hasAnyContent && (
-          <div style={{ textAlign: "center", padding: "40px 0 24px" }}>
-            <p style={{ fontFamily: "var(--serif)", fontSize: 17, color: "var(--ink)", marginBottom: 4, marginTop: 0 }}>Nothing here yet</p>
-            <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>Edit your profile to share details with your community.</p>
-          </div>
+          mobile ? (
+            <EmptyState
+              variant="quiet"
+              icon={<UserIcon className="w-5 h-5" strokeWidth={1.6} />}
+              title="Your profile is empty"
+              subtitle="Edit your profile to share details with your community."
+            />
+          ) : (
+            <div style={{ textAlign: "center", padding: "40px 0 24px" }}>
+              <p style={{ fontFamily: "var(--serif)", fontSize: 17, color: "var(--ink)", marginBottom: 4, marginTop: 0 }}>Nothing here yet</p>
+              <p style={{ fontSize: 13, color: "var(--muted-text)", margin: 0 }}>Edit your profile to share details with your community.</p>
+            </div>
+          )
         )}
       </div>
     )
@@ -1307,47 +1319,54 @@ export function ProfileTab({
 
       {activeSection === "spiritual-profile" && <div className="md:flex md:flex-col md:flex-1">
 
-        {/* ── Mobile: top bar ── */}
-        <div className="flex items-center gap-2.5 px-5 pt-6 pb-5 md:hidden">
-          <a href="/landing" className="flex items-center gap-2.5" style={{ textDecoration: "none" }}>
-            <RingCrossLogo size={26} color="var(--plum)" />
-            <span style={{ fontFamily: "var(--serif)", fontSize: 28, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1 }}>{ministryName}</span>
-          </a>
-        </div>
+        {/* ── Mobile: single chrome row (no two-header). Editing swaps the title
+            to "Edit profile" and surfaces Cancel/Save in the chrome (§1). ── */}
+        <PocketChrome
+          title={editing ? "Edit profile" : "Profile"}
+          back={editing ? cancelEdit : onBack}
+          hideAvatar
+          userName=""
+          onAvatarClick={() => {}}
+          action={editing ? <PocketButton variant="quiet" compact surface="page" onClick={cancelEdit}>Cancel</PocketButton> : undefined}
+          action2={editing ? <PocketButton variant="primary" compact onClick={saveEdit} disabled={saving}>{saving ? "Saving…" : "Save"}</PocketButton> : undefined}
+        />
 
-        {/* ── Mobile: cream identity block ── */}
-        <div className="md:hidden px-5 pb-6">
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
-            <label className="group relative flex-shrink-0" style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
-              <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
-              {profile.avatar_url
-                ? <Image src={profile.avatar_url} alt="Profile" fill sizes="56px" style={{ objectFit: "cover" }} />
-                : <span style={{ fontFamily: "var(--serif)", fontSize: 20, color: "var(--cream)" }}>{getInitials(profile.name)}</span>
-              }
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 35%, transparent)" }}>
-                <Camera style={{ width: 14, height: 14, color: "white" }} />
-              </div>
-              {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 40%, transparent)" }}><div className="animate-spin" style={{ width: 18, height: 18, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
-            </label>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h1 style={{ fontFamily: "var(--serif)", fontSize: 26, fontWeight: 400, letterSpacing: "-0.02em", color: "var(--ink)", margin: 0, lineHeight: 1.1 }}>{profile.name}</h1>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
-                <span style={{ fontSize: 11, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "2px 8px", textTransform: "capitalize" as const }}>{roleLabel(profile.role, null)}</span>
-                {profile.graduation_year && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Class of {profile.graduation_year}</span>}
-                {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
+        {/* ── Mobile: identity card (tonal ivory) ── */}
+        <div className="md:hidden px-5 pb-2">
+          <PocketCard padding="22px 20px">
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <label className="group relative flex-shrink-0" style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
+                <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+                {profile.avatar_url
+                  ? <Image src={profile.avatar_url} alt="Profile" fill sizes="56px" style={{ objectFit: "cover" }} />
+                  : <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--cream-on-dark)" }}>{getInitials(profile.name)}</span>
+                }
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 35%, transparent)" }}>
+                  <Camera style={{ width: 14, height: 14, color: "white" }} />
+                </div>
+                {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 40%, transparent)" }}><div className="animate-spin" style={{ width: 18, height: 18, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
+              </label>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h1 style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: 0, lineHeight: 1.15 }}>{profile.name}</h1>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, minWidth: 0 }}>
+                  <PocketTag label={roleLabel(profile.role, null)} variant="role" />
+                  <span style={{ fontSize: 13, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.email}</span>
+                </div>
+                {(profile.graduation_year || (currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation)) && (
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 5 }}>
+                    {profile.graduation_year && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Class of {profile.graduation_year}</span>}
+                    {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-          <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "0 0 14px" }}>{profile.email}</p>
-          {avatarError && <p style={{ fontSize: 11, color: "var(--danger)", margin: "0 0 10px" }}>{avatarError}</p>}
-          {editing ? (
-            <div style={{ display: "flex", gap: 8 }}>
-              <CentralButton variant="secondary" onClick={cancelEdit} style={{ fontSize: 13 }}><X size={12} />Cancel</CentralButton>
-              <CentralButton onClick={saveEdit} disabled={saving} style={{ fontSize: 13 }}><Check size={12} />{saving ? "Saving…" : "Save"}</CentralButton>
-            </div>
-          ) : (
-            <CentralButton variant="secondary" onClick={startEdit} style={{ fontSize: 13 }}><Pencil size={13} />Edit profile</CentralButton>
-          )}
+            {avatarError && <p style={{ fontSize: 11, color: "var(--danger)", margin: "10px 0 0" }}>{avatarError}</p>}
+            {!editing && (
+              <PocketButton variant="quiet" surface="card" onClick={startEdit} style={{ marginTop: 16 }}>
+                <Pencil size={13} />Edit profile
+              </PocketButton>
+            )}
+          </PocketCard>
         </div>
 
         {/* ── Desktop: page-title header (R1 — mono eyebrow + serif H1) ──
@@ -1424,7 +1443,7 @@ export function ProfileTab({
         </div>
 
         {/* ── Mobile: profile sections ── */}
-        <div className="md:hidden px-5 pb-6">
+        <div className="md:hidden px-5 pb-6" style={{ paddingTop: 24 }}>
           {renderProfileSections(true)}
           <div style={{ marginTop: 24, marginBottom: 24 }}>
             <NotificationsSection
@@ -1432,6 +1451,7 @@ export function ProfileTab({
               ministryId={initialProfile.ministry_id ?? ""}
               notificationSettings={profile.notification_settings}
               onSettingsChange={(s: NotificationSettings) => setProfile(p => ({ ...p, notification_settings: s }))}
+              mobile
             />
           </div>
           <div style={{ marginBottom: 24 }}>
@@ -1441,9 +1461,9 @@ export function ProfileTab({
               (desktop-nav.tsx); the mobile pill nav has no Profile item, so the
               sign-out affordance must live here. Neutral action, kept OUT of the
               red Danger Zone below (which is Leave / Delete account). */}
-          <CentralButton variant="secondary" onClick={onLogout} style={{ width: "100%", justifyContent: "center", marginBottom: 24 }}>
+          <PocketButton variant="quiet" surface="page" onClick={onLogout} style={{ width: "100%", marginBottom: 24 }}>
             <LogOut size={14} />Sign out
-          </CentralButton>
+          </PocketButton>
           <DangerZone
             mobile
             ministryName={ministryName}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase"
 import { Pencil, Check, Copy, ExternalLink, Wallet } from "lucide-react"
 import { TabPageHeader, PageTitle, FormField, Input, CentralButton, POCKET_KICKER_STYLE } from "@/components/central"
+import { PocketChrome } from "./pocket-header"
 import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
 import { isAdminRole } from "@/lib/roles"
 
@@ -70,11 +71,12 @@ function useZelleInfo(ministryId: string) {
 
 // ── Full member Give surface (rendered for the `give` tab) ────────────────────
 export function GiveView({
-  ministryId, userId, userRole,
+  ministryId, userId, userRole, onBack,
 }: {
   ministryId: string
   userId: string
   userRole: string
+  onBack?: () => void
 }) {
   const supabase = createClient()
   const isAdmin = isAdminRole(userRole)
@@ -115,17 +117,19 @@ export function GiveView({
 
   return (
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
-      {/* Mobile header */}
-      <div className="md:hidden px-5 pt-6 pb-5">
-        <p style={EYEBROW_STYLE}>Give · 2 Corinthians 9:7</p>
-        <h1 style={{ fontFamily: "var(--serif)", fontSize: 36, color: "var(--ink)", lineHeight: 1.05, margin: "14px 0 0", fontWeight: 400 }}>Give</h1>
-        <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>Give directly to your ministry through Zelle.</p>
-      </div>
+      {/* Mobile: single chrome row (no two-header) */}
+      <PocketChrome title="Give" back={onBack} hideAvatar userName="" onAvatarClick={() => {}} />
 
       {/* Desktop header — landing tier (R1) */}
       <TabPageHeader>
         <PageTitle eyebrow="Offering" title="Give" />
       </TabPageHeader>
+
+      {/* Mobile: verse kicker + one calm sentence */}
+      <div className="md:hidden px-5">
+        <p style={{ ...POCKET_KICKER_STYLE, letterSpacing: "1.6px" }}>2 Corinthians 9 : 7</p>
+        <p style={{ fontSize: 15.5, color: "var(--body)", marginTop: 10 }}>Give directly to your ministry through Zelle.</p>
+      </div>
 
       <div className="px-5 md:px-14 pt-6 md:pt-5 md:flex-1 md:overflow-y-auto">
         {loading ? <Spinner /> : editing || (!zelleInfo && isAdmin) ? (

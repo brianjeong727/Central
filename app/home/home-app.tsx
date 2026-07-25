@@ -1288,6 +1288,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 ministryId={ministryId}
                 userId={userId}
                 userRole={initialProfile.role}
+                onBack={() => handleNavClick("home")}
               />
             </div>
           )}
@@ -1304,6 +1305,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 onAvatarChange={(url) => setAvatarUrl(url)}
                 activeSection={profileSection}
                 onSectionChange={handleProfileSectionChange}
+                onBack={() => handleNavClick("home")}
               />
             </div>
           )}
@@ -1317,6 +1319,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
               userRole={initialProfile.role}
               userId={userId}
               userName={initialProfile.name}
+              onBack={() => handleNavClick("home")}
             />
           )}
 
@@ -1328,6 +1331,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
               ministryId={ministryId}
               ministryName={ministryName}
               onViewChange={(v, t) => { setFormsView(v); if (t) setFormsDetailTitle(t) }}
+              onBack={() => handleNavClick("home")}
             />
           )}
 
@@ -1338,13 +1342,14 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 ministryId={ministryId}
                 userRole={initialProfile.role}
                 onViewChange={setCongregationView}
+                onBack={() => handleNavClick("home")}
               />
             </div>
           )}
 
           {activeTab === "network" && isAdmin && (
             <div className="md:h-full md:overflow-y-auto">
-              <NetworkTab />
+              <NetworkTab onBack={() => handleNavClick("home")} />
             </div>
           )}
 

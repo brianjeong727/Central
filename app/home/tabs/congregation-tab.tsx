@@ -5,7 +5,8 @@ import { useNavState } from "../nav-state"
 import { Plus, X, BarChart2, ChevronLeft } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, MONO_STYLE, EmptyState } from "../components/shared"
-import { TabPageHeader, PageTitle, CentralButton, ContentActionButton, ContentHeader, PocketBackRow } from "@/components/central"
+import { TabPageHeader, PageTitle, CentralButton, ContentActionButton, ContentHeader, PocketBackRow, PocketRoundButton, PocketKicker } from "@/components/central"
+import { PocketChrome } from "../components/pocket-header"
 import type { CongregationTabProps, CongregationQuestion } from "../types"
 
 interface Response {
@@ -49,7 +50,7 @@ const inputStyle: React.CSSProperties = {
   outline: "none",
 }
 
-export function CongregationTab({ userId, ministryId, onViewChange }: CongregationTabProps) {
+export function CongregationTab({ userId, ministryId, onViewChange, onBack }: CongregationTabProps) {
   const supabase = createClient()
   const { setParam } = useNavState()
 
@@ -252,17 +253,20 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
 
   return (
     <div className="pb-28 md:pb-0">
-      {/* Mobile header — title only; the create lives in the Questions content header below */}
+      {/* Mobile: single chrome row + the screen's ONE plum create (§3.3) */}
       {view === "list" && (
-        <div className="md:hidden px-5 pt-6 pb-5">
-          <p style={{ ...MONO_STYLE, margin: 0 }}>Congregation Pulse</p>
-          <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>
-            Congregation
-          </h1>
-          <p style={{ fontSize: 14, color: "var(--body)", marginTop: 8 }}>
-            Ask your congregation — responses are anonymous.
-          </p>
-        </div>
+        <PocketChrome
+          title="Congregation"
+          back={onBack}
+          hideAvatar
+          userName=""
+          onAvatarClick={() => {}}
+          action={
+            <PocketRoundButton variant="plum" onClick={() => goTo("create")} ariaLabel="New question">
+              <Plus style={{ width: 16, height: 16 }} strokeWidth={1.8} />
+            </PocketRoundButton>
+          }
+        />
       )}
 
       {/* Desktop header — landing tier (R1); no create in the title row */}
@@ -276,8 +280,15 @@ export function CongregationTab({ userId, ministryId, onViewChange }: Congregati
         {/* ── LIST VIEW ── */}
         {view === "list" && (
           <>
-            {/* Content header — the create CTA lives here (Zone C, R2), never in the title row */}
-            <div style={{ marginBottom: 20 }}>
+            {/* Mobile: one calm sentence + a Questions kicker (create is the chrome "+") */}
+            <p className="md:hidden" style={{ fontSize: 15.5, color: "var(--body)", margin: "0 0 18px" }}>
+              Ask your congregation — responses are anonymous.
+            </p>
+            <div className="md:hidden">
+              <PocketKicker label="Questions" />
+            </div>
+            {/* Desktop: content header — the create CTA lives here (Zone C, R2) */}
+            <div className="hidden md:block" style={{ marginBottom: 20 }}>
               <ContentHeader
                 label="Questions"
                 action={<ContentActionButton label="New question" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => goTo("create")} />}
