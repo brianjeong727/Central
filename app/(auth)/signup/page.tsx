@@ -8,8 +8,8 @@ import { createClient, siteOrigin } from "@/lib/supabase"
 import { Spinner } from "@/app/home/components/shared"
 import { SplitShell, GoogleButton, AppleButton, AppleGlyph, GoogleGlyph, OrDivider, EyeButton,
   PocketAuthScreen, PocketBack, PocketField, PocketSubmit, PocketError,
-  pocketPillCard, pocketFieldLabel, pocketH1, pocketSub } from "@/app/(auth)/shared"
-import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured } from "@/lib/native-auth"
+  pocketPillCard, pocketFieldLabel, pocketFieldBox, pocketH1, pocketSub } from "@/app/(auth)/shared"
+import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn } from "@/lib/native-auth"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
 
@@ -17,7 +17,7 @@ const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
 const serif: React.CSSProperties = { fontFamily: SERIF, fontWeight: 400, color: "var(--ink)", margin: 0 }
 
-type View = "role-choice" | "admin" | "member" | "check-email"
+type View = "role-choice" | "admin" | "member" | "verify-code"
 
 // ─── tiny icon helper ──────────────────────────────────────────
 function Icon({ d, size = 16, stroke = 1.8, style }: {
@@ -233,13 +233,18 @@ function SignupContent() {
   const [memberError,      setMemberError]      = useState<string|null>(null)
   const [memberLoading,    setMemberLoading]    = useState(false)
 
-  // check-email state — which email was used, its confirmation redirect, and
-  // which form to return to via "Go back". Field state is preserved on return.
+  // verify-code state — which email was used, its confirmation redirect (kept as a
+  // harmless fallback link), and which form to return to via "Go back". Field state
+  // is preserved on return.
   const [pendingEmail,    setPendingEmail]    = useState("")
   const [pendingRedirect, setPendingRedirect] = useState("")
   const [pendingView,     setPendingView]     = useState<"admin"|"member">("admin")
   const [resendLoading,   setResendLoading]   = useState(false)
   const [resendStatus,    setResendStatus]    = useState<{ ok: boolean; msg: string }|null>(null)
+  // The 6-digit email-confirmation code the user types in-app (replaces the link).
+  const [code,          setCode]          = useState("")
+  const [verifyLoading, setVerifyLoading] = useState(false)
+  const [verifyError,   setVerifyError]   = useState<string|null>(null)
 
   const rateLimitCopy = (msg: string) =>
     msg.toLowerCase().includes("rate limit")
@@ -262,7 +267,7 @@ function SignupContent() {
       setAdminLoading(false); return
     }
     setPendingEmail(adminEmail); setPendingRedirect(redirect); setPendingView("admin")
-    setResendStatus(null); setAdminLoading(false); setView("check-email")
+    setResendStatus(null); setCode(""); setVerifyError(null); setAdminLoading(false); setView("verify-code")
   }
 
   async function handleAdminGoogle() {
@@ -311,7 +316,7 @@ function SignupContent() {
       setMemberLoading(false); return
     }
     setPendingEmail(memberEmail); setPendingRedirect(redirect); setPendingView("member")
-    setResendStatus(null); setMemberLoading(false); setView("check-email")
+    setResendStatus(null); setCode(""); setVerifyError(null); setMemberLoading(false); setView("verify-code")
   }
 
   async function handleMemberGoogle() {
@@ -353,7 +358,37 @@ function SignupContent() {
     setResendLoading(false)
     setResendStatus(error
       ? { ok: false, msg: rateLimitCopy(error.message) }
-      : { ok: true, msg: "Confirmation email sent again." })
+      : { ok: true, msg: "New code sent — check your inbox." })
+  }
+
+  // Confirm the email IN-APP with the 6-digit code (replaces the email LINK, which
+  // the native shell can't deep-link back from). verifyOtp confirms + mints a
+  // session in the browser client on success; an invalid/expired token returns an
+  // error and creates NO session. handle_new_user already created the profile row
+  // + the central_signup marker at signUp time, so this path skips /auth/callback
+  // without skipping anything security-relevant (email ownership is proven by the
+  // code; the OAuth mint-guard is for OAuth mints, not email OTP).
+  async function handleVerifyCode(e: React.FormEvent) {
+    e.preventDefault()
+    const token = code.replace(/\D/g, "")
+    if (token.length !== 6) { setVerifyError("Enter the 6-digit code from your email."); return }
+    setVerifyLoading(true); setVerifyError(null)
+    const supabase = createClient()
+    const { error } = await supabase.auth.verifyOtp({ email: pendingEmail, token, type: "signup" })
+    if (error) {
+      // Supabase returns a single combined "Token has expired or is invalid"
+      // for both a wrong AND an expired code, so we don't assert which it was.
+      setVerifyError(
+        error.message.toLowerCase().includes("rate limit")
+          ? rateLimitCopy(error.message)
+          : "That code is incorrect or has expired. Double-check your email, or resend a new one.")
+      setVerifyLoading(false); return
+    }
+    // Session established in-app. Route exactly as the post-signup path intends —
+    // admin registrants set up the workspace; members go where login/callback send
+    // a fresh sign-in (active ministries: 1→/home, >1→/pick-ministry, 0→/ministries).
+    if (pendingView === "admin") { window.location.assign("/onboarding"); return }
+    await routeAfterNativeSignIn(supabase)
   }
 
   const ROLES = [
@@ -371,31 +406,61 @@ function SignupContent() {
     </span>
   )
 
-  // ── CHECK EMAIL (confirmation sent) ────────────────────────────
-  if (view === "check-email") return (<>
+  // ── VERIFY CODE (email confirmation via in-app 6-digit code) ───
+  const codeInputProps = {
+    value: code,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      setCode(e.target.value.replace(/\D/g, "").slice(0, 6)),
+    inputMode: "numeric" as const,
+    autoComplete: "one-time-code",
+    pattern: "[0-9]*",
+    maxLength: 6,
+    placeholder: "000000",
+    autoFocus: true,
+    "aria-label": "6-digit confirmation code",
+  }
+  if (view === "verify-code") return (<>
     <div className="hidden md:block">
     <SplitShell topBar={<>{alreadyHaveAccount}</>}>
-      <div style={mono}>CHECK YOUR INBOX · CENTRAL</div>
+      <div style={mono}>VERIFY YOUR EMAIL · CENTRAL</div>
       <h1 style={{ ...serif, fontWeight: 600, fontSize: 44, lineHeight: 1.03, letterSpacing: "-0.02em", margin: "14px 0 0" }}>
-        Check your email.
+        Enter your code.
       </h1>
       <p style={{ fontSize: 16, color: "var(--body)", lineHeight: 1.6, margin: "16px 0 0" }}>
-        We sent a confirmation link to{" "}
+        We sent a 6-digit code to{" "}
         <span style={{ color: "var(--ink)", fontWeight: 500 }}>{pendingEmail}</span>.
-        Open it to finish setting up your account — the link signs you in and takes you to the next step.
+        Enter it below to finish setting up your account.
       </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 30 }}>
-        <button type="button" onClick={handleResend} disabled={resendLoading} style={{
-          width: "100%", padding: "13px 18px", borderRadius: 12,
-          background: "var(--cream-panel)", border: "1px solid var(--line-2)", color: "var(--ink)",
-          fontSize: 15, fontWeight: 500, fontFamily: SANS, cursor: resendLoading ? "default" : "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-          opacity: resendLoading ? 0.7 : 1, transition: "background .15s",
-        }} className="hover:bg-[var(--ivory)]">
-          {resendLoading && <Spinner/>}
-          {resendLoading ? "Sending…" : "Resend email"}
-        </button>
+      <form onSubmit={handleVerifyCode} style={{ marginTop: 28 }}>
+        {verifyError && <div style={{ marginBottom: 16 }}><ErrorBanner msg={verifyError}/></div>}
+        <div style={{ ...mono, marginBottom: 8 }}>CONFIRMATION CODE</div>
+        <div style={{ display: "flex", alignItems: "center", background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 14px" }}>
+          <input
+            {...codeInputProps}
+            style={{
+              flex: 1, border: "none", outline: "none", background: "transparent", padding: "14px 0",
+              fontFamily: SANS, fontSize: 24, fontWeight: 500, letterSpacing: "0.42em",
+              textAlign: "center", color: "var(--ink)",
+            }}
+          />
+        </div>
+        <div style={{ marginTop: 24 }}>
+          <Primary disabled={code.length !== 6 || verifyLoading} loading={verifyLoading}>
+            {verifyLoading ? "Verifying…" : "Verify & continue"}
+          </Primary>
+        </div>
+      </form>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 24 }}>
+        <div style={{ fontSize: 13, color: "var(--body)" }}>
+          Didn&apos;t get it? Check spam, or{" "}
+          <button type="button" onClick={handleResend} disabled={resendLoading}
+            style={{ color: "var(--plum-2)", fontWeight: 500, background: "none", border: "none", cursor: resendLoading ? "default" : "pointer", padding: 0, fontFamily: SANS, fontSize: 13, opacity: resendLoading ? 0.7 : 1 }}
+            className="hover:underline underline-offset-2">
+            {resendLoading ? "sending…" : "resend the code"}
+          </button>.
+        </div>
         {resendStatus && (
           <div style={{ fontSize: 13, color: resendStatus.ok ? "var(--body)" : "var(--danger)" }} role="status">
             {resendStatus.msg}
@@ -405,7 +470,7 @@ function SignupContent() {
 
       <div style={{ marginTop: 26, paddingTop: 22, borderTop: "1px solid var(--line)", fontSize: 13, color: "var(--body)" }}>
         Wrong address?{" "}
-        <button type="button" onClick={() => { setResendStatus(null); setView(pendingView) }}
+        <button type="button" onClick={() => { setResendStatus(null); setVerifyError(null); setView(pendingView) }}
           style={{ color: "var(--plum-2)", fontWeight: 500, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: SANS, fontSize: 13 }}
           className="hover:underline underline-offset-2">
           Go back
@@ -418,27 +483,44 @@ function SignupContent() {
     <div className="md:hidden">
       <PocketAuthScreen topInset>
         <div style={{ marginTop: 8 }}>
-          <div style={mono}>Check your inbox</div>
-          <h1 style={{ ...pocketH1, marginTop: 8 }}>Check your email.</h1>
+          <div style={mono}>Verify your email</div>
+          <h1 style={{ ...pocketH1, marginTop: 8 }}>Enter your code.</h1>
         </div>
         <p style={{ ...pocketSub, marginTop: 14 }}>
-          We sent a confirmation link to <span style={{ color: "var(--ink)", fontWeight: 600 }}>{pendingEmail}</span>. Open it to finish setting up your account — the link signs you in and takes you to the next step.
+          We sent a 6-digit code to <span style={{ color: "var(--ink)", fontWeight: 600 }}>{pendingEmail}</span>. Enter it below to finish setting up your account.
         </p>
-        <button type="button" onClick={handleResend} disabled={resendLoading} style={{
-          ...pocketPillCard, marginTop: 26,
-          opacity: resendLoading ? 0.7 : 1, cursor: resendLoading ? "default" : "pointer",
-        }}>
-          {resendLoading && <Spinner/>}
-          {resendLoading ? "Sending…" : "Resend email"}
-        </button>
+        {verifyError && <PocketError msg={verifyError}/>}
+        <form onSubmit={handleVerifyCode} style={{ marginTop: 24 }}>
+          <span style={pocketFieldLabel}>Confirmation code</span>
+          <div style={{ ...pocketFieldBox, padding: "0 18px" }}>
+            <input
+              {...codeInputProps}
+              style={{
+                flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent",
+                fontSize: 24, fontWeight: 600, letterSpacing: "0.4em", textAlign: "center",
+                fontFamily: SERIF, color: "var(--ink)", padding: "14px 0",
+              }}
+            />
+          </div>
+          <PocketSubmit loading={verifyLoading} disabled={code.length !== 6 || verifyLoading}>
+            {verifyLoading ? "Verifying…" : "Verify & continue"}
+          </PocketSubmit>
+        </form>
+        <div style={{ fontSize: 13.5, color: "var(--body)", marginTop: 18, textAlign: "center", lineHeight: 1.5 }}>
+          Didn&apos;t get it? Check spam, or{" "}
+          <button type="button" onClick={handleResend} disabled={resendLoading}
+            style={{ color: "var(--plum)", fontWeight: 600, background: "none", border: "none", cursor: resendLoading ? "default" : "pointer", padding: 0, fontFamily: SERIF, fontSize: 13.5, opacity: resendLoading ? 0.7 : 1 }}>
+            {resendLoading ? "sending…" : "resend the code"}
+          </button>.
+        </div>
         {resendStatus && (
-          <div style={{ fontSize: 13, color: resendStatus.ok ? "var(--body)" : "var(--danger)", marginTop: 12, textAlign: "center" }} role="status">
+          <div style={{ fontSize: 13, color: resendStatus.ok ? "var(--body)" : "var(--danger)", marginTop: 10, textAlign: "center" }} role="status">
             {resendStatus.msg}
           </div>
         )}
         <div style={{ marginTop: 22, paddingTop: 20, borderTop: "1px solid var(--line-3)", fontSize: 13.5, color: "var(--body)", textAlign: "center" }}>
           Wrong address?{" "}
-          <button type="button" onClick={() => { setResendStatus(null); setView(pendingView) }}
+          <button type="button" onClick={() => { setResendStatus(null); setVerifyError(null); setView(pendingView) }}
             style={{ color: "var(--plum)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: SERIF, fontSize: 13.5 }}>
             Go back
           </button>
@@ -542,7 +624,7 @@ function SignupContent() {
           <AppleButton onClick={handleAdminApple}/>
           {(!nativeShell || googleInShell) && <GoogleButton onClick={handleAdminGoogle}/>}
         </div>
-        <OrDivider/>
+        <OrDivider label="or sign up with email"/>
 
         {adminError && <ErrorBanner msg={adminError}/>}
 
@@ -608,7 +690,7 @@ function SignupContent() {
             <GoogleGlyph size={18}/> Continue with Google
           </button>
         )}
-        <div style={{ margin: "18px 0" }}><OrDivider/></div>
+        <div style={{ margin: "18px 0" }}><OrDivider label="or sign up with email"/></div>
         {adminError && <PocketError msg={adminError}/>}
         <form onSubmit={handleAdminSignup} style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 4 }}>
           <PocketField label="Full name" placeholder="Pastor John Smith" value={adminName} onChange={(e) => setAdminName(e.target.value)} required autoComplete="name"/>
@@ -667,7 +749,7 @@ function SignupContent() {
           <AppleButton onClick={handleMemberApple}/>
           {(!nativeShell || googleInShell) && <GoogleButton onClick={handleMemberGoogle}/>}
         </div>
-        <OrDivider/>
+        <OrDivider label="or sign up with email"/>
 
         {memberError && <ErrorBanner msg={memberError}/>}
 
@@ -735,7 +817,7 @@ function SignupContent() {
             <GoogleGlyph size={18}/> Continue with Google
           </button>
         )}
-        <div style={{ margin: "18px 0" }}><OrDivider/></div>
+        <div style={{ margin: "18px 0" }}><OrDivider label="or sign up with email"/></div>
         {memberError && <PocketError msg={memberError}/>}
         <form onSubmit={handleMemberSignup} style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 4 }}>
           <PocketField label="Full name" placeholder="Brian Jeong" value={memberName} onChange={(e) => setMemberName(e.target.value)} required autoComplete="name"/>
