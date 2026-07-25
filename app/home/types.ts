@@ -376,6 +376,9 @@ export interface AnnouncementCardProps {
   announcement: EnrichedAnnouncement
   isPinned: boolean
   featured?: boolean
+  // Mobile DRAFTS tray card: shows a DRAFT tag, routes the whole-card tap to the
+  // editor (resume), and suppresses RSVP/form/pin (a draft isn't interactive yet).
+  isDraft?: boolean
   userId: string
   ministryId: string
   userRole: string

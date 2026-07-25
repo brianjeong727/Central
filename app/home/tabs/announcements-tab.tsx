@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, MONO_STYLE, EYEBROW_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu, PocketFilterChip, PocketCard, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu, PocketFilterChip, PocketFilterChipRow, PocketCard, PocketKicker, PocketButton, PocketSwitch, PocketTag, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
 import type { ActionMenuItem } from "@/components/central"
 import { audienceLabel, formatDate, previewBody } from "../utils"
 import { FormFillView } from "./forms-tab"
@@ -204,8 +204,8 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
-  async function handleSubmit(e: React.FormEvent, asDraft = false) {
-    e.preventDefault()
+  async function handleSubmit(e?: React.FormEvent, asDraft = false) {
+    e?.preventDefault()
     if (!title.trim() || !body.trim()) { setError("Title and body are required."); return }
     if (!asDraft && isEvent && !eventDate.trim()) { setError("Events need a date & time before publishing."); return }
     setSubmitting(true)
@@ -285,6 +285,17 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const monoStyle = EYEBROW_STYLE
   const titleText = isEditing ? "Edit announcement" : "New announcement"
 
+  // Draft-aware action affordances. A "Save draft" action is offered on a NEW
+  // post and when editing an announcement that is STILL a draft (so a leader can
+  // keep iterating privately); editing an already-published post shows only
+  // "Save changes". Publishing a draft flips status → published (handleSubmit
+  // asDraft=false), which drops it out of the mobile DRAFTS tray into the feed.
+  const isDraftEditing = isEditing && existing?.status === "draft"
+  const showDraftAction = !isEditing || isDraftEditing
+  const publishLabel = submitting ? "Saving…" : (isEditing && !isDraftEditing) ? "Save changes" : "Publish"
+  // Publish is disabled (45% plum on mobile) until there's a headline + body.
+  const publishDisabled = submitting || !title.trim() || !body.trim()
+
   // Primary + secondary action buttons (shared by mobile + desktop headers).
   // Height is parametrized so the mobile chrome gets a ≥34px hit target while
   // desktop stays at its 28px footer size (byte-identical). Padding/line-height
@@ -323,37 +334,45 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
         <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-xl -ml-1 flex-shrink-0 hover:bg-[var(--ivory)] transition-colors">
           <ArrowLeft className="w-5 h-5" style={{ color: "var(--plum)" }} />
         </button>
-        <span className="flex-1 min-w-0 truncate" style={{ fontFamily: "var(--serif)", fontSize: isEditing ? 22 : 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05 }}>{titleText}</span>
+        <span className="flex-1 min-w-0 truncate" style={{ fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05 }}>{titleText}</span>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {renderDraft(34, "Save")}
-          {renderPublish(34)}
+          {/* "Save" (quiet) = save-as-draft — the full "Save draft" label crowds the
+              one-line chrome and truncates the title (Brian, 2026-07-15). Publish =
+              primary compact, 45% plum until headline + body exist (v2 disabled rule). */}
+          {showDraftAction && (
+            <PocketButton variant="quiet" surface="page" compact disabled={submitting} onClick={() => handleSubmit(undefined, true)}>Save</PocketButton>
+          )}
+          <PocketButton variant="primary" compact disabled={publishDisabled} onClick={() => handleSubmit(undefined, false)}>{publishLabel}</PocketButton>
         </div>
       </div>
 
       {/* ── Mobile: scrollable single column on cream ── */}
       <div className="md:hidden flex-1 overflow-y-auto min-h-0 px-5 py-5 flex flex-col gap-5">
         {error && <div className="rounded-xl px-4 py-3 text-[13px] text-[var(--plum)] font-medium" style={{ background: "rgba(62,21,64,0.08)" }}>{error}</div>}
-        {/* Writing surface */}
+        {/* Writing surface — mono kickers over a borderless serif headline + body,
+            on the page bg (v2 §4 forms; prototype s.annCompose). */}
         <div className="flex flex-col">
+          <p style={POCKET_KICKER_STYLE} className="mb-2.5">Headline</p>
           <input
             type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="A clear, scannable headline" required
             className="placeholder:text-[var(--faint)]"
-            style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 21, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid var(--line-2)", outline: "none", width: "100%", paddingBottom: 12 }}
+            style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", lineHeight: 1.1, background: "transparent", border: "none", borderBottom: "1px solid var(--line-3)", outline: "none", width: "100%", paddingBottom: 14 }}
           />
+          <p style={POCKET_KICKER_STYLE} className="mt-[18px] mb-2.5">Body</p>
           <textarea
-            value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write the full announcement here…" required rows={8}
+            value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write the full announcement here…" required rows={7}
             className="placeholder:text-[var(--faint)]"
-            style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, lineHeight: 1.6, color: "var(--ink)", background: "transparent", border: "none", outline: "none", resize: "none", width: "100%", marginTop: 16 }}
+            style={{ fontFamily: "var(--serif)", fontSize: 15.5, lineHeight: 1.6, color: "var(--ink)", background: "transparent", border: "none", outline: "none", resize: "none", width: "100%" }}
           />
         </div>
 
         <div style={{ borderTop: "1px solid var(--line-3)" }} />
 
         {/* Audience — one horizontally scrollable chip rail (never wraps);
-            .pocket-chiprow breaks out of the px-5 screen padding edge-to-edge. */}
+            PocketFilterChipRow breaks out of the px-5 padding edge-to-edge. */}
         <div>
-          <p style={monoStyle} className="mb-3">Audience</p>
-          <div className="pocket-chiprow">
+          <p style={POCKET_KICKER_STYLE} className="mb-3">Audience</p>
+          <PocketFilterChipRow>
             {AUDIENCE_OPTIONS.map((opt) => (
               <PocketFilterChip
                 key={opt.value}
@@ -362,39 +381,35 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                 onClick={() => setAudience(opt.value)}
               />
             ))}
-          </div>
+          </PocketFilterChipRow>
         </div>
 
         <div style={{ borderTop: "1px solid var(--line-3)" }} />
 
-        {/* Options */}
+        {/* Options — 46×28 PocketSwitch rows (v2 §4 switch) */}
         <div className="flex flex-col gap-5">
-          <p style={monoStyle}>Options</p>
-          <div className="flex items-start gap-3">
-            <button type="button" onClick={() => setIsEvent((v) => !v)} style={{ width: 34, height: 20, borderRadius: 999, background: isEvent ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}>
-              <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.2s", left: isEvent ? "16px" : "2px" }} />
-            </button>
+          <p style={POCKET_KICKER_STYLE}>Options</p>
+          <div className="flex items-center gap-3">
+            <PocketSwitch checked={isEvent} onChange={setIsEvent} ariaLabel="This is an event" />
             <div>
-              <p className="text-[13px] font-medium text-[var(--ink)]">This is an event</p>
-              <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Adds RSVP button + calendar marker</p>
+              <p className="text-[14.5px] font-semibold text-[var(--ink)]">This is an event</p>
+              <p className="text-[13px] text-[var(--muted-text)] mt-0.5">Adds RSVP button + calendar marker</p>
             </div>
           </div>
           {isEvent && (
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-1.5">
-                <p className="text-[13px] font-medium text-[var(--ink)]">Event date &amp; time</p>
+                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Event date &amp; time</p>
                 <input
                   type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required
-                  style={{ fontSize: 13, color: "var(--ink)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: "var(--r-input)", padding: "8px 10px", outline: "none", width: "100%", fontFamily: "inherit" }}
+                  style={{ fontSize: 15.5, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", fontFamily: "var(--serif)" }}
                 />
               </div>
-              <div className="flex items-start gap-3">
-                <button type="button" onClick={() => setShowAttendees((v) => !v)} style={{ width: 34, height: 20, borderRadius: 999, background: showAttendees ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}>
-                  <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.2s", left: showAttendees ? "16px" : "2px" }} />
-                </button>
+              <div className="flex items-center gap-3">
+                <PocketSwitch checked={showAttendees} onChange={setShowAttendees} ariaLabel="Show attendees publicly" />
                 <div>
-                  <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
-                  <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
+                  <p className="text-[14.5px] font-semibold text-[var(--ink)]">Show attendees publicly</p>
+                  <p className="text-[13px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
                 </div>
               </div>
             </div>
@@ -403,19 +418,19 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
         <div style={{ borderTop: "1px solid var(--line-3)" }} />
 
-        {/* Attachment */}
+        {/* Attachment — dashed add-affordance (--r-pocket, 1.5px --dashed) */}
         <div>
-          <p style={monoStyle} className="mb-3">Attachment</p>
+          <p style={POCKET_KICKER_STYLE} className="mb-3">Attachment</p>
           {imagePreview ? (
-            <div className="relative rounded-[10px] overflow-hidden">
+            <div className="relative overflow-hidden" style={{ borderRadius: "var(--r-pocket)" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={imagePreview} alt="Preview" className="w-full h-44 object-cover" />
               <button type="button" onClick={removeImage} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center hover:bg-black/70 transition-colors"><X className="w-3.5 h-3.5 text-[var(--cream)]" /></button>
             </div>
           ) : (
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full py-7 rounded-[10px] flex flex-col items-center justify-center gap-2 text-[var(--body)] transition-all" style={{ border: "1px dashed var(--dashed)", background: "transparent" }}>
-              <ImageIcon className="w-5 h-5" />
-              <span className="text-[12px]">Add image or file</span>
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full flex flex-col items-center justify-center gap-2.5" style={{ padding: 34, border: "1.5px dashed var(--dashed)", borderRadius: "var(--r-pocket)", background: "transparent", cursor: "pointer" }}>
+              <ImageIcon style={{ width: 22, height: 22, color: "var(--body)" }} strokeWidth={1.6} />
+              <span style={{ fontFamily: "var(--serif)", fontSize: 14.5, fontWeight: 600, color: "var(--plum)" }}>Add image or file</span>
             </button>
           )}
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
@@ -423,13 +438,13 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
         <div style={{ borderTop: "1px solid var(--line-3)" }} />
 
-        {/* Attach a form — same picker as the desktop rail */}
+        {/* Attach a form — same picker as the desktop rail (pocket kicker on mobile) */}
         <div>
           <AttachFormSection
             attachedFormId={attachedFormId}
             setAttachedFormId={setAttachedFormId}
             availableForms={availableForms}
-            monoStyle={monoStyle}
+            monoStyle={POCKET_KICKER_STYLE}
           />
         </div>
       </div>
@@ -1109,40 +1124,78 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
             </div>
           ) : (
             <>
-          {/* Mobile Pocket feed — tonal cards, filter pills, pinned-first order. */}
+          {/* Mobile Pocket feed — tonal cards, filter pills, pinned-first order.
+              Drafts (leader-only — members never receive draft rows from the
+              status-filtered query) surface in a DRAFTS tray at the very top; the
+              filtered published feed follows. */}
           <div className="md:hidden" style={{ padding: "2px 20px 0" }}>
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              {MOBILE_FILTERS.map((f) => (
-                <PocketFilterChip key={f.id} label={f.label} active={mobileFilter === f.id} onClick={() => setMobileFilter(f.id)} />
-              ))}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16 }}>
-              {(() => {
-                const mobileFiltered = announcements.filter((a) =>
-                  mobileFilter === "all" ? true : mobileFilter === "events" ? a.is_event : !a.is_event
-                )
-                if (mobileFiltered.length === 0) {
-                  return <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "8px 4px" }}>Nothing here yet.</p>
-                }
-                return mobileFiltered.map((ann) => (
-                  <AnnouncementCard
-                    key={ann.id}
-                    announcement={ann}
-                    isPinned={ann.is_pinned}
-                    userId={userId}
-                    ministryId={ministryId}
-                    userRole={userRole}
-                    onRsvpToggle={handleRsvpToggle}
-                    onEdit={handleOpenEditor}
-                    onDelete={handleDeleteAnnouncement}
-                    onPinToggle={handlePinToggle}
-                    onSubPinToggle={handleSubPinToggle}
-                    onOpenForm={(formId, annId, title) => setFormFillState({ formId, announcementId: annId, title })}
-                    onOpenDetail={onOpenAnnouncement}
-                  />
-                ))
-              })()}
-            </div>
+            {(() => {
+              const drafts = announcements.filter((a) => a.status === "draft")
+              const published = announcements.filter((a) => a.status !== "draft")
+              const mobileFiltered = published.filter((a) =>
+                mobileFilter === "all" ? true : mobileFilter === "events" ? a.is_event : !a.is_event
+              )
+              return (
+                <>
+                  {/* DRAFTS tray — tap a card to resume it in the composer. Always
+                      shown in full (unaffected by the All/Events/Updates filter). */}
+                  {drafts.length > 0 && (
+                    <div style={{ marginBottom: 20 }}>
+                      <PocketKicker label="Drafts" style={{ marginTop: 8 }} />
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {drafts.map((ann) => (
+                          <AnnouncementCard
+                            key={ann.id}
+                            announcement={ann}
+                            isPinned={ann.is_pinned}
+                            isDraft
+                            userId={userId}
+                            ministryId={ministryId}
+                            userRole={userRole}
+                            onRsvpToggle={handleRsvpToggle}
+                            onEdit={handleOpenEditor}
+                            onDelete={handleDeleteAnnouncement}
+                            onPinToggle={handlePinToggle}
+                            onSubPinToggle={handleSubPinToggle}
+                            onOpenForm={(formId, annId, title) => setFormFillState({ formId, announcementId: annId, title })}
+                            onOpenDetail={onOpenAnnouncement}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <PocketFilterChipRow style={{ marginTop: 4 }}>
+                    {MOBILE_FILTERS.map((f) => (
+                      <PocketFilterChip key={f.id} label={f.label} active={mobileFilter === f.id} onClick={() => setMobileFilter(f.id)} />
+                    ))}
+                  </PocketFilterChipRow>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16 }}>
+                    {mobileFiltered.length === 0 ? (
+                      <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "8px 4px", lineHeight: 1.5 }}>
+                        {mobileFilter === "events" ? "No events posted yet — event announcements show up here." : mobileFilter === "updates" ? "No updates yet — non-event posts show up here." : "No announcements yet."}
+                      </p>
+                    ) : mobileFiltered.map((ann) => (
+                      <AnnouncementCard
+                        key={ann.id}
+                        announcement={ann}
+                        isPinned={ann.is_pinned}
+                        userId={userId}
+                        ministryId={ministryId}
+                        userRole={userRole}
+                        onRsvpToggle={handleRsvpToggle}
+                        onEdit={handleOpenEditor}
+                        onDelete={handleDeleteAnnouncement}
+                        onPinToggle={handlePinToggle}
+                        onSubPinToggle={handleSubPinToggle}
+                        onOpenForm={(formId, annId, title) => setFormFillState({ formId, announcementId: annId, title })}
+                        onOpenDetail={onOpenAnnouncement}
+                      />
+                    ))}
+                  </div>
+                </>
+              )
+            })()}
             {hasMoreAnnouncements && (
               <div style={{ display: "flex", justifyContent: "center", padding: "16px 0 4px" }}>
                 <CentralButton variant="quiet" onClick={() => setFeedLimit((n) => n + FEED_PAGE)} style={{ padding: "8px 16px", fontSize: 13 }}>
@@ -1356,7 +1409,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
 // ── Announcement Card (mobile) ───────────────────────────────────────────────
 
-export function AnnouncementCard({ announcement, ministryId, userRole, onRsvpToggle, onEdit, onDelete, onPinToggle, onOpenForm, onOpenDetail }: AnnouncementCardProps) {
+export function AnnouncementCard({ announcement, ministryId, userRole, isDraft = false, onRsvpToggle, onEdit, onDelete, onPinToggle, onOpenForm, onOpenDetail }: AnnouncementCardProps) {
   const supabase = createClient()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -1377,16 +1430,18 @@ export function AnnouncementCard({ announcement, ministryId, userRole, onRsvpTog
 
   // ── B3 Pocket tonal card — the ONLY AnnouncementCard consumer is the mobile
   // Pocket feed, so this is the single card design (no featured/hero variant).
-  // The whole card taps through to the detail view; the RSVP pill, admin kebab,
-  // and form button are stop-propagation islands inside it. ──
+  // A published card taps through to the detail view; a DRAFT card taps into the
+  // composer (resume) and suppresses RSVP/form. The RSVP pill, admin kebab, and
+  // form button are stop-propagation islands inside it. ──
   const eventDate = announcement.event_date ?? announcement.created_at
+  const openCard = () => (isDraft ? onEdit(announcement) : onOpenDetail(announcement.id))
   return (
     <>
       <div
         role="button"
         tabIndex={0}
-        onClick={() => onOpenDetail(announcement.id)}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenDetail(announcement.id) } }}
+        onClick={openCard}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCard() } }}
         style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", overflow: "hidden", cursor: "pointer" }}
       >
         {announcement.image_url && (
@@ -1400,6 +1455,7 @@ export function AnnouncementCard({ announcement, ministryId, userRole, onRsvpTog
               <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", color: announcement.is_event ? "var(--plum)" : "var(--muted-text)" }}>
                 {announcement.is_event ? `Event · ${formatDate(eventDate)}` : formatDate(announcement.created_at)}
               </span>
+              {isDraft && <PocketTag label="Draft" />}
               {announcement.audience && announcement.audience !== "all" && (
                 <span style={{ fontSize: 9, letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "var(--line-3)", color: "var(--body)", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
               )}
@@ -1415,13 +1471,14 @@ export function AnnouncementCard({ announcement, ministryId, userRole, onRsvpTog
                     </button>
                   )}
                   items={[
-                    {
+                    // A draft can't be pinned (it isn't published) — resume + delete only.
+                    ...(isDraft ? [] : [{
                       key: "pin",
                       label: announcement.is_pinned ? "Unpin" : "Pin",
                       icon: announcement.is_pinned ? <PinOff className="w-3.5 h-3.5 text-[var(--plum)]" /> : <Pin className="w-3.5 h-3.5 text-[var(--plum)]" />,
                       onSelect: () => onPinToggle?.(announcement.id, announcement.is_pinned),
-                    },
-                    { key: "edit", label: "Edit", icon: <Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />, onSelect: () => onEdit(announcement) },
+                    }]),
+                    { key: "edit", label: isDraft ? "Resume" : "Edit", icon: <Edit3 className="w-3.5 h-3.5 text-[var(--plum)]" />, onSelect: () => onEdit(announcement) },
                     { key: "delete", label: "Delete", tone: "danger", icon: <Trash2 className="w-3.5 h-3.5" />, onSelect: () => setShowDeleteConfirm(true) },
                   ]}
                 />
@@ -1434,7 +1491,7 @@ export function AnnouncementCard({ announcement, ministryId, userRole, onRsvpTog
             <p className="line-clamp-3" style={{ fontSize: 13, lineHeight: 1.5, color: "var(--body)", margin: "6px 0 0" }}>{previewBody(announcement.body)}</p>
           )}
 
-          {announcement.is_event && (
+          {!isDraft && announcement.is_event && (
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
               <button
                 onClick={(e) => { e.stopPropagation(); handleRsvp() }}
@@ -1450,7 +1507,7 @@ export function AnnouncementCard({ announcement, ministryId, userRole, onRsvpTog
               {announcement.rsvp_count > 0 && <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{announcement.rsvp_count} going</span>}
             </div>
           )}
-          {announcement.has_form && (
+          {!isDraft && announcement.has_form && (
             <div style={{ marginTop: 14 }} onClick={(e) => e.stopPropagation()}>
               {announcement.user_has_responded
                 ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
@@ -1732,7 +1789,7 @@ export function AnnouncementDetailView({
           <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, textAlign: "center" }}>{ann.rsvp_count} going</div>
           {showAttendees && (
             <div className="flex flex-wrap justify-center gap-1.5" style={{ marginTop: 12 }}>
-              {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "var(--body)", background: "var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
+              {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, fontWeight: 600, color: "var(--body)", background: "var(--pocket-track)", padding: "6px 12px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
             </div>
           )}
         </PocketCard>
@@ -1787,7 +1844,10 @@ export function AnnouncementDetailView({
                 tier; desktop (≥768px, 5vw≥38px) never hits the lower bound so it
                 stays byte-identical up to 46px. */}
             <h1 style={{ fontFamily: DETAIL_SERIF, fontWeight: 600, fontSize: "clamp(26px, 5vw, 46px)", letterSpacing: "-0.02em", lineHeight: 1.02, color: "var(--ink)", margin: "13px 0 0" }}>{ann.title}</h1>
-            <div style={{ fontFamily: DETAIL_SANS, fontSize: 16, lineHeight: 1.75, color: "var(--body)", marginTop: 26, maxWidth: 640, whiteSpace: "pre-wrap" }}>{ann.body}</div>
+            {/* Reading body — mobile is serif 17 on --ink (v2 §5 Announcements
+                detail); desktop keeps its editorial sans 16 on --body (unchanged). */}
+            <div className="md:hidden" style={{ fontFamily: DETAIL_SERIF, fontSize: 17, lineHeight: 1.65, color: "var(--ink)", marginTop: 20, whiteSpace: "pre-wrap" }}>{ann.body}</div>
+            <div className="hidden md:block" style={{ fontFamily: DETAIL_SANS, fontSize: 16, lineHeight: 1.75, color: "var(--body)", marginTop: 26, maxWidth: 640, whiteSpace: "pre-wrap" }}>{ann.body}</div>
             {/* No aside → posted/views anchor the bottom of the single column */}
             {!hasAside && (
               <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 34, paddingTop: 22, borderTop: "1px solid var(--line)", fontSize: 14, color: "var(--faint)" }}>
