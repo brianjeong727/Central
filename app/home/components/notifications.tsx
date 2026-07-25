@@ -9,6 +9,8 @@ import {
   IconButton,
   Select,
   MONO_STYLE,
+  POCKET_KICKER_STYLE,
+  PocketSwitch,
 } from "@/components/central"
 import { unsubscribeFromPush, type PushState } from "@/lib/push"
 // Native-aware wrappers: inside the Capacitor iOS shell these route to APNs; on plain
@@ -137,12 +139,19 @@ function Toggle({
   onToggle,
   disabled,
   label,
+  mobile = false,
 }: {
   on: boolean
   onToggle: () => void
   disabled?: boolean
   label: string
+  mobile?: boolean
 }) {
+  // Mobile → the 46×28 PocketSwitch (mobile design system §Forms); desktop keeps
+  // the shipped 38×22 pill.
+  if (mobile) {
+    return <PocketSwitch checked={on} onChange={() => onToggle()} ariaLabel={label} />
+  }
   return (
     <button
       type="button"
@@ -184,27 +193,29 @@ function ToggleRow({
   sub,
   on,
   onToggle,
+  mobile = false,
 }: {
   title: string
   sub: string
   on: boolean
   onToggle: () => void
+  mobile?: boolean
 }) {
   return (
     <div
       style={{
         display: "flex",
-        alignItems: "flex-start",
-        gap: 16,
-        padding: "14px 18px",
-        borderTop: "1px solid var(--line)",
+        alignItems: mobile ? "center" : "flex-start",
+        gap: mobile ? 14 : 16,
+        padding: mobile ? "14px 0" : "14px 18px",
+        borderTop: `1px solid ${mobile ? "var(--line-3)" : "var(--line)"}`,
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{title}</div>
-        <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>{sub}</div>
+        <div style={{ fontSize: mobile ? 14.5 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>{title}</div>
+        <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 1.5 }}>{sub}</div>
       </div>
-      <Toggle on={on} onToggle={onToggle} label={title} />
+      <Toggle on={on} onToggle={onToggle} label={title} mobile={mobile} />
     </div>
   )
 }
@@ -232,11 +243,13 @@ export function NotificationsSection({
   ministryId,
   notificationSettings,
   onSettingsChange,
+  mobile = false,
 }: {
   userId: string
   ministryId: string
   notificationSettings?: NotificationSettings
   onSettingsChange?: (s: NotificationSettings) => void
+  mobile?: boolean
 }) {
   const saved = normalize(notificationSettings)
   const [pending, setPending] = useState(saved)
@@ -317,18 +330,25 @@ export function NotificationsSection({
     permissionSub = "Turn on push notifications to receive them on this device."
   }
 
-  const cardBorder = { border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" as const, background: "var(--cream)" }
+  // Mobile → tonal ivory borderless cards + --line-3 dividers (mobile design
+  // system §1.1); desktop keeps the shipped hairline cream card language.
+  const cardBorder = mobile
+    ? { borderRadius: "var(--r-pocket)", overflow: "hidden" as const, background: "var(--ivory)" }
+    : { border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden" as const, background: "var(--cream)" }
+  const rowPad = mobile ? "14px 18px" : "16px 18px"
+  const rowPadTight = mobile ? "14px 18px" : "14px 18px"
+  const groupDivider = mobile ? "var(--line-3)" : "var(--line)"
 
   return (
     <div>
-      <p style={{ ...MONO_STYLE, marginBottom: 10, marginTop: 0 }}>Notifications</p>
+      <p style={{ ...(mobile ? POCKET_KICKER_STYLE : MONO_STYLE), marginBottom: 10, marginTop: 0 }}>Notifications</p>
 
       {/* Device permission — immediate action, not staged */}
-      <div style={{ ...cardBorder, marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 16, padding: "16px 18px" }}>
+      <div style={{ ...cardBorder, marginBottom: mobile ? 12 : 16 }}>
+        <div style={{ display: "flex", alignItems: mobile ? "center" : "flex-start", gap: mobile ? 14 : 16, padding: rowPad }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{permissionLabel}</div>
-            <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>{permissionSub}</div>
+            <div style={{ fontSize: mobile ? 14.5 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>{permissionLabel}</div>
+            <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 1.5 }}>{permissionSub}</div>
             {enableError && (
               <div style={{ marginTop: 6, fontSize: 13, color: "var(--danger)", lineHeight: 1.5 }}>{enableError}</div>
             )}
@@ -348,26 +368,26 @@ export function NotificationsSection({
       </div>
 
       {/* Per-tier preferences — staged behind Save/Cancel */}
-      <div style={cardBorder}>
+      <div style={mobile ? { ...cardBorder, padding: "0 18px" } : cardBorder}>
         {/* first row has no top border */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 16, padding: "14px 18px" }}>
+        <div style={{ display: "flex", alignItems: mobile ? "center" : "flex-start", gap: mobile ? 14 : 16, padding: mobile ? "14px 0" : rowPadTight }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Direct messages</div>
-            <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Someone sends you a direct message.</div>
+            <div style={{ fontSize: mobile ? 14.5 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>Direct messages</div>
+            <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 1.5 }}>Someone sends you a direct message.</div>
           </div>
-          <Toggle on={pending.dms} onToggle={() => set("dms", !pending.dms)} label="Direct messages" />
+          <Toggle on={pending.dms} onToggle={() => set("dms", !pending.dms)} label="Direct messages" mobile={mobile} />
         </div>
-        <ToggleRow title="Mentions" sub="Someone @mentions you in a chat." on={pending.mentions} onToggle={() => set("mentions", !pending.mentions)} />
-        <ToggleRow title="Replies" sub="Someone replies to one of your messages." on={pending.replies} onToggle={() => set("replies", !pending.replies)} />
-        <ToggleRow title="Announcements" sub="Your church posts a new announcement." on={pending.announcements} onToggle={() => set("announcements", !pending.announcements)} />
-        <ToggleRow title="Activity & assignments" sub="You're given a task, role, or DGL week, a receipt is decided, your role changes, or your pastor asks a question." on={pending.activity} onToggle={() => set("activity", !pending.activity)} />
-        <ToggleRow title="Deadlines" sub="Task due dates and confirmation requests." on={pending.deadlines} onToggle={() => set("deadlines", !pending.deadlines)} />
+        <ToggleRow title="Mentions" sub="Someone @mentions you in a chat." on={pending.mentions} onToggle={() => set("mentions", !pending.mentions)} mobile={mobile} />
+        <ToggleRow title="Replies" sub="Someone replies to one of your messages." on={pending.replies} onToggle={() => set("replies", !pending.replies)} mobile={mobile} />
+        <ToggleRow title="Announcements" sub="Your church posts a new announcement." on={pending.announcements} onToggle={() => set("announcements", !pending.announcements)} mobile={mobile} />
+        <ToggleRow title="Activity & assignments" sub="You're given a task, role, or DGL week, a receipt is decided, your role changes, or your pastor asks a question." on={pending.activity} onToggle={() => set("activity", !pending.activity)} mobile={mobile} />
+        <ToggleRow title="Deadlines" sub="Task due dates and confirmation requests." on={pending.deadlines} onToggle={() => set("deadlines", !pending.deadlines)} mobile={mobile} />
 
         {/* Group chat mode */}
-        <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 18px", borderTop: "1px solid var(--line)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: mobile ? 14 : 16, padding: mobile ? "14px 0" : "14px 18px", borderTop: `1px solid ${groupDivider}` }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Group chats</div>
-            <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
+            <div style={{ fontSize: mobile ? 14.5 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>Group chats</div>
+            <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 1.5 }}>
               Smart notifies you for every message in smaller chats and only mentions in large ones.
             </div>
           </div>
@@ -385,8 +405,8 @@ export function NotificationsSection({
           </Select>
         </div>
 
-        <ToggleRow title="Desk work on web" sub="Approvals, form responses, and other team tasks while you're on the web app." on={pending.desk_web} onToggle={() => set("desk_web", !pending.desk_web)} />
-        <ToggleRow title="Daily digest" sub="A once-a-day summary of desk-work items on mobile." on={pending.desk_digest} onToggle={() => set("desk_digest", !pending.desk_digest)} />
+        <ToggleRow title="Desk work on web" sub="Approvals, form responses, and other team tasks while you're on the web app." on={pending.desk_web} onToggle={() => set("desk_web", !pending.desk_web)} mobile={mobile} />
+        <ToggleRow title="Daily digest" sub="A once-a-day summary of desk-work items on mobile." on={pending.desk_digest} onToggle={() => set("desk_digest", !pending.desk_digest)} mobile={mobile} />
       </div>
 
       {dirty && (

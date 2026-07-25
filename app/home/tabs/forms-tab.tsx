@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback, type ReactNode } from "react"
 import { Archive, ArchiveRestore, Check, ChevronDown, ChevronLeft, ChevronRight, Edit3, FileText, Plus, Trash2 } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { Spinner, EmptyState, MONO_STYLE, EYEBROW_STYLE, AnimateIn } from "../components/shared"
+import { Spinner, EmptyState, EYEBROW_STYLE, AnimateIn } from "../components/shared"
 import { TabPageHeader, PageTitle, PlanSubTabStrip, ContentHeader, ContentActionButton, CentralButton, CentralModal, PocketFilterChip, PocketRoundButton } from "@/components/central"
+import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
 import type { FormsTabProps, FieldType } from "../types"
 
@@ -667,19 +668,8 @@ export function FormResponsesView({ formId, title, onClose }: {
 
   return (
     <>
-      {/* Mobile header — compact, with back */}
-      <div className="md:hidden px-5 pt-6 pb-5">
-        <button
-          onClick={onClose}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--body)', fontSize: 13, fontWeight: 500, padding: 0, marginBottom: 10 }}
-        >
-          <ChevronLeft className="w-4 h-4" /> Back
-        </button>
-        <p style={MONO_STYLE}>Responses · {loading ? '…' : respondents.length}</p>
-        <h1 className="line-clamp-2" style={{ fontFamily: "var(--serif)", fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, margin: "8px 0 0" }}>
-          {title}
-        </h1>
-      </div>
+      {/* Mobile: single chrome row, back returns to the forms list */}
+      <PocketChrome title={title} back={onClose} hideAvatar userName="" onAvatarClick={() => {}} />
 
       {/* Desktop header — back is the shell breadcrumb (§3.2 Zone A); no in-header
           back. Sub-tab strip below is the single terminating hairline (R1). */}
@@ -830,7 +820,7 @@ function initialFormsView(): FormsView {
   return { mode: "list" }
 }
 
-export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
+export function FormsTab({ ministryId, userId, onViewChange, onBack }: FormsTabProps) {
   const supabase = createClient()
   const { setParams } = useNavState()
   const [loading, setLoading] = useState(true)
@@ -998,16 +988,19 @@ export function FormsTab({ ministryId, userId, onViewChange }: FormsTabProps) {
   return (
     <>
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
-      {/* Mobile header — compact */}
-      <div className="md:hidden px-5 pt-6 pb-5 flex items-end justify-between">
-        <div>
-          <p style={MONO_STYLE}>Forms</p>
-          <h1 style={{ fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: "8px 0 0" }}>Forms</h1>
-        </div>
-        <PocketRoundButton variant="plum" onClick={() => openBuilder(null)} ariaLabel="Create form">
-          <Plus style={{ width: 16, height: 16 }} strokeWidth={1.8} />
-        </PocketRoundButton>
-      </div>
+      {/* Mobile: single chrome row + the screen's ONE plum create (§3.3) */}
+      <PocketChrome
+        title="Forms"
+        back={onBack}
+        hideAvatar
+        userName=""
+        onAvatarClick={() => {}}
+        action={
+          <PocketRoundButton variant="plum" onClick={() => openBuilder(null)} ariaLabel="Create form">
+            <Plus style={{ width: 16, height: 16 }} strokeWidth={1.8} />
+          </PocketRoundButton>
+        }
+      />
 
       <TabPageHeader>
         <PageTitle

@@ -6,7 +6,7 @@ import { Search, ArrowLeft, MessageCircle, MoreHorizontal, Heart, Users, Flag, B
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { EmptyState } from "../components/shared"
-import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, SubpageShell, ActionMenu, PocketCard, PocketRow, PocketRowCard, PocketKicker } from "@/components/central"
+import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, SubpageShell, ActionMenu, PocketCard, PocketRow, PocketRowCard, PocketKicker, PocketSearchField } from "@/components/central"
 import type { ActionMenuItem } from "@/components/central"
 import { getInitials } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
@@ -350,18 +350,8 @@ export function DirectoryTab({
             )}
             <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.1, fontWeight: 600 }}>Directory</span>
           </div>
-          {/* Tonal search pill (§3.6): --ivory, borderless, radius --r-pocket-sm */}
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--muted-text)" }} />
-            <input
-              type="text"
-              placeholder="Search members…"
-              value={mobileSearch}
-              onChange={(e) => setMobileSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 text-[13px] placeholder:text-[var(--muted-text)] focus:outline-none"
-              style={{ background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", color: "var(--ink)" }}
-            />
-          </div>
+          {/* Tonal search pill (§3.6): PocketSearchField, --ivory borderless */}
+          <PocketSearchField value={mobileSearch} onChange={setMobileSearch} placeholder="Search members…" />
         </div>
 
         {mobileLoading ? (

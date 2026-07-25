@@ -35,7 +35,8 @@ import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@
 import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
-import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, PocketKicker, PocketRowCard, PocketRow, PocketBackRow, PocketFilterChip, useScrollResetOn } from "@/components/central"
+import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, PocketKicker, PocketRowCard, PocketRow, PocketFilterChip, useScrollResetOn } from "@/components/central"
+import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
 import { isAdminRole } from "@/lib/roles"
 
@@ -202,6 +203,7 @@ export function SettingsTab({
   userRole,
   userId,
   userName,
+  onBack,
 }: {
   ministryId: string
   ministryName: string
@@ -210,6 +212,7 @@ export function SettingsTab({
   userRole: string
   userId: string
   userName: string
+  onBack?: () => void
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
@@ -1130,11 +1133,18 @@ export function SettingsTab({
 
   return (
     <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
-      {/* Mobile chrome title — single 22px serif row, shown at the hub level only */}
-      {mobileSection === null && (
-        <div className="md:hidden px-5 pt-6 pb-2">
-          <h1 style={{ fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", fontWeight: 600, letterSpacing: "-0.01em", lineHeight: 1.1, margin: 0 }}>Church Settings</h1>
-        </div>
+      {/* Mobile: single chrome row — hub shows "Church Settings" + back; a drilled
+          section shows that section's title + back one level to the hub (§1/§3). */}
+      {mobileSection === null ? (
+        <PocketChrome title="Church Settings" back={onBack} hideAvatar userName="" onAvatarClick={() => {}} />
+      ) : (
+        <PocketChrome
+          title={TABS.find(t => t.key === mobileSection)?.label ?? "Settings"}
+          back={closeMobileSection}
+          hideAvatar
+          userName=""
+          onAvatarClick={() => {}}
+        />
       )}
 
       {/* Desktop header — settings tab strip below is the single terminating hairline (R1) */}
@@ -1177,13 +1187,6 @@ export function SettingsTab({
           />
         </div>
 
-        {/* ── Mobile back row when drilled into a section ── */}
-        {mobileSection !== null && (
-          <div className="md:hidden px-5 pt-4">
-            <PocketBackRow label="Settings" onBack={closeMobileSection} />
-          </div>
-        )}
-
         {/* ── Section bodies: desktop always; mobile only when a section is drilled ── */}
         <div className={mobileSection === null ? "hidden md:block" : undefined}>
         {loading ? (
@@ -1198,7 +1201,7 @@ export function SettingsTab({
               {/* Ministry Profile */}
               <section>
                 <div style={{ marginBottom: 20 }}>
-                  <SectionHeader eyebrow="Ministry Identity" title="Profile" titleSize={20} action={
+                  <SectionHeader eyebrow="Ministry Identity" title="Profile" titleSize={20} hideTitleOnMobile action={
                     <SectionEditControls editing={profileEditing} dirty={profileDirty} saving={savingInfo} saved={profileSaved} disabled={!isAdmin}
                       onEdit={startProfileEdit} onCancel={() => { setProfileEditing(false); setInfoError(null) }} onSave={() => setProfileConfirmOpen(true)} />
                   } />
@@ -1233,7 +1236,7 @@ export function SettingsTab({
                   {/* Discovery */}
                   <div>
                     <div style={{ marginBottom: 16 }}>
-                      <SectionHeader eyebrow="Discovery" title={`Who can find ${ministryInfo?.name ?? ministryName}`} titleSize={20} action={
+                      <SectionHeader eyebrow="Discovery" title={`Who can find ${ministryInfo?.name ?? ministryName}`} titleSize={20} hideTitleOnMobile action={
                         <SectionEditControls editing={discoveryEditing} dirty={discoveryDirty} saving={toggling} saved={discoverySaved} disabled={!isAdmin}
                           onEdit={startDiscoveryEdit} onCancel={() => { setDiscoveryEditing(false); setDiscoveryError(null) }} onSave={() => setDiscoveryConfirmOpen(true)} />
                       } />
@@ -1259,7 +1262,7 @@ export function SettingsTab({
                   {/* Schools */}
                   <div>
                     <div style={{ marginBottom: 16 }}>
-                      <SectionHeader eyebrow="Schools" title="Linked campuses" titleSize={20} action={isAdmin && !addingSchool ? (<CentralButton variant="create" size="sm" onClick={() => setAddingSchool(true)} style={{ flexShrink: 0 }}>+ Add school</CentralButton>) : undefined} />
+                      <SectionHeader eyebrow="Schools" title="Linked campuses" titleSize={20} hideTitleOnMobile action={isAdmin && !addingSchool ? (<CentralButton variant="create" size="sm" onClick={() => setAddingSchool(true)} style={{ flexShrink: 0 }}>+ Add school</CentralButton>) : undefined} />
                     </div>
                     <div className={CARD_CLS} style={{ ...CARD, overflow: "hidden" }}>
                       {schools.length === 0 && !addingSchool && <div style={{ padding: "16px 20px" }}><p style={{ fontSize: 13, color: "var(--muted-text)" }}>No schools added yet.</p></div>}
@@ -1296,7 +1299,7 @@ export function SettingsTab({
               {isAdmin && (
                 <section>
                   <div style={{ marginBottom: 16 }}>
-                    <SectionHeader eyebrow="Giving" title="Offering info" titleSize={20} action={
+                    <SectionHeader eyebrow="Giving" title="Offering info" titleSize={20} hideTitleOnMobile action={
                       <div style={{ display: "inline-flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
                         <SavedTick show={givingSaveMsg} />
                         {isAdmin && !editingGiving && (givingSaved.name || givingSaved.info) ? (<button onClick={() => { setGivingName(givingSaved.name); setGivingInfo(givingSaved.info); setGivingError(null); setEditingGiving(true) }} style={{ padding: "7px 12px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", flexShrink: 0 }}>Edit</button>) : null}
@@ -1347,7 +1350,7 @@ export function SettingsTab({
               {isAdmin && (
                 <section>
                   <div style={{ marginBottom: 20 }}>
-                    <SectionHeader eyebrow="Daily Verse Rotation" title="Verses on the sidebar" titleSize={20} action={!addingVerse ? <CentralButton variant="create" size="sm" onClick={() => setAddingVerse(true)} style={{ flexShrink: 0 }}>+ Add verse</CentralButton> : undefined} />
+                    <SectionHeader eyebrow="Daily Verse Rotation" title="Verses on the sidebar" titleSize={20} hideTitleOnMobile action={!addingVerse ? <CentralButton variant="create" size="sm" onClick={() => setAddingVerse(true)} style={{ flexShrink: 0 }}>+ Add verse</CentralButton> : undefined} />
                     <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Verses rotate daily in the order below. Drag to reorder. Today&apos;s verse is highlighted.</p>
                   </div>
                   <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
@@ -1416,7 +1419,7 @@ export function SettingsTab({
               {isAdmin && (
                 <section>
                   <div style={{ marginBottom: 16 }}>
-                    <SectionHeader eyebrow="Onboarding" title="Getting started guide" titleSize={20} />
+                    <SectionHeader eyebrow="Onboarding" title="Getting started guide" titleSize={20} hideTitleOnMobile />
                     <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Show the setup checklist on Home for all admins — useful when onboarding new leadership.</p>
                   </div>
                   <div className={CARD_CLS} style={{ ...CARD, padding: "20px 22px", maxWidth: 520, display: "flex", alignItems: "center", gap: 16 }}>
@@ -1494,7 +1497,7 @@ export function SettingsTab({
           {activeSettingsTab === "people" && (
             <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
               <div>
-                <SectionHeader eyebrow={`People · ${totalMembers}`} title="Members and roles" titleSize={20} />
+                <SectionHeader eyebrow={`People · ${totalMembers}`} title="Members and roles" titleSize={20} hideTitleOnMobile />
                 <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Every person in {ministryInfo?.name ?? ministryName}, the role they hold, and how they joined.</p>
               </div>
 
@@ -1656,7 +1659,7 @@ export function SettingsTab({
               <>
               <section>
                 <div style={{ marginBottom: 20 }}>
-                  <SectionHeader eyebrow="Governance" title="Who governs teams" titleSize={20} action={
+                  <SectionHeader eyebrow="Governance" title="Who governs teams" titleSize={20} hideTitleOnMobile action={
                     <SectionEditControls editing={govEditing} dirty={govDirty} saving={govSaving} saved={govSaved} disabled={!isAdmin}
                       onEdit={startGovEdit} onCancel={cancelGovEdit} onSave={() => setGovConfirmOpen(true)} />
                   } />
@@ -1703,7 +1706,7 @@ export function SettingsTab({
               {/* ── Per-team admin access matrix ── */}
               <section>
                 <div style={{ marginBottom: 20 }}>
-                  <SectionHeader eyebrow="Team Access" title="What governors get per team" titleSize={20} />
+                  <SectionHeader eyebrow="Team Access" title="What governors get per team" titleSize={20} hideTitleOnMobile />
                   <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>For admins who aren&apos;t on a team, this sets how much of it they can reach. Team members always keep full access.</p>
                   <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 4 }}>
                     {[
@@ -1751,7 +1754,7 @@ export function SettingsTab({
           {activeSettingsTab === "automations" && (
             <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
               <div>
-                <SectionHeader eyebrow="Automations" title="Chat & membership rules" titleSize={20} action={
+                <SectionHeader eyebrow="Automations" title="Chat & membership rules" titleSize={20} hideTitleOnMobile action={
                   <SectionEditControls editing={automationsEditing} dirty={hasAutomationChanges} saving={savingAutomations} saved={automationsSaved} disabled={!isAdmin}
                     onEdit={startAutomationsEdit} onCancel={cancelAutomationsEdit} onSave={() => setAutomationsConfirmOpen(true)} />
                 } />
@@ -1849,7 +1852,7 @@ export function SettingsTab({
           {activeSettingsTab === "chat" && (
             <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
               <div>
-                <SectionHeader eyebrow="Chat" title="Chat moderation" titleSize={20} action={
+                <SectionHeader eyebrow="Chat" title="Chat moderation" titleSize={20} hideTitleOnMobile action={
                   <SectionEditControls editing={moderationEditing} dirty={hasModerationChanges} saving={savingModeration} saved={moderationSaved} disabled={!isAdmin}
                     onEdit={startModerationEdit} onCancel={cancelModerationEdit} onSave={() => setModerationConfirmOpen(true)} />
                 } />
@@ -1945,7 +1948,7 @@ export function SettingsTab({
           {activeSettingsTab === "reports" && isAdmin && (
             <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 40 }}>
               <div>
-                <SectionHeader eyebrow="Moderation" title="Reports" titleSize={20} />
+                <SectionHeader eyebrow="Moderation" title="Reports" titleSize={20} hideTitleOnMobile />
                 <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", maxWidth: 640, lineHeight: 1.55 }}>Messages, announcements, and profiles your members have reported. Review each one, then mark it reviewed or dismiss it.</p>
               </div>
 
@@ -1998,7 +2001,7 @@ export function SettingsTab({
               {/* Join codes */}
               <section>
                 <div style={{ marginBottom: 20 }}>
-                  <SectionHeader eyebrow="Join Codes" title="How people get in" titleSize={20} />
+                  <SectionHeader eyebrow="Join Codes" title="How people get in" titleSize={20} hideTitleOnMobile />
                   <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Share these codes to let people join {ministryInfo?.name ?? ministryName}. Staff codes assign admin-tier roles automatically.</p>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: isAdmin && staffCode ? "1fr 1fr" : "1fr", gap: 18, maxWidth: isAdmin && staffCode ? undefined : 480 }}>
@@ -2061,7 +2064,7 @@ export function SettingsTab({
               {/* Calendar integration */}
               <section>
                 <div style={{ marginBottom: 20 }}>
-                  <SectionHeader eyebrow="Calendar Integration" title="Sync events to your calendar" titleSize={20} />
+                  <SectionHeader eyebrow="Calendar Integration" title="Sync events to your calendar" titleSize={20} hideTitleOnMobile />
                   <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Subscribe to your ministry&apos;s event calendar in Google Calendar, Apple Calendar, or Outlook. Events added in Central sync automatically every few hours.</p>
                 </div>
                 <div className={CARD_CLS} style={{ ...CARD, padding: 22 }}>
@@ -2086,7 +2089,7 @@ export function SettingsTab({
                     <SectionHeader
                       eyebrow="Funds"
                       title="Funding sources"
-                      titleSize={20}
+                      titleSize={20} hideTitleOnMobile
                       action={fundsEditing
                         ? <CentralButton variant="create" size="sm" onClick={addPendingFund} style={{ flexShrink: 0 }}>+ Add fund</CentralButton>
                         : <CentralButton variant="secondary" size="sm" onClick={startEditFunds} style={{ flexShrink: 0 }}>Edit</CentralButton>}
@@ -2140,7 +2143,7 @@ export function SettingsTab({
               {isAdmin && (
                 <section>
                   <div style={{ marginBottom: 20 }}>
-                    <SectionHeader eyebrow="Receipt Limits" title="Per-event reimbursement caps" titleSize={20} action={!addingLimit ? <CentralButton variant="create" size="sm" onClick={() => setAddingLimit(true)} style={{ flexShrink: 0 }}>+ Add limit</CentralButton> : undefined} />
+                    <SectionHeader eyebrow="Receipt Limits" title="Per-event reimbursement caps" titleSize={20} hideTitleOnMobile action={!addingLimit ? <CentralButton variant="create" size="sm" onClick={() => setAddingLimit(true)} style={{ flexShrink: 0 }}>+ Add limit</CentralButton> : undefined} />
                     <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Define a maximum reimbursement that members can submit against an event before it requires admin approval.</p>
                   </div>
                   <div style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--cream-panel)", overflow: "hidden" }}>
@@ -2213,7 +2216,7 @@ export function SettingsTab({
           {activeSettingsTab === "audit" && isAdmin && (
             <div className="px-5 md:px-14" style={{ marginTop: 40 }}>
               <div style={{ marginBottom: 24 }}>
-                <SectionHeader eyebrow="Audit Log" title="Admin activity" titleSize={20} />
+                <SectionHeader eyebrow="Audit Log" title="Admin activity" titleSize={20} hideTitleOnMobile />
                 <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>A read-only record of administrative actions taken in your ministry. Last 100 entries.</p>
               </div>
               {auditLoading ? (

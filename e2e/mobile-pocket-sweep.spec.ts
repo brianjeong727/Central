@@ -196,7 +196,10 @@ test.describe("mobile Pocket sweep — Settings hub (d)", () => {
     await expect(peopleRow).toBeVisible({ timeout: 10000 })
     await peopleRow.click()
     await expect(page.getByPlaceholder(/Search/i).filter({ visible: true }).first()).toBeVisible({ timeout: 10000 })
-    const back = page.getByRole("button", { name: "Settings" }).filter({ visible: true }).first()
+    // Phase 6 (Pocket Daybreak v2): the subpage back affordance migrated from a
+    // text-labeled "Settings" PocketBackRow to an icon-only PocketChrome back
+    // button (aria-label="Back") — update the locator to match.
+    const back = page.getByRole("button", { name: "Back" }).filter({ visible: true }).first()
     await back.click()
     await expect(vis(page, "People").first()).toBeVisible({ timeout: 10000 })
     assertNoErrors(errors)

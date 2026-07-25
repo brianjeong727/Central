@@ -154,6 +154,7 @@ export interface FormsTabProps {
   ministryId: string
   ministryName: string
   onViewChange?: (view: "list" | "detail", title?: string) => void
+  onBack?: () => void
 }
 
 export interface ChatGroup {
@@ -322,6 +323,7 @@ export interface CongregationTabProps {
   ministryId: string
   userRole: string
   onViewChange?: (view: "list" | "create" | "detail") => void
+  onBack?: () => void
 }
 
 export interface HomeTabProps {
