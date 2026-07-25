@@ -1163,7 +1163,7 @@ export function StudentOrgTeamHome({
   // Mobile drilled-section crumb reported by EventPlanWorkspace (null at the
   // hub and always on desktop) — appended as the tail crumb so the SubpageShell
   // chrome chevron returns section → hub (§2.3 one level; §5.3 single back).
-  const [evMobileCrumb, setEvMobileCrumb] = useState<{ label: string; onBack: () => void } | null>(null)
+  const [evMobileCrumb, setEvMobileCrumb] = useState<{ label: string; onBack: () => void; chromeOwnsTitle?: boolean } | null>(null)
 
   // Roster
   const [roster, setRoster] = useState<{ id: string; user_id: string; name: string; role: string }[]>([])
@@ -1366,7 +1366,7 @@ export function StudentOrgTeamHome({
         ]
       : baseCrumbs
     return (
-      <SubpageShell crumbs={crumbs} title={activeEvent.title} width="full">
+      <SubpageShell crumbs={crumbs} title={activeEvent.title} mobileTitle={evMobileCrumb?.chromeOwnsTitle ? evMobileCrumb.label : undefined} width="full">
         {/* key on the event id: remount when switching parent<->sub-event so the
             section state re-inits (a sub-event has no Sub-events tab → lands on
             Overview instead of inheriting the parent's ?evtab=sub_events). */}
@@ -6913,7 +6913,7 @@ export function MinistryCalendar({
   // Mobile drilled-section crumb reported by EventPlanWorkspace (null at the
   // hub and always on desktop) — appended as the tail crumb so the SubpageShell
   // chrome chevron returns section → hub (§2.3 one level; §5.3 single back).
-  const [evMobileCrumb, setEvMobileCrumb] = useState<{ label: string; onBack: () => void } | null>(null)
+  const [evMobileCrumb, setEvMobileCrumb] = useState<{ label: string; onBack: () => void; chromeOwnsTitle?: boolean } | null>(null)
 
   // Notify the mobile parent whether the event subpage owns the screen (§2.2b),
   // releasing the flag on unmount (section switch) so its back-row returns.
@@ -6947,7 +6947,7 @@ export function MinistryCalendar({
         ]
       : [{ label: teamName, onClick: () => setPlanningEvent(null) }, { label: planningEvent.title }]
     return (
-      <SubpageShell crumbs={crumbs} title={planningEvent.title} width="full">
+      <SubpageShell crumbs={crumbs} title={planningEvent.title} mobileTitle={evMobileCrumb?.chromeOwnsTitle ? evMobileCrumb.label : undefined} width="full">
         <EventPlanWorkspace
           key={planningEvent.id}
           inline
@@ -7250,7 +7250,7 @@ export function EventPlanWorkspace({
   // tail SubpageShell crumb and point the event crumb at the hub — making the
   // chrome chevron go section → hub → team. Reports null on desktop / at the
   // hub / on unmount, so desktop crumbs are untouched.
-  onMobileCrumbChange?: (crumb: { label: string; onBack: () => void } | null) => void
+  onMobileCrumbChange?: (crumb: { label: string; onBack: () => void; chromeOwnsTitle?: boolean } | null) => void
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
@@ -7983,7 +7983,12 @@ export function EventPlanWorkspace({
     if (!onMobileCrumbChange) return
     if (isMobile && mobileSection) {
       const label = sections.find(s => s.key === mobileSection)?.label ?? "Section"
-      onMobileCrumbChange({ label, onBack: backToMobileHub })
+      // The 4 core spokes drop their in-body EventSectionHeader on mobile, so the
+      // chrome row OWNS the section title (mobileTitle). The extra type-tabs keep
+      // their own in-body header (with its create action) → chrome stays the event
+      // name, avoiding a duplicate title.
+      const chromeOwnsTitle = mobileSection === "overview" || mobileSection === "checklist" || mobileSection === "roles" || mobileSection === "runsheet"
+      onMobileCrumbChange({ label, onBack: backToMobileHub, chromeOwnsTitle })
     } else {
       onMobileCrumbChange(null)
     }
@@ -8878,9 +8883,20 @@ export function EventPlanWorkspace({
                           </Select>
                         </div>
                         <Input value={editRoleNotes} onChange={(e) => setEditRoleNotes(e.target.value)} placeholder="Notes (optional)" className="roleinput" />
-                        <div style={{ display: "flex", gap: 8 }}>
+                        <div style={{ display: "flex", alignItems: isMobile ? "center" : undefined, gap: 8 }}>
                           <CentralButton variant="primary" size="sm" onClick={() => handleSaveRoleEdit(role.id)}>Save</CentralButton>
                           <button onClick={() => setEditingRoleId(null)} style={{ padding: "6px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", cursor: "pointer" }}>Cancel</button>
+                          {/* Mobile carries no per-row trash icon (glance-and-act);
+                              delete lives in the edit form instead. */}
+                          {isMobile && (
+                            <button
+                              onClick={() => { setEditingRoleId(null); setConfirm({ title: "Delete this role?", onConfirm: () => handleDeleteRole(role.id) }) }}
+                              style={{ marginLeft: "auto", padding: "6px 8px", borderRadius: 10, border: "none", background: "none", color: "var(--danger)", cursor: "pointer", display: "grid", placeItems: "center" }}
+                              aria-label="Delete role"
+                            >
+                              <Trash2 style={{ width: 16, height: 16 }} />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -8888,6 +8904,58 @@ export function EventPlanWorkspace({
                 }
                 const isCovered = !!role.assigned_to
                 const initials = role.assigned_name?.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase() ?? ""
+
+                // ── Mobile display row (Pocket §Row grammar) ─────────────────
+                // The desktop grid packs assignee + edit/delete/confirm icons
+                // into the right column, which squeezes the title to a per-word
+                // wrap at 390px. Mobile instead gives the title a flex:1 column
+                // and a minimal right rail (confirm status), tap → the edit form
+                // (assign / rename / delete all live there).
+                if (isMobile) {
+                  const c = confirmations[role.id]
+                  const cMeta: Record<EventConfirmation["status"], { label: string; color: string }> | null = c ? {
+                    requested: { label: "Awaiting", color: "var(--plum)" },
+                    escalated: { label: "Escalated", color: "var(--plum)" },
+                    confirmed: { label: "Confirmed", color: "var(--sage)" },
+                    declined: { label: "Declined", color: "var(--muted-text)" },
+                  } : null
+                  const canReRequest = !!c && canEdit && (c.status === "declined" || c.status === "escalated")
+                  const openEdit = () => { setShowAddRole(false); setEditingRoleId(role.id); setEditRoleName(role.role_name); setEditRoleAssignee(role.assigned_to ?? ""); setEditRoleNotes(role.notes ?? "") }
+                  const subText = isCovered
+                    ? role.assigned_name
+                    : (role.notes || (canEdit ? "Tap to assign someone" : "Unassigned"))
+                  return (
+                    <div
+                      key={role.id}
+                      onClick={canEdit ? openEdit : undefined}
+                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 0", borderBottom: isLast ? "none" : "1px solid var(--line-3)", cursor: canEdit ? "pointer" : "default", width: "100%" }}
+                    >
+                      {isCovered ? (
+                        <MonogramChip initials={initials} style={{ width: 40, height: 40, fontSize: 13, fontWeight: 500, flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: 40, height: 40, border: "1px dashed var(--dashed)", borderRadius: "var(--r-callout)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                          <Plus style={{ width: 16, height: 16, color: "var(--dashed)" }} />
+                        </div>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{role.role_name}</div>
+                        <div style={{ fontSize: 13, color: isCovered ? "var(--body)" : "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subText}</div>
+                      </div>
+                      {cMeta && (
+                        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
+                          <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.6px", textTransform: "uppercase", color: cMeta[c!.status].color, whiteSpace: "nowrap" }}>{cMeta[c!.status].label}</span>
+                          {canReRequest && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleReRequestConfirmation(c!.id) }}
+                              style={{ fontSize: 11, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "var(--serif)", fontWeight: 600 }}
+                            >Re-request</button>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  )
+                }
+
                 return (
                   <ListRow key={role.id} hover={false} last={isLast} className="rrow" style={{ display: "grid", gridTemplateColumns: "38px 1fr auto", gap: 16, alignItems: "center", padding: "14px 8px" }}>
                     {isCovered ? (
@@ -8970,32 +9038,66 @@ export function EventPlanWorkspace({
                   .rolesui .role-icon.danger:hover{color:var(--danger)}
                   .rolesui .assignbtn:hover{border-color:var(--plum)}
                 `}</style>
-                <EventSectionHeader
-                  title="Roles"
-                  action={canEdit ? (
-                    <>
-                      {planChatBtn}
-                      {covered.length > 0 && (
-                        <ContentActionButton
-                          variant="ghost"
-                          icon={<CheckCircle2 style={{ width: 14, height: 14 }} />}
-                          label={requestingConfirmations ? "Requesting…" : "Request confirmations"}
-                          onClick={handleRequestConfirmations}
-                          disabled={requestingConfirmations}
-                          title="Ask every assigned role-holder to confirm they're set"
-                        />
-                      )}
-                      {!showAddRole && !editingRoleId && (
-                        <ContentActionButton
-                          variant="primary"
-                          icon={<Plus style={{ width: 14, height: 14 }} />}
-                          label="Add role"
-                          onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setEditingRoleId(null); setShowAddRole(true) }}
-                        />
-                      )}
-                    </>
-                  ) : undefined}
-                />
+                {/* Desktop: the shared EventSectionHeader with its full action
+                    row. Mobile: the SubpageShell chrome already carries the
+                    "Roles & Leads" title (via mobileTitle), so the spoke shows
+                    only a compact right-aligned action rail — the planning-chat
+                    icon + a single plum "+" create — that fits 390px without
+                    clipping. "Request confirmations" drops to a full-width quiet
+                    button below (glance-and-act). */}
+                {isMobile ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ flex: 1, minWidth: 0 }} />
+                    {planChatBtn}
+                    {canEdit && !showAddRole && !editingRoleId && (
+                      <PocketRoundButton
+                        variant="plum"
+                        ariaLabel="Add role"
+                        onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setEditingRoleId(null); setShowAddRole(true) }}
+                      >
+                        <Plus style={{ width: 18, height: 18 }} strokeWidth={2.2} />
+                      </PocketRoundButton>
+                    )}
+                  </div>
+                ) : (
+                  <EventSectionHeader
+                    title="Roles"
+                    action={canEdit ? (
+                      <>
+                        {planChatBtn}
+                        {covered.length > 0 && (
+                          <ContentActionButton
+                            variant="ghost"
+                            icon={<CheckCircle2 style={{ width: 14, height: 14 }} />}
+                            label={requestingConfirmations ? "Requesting…" : "Request confirmations"}
+                            onClick={handleRequestConfirmations}
+                            disabled={requestingConfirmations}
+                            title="Ask every assigned role-holder to confirm they're set"
+                          />
+                        )}
+                        {!showAddRole && !editingRoleId && (
+                          <ContentActionButton
+                            variant="primary"
+                            icon={<Plus style={{ width: 14, height: 14 }} />}
+                            label="Add role"
+                            onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setEditingRoleId(null); setShowAddRole(true) }}
+                          />
+                        )}
+                      </>
+                    ) : undefined}
+                  />
+                )}
+                {isMobile && canEdit && covered.length > 0 && !showAddRole && !editingRoleId && (
+                  <PocketButton
+                    variant="quiet"
+                    surface="page"
+                    onClick={handleRequestConfirmations}
+                    disabled={requestingConfirmations}
+                    style={{ width: "100%", marginTop: 12 }}
+                  >
+                    <CheckCircle2 style={{ width: 15, height: 15 }} /> {requestingConfirmations ? "Requesting…" : "Request confirmations"}
+                  </PocketButton>
+                )}
                 {planChatError && <p style={{ fontSize: 12, color: "var(--danger)", marginTop: 8 }}>{planChatError}</p>}
 
                 {/* Planning-chat confirm surface — mobile PocketSheet / desktop ConfirmDialog.
@@ -9070,9 +9172,10 @@ export function EventPlanWorkspace({
                   )
                 })()}
 
-                {/* Inline add-role form */}
+                {/* Inline add-role form — desktop is a single dense row; mobile
+                    stacks the fields (the 5-col grid clips at 390px). */}
                 {canEdit && showAddRole && (
-                  <div style={{ display: "grid", gridTemplateColumns: "230px 1fr 180px auto auto", gap: 14, alignItems: "center", border: "1px dashed var(--dashed)", borderRadius: 14, padding: "14px 18px", marginTop: 20, background: "var(--cream-2)" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "230px 1fr 180px auto auto", gap: isMobile ? 10 : 14, alignItems: "center", border: "1px dashed var(--dashed)", borderRadius: 14, padding: isMobile ? "16px" : "14px 18px", marginTop: 20, background: "var(--cream-2)" }}>
                     <Input
                       value={newRoleName}
                       onChange={(e) => setNewRoleName(e.target.value)}
@@ -9857,11 +9960,13 @@ function RunSheetTab({
     setRipple(null)
   }
 
-  if (loading) return <div><EventSectionHeader title="Showtime" /><p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p></div>
+  if (loading) return <div>{!isMobile && <EventSectionHeader title="Showtime" />}<p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p></div>
 
   return (
     <div>
-      <EventSectionHeader title="Showtime" />
+      {/* Mobile: the SubpageShell chrome already reads "Showtime" (mobileTitle),
+          so the in-body section header is redundant — desktop keeps it. */}
+      {!isMobile && <EventSectionHeader title="Showtime" />}
 
       {days.map((day, dayIdx) => {
         const dayBlocks = blocks.filter(b => b.day_index === dayIdx)
@@ -9916,23 +10021,51 @@ function RunSheetTab({
                   ) : (
                     /* ── READ MODE — clean display + pencil ── */
                     <>
-                      <div style={{ display: "grid", gridTemplateColumns: "26px 84px 1fr 140px auto", gap: 12, alignItems: "center" }}>
-                        {(canEdit || block.owner_id === userId) ? (
-                          <button onClick={() => toggleDone(block)} title={done ? "Mark not done" : "Mark done"}
-                            style={{ width: 20, height: 20, borderRadius: 6, border: "1.6px solid " + (done ? "var(--plum-2)" : "var(--dashed)"), background: done ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}>
-                            {done && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
-                          </button>
-                        ) : <span />}
-                        <span style={{ fontSize: 13, fontWeight: isUpNext ? 600 : 500, color: done ? "var(--faint)" : isUpNext ? "var(--plum)" : "var(--muted-text)" }}>{block.time_label || "—"}</span>
-                        <span style={{ fontSize: 14, color: done ? "var(--faint)" : "var(--ink)", textDecoration: done ? "line-through" : "none" }}>{block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Untitled block</span>}</span>
-                        <span style={{ fontSize: 12, color: "var(--body)" }}>{ownerName ?? "—"}</span>
-                        {canEdit ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
-                            <IconButton dim={24} onClick={() => startEdit(block)} title="Edit block"><Pencil style={{ width: 13, height: 13 }} /></IconButton>
-                            <IconButton dim={24} onClick={() => deleteBlock(block.id)} title="Remove block"><X className="w-3.5 h-3.5" /></IconButton>
+                      {isMobile ? (
+                        /* Mobile (§Showtime): the desktop 5-col grid's fixed
+                            84px time + 140px owner columns starve the 1fr title
+                            → per-word wrap at 390px. Give the title the full
+                            width; time (plum mono) + owner drop to a muted sub. */
+                        <div style={{ display: "grid", gridTemplateColumns: "26px 1fr auto", gap: 12, alignItems: "center" }}>
+                          {(canEdit || block.owner_id === userId) ? (
+                            <button onClick={() => toggleDone(block)} title={done ? "Mark not done" : "Mark done"}
+                              style={{ width: 20, height: 20, borderRadius: 6, border: "1.6px solid " + (done ? "var(--plum-2)" : "var(--dashed)"), background: done ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}>
+                              {done && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
+                            </button>
+                          ) : <span />}
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: done ? "var(--faint)" : "var(--ink)", textDecoration: done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Untitled block</span>}</div>
+                            <div style={{ fontSize: 12.5, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.5px", color: done ? "var(--faint)" : "var(--plum)" }}>{block.time_label || "—"}</span>
+                              {ownerName && <span style={{ color: "var(--muted-text)" }}> · {ownerName}</span>}
+                            </div>
                           </div>
-                        ) : <span />}
-                      </div>
+                          {canEdit ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                              <IconButton dim={24} onClick={() => startEdit(block)} title="Edit block"><Pencil style={{ width: 13, height: 13 }} /></IconButton>
+                              <IconButton dim={24} onClick={() => deleteBlock(block.id)} title="Remove block"><X className="w-3.5 h-3.5" /></IconButton>
+                            </div>
+                          ) : <span />}
+                        </div>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "26px 84px 1fr 140px auto", gap: 12, alignItems: "center" }}>
+                          {(canEdit || block.owner_id === userId) ? (
+                            <button onClick={() => toggleDone(block)} title={done ? "Mark not done" : "Mark done"}
+                              style={{ width: 20, height: 20, borderRadius: 6, border: "1.6px solid " + (done ? "var(--plum-2)" : "var(--dashed)"), background: done ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}>
+                              {done && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
+                            </button>
+                          ) : <span />}
+                          <span style={{ fontSize: 13, fontWeight: isUpNext ? 600 : 500, color: done ? "var(--faint)" : isUpNext ? "var(--plum)" : "var(--muted-text)" }}>{block.time_label || "—"}</span>
+                          <span style={{ fontSize: 14, color: done ? "var(--faint)" : "var(--ink)", textDecoration: done ? "line-through" : "none" }}>{block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Untitled block</span>}</span>
+                          <span style={{ fontSize: 12, color: "var(--body)" }}>{ownerName ?? "—"}</span>
+                          {canEdit ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                              <IconButton dim={24} onClick={() => startEdit(block)} title="Edit block"><Pencil style={{ width: 13, height: 13 }} /></IconButton>
+                              <IconButton dim={24} onClick={() => deleteBlock(block.id)} title="Remove block"><X className="w-3.5 h-3.5" /></IconButton>
+                            </div>
+                          ) : <span />}
+                        </div>
+                      )}
                       {block.brief && (
                         <p style={{ marginTop: 4, marginLeft: 38, fontSize: 12.5, color: "var(--faint)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{block.brief}</p>
                       )}
@@ -10272,7 +10405,7 @@ function GroupSessionView({ session, onBack }: { session: GroupSessionRecord; on
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
           {groups.map(g => (
-            <div key={g.id} style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: 14, padding: "18px 20px" }}>
+            <div key={g.id} style={{ background: isMobile ? "var(--ivory)" : "var(--cream-panel)", border: isMobile ? "none" : "1px solid var(--line)", borderRadius: isMobile ? "var(--r-pocket)" : 14, padding: "18px 20px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
                 <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{g.name}</p>
                 <span style={{ fontSize: 11, color: "var(--muted-text)" }}>{g.members.length}</span>
@@ -11984,7 +12117,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   )
 
   return (
-    <SubpageShell title="Settings" crumbs={[{ label: localTeamName, onClick: onClose }, { label: "Settings" }]} width="full">
+    <SubpageShell title="Settings" mobileTitle="Team settings" crumbs={[{ label: localTeamName, onClick: onClose }, { label: "Settings" }]} width="full">
 
       {/* ── Mobile header — SubpageShell's `title` is desktop-only, so mobile keeps a
           self-contained header (team icon + name + inline actions). The mobile back
