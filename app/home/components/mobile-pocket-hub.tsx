@@ -32,11 +32,14 @@ export type HubAvatar = { userName: string; avatarUrl?: string | null; onClick: 
 // workspace to the picker; no separate "← All workspaces" pill, no PocketChrome
 // "Workspace" row above — this IS the workspace's one header. Also reused
 // standalone for drilled-in screens that carry a title + back in one row.
-export function PocketHubChrome({ title, onBack, onSettings, avatar }: {
+export function PocketHubChrome({ title, onBack, onSettings, avatar, action }: {
   title: string
   onBack?: () => void
   onSettings?: () => void
   avatar?: HubAvatar
+  // Optional trailing action (a section-screen create — plum round "+" or a
+  // primary pill). When present the title shrinks to 20 (§2, two-content row).
+  action?: ReactNode
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
@@ -45,7 +48,8 @@ export function PocketHubChrome({ title, onBack, onSettings, avatar }: {
           <ArrowLeft style={{ width: 20, height: 20 }} />
         </button>
       )}
-      <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
+      <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: action ? 20 : 22, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
+      {action}
       {onSettings && (
         <IconButton dim={34} onClick={onSettings} title="Team settings"><Settings className="w-4 h-4" /></IconButton>
       )}
