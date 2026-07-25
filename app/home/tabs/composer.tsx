@@ -306,8 +306,9 @@ function ComposerImpl({
             >
               <BarChart2 className="w-4 h-4" />
             </button>
-            {/* Textarea bubble — its own bordered component */}
-            <div className="flex-1 border border-[var(--line-2)] rounded-2xl bg-[var(--ivory)] px-3 py-[9px]">
+            {/* Textarea bubble — borderless ivory pill on mobile (Pocket composer),
+                bordered on the shared desktop panel (md: keeps desktop untouched). */}
+            <div className="flex-1 border border-transparent md:border-[var(--line-2)] rounded-2xl bg-[var(--ivory)] px-3 py-[9px]">
               {/* Attachment preview — inside the bubble, above the textarea */}
               {pendingAttachment && (
                 <div className="mb-2">
@@ -373,8 +374,7 @@ function ComposerImpl({
             <button
               onClick={triggerSend}
               disabled={(!inputText.trim() && !pendingAttachment) || sending}
-              className="flex-shrink-0 flex items-center justify-center disabled:opacity-50 hover:bg-[var(--ink)] transition-all active:scale-95 bg-[var(--plum-2)]"
-              style={{ width: 44, height: 44, borderRadius: 14 }}
+              className="flex-shrink-0 w-11 h-11 flex items-center justify-center disabled:opacity-50 hover:bg-[var(--ink)] transition-all active:scale-95 rounded-full bg-[var(--plum)] md:rounded-[14px] md:bg-[var(--plum-2)]"
             >
               <Send className="w-4 h-4 text-[var(--cream-on-dark)]" style={{ transform: "rotate(-30deg)" }} />
             </button>
