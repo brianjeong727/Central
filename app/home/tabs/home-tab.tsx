@@ -335,6 +335,12 @@ export function HomeTab({
         .from("announcements")
         .select("*")
         .eq("ministry_id", ministryId)
+        // Drafts are app-filtered everywhere (announcements RLS is ministry-scoped
+        // only — it does NOT gate on status, so a draft row is readable by any
+        // member). Home is a published-only glance surface: exclude drafts here for
+        // EVERYONE (hero, the recent-announcements digest, and the up-next fallback
+        // all read this list) so an unpublished draft can never surface on Home.
+        .or("status.is.null,status.eq.published")
         .order("is_pinned", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(10),

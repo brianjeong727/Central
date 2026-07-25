@@ -45,7 +45,9 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
       const [profilesRes, groupsRes, announcementsRes] = await Promise.all([
         supabase.from("profiles").select("id, name, email, role").eq("ministry_id", ministryId).is("deleted_at", null).ilike("name", `%${q}%`).limit(5),
         supabase.from("groups").select("id, name, type").eq("ministry_id", ministryId).eq("archived", false).ilike("name", `%${q}%`).limit(5),
-        supabase.from("announcements").select("id, title").eq("ministry_id", ministryId).ilike("title", `%${q}%`).limit(5),
+        // Published-only: drafts must never surface outside the authors' DRAFTS tray
+        // (announcements RLS is status-agnostic — app-code WHERE is the enforcement line).
+        supabase.from("announcements").select("id, title").eq("ministry_id", ministryId).or("status.is.null,status.eq.published").ilike("title", `%${q}%`).limit(5),
       ])
       const items: PaletteItem[] = []
       const navMatches = NAV_ITEMS.filter((n) => n.label.toLowerCase().includes(q))
