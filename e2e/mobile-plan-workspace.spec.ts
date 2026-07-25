@@ -242,9 +242,12 @@ test.describe("mobile plan workspace entry (3a15bd6)", () => {
       const eventsRow = page.getByRole("button", { name: /Events/ }).filter({ visible: true }).first()
       await expect(eventsRow).toBeVisible()
 
-      // Drilling into a row reveals the section content + a back-to-hub affordance.
+      // Drilling into a row reveals the section content under a SINGLE chrome row
+      // (§5.3 single-chrome, Phase 5): the "Events" spoke title + one "Back"
+      // chevron to the hub — NOT the retired two-header "← {teamName}" back pill.
       await eventsRow.click()
-      await expect(page.getByRole("button", { name: STUDENT_ORG_NAME }).filter({ visible: true })).toBeVisible()
+      await expect(page.getByRole("button", { name: "Back" }).filter({ visible: true }).first()).toBeVisible()
+      await expect(page.getByText("Events", { exact: true }).filter({ visible: true }).first()).toBeVisible()
 
       assertNoErrors(errors)
     })

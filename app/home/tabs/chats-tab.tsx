@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Settings, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -2537,7 +2537,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
               className="w-10 h-10 md:w-8 md:h-8"
               style={{ fontFamily: "var(--serif)", fontSize: 13 }}
             />
-            <div className="flex-1 min-w-0">
+            {/* Mobile: tapping the name/meta opens chat settings (iMessage/Messenger
+                pattern — replaces the settings gear). Desktop keeps its own buttons, so
+                the tap is gated to phone width and the cursor stays default there. */}
+            <div
+              className="flex-1 min-w-0 cursor-pointer md:cursor-default"
+              onClick={() => { if (window.matchMedia("(max-width: 767px)").matches) setShowSettings(true) }}
+            >
               <div className="flex items-center gap-2">
                 <h2 className="truncate leading-none text-[17px] font-semibold md:text-[16px] md:font-normal" style={{ fontFamily: "var(--serif)", color: "var(--ink)", letterSpacing: "-0.01em" }}>{displayName}</h2>
                 <div className="hidden md:flex items-center flex-shrink-0">
@@ -2573,13 +2579,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 <User size={14} />
               </button>
             </div>
-            {/* Mobile: search + settings — 34px chrome hit boxes (mobile §1.3) */}
+            {/* Mobile: search only — settings is reached by tapping the chat name
+                above (iMessage/Messenger pattern). 34px chrome hit box (mobile §1.3). */}
             <div className="flex items-center gap-1 flex-shrink-0 md:hidden">
               <button onClick={openSearch} className="w-[34px] h-[34px] flex items-center justify-center hover:bg-[var(--cream-2)] rounded-full transition-colors">
                 <Search className="w-4 h-4 text-[var(--muted-text)]" />
-              </button>
-              <button onClick={() => setShowSettings(true)} className="w-[34px] h-[34px] flex items-center justify-center hover:bg-[var(--cream-2)] rounded-full transition-colors">
-                <Settings className="w-5 h-5 text-[var(--muted-text)]" />
               </button>
             </div>
           </>

@@ -7,6 +7,7 @@ import {
   requireSameMinistry,
   requireMinistryAdmin,
   requireTeamMemberOrAdmin,
+  requirePlanPlanner,
   isAdminTier,
 } from "@/app/actions/authz"
 import { STAFF_ROLES, isStaffRole } from "@/lib/roles"
@@ -995,9 +996,12 @@ export async function createEventPlanningChatAction(
   createdBy: string,
   ministryId: string,
 ): Promise<{ groupId: string | null; created: boolean; error?: string }> {
-  // Caller must belong to the ministry; the chat creator is always the caller.
-  const authz = await requireSameMinistry(ministryId)
+  // Authz: caller must be able to PLAN this event (leader/admin OR can_plan_events)
+  // — mirrors the plan-tab canEdit gate. Never rely on the UI guard alone: this is a
+  // service-role write path onto group_members. The chat creator is always the caller.
+  const authz = await requirePlanPlanner(eventPlanId)
   if (authz.error !== null) return { groupId: null, created: false, error: authz.error }
+  if (authz.ministryId !== ministryId) return { groupId: null, created: false, error: "Not authorized." }
 
   const admin = createAdminClient()
 
@@ -1045,6 +1049,89 @@ export async function createEventPlanningChatAction(
   await admin.from("event_plans").update({ planning_group_id: group.id }).eq("id", eventPlanId).eq("ministry_id", ministryId)
 
   return { groupId: group.id as string, created: true }
+}
+
+// ── syncEventPlanningChat ─────────────────────────────────────────────────────
+// Reconciles an EXISTING planning chat's membership to match the plan's current
+// role assignees (the roster is the source of truth). Missing assignees are added;
+// members no longer on any role are removed — EXCEPT the caller and the plan
+// creator, who are always retained (a planner managing the chat is never dropped
+// from it, matching createEventPlanningChatAction's "adds the caller"). Removing a
+// member only deletes their group_members row; their messages persist. Idempotent.
+// Returns {synced:false, groupId:null} gracefully if there is no linked chat or the
+// group no longer exists.
+export async function syncEventPlanningChat(
+  eventPlanId: string,
+  ministryId: string,
+): Promise<{ groupId: string | null; synced: boolean; added?: number; removed?: number; error?: string }> {
+  // Same authz as create — mirrors the plan-tab canEdit gate; never UI-only.
+  const authz = await requirePlanPlanner(eventPlanId)
+  if (authz.error !== null) return { groupId: null, synced: false, error: authz.error }
+  if (authz.ministryId !== ministryId) return { groupId: null, synced: false, error: "Not authorized." }
+
+  const admin = createAdminClient()
+
+  const { data: planRow } = await admin
+    .from("event_plans")
+    .select("planning_group_id, created_by")
+    .eq("id", eventPlanId)
+    .eq("ministry_id", ministryId)
+    .maybeSingle()
+  if (!planRow?.planning_group_id) return { groupId: null, synced: false }
+  const groupId = planRow.planning_group_id as string
+
+  // Group must still exist in this ministry (a deleted chat → nothing to sync).
+  const { data: group } = await admin
+    .from("groups")
+    .select("id")
+    .eq("id", groupId)
+    .eq("ministry_id", ministryId)
+    .maybeSingle()
+  if (!group) return { groupId: null, synced: false }
+
+  // Desired membership = current role assignees ∪ caller ∪ plan creator, filtered
+  // to this ministry's members.
+  const { data: roleRows } = await admin
+    .from("event_roles")
+    .select("assigned_to")
+    .eq("event_plan_id", eventPlanId)
+    .not("assigned_to", "is", null)
+  const assigneeIds = (roleRows ?? []).map((r: { assigned_to: string }) => r.assigned_to)
+
+  const keepIds = [authz.userId, planRow.created_by as string | null].filter(Boolean) as string[]
+  const candidateIds = [...new Set([...assigneeIds, ...keepIds])]
+
+  const { data: validProfiles } = await admin
+    .from("profiles")
+    .select("id")
+    .in("id", candidateIds)
+    .eq("ministry_id", ministryId)
+  const wanted = new Set((validProfiles ?? []).map((p: { id: string }) => p.id))
+
+  const { data: chatMembers } = await admin
+    .from("group_members")
+    .select("user_id")
+    .eq("group_id", groupId)
+  const have = new Set((chatMembers ?? []).map((r: { user_id: string }) => r.user_id))
+
+  const keepSet = new Set(keepIds)
+  const toAdd = [...wanted].filter((id) => !have.has(id))
+  // Never remove the caller or the creator, even if they hold no role.
+  const toRemove = [...have].filter((id) => !wanted.has(id) && !keepSet.has(id))
+
+  const now = new Date().toISOString()
+  if (toAdd.length > 0) {
+    await admin.from("group_members").upsert(
+      toAdd.map((uid) => ({ group_id: groupId, user_id: uid, last_read_at: now })),
+      { onConflict: "group_id,user_id", ignoreDuplicates: true },
+    )
+  }
+  if (toRemove.length > 0) {
+    // group_members carries no ministry_id; the group is already ministry-scoped.
+    await admin.from("group_members").delete().eq("group_id", groupId).in("user_id", toRemove)
+  }
+
+  return { groupId, synced: true, added: toAdd.length, removed: toRemove.length }
 }
 
 // ── syncTeamChat ──────────────────────────────────────────────────────────────
