@@ -10,36 +10,42 @@ interface PocketHeaderProps {
   ministryName: string
   userName: string
   avatarUrl?: string | null
+  // Optional chrome action rendered between the ministry name and the avatar
+  // (Home's admin-tier Settings gear). A single object-level action only — creates
+  // never live here (mobile carve-out from Convention #15 is the plum "+" per screen).
+  action?: ReactNode
   onAvatarClick: () => void
 }
 
 // Shared mobile chrome row for the "Pocket" screens: brand mark + ministry name
-// (serif) on the LEFT, the user's MonogramChip avatar on the RIGHT (taps through to
-// the profile tab). Home wires it in this pass; news/chats/workspace adopt it later.
-export function PocketHeader({ ministryName, userName, avatarUrl, onAvatarClick }: PocketHeaderProps) {
+// (serif) on the LEFT, an optional action (gear) + the user's MonogramChip avatar
+// on the RIGHT (taps through to the profile tab). Home wires it in this pass;
+// news/chats/workspace adopt it later.
+export function PocketHeader({ ministryName, userName, avatarUrl, action, onAvatarClick }: PocketHeaderProps) {
   return (
     <div
-      className="flex items-center justify-between"
-      style={{ paddingTop: "var(--space-6)", paddingBottom: "var(--space-5)" }}
+      className="flex items-center"
+      style={{ gap: 10, paddingTop: "var(--space-6)", paddingBottom: "var(--space-5)" }}
     >
-      <div className="flex items-center" style={{ gap: 10, minWidth: 0 }}>
-        <RingCrossLogo size={26} color="var(--plum)" />
-        <span
-          style={{
-            fontFamily: "var(--serif)",
-            fontSize: 22,
-            fontWeight: 600,
-            color: "var(--ink)",
-            letterSpacing: "-0.01em",
-            lineHeight: 1,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {ministryName}
-        </span>
-      </div>
+      <RingCrossLogo size={26} color="var(--plum)" />
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          fontFamily: "var(--serif)",
+          fontSize: 22,
+          fontWeight: 600,
+          color: "var(--ink)",
+          letterSpacing: "-0.01em",
+          lineHeight: 1,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {ministryName}
+      </span>
+      {action}
       <button
         onClick={onAvatarClick}
         aria-label="Your profile"

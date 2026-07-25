@@ -66,7 +66,7 @@ export function PocketUpNext({ cards }: { cards: PocketCard[] }) {
                 width: i === active ? 22 : 7,
                 height: 7,
                 borderRadius: 999,
-                background: i === active ? "var(--plum-2)" : "var(--dashed)",
+                background: i === active ? "var(--plum)" : "var(--line-2)",
                 border: "none",
                 padding: 0,
                 cursor: "pointer",

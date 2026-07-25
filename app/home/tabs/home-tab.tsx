@@ -3,17 +3,17 @@
 import { useState } from "react"
 import dynamic from "next/dynamic"
 import useSWR from "swr"
-import { ChevronRight, Bell, Calendar, Gift } from "lucide-react"
+import { Bell, Calendar, Gift, Settings } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { EYEBROW_STYLE, PlanLineIcon } from "../components/shared"
 import { PocketHeader } from "../components/pocket-header"
-import { PocketUpNext, type PocketCard } from "../components/pocket-up-next"
+import { PocketUpNext, type PocketCard as UpNextCard } from "../components/pocket-up-next"
 import { teamIconKey } from "../workspace-presets"
 import { getInitials, previewBody } from "../utils"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getSetupChecklist, setLeadersInvited, dismissSetupChecklist } from "@/app/actions/setup-checklist"
-import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard, MonogramChip } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard, MonogramChip, PocketCard, PocketRowCard, PocketRow, PocketButton, PocketRoundButton, POCKET_KICKER_STYLE } from "@/components/central"
 import { useIsNativeShell } from "@/lib/native-auth"
 import type { HeroSlide, SetupChecklistData, UpNextEventDetail } from "@/components/central"
 // Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
@@ -89,8 +89,8 @@ function fmtEvent(detail: UpNextEventDetail): { eyebrow: string; meta: string } 
   return { eyebrow: `Up next · ${monthDay}`, meta }
 }
 
-// Cream event card — the "further upcoming" cards after the plum lead in the Pocket
-// up-next carousel. Pill buttons (radius 999) per the ratified mobile form.
+// Ivory event card — the "further upcoming" cards after the plum lead in the Pocket
+// up-next carousel. Tonal borderless (cream-panel retired on mobile); pill buttons.
 function PocketEventCard({
   eyebrow,
   title,
@@ -113,64 +113,33 @@ function PocketEventCard({
       style={{
         height: "100%",
         boxSizing: "border-box",
-        background: "var(--cream-panel)",
-        border: "1px solid var(--line)",
+        background: "var(--ivory)",
         borderRadius: "var(--r-pocket)",
         padding: "var(--space-8)",
         display: "flex",
         flexDirection: "column",
       }}
     >
-      <div style={{ ...EYEBROW_STYLE, color: "var(--plum)" }}>{eyebrow}</div>
+      <div style={{ ...POCKET_KICKER_STYLE, color: "var(--plum)" }}>{eyebrow}</div>
       <div
         className="line-clamp-2"
-        style={{ fontFamily: "var(--serif)", fontSize: 24, fontWeight: 600, letterSpacing: "-0.015em", lineHeight: 1.12, color: "var(--ink)", marginTop: "var(--space-4)" }}
+        style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 600, letterSpacing: "-0.015em", lineHeight: 1.15, color: "var(--ink)", marginTop: 8 }}
       >
         {title}
       </div>
       {meta && (
-        <div style={{ fontSize: 13, color: "var(--body)", marginTop: "var(--space-4)", fontFamily: "var(--sans)" }}>{meta}</div>
+        <div style={{ fontSize: 13, color: "var(--body)", marginTop: 6, fontFamily: "var(--sans)" }}>{meta}</div>
       )}
       <div style={{ display: "flex", gap: 8, marginTop: "auto", paddingTop: "var(--space-7)", flexWrap: "wrap" }}>
         {onRsvp && (
-          <button
-            type="button"
-            onClick={onRsvp}
-            disabled={disabled}
-            style={{
-              borderRadius: 999,
-              padding: "var(--space-4) var(--space-7)",
-              fontSize: 13,
-              fontWeight: 500,
-              fontFamily: "var(--sans)",
-              cursor: disabled ? "default" : "pointer",
-              opacity: disabled ? 0.5 : 1,
-              border: isRsvped ? "1px solid var(--line-2)" : "none",
-              background: isRsvped ? "transparent" : "var(--plum)",
-              color: isRsvped ? "var(--muted-text)" : "var(--cream)",
-            }}
-          >
+          <PocketButton variant={isRsvped ? "quiet" : "primary"} surface="card" compact disabled={disabled} onClick={onRsvp}>
             {isRsvped ? "Going ✓" : "RSVP"}
-          </button>
+          </PocketButton>
         )}
         {onDetails && (
-          <button
-            type="button"
-            onClick={onDetails}
-            style={{
-              borderRadius: 999,
-              padding: "var(--space-4) var(--space-7)",
-              fontSize: 13,
-              fontWeight: 500,
-              fontFamily: "var(--sans)",
-              cursor: "pointer",
-              border: "1px solid var(--line-2)",
-              background: "transparent",
-              color: "var(--body)",
-            }}
-          >
+          <PocketButton variant="quiet" surface="card" compact onClick={onDetails}>
             Details
-          </button>
+          </PocketButton>
         )}
       </div>
     </div>
@@ -184,35 +153,34 @@ function PocketSectionHeader({ title, onSeeAll }: { title: string; onSeeAll: () 
       <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.01em" }}>{title}</span>
       <button
         onClick={onSeeAll}
-        style={{ display: "flex", alignItems: "center", gap: 2, fontSize: 12, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}
+        style={{ fontSize: 13, fontWeight: 600, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)", padding: 0 }}
       >
-        See all <ChevronRight style={{ width: 12, height: 12 }} />
+        See all ›
       </button>
     </div>
   )
 }
 
-// A single quick-action tile in the Pocket 2-up grid.
+// A single quick-action tile in the Pocket 2-up grid (ivory borderless).
 function PocketQuickTile({ icon, label, subtitle, onClick }: { icon: React.ReactNode; label: string; subtitle: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       style={{
         textAlign: "left",
-        background: "var(--cream-panel)",
-        border: "1px solid var(--line)",
+        background: "var(--ivory)",
+        border: "none",
         borderRadius: "var(--r-pocket)",
-        padding: "var(--space-8)",
+        padding: "20px 18px",
         display: "flex",
         flexDirection: "column",
-        gap: "var(--space-6)",
         cursor: "pointer",
       }}
     >
       {icon}
-      <div>
-        <div style={{ fontFamily: "var(--serif)", fontSize: 17, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.01em" }}>{label}</div>
-        <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2, fontFamily: "var(--sans)" }}>{subtitle}</div>
+      <div style={{ marginTop: 14 }}>
+        <div style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2 }}>{label}</div>
+        <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 3, fontFamily: "var(--sans)" }}>{subtitle}</div>
       </div>
     </button>
   )
@@ -732,7 +700,7 @@ export function HomeTab({
   const pocketSlides = slides.filter(
     (s): s is Extract<HeroSlide, { kind: "announcement" } | { kind: "event" }> => s.kind !== "photo"
   )
-  const pocketCards: PocketCard[] = []
+  const pocketCards: UpNextCard[] = []
   if (pulseNodeMobile) pocketCards.push({ key: "__pulse__", node: pulseNodeMobile })
 
   if (pocketSlides.length > 0) {
@@ -858,6 +826,11 @@ export function HomeTab({
           userName={profile.name}
           avatarUrl={avatarUrl}
           onAvatarClick={onGoToProfile}
+          action={isAdmin ? (
+            <PocketRoundButton variant="ghost" ariaLabel="Church settings" onClick={() => onGoToTab?.("settings")}>
+              <Settings style={{ width: 17, height: 17, color: "var(--plum)" }} strokeWidth={1.7} />
+            </PocketRoundButton>
+          ) : undefined}
         />
       </div>
 
@@ -1164,8 +1137,8 @@ export function HomeTab({
 
       <div className="md:hidden px-5 pb-4">
 
-        {/* Mono date eyebrow */}
-        <div style={{ ...EYEBROW_STYLE, marginBottom: "var(--space-8)" }}>{dateLabel}</div>
+        {/* Mono date kicker (Pocket scale — 10 mono, airier tracking) */}
+        <div style={{ ...POCKET_KICKER_STYLE, letterSpacing: "2px", marginBottom: "var(--space-8)" }}>{dateLabel}</div>
 
         <div className="flex flex-col" style={{ gap: "var(--space-9)" }}>
 
@@ -1173,6 +1146,7 @@ export function HomeTab({
           {checklistData && !nativeShell && (
             <GettingStartedCard
               data={checklistData}
+              variant="mobile"
               onToggleLeadersInvited={handleChecklistToggle}
               onDismiss={handleChecklistDismiss}
               onNavigate={handleChecklistNavigate}
@@ -1188,14 +1162,14 @@ export function HomeTab({
             ) : pocketCards.length > 0 ? (
               <PocketUpNext cards={pocketCards} />
             ) : (
-              <CentralCard
-                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center", borderRadius: "var(--r-pocket)" }}
+              <PocketCard
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center" }}
                 padding="32px 24px"
               >
                 <Calendar style={{ width: 28, height: 28, color: "var(--dashed)" }} />
                 <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", fontFamily: "var(--sans)" }}>No upcoming events</p>
                 <p style={{ fontSize: 12, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>Check back when events are posted.</p>
-              </CentralCard>
+              </PocketCard>
             )}
           </section>
 
@@ -1206,20 +1180,17 @@ export function HomeTab({
           {recentAnns.length > 0 && (
             <section>
               <PocketSectionHeader title="Announcements" onSeeAll={onSeeAnnouncements} />
-              <div style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: "var(--r-pocket)", overflow: "hidden" }}>
+              <PocketRowCard>
                 {recentAnns.map((a, i) => (
-                  <button
+                  <PocketRow
                     key={a.id}
+                    title={a.title}
+                    sub={a.body ? previewBody(a.body) : undefined}
+                    isLast={i === recentAnns.length - 1}
                     onClick={() => onOpenAnnouncement(a.id)}
-                    style={{ width: "100%", textAlign: "left", background: "none", cursor: "pointer", border: "none", borderTop: i === 0 ? "none" : "1px solid var(--line)", padding: "var(--space-7)", display: "block" }}
-                  >
-                    <div className="line-clamp-1" style={{ fontFamily: "var(--serif)", fontSize: 16, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.01em", lineHeight: 1.2 }}>{a.title}</div>
-                    {a.body && (
-                      <p className="line-clamp-1" style={{ marginTop: 4, fontSize: 13, color: "var(--body)", fontFamily: "var(--sans)" }}>{previewBody(a.body)}</p>
-                    )}
-                  </button>
+                  />
                 ))}
-              </div>
+              </PocketRowCard>
             </section>
           )}
 
@@ -1227,31 +1198,20 @@ export function HomeTab({
           {recentChats.length > 0 && (
             <section>
               <PocketSectionHeader title="Chats" onSeeAll={onSeeChats} />
-              <div style={{ background: "var(--cream-panel)", border: "1px solid var(--line)", borderRadius: "var(--r-pocket)", overflow: "hidden" }}>
+              <PocketRowCard>
                 {recentChats.slice(0, 2).map((c, i) => (
-                  <button
+                  <PocketRow
                     key={c.id}
+                    leading={<MonogramChip initials={getInitials(c.groupName)} className="w-10 h-10 flex-shrink-0" style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600 }} />}
+                    title={c.groupName}
+                    sub={c.lastMessageSender ? `${c.lastMessageSender}: ${c.lastMessage}` : c.lastMessage || "No messages yet"}
+                    time={c.time}
+                    showDot={c.unreadCount > 0 && !c.muted}
+                    isLast={i === Math.min(recentChats.length, 2) - 1}
                     onClick={() => onOpenChat(c.id, c.groupName, c.type)}
-                    style={{ width: "100%", textAlign: "left", background: "none", cursor: "pointer", border: "none", borderTop: i === 0 ? "none" : "1px solid var(--line)", padding: "var(--space-7)", display: "flex", alignItems: "center", gap: "var(--space-6)" }}
-                  >
-                    <MonogramChip initials={getInitials(c.groupName)} className="w-11 h-11 flex-shrink-0" style={{ fontFamily: "var(--serif)", fontSize: 18, fontWeight: 400 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--sans)" }}>{c.groupName}</span>
-                        <span style={{ fontSize: 11, color: "var(--muted-text)", flexShrink: 0, fontFamily: "var(--sans)" }}>{c.time}</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 2 }}>
-                        <span className="line-clamp-1" style={{ fontSize: 12.5, color: "var(--body)", fontFamily: "var(--sans)" }}>
-                          {c.lastMessageSender ? `${c.lastMessageSender}: ${c.lastMessage}` : c.lastMessage || "No messages yet"}
-                        </span>
-                        {c.unreadCount > 0 && !c.muted && (
-                          <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--plum)", flexShrink: 0 }} />
-                        )}
-                      </div>
-                    </div>
-                  </button>
+                  />
                 ))}
-              </div>
+              </PocketRowCard>
             </section>
           )}
 
@@ -1261,7 +1221,7 @@ export function HomeTab({
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {!nativeShell && (
               <PocketQuickTile
-                icon={<div style={{ width: 40, height: 40, borderRadius: 999, background: "var(--plum)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Gift style={{ width: 20, height: 20, color: "var(--cream-on-dark)" }} strokeWidth={1.5} /></div>}
+                icon={<div style={{ width: 44, height: 44, borderRadius: 999, background: "var(--plum)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Gift style={{ width: 19, height: 19, color: "var(--cream-on-dark)" }} strokeWidth={1.7} /></div>}
                 label="Give"
                 subtitle="Support the ministry"
                 onClick={() => onGoToTab?.("give")}
@@ -1269,7 +1229,7 @@ export function HomeTab({
               )}
               {firstTeam && (
                 <PocketQuickTile
-                  icon={<PlanLineIcon iconKey={teamIconKey({ team_type: firstTeam.teamType, name: firstTeam.teamName })} size={40} />}
+                  icon={<PlanLineIcon iconKey={teamIconKey({ team_type: firstTeam.teamType, name: firstTeam.teamName })} size={44} />}
                   label={firstTeam.teamName}
                   subtitle={firstTeam.roleName}
                   onClick={() => onGoToTab?.("plan")}
@@ -1279,18 +1239,18 @@ export function HomeTab({
           </section>
           )}
 
-          {/* ── Daily verse — mobile ── */}
+          {/* ── Daily verse — mobile (ivory, tonal borderless) ── */}
           {homeVerse && (
             <section>
-              <div style={{ background: "var(--plum-tint)", border: "1px solid var(--line)", borderRadius: "var(--r-pocket)", padding: "var(--space-8)" }}>
-                <div style={{ ...EYEBROW_STYLE, color: "var(--plum)" }}>Today&apos;s verse</div>
-                <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 17, lineHeight: 1.5, color: "var(--plum-2)", marginTop: "var(--space-5)" }}>
+              <PocketCard padding="22px 20px">
+                <div style={POCKET_KICKER_STYLE}>Today&apos;s verse</div>
+                <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 17, lineHeight: 1.55, color: "var(--ink)", marginTop: 10 }}>
                   &ldquo;{homeVerse.text}&rdquo;
                 </p>
-                <div style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", marginTop: "var(--space-5)" }}>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.8px", textTransform: "uppercase", color: "var(--faint)", marginTop: 10 }}>
                   {homeVerse.reference}
                 </div>
-              </div>
+              </PocketCard>
             </section>
           )}
 
