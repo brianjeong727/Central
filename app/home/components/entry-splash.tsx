@@ -3,17 +3,45 @@
 import { useCallback, useEffect, useState } from "react"
 import { isNativeShell } from "@/lib/native-auth"
 
-// ── EntrySplash — native-only "One Body" cold-launch splash ────────────────────
-// Renders ONLY on the native shell (Capacitor UA "CentralShell"), ONLY on a cold
-// launch, ONLY at mobile widths. The plum overlay animates the saints-gather → ring
-// → core → wordmark → verse timeline from the B3 mockup, then auto-dismisses at 4.2s
-// (tap anywhere to skip). prefers-reduced-motion → static lockup, everything visible.
+// ── EntrySplash — native-only "One Body" FIRST-RUN splash ──────────────────────
+// Renders ONLY on the native shell (Capacitor UA "CentralShell"), ONLY at mobile
+// widths, and ONLY the very first time this install ever opens the app — then never
+// again. The static native launch splash (capacitor.config SplashScreen + the plum
+// LaunchScreen storyboard) still shows on EVERY cold launch; this animated overlay is
+// the one-time welcome layered on top of that first open. Returning users get the
+// static splash then straight into the app, no animation. The plum overlay animates
+// the saints-gather → ring → core → wordmark → verse timeline, auto-dismisses at 4.2s
+// (tap to skip). prefers-reduced-motion → static lockup.
 //
-// Cold-launch guard is a MODULE-SCOPE variable (not sessionStorage — storage
-// conventions ban it). It survives client-side navigations (so a warm nav to /login
-// after /home never re-shows the splash) but resets on a full reload = a real cold
-// launch.
+// TWO guards, different scopes:
+//  • `splashConsumed` (module var) — prevents a double-play WITHIN one page load
+//    (e.g. React re-mount). Resets on a full reload.
+//  • the `central_splash_seen` cookie (below) — the PERSISTENT first-run flag that
+//    survives cold launches AND the hard reload login does (window.location.assign),
+//    so the animation is genuinely once-per-install. Cookie, not localStorage/
+//    sessionStorage (Convention #1). Cleared only on uninstall / data-clear, where
+//    re-showing the welcome to a effectively-new user is correct.
 let splashConsumed = false
+
+// Persistent first-run flag. WKWebView persists cookies across app launches, so this
+// is the "has this install ever seen the welcome" bit.
+const SPLASH_SEEN_COOKIE = "central_splash_seen"
+function hasSeenSplash(): boolean {
+  try {
+    return document.cookie.split("; ").some((c) => c.startsWith(`${SPLASH_SEEN_COOKIE}=`))
+  } catch {
+    return false
+  }
+}
+function markSplashSeen() {
+  try {
+    // 10-year max-age; SameSite=Lax; no Secure so it also persists on http://localhost
+    // dev builds. path=/ so it's visible from every route (login or home first-open).
+    document.cookie = `${SPLASH_SEEN_COOKIE}=1; path=/; max-age=${60 * 60 * 24 * 365 * 10}; SameSite=Lax`
+  } catch {
+    /* no-op */
+  }
+}
 
 // Release the native (Capacitor) launch splash. `launchAutoHide` is false in
 // capacitor.config.ts, so the native cream splash stays up until we call this. On web
@@ -104,6 +132,17 @@ export function EntrySplash() {
     }
 
     splashConsumed = true
+
+    // First-run gate: returning installs skip the animation entirely — the static
+    // native splash covered the launch; just release it and drop straight into the app.
+    if (hasSeenSplash()) {
+      hideNativeSplash()
+      return
+    }
+    // First open ever on this install — mark it now (before painting) so a kill mid-
+    // animation, or login's hard reload to /home, can never replay it.
+    markSplashSeen()
+
     // Reveal on the next frame, then hand off the native splash once the plum overlay
     // has painted — no flash. rAF-wrapping also keeps setState out of the effect body
     // (mirrors the AnimateIn idiom in shared.tsx).
