@@ -57,4 +57,12 @@ export {
   PocketBackRow,
   PocketChip,
   PocketRoundButton,
+  PocketSheet,
+  PocketButton,
+  PocketFactsGrid,
+  PocketStatCard,
+  PocketSwitch,
+  PocketSearchField,
+  PocketTag,
+  PocketFilterChipRow,
 } from "./pocket"

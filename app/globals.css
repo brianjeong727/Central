@@ -81,6 +81,7 @@
   --line-2:      #E2DDCF;
   --line-3:      #EFE9DA;
   --dashed:      #C4C0B0;
+  --pocket-track: #E9E1CC;  /* mobile Pocket chip / progress-track / icon-chip FILL (ratified Daybreak v2) — warmer than --line-2 */
 
   /* Semantic accents */
   --success:     #7FA67F;
