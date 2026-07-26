@@ -15,6 +15,7 @@ import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
 import { useNavState } from "../nav-state"
+import { useOpenMemberProfile } from "../member-profile-context"
 import { InsetHairline } from "@/components/central/hairline"
 import { fetchChatList } from "../chat-list"
 import { subscribeChatTopic } from "../chat-broadcast"
@@ -399,6 +400,7 @@ function ChatPrefsCard({ pendingMuted, pendingPinned, onToggleMuted, onTogglePin
 export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, isCentral = false, userId, userName, ministryId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
   const supabase = createClient()
   const { mutate: mutateGlobal } = useSWRConfig()
+  const openMemberProfile = useOpenMemberProfile()
   const [members, setMembers] = useState<GroupMember[]>([])
   const [displayGroupName, setDisplayGroupName] = useState(groupName)
   const [renaming, setRenaming] = useState(false)
@@ -820,10 +822,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     style={{ padding: "13px 0", borderBottom: i < members.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--ivory))" : "transparent", transition: "background 0.1s" }}
                     onClick={() => { if (canManage && member.user_id !== userId && !isConfirming) setMobileRevealMemberId((id) => id === member.user_id ? null : member.user_id) }}
                   >
-                    <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-medium text-[10px]" />
+                    <span onClick={(e) => { e.stopPropagation(); openMemberProfile(member.user_id) }} style={{ cursor: "pointer", display: "inline-flex", flexShrink: 0 }}>
+                      <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-medium text-[10px]" />
+                    </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <p className="text-[15px] font-semibold truncate" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>{member.name}</p>
+                        <p onClick={(e) => { e.stopPropagation(); openMemberProfile(member.user_id) }} className="text-[15px] font-semibold truncate cursor-pointer" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>{member.name}</p>
                         {member.user_id === userId && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
                       </div>
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -1001,10 +1005,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     onMouseLeave={() => setHoveredMemberId(null)}
                     style={{ display: "grid", gridTemplateColumns: "40px 1fr auto auto", alignItems: "center", gap: 14, padding: "15px 20px", borderBottom: i < members.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--cream))" : isHovered ? "var(--cream-2)" : "transparent", transition: "background 0.1s" }}
                   >
-                    <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-medium text-[11px]" />
+                    <span onClick={() => openMemberProfile(member.user_id)} style={{ cursor: "pointer", display: "inline-flex" }}>
+                      <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-medium text-[11px]" />
+                    </span>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <p style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{member.name}</p>
+                        <p onClick={() => openMemberProfile(member.user_id)} style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500, cursor: "pointer" }}>{member.name}</p>
                         {member.user_id === userId && <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--cream)", color: "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" }}>You</span>}
                       </div>
                       {member.graduation_year && <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Class of {member.graduation_year}</p>}
