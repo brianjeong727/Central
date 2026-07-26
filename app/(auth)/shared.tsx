@@ -152,12 +152,14 @@ export function AppleButton({ onClick }: { onClick: () => void }) {
 }
 
 // ── OrDivider ──────────────────────────────────────────────────
-// No built-in margin — callers control vertical spacing.
-export function OrDivider() {
+// No built-in margin — callers control vertical spacing. `label` defaults to
+// "or"; signup passes "or sign up with email" so the email fields read as a
+// named, equal path rather than an orphaned fallback below the OAuth buttons.
+export function OrDivider({ label = "or" }: { label?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 16, color: "var(--faint)" }}>
       <span style={{ flex: 1, height: 1, background: "var(--line)" }}/>
-      <span style={{ ...mono, color: "var(--faint)", textTransform: "lowercase", letterSpacing: "0.06em" }}>or</span>
+      <span style={{ ...mono, color: "var(--faint)", textTransform: "lowercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{label}</span>
       <span style={{ flex: 1, height: 1, background: "var(--line)" }}/>
     </div>
   )
