@@ -5,6 +5,7 @@ import dynamic from "next/dynamic"
 import { Check, MoreHorizontal, Trash2, CornerUpLeft, Plus, Pencil, Forward, Pin, FileDown, Flag } from "lucide-react"
 import { MonogramChip, ConfirmDialog } from "@/components/central"
 import { formatMessageTime, REACTION_EMOJIS } from "../utils"
+import { useOpenMemberProfile } from "../member-profile-context"
 import type { MessageRowProps } from "../types"
 
 // emoji-mart is ~2MB (almost entirely the @emoji-mart/data JSON). Load both the
@@ -167,6 +168,12 @@ function MessageRowBase({
   const menuRef = useRef<HTMLDivElement>(null)
   const [placeBelow, setPlaceBelow] = useState(false)
   const [confirmDeletePoll, setConfirmDeletePoll] = useState(false)
+  // Tap an incoming sender's name/avatar → open their profile (global overlay).
+  // Context read bypasses the memo boundary; the opener is stable, so this never
+  // forces a row re-render. Bubble press logic (Convention #7/#20) is untouched.
+  const openMemberProfile = useOpenMemberProfile()
+  const canOpenSenderProfile = !isOwn && !!msg.sender_id && !senderDeparted
+  const openSenderProfile = () => { if (canOpenSenderProfile) openMemberProfile(msg.sender_id!) }
   const anyMenuOpen = isEmojiPickerOpen || isFullPickerOpen || isContextMenuOpen
   useLayoutEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- measured-placement reset; behavior-frozen (Convention #7), fix deferred
@@ -522,7 +529,10 @@ function MessageRowBase({
         )}
         {!isOwn && isFirstInGroup && (
           <div className="flex items-baseline gap-1.5 mb-1 ml-9">
-            <span className="text-[13px] font-medium text-[var(--ink)]">{msg.sender_name || "Former Member"}</span>
+            <span
+              className={`text-[13px] font-medium text-[var(--ink)]${canOpenSenderProfile ? " cursor-pointer hover:underline" : ""}`}
+              onClick={canOpenSenderProfile ? openSenderProfile : undefined}
+            >{msg.sender_name || "Former Member"}</span>
             {senderDeparted && (
               <span className="text-[11px] text-[var(--faint)] italic">· left the ministry</span>
             )}
@@ -532,14 +542,21 @@ function MessageRowBase({
 
         {/* Avatar + bubble row */}
         <div className={`flex items-end gap-2 w-full ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
-          {/* Avatar — shown for every incoming message */}
+          {/* Avatar — shown for every incoming message. Tap opens the sender's
+              profile (a sibling of the bubble → does not touch the bubble's
+              press/context-menu logic). Wrapper preserves the flex-end align. */}
           {!isOwn && (
-            <MonogramChip
-              initials={(msg.sender_name || "?").charAt(0).toUpperCase()}
-              avatarUrl={!senderDeparted ? (msg.sender_avatar_url || undefined) : undefined}
-              className="w-7 h-7 text-[11px] font-medium"
-              style={{ alignSelf: "flex-end", opacity: senderDeparted || !msg.sender_id ? 0.4 : 1 }}
-            />
+            <span
+              onClick={canOpenSenderProfile ? openSenderProfile : undefined}
+              style={{ display: "inline-flex", alignSelf: "flex-end", cursor: canOpenSenderProfile ? "pointer" : "default" }}
+            >
+              <MonogramChip
+                initials={(msg.sender_name || "?").charAt(0).toUpperCase()}
+                avatarUrl={!senderDeparted ? (msg.sender_avatar_url || undefined) : undefined}
+                className="w-7 h-7 text-[11px] font-medium"
+                style={{ opacity: senderDeparted || !msg.sender_id ? 0.4 : 1 }}
+              />
+            </span>
           )}
 
           <div

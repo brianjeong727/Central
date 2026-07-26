@@ -38,6 +38,7 @@ import { roleLabel } from "@/app/actions/super-constants"
 import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, PocketKicker, PocketRowCard, PocketRow, PocketFilterChip, PocketSwitch, useScrollResetOn } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
+import { useOpenMemberProfile } from "../member-profile-context"
 import { isAdminRole } from "@/lib/roles"
 
 interface MemberRow {
@@ -254,6 +255,7 @@ export function SettingsTab({
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
+  const openMemberProfile = useOpenMemberProfile()
   const isAdmin = isAdminRole(userRole)
 
   const [activeSettingsTab, setActiveSettingsTab] = useState<ActiveSettingsTab>(() => {
@@ -1597,10 +1599,12 @@ export function SettingsTab({
                   const isMe = m.id === userId
                   return (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 16, padding: "16px 22px", borderBottom: i < peopleFiltered.length - 1 ? "1px solid var(--line-3)" : "none", position: "relative" }}>
-                      <MonogramChip initials={getInitials(m.name)} className="w-[38px] h-[38px] text-[13px] font-medium" />
+                      <span onClick={() => openMemberProfile(m.id)} style={{ cursor: "pointer", display: "inline-flex" }}>
+                        <MonogramChip initials={getInitials(m.name)} className="w-[38px] h-[38px] text-[13px] font-medium" />
+                      </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{m.name}</span>
+                          <span onClick={() => openMemberProfile(m.id)} style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", cursor: "pointer" }}>{m.name}</span>
                           {isMe && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>you</span>}
                         </div>
                         <div style={{ marginTop: 2, fontSize: 13, color: "var(--muted-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>

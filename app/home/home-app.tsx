@@ -24,6 +24,7 @@ import { subscribeChatTopic } from "./chat-broadcast"
 import { CommandPalette } from "./components/command-palette"
 import { DesktopSidebar, DesktopTopbar, ReceiptsSidebarNav } from "./components/desktop-nav"
 import { BreadcrumbProvider, useBreadcrumbExtra } from "./breadcrumb-context"
+import { MemberProfileProvider } from "./member-profile-context"
 
 // Tabs
 // HomeTab stays eager — it's the default landing tab. Every other tab (and the
@@ -59,6 +60,11 @@ const SettingsTab = dynamic(() => import("./tabs/settings-tab").then(m => m.Sett
 const FormsTab = dynamic(() => import("./tabs/forms-tab").then(m => m.FormsTab), { loading: () => <Spinner />, ssr: false })
 const CongregationTab = dynamic(() => import("./tabs/congregation-tab").then(m => m.CongregationTab), { loading: () => <Spinner />, ssr: false })
 const NetworkTab = dynamic(() => import("./tabs/network-tab").then(m => m.NetworkTab), { loading: () => <Spinner />, ssr: false })
+
+// Global member-profile overlay — opened from anywhere via useOpenMemberProfile()
+// (chat sender, RSVP chip, settings/team roster). Code-split: its JS ships only
+// once a profile is first opened.
+const GlobalMemberProfileOverlay = dynamic(() => import("./components/member-sheet").then(m => m.GlobalMemberProfileOverlay), { ssr: false })
 
 function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
   const supabase = createClient()
@@ -144,6 +150,11 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // Announcement detail is a read view → restore from ?ann on reload (overlay can sit over any tab).
   const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(() =>
     searchParams.get("ann")
+  )
+  // Member profile is a global read overlay → restore from ?person on reload
+  // (can sit over any tab, like the chat/announcement overlays).
+  const [openMemberProfileId, setOpenMemberProfileId] = useState<string | null>(() =>
+    searchParams.get("person")
   )
   // Scroll reset: land every tab switch and announcement-detail open/close at the
   // top (mobile window scroll; the desktop shell locks window so scrollTo no-ops
@@ -934,6 +945,18 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     setParam("ann", id)
   }
 
+  // Global member-profile overlay open/close. `openMemberProfile` is the stable
+  // opener handed to MemberProfileProvider (setParam is a stable useCallback), so
+  // the provider value never churns — memoized chat rows don't re-render on it.
+  const openMemberProfile = useCallback((memberId: string) => {
+    setOpenMemberProfileId(memberId)
+    setParam("person", memberId)
+  }, [setParam])
+  const handleMemberProfileClose = useCallback(() => {
+    setOpenMemberProfileId(null)
+    setParam("person", null)
+  }, [setParam])
+
   function handleChatNameChange(name: string) {
     setGlobalOpenChat((prev) => prev ? { ...prev, name } : prev)
     setChatRefreshKey((k) => k + 1)
@@ -1027,6 +1050,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       className={`relative min-h-screen bg-[var(--cream)] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[var(--cream)]${panelHidden ? " shell-compact" : ""}`}
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
+      <MemberProfileProvider open={openMemberProfile}>
 
       {/* Desktop sidebar — hidden on mobile */}
       <DesktopSidebar
@@ -1391,6 +1415,21 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         />
       )}
 
+      {/* Global member-profile overlay — mobile: full-screen fixed sheet; desktop:
+          centered modal card. Mounted outside BreadcrumbProvider (SubpageShell's
+          crumb push is a no-op there, so it doesn't pollute the shell trail). */}
+      {openMemberProfileId && (
+        <GlobalMemberProfileOverlay
+          memberId={openMemberProfileId}
+          ministryId={ministryId}
+          currentUserId={userId}
+          currentUserName={initialProfile.name}
+          online={onlineUserIds.has(openMemberProfileId)}
+          onClose={handleMemberProfileClose}
+          onOpenChat={(id, name, type) => { handleMemberProfileClose(); handleOpenChat(id, name, type) }}
+        />
+      )}
+
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
@@ -1451,6 +1490,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       {/* Native cold-launch splash (self-gated: no-ops on web/desktop/warm nav, and
           releases the native launch splash even when it skips rendering). */}
       <EntrySplash />
+      </MemberProfileProvider>
     </div>
   )
 }
