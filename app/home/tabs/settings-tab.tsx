@@ -35,7 +35,7 @@ import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@
 import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
-import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, PocketKicker, PocketRowCard, PocketRow, PocketFilterChip, useScrollResetOn } from "@/components/central"
+import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, PocketKicker, PocketRowCard, PocketRow, PocketFilterChip, PocketSwitch, useScrollResetOn } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
 import { isAdminRole } from "@/lib/roles"
@@ -115,6 +115,44 @@ function SettingsIconChip({ icon }: { icon: React.ReactNode }) {
     <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 14, background: "var(--line-2)", color: "var(--plum)", flexShrink: 0 }}>
       {icon}
     </span>
+  )
+}
+
+// In-card settings toggle. The section bodies are shared across viewports (only
+// CSS-gated), so this renders BOTH forms: the 46×28 PocketSwitch on phone width
+// (`md:hidden`) and the original 38×22 pill on desktop (`hidden md:block`) — so
+// desktop stays byte-identical while mobile gets the ratified control. `locked`
+// makes it non-interactive (view mode); `interactive={false}` is the pure
+// "coming soon" display state (desktop renders a plain div, mobile a static
+// switch). onToggle fires only when unlocked + interactive.
+function InCardToggle({ on, locked = false, interactive = true, onToggle }: {
+  on: boolean
+  locked?: boolean
+  interactive?: boolean
+  onToggle?: () => void
+}) {
+  const fire = () => { if (interactive && !locked && onToggle) onToggle() }
+  const thumb = <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(on ? { right: 2 } : { left: 2 }) }} />
+  return (
+    <>
+      <span className="md:hidden" style={{ flexShrink: 0 }}>
+        <PocketSwitch checked={on} onChange={fire} />
+      </span>
+      {interactive ? (
+        <button
+          onClick={locked ? undefined : fire}
+          disabled={locked}
+          className="hidden md:block"
+          style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: locked ? "default" : "pointer", padding: 0, opacity: locked ? 0.6 : 1 }}
+        >
+          {thumb}
+        </button>
+      ) : (
+        <div className="hidden md:block" style={{ width: 38, height: 22, borderRadius: 999, background: "var(--dashed)", position: "relative", flexShrink: 0 }}>
+          {thumb}
+        </div>
+      )}
+    </>
   )
 }
 
@@ -1230,9 +1268,10 @@ export function SettingsTab({
                 </div>
               </section>
 
-              {/* Discovery + Schools 2-col */}
+              {/* Discovery + Schools 2-col (desktop) / stacked (mobile — the
+                  2-col grid squeezes both cards at 390px) */}
               <section>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28 }}>
+                <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 28 }}>
                   {/* Discovery */}
                   <div>
                     <div style={{ marginBottom: 16 }}>
@@ -1246,9 +1285,7 @@ export function SettingsTab({
                       const locked = !discoveryEditing
                       return (
                         <div className={CARD_CLS} style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
-                          <button onClick={discoveryEditing ? () => setDiscoveryDraft(v => !v) : undefined} disabled={locked} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: shown ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: locked ? "default" : "pointer", padding: 0, opacity: locked ? 0.6 : 1 }}>
-                            <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(shown ? { right: 2 } : { left: 2 }) }} />
-                          </button>
+                          <InCardToggle on={shown} locked={locked} onToggle={() => setDiscoveryDraft(v => !v)} />
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Public discovery</div>
                             <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>{shown ? "Anyone can find and join without an invite code." : "Invite-only — code required to join."}</div>
@@ -1667,9 +1704,7 @@ export function SettingsTab({
                 </div>
 
                 <div className={CARD_CLS} style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
-                  <button onClick={govEditing ? draftToggleAllAdmins : undefined} disabled={!govEditing} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: gAllAdmins ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: govEditing ? "pointer" : "default", padding: 0, opacity: govEditing ? 1 : 0.6 }}>
-                    <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(gAllAdmins ? { right: 2 } : { left: 2 }) }} />
-                  </button>
+                  <InCardToggle on={gAllAdmins} locked={!govEditing} onToggle={draftToggleAllAdmins} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>All admins can govern teams</div>
                     <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>{gAllAdmins ? "Every admin-tier member governs teams per the access matrix below." : "Only the people you select below govern teams."}</div>
@@ -1692,9 +1727,7 @@ export function SettingsTab({
                               <div style={{ marginTop: 2, fontSize: 13, color: "var(--muted-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</div>
                             </div>
                             {roleBadge(m.role, m.id)}
-                            <button onClick={govEditing ? () => draftToggleRoster(m.id) : undefined} disabled={!govEditing} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: included ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: govEditing ? "pointer" : "default", padding: 0, opacity: govEditing ? 1 : 0.6 }}>
-                              <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(included ? { right: 2 } : { left: 2 }) }} />
-                            </button>
+                            <InCardToggle on={included} locked={!govEditing} onToggle={() => draftToggleRoster(m.id)} />
                           </div>
                         )
                       })}
@@ -1775,9 +1808,7 @@ export function SettingsTab({
                   const locked = !automationsEditing || !isAdmin
                   return (
                     <div key={key} className={CARD_CLS} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, outline: changed ? "2px solid var(--plum)" : "none", outlineOffset: -2 }}>
-                      <button onClick={() => handleAutomationToggle(key)} disabled={locked} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: on ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: locked ? "default" : "pointer", padding: 0, opacity: locked ? 0.6 : 1 }}>
-                        <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(on ? { right: 2 } : { left: 2 }) }} />
-                      </button>
+                      <InCardToggle on={on} locked={locked} onToggle={() => handleAutomationToggle(key)} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{label}</div>
                         <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>{sub}</div>
@@ -1796,9 +1827,7 @@ export function SettingsTab({
                     { key: "auto_archive_praise", label: "Auto-archive praise team chats", sub: "After Sunday at 11:59 pm, the chat is archived from your active list." },
                   ] as { key: string; label: string; sub: string }[]).map(({ key, label, sub }) => (
                     <div key={key} className={CARD_CLS} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "var(--cream-2)", opacity: 0.6, pointerEvents: "none" }}>
-                      <div style={{ width: 38, height: 22, borderRadius: 999, background: "var(--dashed)", position: "relative", flexShrink: 0 }}>
-                        <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, left: 2 }} />
-                      </div>
+                      <InCardToggle on={false} interactive={false} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", display: "flex", alignItems: "center", gap: 8 }}>
                           {label}
@@ -1861,9 +1890,7 @@ export function SettingsTab({
 
               {/* Enable toggle */}
               <div className={CARD_CLS} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
-                <button onClick={() => setModField("enabled", !pendingModerationSettings.enabled)} disabled={!moderationEditing || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.enabled ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: (!moderationEditing || !isAdmin) ? "default" : "pointer", padding: 0, opacity: (!moderationEditing || !isAdmin) ? 0.6 : 1 }}>
-                  <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(pendingModerationSettings.enabled ? { right: 2 } : { left: 2 }) }} />
-                </button>
+                <InCardToggle on={pendingModerationSettings.enabled} locked={!moderationEditing || !isAdmin} onToggle={() => setModField("enabled", !pendingModerationSettings.enabled)} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Filter message language</div>
                   <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>When on, messages are screened using the rules below before they send.</div>
@@ -1910,9 +1937,7 @@ export function SettingsTab({
 
               {/* Reverent capitalization — independent of the language filter */}
               <div className={CARD_CLS} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16 }}>
-                <button onClick={() => setModField("reverent_caps", !pendingModerationSettings.reverent_caps)} disabled={!moderationEditing || !isAdmin} style={{ width: 38, height: 22, borderRadius: 999, border: "none", background: pendingModerationSettings.reverent_caps ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, cursor: (!moderationEditing || !isAdmin) ? "default" : "pointer", padding: 0, opacity: (!moderationEditing || !isAdmin) ? 0.6 : 1 }}>
-                  <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, ...(pendingModerationSettings.reverent_caps ? { right: 2 } : { left: 2 }) }} />
-                </button>
+                <InCardToggle on={pendingModerationSettings.reverent_caps} locked={!moderationEditing || !isAdmin} onToggle={() => setModField("reverent_caps", !pendingModerationSettings.reverent_caps)} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Reverent capitalization</div>
                   <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Auto-capitalizes God, Jesus, and Holy Spirit in messages.</div>
@@ -1923,9 +1948,7 @@ export function SettingsTab({
               <div>
                 <p style={{ ...SECTION_LABEL, marginBottom: 12 }}>Coming soon</p>
                 <div className={CARD_CLS} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 16, background: "var(--cream-2)", opacity: 0.6, pointerEvents: "none" }}>
-                  <div style={{ width: 38, height: 22, borderRadius: 999, background: "var(--dashed)", position: "relative", flexShrink: 0 }}>
-                    <span style={{ position: "absolute", width: 18, height: 18, borderRadius: 999, background: "var(--cream)", top: 2, left: 2 }} />
-                  </div>
+                  <InCardToggle on={false} interactive={false} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", display: "flex", alignItems: "center", gap: 8 }}>
                       Inappropriate photo filter

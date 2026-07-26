@@ -20,10 +20,18 @@ import { useSubpageCrumbs } from "@/app/home/breadcrumb-context"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ type import); flagged Phase 2, refactor pending
 import type { Crumb } from "@/app/home/types"
 
-export function SubpageShell({ crumbs, title, width = "full", maxWidth = 820, children }: {
+export function SubpageShell({ crumbs, title, mobileTitle, width = "full", maxWidth = 820, children }: {
   crumbs: Crumb[]
   /** Optional page title — renders the canonical TabPageHeader rhythm at the top. */
   title?: string
+  /**
+   * Optional override for the MOBILE chrome-row title only (`md:hidden`). When
+   * set, the phone-width chrome shows this instead of `title` — used where the
+   * desktop header must stay the parent object's name but the mobile drilled-in
+   * screen wants its own title (event-plan spokes → the spoke label; team
+   * settings → "Team settings"). Desktop (`title` / PageTitle) is untouched.
+   */
+  mobileTitle?: string
   width?: "full" | "centered"
   maxWidth?: number
   children: ReactNode
@@ -42,9 +50,11 @@ export function SubpageShell({ crumbs, title, width = "full", maxWidth = 820, ch
   // Mobile: edge-swipe from the left mirrors the chrome chevron (§0.3). Inert on
   // desktop (coarse-pointer gated inside the hook).
   const swipeRef = useEdgeSwipeBack<HTMLDivElement>(back?.onClick)
+  // Mobile chrome uses the override when supplied; desktop always uses `title`.
+  const chromeTitle = mobileTitle ?? title
   return (
     <div ref={swipeRef} className="md:flex md:flex-col md:h-full md:overflow-hidden" style={{ background: "var(--cream)" }}>
-      {(back || title) && (
+      {(back || chromeTitle) && (
         // md:hidden must win on desktop — keep `display` in the class, NOT inline
         // (an inline `display` would override md:hidden and leak onto desktop).
         <div className="md:hidden flex items-center" style={{ gap: 8, padding: "12px 20px 10px" }}>
@@ -58,9 +68,9 @@ export function SubpageShell({ crumbs, title, width = "full", maxWidth = 820, ch
               <ArrowLeft style={{ width: 20, height: 20 }} />
             </button>
           )}
-          {title ? (
+          {chromeTitle ? (
             <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {title}
+              {chromeTitle}
             </span>
           ) : back ? (
             <button

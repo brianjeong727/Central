@@ -45,14 +45,16 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      // Cream (--cream, DESIGN_SYSTEM) so the launch surface matches the app.
-      backgroundColor: "#FBF8F2",
+      // Plum-2 (--plum-2, DESIGN_SYSTEM) — matches the LaunchScreen storyboard (plum
+      // bg + cream Central "C" mark) AND the plum "One Body" EntrySplash overlay that
+      // follows, so the whole cold-launch sequence is one uninterrupted plum surface
+      // (icon → storyboard → plugin splash → One Body → app) with no white/cream flash.
+      backgroundColor: "#2D0F2E",
       showSpinner: false,
       // Kept up until EntrySplash calls SplashScreen.hide() on its first painted
-      // frame — the native cream splash then hands off directly to the plum "One
-      // Body" overlay with no flash. When the overlay is skipped (web/desktop/warm
-      // nav) EntrySplash's always-mounted effect still calls hide(), so the native
-      // splash never sticks.
+      // frame — the native plum splash hands off directly to the plum "One Body"
+      // overlay with no flash. When the overlay is skipped (web/desktop/warm nav)
+      // EntrySplash's always-mounted effect still calls hide(), so the splash never sticks.
       launchAutoHide: false,
     },
   },
