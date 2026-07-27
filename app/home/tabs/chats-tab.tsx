@@ -801,17 +801,27 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             </div>
           </div>
 
-          <PocketKicker
-            label="Members"
-            style={{ margin: "0 4px 12px" }}
-            action={canManage ? (
-              <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="text-[13.5px] font-semibold" style={{ color: "var(--plum)", fontFamily: "var(--serif)" }}>+ Add</button>
-            ) : undefined}
-          />
+          <PocketKicker label="Members" style={{ margin: "0 4px 12px" }} />
           {loading ? <Spinner /> : (
             /* Borderless tonal rows-card (Pocket grammar): one --ivory surface at
                --r-pocket, rows divided by the --line-3 hairline. */
             <div className="mb-6" style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "6px 18px" }}>
+              {/* Obvious add-members affordance (iMessage-style) — the first row of the
+                  roster, plum chip + label so it reads clearly as an action. Replaces
+                  the subtle kicker "+ Add" that was easy to miss on phone. */}
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => { setShowAddMembers(true); loadAllProfiles() }}
+                  className="flex items-center gap-3 w-full text-left"
+                  style={{ padding: "13px 0", borderBottom: "1px solid var(--line-3)", background: "transparent", border: "none", WebkitTapHighlightColor: "transparent" }}
+                >
+                  <span className="w-9 h-9 rounded-full inline-flex items-center justify-center flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 10%, transparent)", color: "var(--plum)" }}>
+                    <Plus style={{ width: 17, height: 17 }} strokeWidth={2.2} />
+                  </span>
+                  <span className="text-[15px] font-semibold" style={{ color: "var(--plum)", letterSpacing: "-0.01em" }}>Add members</span>
+                </button>
+              )}
               {members.map((member, i) => {
                 const isConfirming = confirmRemoveMemberId === member.user_id
                 const isRevealed = mobileRevealMemberId === member.user_id
