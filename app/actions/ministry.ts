@@ -6,6 +6,7 @@ import { requireSameMinistry, requireMinistryAdmin, isAdminTier } from "./authz"
 import { autoAddUserToChats, ensureMinistryChats } from "./auto-chats"
 import { presetById } from "@/app/home/workspace-presets"
 import { ADMIN_ROLES, LEADER_ROLES, MEMBER_TIER, isAdminRole, isStaffRole } from "@/lib/roles"
+import { SUPER_UUID } from "./super-constants"
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
 
@@ -154,12 +155,24 @@ export async function getPublicMinistries(search?: string): Promise<{
   error: string | null
 }> {
   const admin = createAdminClient()
+
+  // Ministries flagged hidden_from_discovery (test/dev tenants) are dropped from
+  // public discovery for everyone EXCEPT the super account, which needs to reach
+  // them. This is a DEDICATED flag — NOT is_sandbox, which means "super write-as
+  // allowed" and must keep e.g. Central (is_sandbox=true) discoverable. Fail-closed:
+  // an unknown/logged-out caller is not super, so the filter still applies.
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const isSuper = user?.id === SUPER_UUID
+
   let query = admin
     .from("ministries")
     .select("id, name, university, size, location, is_public")
     .eq("status", "active")
     .order("is_public", { ascending: false })
     .order("name")
+
+  if (!isSuper) query = query.eq("hidden_from_discovery", false) // column is NOT NULL default false
 
   if (search?.trim()) {
     query = query.or(`name.ilike.%${search.trim()}%,university.ilike.%${search.trim()}%`)

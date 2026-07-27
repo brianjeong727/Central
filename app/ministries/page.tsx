@@ -567,6 +567,19 @@ function MinistriesContent() {
       <div className="md:hidden" style={{ minHeight: "100svh", background: "var(--cream)", fontFamily: SANS, color: "var(--ink)" }}>
         <div className="max-w-[390px] mx-auto w-full" style={{ padding: "calc(env(safe-area-inset-top) + 22px) 24px calc(env(safe-area-inset-bottom) + 40px)" }}>
 
+          {/* Back chevron — quick exit for anyone who opened "Switch ministry" by
+              mistake (only shown when they have a ministry to return to). */}
+          {isLoggedIn && myMinistries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => { if (typeof window !== "undefined" && window.history.length > 1) window.history.back(); else window.location.assign("/home") }}
+              aria-label="Back"
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, marginLeft: -8, marginBottom: 6, background: "none", border: "none", color: "var(--plum)", cursor: "pointer" }}
+            >
+              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            </button>
+          )}
+
           <div style={mono}>{isLoggedIn && myMinistries.length === 0 ? "Almost there" : "Ministries"}</div>
           <h1 style={mTitle}>Choose a ministry</h1>
           <div style={{ ...mSub, marginTop: 8 }}>Your communities, and ones you can join.</div>
