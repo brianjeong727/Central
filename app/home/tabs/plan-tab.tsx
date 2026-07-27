@@ -17,6 +17,7 @@ import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
 import { getCategoryBudgetAllocation } from "@/app/actions/budget-planning"
 import { useNavState } from "../nav-state"
+import { useOpenMemberProfile } from "../member-profile-context"
 import { useSubpageCrumbs, useBreadcrumbExtra } from "../breadcrumb-context"
 
 function currentFiscalYear(): string {
@@ -11613,6 +11614,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
   onOpenChat?: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
+  const openMemberProfile = useOpenMemberProfile()
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
   const [roles, setRoles] = useState<TeamRole[]>([])
@@ -12238,9 +12240,11 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                             style={{ background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--cream))" : "var(--ivory)", transition: "background 0.1s" }}
                             onClick={() => { if (canManageTeam && m.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === m.user_id ? null : m.user_id) }}
                           >
-                            <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-medium" />
+                            <span onClick={(e) => { e.stopPropagation(); openMemberProfile(m.user_id) }} style={{ cursor: "pointer", display: "inline-flex", flexShrink: 0 }}>
+                              <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-medium" />
+                            </span>
                             <div className="flex-1 min-w-0">
-                              <p className="text-[14px] font-medium text-[var(--ink)] truncate">{m.name}</p>
+                              <p onClick={(e) => { e.stopPropagation(); openMemberProfile(m.user_id) }} className="text-[14px] font-medium text-[var(--ink)] truncate cursor-pointer">{m.name}</p>
                               {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
                                 <select
                                   value={m.role_id}
@@ -12539,8 +12543,10 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                           transition: "background 0.1s",
                         }}
                       >
-                        <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-medium" />
-                        <span style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>{m.name}</span>
+                        <span onClick={() => openMemberProfile(m.user_id)} style={{ cursor: "pointer", display: "inline-flex" }}>
+                          <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-medium" />
+                        </span>
+                        <span onClick={() => openMemberProfile(m.user_id)} style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500, cursor: "pointer" }}>{m.name}</span>
                         {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
                           <select
                             value={m.role_id}
@@ -12807,6 +12813,7 @@ function SmallGroupLeadersTab({
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
+  const openMemberProfile = useOpenMemberProfile()
   // Unique per-mount ID so desktop + mobile instances don't collide on the same channel name
   const channelInstanceId = useRef(Math.random().toString(36).slice(2)).current
   type SGLTab = "home" | "schedule" | "bible_study"
@@ -13605,8 +13612,10 @@ function SmallGroupLeadersTab({
                 <div className="mt-4 rounded-[var(--r-pocket)] overflow-hidden" style={{ background: "var(--ivory)", padding: "0 18px" }}>
                   {rosterMembers.map((m, i) => (
                     <div key={m.user_id} className="flex items-center gap-3 py-[13px]" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)" }}>
-                      <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-medium" />
-                      <p className="flex-1 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)]">{m.name}</p>
+                      <span onClick={() => openMemberProfile(m.user_id)} style={{ cursor: "pointer", display: "inline-flex", flexShrink: 0 }}>
+                        <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-medium" />
+                      </span>
+                      <p onClick={() => openMemberProfile(m.user_id)} className="flex-1 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ink)] cursor-pointer">{m.name}</p>
                     </div>
                   ))}
                 </div>
@@ -13655,8 +13664,10 @@ function SmallGroupLeadersTab({
                         const isConfirming = confirmRemoveSgMemberId === m.user_id
                         return (
                           <div key={m.id} className="flex items-center gap-3 px-[18px] py-[13px]" style={{ borderTop: i === 0 ? "none" : "1px solid var(--line-3)", background: isPendingRemove || isConfirming ? "color-mix(in srgb, var(--danger) 5%, transparent)" : "transparent" }}>
-                            <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-medium" />
-                            <p className={`flex-1 text-[15px] font-semibold tracking-[-0.01em] ${isPendingRemove ? "line-through text-[var(--danger)]" : "text-[var(--ink)]"}`}>{m.name}</p>
+                            <span onClick={() => openMemberProfile(m.user_id)} style={{ cursor: "pointer", display: "inline-flex", flexShrink: 0 }}>
+                              <MonogramChip initials={getInitials(m.name)} className="w-7 h-7 text-[11px] font-medium" />
+                            </span>
+                            <p onClick={() => openMemberProfile(m.user_id)} className={`flex-1 text-[15px] font-semibold tracking-[-0.01em] cursor-pointer ${isPendingRemove ? "line-through text-[var(--danger)]" : "text-[var(--ink)]"}`}>{m.name}</p>
                             {isEditing ? (
                               isPendingRemove ? (
                                 <button onClick={() => setPendingRemoveMemberIds(prev => { const n = new Set(prev); n.delete(m.user_id); return n })} style={{ fontSize: 11, fontWeight: 500, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 6px" }}>Undo</button>

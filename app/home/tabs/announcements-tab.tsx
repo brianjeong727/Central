@@ -11,6 +11,7 @@ import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
 import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu, PocketFilterChip, PocketFilterChipRow, PocketCard, PocketKicker, PocketButton, PocketSwitch, PocketTag, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
 import type { ActionMenuItem } from "@/components/central"
 import { audienceLabel, formatDate, previewBody } from "../utils"
+import { useOpenMemberProfile } from "../member-profile-context"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee } from "../types"
 import { isLeaderRole } from "@/lib/roles"
@@ -788,6 +789,7 @@ function DesktopActionMenu({
 
 export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, avatarUrl, onGoToProfile, onOpenAnnouncement, onComposerOpenChange }: AnnouncementsTabProps) {
   const supabase = createClient()
+  const openMemberProfile = useOpenMemberProfile()
   // Compose/edit is ephemeral plain state — never in the URL. A reload mid-compose
   // drops back to the underlying announcements list (Phase 2).
   const [showCreate, setShowCreate] = useState(false)
@@ -1350,7 +1352,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                           <div style={{ marginTop: 12 }}>
                             <div className="flex flex-wrap gap-1.5">
                               {ann.rsvp_attendees.slice(0, 10).map(a => (
-                                <span key={a.user_id} style={{ fontSize: "11px", color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line)", padding: "2px 8px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>
+                                <span key={a.user_id} onClick={() => openMemberProfile(a.user_id)} style={{ fontSize: "11px", color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line)", padding: "2px 8px", borderRadius: 999, cursor: "pointer" }}>{a.name.split(" ")[0]}</span>
                               ))}
                               {ann.rsvp_attendees.length > 10 && (
                                 <span style={{ fontSize: "11px", color: "var(--muted-text)", padding: "2px 4px" }}>+{ann.rsvp_attendees.length - 10} more</span>
@@ -1589,6 +1591,7 @@ export function AnnouncementDetailView({
   onGoToList: () => void
 }) {
   const supabase = createClient()
+  const openMemberProfile = useOpenMemberProfile()
   const [ann, setAnn] = useState<DetailAnnouncement | null>(null)
   const [loading, setLoading] = useState(true)
   const [rsvping, setRsvping] = useState(false)
@@ -1730,7 +1733,7 @@ export function AnnouncementDetailView({
           <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, textAlign: "center" }}>{ann.rsvp_count} going</div>
           {showAttendees && (
             <div className="flex flex-wrap justify-center gap-1.5" style={{ marginTop: 12 }}>
-              {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
+              {ann.rsvp_attendees.map((a) => <span key={a.user_id} onClick={() => openMemberProfile(a.user_id)} style={{ fontSize: 12, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999, cursor: "pointer" }}>{a.name.split(" ")[0]}</span>)}
             </div>
           )}
         </div>
@@ -1789,7 +1792,7 @@ export function AnnouncementDetailView({
           <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, textAlign: "center" }}>{ann.rsvp_count} going</div>
           {showAttendees && (
             <div className="flex flex-wrap justify-center gap-1.5" style={{ marginTop: 12 }}>
-              {ann.rsvp_attendees.map((a) => <span key={a.user_id} style={{ fontSize: 12, fontWeight: 600, color: "var(--body)", background: "var(--pocket-track)", padding: "6px 12px", borderRadius: 999 }}>{a.name.split(" ")[0]}</span>)}
+              {ann.rsvp_attendees.map((a) => <span key={a.user_id} onClick={() => openMemberProfile(a.user_id)} style={{ fontSize: 12, fontWeight: 600, color: "var(--body)", background: "var(--pocket-track)", padding: "6px 12px", borderRadius: 999, cursor: "pointer" }}>{a.name.split(" ")[0]}</span>)}
             </div>
           )}
         </PocketCard>

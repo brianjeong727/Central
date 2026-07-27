@@ -459,6 +459,7 @@ Permission tiers:
 | Announcement detail | 60 |
 | Chat screen | 100 |
 | Chat settings | 110 |
+| Member profile overlay (global) | 130 |
 | Emoji dismiss overlay | 155 |
 | Emoji picker | 160 |
 | Action menus (`ActionMenu` portal) | 200 |
