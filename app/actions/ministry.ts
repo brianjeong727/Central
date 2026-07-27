@@ -920,6 +920,24 @@ export async function updateMemberRole(targetUserId: string, newRole: "visitor" 
   return { error: null }
 }
 
+// A user who exits a ministry (leave / remove / excommunicate) must also be dropped
+// from that ministry's chats. Otherwise their group_members rows linger: once their
+// profile.ministry_id is nulled the roster join is RLS-invisible and they render as
+// "Unknown" (and the chat name-resolution treats departed senders as non-roster).
+// Message history is preserved — messages.sender_id is independent, and
+// ministry_departures drives the "left" indicator on their past messages.
+async function removeUserFromMinistryChats(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  ministryId: string,
+): Promise<void> {
+  const { data: groups } = await admin.from("groups").select("id").eq("ministry_id", ministryId)
+  const groupIds = (groups ?? []).map((g) => g.id)
+  if (groupIds.length) {
+    await admin.from("group_members").delete().eq("user_id", userId).in("group_id", groupIds)
+  }
+}
+
 // ─── Admin: remove a member from the ministry ────────────────────────────────
 export async function removeMember(targetUserId: string): Promise<{ error: string | null }> {
   const supabase = await createClient()
@@ -946,6 +964,9 @@ export async function removeMember(targetUserId: string): Promise<{ error: strin
   // otherwise the removed member can re-enter via setCurrentMinistry, which restores
   // their stale role from user_ministries.
   await admin.from("user_ministries").delete().eq("user_id", targetUserId).eq("ministry_id", profile.ministry_id)
+
+  // Drop them from the ministry's chats too (else they linger as "Unknown").
+  await removeUserFromMinistryChats(admin, targetUserId, profile.ministry_id)
 
   return { error: null }
 }
@@ -1090,6 +1111,9 @@ export async function excommunicateMember(targetUserId: string): Promise<{ error
   await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", targetUserId).eq("ministry_id", targetMinistryId)
   await admin.from("user_ministries").delete().eq("user_id", targetUserId).eq("ministry_id", targetMinistryId)
 
+  // Drop them from the ministry's chats too (else they linger as "Unknown").
+  await removeUserFromMinistryChats(admin, targetUserId, targetMinistryId)
+
   return { error: null }
 }
 
@@ -1114,6 +1138,9 @@ export async function selfLeaveMinistry(): Promise<{ error: string | null }> {
   // Remove from the ministry
   await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", user.id)
   await admin.from("user_ministries").delete().eq("user_id", user.id).eq("ministry_id", ministryId)
+
+  // Drop them from the ministry's chats too (else they linger as "Unknown").
+  await removeUserFromMinistryChats(admin, user.id, ministryId)
 
   return { error: null }
 }
