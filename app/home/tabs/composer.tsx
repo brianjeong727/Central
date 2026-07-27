@@ -45,7 +45,12 @@ function ComposerImpl({
   const filteredMentions = useMemo(() => {
     if (mentionQuery === null) return []
     const q = mentionQuery.toLowerCase()
-    return mentionMembers.filter(m => m.name.split(" ")[0].toLowerCase().startsWith(q)).slice(0, 5)
+    // Match the nickname OR the real first name (forgiving), but insert/display the
+    // nickname's first word — the token the dispatch resolves.
+    return mentionMembers.filter(m =>
+      m.displayName.split(" ")[0].toLowerCase().startsWith(q) ||
+      m.name.split(" ")[0].toLowerCase().startsWith(q),
+    ).slice(0, 5)
   }, [mentionQuery, mentionMembers])
 
   // ── GIF picker ──
@@ -167,7 +172,7 @@ function ComposerImpl({
     if (mentionQuery !== null && filteredMentions.length > 0) {
       if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, filteredMentions.length - 1)); return }
       if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return }
-      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); handleMentionSelect(filteredMentions[mentionIndex].name); return }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); handleMentionSelect(filteredMentions[mentionIndex].displayName); return }
       if (e.key === "Escape") { setMentionQuery(null); return }
     }
     if (e.key === "Enter" && !e.shiftKey) {
@@ -262,11 +267,11 @@ function ComposerImpl({
                 <button
                   key={member.id}
                   onPointerDown={(e) => e.preventDefault()}
-                  onClick={() => handleMentionSelect(member.name)}
+                  onClick={() => handleMentionSelect(member.displayName)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${idx === mentionIndex ? "bg-[var(--line-2)]" : "hover:bg-[var(--line-3)]"} ${idx > 0 ? "border-t border-[var(--line-3)]" : ""}`}
                 >
-                  <MonogramChip initials={member.name.charAt(0).toUpperCase()} className="w-7 h-7 text-[11px] font-medium" />
-                  <span className="text-[14px] font-medium text-[var(--ink)]">{member.name.split(" ")[0]}</span>
+                  <MonogramChip initials={member.displayName.charAt(0).toUpperCase()} className="w-7 h-7 text-[11px] font-medium" />
+                  <span className="text-[14px] font-medium text-[var(--ink)]">{member.displayName.split(" ")[0]}</span>
                 </button>
               ))}
             </div>

@@ -174,9 +174,15 @@ export interface ChatGroup {
   is_central_chat?: boolean
 }
 
+/** Max length of a shared chat nickname (chat_nicknames). Lives here (not the
+ *  "use server" action file, which may only export async functions). */
+export const MAX_NICKNAME_LEN = 32
+
 export interface GroupMember {
   user_id: string
   name: string
+  /** Shared per-chat nickname (chat_nicknames), or null. displayName = nickname ?? name. */
+  nickname?: string | null
   role: string
   graduation_year: number | null
   avatar_url?: string | null
@@ -445,7 +451,7 @@ export interface ComposerProps {
   displayName: string
   // Roster (self already excluded) for @mention autocomplete. Structural type — the
   // richer roster objects pass fine.
-  mentionMembers: { id: string; name: string }[]
+  mentionMembers: { id: string; name: string; displayName: string }[]
   replyingTo: Message | null
   sending: boolean
   uploading: boolean
