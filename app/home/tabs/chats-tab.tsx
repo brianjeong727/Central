@@ -27,7 +27,7 @@ import { useBlocks } from "../use-blocks"
 import { MODERATION_DEFAULTS, moderateText, scopeApplies, reverentCapitalize } from "@/lib/moderation"
 import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
-import { isChatManageRole } from "@/lib/roles"
+import { isChatManageRole, isLeaderRole } from "@/lib/roles"
 
 // Hydration-safe "are we mounted on the client yet?" flag with no set-state-in-
 // effect. useSyncExternalStore returns the server snapshot (false) during SSR
@@ -432,7 +432,6 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // document.body so a transformed content-enter ancestor can't trap position:fixed).
   const mounted = useMountedFlag()
 
-  const isAdminOrLeader = isChatManageRole(userRole)
   const isDM = groupType === "dm"
   const isMy = groupType === "my"
   const isChurch = groupType === "church"
@@ -440,11 +439,16 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // flag (set by the DB auto-create trigger), NOT by a name match — so renaming it
   // can never break identification, auto-enroll, or the delete/archive guards.
   const isCentralChat = isChurch && isCentral
-  const canManage = (isChurch && isAdminOrLeader) || isMy
+  // Church-chat management is now "in-chat leader-or-above": a leader-tier role
+  // (incl. pastor) AND membership of THIS chat — mirrors the groups/group_members
+  // /messages RLS. Non-church (my) chats force manage as before.
+  const isMemberOfChat = members.some((m) => m.user_id === userId)
+  const churchManage = isChurch && isLeaderRole(userRole) && isMemberOfChat
+  const canManage = churchManage || isMy
   const canLeave = isMy || isDM
-  const canArchive = isChurch && isAdminOrLeader && !groupArchived && !isCentralChat
-  const canUnarchive = isChurch && isAdminOrLeader && groupArchived
-  const canDelete = isChurch && isAdminOrLeader && !isCentralChat
+  const canArchive = churchManage && !groupArchived && !isCentralChat
+  const canUnarchive = churchManage && groupArchived
+  const canDelete = churchManage && !isCentralChat
 
   // SWR-cached settings load — members + this user's mute/pin prefs. Pure fetcher;
   // local state is populated via the effect below so re-opening a chat paints from cache.
@@ -533,7 +537,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
   // ── Chat prefs (mute/pin): stage locally, commit on Save. Member changes still
   //    persist immediately (optimistic + rollback); only prefs are staged. ──
-  const canReassignSection = isChurch && canManage && !isCentralChat
+  const canReassignSection = churchManage && !isCentralChat
   const prefsDirty = pendingMuted !== muted || pendingPinned !== pinned || (canReassignSection && pendingCategory !== category)
 
   // Patch the shared chat-list SWR cache so the list's muted/pinned indicators +
@@ -1308,8 +1312,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       .map(m => m.id)
   }, [messages, searchQuery])
 
-  const isAdminOrLeader = isChatManageRole(userRole)
-  const canPin = !groupArchived && (isAdminOrLeader || groupType !== "church")
+  // Church-chat moderation (delete others' messages/polls, pin) is now "in-chat
+  // leader-or-above": a leader-tier role (incl. pastor) AND membership of THIS chat,
+  // mirroring the messages/groups RLS. My/DM behavior is UNCHANGED (isChatManageRole).
+  const isMemberOfChat = roster.some((m) => m.id === userId)
+  const canModerate = groupType === "church" ? (isLeaderRole(userRole) && isMemberOfChat) : isChatManageRole(userRole)
+  const canPin = !groupArchived && (groupType !== "church" ? true : (isLeaderRole(userRole) && isMemberOfChat))
 
   // @mention member list is loaded via useSWR above (see rosterData/mentionMembers).
   // The @mention dropdown, GIF picker, and input state now live in <Composer>.
@@ -2671,7 +2679,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   senderDeparted={!!(msg.sender_id && departedIds.has(msg.sender_id))}
                   userId={userId}
                   canPin={canPin}
-                  isAdminOrLeader={isAdminOrLeader}
+                  isAdminOrLeader={canModerate}
                   isEmojiPickerOpen={emojiPickerFor === msg.id}
                   isFullPickerOpen={fullReactionPickerFor === msg.id}
                   isContextMenuOpen={contextMenuFor === msg.id}

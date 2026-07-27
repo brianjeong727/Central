@@ -27,9 +27,12 @@ export type StaffRole = (typeof STAFF_ROLES)[number]
 export const LEADER_ROLES = ["leader", "admin", "deacon", "elder", "pastor"] as const
 export type LeaderRole = (typeof LEADER_ROLES)[number]
 
-// Chat management / pins. `pastor` is INTENTIONALLY EXCLUDED here — per
-// permissions.md, pastor is a spiritual-oversight role, not a chat moderator.
-// Do not add "pastor" to this tier (CLAUDE.md Convention #2).
+// LEGACY / COSMETIC chat-manage set. This tier now governs only the cosmetic role
+// pills (chats-tab role labels) and MY/DM-chat moderation — NOT church chats.
+// Church-chat management + message pins moved to "in-chat leader-or-above":
+// `isLeaderRole` (incl. pastor) AND membership of the chat (`is_group_member` in
+// RLS / a members lookup in app code). `pastor` is still excluded from THIS set on
+// purpose (it is not a legacy chat moderator); do not add it (CLAUDE.md Conv #2).
 export const CHAT_MANAGE_ROLES = ["admin", "leader", "deacon", "elder"] as const
 export type ChatManageRole = (typeof CHAT_MANAGE_ROLES)[number]
 
