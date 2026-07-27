@@ -9,7 +9,7 @@ import { Spinner } from "@/app/home/components/shared"
 import { SplitShell, GoogleButton, AppleButton, AppleGlyph, GoogleGlyph, OrDivider, EyeButton,
   PocketAuthScreen, PocketBack, PocketField, PocketSubmit, PocketError,
   pocketPillCard, pocketFieldLabel, pocketFieldBox, pocketH1, pocketSub } from "@/app/(auth)/shared"
-import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn } from "@/lib/native-auth"
+import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn, nativeAuthDebugMessage } from "@/lib/native-auth"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
 
@@ -288,8 +288,9 @@ function SignupContent() {
       setAdminError(null)
       const res = await signInWithAppleNative("signup")
       if (res.ok) { window.location.assign("/onboarding"); return }
-      if (res.error === "failed") setAdminError("Apple sign-in didn't complete — make sure this device is signed in to an Apple ID (Settings), then try again.")
-      if (res.error !== "unavailable") return
+      // TEMP DIAGNOSTIC: show the raw reason for EVERY non-unavailable failure
+      // (previously no-account/canceled returned silently — the "frozen" bug).
+      if (res.error !== "unavailable") { setAdminError(nativeAuthDebugMessage(res)); return }
       // plugin missing from this binary — fall through to the web flow
     }
     const supabase = createClient()
@@ -339,8 +340,9 @@ function SignupContent() {
       // Mirrors the web callback's intent=join landing — a fresh member goes to
       // the join flow, never the marketing landing (hidden in the shell anyway).
       if (res.ok) { window.location.assign("/ministries?tab=code"); return }
-      if (res.error === "failed") setMemberError("Apple sign-in didn't complete — make sure this device is signed in to an Apple ID (Settings), then try again.")
-      if (res.error !== "unavailable") return
+      // TEMP DIAGNOSTIC: show the raw reason for EVERY non-unavailable failure
+      // (previously no-account/canceled returned silently — the "frozen" bug).
+      if (res.error !== "unavailable") { setMemberError(nativeAuthDebugMessage(res)); return }
       // plugin missing from this binary — fall through to the web flow
     }
     const supabase = createClient()
