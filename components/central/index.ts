@@ -44,6 +44,7 @@ export { ConfirmDialog } from "./confirm-dialog"
 export { Toast } from "./toast"
 export { ReadOnlyMat, ReadOnlyPill } from "./read-only-mat"
 export { useEdgeSwipeBack } from "./use-edge-swipe-back"
+export { BackChevron } from "./back-chevron"
 export { SuperSwitcher } from "./super-switcher"
 export {
   POCKET_KICKER_STYLE,

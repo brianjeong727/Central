@@ -10,9 +10,9 @@
 // ReceiptsWorkspace (app/home/components) can reuse it without an import cycle.
 
 import type { ReactNode } from "react"
-import { ArrowLeft, Settings } from "lucide-react"
+import { Settings } from "lucide-react"
 import {
-  IconButton, MonogramChip, PocketHeroCard, PocketKicker, PocketRow, PocketRowCard,
+  IconButton, MonogramChip, PocketHeroCard, PocketKicker, PocketRow, PocketRowCard, BackChevron,
 } from "@/components/central"
 import { PlanLineIcon } from "./shared"
 import { getInitials } from "../utils"
@@ -44,9 +44,7 @@ export function PocketHubChrome({ title, onBack, onSettings, avatar, action }: {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
       {onBack && (
-        <button onClick={onBack} aria-label="Back" style={{ width: 34, height: 34, marginLeft: -8, flexShrink: 0, display: "grid", placeItems: "center", background: "none", border: "none", color: "var(--plum)", cursor: "pointer" }}>
-          <ArrowLeft style={{ width: 20, height: 20 }} />
-        </button>
+        <BackChevron onClick={onBack} />
       )}
       <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: action ? 20 : 22, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
       {action}

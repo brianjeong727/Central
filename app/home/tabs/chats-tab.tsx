@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -12,7 +12,7 @@ import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
@@ -2659,14 +2659,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           </>
         ) : (
           <>
-            {!inline && (
-              <button
-                onClick={onClose}
-                className="flex-shrink-0 -ml-1 w-[34px] h-[34px] flex items-center justify-center hover:bg-[var(--cream-2)] rounded-full transition-colors md:hidden"
-              >
-                <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
-              </button>
-            )}
+            {!inline && <BackChevron onClick={onClose} className="md:hidden" />}
             {/* Group avatar — 40px on mobile (Pocket chat header), 32px on the
                 shared desktop inline panel (md: override keeps desktop untouched). */}
             <MonogramChip

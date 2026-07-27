@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef } from "react"
 import useSWR from "swr"
-import { Search, ArrowLeft, MessageCircle, Heart, Users } from "lucide-react"
+import { Search, MessageCircle, Heart, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { EmptyState } from "../components/shared"
-import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, PocketRow, PocketRowCard, PocketKicker, PocketSearchField } from "@/components/central"
+import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, PocketRow, PocketRowCard, PocketKicker, PocketSearchField, BackChevron } from "@/components/central"
 import { getInitials } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { DirectoryMember } from "../types"
@@ -244,11 +244,7 @@ export function DirectoryTab({
         {/* Chrome row (mobile spec §2.1): back chevron + 22px serif title inline */}
         <div className="px-5 pt-14 pb-5">
           <div className="flex items-center gap-2 mb-4">
-            {onBack && (
-              <button onClick={onBack} className="flex items-center justify-center rounded-full -ml-1" style={{ width: 34, height: 34, flexShrink: 0 }} aria-label="Back">
-                <ArrowLeft className="w-5 h-5" style={{ color: "var(--plum)" }} />
-              </button>
-            )}
+            {onBack && <BackChevron onClick={onBack} />}
             <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.1, fontWeight: 600 }}>Directory</span>
           </div>
           {/* Tonal search pill (§3.6): PocketSearchField, --ivory borderless */}
