@@ -10,7 +10,7 @@
 // Never hand-roll a header inside the body; the gaps will not match other pages.
 
 import { ReactNode } from "react"
-import { ArrowLeft } from "lucide-react"
+import { BackChevron } from "./back-chevron"
 import { InsetHairline } from "./hairline"
 import { PageTitle } from "./page-title"
 import { useScrollResetOn } from "./scroll-reset"
@@ -58,16 +58,7 @@ export function SubpageShell({ crumbs, title, mobileTitle, width = "full", maxWi
         // md:hidden must win on desktop — keep `display` in the class, NOT inline
         // (an inline `display` would override md:hidden and leak onto desktop).
         <div className="md:hidden flex items-center" style={{ gap: 8, padding: "12px 20px 10px" }}>
-          {back && (
-            <button
-              type="button"
-              onClick={back.onClick}
-              aria-label={`Back to ${back.label}`}
-              style={{ width: 34, height: 34, marginLeft: -8, flexShrink: 0, display: "grid", placeItems: "center", background: "none", border: "none", color: "var(--plum)", cursor: "pointer" }}
-            >
-              <ArrowLeft style={{ width: 20, height: 20 }} />
-            </button>
-          )}
+          {back && <BackChevron onClick={back.onClick} label={`Back to ${back.label}`} />}
           {chromeTitle ? (
             <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {chromeTitle}
