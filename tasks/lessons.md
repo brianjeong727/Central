@@ -29,7 +29,7 @@ This is now a SYSTEM, not per-tab hand-rolling. The single source of truth is `a
 ### URL params in use (browse only; as of 2026-06-29)
 - `?tab=` — top-level tab · `?chats=` — ChatsTab church/my subtab · `?chat=` — open conversation (desktop+mobile)
 - `?team=`, `?sotab=`, `?ptab=`, `?evtab=`, `?sgltab=`, `?fsec=`, `?rteam=`, `?week=` — Plan tab / team sub-state
-- `?member=` — Directory member · `?section=` + `?jtab=` — Profile section + journal subtab
+- `?member=` — Directory member · `?section=` + `?jtab=` — Profile section + journal subtab · `?pset=` — Profile mobile settings hub/section (folded; gear → Notifications/Account/Danger)
 - `?ann=` — open announcement detail overlay · `?cq=` — congregation responses detail · `?fresp=` — admin form-responses view · `?stab=` — Settings subtab
 - **Removed (now ephemeral plain state):** `?compose=` (announcements editor), `?view=settings` (plan settings), `?cnew=` (congregation create).
 
