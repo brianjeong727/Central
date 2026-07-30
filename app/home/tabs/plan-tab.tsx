@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, Fragment, type React
 import dynamic from "next/dynamic"
 import { createPortal } from "react-dom"
 import { isAdminRole } from "@/lib/roles"
-import useSWR from "swr"
+import useSWR, { mutate as globalMutate } from "swr"
 import {
   ChevronRight, ChevronDown, ChevronLeft, X, Check, Plus, Settings, Trash2, MapPin,
   Edit3, ArrowLeft, ArrowRight, Calendar, List, Grid3x3, Users, MoreHorizontal, Search,
@@ -582,7 +582,7 @@ async function fetchCalendarEventsAndPlans([, ministryId, teamScope]: readonly [
   const supabase = createClient()
   let query = supabase
     .from("calendar_events")
-    .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
+    .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
     .eq("ministry_id", ministryId)
     .order("start_date", { ascending: true })
   if (teamScope !== "all") {
@@ -599,6 +599,17 @@ async function fetchCalendarEventsAndPlans([, ministryId, teamScope]: readonly [
   const plannedIds = new Set((plans ?? []).map((p: { calendar_event_id: string }) => p.calendar_event_id))
 
   return { events, plannedIds, tableReady }
+}
+
+// Revalidate EVERY team scope of the shared calendar cache for a ministry. Matched
+// by key PREFIX, not by one exact key, because an edit made under one team's scope
+// must not leave another scope's copy stale — the app runs with
+// `revalidateOnFocus: false`, so a stale scope stays stale until it remounts.
+// Used where a component-local `mutate` isn't in reach (e.g. inside AddEventModal).
+function invalidateCalendarEvents(ministryId: string) {
+  return globalMutate(
+    (key: unknown) => Array.isArray(key) && key[0] === "calendar-events" && key[1] === ministryId,
+  )
 }
 
 // ── Events agenda helpers ──────────────────────────────────────────────────────
@@ -1069,8 +1080,8 @@ function EventsAgendaList({
 
 export function StudentOrgTeamHome({
   teamId, teamName, teamIcon, ministryId, userId, userName, userRole, canEdit, canEditBudget, onTeamSettings,
-  planningEvent, onPlanningEventChange, refreshSignal, onOpenChat,
-  desktopSection, isDesktopView, onCalEventsChange, onEditEvent,
+  planningEvent, onPlanningEventChange, onOpenChat,
+  desktopSection, isDesktopView, onCalEventsChange,
   avatarUrl, onGoToProfile, onExitTeam,
 }: {
   teamId: string | null
@@ -1085,12 +1096,10 @@ export function StudentOrgTeamHome({
   onTeamSettings?: () => void
   planningEvent: CalendarEvent | null
   onPlanningEventChange: (ev: CalendarEvent | null) => void
-  refreshSignal?: number
   onOpenChat?: (id: string, name: string, type?: string) => void
   desktopSection?: string
   isDesktopView?: boolean
   onCalEventsChange?: (events: CalendarEvent[]) => void
-  onEditEvent?: () => void
   // Mobile hub chrome (§2.1): avatar → profile, back chevron → picker.
   avatarUrl?: string | null
   onGoToProfile?: () => void
@@ -1118,7 +1127,7 @@ export function StudentOrgTeamHome({
   useScrollResetOn([teamTab])
 
   // Calendar — SWR-cached list of events + planned-event ids (shared key with MinistryCalendar).
-  const { data: calData, isLoading: calLoading, mutate: mutateCal } = useSWR(
+  const { data: calData, isLoading: calLoading } = useSWR(
     ministryId ? (["calendar-events", ministryId, teamId ?? "all"] as const) : null,
     fetchCalendarEventsAndPlans,
     { keepPreviousData: false },
@@ -1161,6 +1170,16 @@ export function StudentOrgTeamHome({
   useEffect(() => {
     setPlanningChild(null)
   }, [planningEvent?.id])
+  // "Edit event" for the open event. This modal lives HERE, next to planningChild,
+  // because the drilled sub-event is only known at this level: hoisting the modal
+  // to PlanTab (as it used to be) bound it to the PARENT row, so editing a child
+  // silently rewrote the parent and never touched the child. Both viewports mount
+  // this branch, so mobile gets the Edit affordance the desktop-only prop used to
+  // withhold.
+  const [showEditEvent, setShowEditEvent] = useState(false)
+  // Bumped after the edit modal writes, so EventPlanWorkspace re-reads the plan's
+  // plan_start_date / crunch_date and its (possibly shifted) task due dates.
+  const [eventRefresh, setEventRefresh] = useState(0)
   // Mobile drilled-section crumb reported by EventPlanWorkspace (null at the
   // hub and always on desktop) — appended as the tail crumb so the SubpageShell
   // chrome chevron returns section → hub (§2.3 one level; §5.3 single back).
@@ -1210,12 +1229,6 @@ export function StudentOrgTeamHome({
     if (displaySection !== "Meeting Notes" && openNoteId) setOpenNoteAndUrl(null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [displaySection])
-
-  // External refresh trigger → revalidate the shared cache.
-  useEffect(() => {
-    if (refreshSignal) void mutateCal()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshSignal])
 
   useEffect(() => {
     if (!teamId) return
@@ -1292,7 +1305,9 @@ export function StudentOrgTeamHome({
       if ("error" in res) { setSeasonError(res.error); return }
       setShowSeasonConfirm(false)
       setSeasonFilter(res.season)
-      void mutateCal()
+      // Every team scope, not just this one: a season copies events forward that
+      // the "all" scope also lists (same reason the modal invalidates by prefix).
+      void invalidateCalendarEvents(ministryId)
     } catch (e: unknown) {
       setSeasonError((e as { message?: string }).message ?? "Couldn't start the season — try again.")
     } finally {
@@ -1305,7 +1320,7 @@ export function StudentOrgTeamHome({
   async function openLinkedEvent(eventId: string) {
     const { data } = await supabase
       .from("calendar_events")
-      .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
+      .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
       .eq("id", eventId)
       .maybeSingle()
     if (data) onPlanningEventChange(data as CalendarEvent)
@@ -1323,7 +1338,9 @@ export function StudentOrgTeamHome({
       await supabase.from("event_plans").delete().eq("id", plan.id)
     }
     await supabase.from("calendar_events").delete().eq("id", evId)
-    void mutateCal()
+    // Prefix-matched: a per-key mutate left sibling team scopes showing the
+    // deleted event. Invalidation is single-path — see invalidateCalendarEvents.
+    void invalidateCalendarEvents(ministryId)
     setDeleteConfirmId(null)
     setDeleting(false)
     if (planningEvent?.id === evId) onPlanningEventChange(null)
@@ -1383,11 +1400,38 @@ export function StudentOrgTeamHome({
           teamId={teamId}
           onClose={() => planningChild ? setPlanningChild(null) : onPlanningEventChange(null)}
           onOpenChat={onOpenChat}
-          onEditEvent={onEditEvent}
+          onEditEvent={() => setShowEditEvent(true)}
           onOpenChild={planningChild ? undefined : setPlanningChild}
-          refreshSignal={refreshSignal}
+          refreshSignal={eventRefresh}
           onMobileCrumbChange={setEvMobileCrumb}
         />
+        {showEditEvent && (
+          <AddEventModal
+            ministryId={ministryId}
+            teamId={teamId}
+            userId={userId}
+            // The event actually on screen — the drilled sub-event when there is
+            // one, else the parent. Anything else writes to the wrong row.
+            existing={activeEvent}
+            onClose={() => setShowEditEvent(false)}
+            // No invalidation here: AddEventModal invalidates EVERY team scope of
+            // the shared cache itself, on both the success and the partial-failure
+            // branch. One path — a per-key mutate would leave siblings stale.
+            onSaved={(updated) => {
+              if (planningChild) setPlanningChild(updated)
+              else onPlanningEventChange(updated)
+              setEventRefresh(s => s + 1)
+              setShowEditEvent(false)
+            }}
+            onDelete={() => {
+              setShowEditEvent(false)
+              // Deleting a sub-event returns to its parent, not to the team hub.
+              if (planningChild) setPlanningChild(null)
+              else onPlanningEventChange(null)
+              setEventRefresh(s => s + 1)
+            }}
+          />
+        )}
       </SubpageShell>
     )
   }
@@ -1820,8 +1864,8 @@ export function StudentOrgTeamHome({
         teamId={teamId}
         userId={userId}
         onClose={() => setShowAddModal(false)}
+        // Cache invalidation is the modal's job (all scopes) — see above.
         onSaved={(newEv) => {
-          void mutateCal()
           setShowAddModal(false)
           onPlanningEventChange(newEv)
         }}
@@ -2525,11 +2569,12 @@ export function PlanTab({
   // TabPageHeader while one is active (e.g. the finance reimbursement detail).
   const subpageActive = useBreadcrumbExtra().length > 0
   const [openTeam, setOpenTeam] = useState<Team | null>(null)
-  const [showEditEvent, setShowEditEvent] = useState(false)
+  // NOTE: the student-org "Edit event" modal now lives INSIDE StudentOrgTeamHome —
+  // it is the only level that knows whether a sub-event is drilled, and binding it
+  // here bound every edit to the parent row.
   // Finance section is lifted to home-app (drives the sidebar nav on desktop) and synced to ?fsec.
   const financeSection = (financeSectionProp ?? "allocation") as FinanceSection
   const setFinanceSection = (s: FinanceSection) => onFinanceSectionChange?.(s)
-  const [studentOrgRefreshSignal, setStudentOrgRefreshSignal] = useState(0)
   function getPickerSectionCount(team: UserTeam): number {
     const name = team.teamName.toLowerCase()
     const perms = team.permissions
@@ -2727,6 +2772,10 @@ export function PlanTab({
         .select("id, team_id, start_date")
         .eq("ministry_id", ministryId)
         .in("team_id", pickerTeamIds)
+        // Top-level events only. A sub-event is an interior part of its parent's
+        // plan, never a workspace's "next event" — without this a child wins the
+        // slot and the card names a night instead of the week that contains it.
+        .is("parent_event_id", null)
         .gte("start_date", now)
         .order("start_date", { ascending: true })
       // Earliest upcoming event per team.
@@ -2832,29 +2881,6 @@ export function PlanTab({
           userName={userName}
           avatarUrl={avatarUrl}
           onAvatarClick={onGoToProfile}
-        />
-      )}
-
-      {/* Edit planning event modal */}
-      {showEditEvent && studentOrgPlanningEvent && (
-        <AddEventModal
-          ministryId={ministryId}
-          teamId={null}
-          userId={userId}
-          existing={studentOrgPlanningEvent}
-          onClose={() => setShowEditEvent(false)}
-          onSaved={(updated) => {
-            onStudentOrgPlanningEventChange?.(updated)
-            // Bump the refresh signal so EventPlanWorkspace re-fetches the plan's
-            // plan_start_date / crunch_date after the modal writes them.
-            setStudentOrgRefreshSignal(s => s + 1)
-            setShowEditEvent(false)
-          }}
-          onDelete={() => {
-            setShowEditEvent(false)
-            onStudentOrgPlanningEventChange?.(null)
-            setStudentOrgRefreshSignal(s => s + 1)
-          }}
         />
       )}
 
@@ -3083,12 +3109,10 @@ export function PlanTab({
               onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
               planningEvent={studentOrgPlanningEvent ?? null}
               onPlanningEventChange={ev => onStudentOrgPlanningEventChange?.(ev)}
-              refreshSignal={studentOrgRefreshSignal}
               onOpenChat={onOpenChat}
               isDesktopView
               desktopSection={studentOrgSection ?? "Events"}
               onCalEventsChange={evs => onStudentOrgCalEventsChange?.(evs)}
-              onEditEvent={() => setShowEditEvent(true)}
             />
         ) : teamKind === "dgl" && activeTeamId && activeTeamAllowed ? (
           <SmallGroupLeadersTab
@@ -6301,6 +6325,16 @@ export function TimelineView({
   )
 }
 
+// Whole-day difference between two "YYYY-MM-DD" strings (to − from), computed
+// on local-noon dates so DST transitions can never round to ±1.
+function daysBetweenYMD(fromYMD: string, toYMD: string): number {
+  const [fy, fm, fd] = fromYMD.split("-").map(Number)
+  const [ty, tm, td] = toYMD.split("-").map(Number)
+  const from = new Date(fy, fm - 1, fd, 12, 0, 0)
+  const to = new Date(ty, tm - 1, td, 12, 0, 0)
+  return Math.round((to.getTime() - from.getTime()) / 86400000)
+}
+
 export function AddEventModal({
   ministryId,
   teamId,
@@ -6410,10 +6444,23 @@ export function AddEventModal({
   // optional — an empty string saves as null (no crunch phase).
   const [planStartDate, setPlanStartDate] = useState("")
   const [crunchDate, setCrunchDate] = useState("")
+  // False until the async plan/crunch seed resolves. Gates the plan-window WRITE.
+  const [planDatesSeeded, setPlanDatesSeeded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // The event's start DATE as it currently stands in the DB. Seeded from the row
+  // and re-stamped once the event row + its plan window are written, so a second
+  // save shifts from the ALREADY-SHIFTED date rather than re-applying the original
+  // delta. Guards the two writes that are keyed to the event's own date.
+  const savedStartYMDRef = useRef<string | null>(existing ? parseDateStr(existing.start_date) : null)
+  // Per-task ledger of days a previous save FAILED to apply (task id → days owed).
+  // The task shift is N independent row updates with no transaction, so a partial
+  // outcome is a normal result. A retry must re-apply the ORIGINAL delta to exactly
+  // the rows that missed it — replaying the whole shift would double-move the rows
+  // that landed. Cleared only when the ledger empties.
+  const owedTaskShiftRef = useRef<Map<string, number>>(new Map())
   // Run Sheet P2 — "Run it back": if a compiled playbook exists for this (team, type),
   // offer to instantiate from it instead of the static EVENT_TYPE_CONFIGS seed.
   const [template, setTemplate] = useState<{ id: string; name: string } | null>(null)
@@ -6432,7 +6479,10 @@ export function AddEventModal({
   }
 
   // Seed plan/crunch from the event's plan (or the event−1mo / event−1wk defaults)
-  // when editing an existing event.
+  // when editing an existing event. This is ASYNC and Save does not wait for it —
+  // `planDatesSeeded` records whether it landed, so a Save that beats the fetch
+  // omits both columns rather than writing the empty state as NULL and wiping
+  // dates the user never saw (tester WARN-1: reproduced live, both columns → null).
   useEffect(() => {
     if (!isEditing || !existing) return
     let cancelled = false
@@ -6441,11 +6491,13 @@ export function AddEventModal({
         .from("event_plans")
         .select("plan_start_date, crunch_date")
         .eq("calendar_event_id", existing.id)
+        .eq("ministry_id", ministryId)
         .maybeSingle()
       if (cancelled) return
       const ev = new Date(existing.start_date)
       setPlanStartDate((data?.plan_start_date as string | null) || addMonthsYMD(ev, -1))
       setCrunchDate((data?.crunch_date as string | null) || addDaysYMD(ev, -7))
+      setPlanDatesSeeded(true)
     })()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -6482,6 +6534,9 @@ export function AddEventModal({
     }
     await supabase.from("calendar_events").delete().eq("id", existing.id)
     setDeleting(false)
+    // Same single invalidation path as handleSave — a deleted event must leave
+    // every team scope's cache, not just the one on screen.
+    void invalidateCalendarEvents(ministryId)
     onDelete?.()
   }
 
@@ -6496,6 +6551,56 @@ export function AddEventModal({
       ministry: "regular",
     }
     return map[et] ?? "regular"
+  }
+
+  // Move OPEN dated tasks on this plan by `delta` whole days, preserving each
+  // task's own lead/lag off the event. Skips completed tasks (their date is
+  // history) and undated tasks (null stays null). `onlyIds` narrows the move to a
+  // specific set — that is how a retry re-applies a delta to exactly the rows that
+  // missed it. Returns the ids that did NOT move. (`event_tasks` has no
+  // ministry_id column, so tenant scoping rides the plan id, which was itself
+  // resolved under `ministry_id`.)
+  async function shiftTaskDueDates(planId: string, delta: number, onlyIds?: string[]): Promise<string[]> {
+    if (delta === 0 || (onlyIds && onlyIds.length === 0)) return []
+    let q = supabase
+      .from("event_tasks")
+      .select("id, due_date")
+      .eq("event_plan_id", planId)
+      .eq("completed", false)
+      .not("due_date", "is", null)
+    if (onlyIds) q = q.in("id", onlyIds)
+    const { data: rows } = await q
+    const tasks = (rows ?? []) as { id: string; due_date: string }[]
+    if (tasks.length === 0) return []
+    const results = await Promise.all(tasks.map(async t => ({
+      id: t.id,
+      res: await supabase
+        .from("event_tasks")
+        .update({ due_date: addDaysToYMD(t.due_date, delta) })
+        .eq("id", t.id)
+        .eq("event_plan_id", planId)
+        .select("id"),
+    })))
+    // An RLS-blocked UPDATE returns no error and zero rows — treat that as a
+    // failure, never as applied.
+    return results.filter(r => r.res.error || (r.res.data ?? []).length === 0).map(r => r.id)
+  }
+
+  // Run the task shift for this save: first flush whatever a previous save left
+  // owing (each group at the delta IT owes), then apply this save's own delta to
+  // every open dated task. Failures accumulate per row, so pressing Save again
+  // converges instead of double-moving the rows that already landed.
+  async function runTaskShift(planId: string, delta: number) {
+    const owed = owedTaskShiftRef.current
+    if (owed.size > 0) {
+      const byDelta = new Map<number, string[]>()
+      for (const [id, d] of owed) byDelta.set(d, [...(byDelta.get(d) ?? []), id])
+      owed.clear()
+      for (const [d, ids] of byDelta) {
+        for (const id of await shiftTaskDueDates(planId, d, ids)) owed.set(id, (owed.get(id) ?? 0) + d)
+      }
+    }
+    for (const id of await shiftTaskDueDates(planId, delta)) owed.set(id, (owed.get(id) ?? 0) + delta)
   }
 
   const cfg = EVENT_TYPE_CONFIGS[eventType]
@@ -6539,27 +6644,93 @@ export function AddEventModal({
             recurring,
           })
           .eq("id", existing.id)
-          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
+          .eq("ministry_id", ministryId)
+          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
           .single()
         if (upErr || !data) { setError(upErr?.message ?? "Failed to update event."); setSaving(false); return }
         evData = data as CalendarEvent
 
-        // Persist plan/crunch dates to this event's plan row. Update first; if no
-        // plan exists yet (0 rows), insert one. Crunch empty → null (no phase).
-        const { data: planUpd } = await supabase
-          .from("event_plans")
-          .update({ plan_start_date: planStartDate || null, crunch_date: crunchDate || null })
-          .eq("calendar_event_id", existing.id)
-          .eq("ministry_id", ministryId)
-          .select("id")
-        if (!planUpd || planUpd.length === 0) {
-          await supabase.from("event_plans").insert({
-            ministry_id: ministryId,
-            calendar_event_id: existing.id,
-            created_by: userId,
-            plan_start_date: planStartDate || null,
-            crunch_date: crunchDate || null,
-          })
+        // How far the event MOVED in whole days. Measured from the date as it
+        // stands in the DB (not from the `existing` prop, which never changes), so
+        // a second save in this session measures from the already-shifted date.
+        // A time-only edit leaves the same YMD on both sides → delta 0 → nothing
+        // downstream moves.
+        const prevStartYMD = savedStartYMDRef.current
+        const dayDelta = prevStartYMD ? daysBetweenYMD(prevStartYMD, startDateStr) : 0
+
+        // Plan/crunch window. Written ONLY once the async seed (above) has landed:
+        // before that `planStartDate`/`crunchDate` are still "" and `|| null` would
+        // silently wipe two columns the user never saw.
+        //
+        // STOPGAP — delete when T-minus benchmarks land (followup-benchmarks.md).
+        // The window rides the date move by the SAME delta the tasks do. It has to:
+        // `sectionOf` buckets a task by comparing its due_date to `crunch_date`, so
+        // moving the tasks and not the anchors collapses every task into Crunch and
+        // empties Planning. Relative benchmarks make this whole shift unnecessary.
+        const shiftYMD = (ymd: string) => (ymd && dayDelta !== 0 ? addDaysToYMD(ymd, dayDelta) : ymd)
+        const planWindow = planDatesSeeded
+          ? { plan_start_date: shiftYMD(planStartDate) || null, crunch_date: shiftYMD(crunchDate) || null }
+          : null
+
+        let planId: string | null = null
+        if (planWindow) {
+          // Update first; if no plan exists yet (0 rows), insert one.
+          const { data: planUpd } = await supabase
+            .from("event_plans")
+            .update(planWindow)
+            .eq("calendar_event_id", existing.id)
+            .eq("ministry_id", ministryId)
+            .select("id")
+          if (!planUpd || planUpd.length === 0) {
+            await supabase.from("event_plans").insert({
+              ministry_id: ministryId,
+              calendar_event_id: existing.id,
+              created_by: userId,
+              ...planWindow,
+            })
+          } else {
+            planId = (planUpd[0] as { id: string }).id
+          }
+          // Re-seed the fields from what we just wrote. Without this the modal's
+          // state still holds the values seeded at MOUNT — i.e. pre-shift — and a
+          // second save in the same session (notably the partial-failure retry,
+          // where dayDelta is then 0 so shiftYMD is the identity) would write the
+          // OLD anchors back over the shifted ones while the tasks stayed shifted.
+          // Same failure shape savedStartYMDRef already fixes for the start date.
+          setPlanStartDate(planWindow.plan_start_date ?? "")
+          setCrunchDate(planWindow.crunch_date ?? "")
+        } else {
+          // Seed still in flight: touch no plan column, just resolve the plan id so
+          // the task shift can still run.
+          const { data: planRow } = await supabase
+            .from("event_plans")
+            .select("id")
+            .eq("calendar_event_id", existing.id)
+            .eq("ministry_id", ministryId)
+            .maybeSingle()
+          planId = (planRow as { id: string } | null)?.id ?? null
+        }
+
+        // Both writes keyed to the event's own date have now landed, so this is the
+        // date of record. Advancing it here (and NOT after the task shift) is what
+        // makes a retry safe: a re-press re-runs neither the event update at a
+        // stale delta nor the window shift twice.
+        savedStartYMDRef.current = startDateStr
+
+        // The checklist rides the move: each open dated task keeps the lead/lag it
+        // was seeded with. Failures are recorded per row (see owedTaskShiftRef) so
+        // pressing Save again retries exactly those.
+        if (planId) await runTaskShift(planId, dayDelta)
+        const owedCount = owedTaskShiftRef.current.size
+        if (owedCount > 0) {
+          // Never a silent partial, and never a false "nothing moved": the event is
+          // saved and SOME due dates moved, so say the checklist is PARTLY shifted.
+          setError(`Event saved, and the checklist was only PARTLY shifted — ${owedCount} due date${owedCount === 1 ? "" : "s"} didn't move (the rest did). Press Save again to retry just those, or ask a leader to check them.`)
+          // The event row DID change, so the cache must not keep the old value even
+          // though onSaved never fires on this path.
+          void invalidateCalendarEvents(ministryId)
+          setSaving(false)
+          return
         }
       } else {
         // Create new event
@@ -6580,7 +6751,7 @@ export function AddEventModal({
             recurring: parentEventId ? false : recurring,
             created_by: userId,
           })
-          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
+          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
           .single()
 
         if (evErr || !data) { setError(evErr?.message ?? "Failed to create event."); setSaving(false); return }
@@ -6637,6 +6808,13 @@ export function AddEventModal({
         }
       }
 
+      // ONE invalidation path, both outcomes. Every write out of this modal —
+      // create, edit, and the partial-failure return above — goes through the
+      // prefix-matched invalidator, never a single-key `mutate`. A per-key mutate
+      // only refreshes the scope the editor happens to be looking at and leaves
+      // every SIBLING team scope serving the old time (`revalidateOnFocus` is off),
+      // which is the same class of staleness this whole task was filed for.
+      void invalidateCalendarEvents(ministryId)
       onSaved(evData!)
     } catch (e: unknown) {
       setError((e as { message?: string }).message ?? "Failed to save event.")
@@ -6899,7 +7077,9 @@ export function MinistryCalendar({
   const isMobile = useIsMobile()
   const [view, setView] = useState<"month" | "list">("list")
   // SWR-cached events + planned-event ids (shared key with StudentOrgTeamHome).
-  const { data: calData, isLoading: loading, mutate: mutateCal } = useSWR(
+  // No local `mutate` — every write from here goes through AddEventModal, which
+  // invalidates all team scopes of this key itself.
+  const { data: calData, isLoading: loading } = useSWR(
     ministryId ? (["calendar-events", ministryId, teamId ?? "all"] as const) : null,
     fetchCalendarEventsAndPlans,
     { keepPreviousData: false },
@@ -6970,13 +7150,13 @@ export function MinistryCalendar({
             userId={userId}
             existing={planningEvent}
             onClose={() => setShowEditEvent(false)}
+            // Cache invalidation is the modal's job (all scopes) — see the note on
+            // StudentOrgTeamHome's edit modal.
             onSaved={(updated) => {
-              void mutateCal()
               setPlanningEvent(updated)
               setShowEditEvent(false)
             }}
             onDelete={() => {
-              void mutateCal()
               setShowEditEvent(false)
               setPlanningEvent(null)
             }}
@@ -7140,10 +7320,8 @@ export function MinistryCalendar({
           teamId={teamId}
           userId={userId}
           onClose={() => setShowAdd(false)}
-          onSaved={() => {
-            void mutateCal()
-            setShowAdd(false)
-          }}
+          // Cache invalidation is the modal's job (all scopes).
+          onSaved={() => setShowAdd(false)}
         />
       )}
     </div>
@@ -7660,8 +7838,11 @@ export function EventPlanWorkspace({
     setSavingOverview(false)
   }
 
-  // Re-fetch plan/crunch dates when the parent bumps refreshSignal (after the
-  // Edit-event modal saves). Skips the initial mount run (plan not yet loaded).
+  // Re-fetch plan/crunch dates AND the checklist when the parent bumps
+  // refreshSignal (after the Edit-event modal saves). Skips the initial mount run
+  // (plan not yet loaded). The checklist is re-read because moving the event's
+  // date shifts every open task's due_date server-side — without this the
+  // countdown sections would keep rendering the pre-shift dates.
   useEffect(() => {
     if (!plan) return
     let cancelled = false
@@ -7670,10 +7851,20 @@ export function EventPlanWorkspace({
         .from("event_plans")
         .select("plan_start_date, crunch_date")
         .eq("calendar_event_id", calendarEvent.id)
+        .eq("ministry_id", ministryId)
         .maybeSingle()
-      if (cancelled || !data) return
-      setPlanStartDate((data.plan_start_date as string | null) ?? "")
-      setCrunchDate((data.crunch_date as string | null) ?? "")
+      if (cancelled) return
+      if (data) {
+        setPlanStartDate((data.plan_start_date as string | null) ?? "")
+        setCrunchDate((data.crunch_date as string | null) ?? "")
+      }
+      const { data: tasksData } = await supabase
+        .from("event_tasks")
+        .select("*, profiles!event_tasks_assigned_to_fkey(name)")
+        .eq("event_plan_id", plan.id)
+        .order("sort_order", { ascending: true })
+      if (cancelled || !tasksData) return
+      setTasks(tasksData.map(mapTask))
     })()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -8511,14 +8702,27 @@ export function EventPlanWorkspace({
                       )}
                     </div>
                     {canEdit && onEditEvent && (
-                      <button
-                        onClick={onEditEvent}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--dashed)" }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--line-2)" }}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0, background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-input)", padding: "9px 15px", fontSize: 14, color: "var(--body)", cursor: "pointer", transition: "border-color .15s ease", whiteSpace: "nowrap" }}
-                      >
-                        <Pencil style={{ width: 14, height: 14 }} /> Edit event
-                      </button>
+                      // Mobile takes the Pocket primitive, not the desktop bordered
+                      // button: mobile_design_system.md §4 states desktop primitives
+                      // are not reused on mobile, and §5's identity-card edit
+                      // affordance is a quiet pill labelled "Edit" (same as Profile).
+                      // The desktop branch below is byte-identical to before.
+                      isMobile ? (
+                        <span style={{ flexShrink: 0 }}>
+                          <PocketButton variant="quiet" onClick={onEditEvent}>
+                            <Pencil style={{ width: 14, height: 14 }} /> Edit
+                          </PocketButton>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={onEditEvent}
+                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--dashed)" }}
+                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--line-2)" }}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0, background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-input)", padding: "9px 15px", fontSize: 14, color: "var(--body)", cursor: "pointer", transition: "border-color .15s ease", whiteSpace: "nowrap" }}
+                        >
+                          <Pencil style={{ width: 14, height: 14 }} /> Edit event
+                        </button>
+                      )
                     )}
                   </div>
 
@@ -9228,6 +9432,7 @@ export function EventPlanWorkspace({
               <SubEventsTab
                 parentEvent={calendarEvent}
                 ministryId={ministryId}
+                teamId={teamId}
                 userId={userId}
                 canEdit={canEdit}
                 onOpenChild={onOpenChild}
@@ -9312,15 +9517,51 @@ function subEventStatus(done: number, total: number): { label: string; color: st
   return { label: "Needs attention", color: "var(--muted-text)" }
 }
 
+// Readiness fetcher (childId → checklist done/total), batched: child events →
+// their event_plans → event_tasks, aggregated client-side. Two queries total, no
+// per-row N+1. Plans are scoped by ministry_id; event_tasks has no ministry_id
+// column, so it inherits that scope transitively through the resolved plan ids.
+async function fetchSubEventReadiness([, ministryId, childIdsCsv]: readonly [string, string, string]) {
+  const supabase = createClient()
+  const childIds = childIdsCsv ? childIdsCsv.split(",") : []
+  const map: Record<string, { done: number; total: number }> = {}
+  childIds.forEach((id) => { map[id] = { done: 0, total: 0 } })
+  if (childIds.length === 0) return map
+
+  const { data: plans } = await supabase
+    .from("event_plans")
+    .select("id, calendar_event_id")
+    .in("calendar_event_id", childIds)
+    .eq("ministry_id", ministryId)
+  const planRows = (plans ?? []) as { id: string; calendar_event_id: string }[]
+  if (planRows.length === 0) return map
+  const planToChild = new Map(planRows.map((p) => [p.id, p.calendar_event_id]))
+
+  const { data: taskRows } = await supabase
+    .from("event_tasks")
+    .select("event_plan_id, completed")
+    .in("event_plan_id", planRows.map((p) => p.id))
+  ;((taskRows ?? []) as { event_plan_id: string; completed: boolean }[]).forEach((t) => {
+    const childId = planToChild.get(t.event_plan_id)
+    if (!childId || !map[childId]) return
+    map[childId].total++
+    if (t.completed) map[childId].done++
+  })
+  return map
+}
+
 function SubEventsTab({
   parentEvent,
   ministryId,
+  teamId,
   userId,
   canEdit,
   onOpenChild,
 }: {
   parentEvent: CalendarEvent
   ministryId: string
+  // Only used to join the SHARED calendar SWR key — see below.
+  teamId?: string | null
   userId: string
   canEdit: boolean
   // Opening a sub-event lifts it to StudentOrgTeamHome for a single-shell
@@ -9328,64 +9569,45 @@ function SubEventsTab({
   // level) — rows then render without a drill affordance.
   onOpenChild?: (ev: CalendarEvent) => void
 }) {
-  const supabase = createClient()
   // Mobile restyle only (tonal borderless rows + kicker day labels) — structure unchanged.
   const isMobile = useIsMobile()
-  const [subEvents, setSubEvents] = useState<CalendarEvent[]>([])
-  // childId → checklist progress, batched (never N+1).
-  const [readiness, setReadiness] = useState<Record<string, { done: number; total: number }>>({})
-  const [loading, setLoading] = useState(true)
+  // Children come from the SHARED calendar cache, not a private one-shot fetch:
+  // this list and the timeline's sub-event disclosure rows are then the SAME
+  // rows, so an edit or an add revalidates both at once. (The old local useState
+  // never revalidated — a child edited here stayed stale until a remount.)
+  const { data: calData, isLoading: loading } = useSWR(
+    ministryId ? (["calendar-events", ministryId, teamId ?? "all"] as const) : null,
+    fetchCalendarEventsAndPlans,
+    { keepPreviousData: false },
+  )
+  const subEvents = useMemo(
+    () => (calData?.events ?? [])
+      .filter(e => e.parent_event_id === parentEvent.id)
+      .sort((a, b) => a.start_date.localeCompare(b.start_date)),
+    [calData, parentEvent.id],
+  )
+  const childIdsCsv = useMemo(() => subEvents.map(e => e.id).join(","), [subEvents])
+  const { data: readinessData } = useSWR(
+    ministryId ? (["sub-event-readiness", ministryId, childIdsCsv] as const) : null,
+    fetchSubEventReadiness,
+  )
+  const readiness = readinessData ?? {}
   const [showAdd, setShowAdd] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("calendar_events")
-        .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
-        .eq("parent_event_id", parentEvent.id)
-        .order("start_date", { ascending: true })
-      const rows = (data ?? []) as CalendarEvent[]
-      setSubEvents(rows)
-
-      // Batch readiness: child events → their event_plans → event_tasks
-      // done/total, aggregated client-side. Two queries total (no per-row).
-      // Scope the plan lookup by ministry_id (event_tasks has no ministry_id
-      // column, so it's scoped transitively through these plan ids).
-      const childIds = rows.map((e) => e.id)
-      if (childIds.length) {
-        const { data: plans } = await supabase
-          .from("event_plans")
-          .select("id, calendar_event_id")
-          .in("calendar_event_id", childIds)
-          .eq("ministry_id", ministryId)
-        const planRows = (plans ?? []) as { id: string; calendar_event_id: string }[]
-        const planToChild = new Map(planRows.map((p) => [p.id, p.calendar_event_id]))
-        const map: Record<string, { done: number; total: number }> = {}
-        childIds.forEach((id) => { map[id] = { done: 0, total: 0 } })
-        if (planRows.length) {
-          const { data: taskRows } = await supabase
-            .from("event_tasks")
-            .select("event_plan_id, completed")
-            .in("event_plan_id", planRows.map((p) => p.id))
-          ;((taskRows ?? []) as { event_plan_id: string; completed: boolean }[]).forEach((t) => {
-            const childId = planToChild.get(t.event_plan_id)
-            if (!childId) return
-            map[childId].total++
-            if (t.completed) map[childId].done++
-          })
-        }
-        setReadiness(map)
-      }
-      setLoading(false)
-    }
-    load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parentEvent.id])
-
-  // Day-grouped, sorted-ascending rows (query already orders by start_date).
-  let lastDayKey: string | null = null
-  let firstHeaderRendered = false
+  // Day-grouped, sorted-ascending rows (the list is already ordered by
+  // start_date). The grouping flags are derived HERE rather than by mutating
+  // let-bindings inside the render map — the shared cache can re-render this list
+  // at any time, and cross-render mutation is exactly what that breaks.
+  const groupedRows = useMemo(() => {
+    const dayKeys = subEvents.map(ev => new Date(ev.start_date).toDateString())
+    return subEvents.map((ev, i) => ({
+      ev,
+      showHeader: i === 0 || dayKeys[i] !== dayKeys[i - 1],
+      // Row 0 always opens a header, so it is always the first one.
+      isFirstHeader: i === 0,
+    }))
+  }, [subEvents])
 
   return (
     <div>
@@ -9402,13 +9624,9 @@ function SubEventsTab({
       )}
 
       <div>
-        {subEvents.map((ev) => {
+        {groupedRows.map(({ ev, showHeader, isFirstHeader }) => {
           const evCfg = getEventConfig(ev)
           const dt = new Date(ev.start_date)
-          const dayKey = dt.toDateString()
-          const showHeader = dayKey !== lastDayKey
-          const isFirstHeader = showHeader && !firstHeaderRendered
-          if (showHeader) { lastDayKey = dayKey; firstHeaderRendered = true }
           const dayLabel = `${dt.toLocaleDateString("en-US", { weekday: "short" })} · ${dt.toLocaleDateString("en-US", { month: "short" })} ${dt.getDate()}`.toUpperCase()
 
           const r = readiness[ev.id] ?? { done: 0, total: 0 }
@@ -9504,15 +9722,24 @@ function SubEventsTab({
       {showAdd && (
         <AddEventModal
           ministryId={ministryId}
-          teamId={null}
+          // A sub-event INHERITS its parent's team, it does not sit team-less.
+          // `calendar_events_insert`/`_update` gate a non-admin `can_plan_events`
+          // planner on `team_members.team_id = calendar_events.team_id`, and NULL
+          // never matches — so a team-less child is uncreatable AND uneditable by
+          // the exact persona student-org workspaces exist for (raw 42501 on
+          // create, silent 0-row no-op on edit). Inheriting also aligns the
+          // event-template lookup key with what `event-templates.ts` writes.
+          // NOTE: this is the MODAL's teamId. `SubEventsTab`'s own `teamId` prop
+          // must stay as-is — it feeds the shared SWR key.
+          teamId={parentEvent.team_id ?? null}
           userId={userId}
           parentEventId={parentEvent.id}
           excludeTypes={["welcome_week"]}
           onClose={() => setShowAdd(false)}
-          onSaved={(ev) => {
-            setSubEvents(prev => [...prev, ev].sort((a, b) => a.start_date.localeCompare(b.start_date)))
-            setShowAdd(false)
-          }}
+          // The modal invalidates the shared cache across every team scope, so this
+          // list AND the timeline's sub-event disclosure rows both pick the new
+          // child up — no per-key mutate needed here.
+          onSaved={() => setShowAdd(false)}
         />
       )}
     </div>
@@ -9939,6 +10166,14 @@ function RunSheetTab({
       .select("*").single()
     if (data) { const nb = data as EventBlock; setBlocks(prev => [...prev, nb]); setEditingId(nb.id); setDraft({ time: "", title: "", owner: "", brief: "" }) }
   }
+  // DECISION (ratified 2026-07-30, Brian): a Program block's time is INDEPENDENT
+  // of the event's own start time — deliberately, not by omission. `calendar_events`
+  // .start_date stays the single authoritative "when is this event"; `event_blocks`
+  // are the internal run-of-show only. So: editing a block never writes back to the
+  // event, and moving the event never re-derives its blocks. Do NOT "fix" this into
+  // a derivation. (`time_label` is the denormalized display copy of `start_time`;
+  // both are always written together here and in shiftBlocksAction, so they can't
+  // drift — that pairing IS load-bearing and must be preserved.)
   async function saveEdit(block: EventBlock) {
     const parsed = parseTime(draft.time)
     const patch = { time_label: parsed ? parsed.label : (draft.time.trim() || null), start_time: parsed ? parsed.start : null, title: draft.title.trim(), owner_id: draft.owner || null, brief: draft.brief.trim() || null }
