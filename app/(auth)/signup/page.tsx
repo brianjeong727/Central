@@ -19,6 +19,12 @@ const serif: React.CSSProperties = { fontFamily: SERIF, fontWeight: 400, color: 
 
 type View = "role-choice" | "admin" | "member" | "verify-code"
 
+// Shown when signUp resolves to an address that already has an account. The signup
+// screens already carry an "Already have an account? Sign in" link, so this only has to
+// name the situation — the next step is already on screen.
+const EXISTING_ACCOUNT_MSG =
+  "An account with this email already exists. Sign in instead — or reset your password if you've forgotten it."
+
 // ─── tiny icon helper ──────────────────────────────────────────
 function Icon({ d, size = 16, stroke = 1.8, style }: {
   d: string; size?: number; stroke?: number; style?: React.CSSProperties
@@ -246,6 +252,20 @@ function SignupContent() {
   const [verifyLoading, setVerifyLoading] = useState(false)
   const [verifyError,   setVerifyError]   = useState<string|null>(null)
 
+  // ── Already-registered email ────────────────────────────────────────────────
+  // Supabase's email-enumeration protection makes signUp on an address that already
+  // has an account return HTTP 200 with a SYNTHETIC user and send no email at all.
+  // `identities: []` is the only reliable signal — `confirmation_sent_at` IS populated
+  // on that fake user even though nothing was sent, so it can't be used. Without this
+  // check the caller advances to the verify-code screen and waits forever for a code
+  // that was never sent (the "signed up twice and got nothing" dead end).
+  //
+  // Note this deliberately trades a little enumeration resistance for a usable signup:
+  // saying "this email is taken" confirms the address is registered. Standard practice
+  // for consumer apps, and the alternative is stranding real people with no explanation.
+  const isExistingAccount = (d: { user: { identities?: unknown[] | null } | null } | null) =>
+    !!d?.user && Array.isArray(d.user.identities) && d.user.identities.length === 0
+
   const rateLimitCopy = (msg: string) =>
     msg.toLowerCase().includes("rate limit")
       ? "Too many attempts with this email. Please wait a few minutes or use a different address."
@@ -257,13 +277,17 @@ function SignupContent() {
     setAdminLoading(true); setAdminError(null)
     const supabase = createClient()
     const redirect = siteOrigin() + "/auth/callback?intent=register&flow=signup"
-    const { error: signUpError } = await supabase.auth.signUp({
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: adminEmail,
       password: adminPassword,
       options: { data: { name: adminName, role: founderRole, central_signup: true }, emailRedirectTo: redirect },
     })
     if (signUpError) {
       setAdminError(rateLimitCopy(signUpError.message))
+      setAdminLoading(false); return
+    }
+    if (isExistingAccount(signUpData)) {
+      setAdminError(EXISTING_ACCOUNT_MSG)
       setAdminLoading(false); return
     }
     setPendingEmail(adminEmail); setPendingRedirect(redirect); setPendingView("admin")
@@ -307,13 +331,17 @@ function SignupContent() {
     setMemberLoading(true); setMemberError(null)
     const supabase = createClient()
     const redirect = siteOrigin() + "/auth/callback?flow=signup"
-    const { error: signUpError } = await supabase.auth.signUp({
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: memberEmail,
       password: memberPassword,
       options: { data: { name: memberName, graduation_year: String(gradYearNum), gender, central_signup: true }, emailRedirectTo: redirect },
     })
     if (signUpError) {
       setMemberError(rateLimitCopy(signUpError.message))
+      setMemberLoading(false); return
+    }
+    if (isExistingAccount(signUpData)) {
+      setMemberError(EXISTING_ACCOUNT_MSG)
       setMemberLoading(false); return
     }
     setPendingEmail(memberEmail); setPendingRedirect(redirect); setPendingView("member")

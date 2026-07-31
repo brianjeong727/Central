@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import PWARegister from "@/components/pwa-register";
+import NativeSplashRelease from "@/components/native-splash-release";
 
 const bricolageGrotesque = Bricolage_Grotesque({
   variable: "--font-bricolage-grotesque",
@@ -46,6 +47,9 @@ export default function RootLayout({
       <body className="antialiased font-sans">
         <PWARegister />
         {children}
+        {/* After {children} so EntrySplash's effect (deeper in the tree, on /home and
+            /login) runs first and can claim the splash handoff. */}
+        <NativeSplashRelease />
       </body>
     </html>
   );
