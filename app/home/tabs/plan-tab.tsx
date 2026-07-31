@@ -8159,7 +8159,7 @@ export function EventPlanWorkspace({
           display: "flex", alignItems: "center", gap: "var(--space-4)",
           padding: isChild ? "11px 12px" : "13px 12px",
           borderBottom: "1px solid var(--line-3)",
-          background: isDragOver ? "var(--cream-3)" : hovered ? "var(--cream-2)" : isHigh ? "color-mix(in srgb, var(--plum) 7%, transparent)" : "transparent",
+          background: isDragOver ? "var(--cream-3)" : hovered ? "var(--cream-2)" : aug?.overdue ? "color-mix(in srgb, var(--danger) 7%, transparent)" : isHigh ? "color-mix(in srgb, var(--plum) 7%, transparent)" : "transparent",
           boxShadow: isDragOver ? "inset 0 0 0 2px var(--plum)" : "none",
           borderRadius: isDragOver ? 8 : 0,
         }}
@@ -8224,7 +8224,9 @@ export function EventPlanWorkspace({
         {(task.due_date || aug?.reassign) && (
           <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
             {task.due_date && (
-              <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{fmtMD(task.due_date)}</span>
+              aug?.overdue
+                ? <span style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", color: "var(--danger)", whiteSpace: "nowrap" }}>OVERDUE · {fmtMD(task.due_date)}</span>
+                : <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{fmtMD(task.due_date)}</span>
             )}
             {aug?.reassign}
           </span>
@@ -8326,7 +8328,7 @@ export function EventPlanWorkspace({
     const badge = aug?.badge
     return (
       <Fragment key={task.id}>
-        <div style={{ position: "relative", display: "flex", gap: 12, alignItems: "flex-start", padding: "13px 0", paddingLeft: isChild ? 14 : 0, borderBottom: "1px solid var(--line-3)" }}>
+        <div style={{ position: "relative", display: "flex", gap: 12, alignItems: "flex-start", padding: "13px 0", paddingLeft: isChild ? 14 : 0, borderBottom: "1px solid var(--line-3)", background: aug?.overdue ? "color-mix(in srgb, var(--danger) 7%, transparent)" : undefined, borderRadius: aug?.overdue ? 8 : undefined }}>
           {aug?.variant && !isChild && (
             <span aria-hidden style={{ position: "absolute", left: -2, top: 0, bottom: 0, width: 3, borderRadius: "0 2px 2px 0", background: aug.variant === "risk" ? "var(--danger)" : "var(--plum)" }} />
           )}
@@ -8346,7 +8348,9 @@ export function EventPlanWorkspace({
                   <span style={{ padding: "2px 9px", borderRadius: 999, background: "var(--ivory)", fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{task.assigned_name}</span>
                 )}
                 {task.due_date && (
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{fmtMD(task.due_date)}</span>
+                  aug?.overdue
+                    ? <span style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", color: "var(--danger)", whiteSpace: "nowrap" }}>OVERDUE · {fmtMD(task.due_date)}</span>
+                    : <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{fmtMD(task.due_date)}</span>
                 )}
                 {badge && <TriggerBadge kind={badge} copy={aug!.badgeCopy} />}
                 {aug?.reassign}
