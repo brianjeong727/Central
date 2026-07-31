@@ -5,7 +5,7 @@ import Image from "next/image"
 import dynamic from "next/dynamic"
 import useSWR from "swr"
 import { useRouter } from "next/navigation"
-import { ChevronRight, ChevronDown, X, Check, Camera, Pencil, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings, LogOut, User as UserIcon } from "lucide-react"
+import { ChevronRight, ChevronDown, X, Check, Camera, Pencil, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings, LogOut, User as UserIcon, Bell, LifeBuoy, ShieldAlert } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { MONO_STYLE, EmptyState } from "../components/shared"
 import { getInitials } from "../utils"
@@ -15,7 +15,7 @@ import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { deleteMyAccount } from "@/app/actions/delete-account"
 import { unblockUser } from "@/app/actions/blocks"
 import { useBlocks } from "../use-blocks"
-import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, MonogramChip, PocketFilterChip, PocketCard, PocketButton, PocketTag } from "@/components/central"
+import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, MonogramChip, PocketFilterChip, PocketCard, PocketButton, PocketTag, PocketRoundButton, PocketRow, PocketRowCard, PocketKicker, useScrollResetOn, useEdgeSwipeBack } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
@@ -911,8 +911,32 @@ function DangerZone({
   onAccountDeleted: () => void
   mobile?: boolean
 }) {
-  // Mobile hairline token is --line-3; desktop keeps --line.
-  const hair = mobile ? "var(--line-3)" : "var(--line)"
+  // Mobile: the Danger zone is its own settings subpage — tonal cards, not the
+  // inline editorial rule. Each action is a full-width destructiveOutline button
+  // under its own card (mobile_design_system §5: destructive never filled).
+  if (mobile) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "18px 20px" }}>
+          <p style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>Leave {ministryName}</p>
+          <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 16px", lineHeight: 1.5 }}>
+            Your messages remain visible until an admin runs cleanup. You can rejoin with an invite code.
+          </p>
+          {leaveError && <p style={{ fontSize: 12, color: "var(--danger)", margin: "0 0 12px" }}>{leaveError}</p>}
+          {!leaveConfirm ? (
+            <PocketButton variant="destructiveOutline" onClick={onShowConfirm} style={{ width: "100%" }}>Leave</PocketButton>
+          ) : (
+            <div style={{ display: "flex", gap: 8 }}>
+              <PocketButton variant="destructiveOutline" onClick={onConfirm} disabled={leaving} style={{ flex: 1, opacity: leaving ? 0.45 : 1 }}>{leaving ? "Leaving…" : "Confirm leave"}</PocketButton>
+              <PocketButton variant="quiet" surface="card" onClick={onCancel} disabled={leaving} style={{ flex: 1 }}>Cancel</PocketButton>
+            </div>
+          )}
+        </div>
+        <DeleteAccountSection email={email} onDeleted={onAccountDeleted} mobile />
+      </div>
+    )
+  }
+  const hair = "var(--line)"
   return (
     <div style={{ paddingTop: 48 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
@@ -972,6 +996,17 @@ function DeleteAccountSection({ email, onDeleted, mobile = false }: { email: str
   }
 
   if (phase === "idle") {
+    if (mobile) {
+      return (
+        <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "18px 20px" }}>
+          <p style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>Delete your account</p>
+          <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 16px", lineHeight: 1.5 }}>
+            Permanently deletes your login and personal data — profile, journal, RSVPs, and form responses. Messages you sent stay in their chats, shown as “Former member.” This can’t be undone.
+          </p>
+          <PocketButton variant="destructiveOutline" onClick={() => setPhase("confirm")} style={{ width: "100%" }}>Delete account</PocketButton>
+        </div>
+      )
+    }
     return (
       <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap", marginTop: 28 }}>
         <div style={{ flex: 1, minWidth: 200 }}>
@@ -985,6 +1020,30 @@ function DeleteAccountSection({ email, onDeleted, mobile = false }: { email: str
     )
   }
 
+  if (mobile) {
+    return (
+      <div style={{ background: "var(--ivory)", border: "1.5px solid var(--danger)", borderRadius: "var(--r-pocket)", padding: "18px 20px" }}>
+        <p style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>Delete your account?</p>
+        <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 14px", lineHeight: 1.5 }}>
+          This can’t be undone. Type your email <strong style={{ color: "var(--ink)" }}>{email}</strong> to confirm.
+        </p>
+        <Input
+          type="email"
+          autoComplete="off"
+          placeholder="you@university.edu"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          disabled={deleting}
+          style={{ width: "100%", marginBottom: 12 }}
+        />
+        {error && <p style={{ fontSize: 12, color: "var(--danger)", margin: "0 0 12px" }}>{error}</p>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <PocketButton variant="destructiveOutline" onClick={handleDelete} disabled={deleting || !emailMatches} style={{ flex: 1, opacity: (deleting || !emailMatches) ? 0.45 : 1 }}>{deleting ? "Deleting…" : "Delete"}</PocketButton>
+          <PocketButton variant="quiet" surface="card" onClick={() => { setPhase("idle"); setTyped(""); setError(null) }} disabled={deleting} style={{ flex: 1 }}>Cancel</PocketButton>
+        </div>
+      </div>
+    )
+  }
   return (
     <div style={{ marginTop: 28, border: "1px solid var(--danger)", borderRadius: mobile ? "var(--r-pocket)" : 12, padding: "20px 22px", background: mobile ? "var(--ivory)" : "var(--cream)" }}>
       <p style={{ fontFamily: "var(--serif)", fontSize: 20, fontWeight: 400, color: "var(--ink)", margin: "0 0 6px" }}>Delete your account?</p>
@@ -1012,6 +1071,25 @@ function DeleteAccountSection({ email, onDeleted, mobile = false }: { email: str
 }
 
 // ── Profile Tab ───────────────────────────────────────────────────────────────
+
+// Mobile settings hub. The gear on the profile chrome opens a sections list;
+// each row drills into its detail (mirrors the Church-Settings hub, settings-tab.tsx).
+type ProfileSettingsView = "hub" | "notifications" | "account" | "danger"
+const SETTINGS_LABELS: Record<ProfileSettingsView, string> = {
+  hub: "Settings",
+  notifications: "Notifications",
+  account: "Account & support",
+  danger: "Danger zone",
+}
+// 40px tonal chip holding a settings glyph — the leading element in the hub rows
+// (mirrors settings-tab.tsx SettingsIconChip).
+function SettingsIconChip({ icon }: { icon: React.ReactNode }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 14, background: "var(--line-2)", color: "var(--plum)", flexShrink: 0 }}>
+      {icon}
+    </span>
+  )
+}
 
 export function ProfileTab({
   userId,
@@ -1044,6 +1122,21 @@ export function ProfileTab({
   const [leaveConfirm, setLeaveConfirm] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [leaveError, setLeaveError] = useState<string | null>(null)
+  // Mobile settings hub (gear → sections → subpage). null = on the profile;
+  // "hub" = the section list; a key = one drilled section. URL-synced (?pset,
+  // folded — resets on tab leave). Desktop never sets this (settings stay inline).
+  const { setParam: setNavParam } = useNavState()
+  const [settingsView, setSettingsView] = useState<ProfileSettingsView | null>(() => {
+    if (typeof window === "undefined") return null
+    const p = new URLSearchParams(window.location.search).get("pset")
+    return (["hub", "notifications", "account", "danger"] as const).includes(p as ProfileSettingsView) ? (p as ProfileSettingsView) : null
+  })
+  const openSettings = (v: ProfileSettingsView) => { setSettingsView(v); setNavParam("pset", v) }
+  const closeSettings = () => { setSettingsView(null); setNavParam("pset", null) }
+  useScrollResetOn([settingsView])
+  // Edge-swipe-back mirrors the chrome chevron (Convention #22): from a section →
+  // hub, from the hub → profile.
+  const settingsSwipeRef = useEdgeSwipeBack<HTMLDivElement>(settingsView === "hub" ? closeSettings : () => openSettings("hub"))
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [draft, setDraft] = useState<Record<ProfileDraftField, string>>({
@@ -1319,22 +1412,27 @@ export function ProfileTab({
 
       {activeSection === "spiritual-profile" && <div className="md:flex md:flex-col md:flex-1">
 
-        {/* ── Mobile: single chrome row (no two-header). Editing swaps the title
-            to "Edit profile" and surfaces Cancel/Save in the chrome (§1). ── */}
+        {/* ── Mobile: profile chrome + identity — hidden while in the settings drill.
+            The chrome's action slot carries the settings gear (Cancel while editing).
+            Editing swaps the title to "Edit profile" + Cancel/Save (§1). ── */}
+        {settingsView === null && (<>
         <PocketChrome
           title={editing ? "Edit profile" : "Profile"}
           back={editing ? cancelEdit : onBack}
           hideAvatar
           userName=""
           onAvatarClick={() => {}}
-          action={editing ? <PocketButton variant="quiet" compact surface="page" onClick={cancelEdit}>Cancel</PocketButton> : undefined}
+          action={editing
+            ? <PocketButton variant="quiet" compact surface="page" onClick={cancelEdit}>Cancel</PocketButton>
+            : <PocketRoundButton ariaLabel="Settings" onClick={() => openSettings("hub")}><Settings size={16} /></PocketRoundButton>}
           action2={editing ? <PocketButton variant="primary" compact onClick={saveEdit} disabled={saving}>{saving ? "Saving…" : "Save"}</PocketButton> : undefined}
         />
 
-        {/* ── Mobile: identity card (tonal ivory) ── */}
+        {/* ── Mobile: identity card (tonal ivory). Edit is a quiet plum action tucked
+            into the card's top-right corner — no dedicated button row. ── */}
         <div className="md:hidden px-5 pb-2">
-          <PocketCard padding="22px 20px">
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <PocketCard padding="20px">
+            <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
               <label className="group relative flex-shrink-0" style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
                 <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
                 {profile.avatar_url
@@ -1346,8 +1444,8 @@ export function ProfileTab({
                 </div>
                 {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 40%, transparent)" }}><div className="animate-spin" style={{ width: 18, height: 18, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
               </label>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h1 style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: 0, lineHeight: 1.15 }}>{profile.name}</h1>
+              <div style={{ flex: 1, minWidth: 0, paddingRight: !editing ? 40 : 0 }}>
+                <h1 style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: 0, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.name}</h1>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, minWidth: 0 }}>
                   <PocketTag label={roleLabel(profile.role, null)} variant="role" />
                   <span style={{ fontSize: 13, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.email}</span>
@@ -1359,15 +1457,71 @@ export function ProfileTab({
                   </div>
                 )}
               </div>
+              {!editing && (
+                <button onClick={startEdit} aria-label="Edit profile" style={{ position: "absolute", top: 0, right: 0, display: "inline-flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: "var(--plum)", fontSize: 12.5, fontWeight: 600, padding: 0, WebkitTapHighlightColor: "transparent" }}>
+                  <Pencil size={12.5} />Edit
+                </button>
+              )}
             </div>
             {avatarError && <p style={{ fontSize: 11, color: "var(--danger)", margin: "10px 0 0" }}>{avatarError}</p>}
-            {!editing && (
-              <PocketButton variant="quiet" surface="card" onClick={startEdit} style={{ marginTop: 16 }}>
-                <Pencil size={13} />Edit profile
-              </PocketButton>
-            )}
           </PocketCard>
         </div>
+        </>)}
+
+        {/* ── Mobile: settings drill (gear → hub → section). md:hidden; desktop keeps
+            settings inline and never sets settingsView. Edge-swipe-back = the chevron. ── */}
+        {settingsView !== null && (
+          <div className="md:hidden" ref={settingsSwipeRef}>
+            <PocketChrome
+              title={SETTINGS_LABELS[settingsView]}
+              back={settingsView === "hub" ? closeSettings : () => openSettings("hub")}
+              hideAvatar
+              userName=""
+              onAvatarClick={() => {}}
+            />
+            {settingsView === "hub" ? (
+              <div className="px-5 pt-2 pb-6">
+                <PocketKicker label="Settings" />
+                <PocketRowCard>
+                  <PocketRow leading={<SettingsIconChip icon={<Bell size={17} strokeWidth={2} />} />} title="Notifications" chevron onClick={() => openSettings("notifications")} />
+                  <PocketRow leading={<SettingsIconChip icon={<LifeBuoy size={17} strokeWidth={2} />} />} title="Account & support" chevron onClick={() => openSettings("account")} />
+                  <PocketRow leading={<SettingsIconChip icon={<ShieldAlert size={17} strokeWidth={2} />} />} title="Danger zone" chevron isLast onClick={() => openSettings("danger")} />
+                </PocketRowCard>
+                {/* Sign out — neutral action, kept OUT of the red Danger zone. */}
+                <PocketButton variant="quiet" surface="page" onClick={onLogout} style={{ width: "100%", marginTop: 24 }}>
+                  <LogOut size={14} />Sign out
+                </PocketButton>
+              </div>
+            ) : (
+              <div className="px-5 pt-2 pb-6">
+                {settingsView === "notifications" && (
+                  <NotificationsSection
+                    userId={userId}
+                    ministryId={initialProfile.ministry_id ?? ""}
+                    notificationSettings={profile.notification_settings}
+                    onSettingsChange={(s: NotificationSettings) => setProfile(p => ({ ...p, notification_settings: s }))}
+                    mobile
+                  />
+                )}
+                {settingsView === "account" && <AccountLinksSection userId={userId} mobile />}
+                {settingsView === "danger" && (
+                  <DangerZone
+                    mobile
+                    ministryName={ministryName}
+                    leaveConfirm={leaveConfirm}
+                    leaving={leaving}
+                    leaveError={leaveError}
+                    onShowConfirm={() => setLeaveConfirm(true)}
+                    onCancel={() => { setLeaveConfirm(false); setLeaveError(null) }}
+                    onConfirm={handleLeaveMinistry}
+                    email={profile.email ?? ""}
+                    onAccountDeleted={handleAccountDeleted}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Desktop: page-title header (R1 — mono eyebrow + serif H1) ──
             Title / gear only; no buttons. Edit / Save / Cancel live in the
@@ -1442,41 +1596,14 @@ export function ProfileTab({
           </div>
         </div>
 
-        {/* ── Mobile: profile sections ── */}
+        {/* ── Mobile: profile content — About / Faith / Prayer only. Notifications,
+            Account & support, Sign out, and Danger zone moved into the gear → settings
+            hub above (§ Profile). Hidden while in the settings drill. ── */}
+        {settingsView === null && (
         <div className="md:hidden px-5 pb-6" style={{ paddingTop: 24 }}>
           {renderProfileSections(true)}
-          <div style={{ marginTop: 24, marginBottom: 24 }}>
-            <NotificationsSection
-              userId={userId}
-              ministryId={initialProfile.ministry_id ?? ""}
-              notificationSettings={profile.notification_settings}
-              onSettingsChange={(s: NotificationSettings) => setProfile(p => ({ ...p, notification_settings: s }))}
-              mobile
-            />
-          </div>
-          <div style={{ marginBottom: 24 }}>
-            <AccountLinksSection userId={userId} mobile />
-          </div>
-          {/* Sign out — mobile only. Desktop reaches this via the sidebar nav
-              (desktop-nav.tsx); the mobile pill nav has no Profile item, so the
-              sign-out affordance must live here. Neutral action, kept OUT of the
-              red Danger Zone below (which is Leave / Delete account). */}
-          <PocketButton variant="quiet" surface="page" onClick={onLogout} style={{ width: "100%", marginBottom: 24 }}>
-            <LogOut size={14} />Sign out
-          </PocketButton>
-          <DangerZone
-            mobile
-            ministryName={ministryName}
-            leaveConfirm={leaveConfirm}
-            leaving={leaving}
-            leaveError={leaveError}
-            onShowConfirm={() => setLeaveConfirm(true)}
-            onCancel={() => { setLeaveConfirm(false); setLeaveError(null) }}
-            onConfirm={handleLeaveMinistry}
-            email={profile.email ?? ""}
-            onAccountDeleted={handleAccountDeleted}
-          />
         </div>
+        )}
       </div>}
     </div>
   )

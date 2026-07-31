@@ -14,10 +14,13 @@ import { enforceOAuthAccountPolicy } from "@/lib/oauth-account-guard"
 
 export async function verifyNativeOAuthSession(
   flow: "signin" | "signup"
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; reason?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { ok: false }
+  // `reason` is temporary diagnostic surfaced to the native sign-in UI: it
+  // distinguishes a session the server never saw (cookie/propagation problem)
+  // from a session the mint-guard deliberately tore down (unknown signin).
+  if (!user) return { ok: false, reason: "no-server-session" }
 
   const admin = createAdminClient()
   const { allowed } = await enforceOAuthAccountPolicy(admin, user, flow)
@@ -25,6 +28,7 @@ export async function verifyNativeOAuthSession(
     // Kill the server-side (cookie) session for the torn-down user; the client
     // also signs out locally on rejection.
     await supabase.auth.signOut()
+    return { ok: false, reason: "guard-rejected" }
   }
-  return { ok: allowed }
+  return { ok: true }
 }
