@@ -43,7 +43,7 @@ export function seasonLabelOf(eventYMD) {
 export const EVENT_PRESET_DATA = {
   welcome_week: {
     label: "Welcome Week", icon: "🎉", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--plum)",
-    budgetCategory: "welcoming_week", canHaveSubEvents: true,
+    budgetCategory: "welcoming_week",
     description:
       "Two-week freshman welcome across both campuses — Popsicle Socials, Game Day, Involvement Fair, sports, Praise Night, Welcoming Night, Tag-Alongs, The FAIR. Reserve every venue in June.",
     defaults: {
@@ -109,7 +109,7 @@ export const EVENT_PRESET_DATA = {
 
   coffeehouse: {
     label: "Coffeehouse", icon: "☕", dot: "var(--warm-tan)", bg: "#FDF6EC", text: "#6B4C1E",
-    budgetCategory: "coffeehouse", canHaveSubEvents: false,
+    budgetCategory: "coffeehouse",
     description:
       "Fall talent show at Rangos Hall — ~7 acts (music, dance, skits, testimony) from ~30 signups, run on a form pipeline that starts in July.",
     defaults: {
@@ -165,7 +165,7 @@ export const EVENT_PRESET_DATA = {
 
   turkey_bowl: {
     label: "Turkey Bowl", icon: "🏈", dot: "var(--sage)", bg: "#EEF4F1", text: "#2D5445",
-    budgetCategory: "turkeybowl", canHaveSubEvents: false,
+    budgetCategory: "turkeybowl",
     description:
       "Fall flag football — girls and guys run as separate events (late Oct / early Nov). Shirts are the big line: ~190 at ~$1,530, resold at $10.",
     defaults: {
@@ -215,7 +215,7 @@ export const EVENT_PRESET_DATA = {
 
   retreat: {
     label: "Retreat", icon: "⛺", dot: "var(--body)", bg: "var(--body-bg)", text: "var(--plum)",
-    budgetCategory: "retreat", canHaveSubEvents: false,
+    budgetCategory: "retreat",
     description:
       "Overnight retreats — Women's late Oct, Men's early Feb, EM early Mar. Retreat leads (one YA + one undergrad) run program; CCSF co-plans logistics.",
     defaults: {
@@ -261,7 +261,7 @@ export const EVENT_PRESET_DATA = {
 
   appreciation_night: {
     label: "Appreciation Night", icon: "✨", dot: "#C97BB0", bg: "#FAF0F7", text: "#8A3070",
-    budgetCategory: "appreciation_night", canHaveSubEvents: false,
+    budgetCategory: "appreciation_night",
     description:
       "GAN/SAN — February appreciation nights. Guys plan the sisters' night and vice versa. Flowers, food, decor, program.",
     defaults: {
@@ -305,7 +305,7 @@ export const EVENT_PRESET_DATA = {
 
   social: {
     label: "Social", icon: "🎊", dot: "var(--muted-text)", bg: "var(--cream-panel)", text: "var(--body)",
-    budgetCategory: null, canHaveSubEvents: false,
+    budgetCategory: null,
     description:
       "Social events — Churchwide Picnic, EMKM Field Day, Senior Send-off, game nights, hangouts. Volunteers usually pulled from DGs.",
     defaults: {
@@ -344,7 +344,7 @@ export const EVENT_PRESET_DATA = {
 
   ministry: {
     label: "Ministry Event", icon: "🙏", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--body)",
-    budgetCategory: null, canHaveSubEvents: false,
+    budgetCategory: null,
     description:
       "Praise nights, prayer meetings, DG kickoffs, outreach fairs, evangelism, volunteering. The lock-up checklist rides on every church event.",
     defaults: {

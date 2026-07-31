@@ -45,7 +45,8 @@ import { EventCompileModal } from "./event-compile"
 import { MeetingNotesSection } from "./meeting-notes"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketChip } from "../components/pocket-header"
-import { getInitials, formatRelativeTime } from "../utils"
+import { getInitials, formatRelativeTime, eventDaySpan, eventDateRangeLabel, eventDateRangeShort, eventDayHeaderLabel } from "../utils"
+import { useContainerRollup, ContainerWeekTimeline, ContainerStaffing, ContainerTaskRollup, SectionKicker, type ContainerRollup } from "./event-container"
 import { useIsMobile } from "../use-is-mobile"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
@@ -837,10 +838,8 @@ function EventsAgendaList({
     const metaDate = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
     const timeStr = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
     const dtStr = ev.all_day ? metaDate : `${metaDate} · ${timeStr}`
-    const multiDay = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime() !== new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() && !isNaN(end.getTime())
-    const rangeStr = multiDay
-      ? `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-      : dtStr
+    const multiDay = !isNaN(end.getTime()) && eventDaySpan(d, end) > 1
+    const rangeStr = multiDay ? eventDateRangeShort(d, end) : dtStr
 
     const dayNum = daysUntil(d, now)
     const bigNum = dayNum >= 30 ? String(Math.round(dayNum / 30)) : String(Math.max(dayNum, 0))
@@ -6817,7 +6816,9 @@ export function AddEventModal({
                   { key: "acts" as EventExtraTab, label: "Performances", hint: "act line-up + sound checks" },
                   { key: "teams" as EventExtraTab, label: "Teams", hint: "rosters & brackets" },
                   { key: "transport" as EventExtraTab, label: "Transport", hint: "drivers & cars" },
-                  { key: "program" as EventExtraTab, label: "Program", hint: "run-of-show blocks" },
+                  // "Program" is deliberately absent: it never had a render branch (it
+                  // added a permanently blank tab), and every event already carries the
+                  // Run of Show tab that it duplicated in name.
                 ]).map(m => {
                   const on = extras.includes(m.key)
                   return (
@@ -7270,7 +7271,41 @@ export function EventPlanWorkspace({
   // Extra tabs = the type's built-in modules ∪ the plan's free-form modules
   // (type_data.extras, chosen in the Start-from-scratch creator).
   const planExtras = ((plan?.type_data as { extras?: EventExtraTab[] } | undefined)?.extras ?? [])
-  const extraTabs: EventExtraTab[] = [...new Set([...typeCfg.extraTabs, ...planExtras])]
+  // 'program' is retired — it has no render branch, so any plan still carrying it in
+  // type_data.extras would show a blank tab. Filtered out rather than migrated; the
+  // union member and its label/meta entries stay so a stored value can't crash a render.
+  const extraTabs: EventExtraTab[] = [...new Set([...typeCfg.extraTabs, ...planExtras])].filter(t => t !== "program")
+
+  // ── Container vs leaf (see app/home/tabs/event-container.tsx) ────────────────
+  // A CONTAINER is an event whose content is really its sub-events (Welcome Week and
+  // its nights). Its Run of Show / Roles / Countdown become views onto the nights
+  // rather than rivals to them. Derived from extraTabs — which is fixed at creation —
+  // so a parent's tab set never rearranges the moment its first night is added, the
+  // way a `has children` check would. The parent_event_id check holds the one-level
+  // nesting cap: a child created with a container-ish type must not become one.
+  const isContainer = extraTabs.includes("sub_events") && !calendarEvent.parent_event_id
+
+  // Batched nights + their plans/roles/tasks/blocks. Feeds all three container
+  // surfaces (and Sub-events) from ONE fetch — never per-child queries.
+  const containerRollup = useContainerRollup(isContainer ? calendarEvent.id : null, ministryId)
+
+  // Run-of-show blocks written on the WEEK itself, from before timing moved onto the
+  // nights. Shown in the week timeline rather than silently orphaned.
+  const [ownBlocks, setOwnBlocks] = useState<EventBlock[]>([])
+  useEffect(() => {
+    if (!isContainer || !plan) { setOwnBlocks([]); return }
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from("event_blocks").select("*")
+        .eq("event_plan_id", plan.id).eq("ministry_id", ministryId)
+        .order("day_index", { ascending: true })
+        .order("sort_order", { ascending: true })
+      if (!cancelled) setOwnBlocks((data ?? []) as EventBlock[])
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isContainer, plan?.id, ministryId])
   const allValidTabs: ActiveSection[] = [...coreTabs, ...extraTabs]
   const [tasks, setTasks] = useState<EventTask[]>([])
   const [roles, setRoles] = useState<EventRole[]>([])
@@ -7973,7 +8008,7 @@ export function EventPlanWorkspace({
     { key: 'overview', label: 'Overview' },
     { key: 'checklist', label: 'Countdown' },
     { key: 'roles', label: 'Roles & Leads' },
-    { key: 'runsheet', label: 'Showtime' },
+    { key: 'runsheet', label: 'Run of Show' },
     ...extraTabs.map(t => ({ key: t as ActiveSection, label: EXTRA_TAB_LABELS[t] })),
   ]
 
@@ -8388,13 +8423,21 @@ export function EventPlanWorkspace({
               const taskDone = tasks.filter(t => t.completed).length
               const rolesTotal = roles.length
               const rolesAssigned = roles.filter(r => r.assigned_to).length
-              const hubTime = calendarEvent.all_day ? "" :
-                startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
-                " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              const hubSpan = eventDaySpan(startDate, endDate)
+              // Multi-day clock times belong to different days — qualify them with the
+              // date, exactly as the desktop Overview does (a bare "5:00 PM – 2:00 PM"
+              // reads as nonsense).
+              const hubHM = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              const hubTime = calendarEvent.all_day ? ""
+                : hubSpan > 1
+                  ? `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${hubHM(startDate)} – ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${hubHM(endDate)}`
+                  : `${hubHM(startDate)} – ${hubHM(endDate)}`
               const HUB_META: Record<string, { iconKey: string; sub: string }> = {
                 overview: { iconKey: "chart", sub: "Facts, stats & planning notes" },
                 checklist: { iconKey: "plan", sub: taskTotal > 0 ? `${taskDone} of ${taskTotal} done` : "The T-minus plan — tasks by phase" },
-                roles: { iconKey: "users", sub: rolesTotal > 0 ? `${rolesAssigned} of ${rolesTotal} assigned` : "Assign who owns each part" },
+                // A container's spokes are views onto its nights, so they say so.
+                roles: { iconKey: "users", sub: isContainer ? "Week-spanning roles + every night's leads" : rolesTotal > 0 ? `${rolesAssigned} of ${rolesTotal} assigned` : "Assign who owns each part" },
+                runsheet: { iconKey: "clock", sub: isContainer ? "The whole week, night by night" : "Day-of timing, block by block" },
                 notes: { iconKey: "book", sub: "Cross-year pain points" },
                 sub_events: { iconKey: "calendar", sub: EXTRA_TAB_META.sub_events.subtitle },
                 acts: { iconKey: "sparkle", sub: EXTRA_TAB_META.acts.subtitle },
@@ -8405,7 +8448,8 @@ export function EventPlanWorkspace({
               return (
                 <div>
                   <MobileFactsGrid facts={[
-                    { label: "Date", value: startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) },
+                    { label: "Date", value: eventDateRangeLabel(startDate, endDate) },
+                    ...(hubSpan > 1 ? [{ label: "Days", value: String(hubSpan) }] : []),
                     { label: "Time", value: hubTime || "—" },
                     { label: "Location", value: calendarEvent.location?.trim() || "—" },
                     { label: "Plan start", value: planStartDate ? fmtMD(planStartDate) : "—" },
@@ -8458,23 +8502,38 @@ export function EventPlanWorkspace({
                 : pct === 100 ? { color: "var(--success)", label: "Ready" }
                 : pct >= 50 ? { color: "var(--sage)", label: "In progress" }
                 : { color: isMobile ? "var(--danger)" : "var(--gold)", label: "Needs attention" }
-              // Identity facts — display-only. Two columns: LEFT Time + Location,
+              // Identity facts — display-only. Two columns: LEFT Dates/Time + Location,
               // RIGHT Plan start + Crunch start (dates are edited in the Edit-event
               // modal, not here). Time omits when empty (all-day); Location and
               // Crunch start show a muted em-dash when unset.
-              const dateOnly = startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-              const timeVal = calendarEvent.all_day ? "" :
-                startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
-                " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              //
+              // Multi-day events lead with the RANGE and carry an explicit day count.
+              // The end date used to be invisible here (and `Time` is suppressed
+              // entirely for all-day events), which is how a Welcome Week seeded at
+              // the preset's 14 days could sit unnoticed against an 11-day reality.
+              const daySpan = eventDaySpan(startDate, endDate)
+              const isMultiDay = daySpan > 1
+              const dateOnly = eventDateRangeLabel(startDate, endDate)
+              const hhmm = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              const mdTime = (d: Date) => `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${hhmm(d)}`
+              // A multi-day event's clock times belong to different days — rendering
+              // them as one range reads as nonsense ("5:00 PM – 2:00 PM").
+              const timeVal = calendarEvent.all_day ? ""
+                : isMultiDay ? `${mdTime(startDate)} – ${mdTime(endDate)}`
+                : `${hhmm(startDate)} – ${hhmm(endDate)}`
               const locationVal = calendarEvent.location?.trim() || ""
               const descVal = calendarEvent.description?.trim() || ""
-              const leftFacts: { k: string; v: string; muted?: boolean }[] = [
+              // `nowrap` marks facts whose value is a short date that must never break
+              // mid-value ("Aug / 6"). Free-text facts (Location, What) still wrap.
+              type Fact = { k: string; v: string; muted?: boolean; nowrap?: boolean }
+              const leftFacts: Fact[] = [
+                ...(isMultiDay ? [{ k: "Dates", v: `${eventDateRangeShort(startDate, endDate)} · ${daySpan} days`, nowrap: true }] : []),
                 ...(timeVal ? [{ k: "Time", v: timeVal }] : []),
                 { k: "Location", v: locationVal || "—", muted: !locationVal },
               ]
-              const rightFacts: { k: string; v: string; muted?: boolean }[] = [
-                { k: "Plan start", v: planStartDate ? fmtMD(planStartDate) : "—", muted: !planStartDate },
-                { k: "Crunch start", v: crunchDate ? fmtMD(crunchDate) : "—", muted: !crunchDate },
+              const rightFacts: Fact[] = [
+                { k: "Plan start", v: planStartDate ? fmtMD(planStartDate) : "—", muted: !planStartDate, nowrap: true },
+                { k: "Crunch start", v: crunchDate ? fmtMD(crunchDate) : "—", muted: !crunchDate, nowrap: true },
               ]
 
               const monoLabel: React.CSSProperties = { ...MONO_STYLE, margin: 0 }
@@ -8483,10 +8542,10 @@ export function EventPlanWorkspace({
               const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: isMobile ? 22 : 34, fontWeight: 400, letterSpacing: isMobile ? -0.3 : -0.6, lineHeight: 1.05, marginTop: 10 }
               const bigInput: React.CSSProperties = { ...bigNumber, color: "var(--ink)", background: "transparent", border: "none", outline: "none", padding: 0, width: "100%" }
               const factKey: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }
-              const renderFact = (f: { k: string; v: string; muted?: boolean }, keyW: number) => (
+              const renderFact = (f: Fact, keyW: number) => (
                 <div key={f.k} style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
                   <span style={{ ...factKey, width: keyW, flexShrink: 0 }}>{f.k}</span>
-                  <span style={{ fontSize: 15, color: f.muted ? "var(--faint)" : "var(--ink)", lineHeight: 1.5 }}>{f.v}</span>
+                  <span style={{ fontSize: 15, color: f.muted ? "var(--faint)" : "var(--ink)", lineHeight: 1.5, ...(f.nowrap ? { whiteSpace: "nowrap" as const } : null) }}>{f.v}</span>
                 </div>
               )
 
@@ -8782,6 +8841,28 @@ export function EventPlanWorkspace({
                   onPhaseDrop={(phase) => { if (dragTaskId) requestMoveToSection(dragTaskId, phase.sectionKey); clearDrag() }}
                   stickyTop={0}
                 />
+
+                {/* CONTAINER: the week's own checklist above stays the editable list;
+                    this read-only roll-up answers "are the nights on track" without
+                    eight drill-ins. Tapping a night opens its own Countdown. */}
+                {isContainer && (
+                  <>
+                    <SectionKicker
+                      label="Across the nights"
+                      hint="Open items on each night's own checklist. Tap a night to work on it."
+                      isMobile={isMobile}
+                    />
+                    {containerRollup.loading ? (
+                      <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "10px 2px" }}>Loading…</p>
+                    ) : (
+                      <ContainerTaskRollup
+                        nights={containerRollup.children}
+                        isMobile={isMobile}
+                        onOpenChild={onOpenChild}
+                      />
+                    )}
+                  </>
+                )}
 
                 {/* Section-move date-change confirmation (dated task → different window) */}
                 {pendingSectionMove && (
@@ -9203,9 +9284,22 @@ export function EventPlanWorkspace({
                   </div>
                 )}
 
+                {/* On a CONTAINER these are the WEEK-SPANNING roles (Director,
+                    Photographer) — the per-night leads live in the staffing table
+                    below, on the night that owns them. */}
+                {isContainer && (
+                  <SectionKicker
+                    label="Week-spanning"
+                    hint="Roles that cover the whole week. A lead for one night belongs to that night — staff those below."
+                    isMobile={isMobile}
+                  />
+                )}
+
                 {roles.length === 0 ? (
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)", padding: "24px 0 8px" }}>
-                    {canEdit ? "No roles yet — add the first one." : "No roles defined yet."}
+                    {canEdit
+                      ? (isContainer ? "No week-spanning roles yet." : "No roles yet — add the first one.")
+                      : "No roles defined yet."}
                   </p>
                 ) : (
                   <>
@@ -9216,6 +9310,32 @@ export function EventPlanWorkspace({
                         <GroupHeader label="Covered" count={covered.length} />
                         {covered.map((role, i) => renderRow(role, i === covered.length - 1))}
                       </>
+                    )}
+                  </>
+                )}
+
+                {/* Staff every night from one screen. The write lands on the NIGHT's
+                    own event_roles row — same statement its own screen issues. */}
+                {isContainer && (
+                  <>
+                    <SectionKicker
+                      label="Across the nights"
+                      hint="Each night owns its own roles. Assign them here or on the night — it's the same record."
+                      isMobile={isMobile}
+                    />
+                    {containerRollup.loading ? (
+                      <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "10px 2px" }}>Loading…</p>
+                    ) : (
+                      <ContainerStaffing
+                        nights={containerRollup.children}
+                        members={members}
+                        canEdit={canEdit}
+                        isMobile={isMobile}
+                        ministryId={ministryId}
+                        userId={userId}
+                        onOpenChild={onOpenChild}
+                        onChanged={containerRollup.refresh}
+                      />
                     )}
                   </>
                 )}
@@ -9231,6 +9351,7 @@ export function EventPlanWorkspace({
                 userId={userId}
                 canEdit={canEdit}
                 onOpenChild={onOpenChild}
+                rollup={containerRollup}
               />
             )}
 
@@ -9264,16 +9385,39 @@ export function EventPlanWorkspace({
               />
             )}
 
-            {/* ── Showtime (all event types) ── */}
+            {/* ── Run of Show ──
+                LEAF: the editable per-day block grid.
+                CONTAINER: a read-only merged week timeline stitched from the nights'
+                blocks — the week's run of show is a VIEW of the nights', not a rival
+                editable surface (which is what made "Welcome Week has a showtime and
+                so does each night" incoherent). Blocks written on the week itself
+                before this are surfaced, never stranded. */}
             {shownSection === 'runsheet' && plan && (
-              <RunSheetTab
-                plan={plan}
-                event={calendarEvent}
-                members={members}
-                canEdit={canEdit}
-                ministryId={ministryId}
-                userId={userId}
-              />
+              isContainer ? (
+                <div>
+                  {!isMobile && <EventSectionHeader title="Run of Show" />}
+                  {containerRollup.loading ? (
+                    <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p>
+                  ) : (
+                    <ContainerWeekTimeline
+                      nights={containerRollup.children}
+                      isMobile={isMobile}
+                      onOpenChild={onOpenChild}
+                      ownBlocks={ownBlocks}
+                      eventTitle={calendarEvent.title}
+                    />
+                  )}
+                </div>
+              ) : (
+                <RunSheetTab
+                  plan={plan}
+                  event={calendarEvent}
+                  members={members}
+                  canEdit={canEdit}
+                  ministryId={ministryId}
+                  userId={userId}
+                />
+              )
             )}
           </>
         )}
@@ -9318,6 +9462,7 @@ function SubEventsTab({
   userId,
   canEdit,
   onOpenChild,
+  rollup,
 }: {
   parentEvent: CalendarEvent
   ministryId: string
@@ -9327,65 +9472,56 @@ function SubEventsTab({
   // body-swap. Omitted when already viewing a child (nesting capped at one
   // level) — rows then render without a drill affordance.
   onOpenChild?: (ev: CalendarEvent) => void
+  /** Shared container rollup — children + readiness already batched by the parent. */
+  rollup: ContainerRollup
 }) {
-  const supabase = createClient()
   // Mobile restyle only (tonal borderless rows + kicker day labels) — structure unchanged.
   const isMobile = useIsMobile()
-  const [subEvents, setSubEvents] = useState<CalendarEvent[]>([])
-  // childId → checklist progress, batched (never N+1).
-  const [readiness, setReadiness] = useState<Record<string, { done: number; total: number }>>({})
-  const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("calendar_events")
-        .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
-        .eq("parent_event_id", parentEvent.id)
-        .order("start_date", { ascending: true })
-      const rows = (data ?? []) as CalendarEvent[]
-      setSubEvents(rows)
+  // Children + per-child readiness come from the ONE batched fetch the container
+  // already runs for its Run of Show / Roles / Countdown surfaces — this tab used to
+  // repeat the same three queries for itself.
+  const subEvents = rollup.children.map((c) => c.event)
+  const readiness: Record<string, { done: number; total: number }> = Object.fromEntries(
+    rollup.children.map((c) => [c.event.id, { done: c.done, total: c.total }]),
+  )
+  const loading = rollup.loading
 
-      // Batch readiness: child events → their event_plans → event_tasks
-      // done/total, aggregated client-side. Two queries total (no per-row).
-      // Scope the plan lookup by ministry_id (event_tasks has no ministry_id
-      // column, so it's scoped transitively through these plan ids).
-      const childIds = rows.map((e) => e.id)
-      if (childIds.length) {
-        const { data: plans } = await supabase
-          .from("event_plans")
-          .select("id, calendar_event_id")
-          .in("calendar_event_id", childIds)
-          .eq("ministry_id", ministryId)
-        const planRows = (plans ?? []) as { id: string; calendar_event_id: string }[]
-        const planToChild = new Map(planRows.map((p) => [p.id, p.calendar_event_id]))
-        const map: Record<string, { done: number; total: number }> = {}
-        childIds.forEach((id) => { map[id] = { done: 0, total: 0 } })
-        if (planRows.length) {
-          const { data: taskRows } = await supabase
-            .from("event_tasks")
-            .select("event_plan_id, completed")
-            .in("event_plan_id", planRows.map((p) => p.id))
-          ;((taskRows ?? []) as { event_plan_id: string; completed: boolean }[]).forEach((t) => {
-            const childId = planToChild.get(t.event_plan_id)
-            if (!childId) return
-            map[childId].total++
-            if (t.completed) map[childId].done++
-          })
-        }
-        setReadiness(map)
+  // Day-grouped, sorted-ascending rows (the rollup already orders by start_date).
+  // Computed up-front rather than by mutating counters mid-render — the React
+  // Compiler rejects reassignment that outlives the render pass.
+  const headerForChild = new Map<string, { label: string; first: boolean }>()
+  {
+    let lastDayKey: string | null = null
+    let seenFirst = false
+    for (const ev of subEvents) {
+      const dt = new Date(ev.start_date)
+      const dayKey = dt.toDateString()
+      if (dayKey !== lastDayKey) {
+        lastDayKey = dayKey
+        headerForChild.set(ev.id, { label: eventDayHeaderLabel(dt), first: !seenFirst })
+        seenFirst = true
       }
-      setLoading(false)
     }
-    load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parentEvent.id])
+  }
 
-  // Day-grouped, sorted-ascending rows (query already orders by start_date).
-  let lastDayKey: string | null = null
-  let firstHeaderRendered = false
+  // The parent's end_date is the user's to set — a week whose nights only fill 11
+  // of its 14 days is their business. A night scheduled OUTSIDE the parent's dates
+  // is not: it's a real contradiction, so it gets named here rather than corrected.
+  // Compared as calendar days, so a night that starts at 9pm on the closing day
+  // isn't flagged just because the parent's end timestamp reads midnight.
+  const dayOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const parentFrom = new Date(parentEvent.start_date)
+  const parentTo = new Date(parentEvent.end_date)
+  const parentRangeKnown = !isNaN(parentFrom.getTime()) && !isNaN(parentTo.getTime())
+  const isOutOfRange = (ev: CalendarEvent) => {
+    const d = new Date(ev.start_date)
+    if (!parentRangeKnown || isNaN(d.getTime())) return false
+    return dayOf(d) < dayOf(parentFrom) || dayOf(d) > dayOf(parentTo)
+  }
+  const outOfRangeCount = subEvents.filter(isOutOfRange).length
 
   return (
     <div>
@@ -9401,15 +9537,21 @@ function SubEventsTab({
         <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>No sub-events yet. Add the individual events that make up {parentEvent.title}.</p>
       )}
 
+      {outOfRangeCount > 0 && (
+        <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 18px" }}>
+          {outOfRangeCount === 1 ? "One sub-event falls" : `${outOfRangeCount} sub-events fall`} outside {parentEvent.title}&rsquo;s dates
+          ({eventDateRangeShort(parentFrom, parentTo)}). Extend the event, or move {outOfRangeCount === 1 ? "it" : "them"} inside the range.
+        </p>
+      )}
+
       <div>
         {subEvents.map((ev) => {
           const evCfg = getEventConfig(ev)
-          const dt = new Date(ev.start_date)
-          const dayKey = dt.toDateString()
-          const showHeader = dayKey !== lastDayKey
-          const isFirstHeader = showHeader && !firstHeaderRendered
-          if (showHeader) { lastDayKey = dayKey; firstHeaderRendered = true }
-          const dayLabel = `${dt.toLocaleDateString("en-US", { weekday: "short" })} · ${dt.toLocaleDateString("en-US", { month: "short" })} ${dt.getDate()}`.toUpperCase()
+          const head = headerForChild.get(ev.id)
+          const showHeader = !!head
+          const isFirstHeader = !!head?.first
+          const dayLabel = head?.label ?? ""
+          const outOfRange = isOutOfRange(ev)
 
           const r = readiness[ev.id] ?? { done: 0, total: 0 }
           const st = subEventStatus(r.done, r.total)
@@ -9451,7 +9593,14 @@ function SubEventsTab({
 
                 {/* info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 16, fontWeight: 500, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}</p>
+                  <p style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 16, fontWeight: 500, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>
+                    {ev.title}
+                    {outOfRange && (
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", padding: "2px 8px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line-2)", color: "var(--gold)", whiteSpace: "nowrap" }}>
+                        Outside event dates
+                      </span>
+                    )}
+                  </p>
                   <p style={{ fontSize: 13, margin: "3px 0 0" }}>
                     {ev.location
                       ? <span style={{ color: "var(--body)" }}>{ev.location}</span>
@@ -9509,8 +9658,11 @@ function SubEventsTab({
           parentEventId={parentEvent.id}
           excludeTypes={["welcome_week"]}
           onClose={() => setShowAdd(false)}
-          onSaved={(ev) => {
-            setSubEvents(prev => [...prev, ev].sort((a, b) => a.start_date.localeCompare(b.start_date)))
+          onSaved={() => {
+            // The children list is owned by the shared rollup now, so re-run that one
+            // batched fetch rather than splicing a local copy the other container
+            // surfaces would not see.
+            rollup.refresh()
             setShowAdd(false)
           }}
         />
@@ -9852,10 +10004,19 @@ function TransportTab({
   )
 }
 
-// ── RunSheetTab — day-of run-of-show (Run Sheet P3; generalizes retreat-only program) ──
+// ── RunSheetTab — day-of "Run of Show" (Run Sheet P3; generalizes retreat-only program) ──
 // Backed by the event_blocks table (per-row CRUD), available on EVERY event type. Edit mode is
 // a per-day grid (time · title · owner · brief); read mode is a run-of-show that highlights the
 // next block on today's day. Live status/ripple (event_blocks.status) is dormant until Phase 3b.
+//
+// Day headers are DATE-ONLY ("FRI · SEP 12", shared with SubEventsTab via
+// eventDayHeaderLabel) — never "Day N". The ordinal only ever made sense for a
+// multi-day event, and the vast majority are one day. The span itself is a
+// calendar-day count (eventDaySpan), NOT a timestamp comparison: the retreat
+// preset ends at 2 PM having started at 5 PM, so a naive `d <= end` loop drops
+// its final day. Blocks whose day_index lands past the span are never dropped —
+// they surface in a trailing "outside the event dates" group, because end_date
+// is the user's to set and shortening it must not silently hide their work.
 
 function RunSheetTab({
   plan,
@@ -9918,12 +10079,15 @@ function RunSheetTab({
   }
   const toMin = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m }
 
-  const days: Date[] = []
+  // Calendar-day span (see header note) — one entry per day the event covers.
   const start = new Date(event.start_date)
-  const end = new Date(event.end_date)
-  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) days.push(new Date(d))
-  if (days.length === 0) days.push(start)
+  const span = eventDaySpan(start, new Date(event.end_date))
+  const days: Date[] = Array.from({ length: span }, (_, i) =>
+    new Date(start.getFullYear(), start.getMonth(), start.getDate() + i))
   const todayIdx = days.findIndex(d => d.toDateString() === new Date().toDateString())
+  // Blocks stranded past the current span (the end date was shortened after they
+  // were written). Shown, never hidden — see header note.
+  const orphanBlocks = blocks.filter(b => b.day_index >= days.length || b.day_index < 0)
 
   const ctrlInput: React.CSSProperties = { background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: isMobile ? "12px 10px" : "6px 10px", minHeight: isMobile ? 44 : undefined, width: "100%", boxSizing: "border-box" }
   const ctrlSelect: React.CSSProperties = { padding: isMobile ? "12px 8px" : "6px 8px", minHeight: isMobile ? 44 : undefined, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", color: "var(--body)", fontSize: 12, cursor: "pointer", width: "100%", boxSizing: "border-box" }
@@ -9961,24 +10125,115 @@ function RunSheetTab({
     setRipple(null)
   }
 
-  if (loading) return <div>{!isMobile && <EventSectionHeader title="Showtime" />}<p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p></div>
+  // One run-of-show row. Extracted so the trailing out-of-range group renders the
+  // same row machinery as a normal day without duplicating it.
+  function renderBlock(block: EventBlock, isLast: boolean, upNextId?: string) {
+    const isUpNext = block.id === upNextId
+    const editing = editingId === block.id
+    const done = block.status === "done"
+    const ownerName = members.find(m => m.id === block.owner_id)?.name
+    return (
+      <ListRow key={block.id} last={isLast}
+        style={{ display: "block", padding: isUpNext ? "12px 4px 12px 13px" : "12px 4px", ...(isUpNext ? { background: "color-mix(in srgb, var(--plum) 7%, transparent)", borderLeft: "3px solid var(--plum)", borderRadius: 8 } : {}) }}>
+        {isUpNext && (
+          <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 600, margin: "0 0 6px" }}>Up next</p>
+        )}
+
+        {editing ? (
+          /* ── EDIT MODE — inputs + Save/Cancel ── */
+          <div>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "100px 1fr 160px", gap: 10, alignItems: "center" }}>
+              <input value={draft.time} onChange={e => setDraft(d => ({ ...d, time: e.target.value }))} placeholder="7:00 PM" style={ctrlInput} />
+              <input value={draft.title} autoFocus onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="Block title…" style={ctrlInput} />
+              <select value={draft.owner} onChange={e => setDraft(d => ({ ...d, owner: e.target.value }))} style={ctrlSelect}>
+                <option value="">No owner</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+            <input value={draft.brief} onChange={e => setDraft(d => ({ ...d, brief: e.target.value }))} placeholder="Brief — what this block needs, the gotcha…" style={{ ...ctrlInput, marginTop: 8, fontSize: 12.5 }} />
+            <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
+              <CentralButton variant="secondary" size="sm" onClick={() => setEditingId(null)}>Cancel</CentralButton>
+              <CentralButton variant="primary" size="sm" onClick={() => saveEdit(block)}>Save</CentralButton>
+            </div>
+          </div>
+        ) : (
+          /* ── READ MODE — clean display + pencil ── */
+          <>
+            {isMobile ? (
+              /* Mobile (§Showtime — the mobile doc's section name): the desktop 5-col grid's fixed
+                  84px time + 140px owner columns starve the 1fr title
+                  → per-word wrap at 390px. Give the title the full
+                  width; time (plum mono) + owner drop to a muted sub. */
+              <div style={{ display: "grid", gridTemplateColumns: "26px 1fr auto", gap: 12, alignItems: "center" }}>
+                {(canEdit || block.owner_id === userId) ? (
+                  <button onClick={() => toggleDone(block)} title={done ? "Mark not done" : "Mark done"}
+                    style={{ width: 20, height: 20, borderRadius: 6, border: "1.6px solid " + (done ? "var(--plum-2)" : "var(--dashed)"), background: done ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}>
+                    {done && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
+                  </button>
+                ) : <span />}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: done ? "var(--faint)" : "var(--ink)", textDecoration: done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Untitled block</span>}</div>
+                  <div style={{ fontSize: 12.5, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.5px", color: done ? "var(--faint)" : "var(--plum)" }}>{block.time_label || "—"}</span>
+                    {ownerName && <span style={{ color: "var(--muted-text)" }}> · {ownerName}</span>}
+                  </div>
+                </div>
+                {canEdit ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                    <IconButton dim={24} onClick={() => startEdit(block)} title="Edit block"><Pencil style={{ width: 13, height: 13 }} /></IconButton>
+                    <IconButton dim={24} onClick={() => deleteBlock(block.id)} title="Remove block"><X className="w-3.5 h-3.5" /></IconButton>
+                  </div>
+                ) : <span />}
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "26px 84px 1fr 140px auto", gap: 12, alignItems: "center" }}>
+                {(canEdit || block.owner_id === userId) ? (
+                  <button onClick={() => toggleDone(block)} title={done ? "Mark not done" : "Mark done"}
+                    style={{ width: 20, height: 20, borderRadius: 6, border: "1.6px solid " + (done ? "var(--plum-2)" : "var(--dashed)"), background: done ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}>
+                    {done && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
+                  </button>
+                ) : <span />}
+                <span style={{ fontSize: 13, fontWeight: isUpNext ? 600 : 500, color: done ? "var(--faint)" : isUpNext ? "var(--plum)" : "var(--muted-text)" }}>{block.time_label || "—"}</span>
+                <span style={{ fontSize: 14, color: done ? "var(--faint)" : "var(--ink)", textDecoration: done ? "line-through" : "none" }}>{block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Untitled block</span>}</span>
+                <span style={{ fontSize: 12, color: "var(--body)" }}>{ownerName ?? "—"}</span>
+                {canEdit ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                    <IconButton dim={24} onClick={() => startEdit(block)} title="Edit block"><Pencil style={{ width: 13, height: 13 }} /></IconButton>
+                    <IconButton dim={24} onClick={() => deleteBlock(block.id)} title="Remove block"><X className="w-3.5 h-3.5" /></IconButton>
+                  </div>
+                ) : <span />}
+              </div>
+            )}
+            {block.brief && (
+              <p style={{ marginTop: 4, marginLeft: 38, fontSize: 12.5, color: "var(--faint)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{block.brief}</p>
+            )}
+          </>
+        )}
+      </ListRow>
+    )
+  }
+
+  const dayHeadStyle = (tone: string): React.CSSProperties => isMobile
+    ? { ...POCKET_KICKER_STYLE, margin: 0, color: tone }
+    : { fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: tone, fontWeight: 500 }
+
+  if (loading) return <div>{!isMobile && <EventSectionHeader title="Run of Show" />}<p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p></div>
 
   return (
     <div>
-      {/* Mobile: the SubpageShell chrome already reads "Showtime" (mobileTitle),
+      {/* Mobile: the SubpageShell chrome already reads "Run of Show" (mobileTitle),
           so the in-body section header is redundant — desktop keeps it. */}
-      {!isMobile && <EventSectionHeader title="Showtime" />}
+      {!isMobile && <EventSectionHeader title="Run of Show" />}
 
       {days.map((day, dayIdx) => {
         const dayBlocks = blocks.filter(b => b.day_index === dayIdx)
-        const dayLabel = day.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
         const isToday = dayIdx === todayIdx
         const upNextId = isToday ? dayBlocks.find(b => b.status !== "done")?.id : undefined
         return (
           <div key={dayIdx} style={{ marginBottom: 36 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <p style={isMobile ? { ...POCKET_KICKER_STYLE, margin: 0 } : { fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: isToday ? "var(--plum)" : "var(--body)", fontWeight: 500 }}>
-                Day {dayIdx + 1} — {dayLabel}{isToday ? " · Today" : ""}
+              <p style={dayHeadStyle(isToday ? "var(--plum)" : "var(--body)")}>
+                {eventDayHeaderLabel(day)}{isToday ? " · TODAY" : ""}
               </p>
               {canEdit && (
                 <CentralButton variant="secondary" size="sm" onClick={() => addBlock(dayIdx)}><Plus style={{ width: 14, height: 14 }} /> Add block</CentralButton>
@@ -9990,94 +10245,24 @@ function RunSheetTab({
               <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--faint)", padding: "12px 4px" }}>No blocks yet.</p>
             )}
 
-            {dayBlocks.map((block, bIdx) => {
-              const isUpNext = block.id === upNextId
-              const editing = editingId === block.id
-              const done = block.status === "done"
-              const ownerName = members.find(m => m.id === block.owner_id)?.name
-              return (
-                <ListRow key={block.id} last={bIdx === dayBlocks.length - 1}
-                  style={{ display: "block", padding: isUpNext ? "12px 4px 12px 13px" : "12px 4px", ...(isUpNext ? { background: "color-mix(in srgb, var(--plum) 7%, transparent)", borderLeft: "3px solid var(--plum)", borderRadius: 8 } : {}) }}>
-                  {isUpNext && (
-                    <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 600, margin: "0 0 6px" }}>Up next</p>
-                  )}
-
-                  {editing ? (
-                    /* ── EDIT MODE — inputs + Save/Cancel ── */
-                    <div>
-                      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "100px 1fr 160px", gap: 10, alignItems: "center" }}>
-                        <input value={draft.time} onChange={e => setDraft(d => ({ ...d, time: e.target.value }))} placeholder="7:00 PM" style={ctrlInput} />
-                        <input value={draft.title} autoFocus onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="Block title…" style={ctrlInput} />
-                        <select value={draft.owner} onChange={e => setDraft(d => ({ ...d, owner: e.target.value }))} style={ctrlSelect}>
-                          <option value="">No owner</option>
-                          {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                        </select>
-                      </div>
-                      <input value={draft.brief} onChange={e => setDraft(d => ({ ...d, brief: e.target.value }))} placeholder="Brief — what this block needs, the gotcha…" style={{ ...ctrlInput, marginTop: 8, fontSize: 12.5 }} />
-                      <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
-                        <CentralButton variant="secondary" size="sm" onClick={() => setEditingId(null)}>Cancel</CentralButton>
-                        <CentralButton variant="primary" size="sm" onClick={() => saveEdit(block)}>Save</CentralButton>
-                      </div>
-                    </div>
-                  ) : (
-                    /* ── READ MODE — clean display + pencil ── */
-                    <>
-                      {isMobile ? (
-                        /* Mobile (§Showtime): the desktop 5-col grid's fixed
-                            84px time + 140px owner columns starve the 1fr title
-                            → per-word wrap at 390px. Give the title the full
-                            width; time (plum mono) + owner drop to a muted sub. */
-                        <div style={{ display: "grid", gridTemplateColumns: "26px 1fr auto", gap: 12, alignItems: "center" }}>
-                          {(canEdit || block.owner_id === userId) ? (
-                            <button onClick={() => toggleDone(block)} title={done ? "Mark not done" : "Mark done"}
-                              style={{ width: 20, height: 20, borderRadius: 6, border: "1.6px solid " + (done ? "var(--plum-2)" : "var(--dashed)"), background: done ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}>
-                              {done && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
-                            </button>
-                          ) : <span />}
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: done ? "var(--faint)" : "var(--ink)", textDecoration: done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Untitled block</span>}</div>
-                            <div style={{ fontSize: 12.5, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.5px", color: done ? "var(--faint)" : "var(--plum)" }}>{block.time_label || "—"}</span>
-                              {ownerName && <span style={{ color: "var(--muted-text)" }}> · {ownerName}</span>}
-                            </div>
-                          </div>
-                          {canEdit ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
-                              <IconButton dim={24} onClick={() => startEdit(block)} title="Edit block"><Pencil style={{ width: 13, height: 13 }} /></IconButton>
-                              <IconButton dim={24} onClick={() => deleteBlock(block.id)} title="Remove block"><X className="w-3.5 h-3.5" /></IconButton>
-                            </div>
-                          ) : <span />}
-                        </div>
-                      ) : (
-                        <div style={{ display: "grid", gridTemplateColumns: "26px 84px 1fr 140px auto", gap: 12, alignItems: "center" }}>
-                          {(canEdit || block.owner_id === userId) ? (
-                            <button onClick={() => toggleDone(block)} title={done ? "Mark not done" : "Mark done"}
-                              style={{ width: 20, height: 20, borderRadius: 6, border: "1.6px solid " + (done ? "var(--plum-2)" : "var(--dashed)"), background: done ? "var(--plum-2)" : "transparent", display: "grid", placeItems: "center", cursor: "pointer", flexShrink: 0 }}>
-                              {done && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
-                            </button>
-                          ) : <span />}
-                          <span style={{ fontSize: 13, fontWeight: isUpNext ? 600 : 500, color: done ? "var(--faint)" : isUpNext ? "var(--plum)" : "var(--muted-text)" }}>{block.time_label || "—"}</span>
-                          <span style={{ fontSize: 14, color: done ? "var(--faint)" : "var(--ink)", textDecoration: done ? "line-through" : "none" }}>{block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Untitled block</span>}</span>
-                          <span style={{ fontSize: 12, color: "var(--body)" }}>{ownerName ?? "—"}</span>
-                          {canEdit ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
-                              <IconButton dim={24} onClick={() => startEdit(block)} title="Edit block"><Pencil style={{ width: 13, height: 13 }} /></IconButton>
-                              <IconButton dim={24} onClick={() => deleteBlock(block.id)} title="Remove block"><X className="w-3.5 h-3.5" /></IconButton>
-                            </div>
-                          ) : <span />}
-                        </div>
-                      )}
-                      {block.brief && (
-                        <p style={{ marginTop: 4, marginLeft: 38, fontSize: 12.5, color: "var(--faint)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{block.brief}</p>
-                      )}
-                    </>
-                  )}
-                </ListRow>
-              )
-            })}
+            {dayBlocks.map((block, bIdx) => renderBlock(block, bIdx === dayBlocks.length - 1, upNextId))}
           </div>
         )
       })}
+
+      {/* Blocks stranded past the event's end date. Surfaced rather than hidden —
+          the fix is the user's (extend the end date, or move them). */}
+      {orphanBlocks.length > 0 && (
+        <div style={{ marginBottom: 36 }}>
+          <p style={{ ...dayHeadStyle("var(--gold)"), marginBottom: 6 }}>Outside the event dates</p>
+          <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 12px" }}>
+            {orphanBlocks.length === 1 ? "This block sits" : `These ${orphanBlocks.length} blocks sit`} past {event.title}&rsquo;s end date
+            ({eventDateRangeShort(new Date(event.start_date), new Date(event.end_date))}). Extend the event, or move {orphanBlocks.length === 1 ? "it" : "them"} onto a day.
+          </p>
+          <div style={{ borderTop: "1px solid var(--line)" }} />
+          {orphanBlocks.map((block, bIdx) => renderBlock(block, bIdx === orphanBlocks.length - 1))}
+        </div>
+      )}
 
       <ConfirmDialog
         open={!!ripple}

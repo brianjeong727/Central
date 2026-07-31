@@ -6,6 +6,7 @@ import { requireSameMinistry, requireMinistryAdmin, isAdminTier } from "./authz"
 import { autoAddUserToChats, ensureMinistryChats } from "./auto-chats"
 import { presetById } from "@/app/home/workspace-presets"
 import { ADMIN_ROLES, LEADER_ROLES, MEMBER_TIER, isAdminRole, isStaffRole } from "@/lib/roles"
+import { SUPER_UUID } from "./super-constants"
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
 
@@ -153,6 +154,23 @@ export async function getPublicMinistries(search?: string): Promise<{
   data: Array<{ id: string; name: string; university: string; size: string; location: string | null; is_public: boolean }> | null
   error: string | null
 }> {
+  // Test tenants (Brian's Sandbox, Load Test 200, Crossroads, the E2E tenants) must
+  // NEVER surface in public discovery. This runs on the service-role client, so RLS is
+  // not a backstop — this filter IS the boundary. The one super account is exempt so it
+  // can still reach those tenants from the picker.
+  //
+  // Gate on `hidden_from_discovery`, NOT `is_sandbox`. They are different questions:
+  // is_sandbox means "the super account may write-as inside this tenant", which is TRUE
+  // of Central — a REAL ministry that must stay discoverable. Filtering on is_sandbox
+  // would delist real churches that happen to be super-testable.
+  //
+  // `.not(…, is, true)` rather than `.eq(false)` on purpose: the column is nullable, and
+  // a real ministry that registers with a NULL flag must stay VISIBLE — `.eq(false)`
+  // would silently drop it (NULL ≠ false in SQL).
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  const isSuper = user?.id === SUPER_UUID
+
   const admin = createAdminClient()
   let query = admin
     .from("ministries")
@@ -160,6 +178,8 @@ export async function getPublicMinistries(search?: string): Promise<{
     .eq("status", "active")
     .order("is_public", { ascending: false })
     .order("name")
+
+  if (!isSuper) query = query.not("hidden_from_discovery", "is", true)
 
   if (search?.trim()) {
     query = query.or(`name.ilike.%${search.trim()}%,university.ilike.%${search.trim()}%`)

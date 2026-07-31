@@ -734,7 +734,7 @@ export function CountdownTab(props: CountdownTabProps) {
       <div style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "0 0 18px" }}>
         Day-of timing lives in the{" "}
         <button onClick={onGoRunSheet} style={{ background: "none", border: "none", padding: 0, color: "var(--plum)", cursor: "pointer", fontSize: 12.5, fontWeight: 500 }}>
-          Showtime
+          Run of Show
         </button>{" "}
         tab. Nudges fire automatically — this is the plan.
       </div>
