@@ -18,6 +18,8 @@ import { createClient } from "@/lib/supabase"
 import { getCategoryBudgetAllocation } from "@/app/actions/budget-planning"
 import { useNavState } from "../nav-state"
 import { useOpenMemberProfile } from "../member-profile-context"
+import { useMinistryTimezone } from "../ministry-timezone-context"
+import { eventDateColumnsFromInputs, eventDateInputsFromRow, todayInZone } from "@/lib/tz"
 import { useSubpageCrumbs, useBreadcrumbExtra } from "../breadcrumb-context"
 
 function currentFiscalYear(): string {
@@ -582,7 +584,7 @@ async function fetchCalendarEventsAndPlans([, ministryId, teamScope]: readonly [
   const supabase = createClient()
   let query = supabase
     .from("calendar_events")
-    .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
+    .select("id, title, description, location, start_date, end_date, start_day, end_day, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
     .eq("ministry_id", ministryId)
     .order("start_date", { ascending: true })
   if (teamScope !== "all") {
@@ -1320,7 +1322,7 @@ export function StudentOrgTeamHome({
   async function openLinkedEvent(eventId: string) {
     const { data } = await supabase
       .from("calendar_events")
-      .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
+      .select("id, title, description, location, start_date, end_date, start_day, end_day, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
       .eq("id", eventId)
       .maybeSingle()
     if (data) onPlanningEventChange(data as CalendarEvent)
@@ -6358,16 +6360,11 @@ export function AddEventModal({
 }) {
   const supabase = createClient()
   const isEditing = !!existing
-
-  function parseDateStr(iso: string) {
-    return iso ? iso.split("T")[0] : ""
-  }
-  function parseTimeStr(iso: string) {
-    if (!iso) return "09:00"
-    const t = iso.split("T")[1]
-    if (!t) return "09:00"
-    return t.slice(0, 5)
-  }
+  // The ministry's IANA zone (ministries.timezone, via the shell provider). Every
+  // wall clock in this modal is meant IN this zone; `calendar_events.start_date`
+  // stores the true instant. This modal used to slice the raw UTC text out of the
+  // column — the one read in the app that disagreed with all ~40 display sites.
+  const timeZone = useMinistryTimezone()
 
   // New events open pre-filled from the type's preset defaults — last year's
   // title/venue/times/description, dated to the next occurrence of last year's
@@ -6377,18 +6374,29 @@ export function AddEventModal({
   const initialDefaults = EVENT_TYPE_CONFIGS[initialType].defaults
   const touchedRef = useRef<{ title?: boolean; description?: boolean; location?: boolean; dates?: boolean }>({})
 
+  // Edit mode reads the row back through the SAME layer handleSave writes with
+  // (lib/tz.ts) — the round trip is what makes "what the user typed is what they
+  // see" true. All-day rows read their `start_day`/`end_day` date columns; timed
+  // rows project the stored instant into the ministry zone.
+  const initialInputs = useMemo(
+    () => existing
+      ? eventDateInputsFromRow(existing, timeZone, { startHHMM: initialDefaults.startTime, endHHMM: initialDefaults.endTime })
+      : null,
+    [existing, timeZone, initialDefaults],
+  )
+
   const [eventType, setEventType] = useState<EventType>(initialType)
   const [title, setTitle] = useState(existing?.title ?? initialDefaults.title)
   const [description, setDescription] = useState(existing?.description ?? initialDefaults.description)
   const [location, setLocation] = useState(existing?.location ?? initialDefaults.location)
   const [startDateStr, setStartDateStr] = useState(() =>
-    existing ? parseDateStr(existing.start_date) : nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay))
-  const [startTimeStr, setStartTimeStr] = useState(existing ? parseTimeStr(existing.start_date) : initialDefaults.startTime)
+    initialInputs ? initialInputs.startYMD : nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay))
+  const [startTimeStr, setStartTimeStr] = useState(() => initialInputs ? initialInputs.startHHMM : initialDefaults.startTime)
   const [endDateStr, setEndDateStr] = useState(() =>
-    existing
-      ? parseDateStr(existing.end_date)
+    initialInputs
+      ? initialInputs.endYMD
       : addDaysToYMD(nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay), initialDefaults.durationDays - 1))
-  const [endTimeStr, setEndTimeStr] = useState(existing ? parseTimeStr(existing.end_date) : initialDefaults.endTime)
+  const [endTimeStr, setEndTimeStr] = useState(() => initialInputs ? initialInputs.endHHMM : initialDefaults.endTime)
   const [allDay, setAllDay] = useState(existing?.all_day ?? initialDefaults.allDay)
 
   // Quick presets suggest content as GHOST text (dimmed placeholders) — the
@@ -6454,7 +6462,7 @@ export function AddEventModal({
   // and re-stamped once the event row + its plan window are written, so a second
   // save shifts from the ALREADY-SHIFTED date rather than re-applying the original
   // delta. Guards the two writes that are keyed to the event's own date.
-  const savedStartYMDRef = useRef<string | null>(existing ? parseDateStr(existing.start_date) : null)
+  const savedStartYMDRef = useRef<string | null>(initialInputs ? initialInputs.startYMD : null)
   // Per-task ledger of days a previous save FAILED to apply (task id → days owed).
   // The task shift is N independent row updates with no transaction, so a partial
   // outcome is a normal result. A retry must re-apply the ORIGINAL delta to exactly
@@ -6610,18 +6618,23 @@ export function AddEventModal({
     if (!startDateStr) { setError("Start date is required."); focusInvalidField(startDateInputRef); return }
     if (!endDateStr) { setError("End date is required."); focusInvalidField(endDateInputRef); return }
 
-    const startTs = allDay
-      ? `${startDateStr}T00:00:00+00:00`
-      : `${startDateStr}T${startTimeStr}:00+00:00`
-    const endTs = allDay
-      ? `${endDateStr}T23:59:59+00:00`
-      : `${endDateStr}T${endTimeStr}:00+00:00`
+    // The wall clock the user typed is meant in the MINISTRY's zone; the columns
+    // take true instants. `eventDateColumnsFromInputs` owns both halves: the
+    // instant conversion AND the all-day day columns (`start_day`/`end_day`,
+    // end INCLUSIVE) that make an all-day event a date range rather than a
+    // 00:00→23:59 instant range. All-day rows write BOTH — the day columns are
+    // the truth, the instants stay for sorting, ICS, and run_sheet_tick.
+    const dateCols = eventDateColumnsFromInputs(
+      { allDay, startYMD: startDateStr, startHHMM: startTimeStr, endYMD: endDateStr, endHHMM: endTimeStr },
+      timeZone,
+    )
 
-    const startDate = new Date(startTs)
-    const endDate = new Date(endTs)
-    const startYear = startDate.getFullYear()
-    if (startYear < 2000 || startYear > 2100) { setError("Please enter a valid date."); return }
-    if (endDate < startDate) { setError("End date must be after start date."); return }
+    // Year is read off the typed date string, not off the instant — a
+    // `getFullYear()` on the converted instant answers in the VIEWER's zone and
+    // would reject/accept a Dec-31 or Jan-1 event on the wrong side of midnight.
+    const startYear = Number(startDateStr.slice(0, 4))
+    if (!(startYear >= 2000 && startYear <= 2100)) { setError("Please enter a valid date."); return }
+    if (new Date(dateCols.end_date) < new Date(dateCols.start_date)) { setError("End date must be after start date."); return }
 
     setSaving(true)
     setError(null)
@@ -6636,8 +6649,7 @@ export function AddEventModal({
             title: title.trim(),
             description: description.trim() || null,
             location: location.trim() || null,
-            start_date: startTs,
-            end_date: endTs,
+            ...dateCols,
             all_day: allDay,
             category: eventTypeToCategory(eventType),
             event_type: eventType,
@@ -6645,7 +6657,7 @@ export function AddEventModal({
           })
           .eq("id", existing.id)
           .eq("ministry_id", ministryId)
-          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
+          .select("id, title, description, location, start_date, end_date, start_day, end_day, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
           .single()
         if (upErr || !data) { setError(upErr?.message ?? "Failed to update event."); setSaving(false); return }
         evData = data as CalendarEvent
@@ -6742,8 +6754,7 @@ export function AddEventModal({
             title: title.trim(),
             description: description.trim() || null,
             location: location.trim() || null,
-            start_date: startTs,
-            end_date: endTs,
+            ...dateCols,
             all_day: allDay,
             category: eventTypeToCategory(eventType),
             event_type: eventType,
@@ -6751,7 +6762,7 @@ export function AddEventModal({
             recurring: parentEventId ? false : recurring,
             created_by: userId,
           })
-          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
+          .select("id, title, description, location, start_date, end_date, start_day, end_day, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
           .single()
 
         if (evErr || !data) { setError(evErr?.message ?? "Failed to create event."); setSaving(false); return }
@@ -6790,7 +6801,9 @@ export function AddEventModal({
             // today (same rule as playbook instantiation) so a late-created
             // event doesn't open with a wall of overdue tasks.
             const eventYMD = startDateStr
-            const todayYMD = ymdOf(new Date())
+            // "Today" is the MINISTRY's today — a leader creating an event from
+            // another timezone must not clamp due dates to their own calendar day.
+            const todayYMD = todayInZone(timeZone)
             const taskRows: { event_plan_id: string; title: string; phase: string; due_date: string | null; sort_order: number; completed: boolean; created_by: string }[] = []
             let sortIdx = 0
             for (const phase of typeCfg.defaultPhases) {
