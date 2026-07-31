@@ -46,6 +46,7 @@ import { MeetingNotesSection } from "./meeting-notes"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketChip } from "../components/pocket-header"
 import { getInitials, formatRelativeTime, eventDaySpan, eventDateRangeLabel, eventDateRangeShort, eventDayHeaderLabel } from "../utils"
+import { useContainerRollup, ContainerWeekTimeline, ContainerStaffing, ContainerTaskRollup, SectionKicker, type ContainerRollup } from "./event-container"
 import { useIsMobile } from "../use-is-mobile"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
@@ -7274,6 +7275,37 @@ export function EventPlanWorkspace({
   // type_data.extras would show a blank tab. Filtered out rather than migrated; the
   // union member and its label/meta entries stay so a stored value can't crash a render.
   const extraTabs: EventExtraTab[] = [...new Set([...typeCfg.extraTabs, ...planExtras])].filter(t => t !== "program")
+
+  // ── Container vs leaf (see app/home/tabs/event-container.tsx) ────────────────
+  // A CONTAINER is an event whose content is really its sub-events (Welcome Week and
+  // its nights). Its Run of Show / Roles / Countdown become views onto the nights
+  // rather than rivals to them. Derived from extraTabs — which is fixed at creation —
+  // so a parent's tab set never rearranges the moment its first night is added, the
+  // way a `has children` check would. The parent_event_id check holds the one-level
+  // nesting cap: a child created with a container-ish type must not become one.
+  const isContainer = extraTabs.includes("sub_events") && !calendarEvent.parent_event_id
+
+  // Batched nights + their plans/roles/tasks/blocks. Feeds all three container
+  // surfaces (and Sub-events) from ONE fetch — never per-child queries.
+  const containerRollup = useContainerRollup(isContainer ? calendarEvent.id : null, ministryId)
+
+  // Run-of-show blocks written on the WEEK itself, from before timing moved onto the
+  // nights. Shown in the week timeline rather than silently orphaned.
+  const [ownBlocks, setOwnBlocks] = useState<EventBlock[]>([])
+  useEffect(() => {
+    if (!isContainer || !plan) { setOwnBlocks([]); return }
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from("event_blocks").select("*")
+        .eq("event_plan_id", plan.id).eq("ministry_id", ministryId)
+        .order("day_index", { ascending: true })
+        .order("sort_order", { ascending: true })
+      if (!cancelled) setOwnBlocks((data ?? []) as EventBlock[])
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isContainer, plan?.id, ministryId])
   const allValidTabs: ActiveSection[] = [...coreTabs, ...extraTabs]
   const [tasks, setTasks] = useState<EventTask[]>([])
   const [roles, setRoles] = useState<EventRole[]>([])
@@ -8403,8 +8435,9 @@ export function EventPlanWorkspace({
               const HUB_META: Record<string, { iconKey: string; sub: string }> = {
                 overview: { iconKey: "chart", sub: "Facts, stats & planning notes" },
                 checklist: { iconKey: "plan", sub: taskTotal > 0 ? `${taskDone} of ${taskTotal} done` : "The T-minus plan — tasks by phase" },
-                roles: { iconKey: "users", sub: rolesTotal > 0 ? `${rolesAssigned} of ${rolesTotal} assigned` : "Assign who owns each part" },
-                runsheet: { iconKey: "clock", sub: "Day-of timing, block by block" },
+                // A container's spokes are views onto its nights, so they say so.
+                roles: { iconKey: "users", sub: isContainer ? "Week-spanning roles + every night's leads" : rolesTotal > 0 ? `${rolesAssigned} of ${rolesTotal} assigned` : "Assign who owns each part" },
+                runsheet: { iconKey: "clock", sub: isContainer ? "The whole week, night by night" : "Day-of timing, block by block" },
                 notes: { iconKey: "book", sub: "Cross-year pain points" },
                 sub_events: { iconKey: "calendar", sub: EXTRA_TAB_META.sub_events.subtitle },
                 acts: { iconKey: "sparkle", sub: EXTRA_TAB_META.acts.subtitle },
@@ -8808,6 +8841,28 @@ export function EventPlanWorkspace({
                   onPhaseDrop={(phase) => { if (dragTaskId) requestMoveToSection(dragTaskId, phase.sectionKey); clearDrag() }}
                   stickyTop={0}
                 />
+
+                {/* CONTAINER: the week's own checklist above stays the editable list;
+                    this read-only roll-up answers "are the nights on track" without
+                    eight drill-ins. Tapping a night opens its own Countdown. */}
+                {isContainer && (
+                  <>
+                    <SectionKicker
+                      label="Across the nights"
+                      hint="Open items on each night's own checklist. Tap a night to work on it."
+                      isMobile={isMobile}
+                    />
+                    {containerRollup.loading ? (
+                      <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "10px 2px" }}>Loading…</p>
+                    ) : (
+                      <ContainerTaskRollup
+                        nights={containerRollup.children}
+                        isMobile={isMobile}
+                        onOpenChild={onOpenChild}
+                      />
+                    )}
+                  </>
+                )}
 
                 {/* Section-move date-change confirmation (dated task → different window) */}
                 {pendingSectionMove && (
@@ -9229,9 +9284,22 @@ export function EventPlanWorkspace({
                   </div>
                 )}
 
+                {/* On a CONTAINER these are the WEEK-SPANNING roles (Director,
+                    Photographer) — the per-night leads live in the staffing table
+                    below, on the night that owns them. */}
+                {isContainer && (
+                  <SectionKicker
+                    label="Week-spanning"
+                    hint="Roles that cover the whole week. A lead for one night belongs to that night — staff those below."
+                    isMobile={isMobile}
+                  />
+                )}
+
                 {roles.length === 0 ? (
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)", padding: "24px 0 8px" }}>
-                    {canEdit ? "No roles yet — add the first one." : "No roles defined yet."}
+                    {canEdit
+                      ? (isContainer ? "No week-spanning roles yet." : "No roles yet — add the first one.")
+                      : "No roles defined yet."}
                   </p>
                 ) : (
                   <>
@@ -9242,6 +9310,32 @@ export function EventPlanWorkspace({
                         <GroupHeader label="Covered" count={covered.length} />
                         {covered.map((role, i) => renderRow(role, i === covered.length - 1))}
                       </>
+                    )}
+                  </>
+                )}
+
+                {/* Staff every night from one screen. The write lands on the NIGHT's
+                    own event_roles row — same statement its own screen issues. */}
+                {isContainer && (
+                  <>
+                    <SectionKicker
+                      label="Across the nights"
+                      hint="Each night owns its own roles. Assign them here or on the night — it's the same record."
+                      isMobile={isMobile}
+                    />
+                    {containerRollup.loading ? (
+                      <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "10px 2px" }}>Loading…</p>
+                    ) : (
+                      <ContainerStaffing
+                        nights={containerRollup.children}
+                        members={members}
+                        canEdit={canEdit}
+                        isMobile={isMobile}
+                        ministryId={ministryId}
+                        userId={userId}
+                        onOpenChild={onOpenChild}
+                        onChanged={containerRollup.refresh}
+                      />
                     )}
                   </>
                 )}
@@ -9257,6 +9351,7 @@ export function EventPlanWorkspace({
                 userId={userId}
                 canEdit={canEdit}
                 onOpenChild={onOpenChild}
+                rollup={containerRollup}
               />
             )}
 
@@ -9290,16 +9385,39 @@ export function EventPlanWorkspace({
               />
             )}
 
-            {/* ── Run of Show (all event types) ── */}
+            {/* ── Run of Show ──
+                LEAF: the editable per-day block grid.
+                CONTAINER: a read-only merged week timeline stitched from the nights'
+                blocks — the week's run of show is a VIEW of the nights', not a rival
+                editable surface (which is what made "Welcome Week has a showtime and
+                so does each night" incoherent). Blocks written on the week itself
+                before this are surfaced, never stranded. */}
             {shownSection === 'runsheet' && plan && (
-              <RunSheetTab
-                plan={plan}
-                event={calendarEvent}
-                members={members}
-                canEdit={canEdit}
-                ministryId={ministryId}
-                userId={userId}
-              />
+              isContainer ? (
+                <div>
+                  {!isMobile && <EventSectionHeader title="Run of Show" />}
+                  {containerRollup.loading ? (
+                    <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p>
+                  ) : (
+                    <ContainerWeekTimeline
+                      nights={containerRollup.children}
+                      isMobile={isMobile}
+                      onOpenChild={onOpenChild}
+                      ownBlocks={ownBlocks}
+                      eventTitle={calendarEvent.title}
+                    />
+                  )}
+                </div>
+              ) : (
+                <RunSheetTab
+                  plan={plan}
+                  event={calendarEvent}
+                  members={members}
+                  canEdit={canEdit}
+                  ministryId={ministryId}
+                  userId={userId}
+                />
+              )
             )}
           </>
         )}
@@ -9344,6 +9462,7 @@ function SubEventsTab({
   userId,
   canEdit,
   onOpenChild,
+  rollup,
 }: {
   parentEvent: CalendarEvent
   ministryId: string
@@ -9353,65 +9472,40 @@ function SubEventsTab({
   // body-swap. Omitted when already viewing a child (nesting capped at one
   // level) — rows then render without a drill affordance.
   onOpenChild?: (ev: CalendarEvent) => void
+  /** Shared container rollup — children + readiness already batched by the parent. */
+  rollup: ContainerRollup
 }) {
-  const supabase = createClient()
   // Mobile restyle only (tonal borderless rows + kicker day labels) — structure unchanged.
   const isMobile = useIsMobile()
-  const [subEvents, setSubEvents] = useState<CalendarEvent[]>([])
-  // childId → checklist progress, batched (never N+1).
-  const [readiness, setReadiness] = useState<Record<string, { done: number; total: number }>>({})
-  const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("calendar_events")
-        .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring")
-        .eq("parent_event_id", parentEvent.id)
-        .order("start_date", { ascending: true })
-      const rows = (data ?? []) as CalendarEvent[]
-      setSubEvents(rows)
+  // Children + per-child readiness come from the ONE batched fetch the container
+  // already runs for its Run of Show / Roles / Countdown surfaces — this tab used to
+  // repeat the same three queries for itself.
+  const subEvents = rollup.children.map((c) => c.event)
+  const readiness: Record<string, { done: number; total: number }> = Object.fromEntries(
+    rollup.children.map((c) => [c.event.id, { done: c.done, total: c.total }]),
+  )
+  const loading = rollup.loading
 
-      // Batch readiness: child events → their event_plans → event_tasks
-      // done/total, aggregated client-side. Two queries total (no per-row).
-      // Scope the plan lookup by ministry_id (event_tasks has no ministry_id
-      // column, so it's scoped transitively through these plan ids).
-      const childIds = rows.map((e) => e.id)
-      if (childIds.length) {
-        const { data: plans } = await supabase
-          .from("event_plans")
-          .select("id, calendar_event_id")
-          .in("calendar_event_id", childIds)
-          .eq("ministry_id", ministryId)
-        const planRows = (plans ?? []) as { id: string; calendar_event_id: string }[]
-        const planToChild = new Map(planRows.map((p) => [p.id, p.calendar_event_id]))
-        const map: Record<string, { done: number; total: number }> = {}
-        childIds.forEach((id) => { map[id] = { done: 0, total: 0 } })
-        if (planRows.length) {
-          const { data: taskRows } = await supabase
-            .from("event_tasks")
-            .select("event_plan_id, completed")
-            .in("event_plan_id", planRows.map((p) => p.id))
-          ;((taskRows ?? []) as { event_plan_id: string; completed: boolean }[]).forEach((t) => {
-            const childId = planToChild.get(t.event_plan_id)
-            if (!childId) return
-            map[childId].total++
-            if (t.completed) map[childId].done++
-          })
-        }
-        setReadiness(map)
+  // Day-grouped, sorted-ascending rows (the rollup already orders by start_date).
+  // Computed up-front rather than by mutating counters mid-render — the React
+  // Compiler rejects reassignment that outlives the render pass.
+  const headerForChild = new Map<string, { label: string; first: boolean }>()
+  {
+    let lastDayKey: string | null = null
+    let seenFirst = false
+    for (const ev of subEvents) {
+      const dt = new Date(ev.start_date)
+      const dayKey = dt.toDateString()
+      if (dayKey !== lastDayKey) {
+        lastDayKey = dayKey
+        headerForChild.set(ev.id, { label: eventDayHeaderLabel(dt), first: !seenFirst })
+        seenFirst = true
       }
-      setLoading(false)
     }
-    load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parentEvent.id])
-
-  // Day-grouped, sorted-ascending rows (query already orders by start_date).
-  let lastDayKey: string | null = null
-  let firstHeaderRendered = false
+  }
 
   // The parent's end_date is the user's to set — a week whose nights only fill 11
   // of its 14 days is their business. A night scheduled OUTSIDE the parent's dates
@@ -9453,12 +9547,10 @@ function SubEventsTab({
       <div>
         {subEvents.map((ev) => {
           const evCfg = getEventConfig(ev)
-          const dt = new Date(ev.start_date)
-          const dayKey = dt.toDateString()
-          const showHeader = dayKey !== lastDayKey
-          const isFirstHeader = showHeader && !firstHeaderRendered
-          if (showHeader) { lastDayKey = dayKey; firstHeaderRendered = true }
-          const dayLabel = eventDayHeaderLabel(dt)
+          const head = headerForChild.get(ev.id)
+          const showHeader = !!head
+          const isFirstHeader = !!head?.first
+          const dayLabel = head?.label ?? ""
           const outOfRange = isOutOfRange(ev)
 
           const r = readiness[ev.id] ?? { done: 0, total: 0 }
@@ -9566,8 +9658,11 @@ function SubEventsTab({
           parentEventId={parentEvent.id}
           excludeTypes={["welcome_week"]}
           onClose={() => setShowAdd(false)}
-          onSaved={(ev) => {
-            setSubEvents(prev => [...prev, ev].sort((a, b) => a.start_date.localeCompare(b.start_date)))
+          onSaved={() => {
+            // The children list is owned by the shared rollup now, so re-run that one
+            // batched fetch rather than splicing a local copy the other container
+            // surfaces would not see.
+            rollup.refresh()
             setShowAdd(false)
           }}
         />

@@ -1,8 +1,50 @@
 # Events with sub-events: what belongs at which level
 
-**Status:** open problem, not decided. Written 2026-07-30 alongside the Run of Show
-rename (`feat/run-of-show-dates`), which fixed the *symptoms* listed under
-"Already fixed" and deliberately left the model alone.
+**Status: DECIDED AND BUILT** — `feat/event-container`, 2026-07-30. Written first as
+an open question alongside the Run of Show rename (`feat/run-of-show-dates`), which
+fixed the *symptoms* under "Already fixed" and left the model alone; resolved the same
+day. Kept as the record of what was decided and why, not as a live question.
+
+## What shipped
+
+A **container** is an event whose `extraTabs` include `sub_events` and which is not
+itself a child — derived in `EventPlanWorkspace` as `isContainer`. `extraTabs` is fixed
+at creation, so a parent's tab set never rearranges the moment its first night is
+added (which a `has children` check would do mid-planning). The surfaces live in
+`app/home/tabs/event-container.tsx`, fed by one batched `useContainerRollup`.
+
+| Surface | Container behaviour |
+|---|---|
+| `runsheet` | **Read-only merged week timeline** — every night's blocks stitched chronologically, grouped by date, drilling into the night that owns each. No editable blocks on the week. |
+| `roles` | The week's own roles under **WEEK-SPANNING**, then **ACROSS THE NIGHTS**: an editable staffing table covering every night. |
+| `checklist` | The week's own list, then a read-only **ACROSS THE NIGHTS** roll-up of the nights' open items. |
+| `sub_events` | Unchanged, now fed by the shared rollup instead of repeating its own three queries. |
+
+**Where a night's lead is entered: on the night.** The staffing table writes the
+*night's own* `event_roles` row — the identical statement the night's own screen
+issues — so the week is a second place to *work*, never a second place data lives.
+Verified end-to-end: assigning from the week updates the row in the database (checked
+by direct query, not the UI) and the same person then shows on the night's own Roles
+tab.
+
+Nothing is stranded: blocks written on the week itself before this surface under an
+"On the week itself" section rather than disappearing, matching the orphaned-block
+rule shipped in `93fd4d2`.
+
+Also removed: `canHaveSubEvents`, a field declared on all 7 presets and read nowhere.
+`extraTabs` was already the real signal; two competing flags is how this drifts again.
+
+## Still open
+
+- Should a container's readiness roll up from its nights into one number? The data is
+  there (`ContainerChild.done/total`); no surface aggregates it yet.
+- Should a night inherit the week's roster/roles as defaults? Deliberately not built —
+  too magical for v1.
+- Nesting stays capped at one level.
+
+---
+
+*Original framing below, kept because the reasoning is the justification.*
 
 ---
 
