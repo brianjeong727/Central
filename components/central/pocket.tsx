@@ -3,7 +3,7 @@
 import { Fragment, useEffect } from "react"
 import type { CSSProperties, ReactNode } from "react"
 import { createPortal } from "react-dom"
-import { ArrowLeft, ChevronRight, Plus, Search, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react"
 
 // ── Pocket primitives (mobile design system) ──────────────────────────────────
 // The shared building blocks of every phone-width (`md:hidden`) surface, per
@@ -204,8 +204,8 @@ export function PocketDashedButton({ label, onClick, icon }: { label: string; on
 // section content when the chrome row can't carry the back (single-file swaps).
 export function PocketBackRow({ label, onBack, style }: { label: string; onBack: () => void; style?: CSSProperties }) {
   return (
-    <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 12px 0 6px", marginBottom: 18, background: "transparent", border: "none", color: "var(--plum)", fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, cursor: "pointer", ...style }}>
-      <ArrowLeft style={{ width: 18, height: 18 }} /> {label}
+    <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 12px 0 6px", marginBottom: 18, background: "transparent", border: "none", color: "var(--body)", fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, cursor: "pointer", ...style }}>
+      <ChevronLeft style={{ width: 18, height: 18 }} strokeWidth={1.7} /> {label}
     </button>
   )
 }

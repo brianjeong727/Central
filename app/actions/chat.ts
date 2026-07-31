@@ -2,32 +2,45 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
-import { isChatManageRole } from "@/lib/roles"
+import { isChatManageRole, isLeaderRole } from "@/lib/roles"
 
 export async function deleteGroup(groupId: string): Promise<{ error: string | null }> {
   const supabase = await createClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return { error: "Not authenticated." }
 
-  // Verify the caller is admin or leader
   const { data: profile } = await supabase
     .from("profiles")
     .select("ministry_id, role")
     .eq("id", user.id)
     .single()
-  if (!profile?.ministry_id || !isChatManageRole(profile.role)) {
-    return { error: "Insufficient permissions." }
-  }
+  if (!profile?.ministry_id) return { error: "Insufficient permissions." }
 
   const admin = createAdminClient()
 
   const { data: group } = await admin
     .from("groups")
-    .select("id, is_central_chat")
+    .select("id, type, is_central_chat")
     .eq("id", groupId)
     .eq("ministry_id", profile.ministry_id)
     .maybeSingle()
   if (!group) return { error: "Chat not found in your ministry." }
+
+  // Church chats: management moved to "in-chat leader-or-above" — the caller must
+  // be leader-tier (incl. pastor) AND a member of THIS chat (mirrors the groups
+  // UPDATE / group_members RLS). My/DM chats keep the legacy isChatManageRole gate.
+  if (group.type === "church") {
+    if (!isLeaderRole(profile.role)) return { error: "Insufficient permissions." }
+    const { data: membership } = await admin
+      .from("group_members")
+      .select("user_id")
+      .eq("group_id", groupId)
+      .eq("user_id", user.id)
+      .maybeSingle()
+    if (!membership) return { error: "Insufficient permissions." }
+  } else if (!isChatManageRole(profile.role)) {
+    return { error: "Insufficient permissions." }
+  }
 
   // The ministry-wide central chat can never be deleted. Surface a friendly
   // message before hitting the DB (a BEFORE DELETE trigger is the hard backstop).

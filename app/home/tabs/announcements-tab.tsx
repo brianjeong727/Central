@@ -3,12 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import Image from "next/image"
 import useSWR from "swr"
-import { ArrowLeft, X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, Pin, PinOff, Eye } from "lucide-react"
+import { X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, Pin, PinOff, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, MONO_STYLE, EYEBROW_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu, PocketFilterChip, PocketFilterChipRow, PocketCard, PocketKicker, PocketButton, PocketSwitch, PocketTag, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu, PocketFilterChip, PocketFilterChipRow, PocketCard, PocketKicker, PocketButton, PocketSwitch, PocketTag, POCKET_KICKER_STYLE, useScrollResetOn, BackChevron } from "@/components/central"
 import type { ActionMenuItem } from "@/components/central"
 import { audienceLabel, formatDate, previewBody } from "../utils"
 import { useOpenMemberProfile } from "../member-profile-context"
@@ -332,9 +332,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           20px when sharing the row with 2+ actions (mobile §2.1) and truncates
           rather than wrapping against Save draft + Publish. ── */}
       <div className="md:hidden flex items-center gap-3 px-5 pt-6 pb-4" style={{ borderBottom: "1px solid var(--line)" }}>
-        <button onClick={onClose} aria-label="Back" className="w-9 h-9 flex items-center justify-center rounded-xl -ml-1 flex-shrink-0 hover:bg-[var(--ivory)] transition-colors">
-          <ArrowLeft className="w-5 h-5" style={{ color: "var(--plum)" }} />
-        </button>
+        <BackChevron onClick={onClose} />
         <span className="flex-1 min-w-0 truncate" style={{ fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05 }}>{titleText}</span>
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* "Save" (quiet) = save-as-draft — the full "Save draft" label crowds the

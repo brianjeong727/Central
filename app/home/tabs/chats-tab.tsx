@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -12,7 +12,7 @@ import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
@@ -29,7 +29,7 @@ import { useBlocks } from "../use-blocks"
 import { MODERATION_DEFAULTS, moderateText, scopeApplies, reverentCapitalize } from "@/lib/moderation"
 import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
-import { isChatManageRole } from "@/lib/roles"
+import { isChatManageRole, isLeaderRole } from "@/lib/roles"
 
 // Hydration-safe "are we mounted on the client yet?" flag with no set-state-in-
 // effect. useSyncExternalStore returns the server snapshot (false) during SSR
@@ -455,7 +455,6 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // document.body so a transformed content-enter ancestor can't trap position:fixed).
   const mounted = useMountedFlag()
 
-  const isAdminOrLeader = isChatManageRole(userRole)
   const isDM = groupType === "dm"
   const isMy = groupType === "my"
   const isChurch = groupType === "church"
@@ -463,11 +462,16 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // flag (set by the DB auto-create trigger), NOT by a name match — so renaming it
   // can never break identification, auto-enroll, or the delete/archive guards.
   const isCentralChat = isChurch && isCentral
-  const canManage = (isChurch && isAdminOrLeader) || isMy
+  // Church-chat management is now "in-chat leader-or-above": a leader-tier role
+  // (incl. pastor) AND membership of THIS chat — mirrors the groups/group_members
+  // /messages RLS. Non-church (my) chats force manage as before.
+  const isMemberOfChat = members.some((m) => m.user_id === userId)
+  const churchManage = isChurch && isLeaderRole(userRole) && isMemberOfChat
+  const canManage = churchManage || isMy
   const canLeave = isMy || isDM
-  const canArchive = isChurch && isAdminOrLeader && !groupArchived && !isCentralChat
-  const canUnarchive = isChurch && isAdminOrLeader && groupArchived
-  const canDelete = isChurch && isAdminOrLeader && !isCentralChat
+  const canArchive = churchManage && !groupArchived && !isCentralChat
+  const canUnarchive = churchManage && groupArchived
+  const canDelete = churchManage && !isCentralChat
 
   // SWR-cached settings load — members + this user's mute/pin prefs. Pure fetcher;
   // local state is populated via the effect below so re-opening a chat paints from cache.
@@ -563,7 +567,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
   // ── Chat prefs (mute/pin): stage locally, commit on Save. Member changes still
   //    persist immediately (optimistic + rollback); only prefs are staged. ──
-  const canReassignSection = isChurch && canManage && !isCentralChat
+  const canReassignSection = churchManage && !isCentralChat
   const prefsDirty = pendingMuted !== muted || pendingPinned !== pinned || (canReassignSection && pendingCategory !== category)
 
   // Patch the shared chat-list SWR cache so the list's muted/pinned indicators +
@@ -831,17 +835,27 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             </div>
           </div>
 
-          <PocketKicker
-            label="Members"
-            style={{ margin: "0 4px 12px" }}
-            action={canManage ? (
-              <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="text-[13.5px] font-semibold" style={{ color: "var(--plum)", fontFamily: "var(--serif)" }}>+ Add</button>
-            ) : undefined}
-          />
+          <PocketKicker label="Members" style={{ margin: "0 4px 12px" }} />
           {loading ? <Spinner /> : (
             /* Borderless tonal rows-card (Pocket grammar): one --ivory surface at
                --r-pocket, rows divided by the --line-3 hairline. */
             <div className="mb-6" style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "6px 18px" }}>
+              {/* Obvious add-members affordance (iMessage-style) — the first row of the
+                  roster, plum chip + label so it reads clearly as an action. Replaces
+                  the subtle kicker "+ Add" that was easy to miss on phone. */}
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => { setShowAddMembers(true); loadAllProfiles() }}
+                  className="flex items-center gap-3 w-full text-left"
+                  style={{ padding: "13px 0", borderBottom: "1px solid var(--line-3)", background: "transparent", border: "none", WebkitTapHighlightColor: "transparent" }}
+                >
+                  <span className="w-9 h-9 rounded-full inline-flex items-center justify-center flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 10%, transparent)", color: "var(--plum)" }}>
+                    <Plus style={{ width: 17, height: 17 }} strokeWidth={2.2} />
+                  </span>
+                  <span className="text-[15px] font-semibold" style={{ color: "var(--plum)", letterSpacing: "-0.01em" }}>Add members</span>
+                </button>
+              )}
               {members.map((member, i) => {
                 const isConfirming = confirmRemoveMemberId === member.user_id
                 const isRevealed = mobileRevealMemberId === member.user_id
@@ -1404,8 +1418,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       .map(m => m.id)
   }, [messages, searchQuery])
 
-  const isAdminOrLeader = isChatManageRole(userRole)
-  const canPin = !groupArchived && (isAdminOrLeader || groupType !== "church")
+  // Church-chat moderation (delete others' messages/polls, pin) is now "in-chat
+  // leader-or-above": a leader-tier role (incl. pastor) AND membership of THIS chat,
+  // mirroring the messages/groups RLS. My/DM behavior is UNCHANGED (isChatManageRole).
+  const isMemberOfChat = roster.some((m) => m.id === userId)
+  const canModerate = groupType === "church" ? (isLeaderRole(userRole) && isMemberOfChat) : isChatManageRole(userRole)
+  const canPin = !groupArchived && (groupType !== "church" ? true : (isLeaderRole(userRole) && isMemberOfChat))
 
   // @mention member list is loaded via useSWR above (see rosterData/mentionMembers).
   // The @mention dropdown, GIF picker, and input state now live in <Composer>.
@@ -2659,14 +2677,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           </>
         ) : (
           <>
-            {!inline && (
-              <button
-                onClick={onClose}
-                className="flex-shrink-0 -ml-1 w-[34px] h-[34px] flex items-center justify-center hover:bg-[var(--cream-2)] rounded-full transition-colors md:hidden"
-              >
-                <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
-              </button>
-            )}
+            {!inline && <BackChevron onClick={onClose} className="md:hidden" />}
             {/* Group avatar — 40px on mobile (Pocket chat header), 32px on the
                 shared desktop inline panel (md: override keeps desktop untouched). */}
             <MonogramChip
@@ -2788,7 +2799,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   senderDeparted={!!(msg.sender_id && departedIds.has(msg.sender_id))}
                   userId={userId}
                   canPin={canPin}
-                  isAdminOrLeader={isAdminOrLeader}
+                  isAdminOrLeader={canModerate}
                   isEmojiPickerOpen={emojiPickerFor === msg.id}
                   isFullPickerOpen={fullReactionPickerFor === msg.id}
                   isContextMenuOpen={contextMenuFor === msg.id}

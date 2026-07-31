@@ -69,8 +69,9 @@ test.describe("mobile Pocket sweep — chats (a)", () => {
       await expect(vis(page, text)).toBeVisible({ timeout: 15000 })
     }
 
-    // Settings gear (34px chrome icon, mobile chat header).
-    await page.locator('button:has(svg.lucide-settings)').filter({ visible: true }).first().click()
+    // Open settings by tapping the chat-header title (mobile has no gear — the
+    // header row carries the setShowSettings tap handler at phone width).
+    await page.locator('h2').filter({ visible: true }).first().click()
     await expect(vis(page, groupName).first()).toBeVisible({ timeout: 10000 })
     assertNoErrors(errors)
   })

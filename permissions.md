@@ -109,6 +109,7 @@ The DG-dinner `reimbursement_forms` flow is **retired** — replaced by free-for
 | View RSVP attendee list | ✗ | ✗ | ✓ | ✓ |
 | View chats | ✓ | ✓ | ✓ | ✓ |
 | Create church chats | ✗ | ✗ | ✓ (team-based) | ✓ |
+| Manage a church chat (members, rename, section, archive/delete, pin, moderate) | ✗ | ✗ | ✓ if a member | ✓ if a member |
 | View Plan tab | on a team | on a team | on a team | ✓ (or governance) |
 | View directory | ✓ | ✓ | ✓ | ✓ |
 | View Give (Zelle) | ✓ | ✓ | ✓ | ✓ |
@@ -122,6 +123,8 @@ The DG-dinner `reimbursement_forms` flow is **retired** — replaced by free-for
 | Access Settings tab | ✗ | ✗ | ✗ | ✓ |
 | Edit ministry / roles / members / codes / schools | ✗ | ✗ | ✗ | ✓ |
 | View Congregation tab | ✗ | ✗ | ✗ | Pastor only |
+
+> **Church-chat management** requires **membership of that chat** AND a leader-or-above role (`auth_is_admin_or_leader()` = admin/leader/deacon/elder/**pastor**). Pastor **is included** here — unlike the legacy `isChatManageRole` tier (my/DM moderation + cosmetic role pills), which still excludes pastor. A non-member admin/leader cannot manage a church chat they don't belong to. Enforced at both the app layer (`isLeaderRole` + a members/roster lookup) and RLS (`auth_is_admin_or_leader()` + `is_group_member` on `groups` UPDATE, `group_members` INSERT, `messages` DELETE). My/DM chats are unchanged.
 
 ---
 

@@ -6,7 +6,7 @@ import Link from "next/link"
 import { AlertCircle } from "lucide-react"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { SplitShell, GoogleButton, GoogleGlyph, AppleButton, AppleGlyph, OrDivider, EyeButton } from "@/app/(auth)/shared"
-import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn } from "@/lib/native-auth"
+import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn, nativeAuthDebugMessage } from "@/lib/native-auth"
 import { RingCrossLogo } from "@/app/home/components/shared"
 import { EntrySplash } from "@/app/home/components/entry-splash"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
@@ -113,9 +113,9 @@ function LoginContent() {
       const res = await signInWithAppleNative("signin")
       if (!res.ok) {
         if (res.error === "unavailable") { await webAppleOAuth(); return }
-        if (res.error === "no-account") setError("No Central account exists for that Apple ID yet — create an account first.")
-        else if (res.error === "failed") setError("Apple sign-in didn't complete — make sure this device is signed in to an Apple ID (Settings), then try again.")
-        else return // canceled — no error surface
+        // TEMP DIAGNOSTIC: surface the raw reason (incl. canceled) so a
+        // real-device failure is legible without a debuggable build.
+        setError(nativeAuthDebugMessage(res))
         // The mobile welcome step has no error banner — surface it on the form step.
         setMobileStep("form")
         return

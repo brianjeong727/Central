@@ -88,8 +88,9 @@ test.describe("mobile Chats family (P3) screenshots", () => {
     await page.goto("/home?tab=chats&chats=my")
     await vis(page, MYCHAT, false).first().click()
     await expect(vis(page, "8pm at the chapel", false).first()).toBeVisible({ timeout: 15000 })
-    // Open settings via the gear in the chat header.
-    await page.locator("button:has(svg.lucide-settings)").filter({ visible: true }).first().click()
+    // Open settings by tapping the chat-header title (mobile has no gear — the
+    // header row carries the setShowSettings tap handler at phone width).
+    await page.locator("h2").filter({ visible: true }).first().click()
     await expect(vis(page, "Members").first()).toBeVisible({ timeout: 10000 })
     // Wait for the members query to resolve so the role tags + Preferences
     // switches render (both are gated behind the loading spinner).
@@ -111,7 +112,7 @@ test.describe("mobile Chats family (P3) screenshots", () => {
     const sb = sandbox()
     await page.goto("/home?tab=chats&chats=church")
     await vis(page, GROUP, false).first().click()
-    await page.locator("button:has(svg.lucide-settings)").filter({ visible: true }).first().click()
+    await page.locator("h2").filter({ visible: true }).first().click()
     // SECTION control renders with the seeded "Groups" preset active.
     await expect(vis(page, "Section").first()).toBeVisible({ timeout: 10000 })
     await expect(vis(page, "Preferences").first()).toBeVisible({ timeout: 10000 })
@@ -127,10 +128,12 @@ test.describe("mobile Chats family (P3) screenshots", () => {
       const { data } = await sb.client.from("groups").select("category").eq("id", groupCatId).single()
       return data?.category
     }, { timeout: 8000 }).toBe("team")
-    {
+    // Poll (not a single read) so the assertion isn't racy against write→read lag —
+    // mirrors the category poll above.
+    await expect.poll(async () => {
       const { data: msgs } = await sb.client.from("messages").select("content").eq("group_id", groupCatId).eq("message_type", "system").order("created_at", { ascending: false }).limit(1)
-      expect(msgs?.[0]?.content).toBe("Chat moved to Teams")
-    }
+      return msgs?.[0]?.content
+    }, { timeout: 8000 }).toBe("Chat moved to Teams")
 
     // Move back Teams → Groups to restore, confirming re-bucket both ways.
     await page.getByRole("button", { name: "Groups", exact: true }).click()

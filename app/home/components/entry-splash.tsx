@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { isNativeShell } from "@/lib/native-auth"
+import { claimNativeSplash, hideNativeSplash } from "@/lib/native-splash"
 
 // ── EntrySplash — native-only "One Body" FIRST-RUN splash ──────────────────────
 // Renders ONLY on the native shell (Capacitor UA "CentralShell"), ONLY at mobile
@@ -43,18 +44,11 @@ function markSplashSeen() {
   }
 }
 
-// Release the native (Capacitor) launch splash. `launchAutoHide` is false in
-// capacitor.config.ts, so the native cream splash stays up until we call this. On web
-// the dynamic import resolves to a no-op bridge; we swallow any failure so nothing
-// breaks the web build or runtime.
-async function hideNativeSplash() {
-  try {
-    const mod = await import("@capacitor/splash-screen")
-    await mod.SplashScreen.hide()
-  } catch {
-    /* web / no native bridge — no-op */
-  }
-}
+// The native launch-splash release lives in lib/native-splash.ts — it is shared with
+// the root-layout `NativeSplashRelease` net so EVERY route releases the splash, not
+// just the two that mount this component. This component still owns the FIRST-RUN
+// handoff on /home and /login: it claims the splash, then hands off once its own plum
+// overlay has painted, so there is no flash between the two plum surfaces.
 
 const AUTO_DISMISS_MS = 4200
 const FADE_MS = 600
@@ -132,6 +126,11 @@ export function EntrySplash() {
     }
 
     splashConsumed = true
+
+    // Claim the handoff SYNCHRONOUSLY (before any await/rAF) so the root-layout
+    // release net — which defers a macrotask — backs off and lets the overlay paint
+    // under the native splash instead of flashing the app between the two.
+    claimNativeSplash()
 
     // First-run gate: returning installs skip the animation entirely — the static
     // native splash covered the launch; just release it and drop straight into the app.
