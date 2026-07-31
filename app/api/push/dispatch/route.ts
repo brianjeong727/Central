@@ -136,6 +136,21 @@ async function resolveMessage(
     (msg.content?.match(/@(\w+)/g) ?? []).map((t: string) => t.slice(1).toLowerCase()),
   )
 
+  // Nickname-aware mentions: the composer inserts the first word of a member's
+  // chat nickname, so a mention token can resolve via that instead of the real
+  // first name. Only fetch when the message actually has mentions.
+  const nicknameTokenByUser = new Map<string, string>()
+  if (mentionTokens.size > 0) {
+    const { data: nicks } = await admin
+      .from("chat_nicknames")
+      .select("target_user_id, nickname")
+      .eq("group_id", msg.group_id)
+    for (const n of nicks ?? []) {
+      const tok = (n.nickname ?? "").split(" ")[0].toLowerCase()
+      if (tok) nicknameTokenByUser.set(n.target_user_id, tok)
+    }
+  }
+
   let repliedAuthor: string | null = null
   if (msg.reply_to_id) {
     const { data: rep } = await admin
@@ -156,7 +171,8 @@ async function resolveMessage(
     const settings: NotificationSettings =
       (profMap.get(uid)?.notification_settings as NotificationSettings) ?? {}
     const firstName = (profMap.get(uid)?.name ?? "").split(" ")[0].toLowerCase()
-    const isMention = !!firstName && mentionTokens.has(firstName)
+    const nickTok = nicknameTokenByUser.get(uid)
+    const isMention = (!!firstName && mentionTokens.has(firstName)) || (!!nickTok && mentionTokens.has(nickTok))
     const isReply = repliedAuthor === uid
 
     let reason: string | null = null

@@ -3,14 +3,16 @@
 import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, ArrowLeft, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
 import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
+import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames"
+import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
@@ -27,7 +29,7 @@ import { useBlocks } from "../use-blocks"
 import { MODERATION_DEFAULTS, moderateText, scopeApplies, reverentCapitalize } from "@/lib/moderation"
 import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
-import { isChatManageRole } from "@/lib/roles"
+import { isChatManageRole, isLeaderRole } from "@/lib/roles"
 
 // Hydration-safe "are we mounted on the client yet?" flag with no set-state-in-
 // effect. useSyncExternalStore returns the server snapshot (false) during SSR
@@ -428,11 +430,31 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const [confirmRemoveMemberId, setConfirmRemoveMemberId] = useState<string | null>(null)
   const [hoveredMemberId, setHoveredMemberId] = useState<string | null>(null)
   const [mobileRevealMemberId, setMobileRevealMemberId] = useState<string | null>(null)
+  // Nickname editor (personal group chats only). Shared model — any member may set
+  // any member's nickname; writes go through the moderated server action.
+  const [nicknameEditor, setNicknameEditor] = useState<{ userId: string; name: string; current: string } | null>(null)
+  const [nicknameInput, setNicknameInput] = useState("")
+  const [nicknameSaving, setNicknameSaving] = useState(false)
+  const [nicknameError, setNicknameError] = useState<string | null>(null)
+  const canNickname = groupType === "my" || groupType === "dm"
+
+  async function submitNickname(clear: boolean) {
+    if (!nicknameEditor) return
+    const targetId = nicknameEditor.userId
+    setNicknameSaving(true); setNicknameError(null)
+    const res = clear
+      ? await clearChatNickname(groupId, targetId)
+      : await setChatNickname(groupId, targetId, nicknameInput)
+    setNicknameSaving(false)
+    if (res.error) { setNicknameError(res.error); return }
+    mutateSettings()                          // refresh the members list
+    mutateGlobal(["chat-roster", groupId])    // refresh ChatScreen's name seam
+    setNicknameEditor(null)
+  }
   // Portal-safe mount flag for the destructive-action confirm dialog (rendered to
   // document.body so a transformed content-enter ancestor can't trap position:fixed).
   const mounted = useMountedFlag()
 
-  const isAdminOrLeader = isChatManageRole(userRole)
   const isDM = groupType === "dm"
   const isMy = groupType === "my"
   const isChurch = groupType === "church"
@@ -440,18 +462,23 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // flag (set by the DB auto-create trigger), NOT by a name match — so renaming it
   // can never break identification, auto-enroll, or the delete/archive guards.
   const isCentralChat = isChurch && isCentral
-  const canManage = (isChurch && isAdminOrLeader) || isMy
+  // Church-chat management is now "in-chat leader-or-above": a leader-tier role
+  // (incl. pastor) AND membership of THIS chat — mirrors the groups/group_members
+  // /messages RLS. Non-church (my) chats force manage as before.
+  const isMemberOfChat = members.some((m) => m.user_id === userId)
+  const churchManage = isChurch && isLeaderRole(userRole) && isMemberOfChat
+  const canManage = churchManage || isMy
   const canLeave = isMy || isDM
-  const canArchive = isChurch && isAdminOrLeader && !groupArchived && !isCentralChat
-  const canUnarchive = isChurch && isAdminOrLeader && groupArchived
-  const canDelete = isChurch && isAdminOrLeader && !isCentralChat
+  const canArchive = churchManage && !groupArchived && !isCentralChat
+  const canUnarchive = churchManage && groupArchived
+  const canDelete = churchManage && !isCentralChat
 
   // SWR-cached settings load — members + this user's mute/pin prefs. Pure fetcher;
   // local state is populated via the effect below so re-opening a chat paints from cache.
   const { data: settingsData, mutate: mutateSettings } = useSWR(
     groupId ? ["group-settings", groupId] : null,
     async () => {
-      const [{ data }, { data: prefData }, { data: groupRow }] = await Promise.all([
+      const [{ data }, { data: prefData }, { data: groupRow }, { data: nicks }] = await Promise.all([
         supabase
           .from("group_members")
           .select("user_id, profiles!user_id(name, role, graduation_year, avatar_url)")
@@ -467,7 +494,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           .select("category")
           .eq("id", groupId)
           .maybeSingle(),
+        supabase
+          .from("chat_nicknames")
+          .select("target_user_id, nickname")
+          .eq("group_id", groupId),
       ])
+      const nickById: Record<string, string> = {}
+      for (const n of (nicks ?? []) as { target_user_id: string; nickname: string }[]) nickById[n.target_user_id] = n.nickname
       const mapped: GroupMember[] = (data ?? []).map((m: {
         user_id: string
         profiles: { name: string; role: string; graduation_year: number | null; avatar_url: string | null } | { name: string; role: string; graduation_year: number | null; avatar_url: string | null }[] | null
@@ -476,6 +509,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         return {
           user_id: m.user_id,
           name: p?.name ?? "Unknown",
+          nickname: nickById[m.user_id] ?? null,
           role: p?.role ?? "",
           graduation_year: p?.graduation_year ?? null,
           avatar_url: p?.avatar_url ?? null,
@@ -533,7 +567,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
   // ── Chat prefs (mute/pin): stage locally, commit on Save. Member changes still
   //    persist immediately (optimistic + rollback); only prefs are staged. ──
-  const canReassignSection = isChurch && canManage && !isCentralChat
+  const canReassignSection = churchManage && !isCentralChat
   const prefsDirty = pendingMuted !== muted || pendingPinned !== pinned || (canReassignSection && pendingCategory !== category)
 
   // Patch the shared chat-list SWR cache so the list's muted/pinned indicators +
@@ -801,17 +835,27 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             </div>
           </div>
 
-          <PocketKicker
-            label="Members"
-            style={{ margin: "0 4px 12px" }}
-            action={canManage ? (
-              <button onClick={() => { setShowAddMembers(true); loadAllProfiles() }} className="text-[13.5px] font-semibold" style={{ color: "var(--plum)", fontFamily: "var(--serif)" }}>+ Add</button>
-            ) : undefined}
-          />
+          <PocketKicker label="Members" style={{ margin: "0 4px 12px" }} />
           {loading ? <Spinner /> : (
             /* Borderless tonal rows-card (Pocket grammar): one --ivory surface at
                --r-pocket, rows divided by the --line-3 hairline. */
             <div className="mb-6" style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "6px 18px" }}>
+              {/* Obvious add-members affordance (iMessage-style) — the first row of the
+                  roster, plum chip + label so it reads clearly as an action. Replaces
+                  the subtle kicker "+ Add" that was easy to miss on phone. */}
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => { setShowAddMembers(true); loadAllProfiles() }}
+                  className="flex items-center gap-3 w-full text-left"
+                  style={{ padding: "13px 0", borderBottom: "1px solid var(--line-3)", background: "transparent", border: "none", WebkitTapHighlightColor: "transparent" }}
+                >
+                  <span className="w-9 h-9 rounded-full inline-flex items-center justify-center flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 10%, transparent)", color: "var(--plum)" }}>
+                    <Plus style={{ width: 17, height: 17 }} strokeWidth={2.2} />
+                  </span>
+                  <span className="text-[15px] font-semibold" style={{ color: "var(--plum)", letterSpacing: "-0.01em" }}>Add members</span>
+                </button>
+              )}
               {members.map((member, i) => {
                 const isConfirming = confirmRemoveMemberId === member.user_id
                 const isRevealed = mobileRevealMemberId === member.user_id
@@ -823,14 +867,25 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     onClick={() => { if (canManage && member.user_id !== userId && !isConfirming) setMobileRevealMemberId((id) => id === member.user_id ? null : member.user_id) }}
                   >
                     <span onClick={(e) => { e.stopPropagation(); openMemberProfile(member.user_id) }} style={{ cursor: "pointer", display: "inline-flex", flexShrink: 0 }}>
-                      <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-medium text-[10px]" />
+                      <MonogramChip initials={getInitials(member.nickname ?? member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-medium text-[10px]" />
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <p onClick={(e) => { e.stopPropagation(); openMemberProfile(member.user_id) }} className="text-[15px] font-semibold truncate cursor-pointer" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>{member.name}</p>
+                        <p onClick={(e) => { e.stopPropagation(); openMemberProfile(member.user_id) }} className="text-[15px] font-semibold truncate cursor-pointer" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>{member.nickname ?? member.name}</p>
                         {member.user_id === userId && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
+                        {canNickname && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setNicknameEditor({ userId: member.user_id, name: member.name, current: member.nickname ?? "" }); setNicknameInput(member.nickname ?? ""); setNicknameError(null) }}
+                            aria-label={`Set nickname for ${member.name}`}
+                            className="flex-shrink-0"
+                            style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)" }}
+                          >
+                            <Pencil style={{ width: 13, height: 13 }} />
+                          </button>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {member.nickname && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>{member.name}</span>}
                         {member.role && <PocketTag label={roleLabel(member.role, member.user_id)} variant={pocketRoleVariant(member.role)} />}
                         {member.graduation_year && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
                       </div>
@@ -1006,14 +1061,25 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     style={{ display: "grid", gridTemplateColumns: "40px 1fr auto auto", alignItems: "center", gap: 14, padding: "15px 20px", borderBottom: i < members.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--cream))" : isHovered ? "var(--cream-2)" : "transparent", transition: "background 0.1s" }}
                   >
                     <span onClick={() => openMemberProfile(member.user_id)} style={{ cursor: "pointer", display: "inline-flex" }}>
-                      <MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-medium text-[11px]" />
+                      <MonogramChip initials={getInitials(member.nickname ?? member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-medium text-[11px]" />
                     </span>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <p onClick={() => openMemberProfile(member.user_id)} style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500, cursor: "pointer" }}>{member.name}</p>
+                        <p onClick={() => openMemberProfile(member.user_id)} style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500, cursor: "pointer" }}>{member.nickname ?? member.name}</p>
                         {member.user_id === userId && <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--cream)", color: "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" }}>You</span>}
+                        {canNickname && (
+                          <button
+                            onClick={() => { setNicknameEditor({ userId: member.user_id, name: member.name, current: member.nickname ?? "" }); setNicknameInput(member.nickname ?? ""); setNicknameError(null) }}
+                            aria-label={`Set nickname for ${member.name}`}
+                            style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)", opacity: isHovered ? 1 : 0.5, transition: "opacity 0.15s" }}
+                          >
+                            <Pencil style={{ width: 12, height: 12 }} />
+                          </button>
+                        )}
                       </div>
-                      {member.graduation_year && <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Class of {member.graduation_year}</p>}
+                      {member.nickname
+                        ? <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>{member.name}{member.graduation_year ? ` · Class of ${member.graduation_year}` : ""}</p>
+                        : member.graduation_year ? <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Class of {member.graduation_year}</p> : null}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       {member.role && roleBadge(member.role, "md", member.user_id)}
@@ -1081,6 +1147,42 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
             {confirmAction === "archive" ? "Members won't be able to send new messages." : confirmAction === "unarchive" ? "Members will be able to send messages again." : confirmAction === "leave" ? "You'll stop receiving its messages." : "This chat and all its messages will be permanently removed. This can't be undone."}
           </p>
+        </CentralModal>,
+        document.body
+      )}
+
+      {/* Nickname editor (personal group chats). Shared model — any member sets any
+          member's nickname; the write is moderated server-side. */}
+      {mounted && nicknameEditor && createPortal(
+        <CentralModal
+          onClose={() => setNicknameEditor(null)}
+          eyebrow="Nickname"
+          title={`Nickname for ${nicknameEditor.name}`}
+          maxWidth={420}
+          sheet
+          footer={
+            <>
+              {nicknameEditor.current
+                ? <CentralButton variant="quiet" size="md" onClick={() => submitNickname(true)} disabled={nicknameSaving}>Remove</CentralButton>
+                : null}
+              <CentralButton variant="secondary" size="md" onClick={() => setNicknameEditor(null)}>Cancel</CentralButton>
+              <CentralButton variant="primary" size="md" onClick={() => submitNickname(false)} disabled={nicknameSaving || !nicknameInput.trim()}>Save</CentralButton>
+            </>
+          }
+        >
+          <input
+            autoFocus
+            value={nicknameInput}
+            onChange={(e) => { setNicknameInput(e.target.value.slice(0, MAX_NICKNAME_LEN)); setNicknameError(null) }}
+            onKeyDown={(e) => { if (e.key === "Enter" && nicknameInput.trim() && !nicknameSaving) submitNickname(false) }}
+            placeholder={nicknameEditor.name}
+            maxLength={MAX_NICKNAME_LEN}
+            style={{ width: "100%", height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid var(--line)", background: "var(--cream)", color: "var(--ink)", fontSize: 15, outline: "none" }}
+          />
+          <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "10px 0 0", lineHeight: 1.5 }}>
+            Everyone in this chat sees this in place of {nicknameEditor.name}. {nicknameInput.length}/{MAX_NICKNAME_LEN}
+          </p>
+          {nicknameError && <p style={{ fontSize: 13, color: "var(--danger)", margin: "8px 0 0" }}>{nicknameError}</p>}
         </CentralModal>,
         document.body
       )}
@@ -1181,24 +1283,42 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // SWR-cached group roster — the SINGLE source for @mention names, member count,
   // and (small-room) seed read state. Read-only lookup, pure fetcher. Replaces the
   // old @mention-only join AND the standalone loadMemberReadStates fetch.
-  const { data: rosterData } = useSWR(
+  const { data: rosterData, mutate: mutateRoster } = useSWR(
     groupId ? ["chat-roster", groupId] : null,
     async () => {
-      const { data } = await supabase
-        .from("group_members")
-        .select("user_id, last_read_at, profiles!user_id(name, avatar_url)")
-        .eq("group_id", groupId)
+      // Members + this chat's nicknames in one pass. displayName = nickname ?? name
+      // is the single value every name render reads (Convention #18 roster seam).
+      const [{ data }, { data: nicks }] = await Promise.all([
+        supabase
+          .from("group_members")
+          .select("user_id, last_read_at, profiles!user_id(name, avatar_url)")
+          .eq("group_id", groupId),
+        supabase
+          .from("chat_nicknames")
+          .select("target_user_id, nickname")
+          .eq("group_id", groupId),
+      ])
+      const nickById: Record<string, string | undefined> = {}
+      for (const n of (nicks ?? []) as { target_user_id: string; nickname: string }[]) nickById[n.target_user_id] = n.nickname
       return (data ?? [])
         .map((m: { user_id: string; last_read_at: string | null; profiles: { name: string; avatar_url: string | null } | { name: string; avatar_url: string | null }[] | null }) => {
           const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-          return p ? { id: m.user_id, name: p.name, avatarUrl: p.avatar_url ?? null, lastReadAt: m.last_read_at ?? null } : null
+          if (!p) return null
+          const nickname: string | null = nickById[m.user_id] ?? null
+          return { id: m.user_id, name: p.name, nickname, displayName: nickname ?? p.name, avatarUrl: p.avatar_url ?? null, lastReadAt: m.last_read_at ?? null }
         })
-        .filter((m): m is { id: string; name: string; avatarUrl: string | null; lastReadAt: string | null } => m !== null)
+        .filter((m): m is { id: string; name: string; nickname: string | null; displayName: string; avatarUrl: string | null; lastReadAt: string | null } => m !== null)
     }
   )
   const roster = useMemo(() => rosterData ?? [], [rosterData])
   const rosterLoaded = rosterData !== undefined
   const mentionMembers = useMemo(() => roster.filter(m => m.id !== userId), [roster, userId])
+  // senderId → nickname-aware display name; drives message senders, typing, header.
+  const displayNameById = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const m of roster) map[m.id] = m.displayName
+    return map
+  }, [roster])
   const memberCount = roster.length
   // Threshold switch (Brian's product decision): rooms ≥30 members drop the live
   // per-member read-receipt fan-out (the O(members²) source) for an on-demand
@@ -1211,7 +1331,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // non-roster senders (e.g. departed members no longer in group_members).
   useEffect(() => {
     for (const m of roster) {
-      profilesCache.current[m.id] = m.name
+      profilesCache.current[m.id] = m.displayName
       avatarCache.current[m.id] = m.avatarUrl
     }
   }, [roster])
@@ -1298,8 +1418,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       .map(m => m.id)
   }, [messages, searchQuery])
 
-  const isAdminOrLeader = isChatManageRole(userRole)
-  const canPin = !groupArchived && (isAdminOrLeader || groupType !== "church")
+  // Church-chat moderation (delete others' messages/polls, pin) is now "in-chat
+  // leader-or-above": a leader-tier role (incl. pastor) AND membership of THIS chat,
+  // mirroring the messages/groups RLS. My/DM behavior is UNCHANGED (isChatManageRole).
+  const isMemberOfChat = roster.some((m) => m.id === userId)
+  const canModerate = groupType === "church" ? (isLeaderRole(userRole) && isMemberOfChat) : isChatManageRole(userRole)
+  const canPin = !groupArchived && (groupType !== "church" ? true : (isLeaderRole(userRole) && isMemberOfChat))
 
   // @mention member list is loaded via useSWR above (see rosterData/mentionMembers).
   // The @mention dropdown, GIF picker, and input state now live in <Composer>.
@@ -1359,8 +1483,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       const voters = group.map(m => m.content.split(' voted for "')[0])
       result.push({ ...msg, _voteGroup: voters })
     }
-    return result
-  }, [messages, blockedIds])
+    // Resolve nickname-aware sender names — reactive to nickname changes, and
+    // covers messages whose stored sender_name predates a nickname.
+    return result.map((m) => {
+      const dn = m.sender_id ? displayNameById[m.sender_id] : undefined
+      return dn && dn !== m.sender_name ? { ...m, sender_name: dn } : m
+    })
+  }, [messages, blockedIds, displayNameById])
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" })
@@ -1696,7 +1825,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     const map: Record<string, { name: string; lastReadAt: string | null; avatarUrl: string | null }> = {}
     for (const m of roster) {
       if (m.id === userId) continue
-      map[m.id] = { name: m.name, lastReadAt: m.lastReadAt, avatarUrl: m.avatarUrl }
+      map[m.id] = { name: m.displayName, lastReadAt: m.lastReadAt, avatarUrl: m.avatarUrl }
     }
     setMemberReadMap(map)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1759,6 +1888,21 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, userId])
+
+  // Live nickname changes — anyone in the chat setting/changing/clearing a nickname
+  // revalidates the roster (the display-name seam) so every member's UI updates.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`chat-nicknames-${groupId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "chat_nicknames", filter: `group_id=eq.${groupId}` },
+        () => { mutateRoster() },
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId])
 
   // Mark messages as read on open (clears the badge). No unmount fire: the realtime
   // INSERT handler below already advances last_read_at = raw.created_at for every
@@ -2354,11 +2498,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const list = (data ?? []).map((m: any) => {
         const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-        return { name: (p as { name: string } | null)?.name ?? "?", avatarUrl: (p as { avatar_url: string | null } | null)?.avatar_url ?? null }
+        const realName = (p as { name: string } | null)?.name ?? "?"
+        return { name: displayNameById[m.user_id] ?? realName, avatarUrl: (p as { avatar_url: string | null } | null)?.avatar_url ?? null }
       })
       setSeenByList(list)
     }
-  }, [latestOwnMsg, seenByOpen, seenByList, supabase, groupId, userId])
+  }, [latestOwnMsg, seenByOpen, seenByList, supabase, groupId, userId, displayNameById])
 
   function openSearch() {
     setSearchMode(true)
@@ -2446,8 +2591,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // Header member summary — derived from the roster SWR (not memberReadMap, which is
   // empty in large rooms). Self first, then everyone else, to match prior ordering.
   const memberFirstNames = useMemo(() => {
-    const self = roster.filter(m => m.id === userId).map(m => m.name.split(" ")[0])
-    const others = roster.filter(m => m.id !== userId).map(m => m.name.split(" ")[0])
+    const self = roster.filter(m => m.id === userId).map(m => m.displayName.split(" ")[0])
+    const others = roster.filter(m => m.id !== userId).map(m => m.displayName.split(" ")[0])
     return [...self, ...others]
   }, [roster, userId])
 
@@ -2532,14 +2677,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           </>
         ) : (
           <>
-            {!inline && (
-              <button
-                onClick={onClose}
-                className="flex-shrink-0 -ml-1 w-[34px] h-[34px] flex items-center justify-center hover:bg-[var(--cream-2)] rounded-full transition-colors md:hidden"
-              >
-                <ArrowLeft className="w-5 h-5 text-[var(--ink)]" />
-              </button>
-            )}
+            {!inline && <BackChevron onClick={onClose} className="md:hidden" />}
             {/* Group avatar — 40px on mobile (Pocket chat header), 32px on the
                 shared desktop inline panel (md: override keeps desktop untouched). */}
             <MonogramChip
@@ -2661,7 +2799,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   senderDeparted={!!(msg.sender_id && departedIds.has(msg.sender_id))}
                   userId={userId}
                   canPin={canPin}
-                  isAdminOrLeader={isAdminOrLeader}
+                  isAdminOrLeader={canModerate}
                   isEmojiPickerOpen={emojiPickerFor === msg.id}
                   isFullPickerOpen={fullReactionPickerFor === msg.id}
                   isContextMenuOpen={contextMenuFor === msg.id}
@@ -2713,17 +2851,20 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             })}
 
             {/* Typing indicators */}
-            {Object.entries(typingUsers).slice(0, 3).map(([uid, { name, avatarUrl }]) => (
+            {Object.entries(typingUsers).slice(0, 3).map(([uid, { name, avatarUrl }]) => {
+              const typerName = displayNameById[uid] ?? name
+              return (
               <div key={uid} className="flex items-center gap-2 mt-3">
-                <MonogramChip initials={name.charAt(0).toUpperCase()} avatarUrl={avatarUrl || undefined} className="w-7 h-7 text-[11px] font-medium" />
+                <MonogramChip initials={typerName.charAt(0).toUpperCase()} avatarUrl={avatarUrl || undefined} className="w-7 h-7 text-[11px] font-medium" />
                 <div className="bg-[var(--ivory)] rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex items-center gap-1">
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                 </div>
-                <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "12px", color: "var(--muted-text)" }}>{name} is typing…</span>
+                <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "12px", color: "var(--muted-text)" }}>{typerName} is typing…</span>
               </div>
-            ))}
+              )
+            })}
 
             <div ref={bottomRef} />
           </div>

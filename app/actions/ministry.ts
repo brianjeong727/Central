@@ -154,17 +154,24 @@ export async function getPublicMinistries(search?: string): Promise<{
   data: Array<{ id: string; name: string; university: string; size: string; location: string | null; is_public: boolean }> | null
   error: string | null
 }> {
-  const admin = createAdminClient()
-
-  // Ministries flagged hidden_from_discovery (test/dev tenants) are dropped from
-  // public discovery for everyone EXCEPT the super account, which needs to reach
-  // them. This is a DEDICATED flag — NOT is_sandbox, which means "super write-as
-  // allowed" and must keep e.g. Central (is_sandbox=true) discoverable. Fail-closed:
-  // an unknown/logged-out caller is not super, so the filter still applies.
+  // Test tenants (Brian's Sandbox, Load Test 200, Crossroads, the E2E tenants) must
+  // NEVER surface in public discovery. This runs on the service-role client, so RLS is
+  // not a backstop — this filter IS the boundary. The one super account is exempt so it
+  // can still reach those tenants from the picker.
+  //
+  // Gate on `hidden_from_discovery`, NOT `is_sandbox`. They are different questions:
+  // is_sandbox means "the super account may write-as inside this tenant", which is TRUE
+  // of Central — a REAL ministry that must stay discoverable. Filtering on is_sandbox
+  // would delist real churches that happen to be super-testable.
+  //
+  // `.not(…, is, true)` rather than `.eq(false)` on purpose: the column is nullable, and
+  // a real ministry that registers with a NULL flag must stay VISIBLE — `.eq(false)`
+  // would silently drop it (NULL ≠ false in SQL).
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const isSuper = user?.id === SUPER_UUID
 
+  const admin = createAdminClient()
   let query = admin
     .from("ministries")
     .select("id, name, university, size, location, is_public")
@@ -172,7 +179,7 @@ export async function getPublicMinistries(search?: string): Promise<{
     .order("is_public", { ascending: false })
     .order("name")
 
-  if (!isSuper) query = query.eq("hidden_from_discovery", false) // column is NOT NULL default false
+  if (!isSuper) query = query.not("hidden_from_discovery", "is", true)
 
   if (search?.trim()) {
     query = query.or(`name.ilike.%${search.trim()}%,university.ilike.%${search.trim()}%`)
@@ -933,6 +940,24 @@ export async function updateMemberRole(targetUserId: string, newRole: "visitor" 
   return { error: null }
 }
 
+// A user who exits a ministry (leave / remove / excommunicate) must also be dropped
+// from that ministry's chats. Otherwise their group_members rows linger: once their
+// profile.ministry_id is nulled the roster join is RLS-invisible and they render as
+// "Unknown" (and the chat name-resolution treats departed senders as non-roster).
+// Message history is preserved — messages.sender_id is independent, and
+// ministry_departures drives the "left" indicator on their past messages.
+async function removeUserFromMinistryChats(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  ministryId: string,
+): Promise<void> {
+  const { data: groups } = await admin.from("groups").select("id").eq("ministry_id", ministryId)
+  const groupIds = (groups ?? []).map((g) => g.id)
+  if (groupIds.length) {
+    await admin.from("group_members").delete().eq("user_id", userId).in("group_id", groupIds)
+  }
+}
+
 // ─── Admin: remove a member from the ministry ────────────────────────────────
 export async function removeMember(targetUserId: string): Promise<{ error: string | null }> {
   const supabase = await createClient()
@@ -959,6 +984,9 @@ export async function removeMember(targetUserId: string): Promise<{ error: strin
   // otherwise the removed member can re-enter via setCurrentMinistry, which restores
   // their stale role from user_ministries.
   await admin.from("user_ministries").delete().eq("user_id", targetUserId).eq("ministry_id", profile.ministry_id)
+
+  // Drop them from the ministry's chats too (else they linger as "Unknown").
+  await removeUserFromMinistryChats(admin, targetUserId, profile.ministry_id)
 
   return { error: null }
 }
@@ -1103,6 +1131,9 @@ export async function excommunicateMember(targetUserId: string): Promise<{ error
   await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", targetUserId).eq("ministry_id", targetMinistryId)
   await admin.from("user_ministries").delete().eq("user_id", targetUserId).eq("ministry_id", targetMinistryId)
 
+  // Drop them from the ministry's chats too (else they linger as "Unknown").
+  await removeUserFromMinistryChats(admin, targetUserId, targetMinistryId)
+
   return { error: null }
 }
 
@@ -1127,6 +1158,9 @@ export async function selfLeaveMinistry(): Promise<{ error: string | null }> {
   // Remove from the ministry
   await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", user.id)
   await admin.from("user_ministries").delete().eq("user_id", user.id).eq("ministry_id", ministryId)
+
+  // Drop them from the ministry's chats too (else they linger as "Unknown").
+  await removeUserFromMinistryChats(admin, user.id, ministryId)
 
   return { error: null }
 }

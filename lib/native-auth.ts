@@ -52,7 +52,15 @@ async function sha256Hex(input: string): Promise<string> {
 
 export type NativeAppleResult =
   | { ok: true }
-  | { ok: false; error: "canceled" | "unavailable" | "no-account" | "failed" }
+  | { ok: false; error: "canceled" | "unavailable" | "no-account" | "failed"; detail?: string }
+
+// TEMP DIAGNOSTIC (Apple sign-in triage): the coarse error enum hides WHY the
+// native flow failed. This surfaces the raw reason to the sign-in UI (native
+// shell only — see the handlers) so a real-device failure is legible without a
+// debuggable build. Safe to keep: better errors than a generic string.
+export function nativeAuthDebugMessage(res: Extract<NativeAppleResult, { ok: false }>): string {
+  return `Sign-in failed (${res.error})${res.detail ? `: ${res.detail}` : ""}`
+}
 
 export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<NativeAppleResult> {
   let SignInWithApple: typeof import("@capacitor-community/apple-sign-in").SignInWithApple
@@ -88,16 +96,16 @@ export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<
     console.error("[native-auth] authorize failed:", msg)
     // Capacitor's UNIMPLEMENTED: the JS bundle (remote) is newer than the
     // installed binary — no native module. Fall back to the web OAuth flow.
-    if (/not implemented|unimplemented/i.test(msg)) return { ok: false, error: "unavailable" }
+    if (/not implemented|unimplemented/i.test(msg)) return { ok: false, error: "unavailable", detail: msg }
     // ASAuthorizationError 1001 = user dismissed the sheet — genuinely silent.
-    if (/1001|cancel/i.test(msg)) return { ok: false, error: "canceled" }
+    if (/1001|cancel/i.test(msg)) return { ok: false, error: "canceled", detail: msg }
     // Everything else (1000 = no Apple ID signed in on the device, 1004 =
     // request failed, entitlement problems) must SURFACE, not vanish.
-    return { ok: false, error: "failed" }
+    return { ok: false, error: "failed", detail: `authorize threw: ${msg}` }
   }
 
   const identityToken = authorization.response?.identityToken
-  if (!identityToken) return { ok: false, error: "failed" }
+  if (!identityToken) return { ok: false, error: "failed", detail: "authorize returned no identityToken" }
 
   const supabase = createClient()
   const { data, error } = await supabase.auth.signInWithIdToken({
@@ -107,7 +115,10 @@ export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<
   })
   if (error || !data?.user) {
     console.error("[native-auth] signInWithIdToken failed:", error)
-    return { ok: false, error: "failed" }
+    const detail = error
+      ? `signInWithIdToken: ${[error.status, error.code, error.message].filter(Boolean).join(" ")}`
+      : "signInWithIdToken returned no user"
+    return { ok: false, error: "failed", detail }
   }
 
   // Apple only surfaces the user's name on the FIRST authorization, and it
@@ -125,11 +136,21 @@ export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<
     }
   }
 
-  const { ok } = await verifyNativeOAuthSession(flow)
-  if (!ok) {
+  let verified: { ok: boolean; reason?: string }
+  try {
+    verified = await verifyNativeOAuthSession(flow)
+  } catch (err) {
+    // The guard runs as a Server Action POST to the current page. If anything
+    // redirects/breaks that request (see proxy.ts's Server-Action bypass), the
+    // call throws — never let that strand a half-established session silently.
+    const msg = err instanceof Error ? err.message : String(err)
+    await supabase.auth.signOut()
+    return { ok: false, error: "failed", detail: `verify action threw: ${msg}` }
+  }
+  if (!verified.ok) {
     // Torn down server-side; clear the local session too.
     await supabase.auth.signOut()
-    return { ok: false, error: "no-account" }
+    return { ok: false, error: "no-account", detail: verified.reason }
   }
   return { ok: true }
 }
@@ -185,10 +206,17 @@ export async function signInWithGoogleNative(flow: "signin" | "signup"): Promise
     return { ok: false, error: "failed" }
   }
 
-  const { ok } = await verifyNativeOAuthSession(flow)
-  if (!ok) {
+  let verified: { ok: boolean; reason?: string }
+  try {
+    verified = await verifyNativeOAuthSession(flow)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
     await supabase.auth.signOut()
-    return { ok: false, error: "no-account" }
+    return { ok: false, error: "failed", detail: `verify action threw: ${msg}` }
+  }
+  if (!verified.ok) {
+    await supabase.auth.signOut()
+    return { ok: false, error: "no-account", detail: verified.reason }
   }
   return { ok: true }
 }

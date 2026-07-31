@@ -661,3 +661,18 @@
 .role-desc-view ul, .role-desc-view ol { padding-left: 1.5em; margin: 0.25em 0; }
 .role-desc-view li { margin: 0.05em 0; }
 .role-desc-view li > p { margin: 0; }
+
+/* Back chevron (cdesign "Back chevron" handoff) — the shared stacked-header back
+   control. Visual glyph is 24px wide; the TAP target is expanded to a centered
+   44×44 via this transparent ::after, never by growing the visible box. Hover
+   deepens the muted-ink glyph to --ink. See components/central/back-chevron.tsx. */
+.back-chevron::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+.back-chevron:hover { color: var(--ink); }

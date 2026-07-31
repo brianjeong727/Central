@@ -1,9 +1,8 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { ArrowLeft } from "lucide-react"
 import { RingCrossLogo } from "./shared"
-import { MonogramChip } from "@/components/central"
+import { MonogramChip, BackChevron } from "@/components/central"
 import { getInitials } from "../utils"
 
 interface PocketHeaderProps {
@@ -88,15 +87,7 @@ export function PocketChrome({
   const twoActions = Boolean(action && action2)
   return (
     <div className="flex items-center md:hidden" style={{ gap: 10, padding: "12px 20px 10px" }}>
-      {back && (
-        <button
-          onClick={back}
-          aria-label="Back"
-          style={{ flexShrink: 0, width: 34, height: 34, marginLeft: -6, borderRadius: 999, display: "grid", placeItems: "center", border: "none", background: "none", color: "var(--ink)", cursor: "pointer" }}
-        >
-          <ArrowLeft style={{ width: 20, height: 20 }} />
-        </button>
-      )}
+      {back && <BackChevron onClick={back} />}
       <span
         style={{
           flex: 1, minWidth: 0,
