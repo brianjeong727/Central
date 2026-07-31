@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase-admin"
+import { getMinistryTimezone } from "@/lib/ministry-timezone"
+import { instantToZoned } from "@/lib/tz"
 
 // Fold long iCal lines at 75 octets per RFC 5545 §3.1
 function fold(line: string): string {
@@ -41,7 +43,10 @@ function icalDateTime(dateStr: string): string {
   return `${y}${mo}${day}T${h}${min}${s}Z`
 }
 
-// Add one day to a date string (iCal all-day DTEND is exclusive)
+// Add one day to a "YYYY-MM-DD". RFC 5545 §3.8.2.2: DTEND is EXCLUSIVE, so an
+// all-day event's DTEND is the day AFTER its last day. Emitting the inclusive last
+// day (or, worse, DTEND == DTSTART) produces a zero-length event that Google
+// Calendar / Apple Calendar silently drop — the reason subscribed feeds looked empty.
 function addOneDay(dateStr: string): string {
   const d = new Date(dateStr.slice(0, 10) + "T12:00:00Z")
   d.setUTCDate(d.getUTCDate() + 1)
@@ -58,14 +63,18 @@ export async function GET(
   const { ministryId } = await params
   const admin = createAdminClient()
 
-  const [ministryRes, eventsRes] = await Promise.all([
+  // The ministry's IANA zone is fetched IN PARALLEL with the rest (no added latency).
+  // A server route can't read the client MinistryTimezoneProvider, and the feed used
+  // to hardcode America/New_York while every scheduler computed Pacific.
+  const [ministryRes, eventsRes, timeZone] = await Promise.all([
     admin.from("ministries").select("name").eq("id", ministryId).maybeSingle(),
     admin
       .from("calendar_events")
-      .select("id, title, description, location, start_date, end_date, all_day")
+      .select("id, title, description, location, start_date, end_date, start_day, end_day, all_day")
       .eq("ministry_id", ministryId)
       .is("parent_event_id", null)
       .order("start_date", { ascending: true }),
+    getMinistryTimezone(admin, ministryId),
   ])
 
   if (!ministryRes.data) {
@@ -80,7 +89,9 @@ export async function GET(
     location: string | null
     start_date: string
     end_date: string
-    all_day: boolean
+    start_day: string | null
+    end_day: string | null
+    all_day: boolean | null
   }[]
 
   const now = new Date()
@@ -101,22 +112,34 @@ export async function GET(
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     fold(`X-WR-CALNAME:${esc(ministryName)}`),
-    "X-WR-TIMEZONE:America/New_York",
+    `X-WR-TIMEZONE:${timeZone}`,
     "X-PUBLISHED-TTL:PT6H",
   ]
 
   for (const ev of events) {
-    const isAllDay = ev.all_day !== false
-    const dtstart = isAllDay
-      ? `DTSTART;VALUE=DATE:${icalDate(ev.start_date)}`
-      : `DTSTART:${icalDateTime(ev.start_date)}`
+    // EXPLICIT: only a true `all_day` is all-day. The old `ev.all_day !== false`
+    // treated a NULL as all-day, so a row with an unset flag lost its clock times.
+    const isAllDay = ev.all_day === true
 
-    const endDate = ev.end_date && ev.end_date !== ev.start_date
-      ? ev.end_date
-      : isAllDay ? addOneDay(ev.start_date) : ev.start_date
-    const dtend = isAllDay
-      ? `DTEND;VALUE=DATE:${icalDate(endDate)}`
-      : `DTEND:${icalDateTime(endDate)}`
+    let dtstart: string
+    let dtend: string
+    if (isAllDay) {
+      // An all-day event is a DATE RANGE. `start_day`/`end_day` are the truth when
+      // present (end INCLUSIVE); otherwise project the stored instants into the
+      // MINISTRY's zone — never `start_date.slice(0, 10)`, which reads the UTC day
+      // and lands an evening-stored row on the wrong date.
+      const startDay = ev.start_day ?? instantToZoned(ev.start_date, timeZone).ymd
+      const rawEndDay = ev.end_day ?? (ev.end_date ? instantToZoned(ev.end_date, timeZone).ymd : startDay)
+      // Guard a malformed row (end before start) into a single-day event rather than
+      // emitting a negative range that clients reject outright.
+      const endDayInclusive = rawEndDay && rawEndDay >= startDay ? rawEndDay : startDay
+      dtstart = `DTSTART;VALUE=DATE:${icalDate(startDay)}`
+      dtend = `DTEND;VALUE=DATE:${icalDate(addOneDay(endDayInclusive))}`
+    } else {
+      const endInstant = ev.end_date && ev.end_date !== ev.start_date ? ev.end_date : ev.start_date
+      dtstart = `DTSTART:${icalDateTime(ev.start_date)}`
+      dtend = `DTEND:${icalDateTime(endInstant)}`
+    }
 
     lines.push("BEGIN:VEVENT")
     lines.push(fold(`UID:central-${ev.id}@joincentral.app`))

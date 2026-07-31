@@ -5,6 +5,8 @@ import { X, ChevronUp, ChevronDown, Plus, CalendarDays, Megaphone, Image as Imag
 import { createClient } from "@/lib/supabase"
 import { Spinner } from "./shared"
 import { CentralModal, ConfirmDialog } from "@/components/central"
+import { useMinistryTimezone } from "../ministry-timezone-context"
+import { formatInZone } from "@/lib/tz"
 
 // Curation overlay for the home hero carousel. Reference slides (upcoming events
 // / announcements); add, reorder, remove. Writes go straight to home_slides
@@ -49,6 +51,7 @@ export function HomeSlideManager({
   onClose: () => void
 }) {
   const supabase = createClient()
+  const timeZone = useMinistryTimezone()
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [slides, setSlides] = useState<SlideRow[]>([])
@@ -151,8 +154,11 @@ export function HomeSlideManager({
     setBusy(false)
   }
 
+  // `calendar_events.start_date` is a true instant — render the day it falls on in
+  // the MINISTRY's zone, so a leader curating from another timezone sees the same
+  // date the event actually happens on.
   function formatWhen(iso: string) {
-    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    return formatInZone(iso, timeZone, { month: "short", day: "numeric" })
   }
 
   // Shell is the shared CentralModal (§4.17) — this manager's anatomy IS the

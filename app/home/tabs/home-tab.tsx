@@ -10,6 +10,8 @@ import { PocketHeader } from "../components/pocket-header"
 import { PocketUpNext, type PocketCard as UpNextCard } from "../components/pocket-up-next"
 import { teamIconKey } from "../workspace-presets"
 import { getInitials, previewBody } from "../utils"
+import { useMinistryTimezone } from "../ministry-timezone-context"
+import { formatInZone } from "@/lib/tz"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getSetupChecklist, setLeadersInvited, dismissSetupChecklist } from "@/app/actions/setup-checklist"
@@ -79,12 +81,13 @@ function slideEventDetail(s: HeroSlide): UpNextEventDetail | undefined {
   return undefined
 }
 
-// Compact event eyebrow + meta line for a cream Pocket event card.
-function fmtEvent(detail: UpNextEventDetail): { eyebrow: string; meta: string } {
-  const d = new Date(detail.startDate)
-  const monthDay = d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  const weekday = d.toLocaleDateString("en-US", { weekday: "short" })
-  const time = detail.allDay ? "All day" : d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+// Compact event eyebrow + meta line for a cream Pocket event card. Formatted in the
+// MINISTRY's zone — `detail.startDate` is a true instant (lib/tz.ts), so a bare
+// toLocale* would print the viewer's device zone instead of the event's real clock.
+function fmtEvent(detail: UpNextEventDetail, timeZone: string): { eyebrow: string; meta: string } {
+  const monthDay = formatInZone(detail.startDate, timeZone, { month: "short", day: "numeric" })
+  const weekday = formatInZone(detail.startDate, timeZone, { weekday: "short" })
+  const time = detail.allDay ? "All day" : formatInZone(detail.startDate, timeZone, { hour: "numeric", minute: "2-digit" })
   const meta = [`${weekday}, ${monthDay}`, time, detail.location].filter(Boolean).join(" · ")
   return { eyebrow: `Up next · ${monthDay}`, meta }
 }
@@ -207,6 +210,9 @@ export function HomeTab({
   onResponded,
 }: HomeTabProps) {
   const supabase = createClient()
+  // The ministry's IANA zone — every event time on this tab renders through it.
+  // components/central is a LEAF, so the hero components take it as a prop.
+  const timeZone = useMinistryTimezone()
 
   const [needsGradCheck, setNeedsGradCheck] = useState(profile.needs_grad_check ?? false)
 
@@ -719,6 +725,7 @@ export function HomeTab({
       key: s.key,
       node: (
         <FeaturedHeroCard
+          timeZone={timeZone}
           mobile
           style={{ height: "100%" }}
           eyebrowLabel={s.kind === "announcement" ? s.eyebrowLabel ?? "Up next" : "Up next"}
@@ -743,6 +750,7 @@ export function HomeTab({
       key: heroAnn.id,
       node: (
         <FeaturedHeroCard
+          timeZone={timeZone}
           mobile
           style={{ height: "100%" }}
           eyebrowLabel="Up next"
@@ -766,6 +774,7 @@ export function HomeTab({
       key: latestAnn.id,
       node: (
         <FeaturedHeroCard
+          timeZone={timeZone}
           mobile
           style={{ height: "100%" }}
           eyebrowLabel="Latest"
@@ -784,7 +793,7 @@ export function HomeTab({
     const annId = slideAnnId(s)
     const detailId = slideDetailId(s)
     const ed = slideEventDetail(s)
-    const { eyebrow, meta } = ed ? fmtEvent(ed) : { eyebrow: "Up next", meta: "" }
+    const { eyebrow, meta } = ed ? fmtEvent(ed, timeZone) : { eyebrow: "Up next", meta: "" }
     pocketCards.push({
       key: s.key,
       node: (
@@ -802,7 +811,7 @@ export function HomeTab({
   }
   for (const a of forYouItems.filter((it) => it.is_event && !slideAnnIdSet.has(it.id))) {
     const ed: UpNextEventDetail | undefined = a.event_date ? { startDate: a.event_date, endDate: a.event_date, allDay: false, location: null } : undefined
-    const { eyebrow, meta } = ed ? fmtEvent(ed) : { eyebrow: "Up next", meta: "" }
+    const { eyebrow, meta } = ed ? fmtEvent(ed, timeZone) : { eyebrow: "Up next", meta: "" }
     pocketCards.push({
       key: a.id,
       node: (
@@ -911,6 +920,7 @@ export function HomeTab({
         )}
         {!loading && (slides.length > 0 || pulseNodeDesktop ? (
           <HomeHeroCarousel
+            timeZone={timeZone}
             slides={slides}
             pulseNode={pulseNodeDesktop}
             rsvpedIds={slideRsvpedIds}
@@ -925,6 +935,7 @@ export function HomeTab({
         ) : heroAnn ? (
           <HeroFrame bare>
             <FeaturedHeroCard
+              timeZone={timeZone}
               fill
               eyebrowLabel="Up next"
               title={heroAnn.title}
@@ -944,6 +955,7 @@ export function HomeTab({
         ) : latestAnn ? (
           <HeroFrame bare>
             <FeaturedHeroCard
+              timeZone={timeZone}
               fill
               eyebrowLabel="Latest"
               title={latestAnn.title}
