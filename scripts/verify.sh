@@ -20,7 +20,11 @@
 
 set -uo pipefail
 
-PORT=3001
+# Default the port from the WORKTREE DIRECTORY, not a hardcoded slot. Ports are
+# bound to the directory (.claude/session-slots.json), so a hardcoded 3001 meant
+# running verify.sh without --port from s2/s3 targeted a SIBLING slot's server.
+# --port still overrides.
+PORT=""
 RUN_E2E=0
 SKIP_BUILD=0
 DOCS_ONLY=0
@@ -38,6 +42,26 @@ done
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "verify.sh: not a git repo" >&2; exit 2; }
 cd "$ROOT" || exit 2
+
+# Resolve the slot port from this worktree's directory name when --port was omitted.
+if [[ -z "$PORT" ]]; then
+  PORT="$(
+    python3 - "$ROOT" <<'PY' 2>/dev/null || true
+import json, os, sys
+root = sys.argv[1]
+try:
+    with open(os.path.join(root, ".claude/session-slots.json")) as f:
+        cfg = json.load(f)
+    d = os.path.basename(root)
+    hit = next((s for s in cfg.get("slots", []) if s.get("dir") == d), None)
+    print(hit["port"] if hit else cfg.get("mainPort", 3001))
+except Exception:
+    print(3001)
+PY
+  )"
+  PORT="${PORT:-3001}"
+  echo "▶ port not given — resolved :$PORT from worktree $(basename "$ROOT")"
+fi
 
 # ── docs-only fast path (verifies the claim, then skips the heavy gate) ──────
 if [[ $DOCS_ONLY -eq 1 ]]; then

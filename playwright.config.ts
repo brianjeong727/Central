@@ -1,4 +1,6 @@
 import { defineConfig, devices } from "@playwright/test"
+import { readFileSync } from "node:fs"
+import { basename, resolve } from "node:path"
 import { loadEnv } from "./e2e/load-env"
 
 // Pull sandbox credentials into process.env before the config object is built.
@@ -6,7 +8,29 @@ import { loadEnv } from "./e2e/load-env"
 // sandbox fixtures see the same values.
 loadEnv()
 
-const PORT = process.env.E2E_PORT || "3001"
+// Slot ports are bound to the WORKTREE DIRECTORY (.claude/session-slots.json), so
+// the default is derived from the directory rather than hardcoded. A hardcoded
+// "3001" meant that forgetting E2E_PORT in any other slot silently ran the whole
+// suite against a SIBLING slot's dev server — old code, wrong tenant — and the
+// failures looked like your changes hadn't applied. That trap cost real time
+// twice (see tasks/lessons.md "E2E harness targets E2E_PORT, not PORT").
+// E2E_PORT still wins when set, so verify.sh --port and CI are unaffected.
+function defaultPortForWorktree(): string {
+  try {
+    const slots = JSON.parse(
+      readFileSync(resolve(__dirname, ".claude/session-slots.json"), "utf8"),
+    ) as { mainPort?: number; slots: { dir: string; port: number }[] }
+    const dir = basename(__dirname)
+    const hit = slots.slots.find(s => s.dir === dir)
+    if (hit) return String(hit.port)
+    if (slots.mainPort) return String(slots.mainPort)
+  } catch {
+    // Fall through — a missing or malformed slot file must not break the config.
+  }
+  return "3001"
+}
+
+const PORT = process.env.E2E_PORT || defaultPortForWorktree()
 
 // Storage-state paths, mirrored from e2e/fixtures.ts. Kept as literals here so the
 // config never imports the fixtures module (which would construct the Supabase
