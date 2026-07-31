@@ -7,26 +7,53 @@
 //
 //   node --env-file=.env.local scripts/seed-ccsf-events.mjs
 //   node --env-file=.env.local scripts/seed-ccsf-events.mjs --ministry "E2E Sandbox"
+//   node --env-file=.env.local scripts/seed-ccsf-events.mjs --ministry-id <uuid> --team "CCSF BOARD"
 //
 // Idempotent: re-running deletes and re-creates exactly the fixture events it
-// owns (matched by title within the target board team) — nothing else.
+// owns (matched by title within the target board team) — nothing else. NOTE the
+// title match is season-agnostic: a season rolled forward from these fixtures
+// ("Start next season") carries the same titles and IS therefore wiped too.
+// Re-press "Start next season" afterwards to regenerate it.
+//
+// SANDBOXES ONLY: the target ministry is checked against SEEDABLE_MINISTRY_IDS
+// below — an explicit id allowlist, never a name match — so this can never
+// write fixtures into a real congregation.
 //
 // Task due dates come from the SAME preset data the app seeds from
 // (app/home/event-presets-data.mjs) — offsets applied to each event's real
 // date, NOT past-clamped: planning tasks whose date has passed are marked
 // completed instead, so the Countdown reads like a season in progress.
+//
+// Times: every instant this script writes goes through `lib/tz.ts` — the SAME
+// conversion layer the app uses — interpreted in the target ministry's own
+// `ministries.timezone`. The fixture calendar below is wall-clock local time.
 
 import { createClient } from "@supabase/supabase-js"
 import ws from "ws"
 import { EVENT_PRESET_DATA, BOARD_ROLE_RESOURCES, lineageKeyOf, seasonLabelOf } from "../app/home/event-presets-data.mjs"
+// The app's OWN conversion layer — not a copy of it. See scripts/lib/app-tz.mjs.
+import tz from "./lib/app-tz.mjs"
 
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 if (!URL_ || !KEY) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY")
 
-const argIdx = process.argv.indexOf("--ministry")
-const MINISTRY_NAME = argIdx > -1 ? process.argv[argIdx + 1] : "Brian's Sandbox"
-const BOARD_TEAM_NAME = "Student Org Board"
+// Sandbox / test tenants this fixture may be written into. Add an id here (with
+// `ministries.is_sandbox = true`) to seed a new sandbox; never relax the check.
+const SEEDABLE_MINISTRY_IDS = new Set([
+  "20f8790e-0cb0-411b-8374-41621c6bd78a", // Central (sandbox)
+  "6c68111b-0248-45ba-9ab1-169ee33f62c9", // Brian's Sandbox
+  "fcbe3a1f-7238-44a9-ab5e-c126eac05551", // E2E Sandbox (test tenant)
+  "349ff940-0f62-4fd3-83ae-0cb5a72800ad", // Crossroads College Ministry (demo)
+])
+
+const argOf = (flag) => {
+  const i = process.argv.indexOf(flag)
+  return i > -1 ? process.argv[i + 1] : null
+}
+const MINISTRY_NAME = argOf("--ministry") ?? (argOf("--ministry-id") ? null : "Brian's Sandbox")
+const MINISTRY_ID_ARG = argOf("--ministry-id")
+const BOARD_TEAM_NAME = argOf("--team") ?? "Student Org Board"
 
 const db = createClient(URL_, KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -39,19 +66,9 @@ const addDays = (ymd, n) => {
   const dt = new Date(Date.UTC(y, m - 1, d + n))
   return dt.toISOString().slice(0, 10)
 }
-const todayYMD = new Date().toISOString().slice(0, 10)
-// Store timestamps with the America/New_York offset for that date (EDT/EST-aware)
-// so the app's LOCAL display renders the real calendar times. (The app itself
-// writes naive `+00:00` from the modal and displays local — a pre-existing
-// storage/display mismatch; fixtures side-step it so verification reads true.)
-const etOffset = (ymd) => {
-  const probe = new Date(`${ymd}T12:00:00Z`)
-  const part = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", timeZoneName: "shortOffset" })
-    .formatToParts(probe).find((p) => p.type === "timeZoneName").value // e.g. "GMT-4"
-  const m = part.match(/GMT([+-])(\d+)/)
-  return `${m[1]}${String(Number(m[2])).padStart(2, "0")}:00`
-}
-const ts = (ymd, hhmm) => `${ymd}T${hhmm}:00${etOffset(ymd)}`
+// Set once the ministry (and therefore its timezone) is resolved, in `main`.
+let TIMEZONE = null
+let todayYMD = null
 
 // ── fixture calendar (2026–27, per the CCSF transition-notes calendar) ───────
 // type: EVENT_PRESET_DATA key. tasks/roles omitted → seeded from the preset.
@@ -393,8 +410,14 @@ function presetRoles(type) {
 
 async function seedEvent(ev, { ministryId, teamId, createdBy, parentId = null }) {
   const endDate = ev.endDate ?? ev.date
-  const startTs = ev.allDay ? ts(ev.date, "00:00") : ts(ev.date, ev.start)
-  const endTs = ev.allDay ? `${endDate}T23:59:59${etOffset(endDate)}` : ts(endDate, ev.end)
+  // ONE convention, shared with the app: all-day rows carry `start_day`/`end_day`
+  // (end INCLUSIVE) plus derived instants; timed rows carry instants and NULL day
+  // columns. `lib/tz.ts` owns both halves — see the header note.
+  const dateColumns = tz.eventDateColumnsFromInputs({
+    allDay: !!ev.allDay,
+    startYMD: ev.date, startHHMM: ev.start ?? "00:00",
+    endYMD: endDate, endHHMM: ev.end ?? "23:59",
+  }, TIMEZONE)
   const cfg = EVENT_PRESET_DATA[ev.type]
   const categoryMap = { welcome_week: "welcoming", coffeehouse: "social", turkey_bowl: "social", retreat: "retreat", appreciation_night: "social", social: "social", ministry: "regular" }
 
@@ -403,7 +426,7 @@ async function seedEvent(ev, { ministryId, teamId, createdBy, parentId = null })
     title: ev.title,
     description: ev.description ?? cfg.defaults.description,
     location: ev.location ?? cfg.defaults.location,
-    start_date: startTs, end_date: endTs,
+    ...dateColumns,
     all_day: !!ev.allDay,
     category: categoryMap[ev.type] ?? "regular",
     event_type: ev.type,
@@ -433,11 +456,13 @@ async function seedEvent(ev, { ministryId, teamId, createdBy, parentId = null })
     for (const item of g.items) {
       const due = item.off === null ? null : addDays(ev.date, item.off)
       // Real timeline, not clamped: past-due planning work reads as done.
+      // "Past" is the MINISTRY's calendar day, not the seeding machine's.
       const done = due !== null && due < todayYMD
       taskRows.push({
         event_plan_id: plan.id, title: item.title, phase: g.phase,
         due_date: due, sort_order: sort++, completed: done,
-        completed_at: done ? `${due}T17:00:00+00:00` : null,
+        // `completed_at` is a timestamptz — a true instant, 5pm local on the due day.
+        completed_at: done ? tz.zonedTimeToISO(due, "17:00", TIMEZONE) : null,
         created_by: createdBy,
       })
     }
@@ -456,16 +481,28 @@ async function seedEvent(ev, { ministryId, teamId, createdBy, parentId = null })
 }
 
 // ── main ─────────────────────────────────────────────────────────────────────
-const { data: ministry, error: minErr } = await db
-  .from("ministries").select("id, created_by").eq("name", MINISTRY_NAME).maybeSingle()
-if (minErr || !ministry) throw new Error(`Ministry "${MINISTRY_NAME}" not found`)
+const lookup = db.from("ministries").select("id, name, created_by, timezone, is_sandbox")
+const { data: ministry, error: minErr } = await (
+  MINISTRY_ID_ARG ? lookup.eq("id", MINISTRY_ID_ARG) : lookup.eq("name", MINISTRY_NAME)
+).maybeSingle()
+if (minErr || !ministry) throw new Error(`Ministry ${MINISTRY_ID_ARG ?? `"${MINISTRY_NAME}"`} not found`)
 const ministryId = ministry.id
+// The guard is on the ID, never the name — a renamed or duplicated ministry name
+// must not be able to steer this script into a real congregation.
+if (!SEEDABLE_MINISTRY_IDS.has(ministryId)) {
+  throw new Error(
+    `Refusing to seed "${ministry.name}" (${ministryId}) — not in SEEDABLE_MINISTRY_IDS. ` +
+    `This script writes fixtures and is sandbox-only.`,
+  )
+}
 const createdBy = ministry.created_by
-log(`Ministry: ${MINISTRY_NAME} (${ministryId})`)
+TIMEZONE = tz.resolveMinistryTimezone(ministry.timezone)
+todayYMD = tz.todayInZone(TIMEZONE)
+log(`Ministry: ${ministry.name} (${ministryId}) tz=${TIMEZONE} today=${todayYMD}`)
 
 const { data: team } = await db
   .from("teams").select("id").eq("ministry_id", ministryId).eq("name", BOARD_TEAM_NAME).maybeSingle()
-if (!team) throw new Error(`Team "${BOARD_TEAM_NAME}" not found in ${MINISTRY_NAME}`)
+if (!team) throw new Error(`Team "${BOARD_TEAM_NAME}" not found in ${ministry.name}`)
 const teamId = team.id
 log(`Board team: ${teamId}`)
 
@@ -549,7 +586,7 @@ for (const src of EVENTS) {
   }
   log(`  ✓ [2025–26] ${hist.title}${hist.subEvents?.length ? ` (+${hist.subEvents.length} sub-events)` : ""}`)
 }
-log(`\nSeeded ${eventCount} completed 2025–26 events into ${MINISTRY_NAME} / ${BOARD_TEAM_NAME}. Press \"Start next season\" in the app to roll them into 2026–27.`)
+log(`\nSeeded ${eventCount} completed 2025–26 events into ${ministry.name} / ${BOARD_TEAM_NAME}. Press \"Start next season\" in the app to roll them into 2026–27.`)
 
 // ── 6) Meeting notes (v2 structured) — REAL 2025–26 CCSF meeting content ─────
 // Distilled from the actual board meeting notes (context/CCSF_CONTEXT.md).

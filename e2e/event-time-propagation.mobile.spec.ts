@@ -6,19 +6,33 @@
 // inside the component exposed it on BOTH viewports — this spec is the first time
 // that mobile button has ever been exercised.
 //
-// ⚠️ Times are stored as a hardcoded `+00:00` and rendered with local
-// toLocaleTimeString (known, out-of-scope bug) — assert stored values and
-// relative change only, never a wall-clock reading.
+// TIMEZONE CONVENTION (current — same as the desktop spec): `start_date`/`end_date`
+// hold TRUE INSTANTS; a time typed into the modal is a wall clock in the MINISTRY's
+// zone (`ministries.timezone`), converted through `lib/tz.ts`, and every surface —
+// the modal's own read-back included — renders it back in that same zone. So the
+// wall clocks below are the constants and the expected instant is derived at run
+// time: a hardcoded `+00:00`/`-04:00` literal would break the moment the ministry
+// crosses into EST.
 import { test, expect, type Page, type Locator } from "@playwright/test"
 import { adminState, sandbox, E2E_PREFIX } from "./fixtures"
+import { resolveMinistryTimezone, zonedTimeToISO } from "../lib/tz"
 
 const TEAM_ID = "63a47f06-fdc2-49e1-9703-9ee5dca1ccae"
 const PARENT_TITLE = `${E2E_PREFIX}TP Mobile Week`
 const CHILD_TITLE = `${E2E_PREFIX}TP Mobile Child`
-const PARENT_START = "2026-08-03T14:00:00+00:00"
-const PARENT_END = "2026-08-07T20:00:00+00:00"
-const CHILD_START = "2026-08-04T16:00:00+00:00"
-const CHILD_END = "2026-08-04T18:00:00+00:00"
+// Fixture baseline as MINISTRY-ZONE WALL CLOCKS.
+const PARENT_START_LOCAL = { ymd: "2026-08-03", hhmm: "14:00" }
+const PARENT_END_LOCAL = { ymd: "2026-08-07", hhmm: "20:00" }
+const CHILD_START_LOCAL = { ymd: "2026-08-04", hhmm: "16:00" }
+const CHILD_END_LOCAL = { ymd: "2026-08-04", hhmm: "18:00" }
+
+/** The sandbox ministry's IANA zone, read from the DB in beforeAll. */
+let zone = ""
+/** A ministry-zone wall clock → the instant the timestamptz column holds. */
+const at = (ymd: string, hhmm: string) => zonedTimeToISO(ymd, hhmm, zone)
+const atLocal = (w: { ymd: string; hhmm: string }) => at(w.ymd, w.hhmm)
+/** PostgREST returns "+00:00", `lib/tz.ts` returns "Z" — compare the instants. */
+const iso = (v: string) => new Date(v).toISOString()
 
 const SHOTS = ".claude/task-context/event-time-propagation/shots"
 
@@ -50,10 +64,16 @@ test.describe("event time propagation — mobile Edit affordance (016069e)", () 
   test.beforeAll(async () => {
     const sb = sandbox()
     const adminId = await sb.adminUserId()
+    // The zone is a property of the MINISTRY, so read it rather than assume it.
+    const { data: min, error: ze } = await sb.client
+      .from("ministries").select("timezone").eq("id", sb.ministryId).single()
+    if (ze) throw ze
+    zone = resolveMinistryTimezone((min as { timezone: string | null }).timezone)
+
     const { data: parent, error: pe } = await sb.client.from("calendar_events").insert({
       ministry_id: sb.ministryId, team_id: TEAM_ID, title: PARENT_TITLE,
       description: "e2e mobile parent", location: "E2E Hall",
-      start_date: PARENT_START, end_date: PARENT_END, all_day: false,
+      start_date: atLocal(PARENT_START_LOCAL), end_date: atLocal(PARENT_END_LOCAL), all_day: false,
       category: "welcoming", event_type: "welcome_week", recurring: false, created_by: adminId,
     }).select("id").single()
     if (pe) throw pe
@@ -62,7 +82,7 @@ test.describe("event time propagation — mobile Edit affordance (016069e)", () 
     const { data: child, error: ce } = await sb.client.from("calendar_events").insert({
       ministry_id: sb.ministryId, team_id: null, parent_event_id: parentId, title: CHILD_TITLE,
       description: "e2e mobile child", location: "E2E Room",
-      start_date: CHILD_START, end_date: CHILD_END, all_day: false,
+      start_date: atLocal(CHILD_START_LOCAL), end_date: atLocal(CHILD_END_LOCAL), all_day: false,
       category: "social", event_type: "social", recurring: false, created_by: adminId,
     }).select("id").single()
     if (ce) throw ce
@@ -91,8 +111,8 @@ test.describe("event time propagation — mobile Edit affordance (016069e)", () 
 
   test("mobile: drill parent → sub-event → Overview → Edit writes the CHILD", async ({ page }) => {
     const sb = sandbox()
-    await sb.client.from("calendar_events").update({ start_date: CHILD_START, end_date: CHILD_END }).eq("id", childId)
-    await sb.client.from("calendar_events").update({ start_date: PARENT_START, end_date: PARENT_END }).eq("id", parentId)
+    await sb.client.from("calendar_events").update({ start_date: atLocal(CHILD_START_LOCAL), end_date: atLocal(CHILD_END_LOCAL) }).eq("id", childId)
+    await sb.client.from("calendar_events").update({ start_date: atLocal(PARENT_START_LOCAL), end_date: atLocal(PARENT_END_LOCAL) }).eq("id", parentId)
     const parentBefore = await readEvent(parentId)
 
     await page.goto(`/home?tab=plan&team=${TEAM_ID}`)
@@ -142,7 +162,7 @@ test.describe("event time propagation — mobile Edit affordance (016069e)", () 
     await vis(page.getByRole("button", { name: "Save changes" })).click()
     await expectModalClosed(page)
 
-    expect((await readEvent(childId)).start_date).toBe("2026-08-04T11:45:00+00:00")
+    expect(iso((await readEvent(childId)).start_date)).toBe(iso(at("2026-08-04", "11:45")))
     expect((await readEvent(parentId)).start_date, "PARENT must not move").toBe(parentBefore.start_date)
     await page.screenshot({ path: `${SHOTS}/mobile-390-07-after-save.png`, fullPage: false, animations: "disabled" })
   })

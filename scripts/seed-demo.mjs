@@ -12,6 +12,8 @@
 // DEMO_PASSWORD (the reviewer password that goes in App Store Connect review notes).
 import { createClient } from "@supabase/supabase-js"
 import ws from "ws" // supabase-js needs a WebSocket impl under Node < 22
+// The app's OWN date/time conversion layer — not a copy. See scripts/lib/app-tz.mjs.
+import tz from "./lib/app-tz.mjs"
 
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -62,7 +64,7 @@ const reviewerId = ids[USERS[0].email]
 const sarahId = ids[USERS[1].email]
 
 // ── Ministry ──────────────────────────────────────────────────────────────────
-let { data: ministry } = await db.from("ministries").select("id").eq("name", MINISTRY_NAME).maybeSingle()
+let { data: ministry } = await db.from("ministries").select("id, timezone").eq("name", MINISTRY_NAME).maybeSingle()
 if (!ministry) {
   const { data, error } = await db
     .from("ministries")
@@ -79,7 +81,7 @@ if (!ministry) {
       moderation_settings: { enabled: true, behavior: "asterisk_first", strictness: "moderate", scope: "all", photo_enabled: false },
       created_by: reviewerId,
     })
-    .select("id")
+    .select("id, timezone")
     .single()
   if (error) throw error
   ministry = data
@@ -241,14 +243,22 @@ if (!teamCount) {
 const leadershipTeam = await db.from("teams")
   .select("id").eq("ministry_id", mid).eq("name", "Leadership Team").maybeSingle()
 const leadershipTeamId = leadershipTeam.data?.id ?? null
-const startOfWeek = new Date()
-startOfWeek.setHours(0, 0, 0, 0)
-startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()) // Sunday
+// Wall-clock times below are the MINISTRY's local time, converted to instants
+// through the app's own layer (`lib/tz.ts`) — never `new Date().setHours()`,
+// which silently means "whatever zone the seeding machine is in" and is how
+// these three rows ended up four hours early (a 7pm worship night reading 3pm).
+const demoZone = tz.resolveMinistryTimezone(ministry.timezone)
+const weekStartYMD = (() => {
+  const today = tz.todayInZone(demoZone)
+  const [y, m, d] = today.split("-").map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  dt.setUTCDate(dt.getUTCDate() - dt.getUTCDay()) // back to Sunday
+  return dt.toISOString().slice(0, 10)
+})()
 const at = (days, hour) => {
-  const d = new Date(startOfWeek)
-  d.setDate(d.getDate() + days)
-  d.setHours(hour)
-  return d.toISOString()
+  const [y, m, d] = weekStartYMD.split("-").map(Number)
+  const ymd = new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+  return tz.zonedTimeToISO(ymd, `${String(hour).padStart(2, "0")}:00`, demoZone)
 }
 const EVENTS = [
   { title: "Friday Night Worship", team_id: leadershipTeamId, category: "service", location: "Campus Chapel",
