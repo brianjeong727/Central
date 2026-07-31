@@ -234,7 +234,7 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `app/home/components/desktop-nav.tsx` | Desktop sidebar navigation |
 | `app/home/components/shared.tsx` | Shared UI primitives used across tab files |
 | `app/home/types.ts` | All shared TypeScript types for home and tabs |
-| `app/home/utils.ts` | Shared utility functions (formatRelativeTime, getInitials, getAvatarColor). NOTE: getAvatarColor is NOT exported here — avatar color/shape is owned by `MonogramChip` (plum + cream, circle); do not reintroduce a parallel color util. |
+| `app/home/utils.ts` | Shared utility functions (formatRelativeTime, getInitials, `normalizeMoneyInput`) **plus the canonical event-date helpers — `eventDaySpan` (calendar-day count, NOT a timestamp walk), `eventDateRangeLabel`, `eventDateRangeShort`, `eventDayHeaderLabel` ("FRI · SEP 12"). Every event-date surface (Overview, mobile facts grid, events list, Run of Show day headers) goes through these — never re-derive a span or range inline.** NOTE: getAvatarColor is NOT exported here — avatar color/shape is owned by `MonogramChip` (plum + cream, circle); do not reintroduce a parallel color util. |
 | `app/home/page.tsx` | Server component — auth check, profile load, renders `<HomeApp>` |
 | `app/(auth)/shared.tsx` | Canonical shared auth components: `AuthPhotoPanel`, `SplitShell`, `GoogleButton`, `OrDivider`, `EyeButton`. All auth pages must use these — do not reimplement the split layout inline. |
 | `app/(auth)/login/page.tsx` | Email + password login |
