@@ -14,11 +14,23 @@
 // The whole event shifts by ONE delta (a multiple of 7 days), so sub-events
 // and every task due-date keep their weekday alignment automatically.
 //
+// ONE ZONE, BOTH HALVES. The delta used to be computed from the event's PACIFIC
+// calendar date while the shift was applied to the raw UTC date part of the stored
+// timestamp. For any row stored 00:00–06:59Z those two dates are different days —
+// often different WEEKDAYS — so the copy landed a day off and the same-weekday match
+// silently failed (the observed "+53 weeks instead of +52" drift on Central's 2026
+// Welcome Week). Both halves now resolve in the MINISTRY's timezone, via lib/tz.ts:
+// the instant is projected to a ministry-local wall clock, the DAY is shifted, and the
+// wall clock is converted back to an instant. That also makes the copy DST-correct — a
+// 7pm event stays 7pm even when the target date sits on the other side of a transition.
+//
 // Pattern (Convention #2/#6/#8): authz guard → createAdminClient() →
 // ministry-rescoped writes; actor is always the authz userId.
 
 import { createAdminClient } from "@/lib/supabase-admin"
 import { requireMinistryMember, type AuthzContext } from "@/app/actions/authz"
+import { getMinistryTimezone } from "@/lib/ministry-timezone"
+import { eventDateColumnsFromInputs, eventDateInputsFromRow, instantToZoned, todayInZone, type EventDateColumns } from "@/lib/tz"
 import { isLeaderRole } from "@/lib/roles"
 import { lineageKeyOf, seasonLabelOf } from "@/app/home/event-presets"
 
@@ -37,9 +49,8 @@ async function canPlanEvents(admin: AdminClient, ctx: AuthzContext): Promise<boo
 }
 
 // ── date helpers ─────────────────────────────────────────────────────────────
-function ptYMD(iso: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date(iso))
-}
+// Bare "YYYY-MM-DD" arithmetic — zone-immune by construction. The zone only enters
+// where an INSTANT is involved (`eventYMD` / `shiftEventDates` below).
 function ymdToUTC(ymd: string): number {
   const [y, m, d] = ymd.split("-").map(Number)
   return Date.UTC(y, m - 1, d)
@@ -48,12 +59,35 @@ function addDaysYMD(ymd: string, days: number): string {
   const dt = new Date(ymdToUTC(ymd) + days * 86_400_000)
   return dt.toISOString().slice(0, 10)
 }
-// Shift an ISO timestamp's DATE part by whole days, preserving the clock time
-// and offset exactly as stored (an "exact copy, new date").
-function shiftIsoDays(iso: string, days: number): string {
-  const datePart = iso.slice(0, 10)
-  const rest = iso.slice(10)
-  return `${addDaysYMD(datePart, days)}${rest}`
+/** The ministry-local calendar day an event instant falls on. The ONE projection
+ *  used for season bucketing, the double-press guard, and the weekday delta — so
+ *  every one of them agrees on which day an event "is". */
+function eventYMD(iso: string, timeZone: string): string {
+  return instantToZoned(iso, timeZone).ymd
+}
+/**
+ * Shift a source event's dates forward by whole days, in the ministry's zone.
+ *
+ * Replaces the old `shiftIsoDays`, which sliced the raw UTC date part — the half of
+ * the weekday bug. Round-tripping through lib/tz.ts instead means:
+ *  • the shift lands on the intended ministry-local DAY (so the weekday delta the
+ *    caller computed is the weekday delta that actually happens);
+ *  • the ministry-local CLOCK is preserved across a DST boundary (an "exact copy,
+ *    new date" is a copy of the wall clock, not of the UTC offset);
+ *  • all-day rows carry `start_day`/`end_day` through — the copy is written with the
+ *    day columns AND the derived instants, so an all-day rollover satisfies the
+ *    pending day-column CHECK instead of inserting a half-populated row.
+ */
+function shiftEventDates(
+  src: { all_day: boolean; start_date: string; end_date: string; start_day: string | null; end_day: string | null },
+  days: number,
+  timeZone: string,
+): EventDateColumns {
+  const inputs = eventDateInputsFromRow(src, timeZone)
+  return eventDateColumnsFromInputs(
+    { ...inputs, startYMD: addDaysYMD(inputs.startYMD, days), endYMD: addDaysYMD(inputs.endYMD, days) },
+    timeZone,
+  )
 }
 // Same-weekday match: the source date's (month, nth-weekday) slot next year;
 // a 5th occurrence that doesn't exist next year falls back to the last one.
@@ -75,14 +109,20 @@ function weekdayMatchDelta(sourceYMD: string): number {
 
 type SourceEvent = {
   id: string; title: string; description: string | null; location: string | null
-  start_date: string; end_date: string; all_day: boolean; category: string
+  start_date: string; end_date: string; start_day: string | null; end_day: string | null
+  all_day: boolean; category: string
   event_type: string; team_id: string | null; recurring: boolean
 }
+
+// The columns every read of a source event needs — the day columns included, so an
+// all-day event can be copied as a DATE RANGE rather than re-derived from its instants.
+const SOURCE_EVENT_COLUMNS =
+  "id, title, description, location, start_date, end_date, start_day, end_day, all_day, category, event_type, team_id, recurring"
 
 // Copy one event (+plan/tasks/roles/blocks) shifted by `delta` days. Returns the new event id.
 async function copyEventForward(
   admin: AdminClient,
-  ctx: { ministryId: string; userId: string },
+  ctx: { ministryId: string; userId: string; timeZone: string },
   src: SourceEvent,
   delta: number,
   parentId: string | null,
@@ -95,8 +135,7 @@ async function copyEventForward(
       title: src.title,
       description: src.description,
       location: src.location,
-      start_date: shiftIsoDays(src.start_date, delta),
-      end_date: shiftIsoDays(src.end_date, delta),
+      ...shiftEventDates(src, delta, ctx.timeZone),
       all_day: src.all_day,
       category: src.category,
       event_type: src.event_type,
@@ -198,10 +237,13 @@ export async function startNextSeasonAction(
   const admin = createAdminClient()
   if (!(await canPlanEvents(admin, ctx))) return { error: "Not authorized." }
 
+  // The one zone every date decision below resolves in.
+  const timeZone = await getMinistryTimezone(admin, ctx.ministryId)
+
   // Source = the latest season that has recurring top-level events for this team.
   const { data: recEvents } = await admin
     .from("calendar_events")
-    .select("id, title, description, location, start_date, end_date, all_day, category, event_type, team_id, recurring")
+    .select(SOURCE_EVENT_COLUMNS)
     .eq("ministry_id", ctx.ministryId)
     .eq("team_id", teamId)
     .eq("recurring", true)
@@ -210,22 +252,22 @@ export async function startNextSeasonAction(
   const all = (recEvents ?? []) as SourceEvent[]
   if (all.length === 0) return { error: "No recurring events to carry forward — mark the annual traditions as recurring first." }
 
-  const latestSeason = seasonLabelOf(ptYMD(all[0].start_date))
-  const sources = all.filter((e) => seasonLabelOf(ptYMD(e.start_date)) === latestSeason)
+  const latestSeason = seasonLabelOf(eventYMD(all[0].start_date, timeZone))
+  const sources = all.filter((e) => seasonLabelOf(eventYMD(e.start_date, timeZone)) === latestSeason)
 
   // Double-press guard: a season can only be rolled forward once it has been
   // (mostly) RUN — if its last recurring event is still ahead, there's nothing
   // to inherit yet. This also makes an accidental second press a no-op instead
   // of minting a season two years out.
   const lastEnd = sources.reduce((max, e) => (e.end_date > max ? e.end_date : max), sources[0].end_date)
-  if (ptYMD(lastEnd) > ptYMD(new Date().toISOString())) {
+  if (eventYMD(lastEnd, timeZone) > todayInZone(timeZone)) {
     return { error: `The ${latestSeason} season is still ahead — start the next one after it wraps up.` }
   }
 
   // Target-season dedupe: an event whose lineage already exists next season is skipped.
   const targetLineages = new Set(
     all
-      .filter((e) => seasonLabelOf(ptYMD(e.start_date)) > latestSeason)
+      .filter((e) => seasonLabelOf(eventYMD(e.start_date, timeZone)) > latestSeason)
       .map((e) => lineageKeyOf(e.title)),
   )
 
@@ -238,19 +280,22 @@ export async function startNextSeasonAction(
   // Each event copies as an independent chain (event → plan → tasks/roles/blocks
   // → sub-events); the chains run concurrently — a season is ~100 inserts and
   // sequential round-trips made the button feel broken.
-  const actor = { ministryId: ctx.ministryId, userId: ctx.userId }
+  const actor = { ministryId: ctx.ministryId, userId: ctx.userId, timeZone }
   const results = await Promise.all(toCopy.map(async (src) => {
-    const delta = weekdayMatchDelta(ptYMD(src.start_date))
+    // The delta and the shift now read the SAME ministry-local day (see the file
+    // header) — that agreement is what keeps the copy on the source's weekday.
+    const srcYMD = eventYMD(src.start_date, timeZone)
+    const delta = weekdayMatchDelta(srcYMD)
     const newId = await copyEventForward(admin, actor, src, delta, null)
     // Sub-events ride the SAME delta so the week's internal structure is preserved.
     const { data: children } = await admin
       .from("calendar_events")
-      .select("id, title, description, location, start_date, end_date, all_day, category, event_type, team_id, recurring")
+      .select(SOURCE_EVENT_COLUMNS)
       .eq("ministry_id", ctx.ministryId)
       .eq("parent_event_id", src.id)
       .order("start_date", { ascending: true })
     await Promise.all(((children ?? []) as SourceEvent[]).map((child) => copyEventForward(admin, actor, child, delta, newId)))
-    return { title: src.title, season: seasonLabelOf(addDaysYMD(ptYMD(src.start_date), delta)) }
+    return { title: src.title, season: seasonLabelOf(addDaysYMD(srcYMD, delta)) }
   }))
   const created = results.map((r) => r.title)
   const targetSeason = results[results.length - 1]?.season ?? latestSeason

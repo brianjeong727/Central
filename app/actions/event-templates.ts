@@ -12,23 +12,27 @@
 // RLS) → ministry-rescoped writes. Actor/created_by is ALWAYS the authz userId, never a
 // caller-supplied id. Role gates go through lib/roles.ts predicates + can_plan_events.
 //
-// Offset math is anchored to PT (America/Los_Angeles) so a late-evening event never
-// lands a task on the wrong calendar day: event_date is the PT calendar date of the
-// calendar_event.start_date; completed_at is likewise projected into PT before diffing.
-// due_date is already a bare DATE, so it is used as-is.
+// Offset math is anchored to the MINISTRY's timezone (`ministries.timezone`, read via
+// lib/ministry-timezone.ts) so a late-evening event never lands a task on the wrong
+// calendar day: event_date is the ministry-local calendar date of the
+// calendar_event.start_date; completed_at is likewise projected into that zone before
+// diffing. due_date is already a bare DATE, so it is used as-is.
+//
+// This anchor was hardcoded to America/Los_Angeles, which put EVERY stored offset_days
+// one day off for an Eastern ministry whenever the event or the completion fell in the
+// 00:00–02:59 ET window — i.e. for all-day events (local midnight) and early-morning
+// completions. The zone is now resolved per call from the ministry that owns the plan.
 
 import { createAdminClient } from "@/lib/supabase-admin"
 import { requireMinistryMember, type AuthzContext } from "@/app/actions/authz"
+import { getMinistryTimezone } from "@/lib/ministry-timezone"
+import { instantToZoned, todayInZone } from "@/lib/tz"
 import { isLeaderRole } from "@/lib/roles"
 import { lineageKeyOf, seasonLabelOf } from "@/app/home/event-presets"
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
-// ── PT calendar-date helpers (pure) ────────────────────────────────────────
-// 'en-CA' formats as YYYY-MM-DD; timeZone projects the instant into PT first.
-function ptYMD(iso: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date(iso))
-}
+// ── Calendar-date helpers (pure, zone-immune — they take YMD strings) ──────
 function ymdToUTC(ymd: string): number {
   const [y, m, d] = ymd.split("-").map(Number)
   return Date.UTC(y, m - 1, d)
@@ -42,9 +46,6 @@ function addDaysYMD(ymd: string, days: number): string {
   const m = String(dt.getUTCMonth() + 1).padStart(2, "0")
   const d = String(dt.getUTCDate()).padStart(2, "0")
   return `${y}-${m}-${d}`
-}
-function todayPT(): string {
-  return ptYMD(new Date().toISOString())
 }
 
 // ── Authz (mirrors event_confirmations authorizePlan) ───────────────────────
@@ -112,8 +113,9 @@ export async function compileEventTemplateAction(
     .maybeSingle()
   if (!ev) return { error: "Event not found." }
 
-  const eventDate = ptYMD(ev.start_date as string)
   const ministryId = plan.ministry_id as string
+  const timeZone = await getMinistryTimezone(admin, ministryId)
+  const eventDate = instantToZoned(ev.start_date as string, timeZone).ymd
   const teamId = (ev.team_id as string | null) ?? null
   const eventType = ev.event_type as string
 
@@ -139,12 +141,13 @@ export async function compileEventTemplateAction(
     useActualByTask.set(c.taskId, c.useActual)
   }
 
-  // Per-task offsets (PT). offset_days = the value instantiate uses (planned by default,
-  // or the adopted actual). actual_offset_days is always recorded for display.
+  // Per-task offsets, on the ministry's calendar. offset_days = the value instantiate
+  // uses (planned by default, or the adopted actual). actual_offset_days is always
+  // recorded for display.
   let onTime = 0
   const perTask = sourceTasks.map((t) => {
     const planned = t.due_date ? daysBetween(eventDate, t.due_date) : null
-    const actual = t.completed && t.completed_at ? daysBetween(eventDate, ptYMD(t.completed_at)) : null
+    const actual = t.completed && t.completed_at ? daysBetween(eventDate, instantToZoned(t.completed_at, timeZone).ymd) : null
     if (planned !== null && actual !== null && actual <= planned) onTime++
     const chosen = useActualByTask.get(t.id) && actual !== null ? actual : planned
     return { t, planned, actual, chosen }
@@ -276,8 +279,9 @@ export async function instantiateTemplateAction(
     .eq("id", calendarEventId)
     .maybeSingle()
   if (!ev || ev.ministry_id !== ministryId) return { error: "Event not found." }
-  const eventDate = ptYMD(ev.start_date as string)
-  const today = todayPT()
+  const timeZone = await getMinistryTimezone(admin, ministryId)
+  const eventDate = instantToZoned(ev.start_date as string, timeZone).ymd
+  const today = todayInZone(timeZone)
 
   // Ensure the event_plan (AddEventModal usually created it) and stamp provenance.
   let { data: plan } = await admin

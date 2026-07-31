@@ -3,8 +3,8 @@
 // ── Countdown tab ─────────────────────────────────────────────────────────────
 // A T-minus planning timeline that REPLACES the old Checklist tab. It re-presents
 // the SAME event_tasks data (owned by EventPlanWorkspace) grouped by T-minus phase
-// — computed from each task's due_date vs the event's start_date in America/
-// Los_Angeles — and adds three augmentations: trigger badges (nudge state), playbook
+// — computed from each task's due_date vs the event's start_date projected into the
+// MINISTRY's timezone — and adds three augmentations: trigger badges (nudge state), playbook
 // whispers (event_tasks.brief), and load-aware reassign; plus a right rail
 // (Readiness · Reminder schedule · Load this month).
 //
@@ -20,6 +20,8 @@ import { Radio, Send, AlertTriangle, ArrowLeftRight } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { MONO_STYLE } from "@/components/central/typography"
 import { CentralCard, ActionMenu, PocketKicker, PocketProgress } from "@/components/central"
+import { instantToZoned, todayInZone } from "@/lib/tz"
+import { useMinistryTimezone } from "../ministry-timezone-context"
 import type { EventTask } from "../types"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -61,16 +63,13 @@ export interface CountdownPhase {
   sectionKey: ChecklistSection  // maps to the existing section-move / add-row window
 }
 
-// ── Pure date helpers (PT-anchored) ────────────────────────────────────────────
-
-// YYYY-MM-DD for a Date rendered in a given IANA tz (en-CA → ISO order).
-export function ymdInTZ(d: Date, tz = "America/Los_Angeles"): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(d)
-}
-
-export function ptTodayYMD(): string {
-  return ymdInTZ(new Date())
-}
+// ── Pure date helpers ──────────────────────────────────────────────────────────
+// These operate on bare "YYYY-MM-DD" strings only, so they are zone-immune. The
+// two places a zone IS needed — projecting the event's start instant onto a
+// calendar day, and "today" — go through lib/tz.ts with the MINISTRY's zone
+// (see CountdownTab below). There is no PT default here any more: a hardcoded
+// America/Los_Angeles put every Eastern ministry's T-minus math a day off for
+// any event or deadline near midnight.
 
 // Whole calendar days from a → b (b − a), both "YYYY-MM-DD".
 export function daysBetweenYMD(a: string, b: string): number {
@@ -81,7 +80,7 @@ export function daysBetweenYMD(a: string, b: string): number {
 
 function addDaysToYMD(ymd: string, n: number): string {
   const [y, m, d] = ymd.split("-").map(Number)
-  return ymdInTZ(new Date(Date.UTC(y, m - 1, d + n)), "UTC")
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
 }
 
 function fmtMD(ymd: string): string {
@@ -186,7 +185,8 @@ export function bucketCountdownPhases(tasks: EventTask[], eventYMD: string, toda
 
 // ── Trigger badges ─────────────────────────────────────────────────────────────
 // Precedence: overdue > fired > armed. overdue is purely computed (incomplete,
-// assigned, past-due PT). fired reads the notification_ledger set. armed = an
+// assigned, past-due on the ministry's calendar — `todayYMD` is resolved by the
+// caller in the ministry's zone). fired reads the notification_ledger set. armed = an
 // upcoming auto-DM is scheduled.
 export function badgeFor(task: EventTask, firedIds: Set<string>, todayYMD: string): TriggerKind | null {
   const due = task.due_date
@@ -642,8 +642,12 @@ export function CountdownTab(props: CountdownTabProps) {
     dragActive, dragOverPhaseKey, onPhaseDragOver, onPhaseDrop, stickyTop = 52,
   } = props
 
-  const eventYMD = ymdInTZ(new Date(eventStartISO))
-  const todayYMD = ptTodayYMD()
+  // The two zone-dependent values in the whole T-minus model. Both resolve in the
+  // MINISTRY's zone: `eventStartISO` is a true instant (lib/tz.ts), and "today"
+  // must flip at the ministry's midnight, not the viewer's and not Pacific's.
+  const timeZone = useMinistryTimezone()
+  const eventYMD = instantToZoned(eventStartISO, timeZone).ymd
+  const todayYMD = todayInZone(timeZone)
   const phases = bucketCountdownPhases(tasks, eventYMD, todayYMD, hasCrunch)
   const loadCounts = useLoadCounts(teamId)
 
