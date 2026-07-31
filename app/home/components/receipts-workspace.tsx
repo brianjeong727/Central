@@ -7,6 +7,7 @@ import { TabPageHeader, PageTitle, PlanSubTabStrip, MonogramChip, SubpageShell, 
 import { EmptyState } from "./shared"
 import { MobilePocketHub, PocketHubChrome } from "./mobile-pocket-hub"
 import { useIsMobile } from "../use-is-mobile"
+import { parseDateLocal } from "../utils"
 import { createClient } from "@/lib/supabase"
 import { SubmitReceiptModal, STATUS_META, MobileFactsGrid } from "./finance-workspace"
 import {
@@ -359,6 +360,17 @@ function fundLabel(fund?: string) {
   return FUND_OPTIONS.find(f => f.value === fund)?.label ?? fund ?? ""
 }
 
+// `receipts.purchase_date` is a DATE column — a calendar day with no instant and
+// no zone. A bare `new Date("2026-07-15")` parses it as UTC midnight, which reads
+// back as Jul 14 anywhere behind UTC. `parseDateLocal` (app/home/utils.ts) is the
+// one existing helper for this; it builds a LOCAL date from the Y/M/D parts so no
+// offset can drag it across a boundary. Never route a DATE column through a
+// timezone conversion (lib/tz.ts) — there is no instant to convert.
+function formatPurchaseDate(ymd: string | null | undefined): string {
+  if (!ymd) return "—"
+  return parseDateLocal(ymd).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+}
+
 function CategoryContent({
   ministryId, userId, teamId, category, onOpenDetail, onRequestDelete,
 }: {
@@ -675,13 +687,13 @@ function ReceiptDetailOverlay({
         {/* Details */}
         {isMobile ? (
           <MobileFactsGrid facts={[
-            { label: "Purchase date", value: new Date(receipt.purchase_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) },
+            { label: "Purchase date", value: formatPurchaseDate(receipt.purchase_date) },
             { label: "Category", value: categoryName || "—" },
             { label: "Team", value: teamName || "—" },
           ]} />
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, marginBottom: 22 }}>
-            <DetailRow label="Purchase date" value={new Date(receipt.purchase_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} />
+            <DetailRow label="Purchase date" value={formatPurchaseDate(receipt.purchase_date)} />
             <DetailRow label="Category" value={categoryName} />
             <DetailRow label="Team" value={teamName || "—"} />
           </div>

@@ -225,6 +225,33 @@ export function todayInZone(timeZone: string): string {
   return instantToZoned(new Date(), timeZone).ymd
 }
 
+/**
+ * The instant at which the ministry's TODAY began — midnight in `timeZone`,
+ * as an ISO-8601 UTC string.
+ *
+ * This is the ONE boundary every "is this event still upcoming?" filter compares
+ * against, and the rule it encodes is: **an event stays upcoming until the end of
+ * the last calendar day it touches in the ministry's zone.** Pair it with the
+ * event's `end_date` — `end_date >= startOfTodayInstantISO(tz)`:
+ *
+ *  • A 7pm service is still "upcoming" at 8pm — it is the thing happening tonight,
+ *    and every one of these surfaces (the home-hero picker, the workspace "next
+ *    event" card, the mobile hub hero) exists to point at exactly that.
+ *  • A multi-day retreat that started yesterday and ends tomorrow is still current.
+ *  • Yesterday's event drops out, because its end instant is before this midnight.
+ *  • The boundary moves once a day, at the ministry's midnight — not at the
+ *    viewer's, and not at UTC midnight (8pm Eastern), which is what made "today's
+ *    event" vanish mid-evening.
+ *
+ * Comparing `start_date >= now()` instead is the trap: it hides an event the
+ * moment it BEGINS, which is precisely when it matters most.
+ *
+ * (`dayStartInstantISO` is declared below; function declarations hoist.)
+ */
+export function startOfTodayInstantISO(timeZone: string): string {
+  return dayStartInstantISO(todayInZone(timeZone), timeZone)
+}
+
 // ── all-day events ───────────────────────────────────────────────────────────
 //
 // An all-day event is a DATE RANGE, not an instant range. `calendar_events`

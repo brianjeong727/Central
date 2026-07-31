@@ -19,7 +19,7 @@ import { getCategoryBudgetAllocation } from "@/app/actions/budget-planning"
 import { useNavState } from "../nav-state"
 import { useOpenMemberProfile } from "../member-profile-context"
 import { useMinistryTimezone } from "../ministry-timezone-context"
-import { eventDateColumnsFromInputs, eventDateInputsFromRow, formatInZone, instantToZoned, todayInZone } from "@/lib/tz"
+import { eventDateColumnsFromInputs, eventDateInputsFromRow, formatInZone, instantToZoned, startOfTodayInstantISO, todayInZone } from "@/lib/tz"
 import { useSubpageCrumbs, useBreadcrumbExtra } from "../breadcrumb-context"
 
 function currentFiscalYear(): string {
@@ -1188,11 +1188,15 @@ export function StudentOrgTeamHome({
   // Mobile hub up-next hero (ruling B-1): the team's next upcoming event + its
   // plan-task completion, fetched lazily only when an upcoming event exists.
   const nextEvent = useMemo(() => {
-    const now = Date.now()
+    // "Upcoming" runs to the END of an event's last ministry-zone day, so the hub
+    // hero keeps pointing at tonight's event while it is happening (and through a
+    // multi-day retreat) instead of jumping to next week the second it starts.
+    // The rule + why start_date >= now() is wrong: startOfTodayInstantISO (lib/tz.ts).
+    const from = Date.parse(startOfTodayInstantISO(timeZone))
     return calEvents
-      .filter(e => new Date(e.start_date).getTime() >= now)
+      .filter(e => new Date(e.end_date).getTime() >= from)
       .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())[0] ?? null
-  }, [calEvents])
+  }, [calEvents, timeZone])
   const { data: heroProgress } = useSWR(
     nextEvent ? (["hub-hero-progress", nextEvent.id] as const) : null,
     async () => {
@@ -2588,6 +2592,7 @@ export function PlanTab({
   const setShowCreateTeam = onShowCreateTeam
   const supabase = createClient()
   const isMobile = useIsMobile()
+  const timeZone = useMinistryTimezone()
   const { setParam } = useNavState()
   // Entering/leaving a workspace (picker → team, team → team) lands at the top.
   useScrollResetOn([activeTeamId])
@@ -2825,9 +2830,13 @@ export function PlanTab({
   const pickerTeamIds = activeTeamId ? [] : [...userTeams.map(t => t.teamId), ...govTeams.map(t => t.id)]
   const pickerTeamKey = pickerTeamIds.join(",")
   const { data: teamProgress } = useSWR(
-    pickerTeamIds.length > 0 ? ["ws-progress", ministryId, pickerTeamKey] : null,
+    pickerTeamIds.length > 0 ? ["ws-progress", ministryId, pickerTeamKey, timeZone] : null,
     async (): Promise<Record<string, { done: number; total: number; nextDate: string }>> => {
-      const now = new Date().toISOString()
+      // A workspace's "next event" stays the event that is happening TODAY, for the
+      // whole of its last ministry-zone day — a start_date >= now() cutoff swapped
+      // the card to next week (and blanked its task progress) mid-service.
+      // Rule: startOfTodayInstantISO (lib/tz.ts).
+      const upcomingFrom = startOfTodayInstantISO(timeZone)
       const { data: events } = await supabase
         .from("calendar_events")
         .select("id, team_id, start_date")
@@ -2837,7 +2846,7 @@ export function PlanTab({
         // plan, never a workspace's "next event" — without this a child wins the
         // slot and the card names a night instead of the week that contains it.
         .is("parent_event_id", null)
-        .gte("start_date", now)
+        .gte("end_date", upcomingFrom)
         .order("start_date", { ascending: true })
       // Earliest upcoming event per team.
       const nextByTeam: Record<string, { id: string; start_date: string }> = {}
@@ -3830,8 +3839,15 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
   const [confirm, setConfirm] = useState<ConfirmTarget>(null)
 
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
+  // `worship_weeks.week_date` / `worship_availability.week_date` are DATE columns —
+  // calendar days with no instant and no zone — so this range must be built from
+  // calendar fields, never round-tripped through an instant. `toISOString()`
+  // projects a LOCAL midnight into UTC, which for any viewer AHEAD of UTC slides
+  // BOTH ends back a day (Asia/Tokyo: Jul 1–31 became Jun 30–Jul 30 — the range
+  // dragged in the previous month's last week and dropped the 31st). `ymd()` reads
+  // the local calendar fields straight off the Date, so no offset can shift them.
+  const monthStart = ymd(new Date(now.getFullYear(), now.getMonth(), 1))
+  const monthEnd = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0))
 
   const monoStyle: React.CSSProperties = EYEBROW_STYLE
   async function loadSchedule() {
@@ -6569,7 +6585,14 @@ export function AddEventModal({
         .eq("ministry_id", ministryId)
         .maybeSingle()
       if (cancelled) return
-      const ev = new Date(existing.start_date)
+      // `plan_start_date` / `crunch_date` are DATE columns DERIVED from the event's
+      // calendar day, so the day they count back from must be the MINISTRY's, not
+      // the viewer's: `new Date(existing.start_date)` + device-local getters seeded
+      // a Tokyo leader's plan window a day off from the one an ET leader saw for the
+      // same event. `eventStartYMD` prefers `start_day` for all-day rows; the noon
+      // anchor keeps the ±month / ±7-day arithmetic clear of any boundary. Same
+      // idiom as the checklist window anchors below.
+      const ev = new Date(`${eventStartYMD(existing, timeZone)}T12:00:00`)
       setPlanStartDate((data?.plan_start_date as string | null) || addMonthsYMD(ev, -1))
       setCrunchDate((data?.crunch_date as string | null) || addDaysYMD(ev, -7))
       setPlanDatesSeeded(true)
@@ -7806,7 +7829,13 @@ export function EventPlanWorkspace({
       let psd = planData.plan_start_date as string | null
       let cd = planData.crunch_date as string | null
       if (!psd) {
-        const eventDate = new Date(calendarEvent.start_date)
+        // Count back from the event's MINISTRY-zone calendar day (`eventStart`,
+        // :7795), not from device-local getters on the instant — these two DATE
+        // columns are the checklist's window anchors, and seeding them off the
+        // viewer's day made the same event produce different phase boundaries
+        // depending on who happened to open it first. Noon-anchored so the
+        // ±month / ±7-day arithmetic can't slip a day.
+        const eventDate = new Date(`${eventStart}T12:00:00`)
         psd = addMonthsYMD(eventDate, -1)
         cd = addDaysYMD(eventDate, -7)
         await supabase.from("event_plans").update({ plan_start_date: psd, crunch_date: cd }).eq("id", planId).eq("ministry_id", ministryId)
