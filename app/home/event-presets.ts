@@ -29,7 +29,7 @@ export type EventTypeDefaults = {
 
 export type EventTypeConfig = {
   label: string; icon: string; dot: string; bg: string; text: string
-  budgetCategory: string | null; canHaveSubEvents: boolean; description: string
+  budgetCategory: string | null; description: string
   defaults: EventTypeDefaults
   defaultPhases: { key: string; label: string; tasks: PresetTask[] }[]
   defaultRoles: { name: string; notes: string }[]

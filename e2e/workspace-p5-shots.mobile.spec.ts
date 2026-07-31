@@ -232,7 +232,7 @@ test.describe("workspace p5 shots (mobile)", () => {
     }
     await openEventSpoke("Countdown", "countdown")
     await openEventSpoke("Roles & Leads", "roles")
-    await openEventSpoke("Showtime", "showtime")
+    await openEventSpoke("Run of Show", "runofshow")
 
     // 6. notes list
     await page.goto(`/home?tab=plan&team=${leadTeamId}&sotab=Meeting Notes`)

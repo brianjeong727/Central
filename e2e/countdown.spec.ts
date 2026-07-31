@@ -4,7 +4,7 @@
 // re-presented as a T-minus timeline with three augmentations — trigger badges
 // (nudge state), playbook whispers (event_tasks.brief), and load-aware reassign
 // — plus a right rail (Readiness · Reminder schedule · Load this month). The day-of
-// "Run of show" tab was renamed "Showtime". New file app/home/tabs/countdown-tab.tsx,
+// The day-of tab is labeled "Run of Show". New file app/home/tabs/countdown-tab.tsx,
 // wired into app/home/tabs/plan-tab.tsx.
 //
 // This spec drives the SEEDED E2E-sandbox fixture (team "Student Org Board",
@@ -81,11 +81,11 @@ test.describe("Countdown tab (feat/run-sheet-countdown)", () => {
     const errors = watchConsole(page)
     await openCountdown(page)
 
-    // ── Tab labels: Countdown (not Checklist) + Showtime (not Run of show) ──
+    // ── Tab labels: Countdown (not Checklist) + Run of Show (not Showtime) ──
     await expect(page.getByRole("button", { name: "Countdown", exact: true })).toBeVisible()
-    await expect(page.getByRole("button", { name: "Showtime", exact: true })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Run of Show", exact: true })).toBeVisible()
     await expect(page.getByRole("button", { name: "Checklist", exact: true })).toHaveCount(0)
-    await expect(page.getByRole("button", { name: "Run of show", exact: true })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Showtime", exact: true })).toHaveCount(0)
 
     // ── Phase group headers + timeline rows ──
     await expect(page.getByText(/WEEKS/).first()).toBeVisible()   // T−4/T−3 WEEKS
