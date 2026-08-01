@@ -52,6 +52,15 @@ test.describe("OAuth onboarding gate", () => {
       .eq("id", memberId)
     if (nullErr) throw nullErr
 
+    // Drop the proxy's routing-cache cookie first. proxy.ts caches the routing decision
+    // — INCLUDING profile-completeness — in the signed `central-mw` cookie for 5 minutes,
+    // and only caches the settled state (complete profile). auth.setup runs seconds before
+    // this test and mints a FRESH cookie with pc=true, so without this the proxy serves the
+    // cached "complete" verdict, never re-reads the nulled columns, and the gate never
+    // fires. It passed only when the cookie happened to be older than the TTL — i.e. the
+    // test was order- and clock-dependent. A real OAuth mint has no such cookie.
+    await page.context().clearCookies({ name: "central-mw" })
+
     // Assert: navigating to a protected path redirects to /complete-profile?next=...
     await page.goto("/home")
     await page.waitForURL(/\/complete-profile\?next=%2Fhome/, { timeout: 15_000 })
