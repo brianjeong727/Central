@@ -136,11 +136,21 @@ export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<
     }
   }
 
-  const { ok, reason } = await verifyNativeOAuthSession(flow)
-  if (!ok) {
+  let verified: { ok: boolean; reason?: string }
+  try {
+    verified = await verifyNativeOAuthSession(flow)
+  } catch (err) {
+    // The guard runs as a Server Action POST to the current page. If anything
+    // redirects/breaks that request (see proxy.ts's Server-Action bypass), the
+    // call throws — never let that strand a half-established session silently.
+    const msg = err instanceof Error ? err.message : String(err)
+    await supabase.auth.signOut()
+    return { ok: false, error: "failed", detail: `verify action threw: ${msg}` }
+  }
+  if (!verified.ok) {
     // Torn down server-side; clear the local session too.
     await supabase.auth.signOut()
-    return { ok: false, error: "no-account", detail: reason }
+    return { ok: false, error: "no-account", detail: verified.reason }
   }
   return { ok: true }
 }
@@ -196,10 +206,17 @@ export async function signInWithGoogleNative(flow: "signin" | "signup"): Promise
     return { ok: false, error: "failed" }
   }
 
-  const { ok } = await verifyNativeOAuthSession(flow)
-  if (!ok) {
+  let verified: { ok: boolean; reason?: string }
+  try {
+    verified = await verifyNativeOAuthSession(flow)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
     await supabase.auth.signOut()
-    return { ok: false, error: "no-account" }
+    return { ok: false, error: "failed", detail: `verify action threw: ${msg}` }
+  }
+  if (!verified.ok) {
+    await supabase.auth.signOut()
+    return { ok: false, error: "no-account", detail: verified.reason }
   }
   return { ok: true }
 }

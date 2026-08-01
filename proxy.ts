@@ -154,6 +154,23 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL(user ? '/home' : '/login', request.url))
   }
 
+  // Next.js Server Actions POST to the URL of the page the user is currently on.
+  // Everything below is NAVIGATION routing (founder→/admin, logged-in bounce off
+  // /login|/signup, completeness + ministry-status gates) written for GET page
+  // loads. A 307 on a Server Action POST hijacks the action's own request — the
+  // RSC client can't follow a redirect as an action response, so the action never
+  // runs. The native Sign in with Apple/Google flow invokes verifyNativeOAuthSession
+  // FROM /login|/signup right AFTER signInWithIdToken sets the session cookie, so
+  // without this bypass that guard action is always redirected and the sign-in
+  // silently dead-ends (id_token succeeds, but the account is never verified/stamped
+  // and the client never navigates). Let Server Actions execute on their route —
+  // RLS and each action's own guards are the enforcement layer (this middleware's
+  // routing is explicitly never an authorization signal, see the MW_COOKIE note).
+  // Cookie refresh above is already applied to supabaseResponse.
+  if (request.method === 'POST' && request.headers.has('next-action')) {
+    return supabaseResponse
+  }
+
   const isPublicPath =
     pathname === '/' ||
     pathname.startsWith('/landing') ||
