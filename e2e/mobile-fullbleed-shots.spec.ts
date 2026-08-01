@@ -100,7 +100,8 @@ test.describe("mobile §2.2b full-bleed subpage screenshots", () => {
     await expect(vis(page, "Reimbursements").first()).toBeVisible({ timeout: 15000 })
     const gear = page.getByTitle("Team settings").filter({ visible: true }).first()
     await gear.click()
-    await expect(vis(page, "Settings").first()).toBeVisible({ timeout: 10000 })
+    // The subpage title is "Team settings" — an exact "Settings" match never hits it.
+    await expect(vis(page, "Team settings").first()).toBeVisible({ timeout: 10000 })
     // The generic "Workspace" chrome title must NOT remain above the subpage.
     await expect(page.getByText("Workspace", { exact: true }).filter({ visible: true })).toHaveCount(0)
     await shot(page, "team-settings")
@@ -111,7 +112,9 @@ test.describe("mobile §2.2b full-bleed subpage screenshots", () => {
     await expect(vis(page, "Church Settings").first()).toBeVisible({ timeout: 15000 })
     // Drill the "People" hub row.
     await vis(page, "People").first().click()
-    const back = page.getByRole("button", { name: "Settings" }).filter({ visible: true }).first()
+    // Convention #22: the labeled back row became the shared BackChevron, whose
+    // accessible name is "Back" — this spec predates that ratification.
+    const back = page.getByRole("button", { name: "Back" }).filter({ visible: true }).first()
     await expect(back).toBeVisible({ timeout: 10000 })
     // The hub title "Church Settings" is suppressed while drilled.
     await expect(page.getByRole("heading", { name: "Church Settings" }).filter({ visible: true })).toHaveCount(0)
@@ -122,6 +125,11 @@ test.describe("mobile §2.2b full-bleed subpage screenshots", () => {
     await page.goto(`/home?tab=plan&team=${financeTeamId}`)
     // Hub -> Reimbursements section -> the seeded receipt row -> detail subpage.
     await vis(page, "Reimbursements").first().click()
+    // The inbox defaults to a "Needs action" filter, which excludes the seeded receipt
+    // (the header still counts it: "Reimbursements inbox · 1"). Switch to All so the row
+    // is reachable — the subject of this test is the detail subpage's chrome, not the filter.
+    await page.getByRole("button", { name: /Needs action/ }).first().click()
+    await page.getByText("All", { exact: true }).filter({ visible: true }).first().click()
     const row = vis(page, "$42.50", false).first()
     await expect(row).toBeVisible({ timeout: 15000 })
     await row.click()
