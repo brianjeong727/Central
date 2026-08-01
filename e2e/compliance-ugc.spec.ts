@@ -231,7 +231,10 @@ test.describe("compliance §1.2 — member: report + block (mobile)", () => {
     await expect(blockedRow).toBeDisabled()
 
     // Profile → Blocked users lists the admin; Unblock removes the row.
-    await page.goto("/home?tab=profile")
+    // Mobile tucks these behind the gear → settings hub → "Account & support"
+    // (profile-tab settingsView, URL-synced as ?pset). Deep-link straight to that
+    // section rather than expecting the rows on the bare profile.
+    await page.goto("/home?tab=profile&pset=account")
     const blockedToggle = page.getByRole("button", { name: /Blocked users/ })
     await expect(blockedToggle).toBeVisible({ timeout: 15000 })
     await blockedToggle.click()
@@ -298,8 +301,13 @@ test.describe("compliance §1.2 — admin Reports inbox (mobile)", () => {
     const sb = sandbox()
     await page.goto("/home?tab=settings&stab=reports")
 
-    await expect(page.getByRole("heading", { name: "Reports" }).first()).toBeVisible({ timeout: 15000 })
-    await expect(page.getByText("Harassment or bullying")).toBeVisible({ timeout: 10000 })
+    // The mobile settings section renders its title as plain text — the drilled section
+    // exposes NO heading-role element, so getByRole("heading") can never match here
+    // (the desktop spot-check at the bottom of this file still asserts the real heading).
+    await expect(page.getByText("Reports", { exact: true }).filter({ visible: true }).first())
+      .toBeVisible({ timeout: 15000 })
+    await expect(page.getByText("Harassment or bullying").filter({ visible: true }).first())
+      .toBeVisible({ timeout: 10000 })
     await page.getByRole("button", { name: "Mark reviewed" }).first().click()
 
     await expect
@@ -366,7 +374,8 @@ test.describe("compliance — admin surfaces (mobile)", () => {
 
   test("7. Profile: Switch ministry row → /ministries", async ({ page }) => {
     const errors = watchConsole(page)
-    await page.goto("/home?tab=profile")
+    // Same mobile settings-hub deep link as the blocked-users test above.
+    await page.goto("/home?tab=profile&pset=account")
     const row = page.getByRole("link", { name: "Switch ministry" })
     await expect(row).toBeVisible({ timeout: 15000 })
     await expect(row).toHaveAttribute("href", "/ministries")
