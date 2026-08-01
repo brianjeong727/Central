@@ -185,3 +185,5 @@ migration (rls APPROVE ×2, applied live) → build → 6-test spec → full gat
   list also revalidates from the surviving instance on visibility (dual-mount swap).
 - UNSURE (Brian to ratify): multi-hue vs uniform-plum avatars · gold decision dots
   vs plum · 21px vs 19px date numeral. Defaults shipped: uniform plum, gold dots, 19px.
+
+<!-- ci stacked-PR trigger probe; branch is deleted immediately after -->
