@@ -82,6 +82,7 @@ fi
 BUILD_STATUS="skipped"
 LINT_STATUS="n/a"
 HEX_STATUS="n/a"
+DEDUP_STATUS="n/a"
 SERVER_STATUS="fail"
 E2E_STATUS="n/a"
 
@@ -169,6 +170,24 @@ else
   exit 1
 fi
 
+# ── (c3) archived-chat dedup rule (BLOCKING) ─────────────────────────────────
+# Archived is a STASH, not a delete: an unfiltered dedup read in auto-chats.ts
+# resurrects a stashed chat as a live room (PR #252). Static because there are 13
+# such reads and the real risk is the 14th one added later.
+echo "▶ scripts/check-archived-dedup.mjs"
+DEDUP_LOG="$(mktemp)"
+if node scripts/check-archived-dedup.mjs >"$DEDUP_LOG" 2>&1; then
+  DEDUP_STATUS="pass"
+  tail -n 1 "$DEDUP_LOG"
+else
+  DEDUP_STATUS="fail"
+  echo "── archived-dedup FAILED (BLOCKING) ─────────────────"
+  cat "$DEDUP_LOG"
+  echo "─────────────────────────────────────────────────────"
+  echo "════════ VERIFY RESULT: FAIL (archived-dedup) ════════"
+  exit 1
+fi
+
 # ── (d) restart dev server ───────────────────────────────────────────────────
 case "$PORT" in
   3000) SLOT="main" ;;
@@ -226,6 +245,7 @@ printf '  %-8s %s\n' "build"  "$BUILD_STATUS"
 printf '  %-8s %s\n' "lint"   "$LINT_STATUS"
 printf '  %-8s %s\n' "lockfile" "$LOCK_STATUS"
 printf '  %-8s %s\n' "hex"    "$HEX_STATUS"
+printf '  %-8s %s\n' "dedup"  "$DEDUP_STATUS"
 printf '  %-8s %s (:%s)\n' "server" "$SERVER_STATUS" "$PORT"
 printf '  %-8s %s\n' "e2e"    "$E2E_STATUS"
 echo "════════════════════════════════════════"
@@ -235,6 +255,7 @@ FAIL=0
 [[ "$BUILD_STATUS" == "fail" ]] && FAIL=1
 [[ "$LINT_STATUS" == "fail" ]] && FAIL=1
 [[ "$HEX_STATUS" == "fail" ]] && FAIL=1
+[[ "$DEDUP_STATUS" == "fail" ]] && FAIL=1
 [[ "$SERVER_STATUS" != "pass" ]] && FAIL=1
 [[ "$E2E_STATUS" == "fail" ]] && FAIL=1
 
