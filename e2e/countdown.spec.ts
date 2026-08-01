@@ -42,8 +42,20 @@ test.describe("Countdown tab (feat/run-sheet-countdown)", () => {
   let planId: string
   let toggleTaskId: string
 
+  // Lane guard: the TEAM_ID/EVENT_ID above are hand-seeded LANE-1 rows. Lane 2 (slot s2,
+  // port 3002) carries the tenant and two users only, so this spec must SKIP there rather
+  // than fail — a normally-red suite trains everyone to ignore red, and a real regression
+  // then hides in the noise. See sandbox().hasRow.
+  let hasLaneFixture = false
+
+  test.beforeEach(() => {
+    test.skip(!hasLaneFixture, "lane-1 fixture only (hand-seeded team/event) — see sandbox().hasRow")
+  })
+
   test.beforeAll(async () => {
     const sb = sandbox()
+    hasLaneFixture = await sb.hasRow("teams", { id: TEAM_ID, ministry_id: sb.ministryId })
+    if (!hasLaneFixture) return
     const { data: plan, error: pe } = await sb.client
       .from("event_plans").select("id").eq("calendar_event_id", EVENT_ID).single()
     if (pe) throw pe
@@ -55,6 +67,7 @@ test.describe("Countdown tab (feat/run-sheet-countdown)", () => {
   })
 
   test.afterAll(async () => {
+    if (!hasLaneFixture) return
     // Restore the seed exactly: un-complete the toggled task, drop any probe adds.
     const sb = sandbox()
     if (toggleTaskId) await sb.client.from("event_tasks").update({ completed: false, completed_at: null }).eq("id", toggleTaskId)
