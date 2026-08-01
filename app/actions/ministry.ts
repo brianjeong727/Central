@@ -692,9 +692,13 @@ export async function rejectMinistry(ministryId: string): Promise<{ error: strin
   return { error: error?.message ?? null }
 }
 
-// Returns all active ministries the current user belongs to
+// Returns all active ministries the current user belongs to.
+// Ordering is deliberately UNCHANGED (whatever PostgREST returns for the step-2 IN
+// query) — three surfaces consume this (/pick-ministry, /ministries, the landing
+// page), so recency ordering belongs to the ONE surface that renders it. The
+// `last_opened_at` stamp is carried here; /pick-ministry sorts on it locally.
 export async function getUserMinistries(): Promise<{
-  data: Array<{ id: string; name: string; university: string; role: string }> | null
+  data: Array<{ id: string; name: string; university: string; role: string; last_opened_at: string | null }> | null
   error: string | null
 }> {
   const supabase = await createClient()
@@ -703,18 +707,25 @@ export async function getUserMinistries(): Promise<{
 
   const admin = createAdminClient()
 
-  // Step 1: get all (ministry_id, role) rows for this user — deduplicate by ministry_id
+  // Step 1: get all (ministry_id, role, last_opened_at) rows for this user — deduplicate by ministry_id
   const { data: rows, error: rowsErr } = await admin
     .from("user_ministries")
-    .select("ministry_id, role")
+    .select("ministry_id, role, last_opened_at")
     .eq("user_id", user.id)
 
   if (rowsErr) return { data: null, error: rowsErr.message }
 
-  // Build a map of ministry_id → role (deduplicates multiple rows for the same ministry)
-  const byMinistry = new Map<string, string>()
+  // Build a map of ministry_id → { role, last_opened_at } (deduplicates multiple rows
+  // for the same ministry). Role keeps the first row's value (existing behaviour);
+  // the stamp takes the most recent across duplicate rows so recency can't be lost.
+  const byMinistry = new Map<string, { role: string; lastOpenedAt: string | null }>()
   for (const row of (rows ?? [])) {
-    if (!byMinistry.has(row.ministry_id)) byMinistry.set(row.ministry_id, row.role)
+    const existing = byMinistry.get(row.ministry_id)
+    if (!existing) {
+      byMinistry.set(row.ministry_id, { role: row.role, lastOpenedAt: row.last_opened_at ?? null })
+    } else if (row.last_opened_at && (!existing.lastOpenedAt || new Date(row.last_opened_at) > new Date(existing.lastOpenedAt))) {
+      existing.lastOpenedAt = row.last_opened_at
+    }
   }
 
   if (byMinistry.size === 0) return { data: [], error: null }
@@ -733,7 +744,8 @@ export async function getUserMinistries(): Promise<{
       id: m.id,
       name: m.name,
       university: m.university,
-      role: byMinistry.get(m.id) ?? "member",
+      role: byMinistry.get(m.id)?.role ?? "member",
+      last_opened_at: byMinistry.get(m.id)?.lastOpenedAt ?? null,
     })),
     error: null,
   }
@@ -1226,7 +1238,21 @@ export async function setCurrentMinistry(ministryId: string): Promise<{ error: s
     .update({ ministry_id: ministryId, role: rows[0].role })
     .eq("id", user.id)
 
-  return { error: error?.message ?? null }
+  if (error) return { error: error.message }
+
+  // Stamp the switcher's recency signal. Filtered by BOTH user_id AND ministry_id —
+  // ministry_id alone would stamp every member's membership row. Best-effort: a
+  // failure here must never block the navigation the user already earned, so it is
+  // logged and swallowed rather than returned.
+  const { error: stampErr } = await admin
+    .from("user_ministries")
+    .update({ last_opened_at: new Date().toISOString() })
+    .eq("user_id", user.id)
+    .eq("ministry_id", ministryId)
+
+  if (stampErr) console.error("setCurrentMinistry: failed to stamp last_opened_at —", stampErr.message)
+
+  return { error: null }
 }
 
 // ─── Admin: clean up departed members after 30 days ─────────────────────────

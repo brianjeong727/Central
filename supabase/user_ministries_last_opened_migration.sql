@@ -1,0 +1,79 @@
+-- user_ministries.last_opened_at — powers the /pick-ministry "LAST OPENED" ordering
+-- and the per-row "Last opened <date>" stamp on the phone-width switcher.
+--
+-- Nullable by design: every pre-existing membership row has never been "opened" under
+-- this instrumentation, and a NULL sorts last / renders no stamp. Deliberately NOT
+-- backfilled from created_at — that would print a join date under a "Last opened" label,
+-- which is a lie the UI cannot distinguish from a real one.
+
+ALTER TABLE public.user_ministries
+  ADD COLUMN IF NOT EXISTS last_opened_at timestamptz;
+
+-- ── No GRANT, deliberately (rls-reviewer W1) ──────────────────────────────────
+-- An earlier draft added `GRANT SELECT (last_opened_at) ... TO authenticated`, reasoning
+-- by analogy to the documented `ministries.timezone` incident (a new column on a table
+-- whose table-level grant had been revoked lands ungranted, and PostgREST then 403s the
+-- ENTIRE query naming it). That analogy does not hold here:
+--   * `ministries` is the odd one out precisely BECAUSE a revoke was run against it
+--     (`tasks/permissions-rls-migration-APPLIED.sql` revokes invite_code/staff_invite_code).
+--     No such revoke was ever run against user_ministries.
+--   * user_ministries was created by a plain CREATE TABLE with no grant statements, so it
+--     carries the Supabase project default (ALTER DEFAULT PRIVILEGES ... GRANT ALL ON
+--     TABLES TO anon, authenticated, service_role) — a TABLE-level grant, which a new
+--     column inherits automatically.
+--   * A column-level grant would also have been the wrong SHAPE for its own stated fear:
+--     the switcher read filters on user_id, and Postgres requires SELECT on every column a
+--     query references INCLUDING filter columns — so granting last_opened_at alone would
+--     still 403 the very query it was meant to rescue.
+--   * Worst of all it leaves residue: REVOKE SELECT ON <table> does NOT remove a
+--     column-level grant, so a future lock-down of this table would go dark on every
+--     column EXCEPT this one, with nothing at the revoke site explaining why.
+-- Least privilege is correct in both worlds: no shipped code path names this column from a
+-- client role (getUserMinistries/setCurrentMinistry both use the service-role admin client).
+-- If a client-side read is ever added, grant deliberately and completely at that point.
+
+-- ── No index, deliberately (rls-reviewer W3) ──────────────────────────────────
+-- An index on (user_id, last_opened_at DESC NULLS LAST) is the right SHAPE for the read,
+-- but net-negative here: the UNIQUE (user_id, ministry_id) btree is already lead-keyed on
+-- user_id, per-user row counts are 1-3, and the sort happens in JS anyway. Adding it would
+-- also break HOT updates — last_opened_at is unindexed today, so the per-switch stamp can
+-- be HOT; indexing it turns every ministry switch into a non-HOT update with fresh entries
+-- in the PK, the unique index, and this one. Add it later if row counts ever justify it.
+
+-- ── RLS ───────────────────────────────────────────────────────────────────────
+-- No policy change required. The existing "user_ministries_select_own" policy
+-- (FOR SELECT USING (auth.uid() = user_id)) carries no column list, so it is
+-- column-agnostic and covers last_opened_at with no new policy.
+--
+-- Client writes stay denied by the ABSENCE of any INSERT/UPDATE/DELETE policy on this
+-- table under RLS — fail-closed. Note this is an RLS gate, NOT a grant gate: the table
+-- almost certainly carries the Supabase default table-level GRANT ALL, so anyone adding a
+-- write policy here in future removes the only thing denying client writes. There is no
+-- grant-level backstop underneath it.
+--
+-- The service-role admin client bypasses RLS entirely, so for the stamp in
+-- setCurrentMinistry() the WHERE clause IS the whole security boundary: it must filter on
+-- BOTH user_id AND ministry_id. Filtering by ministry_id alone would stamp every member's
+-- row for that tenant, silently and with no error.
+
+-- ── Verify after applying ─────────────────────────────────────────────────────
+-- 1. Column landed:
+--    select column_name, data_type, is_nullable from information_schema.columns
+--      where table_schema='public' and table_name='user_ministries';
+--
+-- 2. Grants — settles whether the table-level grant assumed above actually exists,
+--    and confirms no stray column-level grant was left behind:
+--    select grantee, privilege_type from information_schema.role_table_grants
+--      where table_schema='public' and table_name='user_ministries';
+--    select grantee, column_name, privilege_type from information_schema.column_privileges
+--      where table_schema='public' and table_name='user_ministries';
+--
+-- 3. RLS is actually ENABLED (highest-consequence unverified assumption — default
+--    GRANT ALL with RLS off would mean every authenticated user reads and writes every
+--    other user's memberships):
+--    select relrowsecurity, relforcerowsecurity from pg_class
+--      where oid='public.user_ministries'::regclass;
+--
+-- 4. Policy set is still exactly one SELECT policy:
+--    select policyname, cmd, qual from pg_policies
+--      where schemaname='public' and tablename='user_ministries';

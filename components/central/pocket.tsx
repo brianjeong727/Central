@@ -85,15 +85,17 @@ export function PocketRowCard({ children, style }: { children: ReactNode; style?
 }
 
 // The universal mobile list row: optional leading chip, 15/600 title (+ inline
-// accessory icons), 13px muted one-line sub, and a right column that is either
-// meta text, a time-over-unread-dot stack, or a drill-in chevron.
+// accessory icons), 13px muted one-line sub, an optional 11px --faint third line
+// (`stamp` — a recency/status footnote such as "Last opened July 12"), and a right
+// column that is either meta text, a time-over-unread-dot stack, or a drill-in chevron.
 export function PocketRow({
-  leading, title, titleAccessory, sub, time, showDot = false, meta, chevron = false, isLast = false, onClick,
+  leading, title, titleAccessory, sub, stamp, time, showDot = false, meta, chevron = false, isLast = false, onClick,
 }: {
   leading?: ReactNode
   title: string
   titleAccessory?: ReactNode
   sub?: string
+  stamp?: string
   time?: string
   showDot?: boolean
   meta?: string
@@ -118,6 +120,9 @@ export function PocketRow({
         </span>
         {sub && (
           <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>
+        )}
+        {stamp && (
+          <span style={{ display: "block", fontSize: 11, color: "var(--faint)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{stamp}</span>
         )}
       </span>
       {(time || showDot) ? (
