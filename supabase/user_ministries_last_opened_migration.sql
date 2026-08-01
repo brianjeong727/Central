@@ -1,6 +1,16 @@
 -- user_ministries.last_opened_at — powers the /pick-ministry "LAST OPENED" ordering
 -- and the per-row "Last opened <date>" stamp on the phone-width switcher.
 --
+-- STATUS: APPLIED 2026-08-01 via Supabase MCP (migration `user_ministries_last_opened_at`).
+-- Verified post-apply: column present as nullable timestamptz; policy set still exactly one
+-- (`user_ministries_select_own`, FOR SELECT, no column list); table-level GRANT ALL covers the
+-- new column identically to every pre-existing one; no new index. rls-reviewer AFTER pass —
+-- all probes green, no blocks/warns: own-row read allowed, cross-user read returns 0 rows,
+-- client UPDATE/DELETE affect 0 rows, client INSERT rejected 42501, anon sees 0 rows, and the
+-- app's stamp shape affects exactly 1 row. The same UPDATE without `.eq("user_id", …)` was
+-- measured at 12 rows — the blast radius that filter prevents. security advisors: no finding
+-- names user_ministries.
+--
 -- Nullable by design: every pre-existing membership row has never been "opened" under
 -- this instrumentation, and a NULL sorts last / renders no stamp. Deliberately NOT
 -- backfilled from created_at — that would print a join date under a "Last opened" label,
