@@ -107,6 +107,32 @@ export function sandbox() {
     /** Resolve the sandbox member's auth user id (cached). */
     memberUserId: () => memberUserId(db),
 
+    /** This lane's ministry name — "E2E Sandbox" on lane 1, "E2E Sandbox 2" on lane 2.
+     *
+     *  Specs that assert on displayed identity must derive it rather than hardcode it:
+     *  a literal `getByText("E2E Sandbox", { exact: true })` passes on lane 1 and fails
+     *  on lane 2 for a reason that has nothing to do with the code under test. Deriving
+     *  keeps the coverage in BOTH lanes, which a skip would throw away. */
+    async ministryName(): Promise<string> {
+      const { data, error } = await db.from("ministries").select("name").eq("id", ministryId).single()
+      if (error) throw error
+      return (data as { name: string }).name
+    },
+
+    /** This lane's admin display name — "E2E Admin" / "E2E Admin 2". See ministryName. */
+    async adminName(): Promise<string> {
+      const { data, error } = await db.from("profiles").select("name").eq("id", await adminUserId(db)).single()
+      if (error) throw error
+      return (data as { name: string }).name
+    },
+
+    /** This lane's member display name — "E2E Member" / "E2E Member 2". See ministryName. */
+    async memberName(): Promise<string> {
+      const { data, error } = await db.from("profiles").select("name").eq("id", await memberUserId(db)).single()
+      if (error) throw error
+      return (data as { name: string }).name
+    },
+
     /** Does a fixture row exist in THIS lane?
      *
      *  Lane 2 (slot s2 / port 3002) is seeded with the tenant and two users ONLY —
