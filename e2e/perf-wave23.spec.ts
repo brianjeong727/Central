@@ -82,11 +82,13 @@ test.describe("Wave2+3 — AUTH/MIDDLEWARE (1440x900)", () => {
 
   test("real login (admin AND member) lands on /home — proxy.ts embed regression fixed", async ({ page }) => {
     await login(page, process.env.E2E_ADMIN_EMAIL!)
-    await expect(page.getByText(/Good (morning|afternoon|evening)/).filter({ visible: true })).toBeVisible()
+    // Includes `night`: home-tab.tsx greets "Good night, " for hour >= 21, so a regex
+    // of morning|afternoon|evening made this spec fail every run after 9pm local.
+    await expect(page.getByText(/Good (morning|afternoon|evening|night)/).filter({ visible: true })).toBeVisible()
 
     await page.context().clearCookies()
     await login(page, process.env.E2E_MEMBER_EMAIL!)
-    await expect(page.getByText(/Good (morning|afternoon|evening)/).filter({ visible: true })).toBeVisible()
+    await expect(page.getByText(/Good (morning|afternoon|evening|night)/).filter({ visible: true })).toBeVisible()
   })
 
   test("central-mw cache-hit cookie is set after a settled login; second nav is fast-path; a tampered cookie is treated as a miss and still resolves correctly (no error, no wrong route)", async ({ page, context }) => {
@@ -126,7 +128,7 @@ test.describe("Wave2+3 — AUTH/MIDDLEWARE (1440x900)", () => {
     await context.addCookies([{ name: "central-mw", value: cookieVal, domain: "localhost", path: "/", httpOnly: true, secure: false }])
     await page.goto("/home", { waitUntil: "domcontentloaded" })
     await expect(page).toHaveURL(/\/home/)
-    await expect(page.getByText(/Good (morning|afternoon|evening)/).filter({ visible: true })).toBeVisible()
+    await expect(page.getByText(/Good (morning|afternoon|evening|night)/).filter({ visible: true })).toBeVisible()
   })
 })
 
