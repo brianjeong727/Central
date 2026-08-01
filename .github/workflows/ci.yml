@@ -20,11 +20,25 @@
 name: CI
 
 on:
+  # NO `branches:` filter here, deliberately — do not re-add one.
+  #
+  # A base-branch filter makes CI silently skip STACKED PRs. `pull_request:
+  # branches: [main]` only matches PRs whose BASE is main, so a PR opened against
+  # another feature branch (the normal shape of a stack: #250 -> main, #251 -> #250)
+  # runs ZERO checks for its entire open life and shows a clean, empty check list —
+  # indistinguishable from passing. #251 shipped that way and only got CI after it
+  # was retargeted to main. Every stack hits this.
+  #
+  # Unfiltered, CI runs on a PR to any base. `push:` stays pinned to main so
+  # branch pushes don't double-run alongside their own PR.
   pull_request:
-    branches: [main]
   push:
     branches: [main]
 
+# One in-flight run per PR (and one for main). For a pull_request event github.ref
+# is refs/pull/<n>/merge — distinct per PR — so stacked PRs never cancel each other,
+# including when a push to the lower branch synchronizes BOTH its own PR and the one
+# stacked on top of it. Pushing to main uses refs/heads/main, its own group.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
