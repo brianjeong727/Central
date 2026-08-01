@@ -63,3 +63,11 @@ APPSTORE_SUBMISSION_STEPS.html
 # load-test harness artifacts (tokens are credentials, logs are bulky)
 scripts/loadtest/.tokens.json
 scripts/loadtest/logs/
+
+# package-lock.json is LOCAL-ONLY. pnpm is authoritative: Vercel's build log reads
+# "Detected pnpm-lock.yaml … Using pnpm@10.x" and never looks at package-lock.json,
+# and verify.sh validates only pnpm-lock.yaml. Tracking both meant a second lockfile
+# that silently drifted (it was stale by several commits when this was found).
+# session.sh still runs `npm install --legacy-peer-deps` locally, which regenerates
+# this file — that's fine, it just must never be committed again.
+package-lock.json
