@@ -46,7 +46,7 @@ The rule-check tiers decide whether something reaches Brian:
 
 | Doc | Rule |
 |---|---|
-| `lessons.md` | Auto-write, never ask. Append-only learning log (GC'd via /lessons-gc). |
+| `tasks/lessons/inbox/*.md` | Auto-write, never ask. One file per lesson, `<YYYY-MM-DD>-<kebab-slug>.md`. **Never append to `tasks/lessons.md` directly** (CLAUDE.md #24 — EOF appends conflict with every parallel session); `/lessons-gc` folds the inbox into the canon. |
 | `web_design_system.md` / `mobile_design_system.md` / `contract-card.md` | Gated — UNLESS the task carried `/designchange` (then the flag pre-authorizes: propagate + auto-update, no ask; keep card and doc in lockstep). Without the flag, work that would change the system → `block` to Brian. |
 | `CLAUDE.md` | Ask-then-write. PROPOSE the exact text and WAIT for Brian's explicit approval **in that task**; once approved verbatim, you write the file yourself. A standing preference or an earlier task's approval never counts. If the applied text must differ from what was approved, re-ask first. |
 | `permissions.md` / `MINISTRY_CONTEXT.md` | Propose-then-approve; Brian applies it himself. The `protect-docs` hook hard-blocks direct edits — present the exact text in the handoff. |

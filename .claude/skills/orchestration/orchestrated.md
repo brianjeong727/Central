@@ -105,6 +105,6 @@ When the exit condition is met, lead with ONE human sentence (what got done, in 
 2. **The committed diff** — "committed locally on <branch>, awaiting your push approval." He reviews via `git show` / `/diff`.
 3. **Before/after screenshots** (visual changes only) — from the harness run's artifacts (`test-results/`), at desktop (1440) and mobile (390) viewports, plus the Tester's delta list and any unrequested-change flags. These are FOR BRIAN'S EYES to speed his review — never a self-certification that it "looks right."
 4. **Interpretation calls** — a short list of anything you had to interpret.
-5. **Proposed doc edits** — exact text for any CLAUDE.md / permissions.md / MINISTRY_CONTEXT.md change (per the core's doc-gate table), and a note of any lessons.md entries auto-written.
+5. **Proposed doc edits** — exact text for any CLAUDE.md / permissions.md / MINISTRY_CONTEXT.md change (per the core's doc-gate table), and a note of any inbox lesson files auto-written (`tasks/lessons/inbox/*.md`).
 
 Close with the push decision (core, "The push decision").
