@@ -94,8 +94,9 @@ fi
 
 # --- ensure deps + env (first-run install; refresh when package.json changed since last install) ---
 # Stamp lives inside node_modules so wiping deps also wipes the stamp. Hash package.json
-# (not a lockfile — this repo carries both npm and pnpm lockfiles and pnpm is authoritative,
-# so package-lock.json can be stale while package.json is the true dep-change signal).
+# (not a lockfile — pnpm-lock.yaml is the authoritative one Vercel installs from, and
+# package-lock.json is now gitignored/local-only because it silently drifted while
+# tracked; package.json stays the true dep-change signal either way).
 pkg_hash="$(git -C "$dir" hash-object package.json)"
 deps_stamp="$dir/node_modules/.package-json-hash"
 if [ ! -e "$dir/node_modules" ]; then
