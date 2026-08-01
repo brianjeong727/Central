@@ -122,6 +122,8 @@ only, never claimed. Full guide: `scripts/SESSIONS.md`.
     - **Scheduling is per-ministry too** — no hardcoded zone in cron, push dispatch, templates, or rollover. `run_sheet_tick()` loops ministries in their own local window (`supabase/run_sheet_tick_per_ministry_timezone.sql`).
     - **Exception:** chat message timestamps (`formatMessageTime`) stay device-local by design — that is correct for messaging and is not event time.
 
+24. **Lessons are written as inbox files, never appended to `lessons.md`:** a new lesson goes to `tasks/lessons/inbox/<YYYY-MM-DD>-<kebab-slug>.md`, one lesson per file. Appending to `tasks/lessons.md` conflicts with every other parallel session at EOF — guaranteed, not occasional, because the slot model runs sessions concurrently. Only `/lessons-gc` edits `lessons.md`, folding the inbox in as an approved batch.
+
 ## Database Migrations
 Never create migration files in the `supabase/` folder and ask the user to run them manually. The Supabase MCP is connected — always run migrations directly against the database using the MCP. When a schema change is needed, execute it immediately as part of the task. After running, verify the tables and policies were created correctly by querying the database before moving on.
 
@@ -182,9 +184,13 @@ The global skills have rules that conflict with Central's **intentional** design
 
 # LAYER 3 — LESSONS
 
-> Things learned the hard way. The lessons themselves live in `tasks/lessons.md` — this is the pointer and the boundary definition.
+> Things learned the hard way. The lessons themselves live in `tasks/lessons.md` (the curated canon) and `tasks/lessons/inbox/` (not yet folded in) — this is the pointer and the boundary definition.
 
-`tasks/lessons.md` holds specifics discovered from a mistake or a non-obvious surprise: things a fresh Claude would plausibly get wrong again. Examples currently captured there include URL state persistence patterns (§URL State Persistence). A lesson stays here while it's narrow or situational; once it proves general and load-bearing, propose promoting it into a Layer 2 Critical Convention (the high-frequency, frequently-violated ones live in Layer 2 even if they originated as lessons — e.g. the atomic-replaceParam rule and the "use server" async-only rule are kept as rules above because following them matters more than taxonomic purity).
+`tasks/lessons.md` holds specifics discovered from a mistake or a non-obvious surprise: things a fresh Claude would plausibly get wrong again. Examples currently captured there include URL state persistence patterns (§URL State Persistence). **Read it AND `tasks/lessons/inbox/` at session start** — the inbox holds entries not yet folded into the canon.
+
+**Never append to `tasks/lessons.md` directly** (Convention #24). Every writer appends at EOF, so two parallel sessions conflict on the same final line every time — a content-free conflict whose resolution is always "keep both." Write a new lesson as its own file: `tasks/lessons/inbox/<YYYY-MM-DD>-<kebab-slug>.md`, one lesson per file, same `## Heading (date)` + body format. Separate files are the only shape git merges without a human. `/lessons-gc` folds the inbox into the canon and clears it — that batch is the ONLY thing that edits `lessons.md`.
+
+A lesson stays here while it's narrow or situational; once it proves general and load-bearing, propose promoting it into a Layer 2 Critical Convention (the high-frequency, frequently-violated ones live in Layer 2 even if they originated as lessons — e.g. the atomic-replaceParam rule and the "use server" async-only rule are kept as rules above because following them matters more than taxonomic purity).
 
 ---
 

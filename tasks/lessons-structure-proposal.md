@@ -1,6 +1,8 @@
 # Proposal — stop `tasks/lessons.md` conflicting on every parallel session
 
-**Status: PROPOSAL. Nothing implemented.** Raised 2026-07-31 after the file conflicted twice in one evening's merges. Brian decides; do not restructure the file without his approval, and the CLAUDE.md rule in Option A is ask-then-write.
+**Status: APPROVED AND IMPLEMENTED (Option A), 2026-07-31.** Kept as the record of what was decided and why, not as a live question. Brian approved the exact text in-task, so the CLAUDE.md Layer 3 replacement and Convention #24 were both written as proposed.
+
+Shipped: `tasks/lessons/inbox/` with a README carrying the format + rules; CLAUDE.md Layer 3 pointer replaced and Convention #24 added; `/lessons-gc` gained a **Phase 0 — Fold the inbox** step and is now declared the only editor of `lessons.md`; the orchestration doc-gate table and handoff line retargeted to the inbox. Existing entries did not move, so all 20 citations of specific lessons stay valid.
 
 ## The problem
 
