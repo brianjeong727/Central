@@ -10,10 +10,13 @@
 //   node --env-file=.env.local scripts/seed-ccsf-events.mjs --ministry-id <uuid> --team "CCSF BOARD"
 //
 // Idempotent: re-running deletes and re-creates exactly the fixture events it
-// owns (matched by title within the target board team) — nothing else. NOTE the
-// title match is season-agnostic: a season rolled forward from these fixtures
-// ("Start next season") carries the same titles and IS therefore wiped too.
-// Re-press "Start next season" afterwards to regenerate it.
+// owns — matched by title within the target board team AND bounded to the
+// 2025–26 window this fixture owns (SEASON_FROM/SEASON_TO, derived from
+// HISTORY_DATES). The title match alone is season-agnostic, so the date bound is
+// what stops it: a season rolled forward by "Start next season" carries the SAME
+// titles, and an unbounded wipe destroys that live season's real work. It did
+// exactly that to Central's 2026–27 board on 2026-07-31. Anything outside the
+// window is reported as LEFT ALONE and never touched.
 //
 // SANDBOXES ONLY: the target ministry is checked against SEEDABLE_MINISTRY_IDS
 // below — an explicit id allowlist, never a name match — so this can never
@@ -395,6 +398,23 @@ function toHistory(ev) {
   return shifted
 }
 
+// The window this fixture OWNS, derived from HISTORY_DATES so it can never drift
+// out of sync with the season actually seeded below. The re-seed wipe is bounded
+// to this window: the fixture titles are season-agnostic, and a season rolled
+// forward by "Start next season" carries the SAME titles, so an unbounded
+// title-only delete reaches into the live season and destroys real board work.
+// That is not hypothetical — it wiped Central's live 2026–27 season on
+// 2026-07-31 (see tasks/lessons/inbox/2026-08-01-seed-wipe-crossed-seasons.md).
+// Padded a week each side to absorb timezone offsets on the timestamptz compare;
+// the next season starts ~4 months after this window closes, so the pad is safe.
+const SEASON_PAD_DAYS = 7
+const HISTORY_YMDS = Object.values(HISTORY_DATES)
+  .filter(Boolean)
+  .flatMap((h) => [h.date, h.endDate].filter(Boolean))
+  .sort()
+const SEASON_FROM = addDays(HISTORY_YMDS[0], -SEASON_PAD_DAYS)
+const SEASON_TO = addDays(HISTORY_YMDS[HISTORY_YMDS.length - 1], SEASON_PAD_DAYS)
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 const log = (...a) => console.log(...a)
 
@@ -551,9 +571,12 @@ if (oldTpls?.length) {
   await db.from("event_templates").delete().in("id", tplIds)
   log(`Cleared ${tplIds.length} previously-seeded shelf templates`)
 }
+// Title match ALONE is season-agnostic and would delete live rolled-forward
+// seasons — always bounded to the window this fixture owns. See SEASON_FROM.
 const { data: oldEvents } = await db
-  .from("calendar_events").select("id, parent_event_id")
+  .from("calendar_events").select("id, parent_event_id, title, start_date")
   .eq("ministry_id", ministryId).eq("team_id", teamId).in("title", FIXTURE_TITLES)
+  .gte("start_date", SEASON_FROM).lte("start_date", SEASON_TO)
 if (oldEvents?.length) {
   const ids = oldEvents.map((e) => e.id)
   const { data: oldPlans } = await db.from("event_plans").select("id").in("calendar_event_id", ids)
@@ -569,7 +592,18 @@ if (oldEvents?.length) {
   if (children.length) await db.from("calendar_events").delete().in("id", children)
   const parents = oldEvents.filter((e) => !e.parent_event_id).map((e) => e.id)
   if (parents.length) await db.from("calendar_events").delete().in("id", parents)
-  log(`Cleared ${ids.length} previously-seeded events`)
+  log(`Cleared ${ids.length} previously-seeded events (window ${SEASON_FROM} → ${SEASON_TO})`)
+}
+
+// Say out loud what the bound PROTECTED. A silent wipe is what made the
+// 2026-07-31 data loss invisible until a human noticed the season was empty.
+const { data: keptEvents } = await db
+  .from("calendar_events").select("title, start_date")
+  .eq("ministry_id", ministryId).eq("team_id", teamId).in("title", FIXTURE_TITLES)
+  .or(`start_date.lt.${SEASON_FROM},start_date.gt.${SEASON_TO}`)
+if (keptEvents?.length) {
+  log(`LEFT ALONE: ${keptEvents.length} same-title events outside this fixture's season — NOT touched:`)
+  for (const e of keptEvents) log(`   ${e.start_date?.slice(0, 10)}  ${e.title}`)
 }
 
 // 4) Seed the 2025–26 HISTORY season — completed events with recurring flags.
