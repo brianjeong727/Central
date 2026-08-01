@@ -22,7 +22,8 @@ const ANN_PREFIX = `${E2E_PREFIX}push-test-ann `
 test.describe.serial("Web push v1", () => {
   let adminId: string
   let memberId: string
-  const dispatchUrl = "http://localhost:3001/api/push/dispatch"
+  // Slot-aware — see push-apns.spec.ts for why this must not be hardcoded to 3001.
+  const dispatchUrl = `http://localhost:${process.env.E2E_PORT ?? 3001}/api/push/dispatch`
 
   test.beforeAll(async () => {
     const sb = sandbox()
