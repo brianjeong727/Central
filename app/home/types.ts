@@ -574,6 +574,14 @@ export interface CalendarEvent {
   created_by: string
   /** The traditions flag — "Start next season" copies recurring events forward. */
   recurring?: boolean
+  /**
+   * Owning team. Load-bearing for WRITES, not just display: `calendar_events_insert`
+   * / `_update` gate a non-admin `can_plan_events` planner on
+   * `team_members.team_id = calendar_events.team_id`, so a null here makes the row
+   * uneditable (and uncreatable) by that persona. Sub-events therefore inherit
+   * their parent's team — see `SubEventsTab`'s AddEventModal in plan-tab.tsx.
+   */
+  team_id?: string | null
 }
 
 export interface EventPlan {
