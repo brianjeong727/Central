@@ -12,6 +12,13 @@ import {
 } from "@/app/actions/authz"
 import { STAFF_ROLES, isStaffRole } from "@/lib/roles"
 
+// Archived chats are STASH — replaced, never resurrected (a recurring room like
+// "Welcome Week Leads" gets a fresh chat each cycle; the old one keeps history).
+// Every name/link dedup lookup must therefore exclude archived rows, or creation
+// paths silently converge on a stashed read-only room. `archived` is nullable
+// (NULL = active), so the filter must admit NULL as well as false.
+const NOT_ARCHIVED = "archived.is.null,archived.eq.false"
+
 // ── ensureMinistryChats ───────────────────────────────────────────────────────
 // Creates only the central church chat (e.g. "Central Chat").
 // Class-year chats are created on-demand when members join.
@@ -39,6 +46,7 @@ export async function ensureMinistryChats(
     .select("id, name")
     .eq("ministry_id", ministryId)
     .eq("is_central_chat", true)
+    .or(NOT_ARCHIVED)
     .maybeSingle()
 
   const chatMap = new Map<string, string>()
@@ -106,6 +114,7 @@ export async function autoAddUserToChats(
     .select("id, name, is_central_chat")
     .eq("ministry_id", ministryId)
     .eq("type", "church")
+    .or(NOT_ARCHIVED)
   const groupRows = (churchGroups ?? []) as { id: string; name: string; is_central_chat: boolean }[]
 
   // Central chat — always enrolled unless the automation is off. Guaranteed to
@@ -166,7 +175,7 @@ export async function retroactivelyApplyToggle(
 
     // Identify the central chat by the flag, not by name (rename-safe).
     const { data: group } = await admin
-      .from("groups").select("id").eq("ministry_id", ministryId).eq("is_central_chat", true).maybeSingle()
+      .from("groups").select("id").eq("ministry_id", ministryId).eq("is_central_chat", true).or(NOT_ARCHIVED).maybeSingle()
     if (!group) return { added: 0 }
 
     const ids = (profiles ?? []).map((p: { id: string }) => p.id)
@@ -199,7 +208,7 @@ export async function retroactivelyApplyToggle(
     const classNames = [...nameToYear.keys()]
 
     const { data: existingChats } = await admin
-      .from("groups").select("id, name").eq("ministry_id", ministryId).in("name", classNames)
+      .from("groups").select("id, name").eq("ministry_id", ministryId).in("name", classNames).or(NOT_ARCHIVED)
     const nameToChatId = new Map<string, string>(
       ((existingChats ?? []) as { id: string; name: string }[]).map((g) => [g.name, g.id])
     )
@@ -236,7 +245,7 @@ export async function retroactivelyApplyToggle(
 
     const staffChatName = `${ministry.name} Staff`
     let { data: chat } = await admin
-      .from("groups").select("id").eq("ministry_id", ministryId).eq("name", staffChatName).maybeSingle()
+      .from("groups").select("id").eq("ministry_id", ministryId).eq("name", staffChatName).or(NOT_ARCHIVED).maybeSingle()
     if (!chat) {
       const { data: newChat } = await admin
         .from("groups")
@@ -292,7 +301,7 @@ export async function runAnnualClassMaintenance(ministryId: string): Promise<{
     const incomingYear = currentYear + 4
     const incomingName = `Class of ${incomingYear}`
     const { data: existingIncoming } = await admin
-      .from("groups").select("id").eq("ministry_id", ministryId).eq("name", incomingName).maybeSingle()
+      .from("groups").select("id").eq("ministry_id", ministryId).eq("name", incomingName).or(NOT_ARCHIVED).maybeSingle()
     if (!existingIncoming) {
       await admin.from("groups").insert({
         name: incomingName, type: "church", category: "general",
@@ -305,7 +314,7 @@ export async function runAnnualClassMaintenance(ministryId: string): Promise<{
   // Graduate current class: convert "Class of {currentYear}" from church → my
   const graduatingName = `Class of ${currentYear}`
   const { data: graduatingChat } = await admin
-    .from("groups").select("id, type").eq("ministry_id", ministryId).eq("name", graduatingName).maybeSingle()
+    .from("groups").select("id, type").eq("ministry_id", ministryId).eq("name", graduatingName).or(NOT_ARCHIVED).maybeSingle()
   if (graduatingChat && graduatingChat.type === "church") {
     await admin.from("groups").update({ type: "my" }).eq("id", graduatingChat.id)
     graduated = graduatingName
@@ -380,6 +389,7 @@ export async function createPraiseTeamChatAction(
     .select("id")
     .eq("ministry_id", ministryId)
     .eq("name", chatName)
+    .or(NOT_ARCHIVED)
     .maybeSingle()
 
   let groupId: string
@@ -542,7 +552,7 @@ export async function confirmSmallGroupChatsAction(
   // Phase 2: resolve all existing chats by name in ONE read.
   const allNames = [...new Set(specs.map((s) => s.name))]
   const { data: existingGroups } = await admin
-    .from("groups").select("id, name").eq("ministry_id", ministryId).in("name", allNames)
+    .from("groups").select("id, name").eq("ministry_id", ministryId).in("name", allNames).or(NOT_ARCHIVED)
   const nameToId = new Map<string, string>(
     ((existingGroups ?? []) as { id: string; name: string }[]).map((g) => [g.name, g.id])
   )
@@ -633,6 +643,7 @@ export async function respondToGradCheck(
         .eq("ministry_id", profile.ministry_id)
         .eq("type", "church")
         .in("name", ["Senior Chat", "Young Adult Chat"])
+        .or(NOT_ARCHIVED)
 
       const seniorChat = (chats ?? []).find((g: { name: string }) => g.name === "Senior Chat")
       const youngAdultChat = (chats ?? []).find((g: { name: string }) => g.name === "Young Adult Chat")
@@ -941,6 +952,7 @@ export async function createTeamChatAction(
     .select("id")
     .eq("ministry_id", ministryId)
     .eq("linked_team_id", teamId)
+    .or(NOT_ARCHIVED)
     .order("created_at", { ascending: true })
     .limit(1)
   let existing = linked?.[0] ?? null
@@ -950,6 +962,7 @@ export async function createTeamChatAction(
       .select("id")
       .eq("ministry_id", ministryId)
       .eq("name", chatName)
+      .or(NOT_ARCHIVED)
       .maybeSingle()
     existing = byName ?? null
   }
@@ -1156,6 +1169,7 @@ async function findLinkedTeamChat(
     .select("id")
     .eq("ministry_id", ministryId)
     .eq("linked_team_id", teamId)
+    .or(NOT_ARCHIVED)
     .order("created_at", { ascending: true })
     .limit(1)
   return data?.[0]?.id ?? null
