@@ -42,6 +42,9 @@ export interface RowAug {
   badge: TriggerKind | null
   badgeCopy: string
   variant: "now" | "risk" | null
+  // True for ANY incomplete, past-due task (assigned or not). Drives the loud
+  // overdue treatment on the row — independent of the assignment-gated nudge badge.
+  overdue: boolean
   // Reassign-by-load control, anchored INTO the risk row's meta cluster (not a
   // detached button below the card). Present only on risk rows.
   reassign?: ReactNode
@@ -445,7 +448,7 @@ function railCard(children: ReactNode, key?: string) {
 
 // Readiness — mirrors the overview Readiness render (plan-tab 8419–8437): 8px dot,
 // 14px/500 label, canonical 5-seg bar (plum / success at 100%), "X of Y done" + pct.
-function ReadinessCard({ done, total }: { done: number; total: number }) {
+function ReadinessCard({ done, total, overdue }: { done: number; total: number; overdue: number }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
   const filledSegs = total > 0 ? Math.round((done / total) * 5) : 0
   const readiness =
@@ -480,6 +483,12 @@ function ReadinessCard({ done, total }: { done: number; total: number }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 12 }}>
           <span style={{ fontSize: 12, color: "var(--body)" }}>{done} of {total} done</span>
           <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)" }}>{pct}%</span>
+        </div>
+      )}
+      {overdue > 0 && (
+        <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, background: "color-mix(in srgb, var(--danger) 8%, transparent)", borderRadius: 8, padding: "8px 10px" }}>
+          <span style={{ width: 7, height: 7, borderRadius: 99, background: "var(--danger)", flexShrink: 0 }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--danger)" }}>{overdue} overdue</span>
         </div>
       )}
     </>,
@@ -653,20 +662,25 @@ export function CountdownTab(props: CountdownTabProps) {
 
   const done = tasks.filter((t) => t.completed).length
   const total = tasks.length
+  const overdueCount = tasks.filter((t) => !t.completed && !!t.due_date && t.due_date < todayYMD).length
 
-  // "Now" = the single earliest-due incomplete, non-overdue top-level task.
+  // "Now" = the single earliest-due incomplete top-level task that is NOT overdue
+  // (due today or later). Overdue tasks get the risk treatment instead.
   const nowTaskId = tasks
-    .filter((t) => t.parent_id === null && !t.completed && t.due_date && badgeFor(t, firedIds, todayYMD) !== "overdue")
+    .filter((t) => t.parent_id === null && !t.completed && t.due_date && t.due_date >= todayYMD)
     .sort((a, b) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999"))[0]?.id
 
   const augFor = (task: EventTask): RowAug => {
     const badge = badgeFor(task, firedIds, todayYMD)
-    const variant = badge === "overdue" ? "risk" : task.id === nowTaskId ? "now" : null
+    // Overdue = incomplete + has a due date in the past (PT), regardless of assignee.
+    const overdue = !task.completed && !!task.due_date && task.due_date < todayYMD
+    const variant = overdue ? "risk" : task.id === nowTaskId ? "now" : null
     return {
       countdown: true,
       badge,
       badgeCopy: badge ? badgeCopyFor(task, badge, eventYMD) : "",
       variant,
+      overdue,
       reassign: variant === "risk" && canEdit
         ? <ReassignControl task={task} assigneePool={assigneePool} loadCounts={loadCounts} onReassign={onReassign} />
         : undefined,
@@ -706,6 +720,9 @@ export function CountdownTab(props: CountdownTabProps) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 4px 20px" }}>
           <PocketProgress done={done} total={total} />
           <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{done}/{total} done</span>
+          {overdueCount > 0 && (
+            <span style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", color: "var(--danger)", background: "color-mix(in srgb, var(--danger) 10%, transparent)", borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap" }}>{overdueCount} OVERDUE</span>
+          )}
         </div>
         {firesNext.length > 0 && (
           <div style={{ background: "var(--ivory)", borderRadius: 16, padding: "12px 16px", margin: "0 0 20px" }}>
@@ -738,7 +755,7 @@ export function CountdownTab(props: CountdownTabProps) {
       <div style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "0 0 18px" }}>
         Day-of timing lives in the{" "}
         <button onClick={onGoRunSheet} style={{ background: "none", border: "none", padding: 0, color: "var(--plum)", cursor: "pointer", fontSize: 12.5, fontWeight: 500 }}>
-          Showtime
+          Run of Show
         </button>{" "}
         tab. Nudges fire automatically — this is the plan.
       </div>
@@ -748,7 +765,7 @@ export function CountdownTab(props: CountdownTabProps) {
       >
         <section>{timeline}</section>
         <aside style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }} className="max-md:mt-8">
-          <ReadinessCard done={done} total={total} />
+          <ReadinessCard done={done} total={total} overdue={overdueCount} />
           <FiresNextCard queue={firesNext} />
           {teamId && loadCounts && loadCounts.length > 0 && <LoadCard loadCounts={loadCounts} nameOf={nameOf} />}
         </aside>

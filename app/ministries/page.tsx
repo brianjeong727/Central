@@ -12,6 +12,7 @@ import { CentralButton } from "@/components/central/button"
 import { CentralModal } from "@/components/central"
 import { usePostJoinPickers, PostJoinPickerModals, SIZE_LABELS, ModalAction } from "./post-join-pickers"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
+import { BackChevron } from "@/components/central/back-chevron"
 
 const SANS  = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
@@ -566,6 +567,21 @@ function MinistriesContent() {
       {/* ── Mobile (<768px) — Pocket tree; reuses all state/handlers/modals above ── */}
       <div className="md:hidden" style={{ minHeight: "100svh", background: "var(--cream)", fontFamily: SANS, color: "var(--ink)" }}>
         <div className="max-w-[390px] mx-auto w-full" style={{ padding: "calc(env(safe-area-inset-top) + 22px) 24px calc(env(safe-area-inset-bottom) + 40px)" }}>
+
+          {/* Quick exit for anyone who opened "Switch ministry" by mistake — only shown
+              when they have a ministry to return to. Uses the shared BackChevron
+              (Convention #22): muted-ink chrome, never a plum arrow, and it carries the
+              44×44 tap target the raw glyph doesn't. */}
+          {isLoggedIn && myMinistries.length > 0 && (
+            <BackChevron
+              label="Back to home"
+              onClick={() => {
+                if (typeof window !== "undefined" && window.history.length > 1) window.history.back()
+                else window.location.assign("/home")
+              }}
+              style={{ marginBottom: 6 }}
+            />
+          )}
 
           <div style={mono}>{isLoggedIn && myMinistries.length === 0 ? "Almost there" : "Ministries"}</div>
           <h1 style={mTitle}>Choose a ministry</h1>
