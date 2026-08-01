@@ -25,6 +25,7 @@ import { CommandPalette } from "./components/command-palette"
 import { DesktopSidebar, DesktopTopbar, ReceiptsSidebarNav } from "./components/desktop-nav"
 import { BreadcrumbProvider, useBreadcrumbExtra } from "./breadcrumb-context"
 import { MemberProfileProvider } from "./member-profile-context"
+import { MinistryTimezoneProvider } from "./ministry-timezone-context"
 
 // Tabs
 // HomeTab stays eager — it's the default landing tab. Every other tab (and the
@@ -1508,7 +1509,11 @@ function ShellTopbar({ base, baseVisible }: { base: Crumb[]; baseVisible: boolea
 export function HomeApp(props: HomeAppProps) {
   return (
     <SWRConfig value={{ revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 5000 }}>
-      <HomeAppInner {...props} />
+      {/* The ministry's IANA zone for every event surface below (read via
+          useMinistryTimezone) — boot data, no client fetch, no storage. */}
+      <MinistryTimezoneProvider timezone={props.ministryTimezone}>
+        <HomeAppInner {...props} />
+      </MinistryTimezoneProvider>
     </SWRConfig>
   )
 }

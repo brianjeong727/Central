@@ -18,6 +18,8 @@ import { createClient } from "@/lib/supabase"
 import { getCategoryBudgetAllocation } from "@/app/actions/budget-planning"
 import { useNavState } from "../nav-state"
 import { useOpenMemberProfile } from "../member-profile-context"
+import { useMinistryTimezone } from "../ministry-timezone-context"
+import { eventDateColumnsFromInputs, eventDateInputsFromRow, formatInZone, instantToZoned, startOfTodayInstantISO, todayInZone } from "@/lib/tz"
 import { useSubpageCrumbs, useBreadcrumbExtra } from "../breadcrumb-context"
 
 function currentFiscalYear(): string {
@@ -583,7 +585,7 @@ async function fetchCalendarEventsAndPlans([, ministryId, teamScope]: readonly [
   const supabase = createClient()
   let query = supabase
     .from("calendar_events")
-    .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
+    .select("id, title, description, location, start_date, end_date, start_day, end_day, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
     .eq("ministry_id", ministryId)
     .order("start_date", { ascending: true })
   if (teamScope !== "all") {
@@ -613,16 +615,63 @@ function invalidateCalendarEvents(ministryId: string) {
   )
 }
 
+// ── Event date/time display helpers ────────────────────────────────────────────
+// One rule, applied everywhere below: resolve an event to its MINISTRY-zone calendar
+// day ("YYYY-MM-DD") first, then format that day. `start_date`/`end_date` are true
+// INSTANTS (lib/tz.ts), so anything read off them — `getDate()`, `toLocaleDateString`,
+// `iso.slice(0, 10)` — otherwise answers for the viewer's device zone or for UTC.
+
+// The calendar day an event STARTS on. An all-day row carries its day as DATA
+// (`start_day`) and that is the truth — no conversion, no zone. Timed rows project
+// their instant. The projection fallback for an all-day row with no `start_day` is
+// the documented legacy gap (rows written before the columns existed read a day
+// early); it is fixed by the sandbox re-seed, not guessed at here.
+function eventStartYMD(ev: { start_date: string; start_day?: string | null; all_day?: boolean | null }, timeZone: string): string {
+  if (ev.all_day && ev.start_day) return ev.start_day
+  return instantToZoned(ev.start_date, timeZone).ymd
+}
+// The INCLUSIVE last calendar day of an event (same rules as eventStartYMD).
+function eventEndYMD(ev: { end_date: string; end_day?: string | null; all_day?: boolean | null }, timeZone: string): string {
+  if (ev.all_day && ev.end_day) return ev.end_day
+  return instantToZoned(ev.end_date, timeZone).ymd
+}
+// Format a bare "YYYY-MM-DD" calendar day. Noon-anchored so no device offset can
+// drag it across a date boundary — a date has no instant to convert.
+function formatYMD(ymd: string, options: Intl.DateTimeFormatOptions): string {
+  return new Date(`${ymd}T12:00:00`).toLocaleDateString("en-US", options)
+}
+// The day-of-month number of a "YYYY-MM-DD" (no Date, so no zone can shift it).
+function ymdDayNum(ymd: string): number {
+  return Number(ymd.slice(8, 10))
+}
+// Inclusive calendar-day span between two "YYYY-MM-DD" strings (same day → 1).
+// Counted at UTC noon so a DST boundary between the two can never round it to ±1,
+// and taken from YMDs rather than instants so every viewer gets the same number.
+function ymdSpanInclusive(startYMD: string, endYMD: string): number {
+  if (!startYMD || !endYMD) return 1
+  const a = Date.UTC(Number(startYMD.slice(0, 4)), Number(startYMD.slice(5, 7)) - 1, Number(startYMD.slice(8, 10)), 12)
+  const b = Date.UTC(Number(endYMD.slice(0, 4)), Number(endYMD.slice(5, 7)) - 1, Number(endYMD.slice(8, 10)), 12)
+  if (isNaN(a) || isNaN(b)) return 1
+  return Math.max(1, Math.round((b - a) / 86_400_000) + 1)
+}
+// Wall-clock time of an instant on the ministry's clock ("7:00 PM").
+function eventTimeLabel(iso: string, timeZone: string): string {
+  return formatInZone(iso, timeZone, { hour: "numeric", minute: "2-digit" })
+}
 // ── Events agenda helpers ──────────────────────────────────────────────────────
-// Whole-day difference between two dates (calendar days, sign-preserving).
-function daysUntil(start: Date, now: Date): number {
-  const s = new Date(start.getFullYear(), start.getMonth(), start.getDate())
-  const n = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  return Math.round((s.getTime() - n.getTime()) / 86400000)
+// Whole-day difference between two instants, counted on the MINISTRY's calendar
+// (sign-preserving). Both endpoints are projected into `timeZone` first: an 8pm ET
+// event is "today" for the ministry even though it is already tomorrow in UTC, and
+// device-local getters would answer for whichever timezone the viewer happens to
+// be sitting in.
+function daysUntil(start: Date, now: Date, timeZone: string): number {
+  const s = Date.parse(`${instantToZoned(start, timeZone).ymd}T00:00:00Z`)
+  const n = Date.parse(`${instantToZoned(now, timeZone).ymd}T00:00:00Z`)
+  return Math.round((s - n) / 86400000)
 }
 // Humanised countdown for a future event; null for past events (caller shows no pill).
-function countdownLabel(start: Date, now: Date): { label: string; soon: boolean } | null {
-  const days = daysUntil(start, now)
+function countdownLabel(start: Date, now: Date, timeZone: string): { label: string; soon: boolean } | null {
+  const days = daysUntil(start, now, timeZone)
   if (days < 0) return null
   let label: string
   if (days === 0) label = "Today"
@@ -632,8 +681,8 @@ function countdownLabel(start: Date, now: Date): { label: string; soon: boolean 
   return { label, soon: days <= 7 }
 }
 // Humanised "Ended · …" label for a past event (day/week/month granularity).
-function endedAgoLabel(start: Date, now: Date): string {
-  const days = -daysUntil(start, now) // positive = days in the past
+function endedAgoLabel(start: Date, now: Date, timeZone: string): string {
+  const days = -daysUntil(start, now, timeZone) // positive = days in the past
   if (days <= 0) return "Ended · today"
   if (days === 1) return "Ended · yesterday"
   if (days < 7) return `Ended · ${days} days ago`
@@ -674,6 +723,9 @@ function EventsAgendaList({
 }) {
   const now = useMemo(() => new Date(), [])
   const isMobile = useIsMobile()
+  // Every date/time on this agenda is a stored INSTANT rendered on the MINISTRY's
+  // clock — never the viewer's device zone (lib/tz.ts).
+  const timeZone = useMinistryTimezone()
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   // null = user hasn't toggled anything → fall back to the derived default (up-next open).
   const [openSubs, setOpenSubs] = useState<Set<string> | null>(null)
@@ -686,8 +738,8 @@ function EventsAgendaList({
     [events],
   )
   // Split by the same "today" cutoff countdownLabel uses: on/after today = upcoming.
-  const upcoming = useMemo(() => sorted.filter(e => daysUntil(new Date(e.start_date), now) >= 0), [sorted, now])
-  const past = useMemo(() => sorted.filter(e => daysUntil(new Date(e.start_date), now) < 0), [sorted, now])
+  const upcoming = useMemo(() => sorted.filter(e => daysUntil(new Date(e.start_date), now, timeZone) >= 0), [sorted, now, timeZone])
+  const past = useMemo(() => sorted.filter(e => daysUntil(new Date(e.start_date), now, timeZone) < 0), [sorted, now, timeZone])
   const upNextId = upcoming[0]?.id ?? null
   const showPast = showPastOverride ?? (upcoming.length === 0)
   const childrenByParent = useMemo(() => {
@@ -727,20 +779,20 @@ function EventsAgendaList({
   // Timeline spine, hover-reveal delete, and desktop date serifs are dropped;
   // delete folds into the event detail (edit modal) where it already lives.
   if (isMobile) {
-    const dateChip = (d: Date, dim: boolean) => (
+    const dateChip = (ymd: string, dim: boolean) => (
       <span style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, display: "grid", placeItems: "center", background: "var(--line-2)", lineHeight: 1 }}>
-        <span style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, color: dim ? "var(--muted-text)" : "var(--ink)" }}>{d.getDate()}</span>
-        <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", marginTop: 1 }}>{d.toLocaleDateString("en-US", { month: "short" })}</span>
+        <span style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, color: dim ? "var(--muted-text)" : "var(--ink)" }}>{ymdDayNum(ymd)}</span>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", marginTop: 1 }}>{formatYMD(ymd, { month: "short" })}</span>
       </span>
     )
     const agendaRow = (ev: CalendarEvent, dim: boolean, isLast: boolean) => {
-      const d = new Date(ev.start_date)
-      const timeStr = ev.all_day ? "All day" : d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      const ymd = eventStartYMD(ev, timeZone)
+      const timeStr = ev.all_day ? "All day" : eventTimeLabel(ev.start_date, timeZone)
       const sub = ev.location ? `${timeStr} · ${ev.location}` : timeStr
       return (
         <PocketRow
           key={ev.id}
-          leading={dateChip(d, dim)}
+          leading={dateChip(ymd, dim)}
           title={ev.title}
           sub={sub}
           chevron
@@ -818,8 +870,11 @@ function EventsAgendaList({
   let lastMonthKey = ""
   upcoming.forEach((ev, i) => {
     const d = new Date(ev.start_date)
-    const end = new Date(ev.end_date)
-    const monthKey = `${d.getFullYear()}-${d.getMonth()}`
+    // Ministry-zone calendar days — the month header, the date block, and the
+    // multi-day test all group by THIS, not by the device's or UTC's day.
+    const startYMD = eventStartYMD(ev, timeZone)
+    const endYMD = eventEndYMD(ev, timeZone)
+    const monthKey = startYMD.slice(0, 7)
     if (monthKey !== lastMonthKey) {
       lastMonthKey = monthKey
       // First month sits flush under the section header — the padded wrapper already
@@ -828,7 +883,7 @@ function EventsAgendaList({
       upcomingNodes.push(
         <div key={`m-${monthKey}`} style={{ display: "flex", alignItems: "center", gap: "var(--space-6)", margin: `${firstMonth ? "0" : "var(--space-9)"} 0 var(--space-6)` }}>
           <span style={{ ...monoBase, fontSize: 11, letterSpacing: "0.16em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-            {d.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+            {formatYMD(startYMD, { month: "long", year: "numeric" })}
           </span>
           <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
         </div>,
@@ -841,18 +896,20 @@ function EventsAgendaList({
     const isConfirmDelete = deleteConfirmId === ev.id
     const isHovered = hoveredId === ev.id
     const isPlanned = plannedIds.has(ev.id)
-    const cd = countdownLabel(d, now)
+    const cd = countdownLabel(d, now, timeZone)
     const kids = childrenByParent.get(ev.id) ?? []
     const hasKids = kids.length > 0
     const subsOpen = effectiveOpenSubs.has(ev.id)
 
-    const metaDate = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
-    const timeStr = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    const metaDate = formatYMD(startYMD, { weekday: "short", month: "short", day: "numeric" })
+    const timeStr = eventTimeLabel(ev.start_date, timeZone)
     const dtStr = ev.all_day ? metaDate : `${metaDate} · ${timeStr}`
-    const multiDay = !isNaN(end.getTime()) && eventDaySpan(d, end) > 1
-    const rangeStr = multiDay ? eventDateRangeShort(d, end) : dtStr
+    const multiDay = !!endYMD && endYMD !== startYMD
+    const rangeStr = multiDay
+      ? `${formatYMD(startYMD, { month: "short", day: "numeric" })} – ${formatYMD(endYMD, { month: "short", day: "numeric" })}`
+      : dtStr
 
-    const dayNum = daysUntil(d, now)
+    const dayNum = daysUntil(d, now, timeZone)
     const bigNum = dayNum >= 30 ? String(Math.round(dayNum / 30)) : String(Math.max(dayNum, 0))
     const bigUnit = dayNum <= 0 ? "today" : dayNum < 30 ? (dayNum === 1 ? "day away" : "days away") : (Math.round(dayNum / 30) === 1 ? "month away" : "months away")
 
@@ -936,13 +993,13 @@ function EventsAgendaList({
         <div style={{ overflow: "hidden", maxHeight: subsOpen ? 2000 : 0, transition: "max-height 260ms ease" }}>
           <div style={{ paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
             {kids.map(c => {
-              const cd2 = new Date(c.start_date)
-              const cTime = c.all_day ? "All day" : cd2.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              const cYMD = eventStartYMD(c, timeZone)
+              const cTime = c.all_day ? "All day" : eventTimeLabel(c.start_date, timeZone)
               return (
                 <div key={c.id} onClick={e => { e.stopPropagation(); onOpenEvent(c) }} style={{ display: "grid", gridTemplateColumns: "52px 20px minmax(0, 1fr)", cursor: "pointer" }}>
                   <div style={{ textAlign: "center", paddingTop: 4 }}>
-                    <div style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", lineHeight: 1, letterSpacing: "-0.02em" }}>{cd2.getDate()}</div>
-                    <div style={{ ...monoBase, fontSize: 9, color: "var(--muted-text)", marginTop: 2 }}>{cd2.toLocaleDateString("en-US", { month: "short" })}</div>
+                    <div style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)", lineHeight: 1, letterSpacing: "-0.02em" }}>{ymdDayNum(cYMD)}</div>
+                    <div style={{ ...monoBase, fontSize: 9, color: "var(--muted-text)", marginTop: 2 }}>{formatYMD(cYMD, { month: "short" })}</div>
                   </div>
                   <div style={{ position: "relative" }}>
                     <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 2, background: "var(--line-2)", transform: "translateX(-50%)" }} />
@@ -967,9 +1024,9 @@ function EventsAgendaList({
       <div key={ev.id} style={{ display: "grid", gridTemplateColumns: "76px 26px 1fr" }}>
         {/* Date block */}
         <div style={{ textAlign: "center", paddingTop: 20 }}>
-          <div style={{ ...monoBase, fontSize: 11, letterSpacing: "0.12em", color: "var(--muted-text)" }}>{d.toLocaleDateString("en-US", { weekday: "short" })}</div>
-          <div style={{ fontFamily: "var(--serif)", fontSize: 38, fontWeight: 600, letterSpacing: "-0.02em", color: isUpNext ? "var(--plum)" : "var(--ink)", lineHeight: 1 }}>{d.getDate()}</div>
-          <div style={{ ...monoBase, fontSize: 11, color: "var(--muted-text)" }}>{d.toLocaleDateString("en-US", { month: "short" })}</div>
+          <div style={{ ...monoBase, fontSize: 11, letterSpacing: "0.12em", color: "var(--muted-text)" }}>{formatYMD(startYMD, { weekday: "short" })}</div>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 38, fontWeight: 600, letterSpacing: "-0.02em", color: isUpNext ? "var(--plum)" : "var(--ink)", lineHeight: 1 }}>{ymdDayNum(startYMD)}</div>
+          <div style={{ ...monoBase, fontSize: 11, color: "var(--muted-text)" }}>{formatYMD(startYMD, { month: "short" })}</div>
         </div>
         {/* Spine */}
         <div style={{ position: "relative" }}>
@@ -997,8 +1054,9 @@ function EventsAgendaList({
     const isConfirmDelete = deleteConfirmId === ev.id
     const isHovered = hoveredId === ev.id
     const isPlanned = plannedIds.has(ev.id)
-    const metaDate = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
-    const timeStr = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+    const startYMD = eventStartYMD(ev, timeZone)
+    const metaDate = formatYMD(startYMD, { weekday: "short", month: "short", day: "numeric" })
+    const timeStr = eventTimeLabel(ev.start_date, timeZone)
     const dtStr = ev.all_day ? metaDate : `${metaDate} · ${timeStr}`
 
     const body = isConfirmDelete ? renderConfirmBody(ev) : (
@@ -1016,7 +1074,7 @@ function EventsAgendaList({
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.08em", color: "var(--faint)", whiteSpace: "nowrap" }}>{endedAgoLabel(d, now)}</span>
+          <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.08em", color: "var(--faint)", whiteSpace: "nowrap" }}>{endedAgoLabel(d, now, timeZone)}</span>
           {renderPlannedCheck(isPlanned)}
           {renderDeleteBtn(ev.id, isHovered)}
         </div>
@@ -1027,9 +1085,9 @@ function EventsAgendaList({
       <div key={ev.id} style={{ display: "grid", gridTemplateColumns: "76px 26px 1fr" }}>
         {/* Date block — de-emphasised */}
         <div style={{ textAlign: "center", paddingTop: 20 }}>
-          <div style={{ ...monoBase, fontSize: 11, letterSpacing: "0.12em", color: "var(--faint)" }}>{d.toLocaleDateString("en-US", { weekday: "short" })}</div>
-          <div style={{ fontFamily: "var(--serif)", fontSize: 38, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--muted-text)", lineHeight: 1 }}>{d.getDate()}</div>
-          <div style={{ ...monoBase, fontSize: 11, color: "var(--faint)" }}>{d.toLocaleDateString("en-US", { month: "short" })}</div>
+          <div style={{ ...monoBase, fontSize: 11, letterSpacing: "0.12em", color: "var(--faint)" }}>{formatYMD(startYMD, { weekday: "short" })}</div>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 38, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--muted-text)", lineHeight: 1 }}>{ymdDayNum(startYMD)}</div>
+          <div style={{ ...monoBase, fontSize: 11, color: "var(--faint)" }}>{formatYMD(startYMD, { month: "short" })}</div>
         </div>
         {/* Spine — done node */}
         <div style={{ position: "relative" }}>
@@ -1106,6 +1164,7 @@ export function StudentOrgTeamHome({
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
+  const timeZone = useMinistryTimezone()
   // Mobile drill state (ruling B-1): "Hub" is the mobile landing; other values
   // are drill-ins into the existing section surfaces. Desktop ignores teamTab
   // (it uses desktopSection), so the "Hub" default is desktop-safe.
@@ -1140,11 +1199,15 @@ export function StudentOrgTeamHome({
   // Mobile hub up-next hero (ruling B-1): the team's next upcoming event + its
   // plan-task completion, fetched lazily only when an upcoming event exists.
   const nextEvent = useMemo(() => {
-    const now = Date.now()
+    // "Upcoming" runs to the END of an event's last ministry-zone day, so the hub
+    // hero keeps pointing at tonight's event while it is happening (and through a
+    // multi-day retreat) instead of jumping to next week the second it starts.
+    // The rule + why start_date >= now() is wrong: startOfTodayInstantISO (lib/tz.ts).
+    const from = Date.parse(startOfTodayInstantISO(timeZone))
     return calEvents
-      .filter(e => new Date(e.start_date).getTime() >= now)
+      .filter(e => new Date(e.end_date).getTime() >= from)
       .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())[0] ?? null
-  }, [calEvents])
+  }, [calEvents, timeZone])
   const { data: heroProgress } = useSWR(
     nextEvent ? (["hub-hero-progress", nextEvent.id] as const) : null,
     async () => {
@@ -1268,24 +1331,32 @@ export function StudentOrgTeamHome({
   const [showSeasonConfirm, setShowSeasonConfirm] = useState(false)
   const [seasonBusy, setSeasonBusy] = useState(false)
   const [seasonError, setSeasonError] = useState<string | null>(null)
+  // An event's season is decided by the calendar day it falls on IN THE MINISTRY'S
+  // ZONE. `start_date.slice(0, 10)` reads the UTC day instead, so a late-evening
+  // event bucketed a day late — and one on June 30 crossed the academic July
+  // boundary into the wrong season entirely.
+  const seasonOf = useCallback(
+    (e: CalendarEvent) => seasonLabelOf(eventStartYMD(e, timeZone)),
+    [timeZone],
+  )
   const seasons = useMemo(() => {
     const set = new Set<string>()
-    for (const e of calEvents) set.add(seasonLabelOf(e.start_date.slice(0, 10)))
+    for (const e of calEvents) set.add(seasonOf(e))
     return [...set].sort().reverse()
-  }, [calEvents])
-  const activeSeason = seasonFilter && seasons.includes(seasonFilter) ? seasonFilter : (seasons[0] ?? seasonLabelOf(ymdOf(new Date())))
+  }, [calEvents, seasonOf])
+  const activeSeason = seasonFilter && seasons.includes(seasonFilter) ? seasonFilter : (seasons[0] ?? seasonLabelOf(todayInZone(timeZone)))
   const seasonEvents = useMemo(
-    () => calEvents.filter(e => seasonLabelOf(e.start_date.slice(0, 10)) === activeSeason),
-    [calEvents, activeSeason],
+    () => calEvents.filter(e => seasonOf(e) === activeSeason),
+    [calEvents, activeSeason, seasonOf],
   )
   // What "Start next season" will actually copy: the latest season that has
   // recurring top-level events (independent of the active filter chip).
   const rolloverSource = useMemo(() => {
     const rec = calEvents.filter(e => e.recurring && !e.parent_event_id)
     if (rec.length === 0) return { season: null as string | null, count: 0 }
-    const latest = rec.map(e => seasonLabelOf(e.start_date.slice(0, 10))).sort().reverse()[0]
-    return { season: latest, count: rec.filter(e => seasonLabelOf(e.start_date.slice(0, 10)) === latest).length }
-  }, [calEvents])
+    const latest = rec.map(seasonOf).sort().reverse()[0]
+    return { season: latest, count: rec.filter(e => seasonOf(e) === latest).length }
+  }, [calEvents, seasonOf])
 
   // Notify the parent (sidebar events sub-list) of the current list — the
   // SEASON-FILTERED set, so a finished year's events leave the sidebar after
@@ -1319,7 +1390,7 @@ export function StudentOrgTeamHome({
   async function openLinkedEvent(eventId: string) {
     const { data } = await supabase
       .from("calendar_events")
-      .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
+      .select("id, title, description, location, start_date, end_date, start_day, end_day, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
       .eq("id", eventId)
       .maybeSingle()
     if (data) onPlanningEventChange(data as CalendarEvent)
@@ -1500,7 +1571,7 @@ export function StudentOrgTeamHome({
             hero={nextEvent ? {
               eyebrow: "Up next",
               title: nextEvent.title,
-              meta: [monthDay(nextEvent.start_date), heroProgress?.crunch ? `crunch ${monthDay(heroProgress.crunch)}` : null].filter(Boolean).join(" · "),
+              meta: [monthDay(nextEvent.start_date, timeZone), heroProgress?.crunch ? `crunch ${monthDay(heroProgress.crunch, timeZone)}` : null].filter(Boolean).join(" · "),
               progress: heroProgress ? { done: heroProgress.done, total: heroProgress.total } : null,
               onClick: () => onPlanningEventChange(nextEvent),
             } : null}
@@ -2452,9 +2523,14 @@ function WsAddTile({ onClick }: { onClick: () => void }) {
   )
 }
 
-// Month + day for the workspace progress meta ("next Jul 16").
-function monthDay(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+// Month + day for the workspace progress meta ("next Jul 16"). Takes BOTH shapes it
+// is actually called with: a bare "YYYY-MM-DD" from a date column (no zone applies —
+// `new Date("2026-07-16")` parsed it as UTC midnight and printed Jul 15 in Eastern)
+// and a full timestamp from `calendar_events.start_date`, which is a true INSTANT and
+// must be read on the ministry's clock rather than the viewer's.
+function monthDay(dateStr: string, timeZone: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return formatYMD(dateStr, { month: "short", day: "numeric" })
+  return formatInZone(dateStr, timeZone, { month: "short", day: "numeric" })
 }
 
 // Back row shown when a hub row is drilled into on mobile — "← {section}" returns
@@ -2478,6 +2554,7 @@ function MobileWsRow({ letter, iconKey, name, sub, progress, onEnter, onManage }
   onEnter: () => void
   onManage?: () => void
 }) {
+  const timeZone = useMinistryTimezone()
   return (
     <PocketCard>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
@@ -2495,7 +2572,7 @@ function MobileWsRow({ letter, iconKey, name, sub, progress, onEnter, onManage }
             <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
               <PocketProgress done={progress.done} total={progress.total} />
               <span style={{ whiteSpace: "nowrap", fontSize: 12, color: "var(--muted-text)" }}>
-                {progress.total > 0 ? `${progress.done}/${progress.total} · next ${monthDay(progress.nextDate)}` : `next ${monthDay(progress.nextDate)}`}
+                {progress.total > 0 ? `${progress.done}/${progress.total} · next ${monthDay(progress.nextDate, timeZone)}` : `next ${monthDay(progress.nextDate, timeZone)}`}
               </span>
             </div>
           )}
@@ -2526,6 +2603,7 @@ export function PlanTab({
   const setShowCreateTeam = onShowCreateTeam
   const supabase = createClient()
   const isMobile = useIsMobile()
+  const timeZone = useMinistryTimezone()
   const { setParam } = useNavState()
   // Entering/leaving a workspace (picker → team, team → team) lands at the top.
   useScrollResetOn([activeTeamId])
@@ -2763,9 +2841,13 @@ export function PlanTab({
   const pickerTeamIds = activeTeamId ? [] : [...userTeams.map(t => t.teamId), ...govTeams.map(t => t.id)]
   const pickerTeamKey = pickerTeamIds.join(",")
   const { data: teamProgress } = useSWR(
-    pickerTeamIds.length > 0 ? ["ws-progress", ministryId, pickerTeamKey] : null,
+    pickerTeamIds.length > 0 ? ["ws-progress", ministryId, pickerTeamKey, timeZone] : null,
     async (): Promise<Record<string, { done: number; total: number; nextDate: string }>> => {
-      const now = new Date().toISOString()
+      // A workspace's "next event" stays the event that is happening TODAY, for the
+      // whole of its last ministry-zone day — a start_date >= now() cutoff swapped
+      // the card to next week (and blanked its task progress) mid-service.
+      // Rule: startOfTodayInstantISO (lib/tz.ts).
+      const upcomingFrom = startOfTodayInstantISO(timeZone)
       const { data: events } = await supabase
         .from("calendar_events")
         .select("id, team_id, start_date")
@@ -2775,7 +2857,7 @@ export function PlanTab({
         // plan, never a workspace's "next event" — without this a child wins the
         // slot and the card names a night instead of the week that contains it.
         .is("parent_event_id", null)
-        .gte("start_date", now)
+        .gte("end_date", upcomingFrom)
         .order("start_date", { ascending: true })
       // Earliest upcoming event per team.
       const nextByTeam: Record<string, { id: string; start_date: string }> = {}
@@ -3768,8 +3850,15 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
   const [confirm, setConfirm] = useState<ConfirmTarget>(null)
 
   const now = new Date()
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0]
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0]
+  // `worship_weeks.week_date` / `worship_availability.week_date` are DATE columns —
+  // calendar days with no instant and no zone — so this range must be built from
+  // calendar fields, never round-tripped through an instant. `toISOString()`
+  // projects a LOCAL midnight into UTC, which for any viewer AHEAD of UTC slides
+  // BOTH ends back a day (Asia/Tokyo: Jul 1–31 became Jun 30–Jul 30 — the range
+  // dragged in the previous month's last week and dropped the 31st). `ymd()` reads
+  // the local calendar fields straight off the Date, so no offset can shift them.
+  const monthStart = ymd(new Date(now.getFullYear(), now.getMonth(), 1))
+  const monthEnd = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0))
 
   const monoStyle: React.CSSProperties = EYEBROW_STYLE
   async function loadSchedule() {
@@ -5980,7 +6069,7 @@ function getEventConfig(ev: { event_type?: EventType; category?: string }): { la
 // day-agenda list below that updates on tap. Tapping an agenda event opens its
 // plan directly (no modal in between).
 function MonthGridMobile({
-  cells, year, month, monthLabel, isToday, eventsOnDay, onMonthChange, onSelectEvent,
+  cells, year, month, monthLabel, isToday, eventsOnDay, onMonthChange, onSelectEvent, timeZone,
 }: {
   cells: (number | null)[]
   year: number
@@ -5990,6 +6079,9 @@ function MonthGridMobile({
   eventsOnDay: (day: number) => CalendarEvent[]
   onMonthChange: (d: Date) => void
   onSelectEvent: (e: CalendarEvent) => void
+  // Passed down rather than read from context so the grid and its parent can never
+  // disagree about which zone the cells were bucketed in.
+  timeZone: string
 }) {
   const todayInMonth = cells.find(d => d != null && isToday(d)) as number | undefined
   // Selection resets to null when the month changes (the nav buttons clear it),
@@ -6055,8 +6147,7 @@ function MonthGridMobile({
         {agendaEvents.length > 0 ? (
           <PocketRowCard>
             {agendaEvents.map((ev, i) => {
-              const start = new Date(ev.start_date)
-              const timeStr = ev.all_day ? "All day" : start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+              const timeStr = ev.all_day ? "All day" : eventTimeLabel(ev.start_date, timeZone)
               return (
                 <PocketRow
                   key={ev.id}
@@ -6092,6 +6183,7 @@ export function MonthGrid({
   onSelectEvent: (e: CalendarEvent) => void
 }) {
   const isMobileGrid = useIsMobile()
+  const timeZone = useMinistryTimezone()
   const year = currentMonth.getFullYear()
   const month = currentMonth.getMonth()
   const firstDayOfWeek = new Date(year, month, 1).getDay()
@@ -6103,15 +6195,17 @@ export function MonthGrid({
   ]
   while (cells.length % 7 !== 0) cells.push(null)
 
-  const today = new Date()
-  const isToday = (day: number) =>
-    today.getFullYear() === year && today.getMonth() === month && today.getDate() === day
+  // The grid's cells are calendar days, so both "which day is today" and "which day
+  // does this event land on" are answered on the MINISTRY's clock. Device-local
+  // getters put a 9pm ET event on the next cell for a UTC/European viewer, and
+  // flipped "today" at the viewer's midnight rather than the ministry's.
+  const todayYMD = todayInZone(timeZone)
+  const cellYMD = (day: number) => `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+  const isToday = (day: number) => todayYMD === cellYMD(day)
 
   const eventsOnDay = (day: number) => {
-    return events.filter((ev) => {
-      const d = new Date(ev.start_date)
-      return d.getFullYear() === year && d.getMonth() === month && d.getDate() === day
-    })
+    const target = cellYMD(day)
+    return events.filter((ev) => eventStartYMD(ev, timeZone) === target)
   }
 
   const monthLabel = currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })
@@ -6130,6 +6224,7 @@ export function MonthGrid({
         eventsOnDay={eventsOnDay}
         onMonthChange={onMonthChange}
         onSelectEvent={onSelectEvent}
+        timeZone={timeZone}
       />
     )
   }
@@ -6246,10 +6341,13 @@ export function TimelineView({
   events: CalendarEvent[]
   onSelectEvent: (e: CalendarEvent) => void
 }) {
-  // Group by yyyy-MM
+  const timeZone = useMinistryTimezone()
+  // Group by yyyy-MM of the MINISTRY-zone day. `start_date.slice(0, 7)` took the
+  // UTC month straight off the ISO text, so an 8pm-ET event on the last of the
+  // month filed itself under the NEXT month's header.
   const groups: Record<string, CalendarEvent[]> = {}
   for (const ev of events) {
-    const key = ev.start_date.slice(0, 7)
+    const key = eventStartYMD(ev, timeZone).slice(0, 7)
     if (!groups[key]) groups[key] = []
     groups[key].push(ev)
   }
@@ -6277,13 +6375,12 @@ export function TimelineView({
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {groups[key].map((ev) => {
                 const cfg = getEventConfig(ev)
-                const startDate = new Date(ev.start_date)
-                const endDate = new Date(ev.end_date)
+                const dayLong = formatYMD(eventStartYMD(ev, timeZone), { weekday: "long", month: "long", day: "numeric" })
                 const dateStr = ev.all_day
-                  ? startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
-                  : startDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) +
-                    " · " + startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) +
-                    " – " + endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+                  ? dayLong
+                  : dayLong +
+                    " · " + eventTimeLabel(ev.start_date, timeZone) +
+                    " – " + eventTimeLabel(ev.end_date, timeZone)
 
                 return (
                   <button
@@ -6357,16 +6454,11 @@ export function AddEventModal({
 }) {
   const supabase = createClient()
   const isEditing = !!existing
-
-  function parseDateStr(iso: string) {
-    return iso ? iso.split("T")[0] : ""
-  }
-  function parseTimeStr(iso: string) {
-    if (!iso) return "09:00"
-    const t = iso.split("T")[1]
-    if (!t) return "09:00"
-    return t.slice(0, 5)
-  }
+  // The ministry's IANA zone (ministries.timezone, via the shell provider). Every
+  // wall clock in this modal is meant IN this zone; `calendar_events.start_date`
+  // stores the true instant. This modal used to slice the raw UTC text out of the
+  // column — the one read in the app that disagreed with all ~40 display sites.
+  const timeZone = useMinistryTimezone()
 
   // New events open pre-filled from the type's preset defaults — last year's
   // title/venue/times/description, dated to the next occurrence of last year's
@@ -6376,18 +6468,29 @@ export function AddEventModal({
   const initialDefaults = EVENT_TYPE_CONFIGS[initialType].defaults
   const touchedRef = useRef<{ title?: boolean; description?: boolean; location?: boolean; dates?: boolean }>({})
 
+  // Edit mode reads the row back through the SAME layer handleSave writes with
+  // (lib/tz.ts) — the round trip is what makes "what the user typed is what they
+  // see" true. All-day rows read their `start_day`/`end_day` date columns; timed
+  // rows project the stored instant into the ministry zone.
+  const initialInputs = useMemo(
+    () => existing
+      ? eventDateInputsFromRow(existing, timeZone, { startHHMM: initialDefaults.startTime, endHHMM: initialDefaults.endTime })
+      : null,
+    [existing, timeZone, initialDefaults],
+  )
+
   const [eventType, setEventType] = useState<EventType>(initialType)
   const [title, setTitle] = useState(existing?.title ?? initialDefaults.title)
   const [description, setDescription] = useState(existing?.description ?? initialDefaults.description)
   const [location, setLocation] = useState(existing?.location ?? initialDefaults.location)
   const [startDateStr, setStartDateStr] = useState(() =>
-    existing ? parseDateStr(existing.start_date) : nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay))
-  const [startTimeStr, setStartTimeStr] = useState(existing ? parseTimeStr(existing.start_date) : initialDefaults.startTime)
+    initialInputs ? initialInputs.startYMD : nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay))
+  const [startTimeStr, setStartTimeStr] = useState(() => initialInputs ? initialInputs.startHHMM : initialDefaults.startTime)
   const [endDateStr, setEndDateStr] = useState(() =>
-    existing
-      ? parseDateStr(existing.end_date)
+    initialInputs
+      ? initialInputs.endYMD
       : addDaysToYMD(nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay), initialDefaults.durationDays - 1))
-  const [endTimeStr, setEndTimeStr] = useState(existing ? parseTimeStr(existing.end_date) : initialDefaults.endTime)
+  const [endTimeStr, setEndTimeStr] = useState(() => initialInputs ? initialInputs.endHHMM : initialDefaults.endTime)
   const [allDay, setAllDay] = useState(existing?.all_day ?? initialDefaults.allDay)
 
   // Quick presets suggest content as GHOST text (dimmed placeholders) — the
@@ -6453,7 +6556,7 @@ export function AddEventModal({
   // and re-stamped once the event row + its plan window are written, so a second
   // save shifts from the ALREADY-SHIFTED date rather than re-applying the original
   // delta. Guards the two writes that are keyed to the event's own date.
-  const savedStartYMDRef = useRef<string | null>(existing ? parseDateStr(existing.start_date) : null)
+  const savedStartYMDRef = useRef<string | null>(initialInputs ? initialInputs.startYMD : null)
   // Per-task ledger of days a previous save FAILED to apply (task id → days owed).
   // The task shift is N independent row updates with no transaction, so a partial
   // outcome is a normal result. A retry must re-apply the ORIGINAL delta to exactly
@@ -6493,7 +6596,14 @@ export function AddEventModal({
         .eq("ministry_id", ministryId)
         .maybeSingle()
       if (cancelled) return
-      const ev = new Date(existing.start_date)
+      // `plan_start_date` / `crunch_date` are DATE columns DERIVED from the event's
+      // calendar day, so the day they count back from must be the MINISTRY's, not
+      // the viewer's: `new Date(existing.start_date)` + device-local getters seeded
+      // a Tokyo leader's plan window a day off from the one an ET leader saw for the
+      // same event. `eventStartYMD` prefers `start_day` for all-day rows; the noon
+      // anchor keeps the ±month / ±7-day arithmetic clear of any boundary. Same
+      // idiom as the checklist window anchors below.
+      const ev = new Date(`${eventStartYMD(existing, timeZone)}T12:00:00`)
       setPlanStartDate((data?.plan_start_date as string | null) || addMonthsYMD(ev, -1))
       setCrunchDate((data?.crunch_date as string | null) || addDaysYMD(ev, -7))
       setPlanDatesSeeded(true)
@@ -6609,18 +6719,23 @@ export function AddEventModal({
     if (!startDateStr) { setError("Start date is required."); focusInvalidField(startDateInputRef); return }
     if (!endDateStr) { setError("End date is required."); focusInvalidField(endDateInputRef); return }
 
-    const startTs = allDay
-      ? `${startDateStr}T00:00:00+00:00`
-      : `${startDateStr}T${startTimeStr}:00+00:00`
-    const endTs = allDay
-      ? `${endDateStr}T23:59:59+00:00`
-      : `${endDateStr}T${endTimeStr}:00+00:00`
+    // The wall clock the user typed is meant in the MINISTRY's zone; the columns
+    // take true instants. `eventDateColumnsFromInputs` owns both halves: the
+    // instant conversion AND the all-day day columns (`start_day`/`end_day`,
+    // end INCLUSIVE) that make an all-day event a date range rather than a
+    // 00:00→23:59 instant range. All-day rows write BOTH — the day columns are
+    // the truth, the instants stay for sorting, ICS, and run_sheet_tick.
+    const dateCols = eventDateColumnsFromInputs(
+      { allDay, startYMD: startDateStr, startHHMM: startTimeStr, endYMD: endDateStr, endHHMM: endTimeStr },
+      timeZone,
+    )
 
-    const startDate = new Date(startTs)
-    const endDate = new Date(endTs)
-    const startYear = startDate.getFullYear()
-    if (startYear < 2000 || startYear > 2100) { setError("Please enter a valid date."); return }
-    if (endDate < startDate) { setError("End date must be after start date."); return }
+    // Year is read off the typed date string, not off the instant — a
+    // `getFullYear()` on the converted instant answers in the VIEWER's zone and
+    // would reject/accept a Dec-31 or Jan-1 event on the wrong side of midnight.
+    const startYear = Number(startDateStr.slice(0, 4))
+    if (!(startYear >= 2000 && startYear <= 2100)) { setError("Please enter a valid date."); return }
+    if (new Date(dateCols.end_date) < new Date(dateCols.start_date)) { setError("End date must be after start date."); return }
 
     setSaving(true)
     setError(null)
@@ -6635,8 +6750,7 @@ export function AddEventModal({
             title: title.trim(),
             description: description.trim() || null,
             location: location.trim() || null,
-            start_date: startTs,
-            end_date: endTs,
+            ...dateCols,
             all_day: allDay,
             category: eventTypeToCategory(eventType),
             event_type: eventType,
@@ -6644,7 +6758,7 @@ export function AddEventModal({
           })
           .eq("id", existing.id)
           .eq("ministry_id", ministryId)
-          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
+          .select("id, title, description, location, start_date, end_date, start_day, end_day, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
           .single()
         if (upErr || !data) { setError(upErr?.message ?? "Failed to update event."); setSaving(false); return }
         evData = data as CalendarEvent
@@ -6741,8 +6855,7 @@ export function AddEventModal({
             title: title.trim(),
             description: description.trim() || null,
             location: location.trim() || null,
-            start_date: startTs,
-            end_date: endTs,
+            ...dateCols,
             all_day: allDay,
             category: eventTypeToCategory(eventType),
             event_type: eventType,
@@ -6750,7 +6863,7 @@ export function AddEventModal({
             recurring: parentEventId ? false : recurring,
             created_by: userId,
           })
-          .select("id, title, description, location, start_date, end_date, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
+          .select("id, title, description, location, start_date, end_date, start_day, end_day, all_day, category, event_type, parent_event_id, linked_announcement_id, status, created_by, recurring, team_id")
           .single()
 
         if (evErr || !data) { setError(evErr?.message ?? "Failed to create event."); setSaving(false); return }
@@ -6789,7 +6902,9 @@ export function AddEventModal({
             // today (same rule as playbook instantiation) so a late-created
             // event doesn't open with a wall of overdue tasks.
             const eventYMD = startDateStr
-            const todayYMD = ymdOf(new Date())
+            // "Today" is the MINISTRY's today — a leader creating an event from
+            // another timezone must not clamp due dates to their own calendar day.
+            const todayYMD = todayInZone(timeZone)
             const taskRows: { event_plan_id: string; title: string; phase: string; due_date: string | null; sort_order: number; completed: boolean; created_by: string }[] = []
             let sortIdx = 0
             for (const phase of typeCfg.defaultPhases) {
@@ -7076,6 +7191,7 @@ export function MinistryCalendar({
 }) {
   const supabase = createClient()
   const isMobile = useIsMobile()
+  const timeZone = useMinistryTimezone()
   const [view, setView] = useState<"month" | "list">("list")
   // SWR-cached events + planned-event ids (shared key with StudentOrgTeamHome).
   // No local `mutate` — every write from here goes through AddEventModal, which
@@ -7282,7 +7398,7 @@ export function MinistryCalendar({
             events.map((ev) => {
               const cfg = getEventConfig(ev)
               const isPlanned = plannedEventIds.has(ev.id)
-              const dateStr = new Date(ev.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+              const dateStr = formatYMD(eventStartYMD(ev, timeZone), { month: "short", day: "numeric" })
               return (
                 <div key={ev.id} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid var(--body-bg)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
@@ -7434,6 +7550,7 @@ export function EventPlanWorkspace({
 }) {
   const supabase = createClient()
   const { setParam } = useNavState()
+  const timeZone = useMinistryTimezone()
   // Mobile-only Daybreak restyle (ruling B-2): applied via viewport branch so the
   // shared EventPlanWorkspace tree stays byte-identical on desktop.
   const isMobile = useIsMobile()
@@ -7720,7 +7837,31 @@ export function EventPlanWorkspace({
   // dark archive; its content now surfaces as brief candidates in the compile-playbook modal.
 
   const startDate = new Date(calendarEvent.start_date)
-  const endDate = new Date(calendarEvent.end_date)
+  // The event's own calendar day + clock, on the MINISTRY's zone — every facts-grid
+  // date/time below reads these instead of device-local getters.
+  const eventStart = eventStartYMD(calendarEvent, timeZone)
+  const eventEnd = eventEndYMD(calendarEvent, timeZone)
+  // Inclusive calendar-day span on the ministry's clock. Counted from the YMD
+  // strings, not by walking Dates — walking device-local days off an instant
+  // gives a viewer in another zone a different answer.
+  const eventSpanDays = ymdSpanInclusive(eventStart, eventEnd)
+  const isMultiDayEvent = eventSpanDays > 1
+  // Multi-day events lead with the RANGE and carry an explicit day count. The end
+  // date used to be invisible here, which is how a Welcome Week seeded at the
+  // preset's 14 days could sit unnoticed against an 11-day reality.
+  const eventDayLong = isMultiDayEvent
+    ? `${formatYMD(eventStart, { weekday: "long", month: "long", day: "numeric" })} – ${formatYMD(eventEnd, { weekday: "long", month: "long", day: "numeric" })}`
+    : formatYMD(eventStart, { weekday: "long", month: "long", day: "numeric" })
+  // A multi-day event's clock times belong to DIFFERENT days — rendering them as
+  // one bare range reads as nonsense ("5:00 PM – 2:00 PM"), so qualify each end
+  // with its date.
+  const mdTimeLabel = (iso: string, ymd: string) =>
+    `${formatYMD(ymd, { month: "short", day: "numeric" })}, ${eventTimeLabel(iso, timeZone)}`
+  const eventTimeRange = calendarEvent.all_day
+    ? ""
+    : isMultiDayEvent
+      ? `${mdTimeLabel(calendarEvent.start_date, eventStart)} – ${mdTimeLabel(calendarEvent.end_date, eventEnd)}`
+      : `${eventTimeLabel(calendarEvent.start_date, timeZone)} – ${eventTimeLabel(calendarEvent.end_date, timeZone)}`
 
   useEffect(() => {
     async function init() {
@@ -7753,7 +7894,13 @@ export function EventPlanWorkspace({
       let psd = planData.plan_start_date as string | null
       let cd = planData.crunch_date as string | null
       if (!psd) {
-        const eventDate = new Date(calendarEvent.start_date)
+        // Count back from the event's MINISTRY-zone calendar day (`eventStart`,
+        // :7795), not from device-local getters on the instant — these two DATE
+        // columns are the checklist's window anchors, and seeding them off the
+        // viewer's day made the same event produce different phase boundaries
+        // depending on who happened to open it first. Noon-anchored so the
+        // ±month / ±7-day arithmetic can't slip a day.
+        const eventDate = new Date(`${eventStart}T12:00:00`)
         psd = addMonthsYMD(eventDate, -1)
         cd = addDaysYMD(eventDate, -7)
         await supabase.from("event_plans").update({ plan_start_date: psd, crunch_date: cd }).eq("id", planId).eq("ministry_id", ministryId)
@@ -8225,10 +8372,14 @@ export function EventPlanWorkspace({
   }, [isMobile, mobileSection, onMobileCrumbChange])
 
   // ── Date-driven checklist sections ──────────────────────────────────────────
-  // Window anchors (local YMD): plan-start … [crunch] … event day … event+2mo cap.
-  const eventYMD = toLocalYMD(startDate)
-  const eventPlusOneYMD = addDaysYMD(startDate, 1)
-  const eventPlusTwoMonthsYMD = addMonthsYMD(startDate, 2)
+  // Window anchors (YMD): plan-start … [crunch] … event day … event+2mo cap.
+  // The event day is the MINISTRY-zone day (`eventStart`), not `toLocalYMD` of the
+  // instant — on a non-Eastern device an evening event would anchor the whole
+  // checklist a day off from the dates the leader typed.
+  const eventYMD = eventStart
+  const eventAnchor = new Date(`${eventStart}T12:00:00`)
+  const eventPlusOneYMD = addDaysYMD(eventAnchor, 1)
+  const eventPlusTwoMonthsYMD = addMonthsYMD(eventAnchor, 2)
   const fmtMD = (ymd: string) => new Date(ymd + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
 
   // Map a task to its section. If dated, compare day-granularity YMD strings to
@@ -8618,15 +8769,7 @@ export function EventPlanWorkspace({
               const taskDone = tasks.filter(t => t.completed).length
               const rolesTotal = roles.length
               const rolesAssigned = roles.filter(r => r.assigned_to).length
-              const hubSpan = eventDaySpan(startDate, endDate)
-              // Multi-day clock times belong to different days — qualify them with the
-              // date, exactly as the desktop Overview does (a bare "5:00 PM – 2:00 PM"
-              // reads as nonsense).
-              const hubHM = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-              const hubTime = calendarEvent.all_day ? ""
-                : hubSpan > 1
-                  ? `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${hubHM(startDate)} – ${endDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${hubHM(endDate)}`
-                  : `${hubHM(startDate)} – ${hubHM(endDate)}`
+              const hubTime = eventTimeRange
               const HUB_META: Record<string, { iconKey: string; sub: string }> = {
                 overview: { iconKey: "chart", sub: "Facts, stats & planning notes" },
                 checklist: { iconKey: "plan", sub: taskTotal > 0 ? `${taskDone} of ${taskTotal} done` : "The T-minus plan — tasks by phase" },
@@ -8643,8 +8786,7 @@ export function EventPlanWorkspace({
               return (
                 <div>
                   <MobileFactsGrid facts={[
-                    { label: "Date", value: eventDateRangeLabel(startDate, endDate) },
-                    ...(hubSpan > 1 ? [{ label: "Days", value: String(hubSpan) }] : []),
+                    { label: "Date", value: eventDayLong },
                     { label: "Time", value: hubTime || "—" },
                     { label: "Location", value: calendarEvent.location?.trim() || "—" },
                     { label: "Plan start", value: planStartDate ? fmtMD(planStartDate) : "—" },
@@ -8701,28 +8843,17 @@ export function EventPlanWorkspace({
               // RIGHT Plan start + Crunch start (dates are edited in the Edit-event
               // modal, not here). Time omits when empty (all-day); Location and
               // Crunch start show a muted em-dash when unset.
-              //
-              // Multi-day events lead with the RANGE and carry an explicit day count.
-              // The end date used to be invisible here (and `Time` is suppressed
-              // entirely for all-day events), which is how a Welcome Week seeded at
-              // the preset's 14 days could sit unnoticed against an 11-day reality.
-              const daySpan = eventDaySpan(startDate, endDate)
-              const isMultiDay = daySpan > 1
-              const dateOnly = eventDateRangeLabel(startDate, endDate)
-              const hhmm = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-              const mdTime = (d: Date) => `${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${hhmm(d)}`
-              // A multi-day event's clock times belong to different days — rendering
-              // them as one range reads as nonsense ("5:00 PM – 2:00 PM").
-              const timeVal = calendarEvent.all_day ? ""
-                : isMultiDay ? `${mdTime(startDate)} – ${mdTime(endDate)}`
-                : `${hhmm(startDate)} – ${hhmm(endDate)}`
+              const dateOnly = eventDayLong
+              const timeVal = eventTimeRange
               const locationVal = calendarEvent.location?.trim() || ""
               const descVal = calendarEvent.description?.trim() || ""
               // `nowrap` marks facts whose value is a short date that must never break
               // mid-value ("Aug / 6"). Free-text facts (Location, What) still wrap.
               type Fact = { k: string; v: string; muted?: boolean; nowrap?: boolean }
               const leftFacts: Fact[] = [
-                ...(isMultiDay ? [{ k: "Dates", v: `${eventDateRangeShort(startDate, endDate)} · ${daySpan} days`, nowrap: true }] : []),
+                ...(isMultiDayEvent
+                  ? [{ k: "Dates", v: `${formatYMD(eventStart, { month: "short", day: "numeric" })} – ${formatYMD(eventEnd, { month: "short", day: "numeric" })} · ${eventSpanDays} days`, nowrap: true }]
+                  : []),
                 ...(timeVal ? [{ k: "Time", v: timeVal }] : []),
                 { k: "Location", v: locationVal || "—", muted: !locationVal },
               ]
@@ -8959,9 +9090,9 @@ export function EventPlanWorkspace({
 
             {/* ── Checklist ── */}
             {shownSection === 'checklist' && (() => {
-              const cd = countdownLabel(startDate, new Date())
+              const cd = countdownLabel(startDate, new Date(), timeZone)
               const pillLabel = cd
-                ? `${cd.label} · ${startDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`
+                ? `${cd.label} · ${formatYMD(eventStart, { weekday: "short", month: "short", day: "numeric" })}`
                 : null
               // The inline add-row, reused per Countdown phase — seeds the new task's
               // due to the phase window and calls the SAME handleAddTask write path.
@@ -9722,6 +9853,7 @@ function SubEventsTab({
 }) {
   // Mobile restyle only (tonal borderless rows + kicker day labels) — structure unchanged.
   const isMobile = useIsMobile()
+  const timeZone = useMinistryTimezone()
   const [showAdd, setShowAdd] = useState(false)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
@@ -9734,37 +9866,32 @@ function SubEventsTab({
   )
   const loading = rollup.loading
 
-  // Day-grouped, sorted-ascending rows (the rollup already orders by start_date).
-  // Computed up-front rather than by mutating counters mid-render — the React
-  // Compiler rejects reassignment that outlives the render pass.
-  const headerForChild = new Map<string, { label: string; first: boolean }>()
-  {
-    let lastDayKey: string | null = null
-    let seenFirst = false
-    for (const ev of subEvents) {
-      const dt = new Date(ev.start_date)
-      const dayKey = dt.toDateString()
-      if (dayKey !== lastDayKey) {
-        lastDayKey = dayKey
-        headerForChild.set(ev.id, { label: eventDayHeaderLabel(dt), first: !seenFirst })
-        seenFirst = true
-      }
-    }
-  }
+  // Day-grouped rows (the rollup already orders by start_date). Day boundaries are
+  // the MINISTRY's, not the device's — `toDateString()` on a late sub-event opened a
+  // spurious second day header for a viewer further east. Computed up-front rather
+  // than by mutating counters mid-render, which the React Compiler rejects.
+  const groupedRows = useMemo(() => {
+    const dayKeys = subEvents.map(ev => eventStartYMD(ev, timeZone))
+    return subEvents.map((ev, i) => ({
+      ev,
+      ymd: dayKeys[i],
+      showHeader: i === 0 || dayKeys[i] !== dayKeys[i - 1],
+      // Row 0 always opens a header, so it is always the first one.
+      isFirstHeader: i === 0,
+    }))
+  }, [subEvents, timeZone])
 
   // The parent's end_date is the user's to set — a week whose nights only fill 11
   // of its 14 days is their business. A night scheduled OUTSIDE the parent's dates
   // is not: it's a real contradiction, so it gets named here rather than corrected.
-  // Compared as calendar days, so a night that starts at 9pm on the closing day
-  // isn't flagged just because the parent's end timestamp reads midnight.
-  const dayOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-  const parentFrom = new Date(parentEvent.start_date)
-  const parentTo = new Date(parentEvent.end_date)
-  const parentRangeKnown = !isNaN(parentFrom.getTime()) && !isNaN(parentTo.getTime())
+  // Compared as ministry-zone calendar DAYS, so a night starting at 9pm on the
+  // closing day isn't flagged just because the parent's end timestamp reads midnight.
+  const parentFromYMD = eventStartYMD(parentEvent, timeZone)
+  const parentToYMD = eventEndYMD(parentEvent, timeZone)
   const isOutOfRange = (ev: CalendarEvent) => {
-    const d = new Date(ev.start_date)
-    if (!parentRangeKnown || isNaN(d.getTime())) return false
-    return dayOf(d) < dayOf(parentFrom) || dayOf(d) > dayOf(parentTo)
+    const d = eventStartYMD(ev, timeZone)
+    if (!parentFromYMD || !parentToYMD || !d) return false
+    return d < parentFromYMD || d > parentToYMD
   }
   const outOfRangeCount = subEvents.filter(isOutOfRange).length
 
@@ -9785,23 +9912,20 @@ function SubEventsTab({
       {outOfRangeCount > 0 && (
         <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 18px" }}>
           {outOfRangeCount === 1 ? "One sub-event falls" : `${outOfRangeCount} sub-events fall`} outside {parentEvent.title}&rsquo;s dates
-          ({eventDateRangeShort(parentFrom, parentTo)}). Extend the event, or move {outOfRangeCount === 1 ? "it" : "them"} inside the range.
+          ({formatYMD(parentFromYMD, { month: "short", day: "numeric" })} – {formatYMD(parentToYMD, { month: "short", day: "numeric" })}). Extend the event, or move {outOfRangeCount === 1 ? "it" : "them"} inside the range.
         </p>
       )}
 
       <div>
-        {subEvents.map((ev) => {
+        {groupedRows.map(({ ev, ymd, showHeader, isFirstHeader }) => {
           const evCfg = getEventConfig(ev)
-          const head = headerForChild.get(ev.id)
-          const showHeader = !!head
-          const isFirstHeader = !!head?.first
-          const dayLabel = head?.label ?? ""
-          const outOfRange = isOutOfRange(ev)
+          const dayLabel = `${formatYMD(ymd, { weekday: "short" })} · ${formatYMD(ymd, { month: "short" })} ${ymdDayNum(ymd)}`.toUpperCase()
 
           const r = readiness[ev.id] ?? { done: 0, total: 0 }
           const st = subEventStatus(r.done, r.total)
           const filled = r.total > 0 ? Math.round((r.done / r.total) * 6) : 0
           const drillable = !!onOpenChild
+          const outOfRange = isOutOfRange(ev)
 
           return (
             <Fragment key={ev.id}>
@@ -10289,6 +10413,7 @@ function RunSheetTab({
 }) {
   const supabase = createClient()
   const isMobile = useIsMobile()
+  const timeZone = useMinistryTimezone()
   const [blocks, setBlocks] = useState<EventBlock[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -10333,12 +10458,17 @@ function RunSheetTab({
   }
   const toMin = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m }
 
-  // Calendar-day span (see header note) — one entry per day the event covers.
-  const start = new Date(event.start_date)
-  const span = eventDaySpan(start, new Date(event.end_date))
-  const days: Date[] = Array.from({ length: span }, (_, i) =>
-    new Date(start.getFullYear(), start.getMonth(), start.getDate() + i))
-  const todayIdx = days.findIndex(d => d.toDateString() === new Date().toDateString())
+  // The run sheet's days are the event's calendar days ON THE MINISTRY'S CLOCK,
+  // enumerated as plain "YYYY-MM-DD" — an all-day row's `start_day`/`end_day` are
+  // used directly when present. Walking `Date`s with `setDate()` counted device-local
+  // days off an instant, which produced an extra (or missing) day for a viewer in
+  // another zone and let "Today" highlight the wrong day.
+  const days: string[] = []
+  const startYMD = eventStartYMD(event, timeZone)
+  const endYMD = eventEndYMD(event, timeZone)
+  for (let ymd = startYMD; ymd <= endYMD; ymd = addDaysToYMD(ymd, 1)) days.push(ymd)
+  if (days.length === 0) days.push(startYMD)
+  const todayIdx = days.indexOf(todayInZone(timeZone))
   // Blocks stranded past the current span (the end date was shortened after they
   // were written). Shown, never hidden — see header note.
   const orphanBlocks = blocks.filter(b => b.day_index >= days.length || b.day_index < 0)
@@ -10489,13 +10619,14 @@ function RunSheetTab({
 
       {days.map((day, dayIdx) => {
         const dayBlocks = blocks.filter(b => b.day_index === dayIdx)
+        const dayLabel = formatYMD(day, { weekday: "long", month: "long", day: "numeric" })
         const isToday = dayIdx === todayIdx
         const upNextId = isToday ? dayBlocks.find(b => b.status !== "done")?.id : undefined
         return (
           <div key={dayIdx} style={{ marginBottom: 36 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <p style={dayHeadStyle(isToday ? "var(--plum)" : "var(--body)")}>
-                {eventDayHeaderLabel(day)}{isToday ? " · TODAY" : ""}
+                {dayLabel.toUpperCase()}{isToday ? " · TODAY" : ""}
               </p>
               {canEdit && (
                 <CentralButton variant="secondary" size="sm" onClick={() => addBlock(dayIdx)}><Plus style={{ width: 14, height: 14 }} /> Add block</CentralButton>

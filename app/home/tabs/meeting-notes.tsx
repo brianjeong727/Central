@@ -593,7 +593,13 @@ export function MeetingNotesSection({
     const today = new Date()
     const dateStr = today.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
     const title = `Board Meeting — ${dateStr}`
-    const dateIso = today.toISOString().split("T")[0]
+    // `meeting_notes.date` is a DATE column — a calendar day, no instant, no zone.
+    // `toISOString()` would hand back the UTC day, which after ~8pm Eastern is
+    // TOMORROW: the title said "July 30" while the stored date said "2026-07-31",
+    // one insert contradicting itself. `todayYMD()` (this file, :64) is the same
+    // local calendar day the title renders — and the same one `isDraft` compares
+    // against, so an evening note no longer files itself a day into the future.
+    const dateIso = todayYMD()
     const { data: created, error } = await supabase
       .from("meeting_notes")
       .insert({ team_id: teamId, note_number: noteNumber, date: dateIso, title, body: "", created_by: userId, attendees: [userId] })

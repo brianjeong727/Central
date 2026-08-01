@@ -563,8 +563,16 @@ export interface CalendarEvent {
   title: string
   description: string | null
   location: string | null
+  /** True INSTANT (timestamptz). For all-day rows it is the derived
+   *  midnight-in-ministry-zone instant kept for sorting / ICS / run_sheet_tick —
+   *  `start_day` is the truth. Convert only via `lib/tz.ts`. */
   start_date: string
+  /** True INSTANT. For all-day rows: the 23:59:59 instant of `end_day`. */
   end_date: string
+  /** All-day rows only (null otherwise): the calendar date the event starts on. */
+  start_day?: string | null
+  /** All-day rows only (null otherwise): the LAST day of the event — INCLUSIVE. */
+  end_day?: string | null
   all_day: boolean
   category: string
   event_type: EventType
@@ -1013,6 +1021,10 @@ export interface HomeAppProps {
   initialProfile: Profile
   ministryId: string
   ministryName: string
+  /** IANA zone from `ministries.timezone` — the zone EVERY event wall clock is
+   *  interpreted in. Provided to the tree via MinistryTimezoneProvider; null
+   *  only if the boot fetch failed (resolver logs + falls back). */
+  ministryTimezone?: string | null
   initialRecentChats?: ChatPreview[]
   initialUserTeams?: UserTeam[]
   initialActiveQuestion?: CongregationQuestion | null

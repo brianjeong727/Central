@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, CSSProperties, ReactNode, TransitionEvent } from "react"
 import Image from "next/image"
 import { ChevronLeft, ChevronRight, ClipboardList } from "lucide-react"
+import { formatInZone, instantToZoned } from "@/lib/tz"
 import { UpNextEventDetail } from "./up-next-card"
 
 // A curated hero slide resolves to LIVE data from the entity it references
@@ -131,25 +132,30 @@ export function HeroSectionLabel({ breathe = false, action }: { breathe?: boolea
 
 // Structured date parts for the BIG serif §1.3 date-anchor in the 40% detail slot
 // (restored from the retired UpNextCard's information architecture, now on plum).
-function heroDateParts(iso: string) {
-  const d = new Date(iso)
+// Every part is resolved in the MINISTRY's zone: the stored value is a true instant
+// (lib/tz.ts), so a bare toLocale* would render the viewer's device zone instead —
+// the same event reading "Fri, Oct 24 · 7:00 PM" on campus and "Oct 24 · 4:00 PM"
+// to a student home in California.
+function heroDateParts(iso: string, timeZone: string) {
   return {
-    weekday: d.toLocaleDateString("en-US", { weekday: "long" }),
-    monthDay: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    year: d.toLocaleDateString("en-US", { year: "numeric" }),
-    time: d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+    weekday: formatInZone(iso, timeZone, { weekday: "long" }),
+    monthDay: formatInZone(iso, timeZone, { month: "short", day: "numeric" }),
+    year: formatInZone(iso, timeZone, { year: "numeric" }),
+    time: formatInZone(iso, timeZone, { hour: "numeric", minute: "2-digit" }),
   }
 }
 
-// Compact date range for the event glass chip (e.g. "Oct 24–26").
-function chipDate(detail: UpNextEventDetail): string {
-  const s = new Date(detail.startDate)
-  const e = new Date(detail.endDate)
-  const mo = (d: Date) => d.toLocaleDateString("en-US", { month: "short" })
-  const sameDay = s.toDateString() === e.toDateString()
-  if (sameDay) return `${mo(s)} ${s.getDate()}`
-  if (s.getMonth() === e.getMonth()) return `${mo(s)} ${s.getDate()}–${e.getDate()}`
-  return `${mo(s)} ${s.getDate()} – ${mo(e)} ${e.getDate()}`
+// Compact date range for the event glass chip (e.g. "Oct 24–26"). Same-day and
+// same-month tests run on the ministry-zone calendar date, not `toDateString()`
+// (device zone) — an evening event can otherwise collapse or split a range.
+function chipDate(detail: UpNextEventDetail, timeZone: string): string {
+  const s = instantToZoned(detail.startDate, timeZone)
+  const e = instantToZoned(detail.endDate, timeZone)
+  const mo = (iso: string) => formatInZone(iso, timeZone, { month: "short" })
+  const dayNum = (ymd: string) => String(Number(ymd.slice(8, 10)))
+  if (s.ymd === e.ymd) return `${mo(detail.startDate)} ${dayNum(s.ymd)}`
+  if (s.ymd.slice(0, 7) === e.ymd.slice(0, 7)) return `${mo(detail.startDate)} ${dayNum(s.ymd)}–${dayNum(e.ymd)}`
+  return `${mo(detail.startDate)} ${dayNum(s.ymd)} – ${mo(detail.endDate)} ${dayNum(e.ymd)}`
 }
 
 // ── Featured reference card — THE one plum content surface (prime directive) ──
@@ -162,6 +168,11 @@ interface FeaturedHeroCardProps {
   // Slide's contextual label (e.g. "Up next" / "Latest"). "Featured" is NOT repeated
   // here — the HeroSectionLabel above the frame already carries the constant accent.
   eyebrowLabel: string
+  // The MINISTRY's IANA zone — REQUIRED, and required on purpose. components/central
+  // is a LEAF and cannot read app/home's MinistryTimezoneProvider, so the zone arrives
+  // as a prop; making it non-optional means TypeScript, not vigilance, is what stops a
+  // new caller from silently falling back to the viewer's device zone.
+  timeZone: string
   eventDetail?: UpNextEventDetail | null
   title: string
   body?: string | null
@@ -185,6 +196,7 @@ interface FeaturedHeroCardProps {
 
 export function FeaturedHeroCard({
   eyebrowLabel,
+  timeZone,
   eventDetail,
   title,
   body,
@@ -205,7 +217,7 @@ export function FeaturedHeroCard({
   const bodyText = body ? body.replace(/\n+/g, " ") : null
   // Desktop: the 40% date-anchor panel is the sole date carrier, so the eyebrow reads
   // just the slide label. Mobile has no anchor — it keeps the date in the eyebrow.
-  const eyebrowText = mobile && eventDetail ? `${eyebrowLabel} · ${chipDate(eventDetail)}` : eyebrowLabel
+  const eyebrowText = mobile && eventDetail ? `${eyebrowLabel} · ${chipDate(eventDetail, timeZone)}` : eyebrowLabel
   const maxAttendees = mobile ? 6 : 8
 
   // Actions — RSVP as the hero-invert primary (cream fill / plum text), the details
@@ -323,7 +335,7 @@ export function FeaturedHeroCard({
 
   const detailPanel = (): ReactNode => {
     if (eventDetail) {
-      const p = heroDateParts(eventDetail.startDate)
+      const p = heroDateParts(eventDetail.startDate, timeZone)
       return (
         <>
           <div style={monoLabelStyle}>Starts</div>
@@ -340,7 +352,7 @@ export function FeaturedHeroCard({
       )
     }
     // Fallback: posted date.
-    const p = postedDate ? heroDateParts(postedDate) : null
+    const p = postedDate ? heroDateParts(postedDate, timeZone) : null
     return (
       <>
         <div style={monoLabelStyle}>Posted</div>
@@ -406,11 +418,11 @@ export function FeaturedHeroCard({
           <span style={{ fontSize: 13, color: secondaryText }}>
             {eventDetail
               ? (() => {
-                  const p = heroDateParts(eventDetail.startDate)
+                  const p = heroDateParts(eventDetail.startDate, timeZone)
                   return `${p.weekday}, ${p.monthDay}${eventDetail.allDay ? " · All day" : ` · ${p.time}`}${eventDetail.location ? ` · ${eventDetail.location}` : ""}`
                 })()
               : (() => {
-                  const p = heroDateParts(postedDate!)
+                  const p = heroDateParts(postedDate!, timeZone)
                   return `${p.monthDay}, ${p.year}`
                 })()}
           </span>
@@ -815,6 +827,10 @@ function prefersReducedMotion(): boolean {
 
 interface HomeHeroCarouselProps {
   slides: HeroSlide[]
+  // The MINISTRY's IANA zone — see FeaturedHeroCard.timeZone. Required for the same
+  // reason: this LEAF cannot reach app/home's provider, and an optional zone would
+  // let a caller silently render event times in the viewer's device zone.
+  timeZone: string
   // Optional Pastor Pulse lead slide — rides as slide index 0 when present (NOT a
   // HeroSlide; the interactive card is built by HomeTab and passed in whole).
   pulseNode?: ReactNode
@@ -833,6 +849,7 @@ interface HomeHeroCarouselProps {
 
 export function HomeHeroCarousel({
   slides,
+  timeZone,
   pulseNode,
   mobile = false,
   rsvpedIds,
@@ -958,7 +975,7 @@ export function HomeHeroCarousel({
           body={s.body}
           mobile={mobile}
           event={{
-            dateLabel: chipDate(s.eventDetail),
+            dateLabel: chipDate(s.eventDetail, timeZone),
             location: s.eventDetail.location,
             userHasRsvped: annId ? rsvpedIds.has(annId) : false,
             rsvping,
@@ -976,6 +993,7 @@ export function HomeHeroCarousel({
         <FeaturedHeroCard
           fill={!mobile}
           mobile={mobile}
+          timeZone={timeZone}
           eyebrowLabel={s.kind === "announcement" ? s.eyebrowLabel ?? "Up next" : "Up next"}
           title={s.title}
           body={s.body}

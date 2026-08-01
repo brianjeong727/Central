@@ -2,6 +2,7 @@
 
 import { CSSProperties, ReactNode } from "react"
 import { ClipboardList } from "lucide-react"
+import { formatInZone } from "@/lib/tz"
 import { CentralButton } from "./button"
 
 // Live event-detail data, pulled from a referenced calendar_events row.
@@ -16,19 +17,21 @@ export interface UpNextEventDetail {
 }
 
 // Structured date parts for the BIG serif anchor in the 40% detail slot.
-function dateParts(iso: string) {
-  const d = new Date(iso)
+// Rendered in the MINISTRY's zone (`timeZone`), never the viewer's device zone —
+// stored event times are true instants (lib/tz.ts), so a bare toLocale* would read
+// 7:00 PM in Pittsburgh and 4:00 PM to a student home in California.
+function dateParts(iso: string, timeZone: string) {
   return {
-    weekday: d.toLocaleDateString("en-US", { weekday: "long" }),
-    monthDay: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    year: d.toLocaleDateString("en-US", { year: "numeric" }),
-    time: d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+    weekday: formatInZone(iso, timeZone, { weekday: "long" }),
+    monthDay: formatInZone(iso, timeZone, { month: "short", day: "numeric" }),
+    year: formatInZone(iso, timeZone, { year: "numeric" }),
+    time: formatInZone(iso, timeZone, { hour: "numeric", minute: "2-digit" }),
   }
 }
 
 // Compact "Mon DD · time" line used for the demoted event meta-row value.
-function eventWhenCompact(detail: UpNextEventDetail): string {
-  const p = dateParts(detail.startDate)
+function eventWhenCompact(detail: UpNextEventDetail, timeZone: string): string {
+  const p = dateParts(detail.startDate, timeZone)
   return detail.allDay ? `${p.monthDay} · All day` : `${p.monthDay} · ${p.time}`
 }
 
@@ -104,6 +107,11 @@ const DEM_VAL: CSSProperties = {
 interface UpNextCardProps {
   label: string
   labelAccent?: boolean
+  // The MINISTRY's IANA zone — REQUIRED, and required on purpose. components/central
+  // is a LEAF and cannot read app/home's MinistryTimezoneProvider, so the zone arrives
+  // as a prop; making it non-optional means TypeScript, not vigilance, is what stops a
+  // new caller from silently falling back to the viewer's device zone.
+  timeZone: string
   title: string
   body?: string | null
   isEvent?: boolean
@@ -134,6 +142,7 @@ export function UpNextCard({
   // the carousel's "Featured" section label is the single accent and the title leads.
   label: _label,
   labelAccent: _labelAccent = true,
+  timeZone,
   title,
   body,
   isEvent,
@@ -243,7 +252,7 @@ export function UpNextCard({
   // 40% panel content (shared by desktop seam-panel + mobile stacked section).
   const detailContent = (): ReactNode => {
     if (primary === "event" && eventDetail) {
-      const p = dateParts(eventDetail.startDate)
+      const p = dateParts(eventDetail.startDate, timeZone)
       const r = rsvpFull("md")
       return (
         <>
@@ -277,9 +286,9 @@ export function UpNextCard({
         {postedDate ? (
           <>
             <div style={{ ...BIG_SERIF_DATE, marginTop: "var(--space-7)" }}>
-              {dateParts(postedDate).monthDay}
+              {dateParts(postedDate, timeZone).monthDay}
             </div>
-            <div style={{ ...POSTED_YR, marginTop: "var(--space-3)" }}>{dateParts(postedDate).year}</div>
+            <div style={{ ...POSTED_YR, marginTop: "var(--space-3)" }}>{dateParts(postedDate, timeZone).year}</div>
           </>
         ) : (
           <div style={{ ...BIG_SERIF_DATE, marginTop: "var(--space-7)", color: "var(--faint)" }}>—</div>
@@ -309,7 +318,7 @@ export function UpNextCard({
 
   const demRows: ReactNode[] = []
   if (primary === "image") {
-    if (eventDetail) demRows.push(demRow("ev", "Event", eventWhenCompact(eventDetail), rsvpCompact("sm")))
+    if (eventDetail) demRows.push(demRow("ev", "Event", eventWhenCompact(eventDetail, timeZone), rsvpCompact("sm")))
     if (hasForm) demRows.push(demRow("form", "Form", "Sign-up form", formBtn("sm")))
   } else if (primary === "event") {
     if (hasForm) demRows.push(demRow("form", "Form", "Sign-up form", formBtn("sm")))

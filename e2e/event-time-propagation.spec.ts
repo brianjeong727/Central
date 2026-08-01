@@ -7,18 +7,25 @@
 // parent silently moved. This spec asserts the write lands on the CHILD and the
 // PARENT is untouched.
 //
-// ⚠️ TIMEZONE HAZARD (deliberately unfixed, out of scope): AddEventModal writes
-// times as a hardcoded `+00:00` while every surface renders with local
-// toLocaleTimeString. Saving "8 AM" renders as a different wall-clock hour. So
-// NOTHING here asserts an absolute displayed clock time — assertions are on the
-// STORED start_date and on RELATIVE change (the row that moved vs the row that
-// must not).
+// TIMEZONE CONVENTION (current — this spec asserts it):
+// `calendar_events.start_date`/`end_date` hold TRUE INSTANTS. A time typed into
+// AddEventModal is a wall clock in the MINISTRY's own zone (`ministries.timezone`)
+// and is converted to an instant through `lib/tz.ts`; every display surface —
+// including the edit modal's own read-back — renders that instant back in the same
+// ministry zone. So typing 16:00 stores 20:00Z in August (EDT) and reads back as
+// 16:00, everywhere, on any device.
+//
+// Consequently NOTHING below hardcodes a stored UTC literal or a fixed offset —
+// a `+00:00`/`-04:00` literal would silently start failing when the ministry
+// crosses into EST. Wall clocks are the constants; the expected instant is
+// derived at run time with `at(ymd, hhmm)` against the zone read from the DB.
 //
 // NOTE: both the desktop ("hidden md:flex…") and mobile ("md:hidden") plan trees
 // are always co-mounted (Tailwind hides one via CSS). Every locator is narrowed
 // with `.filter({ visible: true })`.
 import { test, expect, type Page, type Locator } from "@playwright/test"
 import { adminState, sandbox, E2E_PREFIX } from "./fixtures"
+import { resolveMinistryTimezone, zonedTimeToISO } from "../lib/tz"
 
 // The E2E sandbox's one team; classifyTeam routes "Student Org Board" to
 // StudentOrgTeamHome (the component this fix changed).
@@ -28,14 +35,26 @@ const TEAM_NAME = "Student Org Board"
 const PARENT_TITLE = `${E2E_PREFIX}TP Week`
 const CHILD_TITLE = `${E2E_PREFIX}TP Child Night`
 
-// Fixture baseline (stored, UTC — see the timezone note above).
-const PARENT_START = "2026-08-03T14:00:00+00:00"
-const PARENT_END = "2026-08-07T20:00:00+00:00"
-const CHILD_START = "2026-08-04T16:00:00+00:00"
-const CHILD_END = "2026-08-04T18:00:00+00:00"
+// Fixture baseline as MINISTRY-ZONE WALL CLOCKS (see the convention note above).
+const PARENT_START_LOCAL = { ymd: "2026-08-03", hhmm: "14:00" }
+const PARENT_END_LOCAL = { ymd: "2026-08-07", hhmm: "20:00" }
+const CHILD_START_LOCAL = { ymd: "2026-08-04", hhmm: "16:00" }
+const CHILD_END_LOCAL = { ymd: "2026-08-04", hhmm: "18:00" }
 // Task due dates relative to the child's 2026-08-04 start.
 const TASK_OPEN_DUE = "2026-08-01"
 const TASK_DONE_DUE = "2026-08-02"
+
+/** The sandbox ministry's IANA zone, read from the DB in beforeAll. */
+let zone = ""
+/** A ministry-zone wall clock → the instant the timestamptz column holds. */
+const at = (ymd: string, hhmm: string) => zonedTimeToISO(ymd, hhmm, zone)
+const atLocal = (w: { ymd: string; hhmm: string }) => at(w.ymd, w.hhmm)
+/** PostgREST returns "+00:00", `lib/tz.ts` returns "Z" — compare the instants. */
+const iso = (v: string) => new Date(v).toISOString()
+/** Assert a stored instant is exactly the given ministry-zone wall clock. */
+function expectStored(actual: string, ymd: string, hhmm: string, message?: string) {
+  expect(iso(actual), message).toBe(iso(at(ymd, hhmm)))
+}
 
 let parentId = ""
 let childId = ""
@@ -104,8 +123,8 @@ async function readPlanWindow(planId: string) {
 /** Reset every fixture row to its baseline so each test starts from the same state. */
 async function resetFixtures() {
   const sb = sandbox()
-  await sb.client.from("calendar_events").update({ start_date: PARENT_START, end_date: PARENT_END, title: PARENT_TITLE }).eq("id", parentId)
-  await sb.client.from("calendar_events").update({ start_date: CHILD_START, end_date: CHILD_END, title: CHILD_TITLE }).eq("id", childId)
+  await sb.client.from("calendar_events").update({ start_date: atLocal(PARENT_START_LOCAL), end_date: atLocal(PARENT_END_LOCAL), title: PARENT_TITLE }).eq("id", parentId)
+  await sb.client.from("calendar_events").update({ start_date: atLocal(CHILD_START_LOCAL), end_date: atLocal(CHILD_END_LOCAL), title: CHILD_TITLE }).eq("id", childId)
   await sb.client.from("event_tasks").update({ due_date: TASK_OPEN_DUE }).eq("id", taskOpenId)
   await sb.client.from("event_tasks").update({ due_date: TASK_DONE_DUE }).eq("id", taskDoneId)
   await sb.client.from("event_tasks").update({ due_date: null }).eq("id", taskNullId)
@@ -146,12 +165,18 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     const sb = sandbox()
     const adminId = await sb.adminUserId()
 
+    // The zone is a property of the MINISTRY, so read it rather than assume it.
+    const { data: min, error: ze } = await sb.client
+      .from("ministries").select("timezone").eq("id", sb.ministryId).single()
+    if (ze) throw ze
+    zone = resolveMinistryTimezone((min as { timezone: string | null }).timezone)
+
     const { data: parent, error: pe } = await sb.client
       .from("calendar_events")
       .insert({
         ministry_id: sb.ministryId, team_id: TEAM_ID, title: PARENT_TITLE,
         description: "e2e time-propagation parent", location: "E2E Hall",
-        start_date: PARENT_START, end_date: PARENT_END, all_day: false,
+        start_date: atLocal(PARENT_START_LOCAL), end_date: atLocal(PARENT_END_LOCAL), all_day: false,
         category: "welcoming", event_type: "welcome_week", recurring: false, created_by: adminId,
       })
       .select("id").single()
@@ -164,7 +189,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
       .insert({
         ministry_id: sb.ministryId, team_id: null, parent_event_id: parentId, title: CHILD_TITLE,
         description: "e2e time-propagation child", location: "E2E Room",
-        start_date: CHILD_START, end_date: CHILD_END, all_day: false,
+        start_date: atLocal(CHILD_START_LOCAL), end_date: atLocal(CHILD_END_LOCAL), all_day: false,
         category: "social", event_type: "social", recurring: false, created_by: adminId,
       })
       .select("id").single()
@@ -233,7 +258,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     const parentAfter = await readEvent(parentId)
 
     expect(childAfter.start_date, "CHILD start_date must have moved").not.toBe(childBefore.start_date)
-    expect(childAfter.start_date).toBe("2026-08-04T10:00:00+00:00")
+    expectStored(childAfter.start_date, "2026-08-04", "10:00")
     expect(parentAfter.start_date, "PARENT start_date must NOT move").toBe(parentBefore.start_date)
     expect(parentAfter.end_date).toBe(parentBefore.end_date)
     expect(parentAfter.title).toBe(parentBefore.title)
@@ -265,7 +290,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     await expect.poll(async () => timelineChildRowText(page), { timeout: 15_000 }).not.toBe(before)
     const after = await timelineChildRowText(page)
     console.log(`[timeline] disclosure row AFTER:  ${after}`)
-    expect((await readEvent(childId)).start_date).toBe("2026-08-04T21:00:00+00:00")
+    expectStored((await readEvent(childId)).start_date, "2026-08-04", "21:00")
 
     assertNoErrors(errors)
   })
@@ -282,7 +307,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     await vis(page.getByRole("button", { name: "Save changes" })).click()
     await expectModalClosed(page)
 
-    expect((await readEvent(parentId)).start_date).toBe("2026-08-03T09:30:00+00:00")
+    expectStored((await readEvent(parentId)).start_date, "2026-08-03", "09:30")
     expect((await readEvent(childId)).start_date, "child must not move when the parent is edited").toBe(childBefore.start_date)
 
     assertNoErrors(errors)
@@ -299,7 +324,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
       .from("calendar_events")
       .insert({
         ministry_id: sb.ministryId, team_id: null, parent_event_id: parentId, title: throwawayTitle,
-        start_date: "2026-08-05T16:00:00+00:00", end_date: "2026-08-05T18:00:00+00:00",
+        start_date: at("2026-08-05", "16:00"), end_date: at("2026-08-05", "18:00"),
         all_day: false, category: "social", event_type: "social", recurring: false, created_by: adminId,
       })
       .select("id").single()
@@ -375,7 +400,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     await vis(page.getByRole("button", { name: "Save changes" })).click()
     await expectModalClosed(page)
 
-    expect((await readEvent(childId)).start_date).toBe("2026-08-06T16:00:00+00:00")
+    expectStored((await readEvent(childId)).start_date, "2026-08-06", "16:00")
     // Open + dated → shifted +2. Completed → untouched. Null → still null.
     await expect.poll(async () => (await readTaskDue(taskOpenId)).due_date, { timeout: 10_000 }).toBe("2026-08-03")
     expect((await readTaskDue(taskDoneId)).due_date, "completed task must NOT shift").toBe(TASK_DONE_DUE)
@@ -403,7 +428,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     await vis(page.getByRole("button", { name: "Save changes" })).click()
     await expectModalClosed(page)
 
-    expect((await readEvent(childId)).start_date).toBe("2026-08-04T07:15:00+00:00")
+    expectStored((await readEvent(childId)).start_date, "2026-08-04", "07:15")
     expect((await readTaskDue(taskOpenId)).due_date, "time-only edit must not shift due dates").toBe(TASK_OPEN_DUE)
     expect((await readTaskDue(taskDoneId)).due_date).toBe(TASK_DONE_DUE)
     expect((await readTaskDue(taskNullId)).due_date).toBeNull()
@@ -435,7 +460,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     await vis(page.getByRole("button", { name: "Save changes" })).click()
     await expectModalClosed(page)
 
-    expect((await readEvent(childId)).start_date).toBe("2026-08-07T16:00:00+00:00")
+    expectStored((await readEvent(childId)).start_date, "2026-08-07", "16:00")
     await expect.poll(async () => (await readTaskDue(taskOpenId)).due_date, { timeout: 10_000 }).toBe("2026-08-04")
     expect((await readTaskDue(taskDoneId)).due_date).toBe(TASK_DONE_DUE)
     expect((await readTaskDue(taskNullId)).due_date).toBeNull()
@@ -471,7 +496,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     // The modal STAYS open and says so, rather than reporting a clean save.
     await expect(vis(page.getByText(/only PARTLY shifted/))).toBeVisible({ timeout: 10_000 })
     // Event + window moved; the task did not (that is the induced failure).
-    expect((await readEvent(childId)).start_date).toBe("2026-08-06T16:00:00+00:00")
+    expectStored((await readEvent(childId)).start_date, "2026-08-06", "16:00")
     const midPlan = await readPlanWindow(childPlanId)
     expect(midPlan, "window shifted +2 on the first save").toMatchObject({
       plan_start_date: "2026-07-06", crunch_date: "2026-07-30",
@@ -488,7 +513,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     expect(await readPlanWindow(childPlanId), "window must stay shifted, not revert").toMatchObject({
       plan_start_date: "2026-07-06", crunch_date: "2026-07-30",
     })
-    expect((await readEvent(childId)).start_date, "event must not move again").toBe("2026-08-06T16:00:00+00:00")
+    expectStored((await readEvent(childId)).start_date, "2026-08-06", "16:00", "event must not move again")
   })
 
   // ── 9. A SUCCESSFUL save invalidates the shared calendar cache ──────────────
@@ -512,7 +537,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     // WARN-B2: before the fix the modal invalidated on the FAILURE branch only, so
     // a successful save refetched nothing of its own.
     await expect.poll(() => calendarGets, { timeout: 10_000 }).toBeGreaterThan(0)
-    expect((await readEvent(childId)).start_date).toBe("2026-08-04T13:30:00+00:00")
+    expectStored((await readEvent(childId)).start_date, "2026-08-04", "13:30")
 
     assertNoErrors(errors)
   })

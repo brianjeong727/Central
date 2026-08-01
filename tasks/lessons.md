@@ -290,3 +290,129 @@ The calendar cache is keyed `["calendar-events", ministryId, teamId ?? "all"]`, 
 
 ## A retry that re-writes stale modal state can undo the work the previous attempt landed (2026-07-30)
 Two variants hit in one task, same root: modal state seeded at MOUNT is written back on a LATER save, after the DB has moved on. (1) `plan_start_date`/`crunch_date` are seeded by an ASYNC effect but were written unconditionally as `value || null` — saving before the fetch landed silently NULLed both columns, with no visible field for the user to notice. (2) After a successful date shift, a same-session retry rewrote the PRE-shift plan window over the shifted one while tasks stayed shifted — re-creating the very inconsistency the shift existed to prevent. Rules: never write a null you didn't get from the user (gate on a `seeded` flag and OMIT the column when unseeded, rather than writing null); and after any successful write, re-seed the modal's own state from what you just wrote so a second save is a no-op instead of a revert. Also: a guard ref that marks work "done" must advance AFTER the work succeeds, and partial failures need per-row owed-tracking so a re-press converges instead of double-applying to rows that already landed.
+
+---
+
+# Merged from the repo-root `lessons.md` (2026-07-31)
+
+Two lessons files existed: this one (which CLAUDE.md and every skill point at) and an
+orphaned `lessons.md` at the repo root. Nothing referenced the root file. Its contents are
+folded in below verbatim; the root file is deleted.
+
+**Note on the 2026-07-18 datetime entry below: it is SUPERSEDED.** The store/display
+disagreement it describes as a "KNOWN BUG to fix in a dedicated pass" was fixed on
+2026-07-31 — see the timezone lessons above. Seed scripts no longer hand-roll an ET offset;
+they consume `lib/tz.ts` via `scripts/lib/app-tz.mjs`. Kept for the history of how the bug
+was first noticed.
+
+## 2026-05-21 — Group Generator (Groups tab, plan-tab.tsx)
+
+### What was built
+A 3-step group generation wizard inside the SOB plan tab. Users pick a pool source (everyone, RSVP list, form respondents), configure group count and diversity toggles, preview the generated groups with drag-and-drop adjustment, name the session, and save. Algorithm does year-bucket round-robin distribution with optional visitor spreading and small-group-mode penalty optimization. Sessions are persisted to `group_sessions`, `generated_groups`, `generated_group_members` tables. Session view has CSV export.
+
+---
+
+### What took the most time
+
+**1. Supabase Realtime channel crash (React Strict Mode)**
+The meeting notes collab (`useNoteCollab`) was crashing with `cannot add presence callbacks after subscribe()`. Root cause: `supabase.channel(topic)` returns the *existing* channel object if the same topic is already in `supabase.realtime.channels`. React Strict Mode double-invokes effects (mount → cleanup → remount). `supabase.removeChannel()` is async — the channel is not removed from `this.channels` by the time the second mount runs. So the second mount gets the already-subscribed channel and then tries to call `.on("presence", ...)` on it, which throws.
+
+Fix required understanding Supabase internals: synchronously splice the channel out of `supabase.realtime.channels` in the cleanup function before calling `unsubscribe()`. Also needed try-catch around `.on("presence", ...)` as a defense layer.
+
+This was not a bug in the Groups feature itself — it was pre-existing in the meeting notes feature and only surfaced when the test harness triggered it during navigation. Lost roughly 2 hours here before isolating the root cause.
+
+**2. Playwright test selector — `[style*="position: fixed"]` vs `.fixed.inset-0`**
+Wrote all wizard helper functions (`clickNext`, `clickGenerate`, `clickSave`, `setNumGroups`, `setSessionName`, `selectSource`) scoped to `document.querySelector('[style*="position: fixed"]')`. The wizard renders with `className="fixed inset-0 z-[85]"` — Tailwind classes, not inline styles. The selector returned null every time. Had to rewrite all helpers to use `classList.contains('fixed') && classList.contains('inset-0')`. This was about 45 minutes of debugging because the screenshots showed the wizard was rendering correctly — the issue was purely in how the test found it.
+
+**3. `clickSave` timing — fixed 3000ms wasn't enough**
+Saving 10 groups required 10 sequential Supabase inserts (one per group) plus 10 member batch inserts. With 3000ms timeout, the test moved on before the save completed. The next test's `openWizard` saw the previous wizard still open (in step 3, still saving), clicked a background button that did nothing, and then all subsequent selectors found the wrong wizard state. Caused 5+ cascading test failures from a single timing bug.
+
+---
+
+### What had to be redone mid-way
+
+**Test helper functions** — rewrote all 6 (`clickNext`, `clickGenerate`, `clickSave`, `setNumGroups`, `setSessionName`, `selectSource`) after discovering the Tailwind class issue. First version was completely unusable.
+
+**`generate-groups.ts` form pool query** — original: `from("form_responses").select("user_id, profiles(id, name, graduation_year, role)")`. `form_responses.user_id` references `auth.users`, not `profiles`. No FK between them → PostgREST returns an error. Rewrote to two-step: get `user_id` list from `form_responses`, then `.from("profiles").select(...).in("id", userIds)`. Should have checked the schema before writing the query.
+
+**`chats-tab.tsx` build error** — two calls to `handleRemoveMember` which doesn't exist (actual function is `stageRemoveMember`). Caught only during `npm run build` after writing unrelated code. Should have been caught at write time.
+
+---
+
+### Edge cases missed the first time
+
+**`form_responses.user_id → auth.users` (not `profiles`)** — Only the `rsvps` table has a FK to `profiles`. `form_responses` doesn't. The PostgREST join `profiles(...)` silently returns an error. Missed because I assumed all user_id columns follow the same pattern. One `grep "REFERENCES" supabase/forms_migration.sql` would have caught it.
+
+**Clamping when requested groups > pool size** — Was in the algorithm from the start (line: `Math.min(Math.max(1, params.numGroups), pool.length)`) but wasn't tested until T5. The clamp works correctly; the test just needed to verify it.
+
+**Test cascade from slow saves** — Didn't account for the fact that saving 10 groups is not instantaneous. The test assumed each `clickSave` + 3000ms was sufficient before moving to the next test. For 1-3 groups it would have been fine, but 10 groups exposed the gap.
+
+---
+
+### Testing steps that were unnecessary or redundant
+
+Running the full 10-test suite 3+ times while the root selector issue (`[style*="position: fixed"]`) was still unfixed. Every test after T1 was guaranteed to fail for the same reason. Should have fixed the selector, verified T1 passes, then run the full suite.
+
+Running T3–T7 before fixing the `clickSave` timing issue. All of those failures were downstream of T2 not closing before T3 started. One targeted fix would have unblocked all of them.
+
+---
+
+### What would be done differently
+
+1. **Read the DOM before writing selectors.** Take a screenshot of the feature at the `openWizard` step, inspect the classes on the overlay, then write the selector. Never guess.
+
+2. **Check all FK relationships before writing any join.** For every `select("..., otherTable(col)")`, run `grep "REFERENCES" supabase/*.sql` for that table. 30 seconds. Prevents silent PostgREST errors.
+
+3. **Use `waitForFunction` instead of `waitForTimeout` for async operations.** Every place the test waits for a state change (wizard closes, save completes, step transitions) should use `page.waitForFunction(() => ...)` with a reasonable timeout, not a fixed sleep. Fixed sleeps fail on slow days and pass on fast ones.
+
+4. **Test one failure at a time.** When multiple tests fail, fix the first one completely before running again. Don't re-run a suite where you know tests 3–10 will cascade from test 2's failure.
+
+5. **Isolate Supabase Realtime cleanup as its own concern.** The Strict Mode double-invoke issue is not specific to meeting notes — it will affect any feature using `supabase.channel()`. Should have a reusable cleanup pattern documented from the first time it was solved.
+
+---
+
+### What the testing skill should prevent next time
+
+- Writing Playwright selectors without inspecting the actual rendered DOM → selector rules section
+- Writing PostgREST joins without verifying FK exists → schema verification section
+- Fixed-timeout waits for async state → `waitForFunction` rule
+- Running full test suites when a known root cause affects every test → "never run the same failing test twice without a root-cause fix" rule
+- Marking a feature done after only happy-path testing → definition of done checklist
+
+---
+
+### Time estimate vs actual
+
+**Estimated:** 3–4 hours (wizard UI + algorithm + DB writes + basic testing)
+
+**Actual:** ~8–10 hours across two sessions
+
+**Why it differed:**
+- Realtime crash was pre-existing but surfaced during testing: +2h
+- Playwright test infrastructure (building, debugging selectors, fixing timing): +2–3h (test harness was written from scratch and included significant selector debugging)
+- `form_responses` FK bug: +30min
+- Cascading test failures from timing: +30min
+
+The feature implementation itself (wizard UI + algorithm + server action + DB schema) was on estimate. All the overrun was in testing infrastructure and debugging issues that should have been caught earlier with the schema check rule.
+
+## 2026-07-18 — Event fixtures vs. datetime display
+- calendar_events stores modal-typed times as `+00:00` but every surface renders with local `toLocaleTimeString/DateString` — so ANY seeded fixture (and any modal-created event) displays shifted by the viewer's UTC offset. Seed scripts must write America/New_York-offset timestamps (see seed-ccsf-events.mjs etOffset) until the storage convention is fixed app-wide. KNOWN BUG to fix in a dedicated pass: store/display disagree for user-created events.
+- Static e2e fixtures with "near-today" due dates (countdown.spec's Summer Retreat, seeded ~Jul 16) drift into different badge states as days pass — countdown.spec's "Auto-DM sent" assert broke by 7/18 with zero code change. Fixture due dates need re-anchoring relative to run time, not fixed dates.
+- Playwright has no getByDisplayValue (that's Testing Library) — assert inputs with getByPlaceholder(...).toHaveValue(...).
+
+---
+
+## One timestamptz column can hold two opposite conventions — and no query can separate them (2026-07-31)
+`calendar_events.start_date` had two producers writing incompatible meanings into the same column: `AddEventModal` wrote `${ymd}T${hhmm}:00+00:00` (a ministry wall clock mislabeled UTC) while the seed scripts wrote true Eastern instants. ~40 display sites read it as an instant, so a modal-created 7pm event rendered 3pm and the modal read a seeded noon event back as 4pm. **A modal event typed 4:00 PM and a seeded noon-ET event are byte-identical** — same bytes, opposite meaning — so there is no repair query and no single shift that fixes the column. Diagnostic lessons: (1) when a display and an editor disagree about the SAME row, suspect two conventions before suspecting a cache; (2) the polarity of "which one is wrong" flips per row depending on the producer, which is the tell; (3) the fix is a single conversion layer every read and write routes through, plus re-seeding rather than repairing — Brian ratified re-seed precisely because heuristic repair would silently mis-shift the ambiguous rows. Check whether real tenants hold any of the affected data before pricing the migration: here all 141 rows were sandbox/test and the only real tenant had zero, which made a schema change nearly free.
+
+## `NOT VALID` does not make a CHECK constraint safe to add early (2026-07-31)
+`NOT VALID` skips only the scan of EXISTING rows; the constraint still enforces on every INSERT and UPDATE from the instant it lands — including updates that never touch the constrained columns. So a CHECK cannot be applied until every writer, **deployed to production**, populates the columns. The all-day invariant on `calendar_events` was correctly held back through six phases: zero violating rows and all app code fixed was still not enough, because the branch was unmerged and `main` — which production runs — had zero references to the new columns. Applying it would have failed every all-day event creation in production with `23514`. Sequence for adding a CHECK to a live table: fix all writers → merge → deploy → verify zero violations → add `NOT VALID` → `VALIDATE`.
+
+## A pg_cron entry-point function is not automatically private (2026-07-31)
+Seven SECURITY DEFINER cron functions (`run_sheet_tick`, `grade_bump_all_ministries`, and five more) carried the default `EXECUTE` grant to `PUBLIC`/`anon`/`authenticated` and are routed by PostgREST at `/rest/v1/rpc/<name>`. The anon key ships in the public client bundle, so they were internet-callable — one fires push notifications platform-wide, another mutates every ministry's grade data. The only thing limiting the blast radius was an incidental 9-10am time gate inside the function. Rules: (1) a function invoked ONLY by pg_cron should have `EXECUTE` revoked from every client role — cron runs as the function owner and is unaffected; (2) do the revoke BEFORE any rewrite that removes an incidental cap; (3) do NOT revoke the RLS helper functions (`auth_*`, `is_*`, `group_*`) — policies execute as the querying role and break without them, so enumerate carefully rather than revoking by pattern; (4) always `CREATE OR REPLACE`, never `DROP`+`CREATE` — a drop resets `proacl` and silently re-exposes what you just revoked.
+
+## A tenant boundary held up only by `RETURNING` is not a tenant boundary (2026-07-31)
+`calendar_events`' INSERT/UPDATE/DELETE policies had no `ministry_id` term; only the SELECT policy did. Because PostgREST's default `Prefer: return=representation` makes writes return the row, the SELECT policy filtered it and the write appeared to be denied — but **the same statement without `RETURNING` succeeded cross-tenant**. Probe every write policy in both shapes; a denial that depends on the response shape is an accident, not a policy. Related: the fix must go on the right clause — `USING` for DELETE, `WITH CHECK` for INSERT, and BOTH for UPDATE (the `WITH CHECK` half is what stops re-homing an existing row into another tenant, a case neither review pass had thought to probe until the fix made it obvious).
+
+## Date-only columns are not timezone problems — converting them creates one (2026-07-31)
+A cluster of "previous day" bugs all came from `new Date(ymd)` or `localDate.toISOString().split("T")[0]` applied to DATE columns (`purchase_date`, `entry_date`, `meeting_notes.date`, `due_date`). A DATE holds a calendar day with no instant and no zone; the bug is code round-tripping it through a `Date` and picking up an offset. The fix is to keep it a plain YMD string — **not** to convert it through a timezone, which would introduce the same bug in the opposite direction. Only `timestamptz` gets zone conversion. Two directional traps worth knowing: `new Date("2026-07-15")` parses as UTC midnight and renders as the PREVIOUS day west of UTC, while `new Date().toISOString()` yields TOMORROW's date east of ~8pm local — and a bug that fires ahead of UTC (a month-range query in Tokyo) may not reproduce in Eastern at all, so verify the direction before claiming a mechanism.

@@ -13,12 +13,14 @@ import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase"
 import { CentralModal, CentralButton, FilterChip, Textarea } from "@/components/central"
 import { compileEventTemplateAction, type CompileCurated } from "@/app/actions/event-templates"
+import { instantToZoned } from "@/lib/tz"
+import { useMinistryTimezone } from "../ministry-timezone-context"
 import type { CalendarEvent, TransitionNote } from "../types"
 
-// ── PT calendar-date helpers (mirror the server action, client-side preview) ──
-function ptYMD(iso: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date(iso))
-}
+// ── Calendar-date helpers (mirror the server action, client-side preview) ─────
+// The offsets previewed here MUST match the ones compileEventTemplateAction stores,
+// so both project instants onto the MINISTRY's calendar day (was hardcoded PT — a
+// day off for every Eastern ministry with an evening event or completion).
 function ymdToUTC(ymd: string): number {
   const [y, m, d] = ymd.split("-").map(Number)
   return Date.UTC(y, m - 1, d)
@@ -74,7 +76,8 @@ export function EventCompileModal({
   onCompiled?: (templateId: string) => void
 }) {
   const supabase = createClient()
-  const eventDate = ptYMD(calendarEvent.start_date)
+  const timeZone = useMinistryTimezone()
+  const eventDate = instantToZoned(calendarEvent.start_date, timeZone).ymd
 
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<Row[]>([])
@@ -124,7 +127,7 @@ export function EventCompileModal({
         src.map((t) => ({
           task: t,
           planned: t.due_date ? daysBetween(eventDate, t.due_date) : null,
-          actual: t.completed && t.completed_at ? daysBetween(eventDate, ptYMD(t.completed_at)) : null,
+          actual: t.completed && t.completed_at ? daysBetween(eventDate, instantToZoned(t.completed_at, timeZone).ymd) : null,
           brief: "",
           useActual: false,
         })),

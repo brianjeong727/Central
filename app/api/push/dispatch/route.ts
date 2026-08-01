@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import webpush, { WebPushError } from "web-push"
 import { createAdminClient } from "@/lib/supabase-admin"
 import { apnsReady, sendApnsNotification } from "@/lib/apns"
+import { getMinistryTimezone } from "@/lib/ministry-timezone"
+import { formatInZone, resolveMinistryTimezone, todayInZone } from "@/lib/tz"
 import { isAdminRole } from "@/lib/roles"
 import type { NotificationSettings } from "@/app/home/types"
 
@@ -338,23 +340,37 @@ async function resolveSignoffIds(admin: AdminClient, ministryId: string): Promis
   return ids
 }
 
-// event_date is timestamptz (UTC — the composer writes `new Date(local).toISOString()`).
-// There is NO per-ministry timezone column (verified), so absolute reminder times are
-// rendered in a single platform-default zone; documented in build-report §Timezone.
-// A follow-on to add `ministries.timezone` would make this per-ministry correct.
-const DEFAULT_EVENT_TZ = "America/Los_Angeles"
-function eventTime(iso: string | null | undefined): string {
-  if (!iso) return ""
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return ""
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: DEFAULT_EVENT_TZ })
+// ── Timezone (per ministry) ───────────────────────────────────────────────────
+// This route renders wall-clock times and compares against DATE columns, both of
+// which need a zone. That zone is the MINISTRY's (`ministries.timezone`) — it used
+// to be a hardcoded America/Los_Angeles, which rendered every reminder 3 hours
+// early for an Eastern ministry and mis-worded "due today"/"due tomorrow" for any
+// task in the 21:00–23:59 ET window (PT is still on the previous day then).
+//
+// The route is push-secret-gated, not user-auth'd, so the zone is read with the
+// service-role admin client from the ministry that owns the row being notified
+// about. When no ministry is in scope at all the row itself is broken — that is
+// logged, never silently defaulted (resolveMinistryTimezone is the ONE fallback).
+async function ministryTimeZone(admin: AdminClient, ministryId: string | null | undefined): Promise<string> {
+  if (!ministryId) {
+    console.error("[tz] push dispatch: no ministry in scope for a time-rendering notification — using the fallback zone")
+    return resolveMinistryTimezone(null)
+  }
+  return getMinistryTimezone(admin, ministryId)
 }
 
-// Today's / tomorrow's calendar date in PT as 'YYYY-MM-DD' (matches event_tasks.due_date,
-// a plain DATE). en-CA formats as ISO date; tomorrow is computed from a UTC-anchored copy of
-// today so it's DST-safe (we only ever add one calendar day to a date-only string).
-function ptDate(offsetDays = 0): string {
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: DEFAULT_EVENT_TZ })
+// A stored instant → the clock time it reads as in the ministry's zone.
+function eventTime(iso: string | null | undefined, timeZone: string): string {
+  if (!iso) return ""
+  return formatInZone(iso, timeZone, { hour: "numeric", minute: "2-digit" })
+}
+
+// Today's / tomorrow's calendar date in the ministry's zone as 'YYYY-MM-DD' (matches
+// event_tasks.due_date, a plain DATE authored on the ministry's local calendar).
+// Tomorrow is computed from a UTC-anchored copy of today so it's DST-safe (we only
+// ever add one calendar day to a date-only string).
+function zoneDate(timeZone: string, offsetDays = 0): string {
+  const today = todayInZone(timeZone)
   if (offsetDays === 0) return today
   const d = new Date(`${today}T00:00:00Z`)
   d.setUTCDate(d.getUTCDate() + offsetDays)
@@ -559,14 +575,16 @@ async function resolveTaskDue(admin: AdminClient, recordId: string): Promise<Res
   const settings = await settingsFor(admin, t.assigned_to)
   if (settings.deadlines === false) return []
 
-  // Wording keys off due_date (a DATE) vs today/tomorrow in PT.
+  // Wording keys off due_date (a DATE, authored on the ministry's local calendar)
+  // vs today/tomorrow in THAT ministry's zone — resolved from the task's plan.
+  const { teamId, ministryId } = await planContext(admin, t.event_plan_id)
+  const timeZone = await ministryTimeZone(admin, ministryId)
   const title = t.title || "a task"
   let body: string
-  if (t.due_date === ptDate(0)) body = `Due today: ${title}`
-  else if (t.due_date === ptDate(1)) body = `Due tomorrow: ${title}`
+  if (t.due_date === zoneDate(timeZone, 0)) body = `Due today: ${title}`
+  else if (t.due_date === zoneDate(timeZone, 1)) body = `Due tomorrow: ${title}`
   else body = `Task due soon: ${title}`
 
-  const { teamId } = await planContext(admin, t.event_plan_id)
   return [{
     userId: t.assigned_to,
     reason: "task_due",
@@ -797,7 +815,7 @@ async function resolveEventReminder(admin: AdminClient, recordId: string): Promi
   if (userIds.length === 0) return []
 
   const { data: profs } = await admin.from("profiles").select("id, notification_settings").in("id", userIds)
-  const time = eventTime(ann.event_date)
+  const time = eventTime(ann.event_date, await ministryTimeZone(admin, ann.ministry_id))
   const title = "Starting soon"
   const body = time
     ? `${ann.title || "An event you're attending"} at ${time}`

@@ -11,6 +11,8 @@ import {
 import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
 import { normalizeMoneyInput } from "../utils"
 import { useIsMobile } from "../use-is-mobile"
+import { useMinistryTimezone } from "../ministry-timezone-context"
+import { todayInZone } from "@/lib/tz"
 import { MonogramChip, FilterDropdown, FilterChip, CentralButton, SubpageShell, CentralModal, PocketRowCard, PocketRow, Toast, useScrollResetOn } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
@@ -138,6 +140,7 @@ export function SubmitReceiptModal({
   onClose: () => void; onSubmitted: (r: ReceiptType) => void
 }) {
   const supabase = createClient()
+  const timeZone = useMinistryTimezone()
   const fileRef = useRef<HTMLInputElement>(null)
   const categoryMode = !!categoryId
   // When not supplied (called outside FinanceWorkspace), self-fetch limits + funds
@@ -168,7 +171,10 @@ export function SubmitReceiptModal({
     setFund(prev => (funds.some(f => f.slug === prev) ? prev : funds[0].slug))
   }, [funds, categoryMode])
   const [amount, setAmount] = useState("")
-  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split("T")[0])
+  // `purchase_date` is a DATE column — the ministry's calendar day, not an
+  // instant. `new Date().toISOString()` gave the UTC day, so a receipt
+  // submitted after 8pm Eastern was stored dated TOMORROW.
+  const [purchaseDate, setPurchaseDate] = useState(() => todayInZone(timeZone))
   const [eventName, setEventName] = useState("")
   const [notes, setNotes] = useState("")
   const [imageUrls, setImageUrls] = useState<string[]>([])
@@ -1101,6 +1107,7 @@ export function FinanceWorkspace({
   // Land each finance section swap at the top (window scroll on phone width).
   useScrollResetOn([section])
 
+  const timeZone = useMinistryTimezone()
   const [loading, setLoading] = useState(true)
 
   // Per-ministry fund list — single source for the inbox split editor + allocation
@@ -1144,7 +1151,8 @@ export function FinanceWorkspace({
   const [budgetEntries, setBudgetEntries] = useState<BudgetEntry[]>([])
   const [budgetLoading, setBudgetLoading] = useState(false)
   const [showAddEntry, setShowAddEntry] = useState(false)
-  const [entryDate, setEntryDate] = useState(new Date().toISOString().split("T")[0])
+  // DATE column — the ministry's calendar day. See the note on purchaseDate.
+  const [entryDate, setEntryDate] = useState(() => todayInZone(timeZone))
   const [entryCategory, setEntryCategory] = useState("DG Dinner")
   const [entryDescription, setEntryDescription] = useState("")
   const [entryAmount, setEntryAmount] = useState("")
@@ -1280,7 +1288,7 @@ export function FinanceWorkspace({
     setAddingEntry(true)
     const { data } = await addBudgetEntry({ ministryId, category: entryCategory, description: entryDescription.trim(), amount: amt, entryDate, fund: entryFund || null })
     if (data) setBudgetEntries(prev => [data, ...prev])
-    setEntryDate(new Date().toISOString().split("T")[0]); setEntryCategory("other"); setEntryDescription(""); setEntryAmount("")
+    setEntryDate(todayInZone(timeZone)); setEntryCategory("other"); setEntryDescription(""); setEntryAmount("")
     setShowAddEntry(false); setAddingEntry(false)
   }
 

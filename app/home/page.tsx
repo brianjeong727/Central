@@ -50,7 +50,9 @@ export default async function HomePage() {
 
   // Parallel fetch: ministry name + chat previews + user teams + active question
   const [ministryResult, chatResult, teamResult, questionResult] = await Promise.all([
-    supabase.from("ministries").select("name, governance_settings").eq("id", profile.ministry_id).single(),
+    // `timezone` rides this existing fetch (no extra round trip) — the shell
+    // provides it to every event surface via MinistryTimezoneProvider.
+    supabase.from("ministries").select("name, governance_settings, timezone").eq("id", profile.ministry_id).single(),
     supabase.rpc("get_chat_previews", { p_user_id: user.id, p_ministry_id: profile.ministry_id }),
     supabase
       .from("team_members")
@@ -174,6 +176,7 @@ export default async function HomePage() {
       initialProfile={safeProfile}
       ministryId={profile.ministry_id}
       ministryName={ministryResult.data?.name ?? ""}
+      ministryTimezone={(ministryResult.data as { timezone?: string | null } | null)?.timezone ?? null}
       initialRecentChats={initialRecentChats}
       initialUserTeams={initialUserTeams}
       initialActiveQuestion={initialActiveQuestion}
