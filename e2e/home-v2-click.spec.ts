@@ -60,7 +60,10 @@ test.describe("mobile Home v2 (Pocket Daybreak) - Phase 2", () => {
     const errors = watchConsole(page)
     await page.goto("/home")
 
-    await expect(vis(page, "E2E Sandbox").first()).toBeVisible({ timeout: 15000 })
+    // Derived, not hardcoded: the ministry is "E2E Sandbox" on lane 1 and
+    // "E2E Sandbox 2" on lane 2, so an exact literal fails on lane 2 for reasons
+    // unrelated to the code under test. See fixtures.ministryName().
+    await expect(vis(page, await sandbox().ministryName()).first()).toBeVisible({ timeout: 15000 })
     const gear = page.getByRole("button", { name: "Church settings" }).filter({ visible: true })
     await expect(gear).toBeVisible({ timeout: 10000 })
     const avatar = page.getByRole("button", { name: "Your profile" }).filter({ visible: true })

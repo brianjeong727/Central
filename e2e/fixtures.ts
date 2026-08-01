@@ -107,6 +107,57 @@ export function sandbox() {
     /** Resolve the sandbox member's auth user id (cached). */
     memberUserId: () => memberUserId(db),
 
+    /** This lane's ministry name — "E2E Sandbox" on lane 1, "E2E Sandbox 2" on lane 2.
+     *
+     *  Specs that assert on displayed identity must derive it rather than hardcode it:
+     *  a literal `getByText("E2E Sandbox", { exact: true })` passes on lane 1 and fails
+     *  on lane 2 for a reason that has nothing to do with the code under test. Deriving
+     *  keeps the coverage in BOTH lanes, which a skip would throw away. */
+    async ministryName(): Promise<string> {
+      const { data, error } = await db.from("ministries").select("name").eq("id", ministryId).single()
+      if (error) throw error
+      return (data as { name: string }).name
+    },
+
+    /** This lane's admin display name — "E2E Admin" / "E2E Admin 2". See ministryName. */
+    async adminName(): Promise<string> {
+      const { data, error } = await db.from("profiles").select("name").eq("id", await adminUserId(db)).single()
+      if (error) throw error
+      return (data as { name: string }).name
+    },
+
+    /** This lane's member display name — "E2E Member" / "E2E Member 2". See ministryName. */
+    async memberName(): Promise<string> {
+      const { data, error } = await db.from("profiles").select("name").eq("id", await memberUserId(db)).single()
+      if (error) throw error
+      return (data as { name: string }).name
+    },
+
+    /** Does a fixture row exist in THIS lane?
+     *
+     *  Lane 2 (slot s2 / port 3002) is seeded with the tenant and two users ONLY —
+     *  `scripts/seed-e2e.mjs` never seeded the hand-made teams, events and plans that
+     *  lane 1 accumulated. A spec built on those fixtures therefore fails on lane 2 for
+     *  a reason that has nothing to do with the code under test.
+     *
+     *  A suite that is normally red trains everyone to ignore red, and a REAL regression
+     *  then lands in that same noise and gets waved off. Use this to SKIP instead:
+     *
+     *      let hasFixture = false
+     *      test.beforeAll(async () => { hasFixture = await sandbox().hasRow("teams", { id: TEAM_ID }) })
+     *      test("…", async ({ page }) => {
+     *        test.skip(!hasFixture, "lane-1 fixture only — see fixtures.hasRow")
+     *        …
+     *      })
+     *
+     *  Always scope by ministry where the table has one, so a lane-1 row can never
+     *  satisfy a lane-2 run. */
+    async hasRow(table: string, match: Record<string, unknown>): Promise<boolean> {
+      const { data, error } = await db.from(table).select("*", { count: "exact", head: false }).match(match).limit(1)
+      if (error) return false
+      return (data ?? []).length > 0
+    },
+
     /** Insert a published announcement into the sandbox ministry. The title is
      *  force-prefixed with "E2E::" if the caller didn't already, so nothing this
      *  helper writes can escape prefix-based cleanup. */

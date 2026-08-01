@@ -239,12 +239,15 @@ test.describe("mobile Pocket sweep — directory via chats (e)", () => {
     await page.goto("/home?tab=chats")
     await page.getByRole("button", { name: "Directory" }).filter({ visible: true }).click()
     await expect(page).toHaveURL(/tab=directory/, { timeout: 10000 })
-    const memberRow = vis(page, "E2E Admin").first()
+    // Derived, not hardcoded — display names are lane-suffixed ("E2E Admin 2" on
+    // lane 2). See fixtures.adminName()/memberName().
+    const adminName = await sandbox().adminName()
+    const memberRow = vis(page, adminName).first()
     await expect(memberRow).toBeVisible({ timeout: 10000 })
     await memberRow.click()
 
     // Identity card + actions row (Send Message primary, ActionMenu kebab).
-    await expect(vis(page, "E2E Admin").first()).toBeVisible({ timeout: 10000 })
+    await expect(vis(page, adminName).first()).toBeVisible({ timeout: 10000 })
     await expect(vis(page, "Send Message").first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByRole("button", { name: "Member actions" }).filter({ visible: true }).first()).toBeVisible()
     // Shared details actually render when data exists (the with-data path).
@@ -258,7 +261,7 @@ test.describe("mobile Pocket sweep — directory via chats (e)", () => {
     // onboarding gate: every member-tier account must have gender + graduation_year
     // to reach protected pages at all), so the Contact section renders instead of
     // the full "No details shared yet" EmptyState.
-    const selfRow = vis(page, "E2E Member").first()
+    const selfRow = vis(page, await sandbox().memberName()).first()
     await expect(selfRow).toBeVisible({ timeout: 10000 })
     await selfRow.click()
     await expect(vis(page, "Graduation year").first()).toBeVisible({ timeout: 10000 })
