@@ -22,7 +22,11 @@ const APNS_ENDPOINT = "apns:E2E-APNS-FAKETOKEN-000000000000000000000000000000000
 test.describe.serial("APNs sender routing + prune classification", () => {
   let adminId: string
   let memberId: string
-  const dispatchUrl = "http://localhost:3001/api/push/dispatch"
+  // Slot-aware, not hardcoded: 3001 is s1. Running from any other slot POSTed the
+  // dispatch at a SIBLING worktree's dev server — a different branch, different code —
+  // while the assertions read this slot's database. Mirrors the E2E_PORT rule the rest
+  // of the harness follows (lessons.md "E2E harness targets E2E_PORT, not PORT").
+  const dispatchUrl = `http://localhost:${process.env.E2E_PORT ?? 3001}/api/push/dispatch`
   const secret = process.env.PUSH_WEBHOOK_SECRET
 
   test.beforeAll(async () => {

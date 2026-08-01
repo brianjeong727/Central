@@ -16,7 +16,8 @@ const ANN_PREFIX = `${E2E_PREFIX}push-v2-ann `
 test.describe.serial("Web push v2 senders", () => {
   let adminId: string
   let memberId: string
-  const dispatchUrl = "http://localhost:3001/api/push/dispatch"
+  // Slot-aware — see push-apns.spec.ts for why this must not be hardcoded to 3001.
+  const dispatchUrl = `http://localhost:${process.env.E2E_PORT ?? 3001}/api/push/dispatch`
   const secret = process.env.PUSH_WEBHOOK_SECRET
 
   test.beforeAll(async () => {
