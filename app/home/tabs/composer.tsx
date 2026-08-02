@@ -384,7 +384,7 @@ function ComposerImpl({
               <Send className="w-4 h-4 text-[var(--cream-on-dark)]" style={{ transform: "rotate(-30deg)" }} />
             </button>
           </div>
-          <div className="hidden md:flex justify-between mt-2 text-[11px] text-[var(--faint)]">
+          <div className="hidden md:flex justify-between mt-2 text-[11px] text-[var(--muted-text)]">
             <span>Press <span style={{ fontFamily: "ui-monospace,monospace" }}>↵</span> to send · <span style={{ fontFamily: "ui-monospace,monospace" }}>⇧↵</span> for new line</span>
             <span>End-to-end visible to {displayName} members</span>
           </div>

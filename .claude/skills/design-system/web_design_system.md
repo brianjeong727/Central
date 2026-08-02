@@ -35,9 +35,9 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--plum-light`  | `#4A1B4D` | Hero gradient light stop |
 | `--plum-tint`   | `color-mix(in srgb, var(--plum) 12%, var(--cream))` | Selection/wayfinding surface — the ONLY sanctioned light-plum surface; the universal selected-state surface (chips, segments, selected cards, active nav rows — §4.4) and identity-emphasis badges (your role, President, For You). NOT for status pills — statuses derive from the semantic accents (§4.7). Was raw `#EDE3EE` (read cool); ratified R4 |
 | `--ink`         | `#13101A` | Primary text |
-| `--body`        | `#5A5466` | Body text, sub-labels |
-| `--muted`       | `#8A8497` | Tertiary text, eyebrow mono, labels |
-| `--faint`       | `#A09A8C` | Disabled, helper text, timestamps |
+| `--body`        | `#474251` | Body text, sub-labels. **Darkened 2026-08-01** from `#5A5466` — not for its own legibility (that was already 7.07:1) but to re-open the gap to `--muted-text`, which the muted retune had flattened from 2.01:1 to 1.36:1. Now **1.81:1** vs muted, and **9.44:1** on `--cream` / 8.21:1 on `--ivory`. |
+| `--muted-text`  | `#6E687B` | Tertiary text, eyebrow mono, labels. **Retuned 2026-08-01** from `#8A8497`, which was **3.51:1** on `--cream` — failing WCAG AA-normal (4.5:1) for the 11–14px metadata it carries product-wide. New value: **5.21:1** on `--cream`, **4.53:1** on `--ivory`. Targeted against `--ivory` (the darkest standard surface), not cream — tuning against cream alone still failed on every other surface. |
+| `--faint`       | `#8E8777` | **NON-TEXT tier**: placeholders, disabled states, arrows, dashed slot glyphs. Retuned 2026-08-01 from `#A09A8C` (2.73:1 — failed even the 3:1 UI threshold). New value: 3.48:1 on `--cream`, 3.02:1 on `--ivory`. It does **not** meet AA for prose — anything a user must actually read uses `--muted-text` or `--body`. |
 | `--cream`       | `#FDFCF8` | Primary surface (page bg, cards) |
 | `--cream-panel` | `#FBF8F2` | Card / panel / overlay surface — the de-facto surface across cards, dropdowns, and modals (one step warmer than `--cream`) |
 | `--cream-on-dark` | `#F6F4EF` | Cream text / fill **on** plum or dark surfaces — slightly muted from `--cream` for legibility |
@@ -59,6 +59,20 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | `--veil`        | `color-mix(in srgb, var(--ink) 55%, transparent)` | Modal/overlay ink backdrop scrim (≡ `rgba(19,16,26,.55)`) — R11 |
 | `--veil-soft`   | `color-mix(in srgb, var(--ink) 40%, transparent)` | Lighter non-modal scrim (≡ `rgba(19,16,26,.40)`) |
 
+> **Text tier separation (2026-08-01 retune).** On `--cream`: ink 18.32:1 → body 9.44:1 →
+> muted-text 5.21:1 → faint 3.48:1. Every tier is legible against the surface **and** distinct
+> from its neighbours — `--body` vs `--muted-text` is **1.81:1**, essentially the 2.01:1 that
+> existed before the retune.
+> The retune was done in two moves, and the second is the non-obvious one: re-pointing
+> `--muted-text` for AA compliance flattened body-vs-muted to 1.36:1, so `--body` was darkened to
+> re-open it. **Fixing a token's contrast against the SURFACE can quietly collapse its contrast
+> against its NEIGHBOUR — check both.** The rejected alternative was lightening `--muted-text`
+> back toward 4.5-on-cream, which recovered only 0.20 of separation and dropped below AA on
+> `--cream-2`, `--body-bg`, and `--ivory`.
+> Known limit, do not chase: on `--plum-tint` (`#EDE3EE`) `--muted-text` is 4.28:1 — that surface
+> carries `--plum`/`--ink` text by §1.2, not muted. The **rail** is unaffected: it uses
+> `color-mix(--cream-on-dark 55%)`, never `--muted-text` (§2.1 R9).
+
 **Do not:** invent new neutrals. Do not use pure white (`#fff`) — always cream. Do not use saturated red, blue, or green for status. Do not use gradients except in the rare full-identity hero (§4.1). Do not use plum as a repeated surface, card background, or decorative fill — it is a surgical accent appearing in at most one or two intentional moments per view.
 
 > **Chat panel exception (intentional):** The Messages context panel uses the body background token (`--cream`) instead of the standard `--body-bg` panel tone. This is deliberate — the conversation list and thread are one master/detail activity; giving them a continuous surface (vs. a tonal step) creates the Messenger/iMessage feel where list and thread read as one connected space. All other section panels keep `--body-bg`.
@@ -74,23 +88,33 @@ Central is a daily-driver tool that an entire church community lives in for comm
 | Role | Family | Size | Weight | Letter-spacing | Use |
 |---|---|---|---|---|---|
 | Display    | serif | 56–64 | 600 | -0.02em      | Hero banner names ("SSO", "Student Org Board") |
-| H1 | serif | 44 | 600 | -0.02em | Page titles — **landing tier** (PageTitle default 44px). Workspace/detail pages use the compact **25px** tier (§3.1). These are the only two title tiers (R1, ratified 2026-07-09); the former 36px tier is retired. |
+| H1 | serif | 44 | 600 | -0.02em | Page titles — **display tier** (PageTitle default 44px). Used by landing pages **and by event-detail identity headers** (amended 2026-08-01), which pair it with the event meta line. Other workspace/detail pages use the compact **25px** tier (§3.1). These remain the only two title tiers (R1, 2026-07-09); the former 36px tier is still retired — event detail was raised into the *existing* 44 tier, **not** given a third one. |
 | H2         | serif | 28–36 | 600 | -0.02em      | Section titles inside a page |
 | H3         | sans  | 16–18 | 500 | 0            | UI-chrome card titles, role names, list headings. Serif H3 only for genuine editorial section heads within long-form content. |
+| L3 ruled section label | sans | 17 | **600** | 0 | Event-workspace section heads (`EventSectionHeader`). A **ruled** label, not a section H2: a `flex:1` hairline carries the section break, and count / meta / state / action ride the same row. **Takes no eyebrow** (see Pattern rules). Ratified 2026-08-01. |
+| L4 group divider | sans | 14 | **600** | 0 | Sub-grouping inside a ruled section (`NightDivider`) — the per-sub-event groups in Roles / Run of Show / Sub-events. **`--ink`**, same trailing rule; its mono date and count stay `--muted-text` for internal contrast. Subordinate to L3 by SIZE (14 vs 17), not by colour. |
+
+> **Why L4 is ink/600 and not muted/500 (corrected 2026-08-02 at sign-off).** It shipped as
+> `14/500 --muted-text` and read wrong: the group header was quieter *and* smaller than the
+> `15/500 --ink` row titles beneath it, so it scanned as a caption belonging to its own content
+> rather than as a header above it. **A group header must never be less prominent than the rows it
+> contains.** Bolding alone wouldn't have fixed it — the colour step was doing more damage than the
+> weight. Check new sub-headers against the rows *below* them, not just against the header above.
 | Body L     | serif | 19    | 400 | 0.1          | Long-form quotes, editorial body, transition notes, chat reading-room |
 | Body       | sans  | 14–15 | 400 | 0            | UI copy, descriptions |
 | Body S     | sans  | 12–13 | 400 | 0            | Secondary metadata |
-| Eyebrow / Mono | mono | 11 | 400 | 1.4 | All-caps labels above any title or section. **Always required above page H1 and section H2.** |
+| Eyebrow / Mono | mono | 11 | 400 | 1.4 | All-caps labels above any title or section. **Always required above page H1 and section H2** — *not* above an L3 ruled section label, and not on the compact workspace/detail headers exempted by §3.1. |
+| Mono metric | mono | 11 | 400 | 0.5 | `MONO_METRIC_STYLE` — **mixed case**, not all-caps: inline metrics that are values rather than labels ("12 days", "5 of 5 done", "4:30 PM", "in 17 days"). Distinct from the eyebrow, which is a label and stays uppercase. |
 | Numeric    | serif | 28–40 | 400 | -0.4 to -0.6 | Stat card numbers, invite codes — weight 400 is intentional; editorial numbers read differently from heading text |
 | Date anchor | serif | 36–42 | **600** | -0.02em | **Exception (approved 2026-06-30):** the single date/posted numeral that anchors the **featured announcement card's 40% slot** (36px — kept one step below the 44px page-H1 ceiling per R1, so the page header stays the size ceiling; the card title sits one step below the anchor at 30/600) and the **announcement detail aside** (42px) may be serif weight **600** — it acts as a display focal point, not a stat readout. Scoped to those two surfaces only; ordinary stat numbers stay weight 400. |
 
 **Pattern rules:**
 - Every page title is preceded by an eyebrow mono label (`DATE`, `SECTION · CONTEXT`, `WORKSPACE`, etc.).
-- Every section title inside a page repeats the eyebrow + serif H2 pattern.
+- Every section title inside a page repeats the eyebrow + serif H2 pattern — **except the L3 ruled section label**, which is an H3-tier ruled label rather than a section H2 and takes **no eyebrow** (its leading mono `meta` slot already qualifies the section). Ratified 2026-08-01.
 - Long bodies (announcements, transition notes, chat thread) are set in **serif at 17–19px** for a reading-room feel — not sans body.
 - Stat card numbers are serif, not bold sans.
 
-**Display weight threshold:** Weight 600 is the heading emphasis carrier — use it at the top of the hierarchy only. Reserve weight 600 for: page H1, section H2, display/hero text, **and the featured-card / announcement-detail date anchor (the §1.3 "Date anchor" exception)**. Use weight 400 for: editorial long-form body, stat card numbers, and all UI-chrome text (card titles in list views, role badges, metadata rows, tab labels, navigation items, helper copy). If more than two or three text nodes on a single screen carry weight 600, the hierarchy collapses and the effect is diluted.
+**Display weight threshold:** Weight 600 is the heading emphasis carrier — use it at the top of the hierarchy only. Reserve weight 600 for: page H1, section H2, display/hero text, **the featured-card / announcement-detail date anchor (the §1.3 "Date anchor" exception)**, **and the L3 ruled section label (sans 17/600)**. On an event pane exactly **three ROLES** carry 600 — the L1 title, the active tab, and the L3 section label — so the node count scales with the page's own structure (a pane with N sections and M sub-groups shows N+M+2). **Count ROLES, not nodes.** Repeating one role down a page is rhythm — seven group dividers are seven instances of *one* level, and the reader parses them as a set. Adding a fifth *role* is what collapses the hierarchy. Measured live after the L4 correction: Overview 5, Countdown 12, Roles 12, Run of Show 10, Sub-events 10 — all four roles, no more. The budget is about how many *kinds* of emphasis compete, not the raw node count: repeating one role down a page is rhythm, but adding a fourth role is what collapses the hierarchy. Use weight 400 for: editorial long-form body, stat card numbers, and all UI-chrome text (card titles in list views, role badges, metadata rows, tab labels, navigation items, helper copy). If more than two or three text nodes on a single screen carry weight 600, the hierarchy collapses and the effect is diluted.
 
 **Do not:** mix typefaces — Central uses Bricolage Grotesque exclusively; never import additional font families. Do not use weight 600 for body copy, UI labels, or metadata — reserve it for heading hierarchy (H1, H2, display). Do not all-caps anything except mono eyebrows.
 
@@ -147,7 +171,7 @@ Both modes share:
 - **User badge** at the very bottom — 30×30 ink square with cream initial.
 
 ### 2.3 Breadcrumbs
-`Central / Student Org Board / Plan / SSO` — last crumb in `#2D0F2E` weight 500; rest in `#8A8497` weight 400. Slash separator in `#8A8497`.
+`Central / Student Org Board / Plan / SSO` — last crumb in `#2D0F2E` weight 500; rest in `var(--muted-text)` weight 400. Slash separator in `var(--muted-text)`.
 
 **Chat exception (intentional):** The Messages tab omits the breadcrumb strip entirely. The chat header (group name + member row) is the page's context line — a "Central / Chats" breadcrumb above it would duplicate that context. This is a stated exception, not a bug.
 
@@ -178,13 +202,13 @@ For pages without a hero banner (R1 header anatomy, ratified 2026-07-09):
 
 ### 3.1 Workspace headers are compact
 
-**Rule:** Every Plan-tab workspace uses a **compact** header — `<TabPageHeader><PageTitle title={…} compact /></TabPageHeader>`: a **25px** serif title (vs the 36px default) and **no eyebrow**. This applies to ALL workspaces with no exceptions — Finance, Receipts, Praise, DG Praise, One-Time, Tech, the standard calendar team, Student Org Board, and Small Group Leaders. The only right-slot action is the Zone-B settings **gear** (icon button), sized to match the compact line box; creates never sit in this row (§3.2).
+**Rule:** Every Plan-tab workspace uses a **compact** header — `<TabPageHeader><PageTitle title={…} compact /></TabPageHeader>`: a **25px** serif title (vs the 36px default) and **no eyebrow**. This applies to ALL workspaces with no exceptions — Finance, Receipts, Praise, DG Praise, One-Time, Tech, the standard calendar team, Student Org Board, and Small Group Leaders. The right slot holds **Zone-B object actions only**: normally the settings **gear** (icon button), sized to match the compact line box. A **single labeled** Zone-B action is permitted where the object's primary configuration verb is not "settings" — e.g. **"Edit event"** on an event-detail header, which edits the calendar-event identity and must be reachable from every tab, not just Overview (ratified 2026-08-01). Two Zone-B actions sit side by side; **3+ still collapse to a kebab**. Creates never sit in this row (§3.2) — that rule is unchanged.
 
 The workspace's identity (which ministry, which team) is already carried by the sidebar and breadcrumb, so the header stays tight and title-only — do **not** add a `PLANNING · MINISTRY` / `RECEIPTS · TEAM` eyebrow back.
 
 The title-row right slot holds only the Zone-B manage action (the settings gear) — the create/add CTA lives in the content header per §3.2, not the title row.
 
-**Event/identity drill-down headers (carve-out retired, ratified 2026-07-09):** event/identity drill-down headers — e.g. the Student Org and Small Group **event-detail** headers — now use the **compact 25px** tier like all detail pages (in practice rendered by `SubpageShell`, which is already 25px). The former 36px `PageTitle` + eyebrow carve-out is retired; there are only two title tiers (44 landing / 25 compact).
+**Event/identity drill-down headers (amended 2026-08-01):** **event-detail** headers — the Student Org and Small Group event-detail pages — use the **44px display tier** together with the event meta line (§4.22), because the event page is a five-tab workspace whose title must out-rank an L3 ruled section label at 17px. Other identity drill-downs keep the **compact 25px** tier (rendered by `SubpageShell`, which is 25px by default; event detail opts in via `titleScale="display"`). The retired **36px** tier stays retired — this raises event detail into the *existing* 44 tier rather than reviving a third one, so there are still only two (44 display / 25 compact).
 
 ### 3.2 Action placement — one home per button type
 
@@ -273,7 +297,7 @@ The Pastor Pulse question rides **inside** the home hero carousel as a hosted **
 ### 4.2 Tabs (underline)
 - Container: `display: flex; gap: 32; border-bottom: 1px solid #E8E2D2;`
 - Tab: `padding: 12px 0 14px; font-size: 15;`
-- Inactive: color `#8A8497`, weight 400, `border-bottom: 2px solid transparent`
+- Inactive: color `var(--muted-text)`, weight 400, `border-bottom: 2px solid transparent`
 - Active: color `#2D0F2E`, weight 600, `border-bottom: 2px solid #3E1540`, `margin-bottom: -1px`
 
 **Underline tabs switch VIEWS.** For mutually-exclusive FILTERS/modes, use the sanctioned `SegmentedControl` (R4, ratified 2026-07-09) — radius-999 pills carrying the one selected-state grammar (§4.4). Never boxed/pill TABS for view navigation; never underline tabs for filters.
@@ -392,7 +416,7 @@ For meeting notes, transition notes, activity feeds.
 ### 4.16 Composer
 - Pill: 1px `#E2DDCF`, radius 16, `#F8F4EA` bg, padding 10/12/10/16.
 - `+` attachment button left, formatting micro-toolbar middle, plum-2 send button (38 sq, radius 10).
-- Helper line below: 11px `#A09A8C`, left = keyboard hint, right = audience scope.
+- Helper line below: 11px `var(--faint)`, left = keyboard hint, right = audience scope.
 - **Composer bar container:** no top divider, background continuous with the chat body background token. The bar blends into the thread — only the input pill itself carries a distinct affordance. The reply preview, attachment preview, and archived-state bars use the same background and no top border.
 
 ### 4.17 Modal (for **creation/config only**, never navigation)
@@ -473,8 +497,8 @@ When someone views a workspace they can't edit (a governance admin with view-onl
 The **Overview** tab of an event's plan workspace is a **two-column** layout (`1fr 336px`) shared by all standard team events (worship weeks use their own workspace, not this). Under the serif event title + underline tabs:
 
 **Left column** —
-- **Identity header:** the serif event date + a compact facts list (mono key `Time` / `Where` / `What` + value; empty facts omitted), with an **"Edit event"** outline button (edits the calendar-event identity) — bottom hairline.
-- **Launchpad** ("Jump into planning"): a column of link rows into the event's OWN planning tabs, built dynamically per event template — **Checklist** and **Roles & Leads** always first (each with a metric: a mini `--plum` progress bar + "N / M" for checklist, "N / M assigned" for roles), then one row per the event type's `extraTabs` (Sub-events, New Folks, Acts, Teams, Transport, Program). Each row: ivory icon-chip (plum icon) + serif title + subtitle + right-side metric/arrow; hover → `--plum` border + slight translateX. **No left-border on the primary rows** — they're distinguished by position + the progress metric, not a border (the §8.7 exception is NOT extended here).
+- ~~**Identity header**~~ — **removed 2026-08-01.** Event facts no longer live in the Overview column. The **event meta line** under the 44px title (§3.1) carries date range · duration · location · countdown on **every** tab, and **"Edit event"** moved to the header's Zone-B right slot so it is reachable from all five tabs instead of Overview only. `What` folds into the "About this event" prose, which now opens the column. *(Phone width is unaffected — `MobileFactsGrid` is `md:hidden` and governed by `mobile_design_system.md`.)*
+- **Launchpad** ("Jump into planning"): a column of link rows into the event's OWN planning tabs, built dynamically per event template — **Countdown** and **Roles** always first (each with a metric: a mini `--plum` progress bar + "N / M" for countdown, "N / M assigned" for roles; Sub-events carries "N scheduled"), then one row per the event type's `extraTabs` (Sub-events, New Folks, Acts, Teams, Transport, Program). Each row: ivory icon-chip (plum icon) + serif title + subtitle + right-side metric/arrow; hover → `--plum` border + slight translateX. **No left-border on the primary rows** — they're distinguished by position + the progress metric, not a border (the §8.7 exception is NOT extended here).
 - **Planning notes** (demoted): an editable `--cream-2` box for free-form context.
 
 **Right column** — three stat cards (`--cream`, `--r-callout`): **Expected turnout** (serif number or `—`, click-to-edit), **Budget** (allocated number, click-to-edit; divider; ministry-allocation sub-line or "No ministry budget set"), and **Readiness** (a status dot — `--gold` needs-attention → `--success`/`--sage` ready — + a 5-segment bar + "X of N done · P%", derived from checklist completion).
@@ -505,7 +529,8 @@ Mandatory elements above the fold:
 
 ## 6. Content & copy
 
-- **Headings are nouns, not commands.** "Roles & Leads", "Transition Notes", "Up Next" — not "Manage roles" or "View notes".
+- **Headings are nouns, not commands.** "Roles", "Transition Notes", "Up Next" — not "Manage roles" or "View notes".
+- **A tab's label and every link pointing at it must read the same.** The event workspace's launchpad row, its tab, and its section vocabulary are one name. Renaming a tab is never a one-site edit — grep for the old string, including comments, or the old name resurfaces the next time someone greps for it.
 - **Eyebrows describe context.** "INSTITUTIONAL MEMORY — NEVER DELETED" beats "NOTES".
 - **Helper text reads like a sentence.** End with a period when it's a full sentence; omit the period when it's a label fragment.
 - **Numerals:** spell out one through nine in prose; use digits in stats, lists, and metadata.
@@ -647,7 +672,7 @@ Mechanical rules a linter could enforce — each is a hard "never," each has a t
 
 - Minimum hit target 30 sq for chrome buttons, 34 sq for primary header buttons.
 - Body text minimum 13px; sub-labels minimum 11px (mono eyebrows excepted as labels).
-- Color contrast: ink `#13101A` on cream `#FDFCF8` is the primary text pair; do not use `#8A8497` on `#FDFCF8` for anything longer than a label.
+- Color contrast: ink `#13101A` on cream `#FDFCF8` is the primary text pair. Since the 2026-08-01 retune, `--muted-text` (`#6E687B`) clears AA-normal on every standard surface, so the old "labels only" restriction is lifted — it may carry real metadata. **`--faint` (`#8E8777`) still may not**: it is a non-text tier (placeholders, disabled, arrows, dashed glyphs) and does not meet AA for prose.
 - Layouts are designed at 1440 width and scale by content reflow, not by hiding columns.
 
 ---
@@ -694,7 +719,7 @@ Paste-ready patterns. Use these verbatim when assembling a new page — they enc
 ```jsx
 const mono = {
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-  fontSize: 11, letterSpacing: 1.4, color: "#8A8497", textTransform: "uppercase",
+  fontSize: 11, letterSpacing: 1.4, color: "var(--muted-text)", textTransform: "uppercase",
 };
 
 <div style={mono}>SATURDAY, MAY 16 · SOCIAL</div>
@@ -708,7 +733,7 @@ const mono = {
                letterSpacing: "-0.02em", color: "#13101A" }}>
     Church Settings
   </h1>
-  <div style={{ fontSize: 15, color: "#5A5466", marginTop: 8 }}>
+  <div style={{ fontSize: 15, color: "var(--body)", marginTop: 8 }}>
     Identity, members, and discovery controls for your ministry.
   </div>
 </div>
@@ -762,7 +787,7 @@ const mono = {
       <button key={t} onClick={() => setActive(t)} style={{
         background: "none", border: "none", cursor: "pointer",
         padding: "12px 0 14px", fontSize: 15, fontFamily: "var(--sans)",
-        color: on ? "#2D0F2E" : "#8A8497",
+        color: on ? "#2D0F2E" : "var(--muted-text)",
         fontWeight: on ? 600 : 400,
         borderBottom: on ? "2px solid #3E1540" : "2px solid transparent",
         marginBottom: -1,
@@ -779,7 +804,7 @@ const mono = {
     <div style={mono}>EVENT BRIEF</div>
     <h2 style={{ fontFamily: "var(--serif)", fontSize: 36, margin: "6px 0 0",
                  letterSpacing: "-0.02em", color: "#13101A" }}>Planning Details</h2>
-    {/* body 15 sans #5A5466 line-height 1.7 */}
+    {/* body 15 sans var(--body) line-height 1.7 */}
   </div>
   <aside style={{ display: "flex", flexDirection: "column", gap: 18 }}>
     {/* stat cards */}
@@ -793,7 +818,7 @@ const mono = {
   <div style={mono}>EXPECTED TURNOUT</div>
   <div style={{ fontFamily: "var(--serif)", fontSize: 40, marginTop: 10,
                 color: "#13101A", letterSpacing: -0.6 }}>100</div>
-  <div style={{ fontSize: 13, color: "#8A8497", marginTop: 4 }}>guests · capacity 120</div>
+  <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>guests · capacity 120</div>
 </div>
 ```
 
@@ -806,7 +831,7 @@ const btnPrimary = {
 };
 const btnSecondary = {
   padding: "10px 16px", borderRadius: 10, border: "1px solid #E2DDCF",
-  background: "transparent", color: "#5A5466",
+  background: "transparent", color: "var(--body)",
   fontSize: 13, fontFamily: "var(--sans)", cursor: "pointer",
 };
 const btnPlumOutline = {
@@ -828,7 +853,7 @@ const btnDestructive = {
                 fontSize: 19, lineHeight: 1.45, color: "#13101A" }}>
     “Start outreach to the graduating class 3 weeks out — sign-ups dropped off last year when we waited.”
   </div>
-  <div style={{ marginTop: 10, fontSize: 13, color: "#8A8497" }}>
+  <div style={{ marginTop: 10, fontSize: 13, color: "var(--muted-text)" }}>
     <span style={{ color: "#2D0F2E", fontWeight: 500 }}>Min Park</span> · Past President · 2025
   </div>
 </article>
@@ -857,7 +882,7 @@ const btnDestructive = {
     padding: "7px 12px", borderRadius: 999,
     border: "1px solid " + (p.on ? "#3E1540" : "#E2DDCF"),
     background:  p.on ? "#3E1540" : "#FDFCF8",
-    color:       p.on ? "#FDFCF8" : "#5A5466",
+    color:       p.on ? "#FDFCF8" : "var(--body)",
     fontSize: 12, fontWeight: p.on ? 500 : 400,
     fontFamily: "var(--sans)", cursor: "pointer",
   }}>{p.label}</button>
@@ -879,7 +904,7 @@ const btnDestructive = {
   </span>
   <div>
     <div style={{ fontSize: 13, fontWeight: 500, color: "#13101A" }}>Pin to top</div>
-    <div style={{ fontSize: 12, color: "#8A8497", marginTop: 2 }}>
+    <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>
       Stays at the top of Announcements for 7 days
     </div>
   </div>
@@ -887,12 +912,31 @@ const btnDestructive = {
 ```
 
 ### 11.13 Inline add affordance
-A clickable dashed control for **adding content** in place — an upload slot, an "+ Add image, file, or link" row. This is an **action**, not an empty state: empties never contain CTAs (§4.19). Use it only where a tap directly adds/attaches something.
+A clickable control for **adding content** in place — an upload slot, an "+ Add image, file, or link" row, a per-group add. This is an **action**, not an empty state: empties never contain CTAs (§4.19). Use it only where a tap directly adds/attaches something.
+
+**Two variants — the choice is structural, not aesthetic:**
+- **`InlineAddRow`** — a bare row (Plus + label, 14px `--muted-text`, `padding: 12px 2px`, hover → `--plum`). Use to **append to a list that already has content**.
+- **`InlineAddCard`** — the dashed control below. Use **only for a genuinely empty group**.
+
+**Placement rule (ratified 2026-08-01).** An add control must name the list it lands in:
+1. **The collection is grouped → an `InlineAddRow` per group**, at the foot of each ("Add a block to Game Day"). Not one control for the whole section — a single "Add block" cannot say which group it joins.
+2. **Not grouped → the create rides the section rule** as a plum `ContentActionButton` (§3.2 Zone C).
+3. **A group is empty → a compact italic empty line above that group's own `InlineAddRow`.** The add control does **not** change shape just because the group is empty — every group in a grouped list carries the same bare row, so the rhythm holds. Use the compact italic line rather than the full `EmptyState` component when groups repeat (a 52px icon chip per empty night reads as a wall of chrome).
+4. **An UNGROUPED collection that is empty → `InlineAddCard`**, the dashed control. This is the only place the dashed variant belongs.
+
+> **Grouped always wins over empty.** If a list is grouped, rule 3 applies to every group — including
+> when *all* of them are empty. Otherwise the control would shape-shift on a data accident: a
+> one-night event with no blocks would show a dashed card while a two-night event with no blocks
+> showed bare rows. Read the rule off the list's STRUCTURE (is it grouped?), never off its current
+> row count. In practice this means Run of Show — always grouped by night — never shows the dashed
+> card at any density, while Roles' ungrouped week-spanning list does when it is empty.
+
+> **Why 3 and 4 split (ratified 2026-08-01, after seeing it at real density).** The original rule gave every empty *group* the dashed card. That reads fine in a mockup with one empty group among populated ones — and badly in production, where 5 of 7 nights are empty early in planning and the page becomes a stack of dashed boxes. The dashed control is an invitation to start a **collection**; inside a collection that already exists, a group with nothing in it is just a group with nothing in it. **Design a repeating pattern against its worst realistic density, not the mockup's.**
 ```jsx
 <button style={{
   padding: "14px 16px", borderRadius: "var(--r-callout)",
   border: "1.5px dashed var(--dashed)", background: "transparent",
-  color: "#5A5466", fontSize: 13, fontFamily: "var(--sans)", cursor: "pointer",
+  color: "var(--body)", fontSize: 13, fontFamily: "var(--sans)", cursor: "pointer",
   display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%",
 }}>
   + Add image, file, or link
@@ -912,7 +956,7 @@ A clickable dashed control for **adding content** in place — an upload slot, a
       <div style={{ fontFamily: "var(--serif)", fontSize: 22, color: "#13101A" }}>
         Archive ministry
       </div>
-      <div style={{ fontSize: 13, color: "#5A5466", marginTop: 6,
+      <div style={{ fontSize: 13, color: "var(--body)", marginTop: 6,
                     maxWidth: 520, lineHeight: 1.5 }}>
         Deactivates the ministry. Members lose access immediately. Data is preserved.
       </div>
@@ -991,7 +1035,7 @@ const MyNewPage = () => (
       {["Overview", "Detail", "Notes"].map((t, i) => (
         <div key={t} style={{
           padding: "12px 0 14px", fontSize: 15,
-          color: i === 0 ? "#2D0F2E" : "#8A8497",
+          color: i === 0 ? "#2D0F2E" : "var(--muted-text)",
           fontWeight: i === 0 ? 600 : 400,
           borderBottom: i === 0 ? "2px solid #3E1540" : "2px solid transparent",
           marginBottom: -1, cursor: "pointer",
@@ -1036,7 +1080,7 @@ First click replaces the delete control with a compact inline confirm:
     </button>
     <button
       onClick={() => setConfirmId(null)}
-      style={{ fontSize: 11, color: "#8A8497", background: "none", border: "none",
+      style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none",
                cursor: "pointer", padding: "2px 4px" }}
     >
       Cancel

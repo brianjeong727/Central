@@ -110,7 +110,7 @@ function StripCard({ chat, index, onOpen }: {
             {chat.groupName}
           </span>
           {chat.time && (
-            <span style={{ fontSize: 10, color: "var(--faint)", flexShrink: 0, fontFamily: "var(--sans)" }}>
+            <span style={{ fontSize: 10, color: "var(--muted-text)", flexShrink: 0, fontFamily: "var(--sans)" }}>
               {chat.time}
             </span>
           )}
@@ -126,7 +126,7 @@ function StripCard({ chat, index, onOpen }: {
         }}>
           {chat.lastMessageSender
             ? <><span style={{ fontWeight: 500 }}>{chat.lastMessageSender}:</span> {chat.lastMessage}</>
-            : chat.lastMessage || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>No messages yet</span>
+            : chat.lastMessage || <span style={{ color: "var(--muted-text)", fontStyle: "italic" }}>No messages yet</span>
           }
         </p>
       </div>

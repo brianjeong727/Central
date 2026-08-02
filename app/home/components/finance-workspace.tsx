@@ -1456,7 +1456,7 @@ export function FinanceWorkspace({
                     )}
                   </span>
                   <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>${Number(e.amount).toFixed(2)}</span>
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase", color: e.source === "reimbursement" ? "var(--plum)" : "var(--faint)", whiteSpace: "nowrap" }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase", color: e.source === "reimbursement" ? "var(--plum)" : "var(--muted-text)", whiteSpace: "nowrap" }}>
                     {e.source === "reimbursement" ? "Reimbursement" : "Manual"}
                   </span>
                 </div>
@@ -1667,7 +1667,7 @@ function AllocationSection({
 
   const monoLabel: React.CSSProperties = {
     fontFamily: "var(--mono)",
-    fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--faint)",
+    fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)",
   }
   const cellInput: React.CSSProperties = {
     background: "transparent", border: "none", outline: "none",
@@ -1815,12 +1815,12 @@ function AllocationSection({
                     </span>
 
                     {/* Spent */}
-                    <span style={{ fontSize: 14, textAlign: "right", fontVariantNumeric: "tabular-nums", color: spent > 0 ? "var(--ink)" : "var(--faint)" }}>
+                    <span style={{ fontSize: 14, textAlign: "right", fontVariantNumeric: "tabular-nums", color: spent > 0 ? "var(--ink)" : "var(--muted-text)" }}>
                       {spent > 0 ? `$${spent.toFixed(2)}` : emDash}
                     </span>
 
                     {/* Remaining — real minus + danger when negative */}
-                    <span style={{ fontSize: 14, textAlign: "right", fontVariantNumeric: "tabular-nums", color: rowOver ? "var(--danger)" : remaining > 0 && catTotal > 0 ? BUDGET_GREEN : "var(--faint)", fontWeight: rowOver ? 500 : 400 }}>
+                    <span style={{ fontSize: 14, textAlign: "right", fontVariantNumeric: "tabular-nums", color: rowOver ? "var(--danger)" : remaining > 0 && catTotal > 0 ? BUDGET_GREEN : "var(--muted-text)", fontWeight: rowOver ? 500 : 400 }}>
                       {catTotal > 0 || spent > 0 ? (remaining < 0 ? `−$${Math.abs(remaining).toFixed(2)}` : `$${remaining.toFixed(2)}`) : emDash}
                     </span>
                   </div>
@@ -1861,7 +1861,7 @@ function AllocationSection({
                                   />
                                 </div>
                               ) : (
-                                <span style={{ fontSize: 14, color: displayAmt > 0 ? "var(--ink)" : "var(--faint)" }}>
+                                <span style={{ fontSize: 14, color: displayAmt > 0 ? "var(--ink)" : "var(--muted-text)" }}>
                                   {displayAmt > 0 ? `$${displayAmt.toFixed(2)}` : "—"}
                                 </span>
                               )}
@@ -1885,7 +1885,7 @@ function AllocationSection({
                             style={{ width: "100%", background: "transparent", border: "none", outline: "none", resize: "vertical", fontSize: 13, fontFamily: "var(--sans)", fontStyle: notes ? "normal" : "italic", color: "var(--body)", lineHeight: 1.5, boxSizing: "border-box" }}
                           />
                         ) : (
-                          <p style={{ fontSize: 13, color: notes ? "var(--body)" : "var(--faint)", fontStyle: !notes ? "italic" : "normal", margin: 0 }}>
+                          <p style={{ fontSize: 13, color: notes ? "var(--body)" : "var(--muted-text)", fontStyle: !notes ? "italic" : "normal", margin: 0 }}>
                             {notes || "No notes for this category."}
                           </p>
                         )}
@@ -1903,10 +1903,10 @@ function AllocationSection({
               <span style={{ fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 500, color: "var(--ink)" }}>
                 {totalAllocated > 0 ? `$${totalAllocated.toFixed(2)}` : "—"}
               </span>
-              <span style={{ fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 500, color: totalSpent > 0 ? "var(--ink)" : "var(--faint)" }}>
+              <span style={{ fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 500, color: totalSpent > 0 ? "var(--ink)" : "var(--muted-text)" }}>
                 {totalSpent > 0 ? `$${totalSpent.toFixed(2)}` : "—"}
               </span>
-              <span style={{ fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 500, color: overBudget ? "var(--danger)" : totalRemaining > 0 ? BUDGET_GREEN : "var(--faint)" }}>
+              <span style={{ fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 500, color: overBudget ? "var(--danger)" : totalRemaining > 0 ? BUDGET_GREEN : "var(--muted-text)" }}>
                 {totalAllocated > 0 ? (totalRemaining < 0 ? `−$${Math.abs(totalRemaining).toFixed(2)}` : `$${totalRemaining.toFixed(2)}`) : "—"}
               </span>
             </div>
@@ -1996,7 +1996,7 @@ function AllocationSection({
                       title={cat.label}
                       sub={catTotal > 0 ? `Spent $${spent.toFixed(2)} of $${catTotal.toFixed(2)}` : "Not budgeted"}
                       right={catTotal > 0 ? (remaining < 0 ? `-$${Math.abs(remaining).toFixed(2)}` : `$${remaining.toFixed(2)}`) : "—"}
-                      rightColor={rowOver ? "var(--danger)" : catTotal > 0 && remaining > 0 ? BUDGET_GREEN : "var(--faint)"}
+                      rightColor={rowOver ? "var(--danger)" : catTotal > 0 && remaining > 0 ? BUDGET_GREEN : "var(--muted-text)"}
                       isLast={i === allCategories.length - 1}
                     />
                   )

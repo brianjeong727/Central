@@ -501,7 +501,7 @@ function MobileTaskRow({ item, last, onToggleTask }: { item: DeadlineItem & { ki
         </span>
         {item.context && <span className="line-clamp-1" style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2 }}>{item.context}</span>}
       </span>
-      {item.dueDate && <span style={{ fontSize: 11, color: "var(--faint)", flexShrink: 0, ...MONO_STYLE }}>{relLabel(item.dueDate)}</span>}
+      {item.dueDate && <span style={{ fontSize: 11, color: "var(--muted-text)", flexShrink: 0, ...MONO_STYLE }}>{relLabel(item.dueDate)}</span>}
       <TaskCheckbox checked={false} onClick={() => onToggleTask(item.id, true)} />
     </div>
   )

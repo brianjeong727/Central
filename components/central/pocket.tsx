@@ -122,7 +122,7 @@ export function PocketRow({
       </span>
       {(time || showDot) ? (
         <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
-          {time && <span style={{ fontSize: 11, color: "var(--faint)" }}>{time}</span>}
+          {time && <span style={{ fontSize: 11, color: "var(--muted-text)" }}>{time}</span>}
           {showDot && <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--plum)" }} />}
         </span>
       ) : null}

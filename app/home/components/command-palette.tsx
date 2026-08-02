@@ -138,7 +138,7 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
           )}
           {grouped.map((group) => (
             <div key={group.label}>
-              <div className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--faint)]">{group.label}</div>
+              <div className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--muted-text)]">{group.label}</div>
               {group.items.map((item) => {
                 const idx = flatIdx++
                 const active = idx === selectedIdx
@@ -164,7 +164,7 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-3 px-4 py-2.5 border-t border-[var(--line)] text-[10px] text-[var(--faint)]">
+        <div className="flex items-center gap-3 px-4 py-2.5 border-t border-[var(--line)] text-[10px] text-[var(--muted-text)]">
           <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 border border-[var(--line-2)] rounded bg-[var(--body-bg)] leading-none">↑</kbd><kbd className="px-1 py-0.5 border border-[var(--line-2)] rounded bg-[var(--body-bg)] leading-none">↓</kbd> navigate</span>
           <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 border border-[var(--line-2)] rounded bg-[var(--body-bg)] leading-none">↵</kbd> select</span>
           <span className="flex items-center gap-1"><kbd className="px-1 py-0.5 border border-[var(--line-2)] rounded bg-[var(--body-bg)] leading-none">esc</kbd> close</span>

@@ -1232,7 +1232,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                     <div className="text-center">
                       <MessageCircle className="w-10 h-10 text-[var(--line)] mx-auto mb-3" />
                       <p className="text-[14px] font-semibold text-[var(--muted-text)]">Select a chat</p>
-                      <p className="text-[12px] text-[var(--faint)] mt-1">Choose a conversation from the panel</p>
+                      <p className="text-[12px] text-[var(--muted-text)] mt-1">Choose a conversation from the panel</p>
                     </div>
                   </div>
                 )}
