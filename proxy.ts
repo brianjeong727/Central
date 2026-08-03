@@ -485,6 +485,11 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api/|_next/static|_next/image|favicon.ico|manifest\\.json|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mjs)$).*)',
+    // `.well-known` is excluded because Apple's AASA fetcher follows NO redirects and
+    // expects a bare 200 + application/json. Any middleware pass over
+    // /.well-known/apple-app-site-association risks an auth redirect, which silently
+    // breaks iOS password autofill in the native shell with no visible error.
+    // See app/.well-known/apple-app-site-association/route.ts.
+    '/((?!api/|\\.well-known/|_next/static|_next/image|favicon.ico|manifest\\.json|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mjs)$).*)',
   ],
 }
