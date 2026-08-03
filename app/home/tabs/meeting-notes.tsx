@@ -135,7 +135,7 @@ async function fetchNoteSections([, noteId]: readonly [string, string]) {
 const SECHEAD: React.CSSProperties = { display: "flex", alignItems: "baseline", gap: 12, marginBottom: 12 }
 const SECKICKER: React.CSSProperties = { ...EYEBROW_STYLE, fontSize: 11, letterSpacing: "0.14em" }
 const SECRULE: React.CSSProperties = { flex: 1, height: 1, background: "var(--line)" }
-const SECHINT: React.CSSProperties = { fontSize: 12, color: "var(--faint)" }
+const SECHINT: React.CSSProperties = { fontSize: 12, color: "var(--muted-text)" }
 
 function SectionHead({ kicker, hint }: { kicker: string; hint?: string }) {
   return (
@@ -443,7 +443,7 @@ export function MeetingNoteDetail({
               </div>
             )}
             {!canWrite && agenda.length === 0 && (
-              <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", margin: "6px 0 0" }}>No agenda was set.</p>
+              <p style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic", margin: "6px 0 0" }}>No agenda was set.</p>
             )}
           </div>
         </div>
@@ -489,7 +489,7 @@ export function MeetingNoteDetail({
             </div>
           )}
           {!canWrite && decisions.length === 0 && (
-            <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", margin: "6px 0 0" }}>No decisions were recorded.</p>
+            <p style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic", margin: "6px 0 0" }}>No decisions were recorded.</p>
           )}
           {note.linked_event_id && linkedEventTitle && (
             <div style={{ display: "flex", gap: 9, alignItems: "flex-start", fontSize: 12, color: "var(--body)", lineHeight: 1.45, background: "var(--cream-2)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "10px 14px", marginTop: 10 }}>
@@ -684,7 +684,7 @@ export function MeetingNotesSection({
   if (notes.length === 0) {
     return (
       <div style={{ borderLeft: "1px solid var(--line)", paddingLeft: 24, paddingTop: 4, paddingBottom: 4 }}>
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)", margin: 0 }}>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--muted-text)", margin: 0 }}>
           {canWrite ? "No notes yet — start a new one." : "No notes have been created yet."}
         </p>
       </div>
@@ -763,7 +763,7 @@ export function MeetingNotesSection({
                   <span style={{ display: "block", fontSize: 13, color: "var(--body)", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.4 }}>
                     {decs.length > 0
                       ? decs.slice(0, 2).map(x => x.text).join(" · ")
-                      : <span style={{ color: "var(--faint)", fontStyle: "italic" }}>{draft ? "No decisions yet — meeting in progress" : "No decisions recorded"}</span>}
+                      : <span style={{ color: "var(--muted-text)", fontStyle: "italic" }}>{draft ? "No decisions yet — meeting in progress" : "No decisions recorded"}</span>}
                   </span>
                 </span>
                 <span style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
@@ -785,7 +785,7 @@ export function MeetingNotesSection({
         </div>
       ))}
       {filtered.length === 0 && (
-        <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", marginTop: 24 }}>No notes match “{query}”.</p>
+        <p style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic", marginTop: 24 }}>No notes match “{query}”.</p>
       )}
     </div>
   )

@@ -223,7 +223,7 @@ export function EventCompileModal({
       )}
 
       {loading ? (
-        <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic" }}>Loading event…</p>
+        <p style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic" }}>Loading event…</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
           {/* Playbook name */}
@@ -265,7 +265,7 @@ export function EventCompileModal({
             <label style={labelStyle}>Tasks &amp; timing</label>
             <div style={{ marginTop: 8, border: "1px solid var(--line-2)", borderRadius: 12, overflow: "hidden" }}>
               {rows.length === 0 ? (
-                <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "16px 14px", margin: 0 }}>No tasks on this event.</p>
+                <p style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic", padding: "16px 14px", margin: 0 }}>No tasks on this event.</p>
               ) : rows.map((r, i) => {
                 const hasActual = r.actual !== null
                 return (

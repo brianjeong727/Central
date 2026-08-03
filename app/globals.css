@@ -61,9 +61,32 @@
 
   /* Text colors */
   --ink:         #13101A;
-  --body:        #5A5466;
-  --muted-text:  #8A8497;  /* named --muted-text to avoid collision with shadcn --muted surface */
-  --faint:       #A09A8C;
+  /* --body — re-pointed from #5A5466 to #474251 (ratified 2026-08-01).
+     The --muted-text retune (#8A8497 → #6E687B) fixed legibility against every
+     surface but flattened the gap BETWEEN body and tertiary text: --body vs
+     --muted-text fell from 2.01:1 to 1.36:1. Darkening --body re-opens that gap
+     to 1.81:1 (near the pre-retune 2.01) while every tier stays AA-compliant.
+     #474251 is 9.44:1 on --cream, 8.21:1 on --ivory.
+     Rejected alternative: lightening --muted-text back toward 4.5-on-cream — it
+     bought only 1.36 → 1.56 separation and fell below AA on --cream-2,
+     --body-bg and --ivory. */
+  --body:        #474251;
+  /* --muted-text — named to avoid collision with the shadcn --muted SURFACE.
+     Re-pointed from #8A8497 (3.51:1 on --cream — failed AA-normal) to #6E687B:
+     5.21:1 on --cream, 4.53:1 on --ivory (the darkest standard surface) → passes
+     AA-normal everywhere a standard surface is used. Tier separation is preserved:
+     ink 18.32 → body 9.44 → muted 5.21 → faint 3.48.
+     Known limit, do NOT chase: on --plum-tint (the selected-state surface) this is
+     4.28:1. That surface carries --plum/--ink text by §1.2, never muted.
+     Do NOT re-point the dark rail off this token — desktop-nav.tsx deliberately uses
+     color-mix(--cream-on-dark 55%) because --muted-text drifts on deep plum. */
+  --muted-text:  #6E687B;
+  /* --faint is a NON-TEXT tier — placeholders, disabled states, arrows, dashed slot
+     glyphs. Re-pointed from #A09A8C (2.73:1 — failed even the 3:1 UI threshold) to
+     #8E8777: 3.48:1 on --cream, 3.02:1 on --ivory → clears the 3:1 UI/graphical
+     threshold. It still does NOT meet AA for prose: anything a user must actually
+     read uses --muted-text or --body. */
+  --faint:       #8E8777;
 
   /* Cream surface family */
   --cream:       #FDFCF8;
@@ -151,7 +174,9 @@
   --secondary:           #F1ECDE; /* ivory */
   --secondary-foreground: #2D0F2E;
   --muted:               #F1ECDE; /* ivory surface — shadcn uses this as a bg */
-  --muted-foreground:    #8A8497; /* spec --muted text */
+  --muted-foreground:    var(--muted-text); /* ALIAS, never a copy — a hardcoded duplicate of a token
+                                               silently drifts the moment the token moves (it did: this
+                                               held #8A8497 after --muted-text was re-pointed to #6E687B) */
   --accent:              #F1ECDE;
   --accent-foreground:   #2D0F2E;
   --destructive:         #9F3030; /* danger — outline only, per spec */
@@ -304,6 +329,9 @@
 
   /* ── Motion durations (seed token set — Central had inline ms before) ── */
   --dur-fast: 120ms;
+  /* Layout motion — a panel/rail changing WIDTH, not a hover tint changing color.
+     --dur-fast reads as a jump at that travel distance (300px+). */
+  --dur-layout: 240ms;
 }
 
 /* Modal entrance — slide up + fade */
@@ -517,6 +545,19 @@
 /* Destructive icon affordance (remove responsibility / delete link) → danger on hover */
 .central-icon-btn.resource-remove-btn:not(:disabled):hover { background: color-mix(in srgb, var(--danger) 8%, transparent); color: var(--danger); }
 
+/* ── CollapsibleRail (components/central/collapsible-rail.tsx) ─────────────
+   The fold animates `grid-template-columns` so both columns move as one; the
+   rail body only cross-fades (its pixel width is fixed, so it never re-wraps
+   mid-flight). Timing lives here, not inline, because the reduced-motion guard
+   is a media query. */
+.collapsible-rail { transition: grid-template-columns var(--dur-layout) var(--ease-out); }
+.collapsible-rail-body { transition: opacity var(--dur-layout) var(--ease-out); }
+.collapsible-rail-tab { transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out); }
+.collapsible-rail-tab:hover { color: var(--plum); }
+@media (prefers-reduced-motion: reduce) {
+  .collapsible-rail, .collapsible-rail-body { transition: none; }
+}
+
 /* ── Typing indicator animation ─────────────────────────────────────────── */
 @keyframes typing-bounce {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
@@ -525,7 +566,7 @@
 .typing-dot {
   width: 5px;
   height: 5px;
-  background: #8A8497;
+  background: var(--muted-text); /* token, not a copy — was a hardcoded #8A8497 duplicate */
   border-radius: 50%;
   display: inline-block;
   animation: typing-bounce 1.2s infinite ease-in-out;
@@ -601,7 +642,7 @@
   font-family: var(--font-inter), system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.75;
-  color: #5A5466;
+  color: var(--body);
   word-break: break-word;
 }
 .role-description-editor .ProseMirror > * + * { margin-top: 0.4em; }
@@ -637,7 +678,7 @@
 }
 
 /* Role description display (rendered HTML) */
-.role-desc-view { font-family: var(--font-inter), system-ui, sans-serif; font-size: 14px; color: #5A5466; line-height: 1.75; }
+.role-desc-view { font-family: var(--font-inter), system-ui, sans-serif; font-size: 14px; color: var(--body); line-height: 1.75; }
 .role-desc-view > * + * { margin-top: 0.4em; }
 .role-desc-view p { margin: 0; }
 .role-desc-view h1 {

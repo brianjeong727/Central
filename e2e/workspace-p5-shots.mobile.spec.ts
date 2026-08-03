@@ -231,7 +231,7 @@ test.describe("workspace p5 shots (mobile)", () => {
       await shot(page, name)
     }
     await openEventSpoke("Countdown", "countdown")
-    await openEventSpoke("Roles & Leads", "roles")
+    await openEventSpoke("Roles", "roles")
     await openEventSpoke("Run of Show", "runofshow")
 
     // 6. notes list

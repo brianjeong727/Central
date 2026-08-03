@@ -13,7 +13,6 @@ import { isNativeShell, isLikelyNativeShell } from "@/lib/native-push"
 const INK    = "var(--ink)"
 const BODY   = "var(--body)"
 const MUTED  = "var(--muted-text)"
-const FAINT  = "var(--faint)"
 const CREAM  = "var(--cream)"
 const CREAMP = "var(--cream-panel)"
 const CREAM2 = "var(--cream-2)"
@@ -144,7 +143,7 @@ function ChatRow({
       </div>
       {meta && (
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontFamily: MONO, fontSize: 10, color: FAINT }}>5m</span>
+          <span style={{ fontFamily: MONO, fontSize: 10, color: MUTED }}>5m</span>
           <span style={{ width: 7, height: 7, borderRadius: 999, background: PLUM }}/>
         </div>
       )}
@@ -629,7 +628,7 @@ export default function LandingPage() {
               Find an existing ministry <span>→</span>
             </a>
           </div>
-          <p style={{ fontSize: 13, color: FAINT, fontStyle: "italic", marginTop: 44 }}>Soli Deo gloria.</p>
+          <p style={{ fontSize: 13, color: MUTED, fontStyle: "italic", marginTop: 44 }}>Soli Deo gloria.</p>
         </div>
       </section>
 

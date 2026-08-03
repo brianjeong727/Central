@@ -42,7 +42,7 @@ function RailStep({ i, label, sub, status }: {
             color: status === "active" ? "var(--ink)" : "var(--muted-text)",
             fontWeight: status === "active" ? 500 : 400,
           }}>{label}</span>
-          <span style={{ display: "block", fontSize: 12, color: "var(--faint)", marginTop: 1 }}>{sub}</span>
+          <span style={{ display: "block", fontSize: 12, color: "var(--muted-text)", marginTop: 1 }}>{sub}</span>
         </span>
       </div>
       {i < STEPS.length - 1 && (

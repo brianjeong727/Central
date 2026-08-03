@@ -2293,7 +2293,7 @@ export function SettingsTab({
                                 <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{label}{log.entity_label ? ` "${log.entity_label}"` : ""}{roleChange}</div>
                                 <div style={{ marginTop: 2, fontSize: 12, color: "var(--muted-text)" }}>by {log.actor_name}</div>
                               </div>
-                              <div style={{ fontSize: 12, color: "var(--faint)", whiteSpace: "nowrap", paddingTop: 2 }}>{timeStr}</div>
+                              <div style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap", paddingTop: 2 }}>{timeStr}</div>
                             </div>
                           )
                         })}

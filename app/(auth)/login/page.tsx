@@ -281,7 +281,7 @@ function LoginContent() {
             <div style={{ ...mSub, marginTop: 6 }}>One home for your ministry.</div>
             <div style={{ textAlign: "center", marginTop: 40 }}>
               <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 15, color: "var(--body)", margin: 0 }}>&ldquo;Be still, and know that I am God.&rdquo;</p>
-              <span style={{ display: "block", marginTop: 6, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "1.4px", color: "var(--faint)", textTransform: "uppercase" }}>Psalm 46 : 10</span>
+              <span style={{ display: "block", marginTop: 6, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "1.4px", color: "var(--muted-text)", textTransform: "uppercase" }}>Psalm 46 : 10</span>
             </div>
           </div>
           <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>

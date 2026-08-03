@@ -1,3 +1,5 @@
+import { instantToZoned } from "@/lib/tz"
+
 export const REACTION_EMOJIS = ["👍", "❤️", "😂", "🙏", "🔥", "😮"]
 
 // Normalize a typed dollar amount on blur / Enter-commit: "7" → "7.00", "7.7" →
@@ -105,6 +107,47 @@ export function eventDateRangeShort(start: Date | string, end: Date | string): s
 /** Uppercase mono day header shared by Run of Show and Sub-events: "FRI · SEP 12". */
 export function eventDayHeaderLabel(d: Date): string {
   return `${d.toLocaleDateString("en-US", { weekday: "short" })} · ${d.toLocaleDateString("en-US", { month: "short" })} ${d.getDate()}`.toUpperCase()
+}
+
+/**
+ * A run-of-show block's length, from `event_blocks.duration_min` (integer minutes).
+ * This is INTEGER formatting, not date math — a block's duration carries no instant
+ * and no zone, so it never goes near `lib/tz.ts` (Convention #23).
+ *   30 → "30 min" · 60 → "1 hr" · 75 → "1 hr 15 min" · 90 → "1 hr 30 min"
+ * Null / zero / negative → "" so a caller can `label || undefined` a slot away.
+ */
+export function formatDurationMin(min: number | null | undefined): string {
+  if (min === null || min === undefined || !Number.isFinite(min) || min <= 0) return ""
+  const h = Math.floor(min / 60)
+  const m = Math.round(min % 60)
+  if (h === 0) return `${m} min`
+  if (m === 0) return `${h} hr`
+  return `${h} hr ${m} min`
+}
+
+// ── Event countdown ───────────────────────────────────────────────────────────
+// Promoted here from plan-tab.tsx now that a SHARED component (the L1 event meta
+// line) consumes it. Both keep the explicit `timeZone` argument: the countdown is
+// answered on the MINISTRY's calendar, never the device's (Convention #23) — an
+// 8pm ET event is still "today" for the ministry when UTC has already rolled over.
+
+/** Whole-day difference between two instants on the ministry's calendar (sign-preserving). */
+export function daysUntil(start: Date, now: Date, timeZone: string): number {
+  const s = Date.parse(`${instantToZoned(start, timeZone).ymd}T00:00:00Z`)
+  const n = Date.parse(`${instantToZoned(now, timeZone).ymd}T00:00:00Z`)
+  return Math.round((s - n) / 86400000)
+}
+
+/** Humanised countdown for a future event; null for past events (caller shows nothing). */
+export function countdownLabel(start: Date, now: Date, timeZone: string): { label: string; soon: boolean } | null {
+  const days = daysUntil(start, now, timeZone)
+  if (days < 0) return null
+  let label: string
+  if (days === 0) label = "Today"
+  else if (days === 1) label = "Tomorrow"
+  else if (days < 30) label = `in ${days} days`
+  else { const m = Math.round(days / 30); label = `in ${m} month${m === 1 ? "" : "s"}` }
+  return { label, soon: days <= 7 }
 }
 
 export function formatMessageTime(dateStr: string): string {

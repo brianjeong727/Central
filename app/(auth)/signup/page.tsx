@@ -62,7 +62,7 @@ function Field({ label, hint, helper, value, onChange, placeholder, type = "text
         />
         {trailing}
       </div>
-      {helper && <div style={{ fontSize: 12, color: "var(--faint)", marginTop: 8 }}>{helper}</div>}
+      {helper && <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 8 }}>{helper}</div>}
     </label>
   )
 }
@@ -853,7 +853,7 @@ function SignupContent() {
           <PocketField label="Full name" placeholder="Brian Jeong" value={memberName} onChange={(e) => setMemberName(e.target.value)} required autoComplete="name"/>
           <div>
             <span style={pocketFieldLabel}>Gender</span>
-            <div style={{ fontSize: 12.5, color: "var(--faint)", margin: "-2px 0 8px", paddingLeft: 4 }}>Helps us place you in the right small group.</div>
+            <div style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "-2px 0 8px", paddingLeft: 4 }}>Helps us place you in the right small group.</div>
             <div style={{ display: "flex", gap: 8 }}>
               {["Male", "Female"].map(g => (
                 <MGenderPill key={g} label={g} on={gender === g.toLowerCase()} onClick={() => setGender(g.toLowerCase())}/>

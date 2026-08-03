@@ -1728,7 +1728,7 @@ export function AnnouncementDetailView({
           >
             {ann.user_has_rsvped ? <><Check style={{ width: 15, height: 15 }} />Going — tap to undo</> : "RSVP"}
           </CentralButton>
-          <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, textAlign: "center" }}>{ann.rsvp_count} going</div>
+          <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 12, textAlign: "center" }}>{ann.rsvp_count} going</div>
           {showAttendees && (
             <div className="flex flex-wrap justify-center gap-1.5" style={{ marginTop: 12 }}>
               {ann.rsvp_attendees.map((a) => <span key={a.user_id} onClick={() => openMemberProfile(a.user_id)} style={{ fontSize: 12, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999, cursor: "pointer" }}>{a.name.split(" ")[0]}</span>)}
@@ -1787,7 +1787,7 @@ export function AnnouncementDetailView({
           >
             {ann.user_has_rsvped ? <><Check style={{ width: 15, height: 15 }} />Going — tap to undo</> : "RSVP"}
           </CentralButton>
-          <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 12, textAlign: "center" }}>{ann.rsvp_count} going</div>
+          <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 12, textAlign: "center" }}>{ann.rsvp_count} going</div>
           {showAttendees && (
             <div className="flex flex-wrap justify-center gap-1.5" style={{ marginTop: 12 }}>
               {ann.rsvp_attendees.map((a) => <span key={a.user_id} onClick={() => openMemberProfile(a.user_id)} style={{ fontSize: 12, fontWeight: 600, color: "var(--body)", background: "var(--pocket-track)", padding: "6px 12px", borderRadius: 999, cursor: "pointer" }}>{a.name.split(" ")[0]}</span>)}
@@ -1851,7 +1851,7 @@ export function AnnouncementDetailView({
             <div className="hidden md:block" style={{ fontFamily: DETAIL_SANS, fontSize: 16, lineHeight: 1.75, color: "var(--body)", marginTop: 26, maxWidth: 640, whiteSpace: "pre-wrap" }}>{ann.body}</div>
             {/* No aside → posted/views anchor the bottom of the single column */}
             {!hasAside && (
-              <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 34, paddingTop: 22, borderTop: "1px solid var(--line)", fontSize: 14, color: "var(--faint)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 34, paddingTop: 22, borderTop: "1px solid var(--line)", fontSize: 14, color: "var(--muted-text)" }}>
                 Posted {detailPosted(ann.created_at)} · {ann.view_count} {ann.view_count === 1 ? "view" : "views"}
               </div>
             )}

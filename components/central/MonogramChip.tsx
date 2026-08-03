@@ -2,11 +2,16 @@
 
 import type { CSSProperties } from "react"
 import Image from "next/image"
-import { Users } from "lucide-react"
+import { Plus, Users } from "lucide-react"
 
 interface MonogramChipProps {
-  initials: string
+  initials?: string
   avatarUrl?: string | null
+  // UNASSIGNED SLOT variant — an empty seat is not a monogram, so it renders as a
+  // dashed placeholder (§9): 38px circle, 1.5px dashed --dashed, --faint glyph,
+  // transparent fill. `initials`/`avatarUrl`/`online` are ignored. Size is still
+  // overridable via className/style, same contract as the filled chip.
+  unassigned?: boolean
   className?: string
   style?: CSSProperties
   title?: string
@@ -22,7 +27,27 @@ interface MonogramChipProps {
 // Single source of truth for monogram/avatar chips.
 // Color (plum bg + cream text), shape (full circle), and overflow-hidden are
 // structurally enforced — callers set size and font via className/style only.
-export function MonogramChip({ initials, avatarUrl, className = "", style, title, online = false, dotSize = 9, dotRing = "var(--cream)" }: MonogramChipProps) {
+export function MonogramChip({ initials = "", avatarUrl, unassigned = false, className = "", style, title, online = false, dotSize = 9, dotRing = "var(--cream)" }: MonogramChipProps) {
+  if (unassigned) {
+    return (
+      <div
+        className={`flex items-center justify-center flex-shrink-0 ${className}`}
+        title={title}
+        style={{
+          width: 38,
+          height: 38,
+          ...style,
+          background: "transparent",
+          border: "1.5px dashed var(--dashed)",
+          color: "var(--faint)",
+          borderRadius: "999px",
+        }}
+      >
+        <Plus style={{ width: 14, height: 14 }} strokeWidth={1.6} />
+      </div>
+    )
+  }
+
   const chip = (
     <div
       className={`relative flex items-center justify-center flex-shrink-0 ${className}`}

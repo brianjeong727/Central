@@ -1265,7 +1265,7 @@ export function HomeTab({
                 <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 17, lineHeight: 1.55, color: "var(--ink)", marginTop: 10 }}>
                   &ldquo;{homeVerse.text}&rdquo;
                 </p>
-                <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.8px", textTransform: "uppercase", color: "var(--faint)", marginTop: 10 }}>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.8px", textTransform: "uppercase", color: "var(--muted-text)", marginTop: 10 }}>
                   {homeVerse.reference}
                 </div>
               </PocketCard>

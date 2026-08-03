@@ -93,7 +93,7 @@ const FORM_H: CSSProperties = {
 const POSTED_YR: CSSProperties = {
   fontFamily: "var(--sans)",
   fontSize: 15,
-  color: "var(--faint)",
+  color: "var(--muted-text)",
 }
 
 // Demoted meta-row value (left of the plum-outline action).
@@ -193,7 +193,7 @@ export function UpNextCard({
           {userHasRsvped ? "Going ✓" : "RSVP"}
         </CentralButton>
         {rsvpCount > 0 && (
-          <span style={{ fontSize: 12, color: "var(--faint)", fontWeight: 500 }}>{rsvpCount} going</span>
+          <span style={{ fontSize: 12, color: "var(--muted-text)", fontWeight: 500 }}>{rsvpCount} going</span>
         )}
       </div>
     ) : null
@@ -232,7 +232,7 @@ export function UpNextCard({
           </span>
         ))}
         {attendees.length > maxAttendees && (
-          <span style={{ fontSize: 11, color: "var(--faint)", padding: "2px 4px" }}>
+          <span style={{ fontSize: 11, color: "var(--muted-text)", padding: "2px 4px" }}>
             +{attendees.length - maxAttendees} more
           </span>
         )}

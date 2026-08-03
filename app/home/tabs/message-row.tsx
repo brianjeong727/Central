@@ -337,7 +337,7 @@ function MessageRowBase({
               </div>
             )}
           </div>
-          <p className="text-[11px] text-[var(--faint)] mt-1.5">{formatMessageTime(msg.created_at)}</p>
+          <p className="text-[11px] text-[var(--muted-text)] mt-1.5">{formatMessageTime(msg.created_at)}</p>
         </div>
       </div>
     )
@@ -534,7 +534,7 @@ function MessageRowBase({
               onClick={canOpenSenderProfile ? openSenderProfile : undefined}
             >{msg.sender_name || "Former Member"}</span>
             {senderDeparted && (
-              <span className="text-[11px] text-[var(--faint)] italic">· left the ministry</span>
+              <span className="text-[11px] text-[var(--muted-text)] italic">· left the ministry</span>
             )}
             <span className="text-[12px] text-[var(--muted-text)]">{formatMessageTime(msg.created_at)}</span>
           </div>
@@ -755,7 +755,7 @@ function MessageRowBase({
                 ))}
               </div>
             )}
-            <span className="text-[11px] text-[var(--faint)]">{formatMessageTime(msg.created_at)}</span>
+            <span className="text-[11px] text-[var(--muted-text)]">{formatMessageTime(msg.created_at)}</span>
           </div>
         )}
 

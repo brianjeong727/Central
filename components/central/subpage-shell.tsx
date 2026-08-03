@@ -20,10 +20,30 @@ import { useSubpageCrumbs } from "@/app/home/breadcrumb-context"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ type import); flagged Phase 2, refactor pending
 import type { Crumb } from "@/app/home/types"
 
-export function SubpageShell({ crumbs, title, mobileTitle, width = "full", maxWidth = 820, children }: {
+export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact", titleMeta, titleAction, width = "full", maxWidth = 820, children }: {
   crumbs: Crumb[]
   /** Optional page title — renders the canonical TabPageHeader rhythm at the top. */
   title?: string
+  /**
+   * DESKTOP title tier. `compact` (default, 25px) is what every SubpageShell —
+   * announcement detail, member sheet, chat settings, meeting notes, receipts,
+   * plan drills — renders; do NOT change that default. `display` opts into the
+   * EXISTING 44px landing tier (§1.3 R1 — only two tiers exist) and is used by the
+   * event-detail workspace, whose L1 identity block is the page. Opt-in and
+   * additive: the MOBILE chrome row (serif 20/600) is untouched by this.
+   */
+  titleScale?: "compact" | "display"
+  /**
+   * Optional metadata line rendered directly under the desktop title (the event
+   * workspace's `EventMetaLine`). Desktop-only, like the title itself.
+   */
+  titleMeta?: ReactNode
+  /**
+   * Optional OBJECT-level action in the header's right slot — Zone B, §3.1's
+   * labeled-action carve-out ("Edit event"). Never a create (Conv #15): those live
+   * in the body collection's own content header. Desktop-only.
+   */
+  titleAction?: ReactNode
   /**
    * Optional override for the MOBILE chrome-row title only (`md:hidden`). When
    * set, the phone-width chrome shows this instead of `title` — used where the
@@ -82,7 +102,13 @@ export function SubpageShell({ crumbs, title, mobileTitle, width = "full", maxWi
         <div className="hidden md:flex md:flex-col flex-shrink-0">
           <InsetHairline />
           <div className="px-14" style={{ paddingTop: "var(--space-8)", paddingBottom: "var(--space-8)" }}>
-            <PageTitle title={title} compact />
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 24 }}>
+              <div style={{ minWidth: 0 }}>
+                <PageTitle title={title} compact={titleScale === "compact"} />
+                {titleMeta}
+              </div>
+              {titleAction && <div style={{ flexShrink: 0 }}>{titleAction}</div>}
+            </div>
           </div>
           <InsetHairline />
         </div>
