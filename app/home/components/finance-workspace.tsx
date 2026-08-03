@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import useSWR, { mutate } from "swr"
 import { createClient } from "@/lib/supabase"
 import {
-  Plus, X, Check, ChevronRight,
+  Plus, X, Check, ChevronRight, Pencil,
   Upload, Download, DollarSign, AlertTriangle,
   ImageIcon, Inbox,
 } from "lucide-react"
@@ -13,7 +13,7 @@ import { normalizeMoneyInput } from "../utils"
 import { useIsMobile } from "../use-is-mobile"
 import { useMinistryTimezone } from "../ministry-timezone-context"
 import { todayInZone } from "@/lib/tz"
-import { MonogramChip, FilterDropdown, FilterChip, CentralButton, SubpageShell, CentralModal, PocketRowCard, PocketRow, Toast, useScrollResetOn } from "@/components/central"
+import { MonogramChip, FilterDropdown, FilterChip, CentralButton, SubpageShell, CentralModal, ConfirmDialog, PocketRowCard, PocketRow, Toast, useScrollResetOn } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
   getReimbursementInbox,
@@ -30,15 +30,10 @@ import {
 import {
   getBudgetAllocations, getCategoryActuals, upsertBudgetAllocation,
   getAllocationYears, getBudgetCategories, addBudgetCategory, deleteBudgetCategory,
-  type BudgetAllocation, type CategoryActual,
+  renameBudgetCategory, getCategoryCommitments,
+  type BudgetAllocation, type CategoryActual, type CategoryCommitment,
 } from "@/app/actions/budget-planning"
-
-function currentFiscalYear(): string {
-  const now = new Date()
-  const y = now.getFullYear()
-  // Fiscal year runs Jun 1 – May 31; rolls to the next pair on June 1.
-  return now.getMonth() >= 5 ? `${y}-${y + 1}` : `${y - 1}-${y}`
-}
+import { currentFiscalYear } from "@/lib/fiscal-year"
 import type { Receipt as ReceiptType, ReceiptLimit } from "@/app/actions/receipts"
 import type { BudgetEntry } from "@/app/actions/reimbursements"
 
@@ -60,7 +55,6 @@ const WARN_TEXT = "color-mix(in srgb, var(--gold) 65%, var(--ink))"
 const WARN_BORDER = "color-mix(in srgb, var(--gold) 30%, var(--cream))"
 const DANGER_TINT_BORDER = "color-mix(in srgb, var(--danger) 30%, var(--cream))"
 const DANGER_ROW_BG = "var(--cream)"
-const DELETE_CONFIRM_BG = "color-mix(in srgb, var(--danger) 8%, transparent)"
 const BUDGET_GREEN = "color-mix(in srgb, var(--success) 65%, var(--ink))"
 // Reimbursed is a terminal SUCCESS status, not selection/identity — same success-family
 // formula as `approved` (R10: bg = accent 13% on cream, text = accent 65% on ink).
@@ -1102,7 +1096,6 @@ export function FinanceWorkspace({
   canEditBudget, canAccessReimbursements, readOnly,
   onDetailOpenChange,
 }: FinanceWorkspaceProps) {
-  const supabase = createClient()
   const isMobile = useIsMobile()
   // Land each finance section swap at the top (window scroll on phone width).
   useScrollResetOn([section])
@@ -1125,15 +1118,26 @@ export function FinanceWorkspace({
   const [inboxCanSignOff, setInboxCanSignOff] = useState(false)
   const [inboxLoading, setInboxLoading] = useState(false)
 
-  // Dynamic categories (DG Dinner permanent + calendar events + custom)
-  const [calEventCategories, setCalEventCategories] = useState<string[]>([])
+  // Budget categories — `budget_categories` ONLY.
+  //
+  // This list used to UNION every calendar event TITLE into the category list, which
+  // is what made renaming an event orphan its allocations and ledger rows: the
+  // category's identity WAS the title string. The migration backfilled a real
+  // budget_categories row for every category string already in use (verified: zero
+  // orphans), so nothing disappears — and a category is now a row you can rename.
+  // Orphan strings that exist only in ministry_budgets / budget_entries are still
+  // surfaced, by the `orphanedCategories` unions further down, not by re-adding a
+  // second source of truth here.
+  //
+  // `isPermanent` is now always false: every category is a real row, so every one of
+  // them can be renamed and deleted. (DG_DINNER_CATEGORY survives only in
+  // DEFAULT_RECEIPT_CATEGORIES — the fallback list for the submit-receipt modal when
+  // it opens outside FinanceWorkspace and has no ministry categories to offer.)
   const [customCategories, setCustomCategories] = useState<{ id: string; name: string }[]>([])
 
-  const dynamicCategories: DynamicCategory[] = [
-    DG_DINNER_CATEGORY,
-    ...calEventCategories.map(t => ({ value: t, label: t, isPermanent: true })),
-    ...customCategories.map(c => ({ value: c.name, label: c.name, isPermanent: false })),
-  ]
+  const dynamicCategories: DynamicCategory[] = customCategories.map(
+    c => ({ value: c.name, label: c.name, isPermanent: false }),
+  )
 
   async function handleAddCategory(name: string) {
     const trimmed = name.trim()
@@ -1142,9 +1146,26 @@ export function FinanceWorkspace({
     if (!error && data) setCustomCategories(prev => [...prev, { id: data.id, name: data.name }])
   }
 
+  // Returns the result so the caller can surface the error AND the counts. The old
+  // version awaited, discarded both, and removed the chip regardless — a failed
+  // delete looked exactly like a successful one.
   async function handleDeleteCategory(categoryName: string) {
-    await deleteBudgetCategory(ministryId, categoryName)
-    setCustomCategories(prev => prev.filter(c => c.name !== categoryName))
+    const res = await deleteBudgetCategory(ministryId, categoryName)
+    if (!res.error) setCustomCategories(prev => prev.filter(c => c.name !== categoryName))
+    return res
+  }
+
+  async function handleRenameCategory(fromName: string, toName: string) {
+    const res = await renameBudgetCategory(ministryId, fromName, toName)
+    if (!res.error) {
+      setCustomCategories(prev => prev.map(c => c.name === fromName ? { ...c, name: toName.trim() } : c))
+      // The ledger stores the category as TEXT, so a rename moves those rows too
+      // (the RPC cascades). Re-point local ledger state or the Budget section's
+      // category chips would keep showing the pre-rename name until a refetch.
+      setBudgetEntries(prev => prev.map(e => e.category === fromName ? { ...e, category: toName.trim() } : e))
+      setBudgetCategoryFilter(prev => prev === fromName ? toName.trim() : prev)
+    }
+    return res
   }
 
   // Budget
@@ -1153,7 +1174,7 @@ export function FinanceWorkspace({
   const [showAddEntry, setShowAddEntry] = useState(false)
   // DATE column — the ministry's calendar day. See the note on purchaseDate.
   const [entryDate, setEntryDate] = useState(() => todayInZone(timeZone))
-  const [entryCategory, setEntryCategory] = useState("DG Dinner")
+  const [entryCategory, setEntryCategory] = useState("")
   const [entryDescription, setEntryDescription] = useState("")
   const [entryAmount, setEntryAmount] = useState("")
   const [entryFund, setEntryFund] = useState("church")
@@ -1167,6 +1188,13 @@ export function FinanceWorkspace({
     if (funds.length === 0) return
     setEntryFund(prev => funds.some(f => f.slug === prev) ? prev : (funds.find(f => f.slug === "church")?.slug ?? funds[0].slug))
   }, [funds])
+  // Same snap for the category. The default used to be the hardcoded "DG Dinner",
+  // which a ministry without that category would silently submit anyway (a <select>
+  // whose value matches no <option> still POSTs the stale state value).
+  useEffect(() => {
+    if (customCategories.length === 0) return
+    setEntryCategory(prev => customCategories.some(c => c.name === prev) ? prev : customCategories[0].name)
+  }, [customCategories])
   const fundNameFor = (slug: string | null) => slug ? (funds.find(f => f.slug === slug)?.name ?? slug) : null
 
   // Access vs. edit. Gov-view (readOnly) may VIEW any section but mutates nothing.
@@ -1176,24 +1204,15 @@ export function FinanceWorkspace({
 
   useEffect(() => {
     async function load() {
-      const [limitsRes, eventsRes, customCatRes] = await Promise.all([
+      const [limitsRes, customCatRes] = await Promise.all([
         getReceiptLimits(ministryId),
-        supabase.from("calendar_events").select("title").eq("ministry_id", ministryId).order("start_date"),
         getBudgetCategories(ministryId),
       ])
       setLimits(limitsRes.data)
-      // Dedupe calendar event titles (exclude "DG Dinner" — it's already permanent)
-      const seen = new Set<string>(["DG Dinner"])
-      const uniqueTitles: string[] = []
-      for (const e of ((eventsRes.data ?? []) as { title: string }[])) {
-        if (!seen.has(e.title)) { seen.add(e.title); uniqueTitles.push(e.title) }
-      }
-      setCalEventCategories(uniqueTitles)
       setCustomCategories(customCatRes.data.map(c => ({ id: c.id, name: c.name })))
       setLoading(false)
     }
     load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministryId])
 
   // Inbox visible to the treasurer (canManage) and to gov-view (readOnly) read-only.
@@ -1288,7 +1307,10 @@ export function FinanceWorkspace({
     setAddingEntry(true)
     const { data } = await addBudgetEntry({ ministryId, category: entryCategory, description: entryDescription.trim(), amount: amt, entryDate, fund: entryFund || null })
     if (data) setBudgetEntries(prev => [data, ...prev])
-    setEntryDate(todayInZone(timeZone)); setEntryCategory("other"); setEntryDescription(""); setEntryAmount("")
+    // Reset to a category that actually exists (this used to reset to the literal
+    // "other", which was only ever a real option for ministries that happened to
+    // have a category by that name).
+    setEntryDate(todayInZone(timeZone)); setEntryCategory(customCategories[0]?.name ?? ""); setEntryDescription(""); setEntryAmount("")
     setShowAddEntry(false); setAddingEntry(false)
   }
 
@@ -1348,7 +1370,9 @@ export function FinanceWorkspace({
       {/* ── Allocation ── */}
       {/* Non-detail views own their inset (workspace is mounted full-bleed). */}
       {section === "allocation" && budgetAccess && (
-        <div className="px-5 md:px-14 py-7">
+        // pb-28 on phone width clears the floating nav pill — without it the last
+        // category row sits under the pill with nothing left to scroll to.
+        <div className="px-5 md:px-14 py-7 pb-28 md:pb-7">
           <AllocationSection
             ministryId={ministryId}
             canEdit={canManage}
@@ -1356,13 +1380,15 @@ export function FinanceWorkspace({
             categories={dynamicCategories}
             onAddCategory={handleAddCategory}
             onDeleteCategory={handleDeleteCategory}
+            onRenameCategory={handleRenameCategory}
           />
         </div>
       )}
 
       {/* ── Budget ── */}
       {section === "budget" && budgetAccess && (
-        <div className="px-5 md:px-14 py-7">
+        // pb-28 for the nav pill, same as Allocation above.
+        <div className="px-5 md:px-14 py-7 pb-28 md:pb-7">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
             <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>Expense ledger</p>
             {canManage && (
@@ -1519,28 +1545,33 @@ function AllocationSection({
   categories,
   onAddCategory,
   onDeleteCategory,
+  onRenameCategory,
 }: {
   ministryId: string
   canEdit: boolean
   funds: FinanceFund[]
   categories: DynamicCategory[]
   onAddCategory: (name: string) => Promise<void>
-  onDeleteCategory: (name: string) => Promise<void>
+  onDeleteCategory: (name: string) => Promise<{ error: string | null; deletedAllocations: number; unlinkedEvents: number }>
+  onRenameCategory: (from: string, to: string) => Promise<{ error: string | null }>
 }) {
   // Dynamic fund columns (slug = the value stored on budget_allocations.fund).
   // Fall back to a single Church column so the grid still renders pre-seed.
   const fundCols = funds.length > 0
     ? funds.map(f => ({ value: f.slug, label: f.name }))
     : [{ value: "church", label: "Church" }]
-  // At-rest grid: chevron / Category / Allocated / Spent / Remaining. Per-fund
-  // editing moved into the chevron-expanded inset row.
-  const restGridCols = "28px minmax(160px, 1.8fr) 120px 110px 120px"
+  // At-rest grid: chevron / Category / Allocated / Committed / Spent / Remaining.
+  // Committed sits between allocated (the CEILING that Finance sets) and spent (the
+  // ledger), because that is the order money actually moves: allocate → commit an
+  // event's draw against it → spend. Per-fund editing lives in the expanded inset.
+  const restGridCols = "28px minmax(150px, 1.6fr) 116px 116px 106px 116px"
   // Mobile-only Daybreak restyle (ruling B-2): the summary stat cards adopt the
   // 16px --r-pocket-sm radius on mobile via viewport branch; desktop byte-identical.
   const isMobile = useIsMobile()
   const [fiscalYear, setFiscalYear] = useState<string>(currentFiscalYear)
   const [allocations, setAllocations] = useState<BudgetAllocation[]>([])
   const [actuals, setActuals] = useState<CategoryActual[]>([])
+  const [commitments, setCommitments] = useState<CategoryCommitment[]>([])
   const [loading, setLoading] = useState(true)
   // Chevron-expanded category rows (per-fund editors + notes live in the inset).
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
@@ -1555,6 +1586,11 @@ function AllocationSection({
   const [savingCategory, setSavingCategory] = useState(false)
   const [deletingCategory, setDeletingCategory] = useState<string | null>(null)
   const [confirmDeleteCategory, setConfirmDeleteCategory] = useState<string | null>(null)
+  // Inline rename (matches the row's existing inline-confirm grammar).
+  const [renamingCategory, setRenamingCategory] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState("")
+  const [savingRename, setSavingRename] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
 
   // Historical allocation years + the current one — never future years.
   const [yearOptions, setYearOptions] = useState<string[]>([currentFiscalYear()])
@@ -1564,26 +1600,44 @@ function AllocationSection({
     getAllocationYears(ministryId).then(({ data }) => setYearOptions(data))
   }, [ministryId])
 
-  // Include any orphaned categories that have allocations but aren't in the dynamic list
-  const allocatedCategories = Array.from(new Set(allocations.map(a => a.category)))
+  // Include any orphaned categories that have allocations or commitments but aren't
+  // in the category list (a ledger/allocation string with no budget_categories row).
+  const allocatedCategories = Array.from(new Set([
+    ...allocations.map(a => a.category),
+    ...commitments.map(c => c.category),
+  ]))
   const orphanedCategories: DynamicCategory[] = allocatedCategories
     .filter(c => !categories.some(d => d.value === c))
     .map(c => ({ value: c, label: c, isPermanent: false }))
   const allCategories = [...categories, ...orphanedCategories]
 
+  // Re-fetch trigger. A tick rather than a callable loader: the fetch stays inline in
+  // the effect (a useCallback invoked straight from an effect body trips
+  // react-hooks/set-state-in-effect), and callers just ask for a reload.
+  const [reloadTick, setReloadTick] = useState(0)
+  const load = useCallback(() => setReloadTick(t => t + 1), [])
+
   useEffect(() => {
-    async function load() {
+    let cancelled = false
+    async function run() {
       setLoading(true)
-      const [{ data: allocs }, { data: acts }] = await Promise.all([
+      const [{ data: allocs }, { data: acts }, { data: commits }] = await Promise.all([
         getBudgetAllocations(ministryId, fiscalYear),
         getCategoryActuals(ministryId, fiscalYear),
+        // Committed = Σ leaf-event draws against this (category, fund) inside the year.
+        // Reads through the user client, so a reader without finance visibility gets []
+        // — designed emptiness, rendered as an em-dash, never as an error.
+        getCategoryCommitments(ministryId, fiscalYear),
       ])
+      if (cancelled) return
       setAllocations(allocs)
       setActuals(acts)
+      setCommitments(commits)
       setLoading(false)
     }
-    load()
-  }, [ministryId, fiscalYear])
+    run()
+    return () => { cancelled = true }
+  }, [ministryId, fiscalYear, reloadTick])
 
   // Build lookup: category → fund → amount
   function getAllocAmount(category: string, fund: string): number {
@@ -1602,6 +1656,30 @@ function AllocationSection({
   // Per-(category, fund) spent — drives the "spent $X" caption in the expanded row.
   function getActualForFund(category: string, fund: string): number {
     return actuals.filter(a => a.category === category && a.fund === fund).reduce((s, a) => s + a.total_spent, 0)
+  }
+
+  // Committed = Σ of the events drawing against this category (all funds).
+  function getCommitted(category: string): number {
+    return commitments.filter(c => c.category === category).reduce((s, c) => s + c.committed, 0)
+  }
+
+  function getCommittedForFund(category: string, fund: string): number {
+    return commitments.filter(c => c.category === category && c.fund === fund).reduce((s, c) => s + c.committed, 0)
+  }
+
+  // The events behind a category's committed figure, one row per event with its
+  // total across funds — the drill-down from a number to the things that make it up.
+  function getCommittingEvents(category: string): { id: string; title: string; amount: number }[] {
+    const byEvent = new Map<string, { id: string; title: string; amount: number }>()
+    for (const c of commitments) {
+      if (c.category !== category) continue
+      for (const e of c.events) {
+        const cur = byEvent.get(e.eventPlanId) ?? { id: e.eventPlanId, title: e.title, amount: 0 }
+        cur.amount += e.amount
+        byEvent.set(e.eventPlanId, cur)
+      }
+    }
+    return Array.from(byEvent.values()).sort((a, b) => b.amount - a.amount)
   }
 
   function getDraftKey(category: string, fund: string) {
@@ -1649,9 +1727,55 @@ function AllocationSection({
   const totalAllocated = allCategories.reduce((sum, cat) => {
     return sum + fundCols.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
   }, 0)
+  const totalCommitted = allCategories.reduce((sum, cat) => sum + getCommitted(cat.value), 0)
   const totalSpent = allCategories.reduce((sum, cat) => sum + getActual(cat.value), 0)
+  // Remaining stays allocated − SPENT (the pre-existing meaning). Committed is the
+  // forward-looking middle number, deliberately NOT folded into remaining: an event
+  // that has drawn but not yet spent would otherwise be subtracted twice the moment
+  // its receipt posts to the ledger.
   const totalRemaining = totalAllocated - totalSpent
   const overBudget = totalRemaining < 0
+
+  // ── Category rename / delete ───────────────────────────────────────────────
+  async function commitRename(from: string) {
+    const to = renameDraft.trim()
+    if (!to || to === from) { setRenamingCategory(null); return }
+    setSavingRename(true)
+    const { error } = await onRenameCategory(from, to)
+    setSavingRename(false)
+    if (error) { setToast(error); return }
+    setRenamingCategory(null)
+    // The rename cascades across ministry_budgets + budget_entries server-side, and
+    // category identity here is name equality — so re-read rather than patch.
+    load()
+  }
+
+  async function commitDelete(name: string) {
+    setDeletingCategory(name)
+    const { error, deletedAllocations, unlinkedEvents } = await onDeleteCategory(name)
+    setDeletingCategory(null)
+    setConfirmDeleteCategory(null)
+    if (error) { setToast(error); return }
+    // Purge from local allocations state so orphanedCategories doesn't immediately
+    // re-add the row before the next full fetch.
+    setAllocations(prev => prev.filter(a => a.category !== name))
+    setCommitments(prev => prev.filter(c => c.category !== name))
+    const bits = [
+      `${deletedAllocations} allocation ${deletedAllocations === 1 ? "row" : "rows"} removed`,
+      ...(unlinkedEvents > 0 ? [`${unlinkedEvents} ${unlinkedEvents === 1 ? "event" : "events"} unlinked`] : []),
+    ]
+    setToast(`Deleted “${name}” · ${bits.join(", ")}`)
+  }
+
+  // Warning copy for the delete confirm. The counts shown are what this screen can
+  // truthfully see — the selected year's allocation rows and the events committing
+  // in it. The action deletes across EVERY fiscal year, so the sentence says so
+  // rather than implying the visible numbers are the whole cost.
+  const pendingDelete = confirmDeleteCategory
+  const pendingDeleteAllocRows = pendingDelete
+    ? allocations.filter(a => a.category === pendingDelete && Number(a.allocated_amount) > 0).length
+    : 0
+  const pendingDeleteEvents = pendingDelete ? getCommittingEvents(pendingDelete).length : 0
 
   // Per-fund breakdown for the summary cards. Budgeted comes from the allocations
   // grid, Spent from the per-fund actuals (legacy null-fund spend is excluded here
@@ -1716,8 +1840,9 @@ function AllocationSection({
               per-cell inputs, and custom-category management render only at ≥md.
               Mobile shows a read-only per-category summary list below. */}
           <div className="hidden md:block">
-          {/* Allocation table — at rest: chevron / Category / Allocated / Spent /
-              Remaining. The chevron expands an inset row with per-fund editors. */}
+          {/* Allocation table — at rest: chevron / Category / Allocated / Committed /
+              Spent / Remaining. The chevron expands an inset row with per-fund editors
+              and the events behind the committed figure. */}
           <div style={{ border: "1px solid var(--line)", borderRadius: 14, overflow: "hidden" }}>
             {/* Table header */}
             <div style={{ display: "grid", gridTemplateColumns: restGridCols, gap: 0, padding: "10px 16px", borderBottom: "1px solid var(--line)", background: "var(--cream-2)" }}>
@@ -1725,6 +1850,7 @@ function AllocationSection({
                 { h: "", align: "left" as const },
                 { h: "Category", align: "left" as const },
                 { h: "Allocated", align: "right" as const },
+                { h: "Committed", align: "right" as const },
                 { h: "Spent", align: "right" as const },
                 { h: "Remaining", align: "right" as const },
               ].map((c, i) => (
@@ -1735,11 +1861,16 @@ function AllocationSection({
             {/* Category rows */}
             {allCategories.map((cat, catIdx) => {
               const catTotal = fundCols.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
+              const committed = getCommitted(cat.value)
               const spent = getActual(cat.value)
               const remaining = catTotal - spent
               const rowOver = remaining < 0 && catTotal > 0
+              // Events have drawn more than Finance allocated — a ceiling breach that
+              // has not hit the ledger yet. Text/border only, never a fill.
+              const overCommitted = committed > catTotal && catTotal > 0
               const isOpen = expandedRows.has(cat.value)
               const notes = getAllocNotes(cat.value)
+              const isRenaming = renamingCategory === cat.value
               const emDash = <span style={{ color: "var(--faint)" }}>—</span>
 
               return (
@@ -1769,49 +1900,63 @@ function AllocationSection({
                       <ChevronRight size={14} style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.15s" }} />
                     </button>
 
-                    {/* Category label + delete for custom */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{cat.label}</span>
-                      {!cat.isPermanent && canEdit && (
-                        confirmDeleteCategory === cat.value ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                            <button
-                              onClick={async () => {
-                                setDeletingCategory(cat.value)
-                                setConfirmDeleteCategory(null)
-                                await onDeleteCategory(cat.value)
-                                // Also purge from local allocations state so orphanedCategories
-                                // doesn't immediately re-add it before the next full fetch
-                                setAllocations(prev => prev.filter(a => a.category !== cat.value))
-                                setDeletingCategory(null)
-                              }}
-                              disabled={deletingCategory === cat.value}
-                              style={{ fontSize: 11, fontWeight: 500, color: "var(--danger)", background: DELETE_CONFIRM_BG, border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: 6, padding: "2px 8px", cursor: "pointer", whiteSpace: "nowrap", opacity: deletingCategory === cat.value ? 0.5 : 1 }}
-                            >
-                              {deletingCategory === cat.value ? "Deleting…" : "Delete"}
-                            </button>
-                            <button
-                              onClick={() => setConfirmDeleteCategory(null)}
-                              style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "2px 4px" }}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmDeleteCategory(cat.value)}
-                            title="Remove custom category"
-                            style={{ background: "none", border: "none", cursor: "pointer", color: "var(--dashed)", padding: 0, display: "flex", alignItems: "center" }}
-                          >
-                            <X size={13} />
-                          </button>
-                        )
+                    {/* Category label + rename / delete. Renaming was previously
+                        IMPOSSIBLE — which is why renaming the calendar event that a
+                        category was named after orphaned its allocations. */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                      {isRenaming ? (
+                        <input
+                          autoFocus
+                          value={renameDraft}
+                          disabled={savingRename}
+                          onChange={e => setRenameDraft(e.target.value)}
+                          onBlur={() => commitRename(cat.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") e.currentTarget.blur()
+                            else if (e.key === "Escape") { setRenamingCategory(null); e.currentTarget.blur() }
+                          }}
+                          aria-label={`Rename ${cat.label}`}
+                          // Capped so the plum edit underline reads as a field on the
+                          // row, not a rule across the whole category column.
+                          style={{ ...cellInput, fontWeight: 500, width: "100%", maxWidth: 240, opacity: savingRename ? 0.5 : 1 }}
+                        />
+                      ) : (
+                        <>
+                          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.label}</span>
+                          {canEdit && (
+                            <>
+                              <button
+                                onClick={() => { setRenameDraft(cat.value); setRenamingCategory(cat.value) }}
+                                title="Rename category"
+                                aria-label={`Rename ${cat.label}`}
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--dashed)", padding: 0, display: "flex", alignItems: "center", flexShrink: 0 }}
+                              >
+                                <Pencil size={12} />
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteCategory(cat.value)}
+                                title="Delete category"
+                                aria-label={`Delete ${cat.label}`}
+                                disabled={deletingCategory === cat.value}
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--dashed)", padding: 0, display: "flex", alignItems: "center", flexShrink: 0, opacity: deletingCategory === cat.value ? 0.4 : 1 }}
+                              >
+                                <X size={13} />
+                              </button>
+                            </>
+                          )}
+                        </>
                       )}
                     </div>
 
                     {/* Allocated (total across funds) */}
                     <span style={{ fontSize: 14, textAlign: "right", fontVariantNumeric: "tabular-nums", color: "var(--ink)", fontWeight: catTotal > 0 ? 500 : 400 }}>
                       {catTotal > 0 ? `$${catTotal.toFixed(2)}` : emDash}
+                    </span>
+
+                    {/* Committed — Σ leaf-event draws. Danger text once it exceeds the
+                        ceiling, which is a real overrun even though nothing is spent. */}
+                    <span style={{ fontSize: 14, textAlign: "right", fontVariantNumeric: "tabular-nums", color: overCommitted ? "var(--danger)" : committed > 0 ? "var(--ink)" : "var(--faint)", fontWeight: overCommitted ? 500 : 400 }}>
+                      {committed > 0 ? `$${committed.toFixed(2)}` : emDash}
                     </span>
 
                     {/* Spent */}
@@ -1825,7 +1970,7 @@ function AllocationSection({
                     </span>
                   </div>
 
-                  {/* Expanded inset: per-fund editors + notes */}
+                  {/* Expanded inset: per-fund editors + committed drill-down + notes */}
                   {isOpen && (
                     <div style={{ padding: "14px 16px 16px 47px", borderTop: "1px dashed var(--line)", background: "var(--cream-2)" }}>
                       <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
@@ -1835,9 +1980,11 @@ function AllocationSection({
                           const draftVal = getDraftValue(cat.value, fund.value)
                           const displayAmt = getAllocAmount(cat.value, fund.value)
                           const fundSpent = getActualForFund(cat.value, fund.value)
+                          const fundCommitted = getCommittedForFund(cat.value, fund.value)
                           const fundOver = fundSpent > displayAmt
+                          const fundOverCommitted = fundCommitted > displayAmt && displayAmt > 0
                           return (
-                            <div key={fund.value} style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 96 }}>
+                            <div key={fund.value} style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 108 }}>
                               <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{fund.label}</span>
                               {canEdit ? (
                                 <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
@@ -1865,6 +2012,9 @@ function AllocationSection({
                                   {displayAmt > 0 ? `$${displayAmt.toFixed(2)}` : "—"}
                                 </span>
                               )}
+                              <span style={{ fontSize: 12.5, fontVariantNumeric: "tabular-nums", color: fundOverCommitted ? "var(--danger)" : "var(--muted-text)" }}>
+                                committed ${fundCommitted.toFixed(2)}
+                              </span>
                               <span style={{ fontSize: 12.5, fontVariantNumeric: "tabular-nums", color: fundOver ? "var(--danger)" : "var(--muted-text)" }}>
                                 spent ${fundSpent.toFixed(2)}
                               </span>
@@ -1872,6 +2022,30 @@ function AllocationSection({
                           )
                         })}
                       </div>
+
+                      {/* Committed → the events behind it. The whole point of the
+                          ceiling model is that MANY events can draw on one category
+                          (Girls + Guys Turkeybowl), so a committed figure has to be
+                          walkable back to the events that make it up. */}
+                      {(() => {
+                        const events = getCommittingEvents(cat.value)
+                        if (events.length === 0) return null
+                        return (
+                          <div style={{ marginTop: 16 }}>
+                            <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 6px" }}>
+                              Committed by event
+                            </p>
+                            <div style={{ maxWidth: 420 }}>
+                              {events.map((ev, i) => (
+                                <div key={ev.id} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 16, padding: "5px 0", borderTop: i > 0 ? "1px solid var(--line-3)" : "none" }}>
+                                  <span style={{ fontSize: 13, color: "var(--body)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ev.title}</span>
+                                  <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: "var(--ink)", flexShrink: 0 }}>${ev.amount.toFixed(2)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })()}
 
                       {/* Notes, folded into the expanded row */}
                       <div style={{ marginTop: 14 }}>
@@ -1902,6 +2076,9 @@ function AllocationSection({
               <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--body)" }}>Total</span>
               <span style={{ fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 500, color: "var(--ink)" }}>
                 {totalAllocated > 0 ? `$${totalAllocated.toFixed(2)}` : "—"}
+              </span>
+              <span style={{ fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 500, color: totalCommitted > totalAllocated && totalAllocated > 0 ? "var(--danger)" : totalCommitted > 0 ? "var(--ink)" : "var(--faint)" }}>
+                {totalCommitted > 0 ? `$${totalCommitted.toFixed(2)}` : "—"}
               </span>
               <span style={{ fontSize: 13, textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 500, color: totalSpent > 0 ? "var(--ink)" : "var(--faint)" }}>
                 {totalSpent > 0 ? `$${totalSpent.toFixed(2)}` : "—"}
@@ -1987,16 +2164,35 @@ function AllocationSection({
               <PocketRowCard>
                 {allCategories.map((cat, i) => {
                   const catTotal = fundCols.reduce((s, f) => s + getAllocAmount(cat.value, f.value), 0)
+                  const committed = getCommitted(cat.value)
                   const spent = getActual(cat.value)
                   const remaining = catTotal - spent
                   const rowOver = remaining < 0 && catTotal > 0
+                  // One line, whole dollars: the phone row ellipsizes its sub, and
+                  // three cent-precise figures do not survive 390px.
+                  const sub = catTotal > 0
+                    ? `${money(committed)} committed · ${money(spent)} spent of ${money(catTotal)}`
+                    : committed > 0
+                      ? `${money(committed)} committed · not budgeted`
+                      : "Not budgeted"
                   return (
                     <MobileDataRow
                       key={cat.value}
                       title={cat.label}
-                      sub={catTotal > 0 ? `Spent $${spent.toFixed(2)} of $${catTotal.toFixed(2)}` : "Not budgeted"}
+                      sub={sub}
                       right={catTotal > 0 ? (remaining < 0 ? `-$${Math.abs(remaining).toFixed(2)}` : `$${remaining.toFixed(2)}`) : "—"}
-                      rightColor={rowOver ? "var(--danger)" : catTotal > 0 && remaining > 0 ? BUDGET_GREEN : "var(--faint)"}
+                      // `remaining` is allocated − SPENT, so it can be healthily positive while
+                      // the category is over-COMMITTED (rowOver only tracks overspend). Painting
+                      // that green reads as "all good" for a category that is already promised
+                      // more than it has — desktop flags it red in the Committed column, and the
+                      // two surfaces must not disagree about whether something is fine. Green is
+                      // withheld in that case; the sub-line already states the committed figure.
+                      rightColor={
+                        rowOver ? "var(--danger)"
+                          : committed > catTotal && catTotal > 0 ? "var(--body)"
+                          : catTotal > 0 && remaining > 0 ? BUDGET_GREEN
+                          : "var(--faint)"
+                      }
                       isLast={i === allCategories.length - 1}
                     />
                   )
@@ -2006,6 +2202,29 @@ function AllocationSection({
           </div>
         </>
       )}
+
+      {/* Deleting a category is not "removing a chip" — it destroys its allocation in
+          EVERY fiscal year and unlinks every event drawing against it. The old inline
+          two-step had no room to say that, and dropped the action's error on the floor
+          so a failed delete still looked like a success. §14 / contract-card rule 10. */}
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title={pendingDelete ? `Delete “${pendingDelete}”?` : ""}
+        confirmLabel="Delete category"
+        loading={!!deletingCategory}
+        onClose={() => setConfirmDeleteCategory(null)}
+        onConfirm={() => { if (pendingDelete) commitDelete(pendingDelete) }}
+        message={
+          <>
+            This deletes its allocation in <strong style={{ fontWeight: 500, color: "var(--ink)" }}>every fiscal year</strong>
+            {pendingDeleteAllocRows > 0 && <> ({pendingDeleteAllocRows} funded {pendingDeleteAllocRows === 1 ? "row" : "rows"} in {fiscalYear})</>}
+            {pendingDeleteEvents > 0 && <>, and unlinks {pendingDeleteEvents} {pendingDeleteEvents === 1 ? "event that draws" : "events that draw"} against it</>}
+            . Expense-ledger entries already recorded keep the name.
+          </>
+        }
+      />
+
+      {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
     </div>
   )
 }

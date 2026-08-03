@@ -1,0 +1,45 @@
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- DEPLOY-TIME STATEMENT — run this ONLY after the split-save event Overview is live.
+--
+-- Companion to supabase/event_budget_draws_migration.sql. Split out because the
+-- database is shared with production and this statement is the one piece that breaks
+-- currently-deployed code.
+-- ═══════════════════════════════════════════════════════════════════════════════
+--
+-- WHY IT EXISTS
+-- Moving event money into event_budget_draws behind a finance-gated policy achieves
+-- nothing while event_plans.budget_allocated stays writable by any can_plan_events
+-- member: the "Treasurer only" label would still be decorative and the bug would simply
+-- exist in two columns with different gates. Column-level REVOKE keeps the table-level
+-- grant intact for every other column, so planners keep editing turnout, notes, dates.
+--
+-- WHY IT IS NOT IN THE MIGRATION
+-- The deployed handleSaveOverview (plan-tab.tsx) writes budget_allocated through the
+-- BROWSER client in the same UPDATE statement as expected_turnout and overview_notes.
+-- Postgres rejects the whole statement when any targeted column is unprivileged, so
+-- running this early 403s that save and breaks turnout + notes editing in production for
+-- every planner — with no code change to point at.
+--
+-- ORDER OF OPERATIONS
+--   1. Apply event_budget_draws_migration.sql          (additive, safe ahead of code)
+--   2. Merge + deploy the feature (split save; budget_allocated becomes derived,
+--      written only by service-role paths)
+--   3. Run THIS file
+--   4. Verify (below)
+--
+-- SAFE FOR THE WRITERS THAT REMAIN
+-- season-rollover.ts (app/actions/season-rollover.ts) and scripts/seed-ccsf-events.mjs
+-- both use the service-role client, which bypasses column grants — and both INSERT
+-- rather than UPDATE, which this does not touch.
+
+REVOKE UPDATE (budget_allocated) ON public.event_plans FROM authenticated, anon;
+
+-- ── Verify ────────────────────────────────────────────────────────────────────
+-- Expect false:
+--   select has_column_privilege('authenticated','public.event_plans','budget_allocated','UPDATE');
+-- Expect true (planners must keep these):
+--   select has_column_privilege('authenticated','public.event_plans','expected_turnout','UPDATE'),
+--          has_column_privilege('authenticated','public.event_plans','overview_notes','UPDATE');
+--
+-- Rollback if needed:
+--   GRANT UPDATE (budget_allocated) ON public.event_plans TO authenticated, anon;

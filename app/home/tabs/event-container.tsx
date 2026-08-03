@@ -45,6 +45,11 @@ export interface ContainerChild {
   blocks: EventBlock[]
   done: number
   total: number
+  /** This night's per-fund draws against its budget category. Empty for a night
+   *  with no plan yet AND for any reader without finance/leader visibility —
+   *  `event_budget_draws` SELECT is finance + admin/leader only, so an empty
+   *  array is designed emptiness, not an error (see getEventDraws). */
+  drawTotal: number
 }
 
 export interface ContainerRollup {
@@ -52,13 +57,20 @@ export interface ContainerRollup {
   loading: boolean
   /** Re-run the batched fetch (after a write that changed a child's rows). */
   refresh: () => void
+  /** Σ of every night's draws. Only LEAF events commit against a budget category,
+   *  so a container's own budget number is this roll-up — never a figure of its own. */
+  drawTotal: number
+  /** Nights with no `event_plans` row yet. Plans are created lazily on first
+   *  workspace open, so a night nobody has opened can hold no draw — the roll-up
+   *  reads LOW and must SAY SO rather than pass a partial figure off as complete. */
+  unplannedCount: number
 }
 
 // ── Loader ─────────────────────────────────────────────────────────────────────
-// FIVE batched queries, never N+1: children → their plans → roles/tasks/blocks by
-// plan id. event_roles / event_tasks / event_blocks carry no ministry_id of their
+// SIX batched queries, never N+1: children → their plans → roles/tasks/blocks/draws
+// by plan id. event_roles / event_tasks / event_blocks carry no ministry_id of their
 // own (they're scoped transitively through event_plans), so the ministry scope is
-// applied on the two tables that do have it.
+// applied on the tables that do have it.
 
 export function useContainerRollup(parentEventId: string | null, ministryId: string): ContainerRollup {
   const supabase = createClient()
@@ -94,7 +106,7 @@ export function useContainerRollup(parentEventId: string | null, ministryId: str
       const planIds = plans.map((p) => p.id)
       const planByChild = new Map(plans.map((p) => [p.calendar_event_id, p]))
 
-      const [rolesRes, tasksRes, blocksRes] = planIds.length
+      const [rolesRes, tasksRes, blocksRes, drawsRes] = planIds.length
         ? await Promise.all([
             supabase.from("event_roles")
               .select("*, profiles!event_roles_assigned_to_fkey(name)")
@@ -110,8 +122,15 @@ export function useContainerRollup(parentEventId: string | null, ministryId: str
               .in("event_plan_id", planIds)
               .order("day_index", { ascending: true })
               .order("sort_order", { ascending: true }),
+            // Money. Unlike the three above, event_budget_draws DOES carry
+            // ministry_id (its composite FK needs it), so scope it explicitly
+            // per Convention #8. RLS narrows this to finance + admin/leader.
+            supabase.from("event_budget_draws")
+              .select("event_plan_id, amount")
+              .in("event_plan_id", planIds)
+              .eq("ministry_id", ministryId),
           ])
-        : [{ data: [] }, { data: [] }, { data: [] }]
+        : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
 
       const rolesByPlan = new Map<string, EventRole[]>()
       for (const raw of (rolesRes.data ?? []) as Record<string, unknown>[]) {
@@ -155,6 +174,11 @@ export function useContainerRollup(parentEventId: string | null, ministryId: str
         arr.push(b); blocksByPlan.set(b.event_plan_id, arr)
       }
 
+      const drawTotalByPlan = new Map<string, number>()
+      for (const raw of (drawsRes.data ?? []) as { event_plan_id: string; amount: number }[]) {
+        drawTotalByPlan.set(raw.event_plan_id, (drawTotalByPlan.get(raw.event_plan_id) ?? 0) + Number(raw.amount))
+      }
+
       const assembled: ContainerChild[] = events.map((event) => {
         const plan = planByChild.get(event.id) ?? null
         const tasks = plan ? (tasksByPlan.get(plan.id) ?? []) : []
@@ -166,6 +190,7 @@ export function useContainerRollup(parentEventId: string | null, ministryId: str
           blocks: plan ? (blocksByPlan.get(plan.id) ?? []) : [],
           done: tasks.filter((t) => t.completed).length,
           total: tasks.length,
+          drawTotal: plan ? (drawTotalByPlan.get(plan.id) ?? 0) : 0,
         }
       })
       if (!cancelled) { setChildren(assembled); setLoading(false) }
@@ -176,7 +201,19 @@ export function useContainerRollup(parentEventId: string | null, ministryId: str
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentEventId, ministryId, tick])
 
-  return { children, loading, refresh }
+  const drawTotal = useMemo(
+    () => children.reduce((s, c) => s + c.drawTotal, 0),
+    [children],
+  )
+  // Counted from `plan === null`, not from `drawTotal === 0`: a planned night that
+  // genuinely draws nothing is COMPLETE information, an unopened one is MISSING
+  // information, and the week's budget line has to tell a treasurer which it is.
+  const unplannedCount = useMemo(
+    () => children.filter((c) => !c.plan).length,
+    [children],
+  )
+
+  return { children, loading, refresh, drawTotal, unplannedCount }
 }
 
 // ── Shared bits ────────────────────────────────────────────────────────────────

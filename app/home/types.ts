@@ -594,10 +594,23 @@ export interface CalendarEvent {
 
 export interface EventPlan {
   id: string
+  ministry_id: string
   calendar_event_id: string
+  created_by: string
   overview_notes: string | null
   expected_turnout: number | null
+  /**
+   * LEGACY free-number event budget. Being superseded by `event_budget_draws`
+   * (per-fund draws against a category ceiling) — derived from Σ draws, no longer
+   * written from the client. Read-only until the draws UI lands.
+   */
   budget_allocated: number | null
+  /**
+   * The budget category this event draws against (`budget_categories.id`), or null
+   * when unlinked. Replaced the old calendar-event-TITLE string match, which lost
+   * an event's allocations the moment someone renamed it. `ON DELETE SET NULL`.
+   */
+  budget_category_id: string | null
   type_data: Record<string, unknown>
   planning_group_id: string | null
   plan_start_date: string | null
