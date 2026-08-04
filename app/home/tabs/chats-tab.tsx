@@ -3606,7 +3606,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
             {group.muted && <BellOff style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0, alignSelf: "center" }} aria-label="Muted" />}
             {showLock && <Lock style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0, alignSelf: "center" }} aria-label="Members only" />}
             {group.last_message_time && (
-              <span style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.04em", color: "var(--faint)", flexShrink: 0 }}>
+              <span style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.04em", color: "var(--muted-text)", flexShrink: 0 }}>
                 {formatRelativeTime(group.last_message_time)}
               </span>
             )}
@@ -3786,7 +3786,7 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
                   if (rooms.length === 0) return []
                   return [
                     <div key={`sec-${key}`} className="flex items-center justify-between px-4 pt-3 pb-1">
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)" }}>{label}</span>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)" }}>{label}</span>
                       {canCreateChurchChat && (
                         <button
                           onClick={() => { setPendingCategory(key); setShowCreateChat("church") }}
@@ -3814,7 +3814,7 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
                   onClick={() => setShowArchived(s => !s)}
                   className="w-full flex items-center justify-between px-4 py-2"
                 >
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--faint)" }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)" }}>
                     Archived · {archivedChurchChats.length}
                   </span>
                   <ChevronDown className={`w-3.5 h-3.5 text-[var(--faint)] transition-transform duration-200 ${showArchived ? "rotate-180" : ""}`} />

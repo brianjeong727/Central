@@ -19,7 +19,7 @@ import useSWR from "swr"
 import { Radio, Send, AlertTriangle, ArrowLeftRight } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { MONO_STYLE } from "@/components/central/typography"
-import { CentralCard, ActionMenu, PocketKicker, PocketProgress } from "@/components/central"
+import { CentralCard, ActionMenu, CollapsibleRail, PocketKicker, PocketProgress } from "@/components/central"
 import { instantToZoned, todayInZone } from "@/lib/tz"
 import { useMinistryTimezone } from "../ministry-timezone-context"
 import type { EventTask } from "../types"
@@ -628,7 +628,6 @@ export interface CountdownTabProps {
   hasCrunch: boolean
   countdownPill: ReactNode
   pinnedBand?: ReactNode
-  onGoRunSheet: () => void
   // Render-props into EventPlanWorkspace's closure-bound row machinery.
   renderRow: (task: EventTask, aug: RowAug) => ReactNode
   // Mobile row (Pocket-style, title on its own line) — used only at phone width.
@@ -647,7 +646,7 @@ export interface CountdownTabProps {
 export function CountdownTab(props: CountdownTabProps) {
   const {
     tasks, eventStartISO, teamId, assigneePool, firedIds, canEdit, isMobile, hasCrunch,
-    countdownPill, pinnedBand, onGoRunSheet, renderRow, renderMobileRow, renderAddRow, onReassign,
+    countdownPill, pinnedBand, renderRow, renderMobileRow, renderAddRow, onReassign,
     dragActive, dragOverPhaseKey, onPhaseDragOver, onPhaseDrop, stickyTop = 52,
   } = props
 
@@ -750,26 +749,37 @@ export function CountdownTab(props: CountdownTabProps) {
   }
 
   // ── Desktop ──────────────────────────────────────────────────────────────────
+  // The prose line that used to sit here ("Day-of timing lives in the Run of Show
+  // tab…") is gone (2026-08-02, Brian's hierarchy pass): the Run of Show tab is one
+  // click away in the strip directly above, so the sentence bought a cross-link the
+  // reader already had and cost a muted line at the top of every visit.
+  //
+  // The rail is READINESS + REMINDER SCHEDULE + LOAD — supporting readouts, not a
+  // working surface. It starts FOLDED so the task timeline gets the full width, and
+  // the reader unfolds it when they want the readout. No persistence (Convention #1).
+  //
+  // The folded tab says "At a glance", not "Readiness": it was named after its TOP
+  // CARD, which told anyone who folded it that the reminder schedule and the load
+  // readout were gone rather than hidden. A collapsed tab is the only description
+  // its contents get, so it names the whole column. `contentsName` then enumerates
+  // those cards for screen readers, where there is no width limit.
   return (
-    <div>
-      <div style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "0 0 18px" }}>
-        Day-of timing lives in the{" "}
-        <button onClick={onGoRunSheet} style={{ background: "none", border: "none", padding: 0, color: "var(--plum)", cursor: "pointer", fontSize: 12.5, fontWeight: 500 }}>
-          Run of Show
-        </button>{" "}
-        tab. Nudges fire automatically — this is the plan.
-      </div>
-      <div
-        style={{ display: "grid", gridTemplateColumns: "1fr 336px", gap: "var(--space-10)", alignItems: "start" }}
-        className="max-md:!block"
-      >
-        <section>{timeline}</section>
+    <CollapsibleRail
+      label="At a glance"
+      contentsName="readiness and reminder schedule"
+      width={336}
+      gap="var(--space-10)"
+      defaultCollapsed
+      className="max-md:!block"
+      rail={
         <aside style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }} className="max-md:mt-8">
           <ReadinessCard done={done} total={total} overdue={overdueCount} />
           <FiresNextCard queue={firesNext} />
           {teamId && loadCounts && loadCounts.length > 0 && <LoadCard loadCounts={loadCounts} nameOf={nameOf} />}
         </aside>
-      </div>
-    </div>
+      }
+    >
+      <section>{timeline}</section>
+    </CollapsibleRail>
   )
 }

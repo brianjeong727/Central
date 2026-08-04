@@ -1,6 +1,6 @@
 // Click-through + DB coverage for the 3-state planning-chat button (feat/planning-chat).
 //
-// The event Roles & Leads header carries a 3-state icon button:
+// The event Roles header carries a 3-state icon button:
 //   none   — no chat yet (ivory chip, plum icon)          → confirm → create
 //   synced — chat members match the roster (sage dot)      → opens the chat
 //   stale  — roster changed since creation (plum + danger) → confirm → sync
@@ -18,9 +18,21 @@ const EVENT_ID = "7eaa840d-c666-4d69-a345-4b2fb136da91"
 const EVENT_TITLE = "Summer Retreat 2026"
 const SHOTS = ".claude/task-context/mobile-redesign-p1/screenshots-planning-chat"
 
+// Desktop and mobile drive the SAME 3-state control through different affordances
+// since the header-hierarchy adoption (manifest K10, commit 1ab05ab): desktop moved
+// the 34px header icon button to an `ActionCard` at the FOOT of Roles (Conv #15 —
+// the object header carries object config only); mobile kept the icon button in the
+// Pocket action rail. Same onClick, same state machine, same confirm surfaces — only
+// the ACCESSIBLE NAME differs, so the locators are split by width. Nothing about the
+// assertions below changed with them.
 const AL_NONE = "Create planning chat"
 const AL_SYNCED = "Open planning chat"
 const AL_STALE = "Roster changed — update chat"
+// Desktop ActionCard names. The accessible name concatenates title + subtitle, so
+// these match on the title substring.
+const CARD_NONE = /Start the leads group chat/
+const CARD_SYNCED = /Open the leads group chat/
+const CARD_STALE = /Update the leads group chat/
 
 function watchConsole(page: Page) {
   const errors: string[] = []
@@ -102,7 +114,7 @@ test.describe("Planning chat 3-state button (feat/planning-chat)", () => {
     const card = page.getByRole("heading", { name: EVENT_TITLE }).first()
     await expect(card).toBeVisible({ timeout: 20_000 })
     await card.click()
-    const rolesTab = page.getByRole("button", { name: "Roles & Leads", exact: true })
+    const rolesTab = page.getByRole("button", { name: "Roles", exact: true })
     await expect(rolesTab).toBeVisible()
     await rolesTab.click()
     await expect.poll(() => page.url()).toContain("evtab=roles")
@@ -117,10 +129,14 @@ test.describe("Planning chat 3-state button (feat/planning-chat)", () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await openRoles(page)
     await page.setViewportSize({ width: 390, height: 844 })
-    const hubRow = page.getByText("Roles & Leads", { exact: true }).filter({ visible: true }).first()
+    const hubRow = page.getByText("Roles", { exact: true }).filter({ visible: true }).first()
     await expect(hubRow).toBeVisible({ timeout: 10_000 })
     await hubRow.click()
-    await expect(page.getByRole("heading", { name: "Roles", exact: true })).toBeVisible()
+    // Readiness wait. The mobile Roles spoke has carried NO in-body section header
+    // since the mobile-workspace v2 pass (the SubpageShell chrome owns the title via
+    // `chromeOwnsTitle`), so the desktop heading assertion above cannot be reused
+    // here — wait on the spoke's own action rail instead.
+    await expect(page.getByRole("button", { name: "Add role" })).toBeVisible({ timeout: 20_000 })
   }
 
   test("desktop: none → create → synced → stale → update, membership matches roster", async ({ page }) => {
@@ -131,7 +147,7 @@ test.describe("Planning chat 3-state button (feat/planning-chat)", () => {
     await openRoles(page)
 
     // ── none ──
-    const noneBtn = page.getByRole("button", { name: AL_NONE })
+    const noneBtn = page.getByRole("button", { name: CARD_NONE })
     await expect(noneBtn).toBeVisible()
     await page.screenshot({ path: `${SHOTS}/desktop-1-none.png`, fullPage: true })
 
@@ -148,7 +164,7 @@ test.describe("Planning chat 3-state button (feat/planning-chat)", () => {
     // The create flow opens the chat overlay; close it, then re-open roles.
     await page.keyboard.press("Escape").catch(() => {})
     await openRoles(page)
-    await expect(page.getByRole("button", { name: AL_SYNCED })).toBeVisible()
+    await expect(page.getByRole("button", { name: CARD_SYNCED })).toBeVisible()
     await page.screenshot({ path: `${SHOTS}/desktop-3-synced.png`, fullPage: true })
 
     const gid = await planningGroupId()
@@ -158,7 +174,7 @@ test.describe("Planning chat 3-state button (feat/planning-chat)", () => {
     // ── stale (unassign the member's role → roster shrinks to {admin}) ──
     await setMemberAssigned(false)
     await openRoles(page)
-    const staleBtn = page.getByRole("button", { name: AL_STALE })
+    const staleBtn = page.getByRole("button", { name: CARD_STALE })
     await expect(staleBtn).toBeVisible()
     await page.screenshot({ path: `${SHOTS}/desktop-4-stale.png`, fullPage: true })
 
@@ -171,7 +187,7 @@ test.describe("Planning chat 3-state button (feat/planning-chat)", () => {
     await page.getByRole("button", { name: "Update chat", exact: true }).click()
 
     // ── synced again; member removed, admin (creator/caller) retained ──
-    await expect(page.getByRole("button", { name: AL_SYNCED })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole("button", { name: CARD_SYNCED })).toBeVisible({ timeout: 15_000 })
     expect(await chatMemberIds(gid!)).toEqual([adminId])
 
     expect(errors, `console/page errors:\n${errors.join("\n")}`).toEqual([])
@@ -222,12 +238,17 @@ test.describe("Planning chat 3-state button (feat/planning-chat)", () => {
       const card = page.getByRole("heading", { name: EVENT_TITLE }).first()
       if (await card.count()) {
         await card.click().catch(() => {})
-        const rolesTab = page.getByRole("button", { name: "Roles & Leads", exact: true })
+        const rolesTab = page.getByRole("button", { name: "Roles", exact: true })
         if (await rolesTab.count()) await rolesTab.click().catch(() => {})
       }
+      // Both affordances — the mobile icon button AND the desktop ActionCard — must
+      // be absent, or the guard passes vacuously at whichever width it happens to run.
       await expect(page.getByRole("button", { name: AL_NONE })).toHaveCount(0)
       await expect(page.getByRole("button", { name: AL_SYNCED })).toHaveCount(0)
       await expect(page.getByRole("button", { name: AL_STALE })).toHaveCount(0)
+      await expect(page.getByRole("button", { name: CARD_NONE })).toHaveCount(0)
+      await expect(page.getByRole("button", { name: CARD_SYNCED })).toHaveCount(0)
+      await expect(page.getByRole("button", { name: CARD_STALE })).toHaveCount(0)
     })
   })
 })

@@ -25,6 +25,17 @@ export const EYEBROW_STYLE: React.CSSProperties = {
   color: "var(--muted-text)",
 }
 
+// Canonical mono METRIC: 11px / 0.5px tracking / MIXED CASE. Distinct from
+// MONO_STYLE and EYEBROW_STYLE, which are uppercase eyebrows/kickers — a metric is
+// data, not a label, and uppercasing "5 of 5 done" would read as an eyebrow.
+// Used for "12 days", "5 of 5 done", "4:30 PM", "0 / 2", "in 17 days".
+export const MONO_METRIC_STYLE: React.CSSProperties = {
+  fontFamily: "var(--mono)",
+  fontSize: "11px",
+  letterSpacing: "0.5px",
+  color: "var(--muted-text)",
+}
+
 // Desktop icon-rail nav label (R9): 9px mono uppercase. Color is applied per state
 // by the consumer (active = full-opacity var(--cream-on-dark); inactive = muted) —
 // this const carries only the type treatment. The old 7–8px rail labels are retired.

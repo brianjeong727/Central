@@ -134,6 +134,13 @@ test.describe("Countdown tab (feat/run-sheet-countdown)", () => {
     await expect(page.getByText(/severe allergy surfaced on-site/).first()).toBeVisible()
 
     // ── Right rail: Readiness · Reminder schedule · Load this month (scope to the <aside>) ──
+    // The rail is now a CollapsibleRail and DEFAULTS TO COLLAPSED (Brian's
+    // 2026-08-02 hierarchy pass) — the readouts do not hold permanent width. Unfold
+    // it before asserting; the fold itself is the new first assertion.
+    const foldedTab = page.getByRole("button", { name: /show readiness/i })
+    await expect(foldedTab).toBeVisible()
+    await expect(page.getByRole("complementary")).not.toBeVisible()
+    await foldedTab.click()
     const rail = page.getByRole("complementary")
     await expect(rail.getByText("Readiness")).toBeVisible()
     await expect(rail.getByText("2 of 8 done")).toBeVisible()

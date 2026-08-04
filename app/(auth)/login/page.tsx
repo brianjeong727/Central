@@ -225,7 +225,7 @@ function LoginContent() {
           <div style={{ ...mono, marginBottom: 8 }}>Email</div>
           <div style={{ display: "flex", alignItems: "center", background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 14px" }}>
             <input
-              type="email" value={email} onChange={e => setEmail(e.target.value)}
+              type="email" name="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="you@university.edu" required autoComplete="email"
               style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "13px 0", fontFamily: SANS, fontSize: 15, color: "var(--ink)" }}
             />
@@ -241,7 +241,7 @@ function LoginContent() {
           </div>
           <div style={{ display: "flex", alignItems: "center", background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 14px" }}>
             <input
-              type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
+              type={showPw ? "text" : "password"} name="password" value={password} onChange={e => setPassword(e.target.value)}
               placeholder="••••••••" required autoComplete="current-password"
               style={{ flex: 1, border: "none", outline: "none", background: "transparent", padding: "13px 0", fontFamily: SANS, fontSize: 15, color: "var(--ink)" }}
             />
@@ -281,7 +281,7 @@ function LoginContent() {
             <div style={{ ...mSub, marginTop: 6 }}>One home for your ministry.</div>
             <div style={{ textAlign: "center", marginTop: 40 }}>
               <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 15, color: "var(--body)", margin: 0 }}>&ldquo;Be still, and know that I am God.&rdquo;</p>
-              <span style={{ display: "block", marginTop: 6, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "1.4px", color: "var(--faint)", textTransform: "uppercase" }}>Psalm 46 : 10</span>
+              <span style={{ display: "block", marginTop: 6, fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "1.4px", color: "var(--muted-text)", textTransform: "uppercase" }}>Psalm 46 : 10</span>
             </div>
           </div>
           <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -339,7 +339,7 @@ function LoginContent() {
                 <span style={fieldLabel}>Email</span>
                 <div style={fieldBox}>
                   <input
-                    type="email" value={email} onChange={e => setEmail(e.target.value)}
+                    type="email" name="email" value={email} onChange={e => setEmail(e.target.value)}
                     placeholder="you@university.edu" required autoComplete="email"
                     style={fieldInput}
                   />
@@ -351,7 +351,7 @@ function LoginContent() {
                 <span style={fieldLabel}>Password</span>
                 <div style={fieldBox}>
                   <input
-                    type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
+                    type={showPw ? "text" : "password"} name="password" value={password} onChange={e => setPassword(e.target.value)}
                     placeholder="••••••••" required autoComplete="current-password"
                     style={fieldInput}
                   />

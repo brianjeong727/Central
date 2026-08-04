@@ -29,8 +29,8 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ChevronRight, Plus } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { MONO_STYLE } from "@/components/central/typography"
-import { PocketKicker, PocketRow, PocketRowCard } from "@/components/central"
-import { eventDayHeaderLabel } from "../utils"
+import { PocketKicker, PocketRow, PocketRowCard, NightDivider, InlineAddRow } from "@/components/central"
+import { eventDayHeaderLabel, formatDurationMin } from "../utils"
 import type { CalendarEvent, EventBlock, EventPlan, EventRole, EventTask } from "../types"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -243,18 +243,29 @@ export function SectionKicker({ label, hint, isMobile }: { label: string; hint?:
 
 function EmptyLine({ children }: { children: React.ReactNode }) {
   return (
-    <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--faint)", padding: "10px 2px", margin: 0 }}>
+    <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--muted-text)", padding: "10px 2px", margin: 0 }}>
       {children}
     </p>
   )
 }
 
 // ── 1. Merged week timeline (read-only) ────────────────────────────────────────
-// Every night's blocks stitched into one chronological run. A block's absolute
-// moment is its OWN night's start_date + day_index days, at start_time — day_index
-// is relative to the child, never to the week, so this cannot be a flat sort on
-// day_index. Grouped by calendar date via the shared eventDayHeaderLabel so it
-// reads identically to the leaf Run of Show and to Sub-events.
+// Every night's blocks, grouped BY NIGHT and chronological within it. Grouping by
+// night (not by calendar date) is what makes the group headings addressable: an add
+// has to name the list it lands in — "Add a block to Game Day" — and a date can hold
+// two nights, so a date heading cannot say which. Nights with NO blocks are listed
+// too, precisely so the empty-group state has somewhere to render.
+//
+// A block's absolute moment is its OWN night's start_date + day_index days, at
+// start_time — day_index is relative to the child, never to the week, so sorting is
+// per-night and cannot be a flat sort on day_index.
+//
+// TIME: `event_blocks.start_time` is `time without time zone` — a WALL CLOCK, as
+// tz-immune as a DATE column (Convention #23). `time_label` is its denormalized
+// display copy, always written in the same statement. Both render DIRECTLY; neither
+// goes through lib/tz.ts, useMinistryTimezone(), or any Date round-trip — doing so
+// would invent an instant that was never stored. Duration is `duration_min`, an
+// integer, formatted by the shared formatDurationMin (never date math).
 
 interface TimelineEntry {
   block: EventBlock
@@ -284,8 +295,15 @@ export function buildWeekTimeline(children: ContainerChild[]): { ymd: string; en
   return byDay
 }
 
+/** One night's blocks, chronological. Same sort key as buildWeekTimeline, per-night. */
+function sortNightBlocks(child: ContainerChild): EventBlock[] {
+  return [...child.blocks].sort((a, b) =>
+    `${String(a.day_index).padStart(3, "0")} ${a.start_time ?? "99:99"} ${String(a.sort_order).padStart(4, "0")}`
+      .localeCompare(`${String(b.day_index).padStart(3, "0")} ${b.start_time ?? "99:99"} ${String(b.sort_order).padStart(4, "0")}`))
+}
+
 export function ContainerWeekTimeline({
-  nights, isMobile, onOpenChild, ownBlocks, eventTitle,
+  nights, isMobile, onOpenChild, ownBlocks, eventTitle, canEdit = false,
 }: {
   nights: ContainerChild[]
   isMobile: boolean
@@ -293,15 +311,55 @@ export function ContainerWeekTimeline({
   /** Blocks written on the WEEK itself before timing moved to the nights. Never hidden. */
   ownBlocks: EventBlock[]
   eventTitle: string
+  /** Shows the per-night add affordances. The add OPENS the night — see the note on them. */
+  canEdit?: boolean
 }) {
-  const days = useMemo(() => buildWeekTimeline(nights), [nights])
+  const grouped = useMemo(() => nights.map(child => ({ child, blocks: sortNightBlocks(child) })), [nights])
+  const anyBlocks = grouped.some(g => g.blocks.length > 0) || ownBlocks.length > 0
+
+  // One block row, shared by the week's own orphan blocks and the nights'.
+  const blockRow = (b: EventBlock, isLast: boolean, sub: string | null, tone: string, drill?: () => void) => (
+    <div
+      key={b.id}
+      onClick={drill}
+      role={drill ? "button" : undefined}
+      tabIndex={drill ? 0 : undefined}
+      onKeyDown={drill ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); drill() } } : undefined}
+      style={{
+        display: "grid",
+        gridTemplateColumns: isMobile ? "68px 1fr" : "84px 1fr 150px auto",
+        gap: 12,
+        alignItems: "center",
+        padding: "14px 2px",
+        borderBottom: isLast ? "none" : "1px solid var(--line-3)",
+        cursor: drill ? "pointer" : "default",
+      }}
+    >
+      {/* Wall clock, rendered verbatim (see the header note). */}
+      <span style={{ fontFamily: "var(--mono)", fontSize: isMobile ? 11 : 12, letterSpacing: "0.3px", color: tone, whiteSpace: "nowrap" }}>
+        {b.time_label || "—"}
+      </span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: isMobile ? 15 : 14, fontWeight: isMobile ? 600 : 400, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {b.title || <span style={{ color: "var(--muted-text)", fontStyle: "italic" }}>Untitled block</span>}
+        </span>
+        {sub && (
+          <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>
+        )}
+      </span>
+      {!isMobile && <span style={{ fontSize: 13, color: "var(--body)" }}>{formatDurationMin(b.duration_min) || b.owner_name || "—"}</span>}
+      {!isMobile && (drill ? <ChevronRight style={{ width: 15, height: 15, color: "var(--faint)" }} /> : <span />)}
+    </div>
+  )
 
   return (
     <div>
-      <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 20px" }}>
-        The whole week, night by night. Timing is owned by each night — open one to edit its run of show.
-      </p>
-
+      {/* No prose line under "Timed blocks" (2026-08-02, Brian's hierarchy pass). The
+          night dividers + the per-night "Add a block to <Night>" rows already say the
+          timing is owned by each night; the sentence only added another 13px muted
+          line to a pane that already read as one flat weight. The same words survive
+          as the Run of Show launchpad subtitle on Overview, where they orient someone
+          who has NOT opened the pane yet. */}
       {ownBlocks.length > 0 && (
         <>
           <SectionKicker
@@ -309,90 +367,54 @@ export function ContainerWeekTimeline({
             hint={`${ownBlocks.length === 1 ? "This block was" : `These ${ownBlocks.length} blocks were`} written on ${eventTitle} rather than on a night. Move ${ownBlocks.length === 1 ? "it" : "them"} onto the night ${ownBlocks.length === 1 ? "it belongs" : "they belong"} to when you get a chance.`}
             isMobile={isMobile}
           />
-          <div style={{ marginBottom: 34 }}>
-            {/* Same column grid as the night rows below, so the two read as one list. */}
-            {ownBlocks.map((b, i) => (
-              <div
-                key={b.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: isMobile ? "68px 1fr" : "84px 1fr 150px auto",
-                  gap: 12,
-                  alignItems: "center",
-                  padding: "12px 2px",
-                  borderBottom: i === ownBlocks.length - 1 ? "none" : "1px solid var(--line-3)",
-                }}
-              >
-                <span style={{ fontFamily: "var(--mono)", fontSize: isMobile ? 11 : 13, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{b.time_label || "—"}</span>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: isMobile ? 15 : 14, fontWeight: isMobile ? 600 : 400, color: "var(--ink)" }}>
-                    {b.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Untitled block</span>}
-                  </span>
-                  {isMobile && b.owner_name && (
-                    <span style={{ display: "block", fontSize: 12.5, color: "var(--muted-text)", marginTop: 2 }}>{b.owner_name}</span>
-                  )}
-                </span>
-                {!isMobile && <span style={{ fontSize: 12, color: "var(--body)" }}>{b.owner_name ?? "—"}</span>}
-                {!isMobile && <span />}
-              </div>
-            ))}
+          <div style={{ marginBottom: 36 }}>
+            {ownBlocks.map((b, i) => blockRow(b, i === ownBlocks.length - 1, b.owner_name ?? null, "var(--muted-text)"))}
           </div>
         </>
       )}
 
-      {days.length === 0 && ownBlocks.length === 0 && (
+      {nights.length === 0 && !anyBlocks && (
         <EmptyLine>No run of show yet. Open a night and add its blocks — they&rsquo;ll appear here.</EmptyLine>
       )}
 
-      {days.map(({ ymd, entries }) => (
-        <div key={ymd} style={{ marginBottom: 30 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-            <span style={isMobile
-              ? { ...MONO_STYLE, margin: 0 }
-              : { fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--body)", fontWeight: 500, whiteSpace: "nowrap" }}>
-              {eventDayHeaderLabel(new Date(`${ymd}T00:00:00`))}
-            </span>
-            {!isMobile && <span style={{ flex: 1, height: 1, background: "var(--line)" }} />}
-          </div>
-
-          {entries.map(({ block, child }, i) => {
-            const drill = onOpenChild ? () => onOpenChild(child.event) : undefined
-            const owner = block.owner_name
-            return (
-              <div
-                key={block.id}
-                onClick={drill}
-                role={drill ? "button" : undefined}
-                tabIndex={drill ? 0 : undefined}
-                onKeyDown={drill ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); drill() } } : undefined}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: isMobile ? "68px 1fr" : "84px 1fr 150px auto",
-                  gap: 12,
-                  alignItems: "center",
-                  padding: "12px 2px",
-                  borderBottom: i === entries.length - 1 ? "none" : "1px solid var(--line-3)",
-                  cursor: drill ? "pointer" : "default",
-                }}
-              >
-                <span style={{ fontFamily: "var(--mono)", fontSize: isMobile ? 11 : 13, color: "var(--plum)", whiteSpace: "nowrap" }}>
-                  {block.time_label || "—"}
-                </span>
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: "block", fontSize: isMobile ? 15 : 14, fontWeight: isMobile ? 600 : 400, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Untitled block</span>}
-                  </span>
-                  <span style={{ display: "block", fontSize: 12.5, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {child.event.title}{isMobile && owner ? ` · ${owner}` : ""}
-                  </span>
-                </span>
-                {!isMobile && <span style={{ fontSize: 12, color: "var(--body)" }}>{owner ?? "—"}</span>}
-                {!isMobile && (drill ? <ChevronRight style={{ width: 15, height: 15, color: "var(--faint)" }} /> : <span />)}
+      {grouped.map(({ child, blocks }, gi) => {
+        const drill = onOpenChild ? () => onOpenChild(child.event) : undefined
+        return (
+          <div key={child.event.id}>
+            {isMobile ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, margin: gi === 0 ? "0 0 10px" : "22px 0 10px" }}>
+                <span style={{ ...MONO_STYLE, margin: 0 }}>{child.event.title}</span>
               </div>
-            )
-          })}
-        </div>
-      ))}
+            ) : (
+              <NightDivider
+                name={child.event.title}
+                date={nightLabel(child.event)}
+                count={blocks.length > 0 ? `${blocks.length} block${blocks.length === 1 ? "" : "s"}` : "no blocks"}
+                first={gi === 0 && ownBlocks.length === 0}
+                onNameClick={drill}
+              />
+            )}
+
+            {/* The per-night add is DESKTOP only. This pane had no add affordance at
+                phone width before the header-hierarchy adoption, and
+                mobile_design_system.md — which governs phone width — was not
+                amended to take the desktop inline-add pair. */}
+            {/* Empty-group grammar (§11.13 rules 3 + 4): inside a GROUPED list every
+                group gets the SAME bare InlineAddRow; an empty group only adds the
+                compact italic line above it. The dashed InlineAddCard is reserved for
+                a whole EMPTY COLLECTION. Real data has 5 of 7 nights empty, so the
+                dashed card stacked five times and buried the two nights that DO have a
+                run of show. (Also why §4.19's 52px icon-chip empty state isn't used
+                per night — one italic line, per manifest K4.) */}
+            {blocks.length === 0
+              ? <EmptyLine>Nothing timed for this night yet.</EmptyLine>
+              : blocks.map((b, i) => blockRow(b, i === blocks.length - 1, b.owner_name ?? null, "var(--plum)", drill))}
+            {!isMobile && canEdit && drill && (
+              <InlineAddRow label={`Add a block to ${child.event.title}`} onClick={drill} />
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -470,27 +492,40 @@ export function ContainerStaffing({
 
   return (
     <div>
-      {nights.map((child) => (
-        <div key={child.event.id} style={{ marginBottom: 22 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
-            <button
-              onClick={onOpenChild ? () => onOpenChild(child.event) : undefined}
-              style={{ background: "none", border: "none", padding: 0, fontSize: 14, fontWeight: 500, color: "var(--ink)", cursor: onOpenChild ? "pointer" : "default", textAlign: "left" }}
-            >
-              {child.event.title}
-            </button>
-            <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.08em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-              {nightLabel(child.event)}
-            </span>
-          </div>
-
-          {child.roles.length === 0 && addingFor !== child.event.id && (
-            <p style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", margin: "0 0 6px" }}>No roles on this night yet.</p>
+      {nights.map((child, gi) => (
+        <div key={child.event.id}>
+          {/* L4 night divider — name + its date + the staffed fraction riding the
+              rule. The name stays the drill into that night's own workspace. */}
+          {isMobile ? (
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, margin: gi === 0 ? "0 0 6px" : "22px 0 6px" }}>
+              <button
+                onClick={onOpenChild ? () => onOpenChild(child.event) : undefined}
+                style={{ background: "none", border: "none", padding: 0, fontSize: 14, fontWeight: 500, color: "var(--ink)", cursor: onOpenChild ? "pointer" : "default", textAlign: "left" }}
+              >
+                {child.event.title}
+              </button>
+              <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.08em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
+                {nightLabel(child.event)}
+              </span>
+            </div>
+          ) : (
+            <NightDivider
+              name={child.event.title}
+              date={nightLabel(child.event)}
+              count={`${child.roles.filter(r => r.assigned_to).length} / ${child.roles.length}`}
+              first={gi === 0}
+              onNameClick={onOpenChild ? () => onOpenChild(child.event) : undefined}
+            />
           )}
 
-          {child.roles.map((role) => (
-            <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: "1px solid var(--line-3)" }}>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: "var(--body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {child.roles.length === 0 && addingFor !== child.event.id && (
+            <p style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic", margin: "0 0 6px" }}>No roles on this night yet.</p>
+          )}
+
+          {child.roles.map((role, ri) => (
+            // §4.11 — row dividers are --line-3, and the LAST row carries none.
+            <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: ri === child.roles.length - 1 ? "none" : "1px solid var(--line-3)" }}>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {role.role_name}
               </span>
               {canEdit ? (
@@ -504,7 +539,7 @@ export function ContainerStaffing({
                   {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
               ) : (
-                <span style={{ fontSize: 13, color: role.assigned_name ? "var(--ink)" : "var(--faint)", whiteSpace: "nowrap" }}>
+                <span style={{ fontSize: 13, color: role.assigned_name ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>
                   {role.assigned_name ?? "Unassigned"}
                 </span>
               )}
@@ -526,13 +561,22 @@ export function ContainerStaffing({
               <button onClick={() => { setAddingFor(null); setNewName("") }}
                 style={{ background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, cursor: "pointer", padding: "6px 4px" }}>Cancel</button>
             </div>
-          ) : (
+          ) : isMobile ? (
+            // Phone width keeps the control it had before the header-hierarchy
+            // adoption — mobile_design_system.md governs here and was not amended
+            // to take the desktop inline-add pair. ≥44px hit target.
             <button
               onClick={() => { setAddingFor(child.event.id); setNewName("") }}
-              style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", padding: "9px 0 0", color: "var(--muted-text)", fontSize: 12.5, cursor: "pointer", minHeight: isMobile ? 44 : undefined }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "none", border: "none", padding: "9px 0 0", color: "var(--muted-text)", fontSize: 13, cursor: "pointer", minHeight: 44 }}
             >
               <Plus style={{ width: 13, height: 13 }} /> Add a role
             </button>
+          ) : (
+            // K3 — the add names the list it lands in. Inside a grouped list EVERY
+            // group takes the same bare row (§11.13 rule 3); the empty group is
+            // marked by the italic line above, not by a dashed card. The dashed
+            // InlineAddCard is whole-collection-empty only (§11.13 rule 4).
+            <InlineAddRow label={`Add a role to ${child.event.title}`} onClick={() => { setAddingFor(child.event.id); setNewName("") }} />
           ))}
         </div>
       ))}
@@ -590,30 +634,28 @@ export function ContainerTaskRollup({
 
   return (
     <div>
-      {withTasks.map((child) => {
+      {withTasks.map((child, gi) => {
         const open = child.tasks.filter((t) => !t.completed)
         return (
-          <div key={child.event.id} style={{ marginBottom: 22 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 6 }}>
-              <button
-                onClick={onOpenChild ? () => onOpenChild(child.event) : undefined}
-                style={{ background: "none", border: "none", padding: 0, fontSize: 14, fontWeight: 500, color: "var(--ink)", cursor: onOpenChild ? "pointer" : "default" }}
-              >
-                {child.event.title}
-              </button>
-              <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.08em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-                {nightLabel(child.event)}
-              </span>
-              <span style={{ flex: 1, height: 1, background: "var(--line-3)" }} />
-              <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{child.done} of {child.total} done</span>
-            </div>
+          <div key={child.event.id}>
+            <NightDivider
+              name={child.event.title}
+              date={nightLabel(child.event)}
+              count={`${child.done} of ${child.total} done`}
+              first={gi === 0}
+              onNameClick={onOpenChild ? () => onOpenChild(child.event) : undefined}
+            />
             {open.length === 0 ? (
               <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "4px 0 0" }}>All {child.total} done.</p>
-            ) : open.map((t) => (
-              <div key={t.id} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "8px 0", borderBottom: "1px solid var(--line-3)" }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: "var(--body)" }}>{t.title}</span>
+            ) : open.map((t, i) => (
+              // §4.11 — --line-3 dividers, none on the last row.
+              <div key={t.id} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "8px 0", borderBottom: i === open.length - 1 ? "none" : "1px solid var(--line-3)" }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--body)" }}>{t.title}</span>
                 {t.assigned_name && <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{t.assigned_name}</span>}
                 {t.due_date && (
+                  // `event_tasks.due_date` is a DATE column — tz-immune. Parsed at
+                  // LOCAL midnight (never `new Date(ymd)`, which is UTC-parsed and
+                  // renders the previous day west of UTC). S44.
                   <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", whiteSpace: "nowrap" }}>
                     {new Date(`${t.due_date}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                   </span>

@@ -39,13 +39,13 @@ import { EventCompileModal } from "./event-compile"
 import { MeetingNotesSection } from "./meeting-notes"
 import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sidebarItemStyle, EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketChip } from "../components/pocket-header"
-import { getInitials, formatRelativeTime, eventDaySpan, eventDateRangeLabel, eventDateRangeShort, eventDayHeaderLabel } from "../utils"
+import { getInitials, formatRelativeTime, eventDaySpan, eventDateRangeLabel, eventDateRangeShort, eventDayHeaderLabel, formatDurationMin, daysUntil, countdownLabel } from "../utils"
 import { useContainerRollup, ContainerWeekTimeline, ContainerStaffing, ContainerTaskRollup, SectionKicker, type ContainerRollup } from "./event-container"
 import { useIsMobile } from "../use-is-mobile"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, PocketRoundButton, PocketButton, PocketSheet, PocketSearchField, POCKET_KICKER_STYLE, useScrollResetOn } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, EventMetaLine, NightDivider, InlineAddRow, InlineAddCard, ActionCard, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, PocketRoundButton, PocketButton, PocketSheet, PocketSearchField, POCKET_KICKER_STYLE, MONO_METRIC_STYLE, useScrollResetOn } from "@/components/central"
 import { FinanceWorkspace, MobileFactsGrid, type FinanceSection } from "../components/finance-workspace"
 import { MobilePocketHub, PocketHubChrome } from "../components/mobile-pocket-hub"
 import { teamIconKey } from "../workspace-presets"
@@ -451,7 +451,7 @@ export function StudentOrgRoleTabContent({
               <>
                 <div className="role-desc-view" dangerouslySetInnerHTML={{ __html: legacyHtml! }} />
                 {canWrite && (
-                  <p style={{ ...EYEBROW_STYLE, fontSize: 10, letterSpacing: "0.06em", color: "var(--faint)", margin: "14px 0 0" }}>
+                  <p style={{ ...EYEBROW_STYLE, fontSize: 10, letterSpacing: "0.06em", color: "var(--muted-text)", margin: "14px 0 0" }}>
                     Legacy description — edit to migrate
                   </p>
                 )}
@@ -659,27 +659,9 @@ function eventTimeLabel(iso: string, timeZone: string): string {
   return formatInZone(iso, timeZone, { hour: "numeric", minute: "2-digit" })
 }
 // ── Events agenda helpers ──────────────────────────────────────────────────────
-// Whole-day difference between two instants, counted on the MINISTRY's calendar
-// (sign-preserving). Both endpoints are projected into `timeZone` first: an 8pm ET
-// event is "today" for the ministry even though it is already tomorrow in UTC, and
-// device-local getters would answer for whichever timezone the viewer happens to
-// be sitting in.
-function daysUntil(start: Date, now: Date, timeZone: string): number {
-  const s = Date.parse(`${instantToZoned(start, timeZone).ymd}T00:00:00Z`)
-  const n = Date.parse(`${instantToZoned(now, timeZone).ymd}T00:00:00Z`)
-  return Math.round((s - n) / 86400000)
-}
-// Humanised countdown for a future event; null for past events (caller shows no pill).
-function countdownLabel(start: Date, now: Date, timeZone: string): { label: string; soon: boolean } | null {
-  const days = daysUntil(start, now, timeZone)
-  if (days < 0) return null
-  let label: string
-  if (days === 0) label = "Today"
-  else if (days === 1) label = "Tomorrow"
-  else if (days < 30) label = `in ${days} days`
-  else { const m = Math.round(days / 30); label = `in ${m} month${m === 1 ? "" : "s"}` }
-  return { label, soon: days <= 7 }
-}
+// `daysUntil` / `countdownLabel` moved to app/home/utils.ts (imported above) now
+// that the shared L1 event meta line consumes the countdown too. Both still take
+// the ministry `timeZone` explicitly — see the note there.
 // Humanised "Ended · …" label for a past event (day/week/month granularity).
 function endedAgoLabel(start: Date, now: Date, timeZone: string): string {
   const days = -daysUntil(start, now, timeZone) // positive = days in the past
@@ -691,6 +673,75 @@ function endedAgoLabel(start: Date, now: Date, timeZone: string): string {
   if (days < 60) return "Ended · last month"
   const m = Math.round(days / 30)
   return `Ended · ${m} months ago`
+}
+
+// ── L1 · event identity meta line ──────────────────────────────────────────────
+// The persistent facts under an event's 44px title, visible on EVERY pane of the
+// workspace (they used to live only inside Overview's facts grid, which the meta
+// line now replaces). Every value comes from a CANONICAL helper (Convention #23):
+//   range     eventDateRangeShort  — "Aug 16 – Aug 30", no weekdays (D9)
+//   duration  eventDaySpan         — fed the MINISTRY-zone YMD pair, never raw Dates
+//   countdown countdownLabel       — null (renders nothing) once the event is past
+// `eventStartYMD`/`eventEndYMD` already resolve all-day rows to their `start_day`/
+// `end_day` DATE columns and timed rows to `instantToZoned(...).ymd`, so the span
+// and the range are both counted on the ministry's calendar rather than a viewer's.
+function EventIdentityMeta({ ev, timeZone }: { ev: CalendarEvent; timeZone: string }) {
+  const startYMD = eventStartYMD(ev, timeZone)
+  const endYMD = eventEndYMD(ev, timeZone)
+  const span = eventDaySpan(startYMD, endYMD)
+  const cd = countdownLabel(new Date(ev.start_date), new Date(), timeZone)
+  return (
+    <EventMetaLine
+      range={eventDateRangeShort(startYMD, endYMD)}
+      duration={span > 1 ? `${span} days` : undefined}
+      location={ev.location?.trim() || undefined}
+      countdown={cd?.label}
+    />
+  )
+}
+
+// ── L3 · ruled section wrapper (event workspace) ───────────────────────────────
+// Desktop gets the ruled EventSectionHeader; phone width keeps the existing mono
+// SectionKicker (this design is desktop-only by construction — the event tab strip
+// is `hidden md:block` and mobile is hub-and-spoke).
+//
+// `spaced` carries §1.3's `.sect + .sect { margin-top: 36 }`. That is a SIBLING
+// relationship, which a component cannot express through inline styles, so it lands
+// at the call site — pass `spaced={false}` on the FIRST section of a pane.
+//
+// `hint` is MOBILE-ONLY (2026-08-02, Brian's L3/L4 hierarchy pass). On desktop a
+// prose line under every ruled rule made the whole pane read at one weight — the
+// rules stopped looking like structure and started looking like more copy. The
+// desktop rule now carries label + count + trailing metric and nothing else; the
+// phone kicker keeps its hint because at 390px the sibling section it contrasts
+// with is never on screen at the same time.
+function EventRuledSection({
+  title, hint, count, trailing, action, isMobile, spaced = true, children,
+}: {
+  title: string
+  /** Explanatory sentence — rendered on the MOBILE kicker only (see header note). */
+  hint?: string
+  count?: ReactNode
+  trailing?: ReactNode
+  action?: ReactNode
+  isMobile: boolean
+  spaced?: boolean
+  children?: ReactNode
+}) {
+  if (isMobile) {
+    return (
+      <div>
+        <SectionKicker label={title} hint={hint} isMobile />
+        {children}
+      </div>
+    )
+  }
+  return (
+    <div style={spaced ? { marginTop: 36 } : undefined}>
+      <EventSectionHeader title={title} count={count} trailing={trailing} action={action} />
+      {children}
+    </div>
+  )
 }
 
 // ── EventsAgendaList ───────────────────────────────────────────────────────────
@@ -768,7 +819,7 @@ function EventsAgendaList({
   if (events.length === 0) {
     return (
       <div style={{ borderLeft: "2px solid var(--line)", paddingLeft: 20 }}>
-        <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>
+        <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 15, color: "var(--muted-text)" }}>
           No events yet. Click &ldquo;New Event&rdquo; to get started.
         </p>
       </div>
@@ -1068,13 +1119,13 @@ function EventsAgendaList({
       >
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--body)", margin: 0, letterSpacing: "-0.01em" }}>{ev.title}{ev.recurring && <RecurringMark />}</p>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 13, color: "var(--faint)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 13, color: "var(--muted-text)", fontFamily: "var(--sans)", flexWrap: "wrap" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><Calendar className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {dtStr}</span>
             {ev.location && <>{dot}<span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><MapPin className="w-3.5 h-3.5" style={{ opacity: 0.7 }} /> {ev.location}</span></>}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.08em", color: "var(--faint)", whiteSpace: "nowrap" }}>{endedAgoLabel(d, now, timeZone)}</span>
+          <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.08em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>{endedAgoLabel(d, now, timeZone)}</span>
           {renderPlannedCheck(isPlanned)}
           {renderDeleteBtn(ev.id, isHovered)}
         </div>
@@ -1085,9 +1136,9 @@ function EventsAgendaList({
       <div key={ev.id} style={{ display: "grid", gridTemplateColumns: "76px 26px 1fr" }}>
         {/* Date block — de-emphasised */}
         <div style={{ textAlign: "center", paddingTop: 20 }}>
-          <div style={{ ...monoBase, fontSize: 11, letterSpacing: "0.12em", color: "var(--faint)" }}>{formatYMD(startYMD, { weekday: "short" })}</div>
+          <div style={{ ...monoBase, fontSize: 11, letterSpacing: "0.12em", color: "var(--muted-text)" }}>{formatYMD(startYMD, { weekday: "short" })}</div>
           <div style={{ fontFamily: "var(--serif)", fontSize: 38, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--muted-text)", lineHeight: 1 }}>{ymdDayNum(startYMD)}</div>
-          <div style={{ ...monoBase, fontSize: 11, color: "var(--faint)" }}>{formatYMD(startYMD, { month: "short" })}</div>
+          <div style={{ ...monoBase, fontSize: 11, color: "var(--muted-text)" }}>{formatYMD(startYMD, { month: "short" })}</div>
         </div>
         {/* Spine — done node */}
         <div style={{ position: "relative" }}>
@@ -1454,7 +1505,25 @@ export function StudentOrgTeamHome({
         ]
       : baseCrumbs
     return (
-      <SubpageShell crumbs={crumbs} title={activeEvent.title} mobileTitle={evMobileCrumb?.chromeOwnsTitle ? evMobileCrumb.label : undefined} width="full">
+      <SubpageShell
+        crumbs={crumbs}
+        title={activeEvent.title}
+        mobileTitle={evMobileCrumb?.chromeOwnsTitle ? evMobileCrumb.label : undefined}
+        // L1 identity block (desktop): 44px title + the persistent meta line +
+        // the object-scope "Edit event" in the right slot, so it is reachable from
+        // all five panes instead of Overview only (§3.1 labeled-Zone-B carve-out).
+        titleScale="display"
+        titleMeta={<EventIdentityMeta ev={activeEvent} timeZone={timeZone} />}
+        titleAction={canEdit ? (
+          <ContentActionButton
+            variant="ghost"
+            icon={<Pencil style={{ width: 14, height: 14 }} />}
+            label="Edit event"
+            onClick={() => setShowEditEvent(true)}
+          />
+        ) : undefined}
+        width="full"
+      >
         {/* key on the event id: remount when switching parent<->sub-event so the
             section state re-inits (a sub-event has no Sub-events tab → lands on
             Overview instead of inheriting the parent's ?evtab=sub_events). */}
@@ -3621,7 +3690,7 @@ export function StudentOrgSectionNav({
               {isEvents && isPlanOpen && (
                 <div style={{ marginLeft: 16, marginBottom: 4 }}>
                   {calEvents.length === 0 ? (
-                    <p style={{ fontSize: 11, color: FAINT, padding: "4px 10px", fontFamily: "var(--sans)" }}>No events yet</p>
+                    <p style={{ fontSize: 11, color: "var(--muted-text)", padding: "4px 10px", fontFamily: "var(--sans)" }}>No events yet</p>
                   ) : (
                     calEvents.map(ev => {
                       const isEvActive = planningEvent?.id === ev.id
@@ -4511,7 +4580,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                     {/* Song list */}
                     {songs.length === 0 && !isUploadingThis ? (
                       <div style={{ padding: "20px 18px", textAlign: "center" }}>
-                        <p style={{ fontSize: 13, color: "var(--faint)" }}>No charts uploaded yet.</p>
+                        <p style={{ fontSize: 13, color: "var(--muted-text)" }}>No charts uploaded yet.</p>
                       </div>
                     ) : (
                       <div>
@@ -4524,7 +4593,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                           return (
                             <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 18px", borderBottom: idx < songs.length - 1 ? "1px solid var(--line-3)" : "none" }}>
                               {/* Position number */}
-                              <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16, flexShrink: 0 }}>{idx + 1}</span>
+                              <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", minWidth: 16, flexShrink: 0 }}>{idx + 1}</span>
 
                               {/* Title */}
                               <div style={{ flex: 1, minWidth: 0 }}>
@@ -5103,7 +5172,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                     )}
                   </div>
                   {songs.length === 0 ? (
-                    <p style={{ fontSize: 13, color: "var(--faint)", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
+                    <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
                   ) : (
                     <div>
                       {songs.map((song, idx) => {
@@ -5112,7 +5181,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                         const isOcr = ocrInProgress.has(song.id)
                         return (
                           <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid var(--line-3)" }}>
-                            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16 }}>{idx + 1}</span>
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", minWidth: 16 }}>{idx + 1}</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               {isOcr ? <span style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
                                 <input autoFocus value={isEditingTitle ? (editingSong?.value ?? "") : ""}
@@ -5471,7 +5540,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                     )}
                   </div>
                   {songs.length === 0 ? (
-                    <p style={{ fontSize: 13, color: "var(--faint)", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
+                    <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "0 20px 16px" }}>No songs yet. Upload a chart to add one.</p>
                   ) : (
                     <div>
                       {songs.map((song, idx) => {
@@ -5480,7 +5549,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                         const isOcr = ocrInProgress.has(song.id)
                         return (
                           <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderTop: "1px solid var(--line-3)" }}>
-                            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 16 }}>{idx + 1}</span>
+                            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", minWidth: 16 }}>{idx + 1}</span>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               {isOcr ? <span style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic" }}>Reading…</span> : isEditingTitle || !song.title ? (
                                 <input autoFocus value={isEditingTitle ? (editingSong?.value ?? "") : ""}
@@ -5702,12 +5771,12 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
         </div>
         {songs.map((song, i) => (
           <div key={song.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderBottom: i < songs.length - 1 ? "1px solid var(--line-3)" : "none" }}>
-            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", minWidth: 18 }}>{i + 1}</span>
-            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", flex: 1 }}>{song.title || <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "var(--faint)" }}>Untitled</span>}</span>
+            <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", minWidth: 18 }}>{i + 1}</span>
+            <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 17, color: "var(--ink)", flex: 1 }}>{song.title || <span style={{ fontFamily: "var(--font-inter)", fontSize: 14, color: "var(--muted-text)" }}>Untitled</span>}</span>
             {song.key && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, color: "var(--plum-2)", background: "#EDE3EE", borderRadius: 7 }}>{song.key}</span>}
           </div>
         ))}
-        {songs.length === 0 && <p style={{ fontSize: 13, color: "var(--faint)", padding: "12px 18px" }}>No songs in set.</p>}
+        {songs.length === 0 && <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "12px 18px" }}>No songs in set.</p>}
       </div>
     )
   }
@@ -7084,7 +7153,7 @@ export function AddEventModal({
               <FormField label="Plan start date">
                 <Input type="date" value={planStartDate} onChange={(e) => setPlanStartDate(e.target.value)} />
               </FormField>
-              <FormField label={<>Crunch date <span style={{ textTransform: "none", letterSpacing: 0, fontSize: 10, color: "var(--faint)" }}>optional</span></>}>
+              <FormField label={<>Crunch date <span style={{ textTransform: "none", letterSpacing: 0, fontSize: 10, color: "var(--muted-text)" }}>optional</span></>}>
                 <Input type="date" value={crunchDate} onChange={(e) => setCrunchDate(e.target.value)} />
                 {crunchDate && (
                   <button
@@ -7245,7 +7314,23 @@ export function MinistryCalendar({
         ]
       : [{ label: teamName, onClick: () => setPlanningEvent(null) }, { label: planningEvent.title }]
     return (
-      <SubpageShell crumbs={crumbs} title={planningEvent.title} mobileTitle={evMobileCrumb?.chromeOwnsTitle ? evMobileCrumb.label : undefined} width="full">
+      <SubpageShell
+        crumbs={crumbs}
+        title={planningEvent.title}
+        mobileTitle={evMobileCrumb?.chromeOwnsTitle ? evMobileCrumb.label : undefined}
+        // Same L1 identity block as the StudentOrgTeamHome path — see the note there.
+        titleScale="display"
+        titleMeta={<EventIdentityMeta ev={planningEvent} timeZone={timeZone} />}
+        titleAction={canEdit ? (
+          <ContentActionButton
+            variant="ghost"
+            icon={<Pencil style={{ width: 14, height: 14 }} />}
+            label="Edit event"
+            onClick={() => setShowEditEvent(true)}
+          />
+        ) : undefined}
+        width="full"
+      >
         <EventPlanWorkspace
           key={planningEvent.id}
           inline
@@ -7484,11 +7569,15 @@ function LaunchpadRow({ icon: Icon, title, subtitle, right, onClick }: {
         padding: "16px 18px", cursor: "pointer", transition: "border-color .15s ease, transform .15s ease",
       }}
     >
-      <span style={{ width: 40, height: 40, borderRadius: 11, background: "var(--ivory)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+      {/* Radii are tokens, never raw px — 11 snapped to --r-input (10). */}
+      <span style={{ width: 40, height: 40, borderRadius: "var(--r-input)", background: "var(--ivory)", display: "grid", placeItems: "center", flexShrink: 0 }}>
         <Icon style={{ width: 18, height: 18, color: "var(--plum)" }} />
       </span>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: "block", fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)", lineHeight: 1.2 }}>{title}</span>
+        {/* S24 — UI chrome is weight 500 (§1.3 H3). 600 is reserved for the L1
+            title, the active tab, and the L3 section label; a list-card title is
+            none of those (contract-card hard do-not #6). */}
+        <span style={{ display: "block", fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 500, color: "var(--ink)", lineHeight: 1.2 }}>{title}</span>
         <span style={{ display: "block", fontSize: 13, color: "var(--body)", marginTop: 2 }}>{subtitle}</span>
       </span>
       <span style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
@@ -7701,7 +7790,7 @@ function EventBudgetCard({
     <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22} style={isMobile ? { border: "none" } : undefined}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <p style={monoLabel}>Budget</p>
-        {!canEditBudget && <span style={{ fontSize: 11, color: "var(--faint)", fontStyle: "italic" }}>Treasurer only</span>}
+        {!canEditBudget && <span style={{ fontSize: 11, color: "var(--muted-text)", fontStyle: "italic" }}>Treasurer only</span>}
       </div>
 
       <p style={{ ...bigNumber, color: total > 0 ? "var(--ink)" : "var(--faint)" }}>
@@ -7733,7 +7822,7 @@ function EventBudgetCard({
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         ) : (
-          <p style={{ fontSize: 14, color: categoryName ? "var(--ink)" : "var(--faint)" }}>
+          <p style={{ fontSize: 14, color: categoryName ? "var(--ink)" : "var(--muted-text)" }}>
             {categoryName ?? "No budget category"}
           </p>
         )}
@@ -7744,7 +7833,7 @@ function EventBudgetCard({
         <div style={{ marginTop: 18 }}>
           <p style={{ ...monoLabel, marginBottom: 4 }}>Draw by fund</p>
           {funds.length === 0 ? (
-            <p style={{ fontSize: 12.5, color: "var(--faint)", fontStyle: "italic", marginTop: 6 }}>No funds set up yet.</p>
+            <p style={{ fontSize: 12.5, color: "var(--muted-text)", fontStyle: "italic", marginTop: 6 }}>No funds set up yet.</p>
           ) : funds.map(f => {
             const amt = drawsByFund[f.slug] ?? 0
             const draft = drafts[f.slug]
@@ -7769,7 +7858,7 @@ function EventBudgetCard({
                     style={{ width: 104, flexShrink: 0, textAlign: "right", fontVariantNumeric: "tabular-nums", opacity: savingFund === f.slug ? 0.5 : 1 }}
                   />
                 ) : (
-                  <span style={{ fontSize: 14, fontVariantNumeric: "tabular-nums", color: amt > 0 ? "var(--ink)" : "var(--faint)" }}>
+                  <span style={{ fontSize: 14, fontVariantNumeric: "tabular-nums", color: amt > 0 ? "var(--ink)" : "var(--muted-text)" }}>
                     {amt > 0 ? money(amt) : "—"}
                   </span>
                 )}
@@ -8654,7 +8743,7 @@ export function EventPlanWorkspace({
   const sections: { key: ActiveSection; label: string }[] = [
     { key: 'overview', label: 'Overview' },
     { key: 'checklist', label: 'Countdown' },
-    { key: 'roles', label: 'Roles & Leads' },
+    { key: 'roles', label: 'Roles' },
     { key: 'runsheet', label: 'Run of Show' },
     ...extraTabs.map(t => ({ key: t as ActiveSection, label: EXTRA_TAB_LABELS[t] })),
   ]
@@ -8839,7 +8928,7 @@ export function EventPlanWorkspace({
         </button>
         {/* title + optional playbook brief (Run Sheet P2) */}
         <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ fontSize: isChild ? 14.5 : 15.5, color: task.completed ? "var(--faint)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
+          <span style={{ fontSize: isChild ? 14.5 : 15.5, color: task.completed ? "var(--muted-text)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
           {/* Countdown sub-line (mock's tk-sub): assignee + trigger badge live INSIDE the
               body column, under the title — so the flex:1 body keeps full width and the
               title/whisper never get starved by right-side siblings (matches the mobile row). */}
@@ -8855,7 +8944,7 @@ export function EventPlanWorkspace({
           {task.brief && (
             aug?.countdown
               ? <CountdownWhisper text={task.brief} />
-              : <span style={{ fontSize: 12.5, color: "var(--faint)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{task.brief}</span>
+              : <span style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{task.brief}</span>
           )}
         </span>
         {/* Countdown trigger badge (nudge state) — non-Countdown callers only; in
@@ -8992,7 +9081,7 @@ export function EventPlanWorkspace({
             {task.completed && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: isChild ? 400 : 500, color: task.completed ? "var(--faint)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.35, overflowWrap: "anywhere" }}>{task.title}</div>
+            <div style={{ fontSize: 15, fontWeight: isChild ? 400 : 500, color: task.completed ? "var(--muted-text)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.35, overflowWrap: "anywhere" }}>{task.title}</div>
             {(task.assigned_name || task.due_date || badge || aug?.reassign) && (
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 7 }}>
                 {task.assigned_name && (
@@ -9082,8 +9171,16 @@ export function EventPlanWorkspace({
               const HUB_META: Record<string, { iconKey: string; sub: string }> = {
                 overview: { iconKey: "chart", sub: "Facts, stats & planning notes" },
                 checklist: { iconKey: "plan", sub: taskTotal > 0 ? `${taskDone} of ${taskTotal} done` : "The T-minus plan — tasks by phase" },
-                // A container's spokes are views onto its nights, so they say so.
-                roles: { iconKey: "users", sub: isContainer ? "Week-spanning roles + every night's leads" : rolesTotal > 0 ? `${rolesAssigned} of ${rolesTotal} assigned` : "Assign who owns each part" },
+                // A container's spokes are views onto its sub-events, so they say so.
+                // Vocabulary tracks the Roles pane's two L3 labels ("Event Level" /
+                // "Sub-event Level", renamed 2026-08-02) — the row is a doorway into
+                // that pane, so it names what is behind it in the same words. Was
+                // "Week-spanning roles + every night's leads".
+                // Length is load-bearing: this row single-line-ellipsises at 390, and
+                // ~30 chars is the budget. "Event-level and sub-event-level roles"
+                // clipped to "…sub-event-leve…", hiding the second half of the point;
+                // dropping the two "-level"s keeps both terms whole.
+                roles: { iconKey: "users", sub: isContainer ? "Event and sub-event roles" : rolesTotal > 0 ? `${rolesAssigned} of ${rolesTotal} assigned` : "Assign who owns each part" },
                 runsheet: { iconKey: "clock", sub: isContainer ? "The whole week, night by night" : "Day-of timing, block by block" },
                 notes: { iconKey: "book", sub: "Cross-year pain points" },
                 sub_events: { iconKey: "calendar", sub: EXTRA_TAB_META.sub_events.subtitle },
@@ -9144,7 +9241,7 @@ export function EventPlanWorkspace({
               const filledSegs = taskTotal > 0 ? Math.round((taskDone / taskTotal) * 5) : 0
               // Readiness status from checklist progress
               const readiness = taskTotal === 0
-                ? { color: "var(--faint)", label: "No checklist yet" }
+                ? { color: "var(--muted-text)", label: "No checklist yet" }
                 : pct === 100 ? { color: "var(--success)", label: "Ready" }
                 : pct >= 50 ? { color: "var(--sage)", label: "In progress" }
                 : { color: isMobile ? "var(--danger)" : "var(--gold)", label: "Needs attention" }
@@ -9185,13 +9282,21 @@ export function EventPlanWorkspace({
               )
 
               return (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 336px", gap: "var(--space-10)", alignItems: "start", marginTop: "var(--space-9)" }} className="max-md:!block">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 336px", gap: "var(--space-10)", alignItems: "start", marginTop: isMobile ? "var(--space-9)" : 0 }} className="max-md:!block">
                 {/* ── LEFT column ── */}
                 <section>
-                  {/* Event identity header */}
+                  {/* Event identity header — MOBILE ONLY. The desktop facts grid is
+                      GONE (spec D5): date / duration / location now live in the L1
+                      meta line under the title, where they are visible on every pane
+                      instead of only here, and "What" folds into the "About this
+                      event" prose below. Phone width keeps this card (it has no L1
+                      meta line — the Pocket chrome owns the title). §4.22's Overview
+                      edit button is deleted with it (D6): "Edit event" is the header
+                      right-slot action now, not a second copy in the body. */}
+                  {isMobile && (
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, paddingBottom: 24, marginBottom: "var(--space-9)", borderBottom: "1px solid var(--line)" }}>
                     <div>
-                      <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: isMobile ? 22 : 32, fontWeight: 600, color: "var(--ink)", lineHeight: 1.1, letterSpacing: isMobile ? -0.3 : -0.4 }}>{dateOnly}</div>
+                      <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 600, color: "var(--ink)", lineHeight: 1.1, letterSpacing: -0.3 }}>{dateOnly}</div>
                       <div style={{ display: "grid", gridTemplateColumns: "300px auto", columnGap: "var(--space-12)", rowGap: 16, marginTop: 18, justifyContent: "start" }} className="max-md:!grid-cols-1">
                         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                           {leftFacts.map(f => renderFact(f, 72))}
@@ -9209,29 +9314,29 @@ export function EventPlanWorkspace({
                       // button: mobile_design_system.md §4 states desktop primitives
                       // are not reused on mobile, and §5's identity-card edit
                       // affordance is a quiet pill labelled "Edit" (same as Profile).
-                      // The desktop branch below is byte-identical to before.
-                      isMobile ? (
-                        <span style={{ flexShrink: 0 }}>
-                          <PocketButton variant="quiet" onClick={onEditEvent}>
-                            <Pencil style={{ width: 14, height: 14 }} /> Edit
-                          </PocketButton>
-                        </span>
-                      ) : (
-                        <button
-                          onClick={onEditEvent}
-                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--dashed)" }}
-                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--line-2)" }}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0, background: "var(--cream)", border: "1px solid var(--line-2)", borderRadius: "var(--r-input)", padding: "9px 15px", fontSize: 14, color: "var(--body)", cursor: "pointer", transition: "border-color .15s ease", whiteSpace: "nowrap" }}
-                        >
-                          <Pencil style={{ width: 14, height: 14 }} /> Edit event
-                        </button>
-                      )
+                      <span style={{ flexShrink: 0 }}>
+                        <PocketButton variant="quiet" onClick={onEditEvent}>
+                          <Pencil style={{ width: 14, height: 14 }} /> Edit
+                        </PocketButton>
+                      </span>
                     )}
                   </div>
+                  )}
+
+                  {/* About this event — desktop only, and only when there is prose to
+                      show. This is where "What" landed once the facts grid went. */}
+                  {!isMobile && descVal && (
+                    <div style={{ marginBottom: 36 }}>
+                      <EventSectionHeader title="About this event" />
+                      <p style={{ fontFamily: "var(--serif)", fontSize: 17, lineHeight: 1.6, color: "var(--body)", maxWidth: "56ch", margin: 0 }}>{descVal}</p>
+                    </div>
+                  )}
 
                   {/* Launchpad */}
                   <div>
-                    <p style={eyebrow}>Jump into planning</p>
+                    {isMobile
+                      ? <p style={eyebrow}>Jump into planning</p>
+                      : <EventSectionHeader title="Jump into planning" />}
                     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
                       <LaunchpadRow
                         icon={ClipboardList}
@@ -9247,10 +9352,18 @@ export function EventPlanWorkspace({
                           </span>
                         }
                       />
+                      {/* Title is the DESTINATION TAB's name, not a description of it:
+                          this row links to the Roles tab, so it says "Roles" (renamed
+                          from "Roles & Leads" 2026-08-02 with the tab itself — a nav row
+                          that disagrees with the tab it opens is just a wrong label).
+                          Container subtitle mirrors the mobile hub row VERBATIM
+                          (one vocabulary across widths) and tracks the pane's two L3
+                          labels, "Event Level" / "Sub-event Level". A leaf event keeps
+                          the original sentence — it has no sub-events to name. */}
                       <LaunchpadRow
                         icon={Users}
-                        title="Roles & Leads"
-                        subtitle="Assign who owns each part"
+                        title="Roles"
+                        subtitle={isContainer ? "Event and sub-event roles" : "Assign who owns each part"}
                         onClick={() => setActiveSectionAndUrl('roles')}
                         right={<span style={{ fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{rolesAssigned} / {rolesTotal} assigned</span>}
                       />
@@ -9261,26 +9374,40 @@ export function EventPlanWorkspace({
                           title={EXTRA_TAB_LABELS[t]}
                           subtitle={EXTRA_TAB_META[t].subtitle}
                           onClick={() => setActiveSectionAndUrl(t)}
+                          // Every launchpad row states where it stands (Countdown's
+                          // "31 / 31", Roles' "0 / 6 assigned"); Sub-events was the
+                          // one row with nothing but a chevron. The count comes off
+                          // the ONE batched container rollup that is already loaded
+                          // for this workspace — no extra fetch, no N+1. The other
+                          // extra tabs (Acts, Teams, Transport) have no count in
+                          // scope here and keep the bare chevron.
+                          right={t === "sub_events" && isContainer && !containerRollup.loading ? (
+                            <span style={{ fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{containerRollup.children.length} scheduled</span>
+                          ) : undefined}
                         />
                       ))}
                     </div>
                   </div>
 
-                  {/* Planning notes (demoted) */}
-                  <div style={{ marginTop: "var(--space-9)" }}>
-                    <p style={eyebrow}>Planning notes</p>
+                  {/* Planning notes (demoted). §1.3's `.sect + .sect { margin-top: 36 }`
+                      — a sibling relationship, so it lands here at the call site. */}
+                  <div style={{ marginTop: isMobile ? "var(--space-9)" : 36 }}>
+                    {isMobile
+                      ? <p style={eyebrow}>Planning notes</p>
+                      : <EventSectionHeader title="Planning notes" />}
                     {canEdit ? (
                       <textarea
                         value={overviewNotes}
                         onChange={e => setOverviewNotes(e.target.value)}
                         onBlur={handleSaveNotes}
                         placeholder="Add context, key decisions, or reminders for this event…"
-                        style={{ width: "100%", minHeight: 74, background: "var(--cream-2)", border: "1px solid var(--line-2)", borderRadius: 12, padding: "15px 17px", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                        // Radius token, §1.4 padding (15/17 → 14/18).
+                        style={{ width: "100%", minHeight: 74, background: "var(--cream-2)", border: "1px solid var(--line-2)", borderRadius: "var(--r-card)", padding: "14px 18px", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }}
                       />
                     ) : overviewNotes ? (
                       <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{overviewNotes}</p>
                     ) : (
-                      <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic" }}>No planning notes yet.</p>
+                      <p style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic" }}>No planning notes yet.</p>
                     )}
                   </div>
                 </section>
@@ -9346,7 +9473,9 @@ export function EventPlanWorkspace({
                     {taskTotal > 0 && (
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 12 }}>
                         <span style={{ fontSize: 12, color: "var(--body)" }}>{taskDone} of {taskTotal} done</span>
-                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)" }}>{pct}%</span>
+                        {/* S23 — serif numerics are weight 400 (§1.3); the 600 date
+                            anchor is scoped to the featured card + announcement aside. */}
+                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 400, color: "var(--ink)" }}>{pct}%</span>
                       </div>
                     )}
                   </CentralCard>
@@ -9429,10 +9558,16 @@ export function EventPlanWorkspace({
               const pillNode = pillLabel ? <CountdownPill label={pillLabel} soon={cd!.soon} /> : null
               return (
               <div>
+                {/* L3 header layer ONLY (D10) — countdown-tab.tsx's rows, phase
+                    labels, pinned band and reminder card carry their own ratified
+                    spec and are untouched. The remaining-count moves off the action
+                    slot onto the rule as a mono metric, which is what it is. */}
                 {!isMobile && (
                   <EventSectionHeader
                     title="Countdown"
-                    action={pillNode ?? <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{incompleteTasks.length} of {tasks.length} remaining</span>}
+                    count={tasks.length > 0 ? tasks.length : undefined}
+                    trailing={tasks.length > 0 ? `${incompleteTasks.length} of ${tasks.length} remaining` : undefined}
+                    action={pillNode ?? undefined}
                   />
                 )}
 
@@ -9447,7 +9582,6 @@ export function EventPlanWorkspace({
                   hasCrunch={!!crunchDate}
                   countdownPill={pillNode}
                   pinnedBand={pinnedBand}
-                  onGoRunSheet={() => setActiveSectionAndUrl("runsheet")}
                   renderRow={(task, aug) => renderTaskTree(task, aug)}
                   renderMobileRow={(task, aug) => renderMobileTaskRow(task, aug)}
                   renderAddRow={renderPhaseAddRow}
@@ -9460,17 +9594,21 @@ export function EventPlanWorkspace({
                 />
 
                 {/* CONTAINER: the week's own checklist above stays the editable list;
-                    this read-only roll-up answers "are the nights on track" without
-                    eight drill-ins. Tapping a night opens its own Countdown. */}
+                    this read-only roll-up answers "are the sub-events on track"
+                    without eight drill-ins. Tapping a night opens its own Countdown.
+                    Titled "Sub-event Level" to match the Roles pane exactly: the same
+                    event-level/sub-event-level split, so it gets the same two words
+                    (was "Across the nights"; renamed with Roles 2026-08-02). The list
+                    above is the event level — it is the pane's own L3 "Countdown". */}
                 {isContainer && (
-                  <>
-                    <SectionKicker
-                      label="Across the nights"
-                      hint="Open items on each night's own checklist. Tap a night to work on it."
-                      isMobile={isMobile}
-                    />
+                  <EventRuledSection
+                    title="Sub-event Level"
+                    hint="Open items on each night's own checklist. Tap a night to work on it."
+                    count={containerRollup.children.length || undefined}
+                    isMobile={isMobile}
+                  >
                     {containerRollup.loading ? (
-                      <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "10px 2px" }}>Loading…</p>
+                      <p style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic", padding: "10px 2px" }}>Loading…</p>
                     ) : (
                       <ContainerTaskRollup
                         nights={containerRollup.children}
@@ -9478,7 +9616,7 @@ export function EventPlanWorkspace({
                         onOpenChild={onOpenChild}
                       />
                     )}
-                  </>
+                  </EventRuledSection>
                 )}
 
                 {/* Section-move date-change confirmation (dated task → different window) */}
@@ -9516,7 +9654,7 @@ export function EventPlanWorkspace({
               )
             })()}
 
-            {/* ── Roles & Leads ── */}
+            {/* ── Roles ── */}
             {shownSection === 'roles' && (() => {
               const needs = roles.filter(r => !r.assigned_to)
               const covered = roles.filter(r => r.assigned_to)
@@ -9557,16 +9695,56 @@ export function EventPlanWorkspace({
                 </button>
               ) : null
 
-              const GroupHeader = ({ label, count, allSet }: { label: string; count?: number; allSet?: boolean }) => (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "28px 0 4px" }}>
-                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{label}</span>
-                  {allSet ? (
-                    <span style={{ fontStyle: "italic", fontSize: 13, color: "var(--faint)", fontFamily: "var(--font-inter)" }}>All roles covered</span>
-                  ) : (
-                    <span style={{ background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", fontSize: 11, color: "var(--body)", fontFamily: "var(--font-inter)" }}>{count}</span>
-                  )}
-                  <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+              const openAddRole = () => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setEditingRoleId(null); setShowAddRole(true) }
+
+              // One definition, two placements: mobile renders it at the top (under
+              // the round "+" that opens it), desktop at the foot (under the
+              // InlineAddRow that opens it). Extracted so the two can't drift.
+              const addRoleForm = (
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "230px 1fr 180px auto auto", gap: isMobile ? 10 : 14, alignItems: "center", border: "1.5px dashed var(--dashed)", borderRadius: "var(--r-callout)", padding: isMobile ? "16px" : "14px 18px", marginTop: isMobile ? 20 : 12, background: "var(--cream-2)" }}>
+                  <Input
+                    value={newRoleName}
+                    onChange={(e) => setNewRoleName(e.target.value)}
+                    placeholder="Role name…"
+                    className="roleinput"
+                    style={{ fontWeight: 500 }}
+                  />
+                  <Input
+                    value={newRoleNotes}
+                    onChange={(e) => setNewRoleNotes(e.target.value)}
+                    placeholder="What they're responsible for…"
+                    className="roleinput"
+                  />
+                  <Select
+                    value={newRoleAssignee}
+                    onChange={(e) => setNewRoleAssignee(e.target.value)}
+                    className="roleinput"
+                  >
+                    <option value="">Unassigned</option>
+                    {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </Select>
+                  <CentralButton variant="primary" size="sm" onClick={handleAddRole} disabled={addingRole || !newRoleName.trim()}>Add</CentralButton>
+                  <button onClick={() => setShowAddRole(false)} style={{ padding: "8px 14px", borderRadius: "var(--r-input)", border: "none", background: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", cursor: "pointer" }}>Cancel</button>
                 </div>
+              )
+
+              // L4 group divider inside the roles list. Desktop takes the shared
+              // NightDivider (same tier as a container's night groups); phone width
+              // keeps the mono kicker it already had.
+              const GroupHeader = ({ label, count, allSet, first }: { label: string; count?: number; allSet?: boolean; first?: boolean }) => (
+                isMobile ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "28px 0 4px" }}>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{label}</span>
+                    {allSet ? (
+                      <span style={{ fontStyle: "italic", fontSize: 13, color: "var(--muted-text)", fontFamily: "var(--font-inter)" }}>All roles covered</span>
+                    ) : (
+                      <span style={{ background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", fontSize: 11, color: "var(--body)", fontFamily: "var(--font-inter)" }}>{count}</span>
+                    )}
+                    <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+                  </div>
+                ) : (
+                  <NightDivider name={label} count={allSet ? "all covered" : String(count ?? 0)} first={first} />
+                )
               )
 
               const renderRow = (role: EventRole, isLast: boolean) => {
@@ -9660,16 +9838,16 @@ export function EventPlanWorkspace({
                     {isCovered ? (
                       <MonogramChip initials={initials} style={{ width: 38, height: 38, fontSize: 13, fontWeight: 500 }} />
                     ) : (
-                      <div style={{ width: 38, height: 38, border: "1px dashed var(--dashed)", borderRadius: 999, display: "grid", placeItems: "center" }}>
-                        <Plus style={{ width: 16, height: 16, color: "var(--dashed)" }} />
-                      </div>
+                      // §1.4.6 unassigned variant — 38px, 1.5px dashed, --faint glyph.
+                      <MonogramChip unassigned style={{ width: 38, height: 38 }} />
                     )}
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ fontFamily: "var(--font-inter)", fontSize: 15, fontWeight: 500, color: "var(--ink)", letterSpacing: "-0.01em" }}>{role.role_name}</div>
+                      {/* S25 — sans tracking is 0 (§1.3); the -0.01em is dropped. */}
+                      <div style={{ fontFamily: "var(--font-inter)", fontSize: 15, fontWeight: 500, color: "var(--ink)", letterSpacing: 0 }}>{role.role_name}</div>
                       {role.notes ? (
                         <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.4, marginTop: 3 }}>{role.notes}</div>
                       ) : canEdit ? (
-                        <div style={{ fontSize: 13, color: "var(--faint)", fontStyle: "italic", lineHeight: 1.4, marginTop: 3, fontFamily: "var(--font-inter)" }}>Add a note for whoever takes this on</div>
+                        <div style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic", lineHeight: 1.4, marginTop: 3, fontFamily: "var(--font-inter)" }}>Add a note for whoever takes this on</div>
                       ) : null}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -9708,7 +9886,8 @@ export function EventPlanWorkspace({
                             {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                           </select>
                         ) : (
-                          <button className="assignbtn" onClick={() => setAssigningRoleId(role.id)} style={{ border: "1px dashed var(--dashed)", borderRadius: 10, padding: "8px 14px", color: "var(--plum)", background: "transparent", fontSize: 13, fontFamily: "var(--font-inter)", whiteSpace: "nowrap", cursor: "pointer" }}>+ Assign someone</button>
+                          // S35/S36 — the dashed add control is 1.5px (§11.13); radius is a token, never raw px.
+                          <button className="assignbtn" onClick={() => setAssigningRoleId(role.id)} style={{ border: "1.5px dashed var(--dashed)", borderRadius: "var(--r-chip)", padding: "8px 14px", color: "var(--plum)", background: "transparent", fontSize: 13, fontFamily: "var(--font-inter)", whiteSpace: "nowrap", cursor: "pointer" }}>+ Assign someone</button>
                         )
                       ) : null}
                       {canEdit && (
@@ -9739,7 +9918,7 @@ export function EventPlanWorkspace({
                 `}</style>
                 {/* Desktop: the shared EventSectionHeader with its full action
                     row. Mobile: the SubpageShell chrome already carries the
-                    "Roles & Leads" title (via mobileTitle), so the spoke shows
+                    "Roles" title (via mobileTitle), so the spoke shows
                     only a compact right-aligned action rail — the planning-chat
                     icon + a single plum "+" create — that fits 390px without
                     clipping. "Request confirmations" drops to a full-width quiet
@@ -9752,40 +9931,48 @@ export function EventPlanWorkspace({
                       <PocketRoundButton
                         variant="plum"
                         ariaLabel="Add role"
-                        onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setEditingRoleId(null); setShowAddRole(true) }}
+                        onClick={openAddRole}
                       >
                         <Plus style={{ width: 18, height: 18 }} strokeWidth={2.2} />
                       </PocketRoundButton>
                     )}
                   </div>
                 ) : (
+                  // DESKTOP L3. On a container this section IS the event-level list —
+                  // its per-night sibling is the "Sub-event Level" section below. The
+                  // pair was "Week-spanning" / "Across the nights"; renamed 2026-08-02
+                  // (Brian) so the two labels name the same axis in the same words and
+                  // no longer need a prose sentence to explain the split.
+                  // No create rides this rule (add-placement rule K3): an add must name
+                  // the list it lands in, and "Add a role" belongs at the foot of the
+                  // list it appends to. "Request confirmations" stays — it acts on the
+                  // whole section, it does not create anything.
+                  // NO `trailing` here: the status sub-groups below ("Needs someone" /
+                  // "Covered") already state the section's staffing state, WITH their
+                  // own per-status counts. Putting "needs someone" on the rule too
+                  // printed the same words twice ~90px apart. The rule reports state
+                  // only where nothing below already does (Run of Show's "across N
+                  // nights", Sub-events' date range).
                   <EventSectionHeader
-                    title="Roles"
-                    action={canEdit ? (
-                      <>
-                        {planChatBtn}
-                        {covered.length > 0 && (
-                          <ContentActionButton
-                            variant="ghost"
-                            icon={<CheckCircle2 style={{ width: 14, height: 14 }} />}
-                            label={requestingConfirmations ? "Requesting…" : "Request confirmations"}
-                            onClick={handleRequestConfirmations}
-                            disabled={requestingConfirmations}
-                            title="Ask every assigned role-holder to confirm they're set"
-                          />
-                        )}
-                        {!showAddRole && !editingRoleId && (
-                          <ContentActionButton
-                            variant="primary"
-                            icon={<Plus style={{ width: 14, height: 14 }} />}
-                            label="Add role"
-                            onClick={() => { setNewRoleName(""); setNewRoleNotes(""); setNewRoleAssignee(""); setEditingRoleId(null); setShowAddRole(true) }}
-                          />
-                        )}
-                      </>
+                    title={isContainer ? "Event Level" : "Roles"}
+                    count={roles.length || undefined}
+                    action={canEdit && covered.length > 0 ? (
+                      <ContentActionButton
+                        variant="ghost"
+                        icon={<CheckCircle2 style={{ width: 14, height: 14 }} />}
+                        label={requestingConfirmations ? "Requesting…" : "Request confirmations"}
+                        onClick={handleRequestConfirmations}
+                        disabled={requestingConfirmations}
+                        title="Ask every assigned role-holder to confirm they're set"
+                      />
                     ) : undefined}
                   />
                 )}
+                {/* No prose under the desktop L3 rule (2026-08-02): "Event Level" /
+                    "Sub-event Level" carry the split in the labels themselves, and the
+                    sentence that used to explain it flattened the page — every line read
+                    at the same weight. Mobile keeps its SectionKicker hint below (that
+                    surface has no sibling section visible for contrast). */}
                 {isMobile && canEdit && covered.length > 0 && !showAddRole && !editingRoleId && (
                   <PocketButton
                     variant="quiet"
@@ -9872,55 +10059,36 @@ export function EventPlanWorkspace({
                 })()}
 
                 {/* Inline add-role form — desktop is a single dense row; mobile
-                    stacks the fields (the 5-col grid clips at 390px). */}
-                {canEdit && showAddRole && (
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "230px 1fr 180px auto auto", gap: isMobile ? 10 : 14, alignItems: "center", border: "1px dashed var(--dashed)", borderRadius: 14, padding: isMobile ? "16px" : "14px 18px", marginTop: 20, background: "var(--cream-2)" }}>
-                    <Input
-                      value={newRoleName}
-                      onChange={(e) => setNewRoleName(e.target.value)}
-                      placeholder="Role name…"
-                      className="roleinput"
-                      style={{ fontWeight: 500 }}
-                    />
-                    <Input
-                      value={newRoleNotes}
-                      onChange={(e) => setNewRoleNotes(e.target.value)}
-                      placeholder="What they're responsible for…"
-                      className="roleinput"
-                    />
-                    <Select
-                      value={newRoleAssignee}
-                      onChange={(e) => setNewRoleAssignee(e.target.value)}
-                      className="roleinput"
-                    >
-                      <option value="">Unassigned</option>
-                      {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </Select>
-                    <CentralButton variant="primary" size="sm" onClick={handleAddRole} disabled={addingRole || !newRoleName.trim()}>Add</CentralButton>
-                    <button onClick={() => setShowAddRole(false)} style={{ padding: "8px 14px", borderRadius: 10, border: "none", background: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", cursor: "pointer" }}>Cancel</button>
-                  </div>
-                )}
+                    stacks the fields (the 5-col grid clips at 390px). On MOBILE it
+                    opens at the top under the round "+" that triggers it; on DESKTOP
+                    the trigger is the InlineAddRow at the FOOT of the list, so the
+                    form opens there too (see below). */}
+                {isMobile && canEdit && showAddRole && addRoleForm}
 
-                {/* On a CONTAINER these are the WEEK-SPANNING roles (Director,
+                {/* On a CONTAINER these are the EVENT-LEVEL roles (Director,
                     Photographer) — the per-night leads live in the staffing table
-                    below, on the night that owns them. */}
-                {isContainer && (
+                    below, on the night that owns them. Desktop carries that in the L3
+                    header above; mobile keeps the mono kicker (and, unlike desktop, its
+                    explanatory hint — the sibling section isn't on screen to contrast
+                    against at 390px). Label tracks the desktop rename so the two
+                    widths speak one vocabulary. */}
+                {isMobile && isContainer && (
                   <SectionKicker
-                    label="Week-spanning"
+                    label="Event Level"
                     hint="Roles that cover the whole week. A lead for one night belongs to that night — staff those below."
                     isMobile={isMobile}
                   />
                 )}
 
                 {roles.length === 0 ? (
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)", padding: "24px 0 8px" }}>
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--muted-text)", padding: "24px 0 8px" }}>
                     {canEdit
-                      ? (isContainer ? "No week-spanning roles yet." : "No roles yet — add the first one.")
+                      ? (isContainer ? "No event-level roles yet." : "No roles yet — add the first one.")
                       : "No roles defined yet."}
                   </p>
                 ) : (
                   <>
-                    <GroupHeader label="Needs someone" count={needs.length} allSet={needs.length === 0} />
+                    <GroupHeader label="Needs someone" count={needs.length} allSet={needs.length === 0} first />
                     {needs.map((role, i) => renderRow(role, i === needs.length - 1))}
                     {covered.length > 0 && (
                       <>
@@ -9931,17 +10099,29 @@ export function EventPlanWorkspace({
                   </>
                 )}
 
+                {/* DESKTOP add-placement (K3/K5): the create sits at the FOOT of the
+                    list it appends to, never on the section rule. Two-state grammar —
+                    a bare row when there is something to append to, the dashed card
+                    when the list is empty and the control must carry its own shape. */}
+                {!isMobile && canEdit && (
+                  showAddRole ? addRoleForm : (
+                    roles.length === 0
+                      ? <InlineAddCard label={isContainer ? "Add the first event-level role" : "Add the first role"} onClick={openAddRole} />
+                      : <InlineAddRow label="Add a role" onClick={openAddRole} />
+                  )
+                )}
+
                 {/* Staff every night from one screen. The write lands on the NIGHT's
                     own event_roles row — same statement its own screen issues. */}
                 {isContainer && (
-                  <>
-                    <SectionKicker
-                      label="Across the nights"
-                      hint="Each night owns its own roles. Assign them here or on the night — it's the same record."
-                      isMobile={isMobile}
-                    />
+                  <EventRuledSection
+                    title="Sub-event Level"
+                    hint="Each night owns its own roles. Assign them here or on the night — it's the same record."
+                    count={containerRollup.children.length || undefined}
+                    isMobile={isMobile}
+                  >
                     {containerRollup.loading ? (
-                      <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "10px 2px" }}>Loading…</p>
+                      <p style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic", padding: "10px 2px" }}>Loading…</p>
                     ) : (
                       <ContainerStaffing
                         nights={containerRollup.children}
@@ -9954,7 +10134,27 @@ export function EventPlanWorkspace({
                         onChanged={containerRollup.refresh}
                       />
                     )}
-                  </>
+                  </EventRuledSection>
+                )}
+
+                {/* K10 — the planning chat is a card-as-button at the FOOT of Roles,
+                    deliberately not promoted to the page corner (Conv #15: the object
+                    header carries object config only). Replaces the 34px icon button
+                    that used to ride the desktop section header. Mobile keeps that
+                    icon button — the Pocket action rail is its grammar. */}
+                {!isMobile && canEdit && (
+                  <ActionCard
+                    icon={<MessageCircle style={{ width: 18, height: 18 }} strokeWidth={1.6} />}
+                    title={planChatState === 'none' ? "Start the leads group chat" : planChatState === 'stale' ? "Update the leads group chat" : "Open the leads group chat"}
+                    subtitle={planChatState === 'none'
+                      ? `Creates a chat with everyone assigned above — ${covered.length} of ${roles.length} staffed so far`
+                      : planChatState === 'stale'
+                        ? "The roster changed since this chat was created"
+                        : "Everyone assigned above is already in it"}
+                    onClick={handlePlanChatTap}
+                    disabled={(planChatState === 'none' && covered.length === 0) || creatingPlanChat}
+                    style={{ marginTop: 28 }}
+                  />
                 )}
               </div>
               )
@@ -10011,11 +10211,23 @@ export function EventPlanWorkspace({
                 so does each night" incoherent). Blocks written on the week itself
                 before this are surfaced, never stranded. */}
             {shownSection === 'runsheet' && plan && (
-              isContainer ? (
+              isContainer ? (() => {
+                // Section metrics ride the rule (K7): total blocks across the week
+                // and how many nights actually carry any. Counted off the ONE batched
+                // rollup — never a per-night fetch.
+                const blockTotal = containerRollup.children.reduce((n, c) => n + c.blocks.length, 0) + ownBlocks.length
+                const nightsWithBlocks = containerRollup.children.filter(c => c.blocks.length > 0).length
+                return (
                 <div>
-                  {!isMobile && <EventSectionHeader title="Run of Show" />}
+                  {!isMobile && (
+                    <EventSectionHeader
+                      title="Timed blocks"
+                      count={blockTotal || undefined}
+                      trailing={nightsWithBlocks > 0 ? `across ${nightsWithBlocks} night${nightsWithBlocks === 1 ? "" : "s"}` : undefined}
+                    />
+                  )}
                   {containerRollup.loading ? (
-                    <p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p>
+                    <p style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p>
                   ) : (
                     <ContainerWeekTimeline
                       nights={containerRollup.children}
@@ -10023,10 +10235,12 @@ export function EventPlanWorkspace({
                       onOpenChild={onOpenChild}
                       ownBlocks={ownBlocks}
                       eventTitle={calendarEvent.title}
+                      canEdit={canEdit}
                     />
                   )}
                 </div>
-              ) : (
+                )
+              })() : (
                 <RunSheetTab
                   plan={plan}
                   event={calendarEvent}
@@ -10175,20 +10389,31 @@ function SubEventsTab({
 
   return (
     <div>
+      {/* The ONLY section-rule create in the workspace (D8): the day dividers below
+          are not add targets — a night can be created for a day that has none — so
+          there is no per-group foot for it to sit at. Plum primary per Conv #15 /
+          §3.2 Zone C. */}
       <EventSectionHeader
+        // Always "Sub-events" — it matches the tab that opened this pane and it is
+        // true for every container. The old `event_type === "welcome_week" ? "The
+        // nights"` special case (the cdesign's Welcome-Week voice) is retired
+        // 2026-08-02: one event type getting its own section noun made the label
+        // unpredictable for no gain, and the night NAMES are already on the dividers.
         title="Sub-events"
+        count={subEvents.length || undefined}
+        trailing={parentFromYMD && parentToYMD ? eventDateRangeShort(parentFromYMD, parentToYMD) : undefined}
         action={canEdit ? (
-          <ContentActionButton variant="primary" label="Add sub-event" onClick={() => setShowAdd(true)} />
+          <ContentActionButton variant="primary" icon={<Plus style={{ width: 14, height: 14 }} />} label="Add sub-event" onClick={() => setShowAdd(true)} />
         ) : undefined}
       />
 
       {loading && <p style={{ color: "var(--muted-text)", fontSize: 13 }}>Loading…</p>}
       {!loading && subEvents.length === 0 && (
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>No sub-events yet. Add the individual events that make up {parentEvent.title}.</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--muted-text)" }}>No sub-events yet. Add the individual events that make up {parentEvent.title}.</p>
       )}
 
       {outOfRangeCount > 0 && (
-        <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 18px" }}>
+        <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 18px" }}>
           {outOfRangeCount === 1 ? "One sub-event falls" : `${outOfRangeCount} sub-events fall`} outside {parentEvent.title}&rsquo;s dates
           ({formatYMD(parentFromYMD, { month: "short", day: "numeric" })} – {formatYMD(parentToYMD, { month: "short", day: "numeric" })}). Extend the event, or move {outOfRangeCount === 1 ? "it" : "them"} inside the range.
         </p>
@@ -10198,6 +10423,12 @@ function SubEventsTab({
         {groupedRows.map(({ ev, ymd, showHeader, isFirstHeader }) => {
           const evCfg = getEventConfig(ev)
           const dayLabel = `${formatYMD(ymd, { weekday: "short" })} · ${formatYMD(ymd, { month: "short" })} ${ymdDayNum(ymd)}`.toUpperCase()
+          // L4 divider anatomy: the day's NAME leads, its date rides as the mono
+          // micro-label. Split rather than reusing eventDayHeaderLabel here — that
+          // helper returns the combined "TUE · AUG 18", which would repeat the
+          // weekday the name already carries.
+          const dayName = formatYMD(ymd, { weekday: "long" })
+          const dayDate = `${formatYMD(ymd, { month: "short" })} ${ymdDayNum(ymd)}`.toUpperCase()
 
           const r = readiness[ev.id] ?? { done: 0, total: 0 }
           const st = subEventStatus(r.done, r.total)
@@ -10208,10 +10439,13 @@ function SubEventsTab({
           return (
             <Fragment key={ev.id}>
               {showHeader && (
-                <div style={{ display: "flex", alignItems: "center", gap: 12, margin: isFirstHeader ? "0 0 12px" : "26px 0 12px" }}>
-                  <span style={isMobile ? { ...POCKET_KICKER_STYLE, flexShrink: 0 } : { fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)", flexShrink: 0 }}>{dayLabel}</span>
-                  {!isMobile && <span style={{ flex: 1, height: 1, background: "var(--line)" }} />}
-                </div>
+                isMobile ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, margin: isFirstHeader ? "0 0 12px" : "26px 0 12px" }}>
+                    <span style={{ ...POCKET_KICKER_STYLE, flexShrink: 0 }}>{dayLabel}</span>
+                  </div>
+                ) : (
+                  <NightDivider name={dayName} date={dayDate} first={isFirstHeader} />
+                )
               )}
 
               <div
@@ -10225,7 +10459,8 @@ function SubEventsTab({
                   display: "flex",
                   alignItems: "center",
                   gap: 16,
-                  padding: "15px 16px",
+                  // Desktop card padding snaps to the §1.4 scale (15/16 is off it).
+                  padding: isMobile ? "15px 16px" : 18,
                   // Mobile: tonal borderless ivory card (Pocket grammar); desktop keeps the hairline cream card.
                   border: isMobile ? "none" : `1px solid ${hoveredId === ev.id ? "var(--dashed)" : "var(--line)"}`,
                   borderRadius: isMobile ? "var(--r-pocket)" : "var(--r-card)",
@@ -10240,7 +10475,8 @@ function SubEventsTab({
 
                 {/* info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 16, fontWeight: 500, color: "var(--ink)", margin: 0, letterSpacing: "-0.01em" }}>
+                  {/* S25 — sans tracking is 0 (§1.3). */}
+                  <p style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 16, fontWeight: 500, color: "var(--ink)", margin: 0, letterSpacing: 0 }}>
                     {ev.title}
                     {outOfRange && (
                       <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", padding: "2px 8px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line-2)", color: "var(--gold)", whiteSpace: "nowrap" }}>
@@ -10251,24 +10487,38 @@ function SubEventsTab({
                   <p style={{ fontSize: 13, margin: "3px 0 0" }}>
                     {ev.location
                       ? <span style={{ color: "var(--body)" }}>{ev.location}</span>
-                      : <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Location TBD</span>}
+                      : <span style={{ color: "var(--muted-text)", fontStyle: "italic" }}>Location TBD</span>}
                   </p>
-                  {/* mobile-only compact readiness (segmented bar hidden < sm) */}
-                  <div className="sm:hidden" style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 8 }}>
+                  {/* mobile-only compact readiness (segmented bar hidden < sm).
+                      `display` MUST stay in the class, never inline: an inline
+                      `display:flex` outranks `sm:hidden`, which is why this block was
+                      leaking onto desktop and rendering a SECOND, differently-shaped
+                      status next to the §4.7 pill. Pre-existing bug, surfaced by S28. */}
+                  <div className="flex sm:hidden" style={{ alignItems: "center", gap: 7, marginTop: 8 }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: st.color, flexShrink: 0 }} />
                     <span style={{ fontSize: 12, color: "var(--body)" }}>{st.label}</span>
-                    {!st.empty && <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, color: "var(--muted-text)", marginLeft: "auto" }}>{r.done}/{r.total}</span>}
+                    {!st.empty && <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", marginLeft: "auto" }}>{r.done}/{r.total}</span>}
                   </div>
                 </div>
 
                 {/* desktop readiness widget */}
                 <div className="hidden sm:block" style={{ width: 190, flexShrink: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 7 }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--body)" }}>
-                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: st.color, flexShrink: 0 }} />
+                    {/* S28 — §4.7 status pill, not a bare dot. The bare dot is
+                        sanctioned only for §4.22's single Readiness indicator, never
+                        for repeated per-row status. Accents stay the ones
+                        subEventStatus already returns (deliberately neutral: only
+                        "Ready" earns --success). */}
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      padding: "3px 9px", borderRadius: 999,
+                      background: `color-mix(in srgb, ${st.color} 13%, var(--cream))`,
+                      color: `color-mix(in srgb, ${st.color} 65%, var(--ink))`,
+                      fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", flexShrink: 0,
+                    }}>
                       {st.label}
                     </span>
-                    {!st.empty && <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.4px", color: "var(--muted-text)" }}>{r.done}/{r.total}</span>}
+                    {!st.empty && <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.4px", color: "var(--muted-text)" }}>{r.done}/{r.total}</span>}
                   </div>
                   {st.empty ? (
                     <div style={{ height: 6, borderRadius: 999, background: "var(--line-2)" }} />
@@ -10377,7 +10627,7 @@ function ActsTab({
       />
 
       {acts.length === 0 && (
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>No acts yet. Add performers to build your lineup.</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--muted-text)" }}>No acts yet. Add performers to build your lineup.</p>
       )}
 
       {/* Mobile: acts as stacked read-only rows (order · performer · type/time
@@ -10389,7 +10639,7 @@ function ActsTab({
           <PocketRowCard>
             {acts.map((act, idx) => (
               <div key={act.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 0", borderBottom: idx === acts.length - 1 ? "none" : "1px solid var(--line-3)" }}>
-                <span style={{ width: 22, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11, color: "var(--faint)", textAlign: "center" }}>{idx + 1}</span>
+                <span style={{ width: 22, flexShrink: 0, fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", textAlign: "center" }}>{idx + 1}</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: act.performer ? "var(--ink)" : "var(--faint)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{act.performer || "—"}</span>
                   <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -10405,7 +10655,7 @@ function ActsTab({
       {acts.length > 0 && (
         <div className="hidden md:grid" style={{ gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "0 4px 8px", borderBottom: "1px solid var(--line)" }}>
           {["#", "Performer", "Type", "Duration", "Sound Check", ""].map((h, i) => (
-            <span key={i} style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--faint)" }}>{h}</span>
+            <span key={i} style={{ fontFamily: "var(--mono)", fontSize: "10px", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{h}</span>
           ))}
         </div>
       )}
@@ -10413,7 +10663,7 @@ function ActsTab({
       <div className="hidden md:flex" style={{ flexDirection: "column" }}>
         {acts.map((act, idx) => (
           <ListRow key={act.id} last={idx === acts.length - 1} style={{ display: "grid", gridTemplateColumns: "24px 1fr 110px 80px 110px 28px", gap: 10, padding: "12px 4px", alignItems: "center" }}>
-            <span style={{ fontSize: 13, color: "var(--faint)", textAlign: "center" }}>{idx + 1}</span>
+            <span style={{ fontSize: 13, color: "var(--muted-text)", textAlign: "center" }}>{idx + 1}</span>
             {canEdit ? (
               <input value={act.performer} onChange={e => updateAct(act.id, "performer", e.target.value)} placeholder="Performer name…" style={{ background: "none", border: "none", outline: "none", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", width: "100%" }} />
             ) : (
@@ -10606,7 +10856,7 @@ function TransportTab({
       </div>
 
       {cars.length === 0 && (
-        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--faint)" }}>No cars added yet. Add drivers to organize carpooling.</p>
+        <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 15, color: "var(--muted-text)" }}>No cars added yet. Add drivers to organize carpooling.</p>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -10842,9 +11092,9 @@ function RunSheetTab({
                   </button>
                 ) : <span />}
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: done ? "var(--faint)" : "var(--ink)", textDecoration: done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Untitled block</span>}</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: done ? "var(--muted-text)" : "var(--ink)", textDecoration: done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{block.title || <span style={{ color: "var(--muted-text)", fontStyle: "italic" }}>Untitled block</span>}</div>
                   <div style={{ fontSize: 12.5, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.5px", color: done ? "var(--faint)" : "var(--plum)" }}>{block.time_label || "—"}</span>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.5px", color: done ? "var(--muted-text)" : "var(--plum)" }}>{block.time_label || "—"}</span>
                     {ownerName && <span style={{ color: "var(--muted-text)" }}> · {ownerName}</span>}
                   </div>
                 </div>
@@ -10863,8 +11113,16 @@ function RunSheetTab({
                     {done && <Check style={{ width: 12, height: 12, color: "var(--cream)" }} />}
                   </button>
                 ) : <span />}
-                <span style={{ fontSize: 13, fontWeight: isUpNext ? 600 : 500, color: done ? "var(--faint)" : isUpNext ? "var(--plum)" : "var(--muted-text)" }}>{block.time_label || "—"}</span>
-                <span style={{ fontSize: 14, color: done ? "var(--faint)" : "var(--ink)", textDecoration: done ? "line-through" : "none" }}>{block.title || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>Untitled block</span>}</span>
+                {/* `start_time` / `time_label` are a WALL CLOCK (time without time
+                    zone) — rendered verbatim, never through lib/tz.ts (Conv #23). */}
+                <span style={{ fontSize: 13, fontWeight: isUpNext ? 600 : 500, color: done ? "var(--muted-text)" : isUpNext ? "var(--plum)" : "var(--muted-text)" }}>{block.time_label || "—"}</span>
+                <span style={{ fontSize: 14, color: done ? "var(--muted-text)" : "var(--ink)", textDecoration: done ? "line-through" : "none" }}>
+                  {block.title || <span style={{ color: "var(--muted-text)", fontStyle: "italic" }}>Untitled block</span>}
+                  {/* duration_min is an INTEGER — shared formatter, not date math. */}
+                  {formatDurationMin(block.duration_min) && (
+                    <span style={{ ...MONO_METRIC_STYLE, marginLeft: 10 }}>{formatDurationMin(block.duration_min)}</span>
+                  )}
+                </span>
                 <span style={{ fontSize: 12, color: "var(--body)" }}>{ownerName ?? "—"}</span>
                 {canEdit ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
@@ -10875,7 +11133,7 @@ function RunSheetTab({
               </div>
             )}
             {block.brief && (
-              <p style={{ marginTop: 4, marginLeft: 38, fontSize: 12.5, color: "var(--faint)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{block.brief}</p>
+              <p style={{ marginTop: 4, marginLeft: 38, fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{block.brief}</p>
             )}
           </>
         )}
@@ -10887,13 +11145,21 @@ function RunSheetTab({
     ? { ...POCKET_KICKER_STYLE, margin: 0, color: tone }
     : { fontFamily: "var(--mono)", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase", color: tone, fontWeight: 500 }
 
-  if (loading) return <div>{!isMobile && <EventSectionHeader title="Run of Show" />}<p style={{ fontSize: 14, color: "var(--faint)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p></div>
+  if (loading) return <div>{!isMobile && <EventSectionHeader title="Timed blocks" />}<p style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic", padding: "12px 4px" }}>Loading…</p></div>
 
   return (
     <div>
       {/* Mobile: the SubpageShell chrome already reads "Run of Show" (mobileTitle),
-          so the in-body section header is redundant — desktop keeps it. */}
-      {!isMobile && <EventSectionHeader title="Run of Show" />}
+          so the in-body section header is redundant — desktop keeps it. No create
+          rides this rule: the days below ARE the add targets (K3), so each day's
+          add sits at the foot of that day. */}
+      {!isMobile && (
+        <EventSectionHeader
+          title="Timed blocks"
+          count={blocks.length || undefined}
+          trailing={days.length > 1 ? `across ${days.length} days` : undefined}
+        />
+      )}
 
       {days.map((day, dayIdx) => {
         const dayBlocks = blocks.filter(b => b.day_index === dayIdx)
@@ -10902,21 +11168,42 @@ function RunSheetTab({
         const upNextId = isToday ? dayBlocks.find(b => b.status !== "done")?.id : undefined
         return (
           <div key={dayIdx} style={{ marginBottom: 36 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            {/* The day head keeps its mono/TODAY grammar — the plum "· TODAY" state
+                is day-of behaviour, not a header-tier decision, and NightDivider has
+                no tone slot. On DESKTOP the ADD moves off the head onto the day's
+                foot (K3/K5). Phone width is governed by mobile_design_system.md and
+                was not amended, so it keeps the head-hosted "Add block" it had
+                before the header-hierarchy adoption — at the ≥44px hit floor. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
               <p style={dayHeadStyle(isToday ? "var(--plum)" : "var(--body)")}>
                 {dayLabel.toUpperCase()}{isToday ? " · TODAY" : ""}
               </p>
-              {canEdit && (
-                <CentralButton variant="secondary" size="sm" onClick={() => addBlock(dayIdx)}><Plus style={{ width: 14, height: 14 }} /> Add block</CentralButton>
+              {!isMobile && <span aria-hidden style={{ flex: 1, height: 1, background: "var(--line)" }} />}
+              {!isMobile && dayBlocks.length > 0 && (
+                <span style={{ ...MONO_METRIC_STYLE, whiteSpace: "nowrap" }}>{dayBlocks.length} block{dayBlocks.length === 1 ? "" : "s"}</span>
+              )}
+              {isMobile && canEdit && (
+                <>
+                  <span style={{ flex: 1 }} />
+                  <CentralButton variant="secondary" size="sm" onClick={() => addBlock(dayIdx)} style={{ minHeight: 44 }}><Plus style={{ width: 14, height: 14 }} /> Add block</CentralButton>
+                </>
               )}
             </div>
-            <div style={{ borderTop: "1px solid var(--line)" }} />
-
-            {dayBlocks.length === 0 && (
-              <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--faint)", padding: "12px 4px" }}>No blocks yet.</p>
-            )}
+            {isMobile && <div style={{ borderTop: "1px solid var(--line)" }} />}
 
             {dayBlocks.map((block, bIdx) => renderBlock(block, bIdx === dayBlocks.length - 1, upNextId))}
+
+            {/* Empty-group grammar (§11.13 rules 3 + 4) — DESKTOP only; the phone's
+                add lives in the day head above. Every day group takes the SAME bare
+                row; an empty day only adds the italic line above it. The dashed
+                InlineAddCard is reserved for a whole empty collection, so it can never
+                stack once per empty day on a multi-day event. */}
+            {dayBlocks.length === 0 && (
+              <p style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: 14, color: "var(--muted-text)", padding: "12px 4px", margin: 0 }}>Nothing timed for this day yet.</p>
+            )}
+            {!isMobile && canEdit && (
+              <InlineAddRow label={`Add a block to ${dayLabel}`} onClick={() => addBlock(dayIdx)} />
+            )}
           </div>
         )
       })}
@@ -12858,7 +13145,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
       {roles.length > 0 && (
         <div>
           <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 6 }}>Default role</p>
-          <p style={{ fontSize: 12, color: "var(--faint)", marginBottom: 10 }}>Pre-fills for all selections — change individually below.</p>
+          <p style={{ fontSize: 12, color: "var(--muted-text)", marginBottom: 10 }}>Pre-fills for all selections — change individually below.</p>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" as const }}>
             {roles.map((r) => (
               <button

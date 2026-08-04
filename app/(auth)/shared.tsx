@@ -159,7 +159,7 @@ export function OrDivider({ label = "or" }: { label?: string }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 16, color: "var(--faint)" }}>
       <span style={{ flex: 1, height: 1, background: "var(--line)" }}/>
-      <span style={{ ...mono, color: "var(--faint)", textTransform: "lowercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{label}</span>
+      <span style={{ ...mono, color: "var(--muted-text)", textTransform: "lowercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{label}</span>
       <span style={{ flex: 1, height: 1, background: "var(--line)" }}/>
     </div>
   )
@@ -239,7 +239,7 @@ export function PocketField({ label, trailing, hint, ...input }: {
         <input {...input} style={pocketFieldInput} />
         {trailing}
       </div>
-      {hint && <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 7, paddingLeft: 4 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 7, paddingLeft: 4 }}>{hint}</div>}
     </label>
   )
 }

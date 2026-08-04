@@ -47,7 +47,7 @@ Reconciled for adoption from the cdesign source ("Pocket Daybreak v2") against t
 | `--plum` | `#3E1540` | accent, hero, active fchip, filled create |
 | `--plum-2` | `#2D0F2E` | floating nav pill |
 | `--ink` | `#13101A` | primary text, reading bodies |
-| `--body` | `#5A5466` | secondary text |
+| `--body` | `#474251` | secondary text |
 | `--muted-text` | `#8A8497` | meta, kickers |
 | `--faint` | `#A09A8C` | stamps, placeholders, unset `—` |
 | `--danger` | `#9F3030` | destructive **text/outline only**, never a fill (shipped value kept; v2's `#A03B2E` amended down) |

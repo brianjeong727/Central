@@ -8,5 +8,21 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<!-- Password AutoFill in the WKWebView shell. iOS only offers saved iCloud
+	     Keychain credentials (and only offers to SAVE new ones) inside an app's
+	     WebView when the app claims the domain here AND that domain serves a
+	     matching apple-app-site-association — see
+	     app/.well-known/apple-app-site-association/route.ts. Both halves required.
+
+	     www, NOT the apex: the apex 307s to www (capacitor.config.ts) and Apple's
+	     AASA fetcher does not follow redirects, so the apex can never validate.
+
+	     Requires the "Associated Domains" capability enabled on App ID
+	     app.joincentral in the Apple Developer portal, and a regenerated
+	     provisioning profile — the entitlement is inert without it. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:www.joincentral.app</string>
+	</array>
 </dict>
 </plist>
