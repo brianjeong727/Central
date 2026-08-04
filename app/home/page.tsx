@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase-server"
 import { HomeApp } from "./home-app"
 import { formatRelativeTime, getInitials, chatPreviewLabel } from "./utils"
 import type { UserTeam, CongregationQuestion, GovernanceSettings } from "./types"
-import type { ChatPreview } from "@/components/ui/chats-section"
+import type { ChatPreview } from "@/components/central/chat-strip"
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
 

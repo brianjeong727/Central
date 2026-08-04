@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import type { ChatPreview } from "@/components/ui/chats-section"
+import type { ChatPreview } from "@/components/central/chat-strip"
 
 export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "give" | "profile" | "settings" | "forms" | "congregation" | "network"
 

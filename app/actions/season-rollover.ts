@@ -28,25 +28,12 @@
 // ministry-rescoped writes; actor is always the authz userId.
 
 import { createAdminClient } from "@/lib/supabase-admin"
-import { requireMinistryMember, type AuthzContext } from "@/app/actions/authz"
+import { requireMinistryMember, hasCanPlanEvents } from "@/app/actions/authz"
 import { getMinistryTimezone } from "@/lib/ministry-timezone"
 import { eventDateColumnsFromInputs, eventDateInputsFromRow, instantToZoned, todayInZone, type EventDateColumns } from "@/lib/tz"
-import { isLeaderRole } from "@/lib/roles"
 import { lineageKeyOf, seasonLabelOf } from "@/app/home/event-presets"
 
 type AdminClient = ReturnType<typeof createAdminClient>
-
-// Same gate as event planning (mirrors event-templates.ts).
-async function canPlanEvents(admin: AdminClient, ctx: AuthzContext): Promise<boolean> {
-  if (isLeaderRole(ctx.role)) return true
-  const { data: memberships } = await admin
-    .from("team_members")
-    .select("id, team_roles!role_id(permissions)")
-    .eq("user_id", ctx.userId)
-  return ((memberships ?? []) as { team_roles: { permissions?: string[] } | null }[]).some(
-    (m) => (m.team_roles?.permissions ?? []).includes("can_plan_events"),
-  )
-}
 
 // ── date helpers ─────────────────────────────────────────────────────────────
 // Bare "YYYY-MM-DD" arithmetic — zone-immune by construction. The zone only enters
@@ -235,7 +222,7 @@ export async function startNextSeasonAction(
   const ctx = await requireMinistryMember()
   if (ctx.error !== null) return { error: ctx.error }
   const admin = createAdminClient()
-  if (!(await canPlanEvents(admin, ctx))) return { error: "Not authorized." }
+  if (!(await hasCanPlanEvents(admin, ctx))) return { error: "Not authorized." }
 
   // The one zone every date decision below resolves in.
   const timeZone = await getMinistryTimezone(admin, ctx.ministryId)

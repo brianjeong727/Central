@@ -24,13 +24,11 @@
 // completions. The zone is now resolved per call from the ministry that owns the plan.
 
 import { createAdminClient } from "@/lib/supabase-admin"
-import { requireMinistryMember, type AuthzContext } from "@/app/actions/authz"
+import { requireMinistryMember, hasCanPlanEvents } from "@/app/actions/authz"
 import { getMinistryTimezone } from "@/lib/ministry-timezone"
 import { instantToZoned, todayInZone } from "@/lib/tz"
-import { isLeaderRole } from "@/lib/roles"
 import { lineageKeyOf, seasonLabelOf } from "@/app/home/event-presets"
 
-type AdminClient = ReturnType<typeof createAdminClient>
 
 // ── Calendar-date helpers (pure, zone-immune — they take YMD strings) ──────
 function ymdToUTC(ymd: string): number {
@@ -46,19 +44,6 @@ function addDaysYMD(ymd: string, days: number): string {
   const m = String(dt.getUTCMonth() + 1).padStart(2, "0")
   const d = String(dt.getUTCDate()).padStart(2, "0")
   return `${y}-${m}-${d}`
-}
-
-// ── Authz (mirrors event_confirmations authorizePlan) ───────────────────────
-// Same ministry AND (admin-tier/leader OR holds can_plan_events on any team role).
-async function canPlanEvents(admin: AdminClient, ctx: AuthzContext): Promise<boolean> {
-  if (isLeaderRole(ctx.role)) return true
-  const { data: memberships } = await admin
-    .from("team_members")
-    .select("id, team_roles!role_id(permissions)")
-    .eq("user_id", ctx.userId)
-  return ((memberships ?? []) as { team_roles: { permissions?: string[] } | null }[]).some(
-    (m) => (m.team_roles?.permissions ?? []).includes("can_plan_events"),
-  )
 }
 
 // ── Curated payload shape (from the compile-review modal) ───────────────────
@@ -104,7 +89,7 @@ export async function compileEventTemplateAction(
     .eq("id", eventPlanId)
     .maybeSingle()
   if (!plan || plan.ministry_id !== ctx.ministryId) return { error: "Not authorized." }
-  if (!(await canPlanEvents(admin, ctx))) return { error: "Not authorized." }
+  if (!(await hasCanPlanEvents(admin, ctx))) return { error: "Not authorized." }
 
   const { data: ev } = await admin
     .from("calendar_events")
@@ -270,7 +255,7 @@ export async function instantiateTemplateAction(
     .eq("id", templateId)
     .maybeSingle()
   if (!template || template.ministry_id !== ctx.ministryId) return { error: "Not authorized." }
-  if (!(await canPlanEvents(admin, ctx))) return { error: "Not authorized." }
+  if (!(await hasCanPlanEvents(admin, ctx))) return { error: "Not authorized." }
   const ministryId = template.ministry_id as string
 
   const { data: ev } = await admin

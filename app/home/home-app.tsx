@@ -8,7 +8,7 @@ import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { BottomNav } from "@/components/ui/bottom-nav"
 import { EntrySplash } from "@/app/home/components/entry-splash"
-import type { ChatPreview } from "@/components/ui/chats-section"
+import type { ChatPreview } from "@/components/central/chat-strip"
 
 // Types
 import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings, ChatGroup, Crumb } from "./types"
