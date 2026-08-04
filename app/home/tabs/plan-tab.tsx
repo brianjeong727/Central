@@ -15,19 +15,11 @@ import {
 } from "lucide-react"
 import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
-import { getCategoryBudgetAllocation } from "@/app/actions/budget-planning"
 import { useNavState } from "../nav-state"
 import { useOpenMemberProfile } from "../member-profile-context"
 import { useMinistryTimezone } from "../ministry-timezone-context"
 import { eventDateColumnsFromInputs, eventDateInputsFromRow, formatInZone, instantToZoned, startOfTodayInstantISO, todayInZone } from "@/lib/tz"
 import { useSubpageCrumbs, useBreadcrumbExtra } from "../breadcrumb-context"
-
-function currentFiscalYear(): string {
-  const now = new Date()
-  const y = now.getFullYear()
-  // Fiscal year runs Jun 1 – May 31; rolls to the next pair on June 1.
-  return now.getMonth() >= 5 ? `${y}-${y + 1}` : `${y - 1}-${y}`
-}
 import { runAlgorithm, runSmallGroupAlgorithm, type PoolPerson, type GeneratedGroup, type PrevPairing, type DGLLeader, type SGGeneratedGroup } from "@/lib/group-algorithm"
 import {
   generateDGLRotationAction, saveDGLRotationAction, publishDGLRotationAction,
@@ -69,6 +61,14 @@ import type {
   EventType, EventExtraTab,
 } from "../types"
 import { requestConfirmationsAction, reRequestConfirmationAction } from "@/app/actions/event-confirmations"
+import { currentFiscalYear } from "@/lib/fiscal-year"
+import {
+  getBudgetAllocations, getBudgetCategories, getCategoryCommitments,
+  getEventDraws, setEventBudgetCategory, upsertEventDraw,
+  type BudgetCategory,
+} from "@/app/actions/budget-planning"
+import { getFinanceFunds, type FinanceFund } from "@/app/actions/finance-funds"
+import { normalizeMoneyInput } from "../utils"
 import { teamAccessLevel, type TeamAccess } from "../governance"
 import { CountdownTab, TriggerBadge, CountdownWhisper, CountdownPill, type RowAug, type CountdownPhase } from "./countdown-tab"
 
@@ -7588,6 +7588,306 @@ function LaunchpadRow({ icon: Icon, title, subtitle, right, onClick }: {
   )
 }
 
+// ── Event budget card (Overview, right column) ────────────────────────────────
+//
+// "Ceiling + draws". Finance owns the per-(category, fund, fiscal_year) ALLOCATION
+// in ministry_budgets — the ceiling. An event picks ONE budget category and splits
+// its DRAW across funds (event_budget_draws). The two numbers deliberately do not
+// sync: many events can draw against one category (Girls + Guys Turkeybowl), which
+// is exactly what the old title-string match could not represent.
+//
+// Three visibility layers, all of them designed rather than accidental:
+//   · category + ceiling — anyone who can read budget_categories / ministry_budgets
+//   · fund breakdown     — event_budget_draws SELECT is finance + admin/leader, so a
+//                          non-finance planner gets [] with error null. That is
+//                          designed emptiness; it must NOT render as an empty editor
+//                          or an error.
+//   · editing            — `canEditBudget`, backed server-side by cap.canApprove in
+//                          upsertEventDraw / setEventBudgetCategory.
+//
+// CONTAINERS DO NOT DRAW. Only leaf events commit (getCategoryCommitments skips any
+// event with children), so a week's number is the Σ of its nights' draws, read-only.
+// Because event_plans rows are created lazily, a night nobody has opened contributes
+// nothing — the card SAYS SO instead of passing a partial figure off as complete.
+function EventBudgetCard({
+  ministryId,
+  plan,
+  canEditBudget,
+  isMobile,
+  isContainer,
+  containerDrawTotal,
+  containerUnplanned,
+  containerChildCount,
+  monoLabel,
+  bigNumber,
+}: {
+  ministryId: string
+  plan: EventPlan | null
+  canEditBudget: boolean
+  isMobile: boolean
+  isContainer: boolean
+  containerDrawTotal: number
+  containerUnplanned: number
+  containerChildCount: number
+  monoLabel: React.CSSProperties
+  bigNumber: React.CSSProperties
+}) {
+  // Fiscal year is a calendar-day concept — never routed through lib/tz (Convention #23).
+  const fiscalYear = useMemo(() => currentFiscalYear(), [])
+
+  const [categories, setCategories] = useState<BudgetCategory[]>([])
+  const [funds, setFunds] = useState<FinanceFund[]>([])
+  const [allocated, setAllocated] = useState<Record<string, number>>({})     // category name → Σ allocated
+  const [committed, setCommitted] = useState<Record<string, number>>({})     // category name → Σ committed
+  const [drawsByFund, setDrawsByFund] = useState<Record<string, number>>({}) // fund slug → amount
+  const [categoryId, setCategoryId] = useState<string | null>(null)
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [savingFund, setSavingFund] = useState<string | null>(null)
+  const [savingCategory, setSavingCategory] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Ceiling context. Reloaded after every write that can move a committed figure
+  // (a draw amount OR a category re-link, which moves money between categories).
+  const loadCeiling = useCallback(async () => {
+    const [allocRes, commitRes] = await Promise.all([
+      getBudgetAllocations(ministryId, fiscalYear),
+      getCategoryCommitments(ministryId, fiscalYear),
+    ])
+    const alloc: Record<string, number> = {}
+    for (const a of allocRes.data) alloc[a.category] = (alloc[a.category] ?? 0) + Number(a.allocated_amount)
+    const comm: Record<string, number> = {}
+    for (const c of commitRes.data) comm[c.category] = (comm[c.category] ?? 0) + c.committed
+    setAllocated(alloc)
+    setCommitted(comm)
+  }, [ministryId, fiscalYear])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const [catRes, fundRes] = await Promise.all([
+        getBudgetCategories(ministryId),
+        getFinanceFunds(ministryId),
+      ])
+      if (cancelled) return
+      setCategories(catRes.data)
+      setFunds(fundRes.data)
+      await loadCeiling()
+    })()
+    return () => { cancelled = true }
+  }, [ministryId, loadCeiling])
+
+  // Keyed on the plan ID, not the plan OBJECT: `plan` is replaced wholesale by every
+  // overview field save, and re-keying on identity would refetch draws (and stomp the
+  // local category selection) on an unrelated turnout edit.
+  const planId = plan?.id ?? null
+  const planCategoryId = plan?.budget_category_id ?? null
+
+  // Adjust-state-during-render (the React-documented "reset state when a prop
+  // changes" pattern) rather than a reset effect: a synchronous setState inside an
+  // effect triggers a cascading render and is a lint error here.
+  const [syncedPlan, setSyncedPlan] = useState<string | null>(null)
+  const planKey = `${planId ?? ""}::${planCategoryId ?? ""}`
+  if (syncedPlan !== planKey) {
+    setSyncedPlan(planKey)
+    setCategoryId(planCategoryId)
+    setDrafts({})
+    if (!planId || isContainer) setDrawsByFund({})
+  }
+
+  // This event's own draws. Skipped on a container — its number is the roll-up.
+  useEffect(() => {
+    if (!planId || isContainer) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await getEventDraws(planId)
+      if (cancelled) return
+      const map: Record<string, number> = {}
+      for (const d of data) map[d.fund] = d.amount
+      setDrawsByFund(map)
+    })()
+    return () => { cancelled = true }
+  }, [planId, isContainer])
+
+  const ownTotal = Object.values(drawsByFund).reduce((s, v) => s + v, 0)
+  const total = isContainer ? containerDrawTotal : ownTotal
+  const categoryName = categories.find(c => c.id === categoryId)?.name ?? null
+  const money = (n: number) =>
+    `$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+  const signedMoney = (n: number) => (n < 0 ? `−${money(n)}` : money(n))
+
+  // Show the fund block when there is something real to show: either the reader can
+  // edit, or they can actually SEE draws. Never an empty editor for a reader whose
+  // RLS returns [] — that reads as "this event has no budget", which is a lie.
+  const showFunds = !isContainer && (canEditBudget || Object.keys(drawsByFund).length > 0)
+
+  async function commitDraw(fund: string) {
+    if (!plan) return
+    const raw = drafts[fund]
+    if (raw === undefined) return
+    const snapped = normalizeMoneyInput(raw.trim())
+    const amount = snapped === "" ? 0 : parseFloat(snapped)
+    setDrafts(prev => { const n = { ...prev }; delete n[fund]; return n })
+    if (!Number.isFinite(amount) || amount < 0) return
+    if (amount === (drawsByFund[fund] ?? 0)) return
+
+    // Optimistic (Convention #4). amount 0 DELETES the row server-side — a zero
+    // draw and no draw are deliberately the same state, so drop the key here too.
+    const prevDraws = drawsByFund
+    setDrawsByFund(prev => {
+      const n = { ...prev }
+      if (amount === 0) delete n[fund]; else n[fund] = amount
+      return n
+    })
+    setSavingFund(fund)
+    setError(null)
+    const { error: err } = await upsertEventDraw({ ministryId, eventPlanId: plan.id, fund, amount })
+    setSavingFund(null)
+    if (err) { setDrawsByFund(prevDraws); setError(err); return }
+    loadCeiling()
+  }
+
+  async function commitCategory(next: string | null) {
+    if (!plan) return
+    const prev = categoryId
+    setCategoryId(next)
+    setSavingCategory(true)
+    setError(null)
+    const { error: err } = await setEventBudgetCategory(plan.id, next)
+    setSavingCategory(false)
+    if (err) { setCategoryId(prev); setError(err); return }
+    loadCeiling()
+  }
+
+  const ceilingAllocated = categoryName ? (allocated[categoryName] ?? 0) : 0
+  const ceilingCommitted = categoryName ? (committed[categoryName] ?? 0) : 0
+  // Labelled "Uncommitted", NOT "Remaining". The Finance Allocation grid already has a
+  // Remaining column meaning allocated − SPENT (correctly — folding committed into it
+  // would double-subtract the moment a drawn event's receipt posts to the ledger). This
+  // is allocated − COMMITTED, a different number: on the same category the two differed
+  // by $850 in review. One word for two money figures is how a treasurer concludes one
+  // of the screens is broken.
+  const ceilingUncommitted = ceilingAllocated - ceilingCommitted
+  const overCommitted = ceilingUncommitted < 0
+
+  const ceilingRow = (label: string, value: string, tone?: "danger" | "quiet") => (
+    <div key={label} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginTop: 6 }}>
+      <span style={{ fontSize: 12.5, color: "var(--body)" }}>{label}</span>
+      <span style={{
+        fontSize: 13, fontVariantNumeric: "tabular-nums",
+        color: tone === "danger" ? "var(--danger)" : tone === "quiet" ? "var(--muted-text)" : "var(--ink)",
+        fontWeight: tone === "quiet" ? 400 : 500,
+      }}>{value}</span>
+    </div>
+  )
+
+  const caption = isContainer
+    ? containerChildCount > 0
+      ? `rolled up from ${containerChildCount} ${containerChildCount === 1 ? "night" : "nights"}`
+      : "no sub-events yet"
+    : "drawn for this event"
+
+  return (
+    <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22} style={isMobile ? { border: "none" } : undefined}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <p style={monoLabel}>Budget</p>
+        {!canEditBudget && <span style={{ fontSize: 11, color: "var(--muted-text)", fontStyle: "italic" }}>Treasurer only</span>}
+      </div>
+
+      <p style={{ ...bigNumber, color: total > 0 ? "var(--ink)" : "var(--faint)" }}>
+        {total > 0 ? money(total) : "—"}
+      </p>
+      <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>{caption}</p>
+
+      {/* The roll-up's blind spot, named. event_plans rows are lazily created, so a
+          night nobody has opened cannot hold a draw and reads as $0 — a treasurer
+          must know the figure is incomplete rather than infer it. */}
+      {isContainer && containerUnplanned > 0 && (
+        <p style={{ fontSize: 12, color: "var(--body)", lineHeight: 1.45, marginTop: 8 }}>
+          {containerUnplanned} {containerUnplanned === 1 ? "night is" : "nights are"} not yet planned — nothing counted for {containerUnplanned === 1 ? "it" : "them"}.
+        </p>
+      )}
+
+      {/* Category — the link that replaced the event-title string match. */}
+      <div style={{ marginTop: 18 }}>
+        <p style={{ ...monoLabel, marginBottom: 7 }}>Category</p>
+        {canEditBudget ? (
+          <Select
+            size={isMobile ? "md" : "sm"}
+            value={categoryId ?? ""}
+            disabled={savingCategory || !plan}
+            onChange={(e) => commitCategory(e.target.value || null)}
+            aria-label="Budget category"
+          >
+            <option value="">No budget category</option>
+            {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+        ) : (
+          <p style={{ fontSize: 14, color: categoryName ? "var(--ink)" : "var(--muted-text)" }}>
+            {categoryName ?? "No budget category"}
+          </p>
+        )}
+      </div>
+
+      {/* Per-fund draw editors — leaf events only. */}
+      {showFunds && (
+        <div style={{ marginTop: 18 }}>
+          <p style={{ ...monoLabel, marginBottom: 4 }}>Draw by fund</p>
+          {funds.length === 0 ? (
+            <p style={{ fontSize: 12.5, color: "var(--muted-text)", fontStyle: "italic", marginTop: 6 }}>No funds set up yet.</p>
+          ) : funds.map(f => {
+            const amt = drawsByFund[f.slug] ?? 0
+            const draft = drafts[f.slug]
+            return (
+              <div key={f.slug} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minHeight: isMobile ? 48 : 40 }}>
+                <span style={{ fontSize: 13.5, color: "var(--body)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                {canEditBudget ? (
+                  <Input
+                    size={isMobile ? "md" : "sm"}
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    inputMode="decimal"
+                    placeholder="0"
+                    aria-label={`${f.name} draw`}
+                    disabled={savingFund === f.slug || !plan}
+                    value={draft !== undefined ? draft : (amt > 0 ? amt.toFixed(2) : "")}
+                    onChange={(e) => setDrafts(prev => ({ ...prev, [f.slug]: e.target.value }))}
+                    onFocus={(e) => e.currentTarget.select()}
+                    onBlur={() => commitDraw(f.slug)}
+                    onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur() }}
+                    style={{ width: 104, flexShrink: 0, textAlign: "right", fontVariantNumeric: "tabular-nums", opacity: savingFund === f.slug ? 0.5 : 1 }}
+                  />
+                ) : (
+                  <span style={{ fontSize: 14, fontVariantNumeric: "tabular-nums", color: amt > 0 ? "var(--ink)" : "var(--muted-text)" }}>
+                    {amt > 0 ? money(amt) : "—"}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Ceiling context. Nothing but the picker when no category is set — an
+          allocated/committed/remaining trio with no category to belong to would be
+          three numbers about nothing. */}
+      {categoryName && (
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
+          <p style={{ ...monoLabel, marginBottom: 2 }}>{categoryName} · {fiscalYear}</p>
+          {ceilingRow("Allocated", money(ceilingAllocated))}
+          {ceilingRow("Committed", money(ceilingCommitted))}
+          {ceilingRow("Uncommitted", signedMoney(ceilingUncommitted), overCommitted ? "danger" : undefined)}
+          {!isContainer && total > 0 && ceilingRow("This event", money(total), "quiet")}
+        </div>
+      )}
+
+      {error && (
+        <p style={{ fontSize: 12, color: "var(--danger)", lineHeight: 1.45, marginTop: 12 }}>{error}</p>
+      )}
+    </CentralCard>
+  )
+}
+
 // Small hover-aware icon button for the checklist row actions (grip, pin, add
 // subtask, promote, edit, delete). Inline styles across this file preclude CSS
 // :hover, so hover is tracked in local state.
@@ -7736,7 +8036,6 @@ export function EventPlanWorkspace({
   const [compileOpen, setCompileOpen] = useState(false)  // Run Sheet P2 — compile-playbook modal
   const [loading, setLoading] = useState(true)
   const [rsvpCount, setRsvpCount] = useState<number | null>(null)
-  const [ministryBudget, setMinistryBudget] = useState<{ total: number; byFund: Record<string, number> } | null>(null)
 
   const [activeSection, setActiveSection] = useState<ActiveSection>(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("evtab") : null
@@ -7768,12 +8067,12 @@ export function EventPlanWorkspace({
 
   // Overview edit state
   const [turnout, setTurnout] = useState("")
-  const [budget, setBudget] = useState("")
   const [overviewNotes, setOverviewNotes] = useState("")
   const [savingOverview, setSavingOverview] = useState(false)
-  // Overview click-to-edit toggles for the turnout / budget stat numbers
+  // Overview click-to-edit toggle for the turnout stat number. (Budget has no
+  // local state at all any more: the money lives in event_budget_draws and is
+  // owned end-to-end by EventBudgetCard. `budget_allocated` is legacy.)
   const [editingTurnout, setEditingTurnout] = useState(false)
-  const [editingBudget, setEditingBudget] = useState(false)
 
   // Task add state — newTaskSection is the date-derived checklist section the
   // inline add-row is currently active in ("" = none focused yet).
@@ -8001,7 +8300,7 @@ export function EventPlanWorkspace({
       setPlan(planData as EventPlan)
       const pgid = (planData as EventPlan).planning_group_id ?? null
       setPlanningGroupId(pgid)
-      setPlanCreatedBy((planData as { created_by?: string | null }).created_by ?? null)
+      setPlanCreatedBy((planData as EventPlan).created_by ?? null)
       // Load the planning chat's current membership for stale detection.
       if (pgid) {
         const { data: gm } = await supabase.from("group_members").select("user_id").eq("group_id", pgid)
@@ -8010,7 +8309,6 @@ export function EventPlanWorkspace({
         setPlanChatMemberIds([])
       }
       setTurnout(planData.expected_turnout != null ? String(planData.expected_turnout) : "")
-      setBudget(planData.budget_allocated != null ? String(planData.budget_allocated) : "")
       setOverviewNotes(planData.overview_notes ?? "")
 
       // Fetch tasks with assignee name
@@ -8079,34 +8377,45 @@ export function EventPlanWorkspace({
         setRsvpCount(count ?? 0)
       }
 
-      // Fetch ministry budget allocation — keyed by calendar event title (matches dynamic category system)
-      if (typeCfg.budgetCategory) {
-        const { data: budgetData } = await getCategoryBudgetAllocation(ministryId, calendarEvent.title, currentFiscalYear())
-        setMinistryBudget(budgetData)
-      }
-
       setLoading(false)
     }
     init()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarEvent.id, ministryId, userId, teamId])
 
-  async function handleSaveOverview() {
+  /**
+   * ONE FIELD PER WRITE — never bundle the overview fields again.
+   *
+   * This used to be a single `handleSaveOverview` that wrote expected_turnout +
+   * budget_allocated + overview_notes together, from client state, on ANY of the three
+   * blurs. Two people on the same event meant whoever blurred last silently rewrote the
+   * other's fields from their own stale tab — a planner touching the notes box could
+   * revert the budget without ever seeing it.
+   *
+   * `budget_allocated` is deliberately absent from every write path here: it becomes
+   * derived (Σ `event_budget_draws`) and is written only by service-role paths, which is
+   * what makes the card's "Treasurer only" label true rather than decorative.
+   */
+  async function saveOverviewField(updates: Partial<Pick<EventPlan, "expected_turnout" | "overview_notes">>) {
     if (!plan) return
     setSavingOverview(true)
-    const updates = {
-      expected_turnout: turnout !== "" ? parseInt(turnout, 10) : null,
-      budget_allocated: budget !== "" ? parseFloat(budget) : null,
-      overview_notes: overviewNotes || null,
-    }
     const { data } = await supabase
       .from("event_plans")
       .update(updates)
       .eq("id", plan.id)
+      .eq("ministry_id", ministryId)
       .select("*")
       .single()
     if (data) setPlan(data as EventPlan)
     setSavingOverview(false)
+  }
+
+  function handleSaveTurnout() {
+    saveOverviewField({ expected_turnout: turnout !== "" ? parseInt(turnout, 10) : null })
+  }
+
+  function handleSaveNotes() {
+    saveOverviewField({ overview_notes: overviewNotes || null })
   }
 
   // Re-fetch plan/crunch dates AND the checklist when the parent bumps
@@ -9090,7 +9399,7 @@ export function EventPlanWorkspace({
                       <textarea
                         value={overviewNotes}
                         onChange={e => setOverviewNotes(e.target.value)}
-                        onBlur={handleSaveOverview}
+                        onBlur={handleSaveNotes}
                         placeholder="Add context, key decisions, or reminders for this event…"
                         // Radius token, §1.4 padding (15/17 → 14/18).
                         style={{ width: "100%", minHeight: 74, background: "var(--cream-2)", border: "1px solid var(--line-2)", borderRadius: "var(--r-card)", padding: "14px 18px", fontSize: 14, fontFamily: "var(--font-inter)", color: "var(--ink)", lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }}
@@ -9114,8 +9423,8 @@ export function EventPlanWorkspace({
                         autoFocus
                         value={turnout}
                         onChange={(e) => setTurnout(e.target.value)}
-                        onBlur={() => { handleSaveOverview(); setEditingTurnout(false) }}
-                        onKeyDown={(e) => { if (e.key === "Enter") { handleSaveOverview(); setEditingTurnout(false) } }}
+                        onBlur={() => { handleSaveTurnout(); setEditingTurnout(false) }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { handleSaveTurnout(); setEditingTurnout(false) } }}
                         placeholder="—"
                         style={bigInput}
                       />
@@ -9133,52 +9442,21 @@ export function EventPlanWorkspace({
                     )}
                   </CentralCard>
 
-                  {/* Budget */}
-                  <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22} style={isMobile ? { border: "none" } : undefined}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <p style={monoLabel}>Budget</p>
-                      {!canEditBudget && <span style={{ fontSize: 11, color: "var(--muted-text)", fontStyle: "italic" }}>Treasurer only</span>}
-                    </div>
-                    {canEditBudget && editingBudget ? (
-                      <input
-                        type="number"
-                        autoFocus
-                        value={budget}
-                        onChange={(e) => setBudget(e.target.value)}
-                        onBlur={() => { handleSaveOverview(); setEditingBudget(false) }}
-                        onKeyDown={(e) => { if (e.key === "Enter") { handleSaveOverview(); setEditingBudget(false) } }}
-                        placeholder="—"
-                        style={bigInput}
-                      />
-                    ) : (
-                      <p
-                        onClick={() => { if (canEditBudget) setEditingBudget(true) }}
-                        style={{ ...bigNumber, color: budget ? "var(--ink)" : "var(--faint)", cursor: canEditBudget ? "pointer" : "default" }}
-                      >{budget ? `$${budget}` : "—"}</p>
-                    )}
-                    <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4 }}>allocated for this event</p>
-                    {typeCfg.budgetCategory && (
-                      <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
-                        <p style={{ ...monoLabel, letterSpacing: "0.08em" }}>Ministry allocation · {calendarEvent.title}</p>
-                        {ministryBudget ? (
-                          <>
-                            <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 6 }}>
-                              ${ministryBudget.total.toFixed(2)}
-                            </p>
-                            <p style={{ fontSize: 12, color: "var(--body)", marginTop: 2 }}>
-                              {Object.entries(ministryBudget.byFund)
-                                .map(([fund, amt]) => `${fund.charAt(0).toUpperCase() + fund.slice(1)} $${amt.toFixed(2)}`)
-                                .join(" · ")}
-                            </p>
-                          </>
-                        ) : (
-                          <p style={{ fontSize: 12, color: "var(--muted-text)", fontStyle: "italic", marginTop: 6 }}>
-                            No ministry budget set
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </CentralCard>
+                  {/* Budget — "ceiling + draws" (see EventBudgetCard). Replaces the old
+                      free-text budget_allocated stat and the title-keyed ministry-allocation
+                      panel that used to sit under it. */}
+                  <EventBudgetCard
+                    ministryId={ministryId}
+                    plan={plan}
+                    canEditBudget={canEditBudget}
+                    isMobile={isMobile}
+                    isContainer={isContainer}
+                    containerDrawTotal={containerRollup.drawTotal}
+                    containerUnplanned={containerRollup.unplannedCount}
+                    containerChildCount={containerRollup.children.length}
+                    monoLabel={monoLabel}
+                    bigNumber={bigNumber}
+                  />
 
                   {/* Readiness */}
                   <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22} style={isMobile ? { border: "none" } : undefined}>
