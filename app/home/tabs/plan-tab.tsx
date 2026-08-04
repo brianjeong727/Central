@@ -12732,7 +12732,12 @@ async function fetchTeamSettings([, teamId]: readonly [string, string]) {
   const members: TeamMemberDisplay[] = (membersData ?? []).map((m: RawMember) => {
     const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
     const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
-    return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id, role_name: r?.name ?? "Member", joined_at: m.joined_at }
+    // team_members.role_id is NULLABLE in the DB (8 live rows hold null) while
+    // TeamMemberDisplay.role_id is `string`. Normalize to the "" sentinel this
+    // component already uses for the roleless state (see the role-delete handler
+    // below). Passing the raw null through made the role <select> UNCONTROLLED,
+    // so a member with no role silently rendered as whatever the first role was.
+    return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id ?? "", role_name: r?.name ?? "No role", joined_at: m.joined_at }
   })
   return { roles, members }
 }
@@ -13395,6 +13400,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                                   onClick={e => e.stopPropagation()}
                                   style={{ fontSize: 12, color: "var(--body)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0, marginTop: 1 }}
                                 >
+                                  {/* A roleless member ("" sentinel) needs a real option, else the select renders blank. */}
+                                  {!m.role_id && <option value="">No role</option>}
                                   {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                 </select>
                               ) : (
@@ -13696,6 +13703,8 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                             onChange={e => handleChangeRole(m.user_id, e.target.value)}
                             style={{ fontSize: 13, color: "var(--body)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0 }}
                           >
+                            {/* A roleless member ("" sentinel) needs a real option, else the select renders blank. */}
+                            {!m.role_id && <option value="">No role</option>}
                             {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                           </select>
                         ) : (
