@@ -12723,7 +12723,8 @@ async function fetchTeamSettings([, teamId]: readonly [string, string]) {
   ])
   type RawMember = {
     user_id: string
-    role_id: string
+    /** Nullable in the DB — see TeamMemberDisplay.role_id. */
+    role_id: string | null
     joined_at: string
     profiles: { name: string } | { name: string }[] | null
     team_roles: { name: string } | { name: string }[] | null
@@ -12732,7 +12733,9 @@ async function fetchTeamSettings([, teamId]: readonly [string, string]) {
   const members: TeamMemberDisplay[] = (membersData ?? []).map((m: RawMember) => {
     const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
     const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
-    return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id, role_name: r?.name ?? "Member", joined_at: m.joined_at }
+    // role_name must not claim "Member" for a roleless row — that is exactly the
+    // fiction the null role_id was producing in the editable branch.
+    return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id ?? null, role_name: r?.name ?? (m.role_id ? "Member" : "No role"), joined_at: m.joined_at }
   })
   return { roles, members }
 }
@@ -13390,11 +13393,17 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                               <p onClick={(e) => { e.stopPropagation(); openMemberProfile(m.user_id) }} className="text-[14px] font-medium text-[var(--ink)] truncate cursor-pointer">{m.name}</p>
                               {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
                                 <select
-                                  value={m.role_id}
+                                  // `?? ""` + the matching placeholder option keeps this
+                                  // CONTROLLED for a roleless member. Binding null made
+                                  // React fall back to uncontrolled, which renders the
+                                  // first option — so someone with no role was shown as
+                                  // holding whatever role sorted first.
+                                  value={m.role_id ?? ""}
                                   onChange={e => { e.stopPropagation(); handleChangeRole(m.user_id, e.target.value) }}
                                   onClick={e => e.stopPropagation()}
-                                  style={{ fontSize: 12, color: "var(--body)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0, marginTop: 1 }}
+                                  style={{ fontSize: 12, color: m.role_id ? "var(--body)" : "var(--faint)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0, marginTop: 1 }}
                                 >
+                                  {!m.role_id && <option value="" disabled>No role</option>}
                                   {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                 </select>
                               ) : (
@@ -13692,10 +13701,12 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         <span onClick={() => openMemberProfile(m.user_id)} style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500, cursor: "pointer" }}>{m.name}</span>
                         {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
                           <select
-                            value={m.role_id}
+                            // Controlled for a roleless member — see the mobile twin above.
+                            value={m.role_id ?? ""}
                             onChange={e => handleChangeRole(m.user_id, e.target.value)}
-                            style={{ fontSize: 13, color: "var(--body)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0 }}
+                            style={{ fontSize: 13, color: m.role_id ? "var(--body)" : "var(--faint)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0 }}
                           >
+                            {!m.role_id && <option value="" disabled>No role</option>}
                             {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                           </select>
                         ) : (
