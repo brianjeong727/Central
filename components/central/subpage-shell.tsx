@@ -9,7 +9,8 @@
 // var(--space-8) · InsetHairline — butting the breadcrumb with NO extra top gap.
 // Never hand-roll a header inside the body; the gaps will not match other pages.
 
-import { ReactNode } from "react"
+import { ReactNode, createContext, useContext, useState } from "react"
+import { createPortal } from "react-dom"
 import { BackChevron } from "./back-chevron"
 import { InsetHairline } from "./hairline"
 import { PageTitle } from "./page-title"
@@ -19,6 +20,28 @@ import { useEdgeSwipeBack } from "./use-edge-swipe-back"
 import { useSubpageCrumbs } from "@/app/home/breadcrumb-context"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ type import); flagged Phase 2, refactor pending
 import type { Crumb } from "@/app/home/types"
+
+// ── Mobile chrome-row action slot ──────────────────────────────────────────────
+// mobile_design_system §3 puts a phone-width screen's create (and up to one
+// sibling action) in the chrome row itself — the carve-out from desktop
+// Convention #15. The controls that belong there are usually rendered DEEP inside
+// the subpage body (the event workspace's Roles pane is ~7 levels down) and close
+// over live state, so hoisting them through a prop or an effect would either
+// require threading or risk a stale closure. Instead the shell publishes a DOM
+// slot and the deep child portals into it: the child keeps rendering in its own
+// place in the tree with fresh closures, the pixels land in the chrome row.
+const ChromeSlotContext = createContext<HTMLElement | null>(null)
+
+/**
+ * Render actions into the nearest `SubpageShell`'s MOBILE chrome row. Renders
+ * nothing outside a SubpageShell, and nothing on desktop (the slot lives inside
+ * the shell's `md:hidden` row) — desktop actions go through `titleAction`.
+ */
+export function SubpageChromeActions({ children }: { children: ReactNode }) {
+  const host = useContext(ChromeSlotContext)
+  if (!host) return null
+  return createPortal(children, host)
+}
 
 export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact", titleMeta, titleAction, width = "full", maxWidth = 820, children }: {
   crumbs: Crumb[]
@@ -72,6 +95,9 @@ export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact
   const swipeRef = useEdgeSwipeBack<HTMLDivElement>(back?.onClick)
   // Mobile chrome uses the override when supplied; desktop always uses `title`.
   const chromeTitle = mobileTitle ?? title
+  // State (not a plain ref) so the one re-render that publishes the slot happens
+  // after it is in the DOM — a ref would leave the first portal render with null.
+  const [chromeSlot, setChromeSlot] = useState<HTMLElement | null>(null)
   return (
     <div ref={swipeRef} className="md:flex md:flex-col md:h-full md:overflow-hidden" style={{ background: "var(--cream)" }}>
       {(back || chromeTitle) && (
@@ -92,6 +118,13 @@ export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact
               {back.label}
             </button>
           ) : null}
+          {/* Action slot. `marginLeft: auto` (not the title's flex:1) does the
+              pushing, so actions still sit hard right on the titleless fallback
+              row. Empty when nothing portals in — a zero-width flex item. */}
+          <div
+            ref={setChromeSlot}
+            style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: "auto" }}
+          />
         </div>
       )}
       {/* Canonical page header — identical rhythm to TabPageHeader, butting the
@@ -119,9 +152,11 @@ export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact
       <div
         className={`md:flex-1 md:overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+110px)] md:pb-14 ${title ? "pt-0" : "pt-4 md:pt-7"}`}
       >
-        {width === "centered"
-          ? <div className="mx-auto w-full px-5" style={{ maxWidth }}>{children}</div>
-          : <div className="w-full px-5 md:px-14">{children}</div>}
+        <ChromeSlotContext.Provider value={chromeSlot}>
+          {width === "centered"
+            ? <div className="mx-auto w-full px-5" style={{ maxWidth }}>{children}</div>
+            : <div className="w-full px-5 md:px-14">{children}</div>}
+        </ChromeSlotContext.Provider>
       </div>
     </div>
   )
