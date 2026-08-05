@@ -25,7 +25,7 @@
 // with `.filter({ visible: true })`.
 import { test, expect, type Page, type Locator } from "@playwright/test"
 import { adminState, sandbox, E2E_PREFIX } from "./fixtures"
-import { resolveMinistryTimezone, zonedTimeToISO } from "../lib/tz"
+import { addDaysYMD, resolveMinistryTimezone, todayInZone, zonedTimeToISO } from "../lib/tz"
 
 // The E2E sandbox's one team; classifyTeam routes "Student Org Board" to
 // StudentOrgTeamHome (the component this fix changed).
@@ -36,13 +36,41 @@ const PARENT_TITLE = `${E2E_PREFIX}TP Week`
 const CHILD_TITLE = `${E2E_PREFIX}TP Child Night`
 
 // Fixture baseline as MINISTRY-ZONE WALL CLOCKS (see the convention note above).
-const PARENT_START_LOCAL = { ymd: "2026-08-03", hhmm: "14:00" }
-const PARENT_END_LOCAL = { ymd: "2026-08-07", hhmm: "20:00" }
-const CHILD_START_LOCAL = { ymd: "2026-08-04", hhmm: "16:00" }
-const CHILD_END_LOCAL = { ymd: "2026-08-04", hhmm: "18:00" }
-// Task due dates relative to the child's 2026-08-04 start.
-const TASK_OPEN_DUE = "2026-08-01"
-const TASK_DONE_DUE = "2026-08-02"
+//
+// ANCHORED TO TODAY, not to absolute dates. These were originally hardcoded
+// ("2026-08-04" and friends), which worked until real time walked past them:
+// once the child night fell into the past it stopped rendering in the timeline,
+// and test 2 — which reads the sub-event disclosure row off the UP-NEXT event's
+// default-open panel — began timing out. Every offset below is preserved exactly
+// as authored; only the origin moved. (2026-08-05 audit.)
+//
+// ANCHOR is the CHILD NIGHT, and every offset below is expressed relative to it
+// exactly as authored against the original 2026-08-04 literal.
+//
+// It sits 2 days out, which is load-bearing for test 2: that test reads the
+// sub-event disclosure row off the UP-NEXT event's default-open panel, and
+// "up next" means the next event that STARTS in the future. So the parent must
+// start LATER than today (an already-started event is not up-next) and EARLIER
+// than the other seeded event on this team ("Summer Retreat 2026"). Child at
+// +2 puts the parent at +1, which satisfies both.
+const ANCHOR = addDaysYMD(todayInZone(resolveMinistryTimezone(process.env.E2E_TZ ?? null)), 2)
+const d = (offset: number) => addDaysYMD(ANCHOR, offset)
+
+const PARENT_START_LOCAL = { ymd: d(-1), hhmm: "14:00" }
+const PARENT_END_LOCAL = { ymd: d(+3), hhmm: "20:00" }
+const CHILD_START_LOCAL = { ymd: d(0), hhmm: "16:00" }
+const CHILD_END_LOCAL = { ymd: d(0), hhmm: "18:00" }
+// Task due dates relative to the child's start (was −3 / −2 from 2026-08-04).
+const TASK_OPEN_DUE = d(-3)
+const TASK_DONE_DUE = d(-2)
+// Date-move targets and their expected results, all relative to the same anchor
+// so each test's delta is exactly what it was when written.
+const MOVE_TARGET = d(+2)              // child start +2 days (was 08-04 → 08-06)
+const TASK_OPEN_DUE_AFTER_MOVE = d(-1) // open task rides the +2 (was 08-01 → 08-03)
+const PLAN_START_PINNED = d(-31)       // was 2026-07-04
+const PLAN_CRUNCH_PINNED = d(-7)       // was 2026-07-28
+const PLAN_START_AFTER_MOVE = d(-29)   // was 2026-07-06
+const PLAN_CRUNCH_AFTER_MOVE = d(-5)   // was 2026-07-30
 
 /** The sandbox ministry's IANA zone, read from the DB in beforeAll. */
 let zone = ""
@@ -258,7 +286,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
 
     // The single most direct proof of the fix: the modal is bound to the CHILD.
     await expect(fieldInput(page, "Title *")).toHaveValue(CHILD_TITLE)
-    await expect(fieldInput(page, "Start date *")).toHaveValue("2026-08-04")
+    await expect(fieldInput(page, "Start date *")).toHaveValue(CHILD_START_LOCAL.ymd)
     await expect(fieldInput(page, "Start time")).toHaveValue("16:00")
 
     // Time-only change (same YMD) — the exact edit Brian reported. Kept inside
@@ -271,7 +299,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     const parentAfter = await readEvent(parentId)
 
     expect(childAfter.start_date, "CHILD start_date must have moved").not.toBe(childBefore.start_date)
-    expectStored(childAfter.start_date, "2026-08-04", "10:00")
+    expectStored(childAfter.start_date, CHILD_START_LOCAL.ymd, "10:00")
     expect(parentAfter.start_date, "PARENT start_date must NOT move").toBe(parentBefore.start_date)
     expect(parentAfter.end_date).toBe(parentBefore.end_date)
     expect(parentAfter.title).toBe(parentBefore.title)
@@ -303,7 +331,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     await expect.poll(async () => timelineChildRowText(page), { timeout: 15_000 }).not.toBe(before)
     const after = await timelineChildRowText(page)
     console.log(`[timeline] disclosure row AFTER:  ${after}`)
-    expectStored((await readEvent(childId)).start_date, "2026-08-04", "21:00")
+    expectStored((await readEvent(childId)).start_date, CHILD_START_LOCAL.ymd, "21:00")
 
     assertNoErrors(errors)
   })
@@ -320,7 +348,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     await vis(page.getByRole("button", { name: "Save changes" })).click()
     await expectModalClosed(page)
 
-    expectStored((await readEvent(parentId)).start_date, "2026-08-03", "09:30")
+    expectStored((await readEvent(parentId)).start_date, PARENT_START_LOCAL.ymd, "09:30")
     expect((await readEvent(childId)).start_date, "child must not move when the parent is edited").toBe(childBefore.start_date)
 
     assertNoErrors(errors)
@@ -337,7 +365,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
       .from("calendar_events")
       .insert({
         ministry_id: sb.ministryId, team_id: null, parent_event_id: parentId, title: throwawayTitle,
-        start_date: at("2026-08-05", "16:00"), end_date: at("2026-08-05", "18:00"),
+        start_date: at(d(+1), "16:00"), end_date: at(d(+1), "18:00"),
         all_day: false, category: "social", event_type: "social", recurring: false, created_by: adminId,
       })
       .select("id").single()
@@ -396,7 +424,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     // Pin the plan window to known values so the shift assertion below is
     // deterministic (the modal otherwise seeds event−1mo / event−1wk defaults).
     await sandbox().client.from("event_plans")
-      .update({ plan_start_date: "2026-07-04", crunch_date: "2026-07-28" })
+      .update({ plan_start_date: PLAN_START_PINNED, crunch_date: PLAN_CRUNCH_PINNED })
       .eq("id", childPlanId)
 
     await openParentEvent(page)
@@ -405,17 +433,17 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     await expect(fieldInput(page, "Title *")).toHaveValue(CHILD_TITLE)
     // Wait for the ASYNC plan/crunch seed to land — saving before it resolves
     // must not (and now does not) write both columns as null.
-    await expect(fieldInput(page, "Plan start date")).toHaveValue("2026-07-04")
+    await expect(fieldInput(page, "Plan start date")).toHaveValue(PLAN_START_PINNED)
 
     // 2026-08-04 → 2026-08-06 = +2 days.
-    await fieldInput(page, "End date *").fill("2026-08-06")
-    await fieldInput(page, "Start date *").fill("2026-08-06")
+    await fieldInput(page, "End date *").fill(MOVE_TARGET)
+    await fieldInput(page, "Start date *").fill(MOVE_TARGET)
     await vis(page.getByRole("button", { name: "Save changes" })).click()
     await expectModalClosed(page)
 
-    expectStored((await readEvent(childId)).start_date, "2026-08-06", "16:00")
+    expectStored((await readEvent(childId)).start_date, MOVE_TARGET, "16:00")
     // Open + dated → shifted +2. Completed → untouched. Null → still null.
-    await expect.poll(async () => (await readTaskDue(taskOpenId)).due_date, { timeout: 10_000 }).toBe("2026-08-03")
+    await expect.poll(async () => (await readTaskDue(taskOpenId)).due_date, { timeout: 10_000 }).toBe(TASK_OPEN_DUE_AFTER_MOVE)
     expect((await readTaskDue(taskDoneId)).due_date, "completed task must NOT shift").toBe(TASK_DONE_DUE)
     expect((await readTaskDue(taskNullId)).due_date, "undated task must stay null").toBeNull()
 
@@ -424,7 +452,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     const { data: plan } = await sandbox().client
       .from("event_plans").select("plan_start_date, crunch_date").eq("id", childPlanId).single()
     expect(plan, "plan window must survive the save").toMatchObject({
-      plan_start_date: "2026-07-06", crunch_date: "2026-07-30",
+      plan_start_date: PLAN_START_AFTER_MOVE, crunch_date: PLAN_CRUNCH_AFTER_MOVE,
     })
 
     assertNoErrors(errors)
@@ -441,7 +469,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     await vis(page.getByRole("button", { name: "Save changes" })).click()
     await expectModalClosed(page)
 
-    expectStored((await readEvent(childId)).start_date, "2026-08-04", "07:15")
+    expectStored((await readEvent(childId)).start_date, CHILD_START_LOCAL.ymd, "07:15")
     expect((await readTaskDue(taskOpenId)).due_date, "time-only edit must not shift due dates").toBe(TASK_OPEN_DUE)
     expect((await readTaskDue(taskDoneId)).due_date).toBe(TASK_DONE_DUE)
     expect((await readTaskDue(taskNullId)).due_date).toBeNull()
@@ -458,23 +486,23 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
 
     // Move 1: 08-04 → 08-06 (+2). Open dated task 08-01 → 08-03.
     await vis(page.getByRole("button", { name: /Edit event/ })).click()
-    await fieldInput(page, "End date *").fill("2026-08-06")
-    await fieldInput(page, "Start date *").fill("2026-08-06")
+    await fieldInput(page, "End date *").fill(MOVE_TARGET)
+    await fieldInput(page, "Start date *").fill(MOVE_TARGET)
     await vis(page.getByRole("button", { name: "Save changes" })).click()
     await expectModalClosed(page)
-    await expect.poll(async () => (await readTaskDue(taskOpenId)).due_date, { timeout: 10_000 }).toBe("2026-08-03")
+    await expect.poll(async () => (await readTaskDue(taskOpenId)).due_date, { timeout: 10_000 }).toBe(TASK_OPEN_DUE_AFTER_MOVE)
 
     // Move 2 (same drilled session, modal reopened): 08-06 → 08-07 (+1).
     // Correct total = +3 (08-04). A re-applied original delta would give 08-05.
     await vis(page.getByRole("button", { name: /Edit event/ })).click()
-    await expect(fieldInput(page, "Start date *")).toHaveValue("2026-08-06")
-    await fieldInput(page, "End date *").fill("2026-08-07")
-    await fieldInput(page, "Start date *").fill("2026-08-07")
+    await expect(fieldInput(page, "Start date *")).toHaveValue(MOVE_TARGET)
+    await fieldInput(page, "End date *").fill(d(+3))
+    await fieldInput(page, "Start date *").fill(d(+3))
     await vis(page.getByRole("button", { name: "Save changes" })).click()
     await expectModalClosed(page)
 
-    expectStored((await readEvent(childId)).start_date, "2026-08-07", "16:00")
-    await expect.poll(async () => (await readTaskDue(taskOpenId)).due_date, { timeout: 10_000 }).toBe("2026-08-04")
+    expectStored((await readEvent(childId)).start_date, d(+3), "16:00")
+    await expect.poll(async () => (await readTaskDue(taskOpenId)).due_date, { timeout: 10_000 }).toBe(d(0))
     expect((await readTaskDue(taskDoneId)).due_date).toBe(TASK_DONE_DUE)
     expect((await readTaskDue(taskNullId)).due_date).toBeNull()
 
@@ -487,7 +515,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
   // which is exactly what an RLS-blocked UPDATE looks like to supabase-js.
   test("8. a partial task-shift failure retries to agreement — window AND tasks", async ({ page }) => {
     await sandbox().client.from("event_plans")
-      .update({ plan_start_date: "2026-07-04", crunch_date: "2026-07-28" })
+      .update({ plan_start_date: PLAN_START_PINNED, crunch_date: PLAN_CRUNCH_PINNED })
       .eq("id", childPlanId)
 
     // Fail every event_tasks UPDATE for the FIRST save only.
@@ -499,20 +527,20 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     await openParentEvent(page)
     await drillIntoChild(page)
     await vis(page.getByRole("button", { name: /Edit event/ })).click()
-    await expect(fieldInput(page, "Plan start date")).toHaveValue("2026-07-04")
+    await expect(fieldInput(page, "Plan start date")).toHaveValue(PLAN_START_PINNED)
 
     // 2026-08-04 → 2026-08-06 = +2.
-    await fieldInput(page, "End date *").fill("2026-08-06")
-    await fieldInput(page, "Start date *").fill("2026-08-06")
+    await fieldInput(page, "End date *").fill(MOVE_TARGET)
+    await fieldInput(page, "Start date *").fill(MOVE_TARGET)
     await vis(page.getByRole("button", { name: "Save changes" })).click()
 
     // The modal STAYS open and says so, rather than reporting a clean save.
     await expect(vis(page.getByText(/only PARTLY shifted/))).toBeVisible({ timeout: 10_000 })
     // Event + window moved; the task did not (that is the induced failure).
-    expectStored((await readEvent(childId)).start_date, "2026-08-06", "16:00")
+    expectStored((await readEvent(childId)).start_date, MOVE_TARGET, "16:00")
     const midPlan = await readPlanWindow(childPlanId)
     expect(midPlan, "window shifted +2 on the first save").toMatchObject({
-      plan_start_date: "2026-07-06", crunch_date: "2026-07-30",
+      plan_start_date: PLAN_START_AFTER_MOVE, crunch_date: PLAN_CRUNCH_AFTER_MOVE,
     })
     expect((await readTaskDue(taskOpenId)).due_date, "task blocked by the stub").toBe(TASK_OPEN_DUE)
 
@@ -522,11 +550,11 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     await expectModalClosed(page)
 
     // WARN-B1: the retry must NOT rewrite the pre-shift window over the shifted one.
-    await expect.poll(async () => (await readTaskDue(taskOpenId)).due_date, { timeout: 10_000 }).toBe("2026-08-03")
+    await expect.poll(async () => (await readTaskDue(taskOpenId)).due_date, { timeout: 10_000 }).toBe(TASK_OPEN_DUE_AFTER_MOVE)
     expect(await readPlanWindow(childPlanId), "window must stay shifted, not revert").toMatchObject({
-      plan_start_date: "2026-07-06", crunch_date: "2026-07-30",
+      plan_start_date: PLAN_START_AFTER_MOVE, crunch_date: PLAN_CRUNCH_AFTER_MOVE,
     })
-    expectStored((await readEvent(childId)).start_date, "2026-08-06", "16:00", "event must not move again")
+    expectStored((await readEvent(childId)).start_date, MOVE_TARGET, "16:00", "event must not move again")
   })
 
   // ── 9. A SUCCESSFUL save invalidates the shared calendar cache ──────────────
@@ -550,7 +578,7 @@ test.describe("event time propagation — drilled sub-event edit (016069e)", () 
     // WARN-B2: before the fix the modal invalidated on the FAILURE branch only, so
     // a successful save refetched nothing of its own.
     await expect.poll(() => calendarGets, { timeout: 10_000 }).toBeGreaterThan(0)
-    expectStored((await readEvent(childId)).start_date, "2026-08-04", "13:30")
+    expectStored((await readEvent(childId)).start_date, CHILD_START_LOCAL.ymd, "13:30")
 
     assertNoErrors(errors)
   })

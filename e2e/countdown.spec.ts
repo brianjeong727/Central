@@ -15,6 +15,19 @@
 // NOT create the fixture (Brian seeded it); it only toggles/adds and restores.
 import { test, expect, type Page } from "@playwright/test"
 import { adminState, sandbox } from "./fixtures"
+import { addDaysYMD, daysBetweenYMD, instantToZoned, resolveMinistryTimezone, todayInZone } from "../lib/tz"
+
+// How far out the seeded retreat is re-anchored before each run. Every badge
+// state this spec asserts depends on where TODAY falls inside the task spread,
+// and the seed's task offsets from the event day are fixed (30, 25, 24, 20, 16,
+// 7, 6, 2 days before). 22 is the window where all of them coexist:
+//   • offsets > 22 are past-due    → the OVERDUE badge on "Collect dietary…"
+//   • offsets ≤ 22 and > 2 are armed → the "Auto-DM fires <weekday>" badge
+//   • offset 2 takes the T−2 branch  → "Confirm-taps go out T−2 days"
+//   • the earliest upcoming task (offset 20) sits in the T−3 WEEKS bucket
+//     → the "· THIS WEEK" marker the spec asserts lands there
+// Anything in [20, 23] works; 22 is the middle of that band.
+const EVENT_DAYS_OUT = 22
 
 // Seeded fixture ids (E2E sandbox tenant). Deep-link ?team= is honored by
 // home-app (activeTeamId inits from the URL); the event itself is opened by a
@@ -34,6 +47,54 @@ function watchConsole(page: Page) {
   })
   page.on("pageerror", (err) => errors.push(`pageerror: ${err.message}`))
   return errors
+}
+
+/**
+ * Shift "Summer Retreat 2026" and every task on its plan by one whole-day delta
+ * so the event lands on today + EVENT_DAYS_OUT in the MINISTRY's zone.
+ *
+ * Whole days only: the event's timestamptz pair moves by delta×24h and the tasks'
+ * DATE columns move by delta days, so each task's offset from the event — the
+ * thing the phase buckets are computed from — is unchanged.
+ */
+async function reanchorFixture(sb: ReturnType<typeof sandbox>) {
+  const { data: min, error: ze } = await sb.client
+    .from("ministries").select("timezone").eq("id", sb.ministryId).single()
+  if (ze) throw ze
+  const zone = resolveMinistryTimezone((min as { timezone: string | null }).timezone)
+
+  const { data: ev, error: ee } = await sb.client
+    .from("calendar_events").select("start_date, end_date").eq("id", EVENT_ID).single()
+  if (ee) throw ee
+  const { start_date, end_date } = ev as { start_date: string; end_date: string }
+
+  const currentDay = instantToZoned(start_date, zone).ymd
+  const targetDay = addDaysYMD(todayInZone(zone), EVENT_DAYS_OUT)
+  const delta = daysBetweenYMD(currentDay, targetDay)
+  if (delta === 0) return
+
+  const shiftInstant = (iso: string) =>
+    new Date(new Date(iso).getTime() + delta * 86_400_000).toISOString()
+
+  const { error: ue } = await sb.client
+    .from("calendar_events")
+    .update({ start_date: shiftInstant(start_date), end_date: shiftInstant(end_date) })
+    .eq("id", EVENT_ID)
+  if (ue) throw ue
+
+  const { data: plan, error: pe } = await sb.client
+    .from("event_plans").select("id").eq("calendar_event_id", EVENT_ID).single()
+  if (pe) throw pe
+  const { data: tasks, error: te } = await sb.client
+    .from("event_tasks").select("id, due_date").eq("event_plan_id", (plan as { id: string }).id)
+  if (te) throw te
+
+  for (const t of (tasks ?? []) as { id: string; due_date: string | null }[]) {
+    if (!t.due_date) continue
+    const { error } = await sb.client
+      .from("event_tasks").update({ due_date: addDaysYMD(t.due_date, delta) }).eq("id", t.id)
+    if (error) throw error
+  }
 }
 
 test.describe("Countdown tab (feat/run-sheet-countdown)", () => {
@@ -56,6 +117,21 @@ test.describe("Countdown tab (feat/run-sheet-countdown)", () => {
     const sb = sandbox()
     hasLaneFixture = await sb.hasRow("teams", { id: TEAM_ID, ministry_id: sb.ministryId })
     if (!hasLaneFixture) return
+
+    // ── Re-anchor the fixture to today ────────────────────────────────────────
+    // The retreat and its tasks were hand-seeded at FIXED dates. Every assertion
+    // below is about where today falls inside that spread, so as real time walked
+    // forward the badge states silently disappeared — by 2026-08-05 the event was
+    // 2 days out, every task was past-due, and no task could be "armed with a
+    // future fire day" at all (the one remaining upcoming task was inside T−2 and
+    // took the confirm-taps branch instead). The spec had been failing on main.
+    //
+    // Shift the event AND its tasks by the same whole-day delta, which preserves
+    // every task's offset from the event exactly and therefore every phase bucket.
+    // Idempotent: the delta is recomputed from the CURRENT date each run, so this
+    // always lands on today + EVENT_DAYS_OUT and never accumulates.
+    await reanchorFixture(sb)
+
     const { data: plan, error: pe } = await sb.client
       .from("event_plans").select("id").eq("calendar_event_id", EVENT_ID).single()
     if (pe) throw pe
