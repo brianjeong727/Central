@@ -12,7 +12,7 @@ import type { ChatPreview } from "@/components/central/chat-strip"
 
 // Types
 import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings, ChatGroup, Crumb } from "./types"
-import { formatRelativeTime, getInitials, chatPreviewLabel } from "./utils"
+import { formatRelativeTime, getInitials, chatPreviewLabel, rowsToChatPreviews, type ChatPreviewRow } from "./utils"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 import { classifyTeam } from "./team-type"
 import { useNavState, ALL_FOLDED_PARAMS } from "./nav-state"
@@ -558,15 +558,6 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     }
   }
 
-  type ChatPreviewRow = {
-    group_id: string; group_name: string; group_type: string
-    last_read_at: string | null; last_msg_content: string | null
-    last_msg_sender_name: string | null; last_msg_at: string | null
-    last_msg_type: string | null; unread_count: number
-    last_msg_attachment_type: string | null; last_msg_has_poll: boolean | null
-    muted: boolean | null; pinned: boolean | null
-  }
-
   // Single DB round-trip via get_chat_previews function (replaces unbounded messages fetch)
   const loadRecentChats = useCallback(async () => {
     const { data } = await supabase.rpc("get_chat_previews", {
@@ -575,29 +566,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     })
     if (!data) return
 
-    const previews = ((data as ChatPreviewRow[])
-      .map((row) => ({
-        id: row.group_id,
-        groupName: row.group_name,
-        type: row.group_type,
-        lastMessage: chatPreviewLabel(row.last_msg_content, row.last_msg_attachment_type, row.last_msg_has_poll),
-        lastMessageSender: row.last_msg_sender_name ?? "",
-        unreadCount: Number(row.unread_count),
-        initials: getInitials(row.group_name),
-        time: row.last_msg_at ? formatRelativeTime(row.last_msg_at) : "",
-        muted: row.muted ?? false,
-        pinned: row.pinned ?? false,
-        _ts: row.last_msg_at ?? "",
-      }))
-      .sort((a, b) => {
-        if (!a._ts && !b._ts) return 0
-        if (!a._ts) return 1
-        if (!b._ts) return -1
-        return b._ts.localeCompare(a._ts)
-      })
-      .map(({ _ts: _, ...rest }) => rest)) as ChatPreview[]
-
-    setRecentChats(previews)
+    setRecentChats(rowsToChatPreviews(data as ChatPreviewRow[]))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, ministryId])
 

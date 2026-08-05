@@ -1,20 +1,11 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase-server"
 import { HomeApp } from "./home-app"
-import { formatRelativeTime, getInitials, chatPreviewLabel } from "./utils"
+import { rowsToChatPreviews, type ChatPreviewRow } from "./utils"
 import type { UserTeam, CongregationQuestion, GovernanceSettings } from "./types"
 import type { ChatPreview } from "@/components/central/chat-strip"
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
-
-type PreviewRow = {
-  group_id: string; group_name: string; group_type: string
-  last_read_at: string | null; last_msg_content: string | null
-  last_msg_sender_name: string | null; last_msg_at: string | null
-  last_msg_type: string | null; unread_count: number
-  last_msg_attachment_type: string | null; last_msg_has_poll: boolean | null
-  muted: boolean | null; pinned: boolean | null
-}
 
 type RawTeamRef = { id: string; name: string; icon: string | null; description: string | null; team_type: string; allow_co_presidency: boolean | null; allow_admin_members: boolean | null }
 type RawRoleRef = { id: string; name: string; permissions: string[]; is_president: boolean | null }
@@ -66,26 +57,9 @@ export default async function HomePage() {
       .maybeSingle(),
   ])
 
-  // Build sorted ChatPreview[]
-  const rawPreviews = ((chatResult.data ?? []) as PreviewRow[]).map((row) => ({
-    id: row.group_id,
-    groupName: row.group_name,
-    lastMessage: chatPreviewLabel(row.last_msg_content, row.last_msg_attachment_type, row.last_msg_has_poll),
-    lastMessageSender: row.last_msg_sender_name ?? "",
-    unreadCount: Number(row.unread_count),
-    initials: getInitials(row.group_name),
-    time: row.last_msg_at ? formatRelativeTime(row.last_msg_at) : "",
-    muted: row.muted ?? false,
-    pinned: row.pinned ?? false,
-    _ts: row.last_msg_at ?? "",
-  }))
-  rawPreviews.sort((a, b) => {
-    if (!a._ts && !b._ts) return 0
-    if (!a._ts) return 1
-    if (!b._ts) return -1
-    return b._ts.localeCompare(a._ts)
-  })
-  const initialRecentChats: ChatPreview[] = rawPreviews.map(({ _ts: _, ...rest }) => rest)
+  // Shared with the client refetcher (home-app `loadRecentChats`) — see
+  // rowsToChatPreviews. The two used to be hand-kept copies and had drifted.
+  const initialRecentChats: ChatPreview[] = rowsToChatPreviews((chatResult.data ?? []) as ChatPreviewRow[])
 
   // Build UserTeam[]
   const initialUserTeams: UserTeam[] = ((teamResult.data ?? []) as RawMembership[]).flatMap((m) => {

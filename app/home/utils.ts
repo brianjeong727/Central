@@ -1,4 +1,5 @@
 import { instantToZoned } from "@/lib/tz"
+import type { ChatPreview } from "@/components/central/chat-strip"
 
 export const REACTION_EMOJIS = ["👍", "❤️", "😂", "🙏", "🔥", "😮"]
 
@@ -189,4 +190,56 @@ export function replyPreviewLabel(
   if (attachmentType?.startsWith("image/")) return "Photo"
   if (attachmentType) return attachmentName || "File"
   return ""
+}
+
+// ── get_chat_previews → ChatPreview[] ────────────────────────────────────────
+// The row shape and mapper for the `get_chat_previews` RPC, shared by the SSR
+// boot (app/home/page.tsx, server component) and the client refetcher
+// (home-app.tsx `loadRecentChats`).
+//
+// It lives HERE rather than in chat-list.ts because that module imports the
+// BROWSER Supabase client at module scope — a server component importing it
+// would drag the browser client into the server bundle. This mapper is pure and
+// composes only the three helpers above, so both callers can reach it. Each
+// caller still runs its own query with its own client; only the shape and the
+// projection are shared.
+//
+// Both copies had already DRIFTED before this was unified: the client mapped
+// `type: row.group_type` and the server did not, so an SSR-seeded chat carried
+// no `type` until the first client refetch replaced it — and `type` is what
+// routes the Messages church/my subtab when a chat is opened from the Home
+// strip. (Found by the 2026-08-04 audit.)
+export type ChatPreviewRow = {
+  group_id: string; group_name: string; group_type: string
+  last_read_at: string | null; last_msg_content: string | null
+  last_msg_sender_name: string | null; last_msg_at: string | null
+  last_msg_type: string | null; unread_count: number
+  last_msg_attachment_type: string | null; last_msg_has_poll: boolean | null
+  muted: boolean | null; pinned: boolean | null
+}
+
+/** Map + sort `get_chat_previews` rows into the ChatPreview shape the Home strip
+ *  renders. Newest first; rows with no message sort last (never interleaved). */
+export function rowsToChatPreviews(rows: ChatPreviewRow[]): ChatPreview[] {
+  return rows
+    .map((row) => ({
+      id: row.group_id,
+      groupName: row.group_name,
+      type: row.group_type,
+      lastMessage: chatPreviewLabel(row.last_msg_content, row.last_msg_attachment_type, row.last_msg_has_poll),
+      lastMessageSender: row.last_msg_sender_name ?? "",
+      unreadCount: Number(row.unread_count),
+      initials: getInitials(row.group_name),
+      time: row.last_msg_at ? formatRelativeTime(row.last_msg_at) : "",
+      muted: row.muted ?? false,
+      pinned: row.pinned ?? false,
+      _ts: row.last_msg_at ?? "",
+    }))
+    .sort((a, b) => {
+      if (!a._ts && !b._ts) return 0
+      if (!a._ts) return 1
+      if (!b._ts) return -1
+      return b._ts.localeCompare(a._ts)
+    })
+    .map(({ _ts: _, ...rest }) => rest)
 }
