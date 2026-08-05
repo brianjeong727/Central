@@ -30,7 +30,7 @@
 import { createAdminClient } from "@/lib/supabase-admin"
 import { requireMinistryMember, hasCanPlanEvents } from "@/app/actions/authz"
 import { getMinistryTimezone } from "@/lib/ministry-timezone"
-import { eventDateColumnsFromInputs, eventDateInputsFromRow, instantToZoned, todayInZone, type EventDateColumns } from "@/lib/tz"
+import { addDaysYMD, daysBetweenYMD, eventDateColumnsFromInputs, eventDateInputsFromRow, instantToZoned, todayInZone, type EventDateColumns } from "@/lib/tz"
 import { lineageKeyOf, seasonLabelOf } from "@/app/home/event-presets"
 
 type AdminClient = ReturnType<typeof createAdminClient>
@@ -38,14 +38,6 @@ type AdminClient = ReturnType<typeof createAdminClient>
 // ── date helpers ─────────────────────────────────────────────────────────────
 // Bare "YYYY-MM-DD" arithmetic — zone-immune by construction. The zone only enters
 // where an INSTANT is involved (`eventYMD` / `shiftEventDates` below).
-function ymdToUTC(ymd: string): number {
-  const [y, m, d] = ymd.split("-").map(Number)
-  return Date.UTC(y, m - 1, d)
-}
-function addDaysYMD(ymd: string, days: number): string {
-  const dt = new Date(ymdToUTC(ymd) + days * 86_400_000)
-  return dt.toISOString().slice(0, 10)
-}
 /** The ministry-local calendar day an event instant falls on. The ONE projection
  *  used for season bucketing, the double-press guard, and the weekday delta — so
  *  every one of them agrees on which day an event "is". */
@@ -91,7 +83,7 @@ function weekdayMatchDelta(sourceYMD: string): number {
   const daysInMonth = new Date(Date.UTC(y + 1, m, 0)).getUTCDate()
   if (day > daysInMonth) day -= 7 // 5th occurrence missing → last occurrence
   const target = `${y + 1}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-  return Math.round((ymdToUTC(target) - ymdToUTC(sourceYMD)) / 86_400_000)
+  return daysBetweenYMD(sourceYMD, target)
 }
 
 type SourceEvent = {

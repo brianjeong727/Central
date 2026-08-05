@@ -225,6 +225,43 @@ export function todayInZone(timeZone: string): string {
   return instantToZoned(new Date(), timeZone).ymd
 }
 
+// ── Plain calendar-day arithmetic (ZONE-IMMUNE — no timeZone parameter) ──────
+//
+// For the DATE columns Convention #23 calls tz-immune: `event_tasks.due_date`,
+// `worship_weeks.week_date`, `event_plans.plan_start_date`/`crunch_date`, etc.
+// These hold a calendar day with no instant, so the correct arithmetic never
+// touches a zone — passing one in would reintroduce the exact off-by-a-day the
+// convention exists to prevent.
+//
+// Implemented on Date.UTC purely as fixed-length-day arithmetic: UTC has no DST,
+// so a day is always 86,400,000ms and the result cannot drift. The value never
+// represents an instant — it is a counting device for calendar days.
+//
+// These live here, in the sanctioned date layer, because six sites had rolled
+// their own across THREE mutually-incompatible strategies (UTC-ms, local-noon,
+// and a local-midnight constructor) and lib/tz.ts had no plain-YMD helper to
+// reach for. That is the shape of the bug Convention #23 was written about.
+// (Found by the 2026-08-04 audit.)
+
+/** Whole calendar days from `fromYMD` to `toYMD` (to − from). Both "YYYY-MM-DD". */
+export function daysBetweenYMD(fromYMD: string, toYMD: string): number {
+  return Math.round((ymdToEpochUTC(toYMD) - ymdToEpochUTC(fromYMD)) / 86_400_000)
+}
+
+/** Shift a "YYYY-MM-DD" by whole calendar days. Returns "YYYY-MM-DD". */
+export function addDaysYMD(ymd: string, days: number): string {
+  const dt = new Date(ymdToEpochUTC(ymd) + days * 86_400_000)
+  const y = dt.getUTCFullYear()
+  const m = String(dt.getUTCMonth() + 1).padStart(2, "0")
+  const d = String(dt.getUTCDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function ymdToEpochUTC(ymd: string): number {
+  const [y, m, d] = ymd.split("-").map(Number)
+  return Date.UTC(y, m - 1, d)
+}
+
 /**
  * The instant at which the ministry's TODAY began — midnight in `timeZone`,
  * as an ISO-8601 UTC string.

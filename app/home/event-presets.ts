@@ -50,12 +50,6 @@ export function ymdOf(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
-export function addDaysToYMD(ymd: string, days: number): string {
-  const [y, m, d] = ymd.split("-").map(Number)
-  const dt = new Date(y, m - 1, d + days)
-  return ymdOf(dt)
-}
-
 // Next occurrence of the preset's anchor date: this year if it's still at least
 // `minLeadDays` away, otherwise next year — a fresh event always lands ahead.
 export function nextAnchorYMD(anchorMonth: number, anchorDay: number, minLeadDays = 3, from = new Date()): string {

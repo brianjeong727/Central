@@ -26,25 +26,9 @@
 import { createAdminClient } from "@/lib/supabase-admin"
 import { requireMinistryMember, hasCanPlanEvents } from "@/app/actions/authz"
 import { getMinistryTimezone } from "@/lib/ministry-timezone"
-import { instantToZoned, todayInZone } from "@/lib/tz"
+import { addDaysYMD, daysBetweenYMD, instantToZoned, todayInZone } from "@/lib/tz"
 import { lineageKeyOf, seasonLabelOf } from "@/app/home/event-presets"
 
-
-// ── Calendar-date helpers (pure, zone-immune — they take YMD strings) ──────
-function ymdToUTC(ymd: string): number {
-  const [y, m, d] = ymd.split("-").map(Number)
-  return Date.UTC(y, m - 1, d)
-}
-function daysBetween(fromYMD: string, toYMD: string): number {
-  return Math.round((ymdToUTC(toYMD) - ymdToUTC(fromYMD)) / 86_400_000)
-}
-function addDaysYMD(ymd: string, days: number): string {
-  const dt = new Date(ymdToUTC(ymd) + days * 86_400_000)
-  const y = dt.getUTCFullYear()
-  const m = String(dt.getUTCMonth() + 1).padStart(2, "0")
-  const d = String(dt.getUTCDate()).padStart(2, "0")
-  return `${y}-${m}-${d}`
-}
 
 // ── Curated payload shape (from the compile-review modal) ───────────────────
 export type CompileCuratedTask = {
@@ -131,8 +115,8 @@ export async function compileEventTemplateAction(
   // recorded for display.
   let onTime = 0
   const perTask = sourceTasks.map((t) => {
-    const planned = t.due_date ? daysBetween(eventDate, t.due_date) : null
-    const actual = t.completed && t.completed_at ? daysBetween(eventDate, instantToZoned(t.completed_at, timeZone).ymd) : null
+    const planned = t.due_date ? daysBetweenYMD(eventDate, t.due_date) : null
+    const actual = t.completed && t.completed_at ? daysBetweenYMD(eventDate, instantToZoned(t.completed_at, timeZone).ymd) : null
     if (planned !== null && actual !== null && actual <= planned) onTime++
     const chosen = useActualByTask.get(t.id) && actual !== null ? actual : planned
     return { t, planned, actual, chosen }
@@ -312,7 +296,7 @@ export async function instantiateTemplateAction(
     let due: string | null = null
     if (t.offset_days !== null) {
       const computed = addDaysYMD(eventDate, t.offset_days)
-      due = ymdToUTC(computed) < ymdToUTC(today) ? today : computed
+      due = daysBetweenYMD(computed, today) > 0 ? today : computed
     }
     return {
       id: idMap.get(t.id)!,

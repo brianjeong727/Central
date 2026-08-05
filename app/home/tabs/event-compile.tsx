@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from "react"
 import { createClient } from "@/lib/supabase"
 import { CentralModal, CentralButton, FilterChip, Textarea } from "@/components/central"
 import { compileEventTemplateAction, type CompileCurated } from "@/app/actions/event-templates"
-import { instantToZoned } from "@/lib/tz"
+import { daysBetweenYMD, instantToZoned } from "@/lib/tz"
 import { useMinistryTimezone } from "../ministry-timezone-context"
 import type { CalendarEvent, TransitionNote } from "../types"
 
@@ -21,13 +21,6 @@ import type { CalendarEvent, TransitionNote } from "../types"
 // The offsets previewed here MUST match the ones compileEventTemplateAction stores,
 // so both project instants onto the MINISTRY's calendar day (was hardcoded PT — a
 // day off for every Eastern ministry with an evening event or completion).
-function ymdToUTC(ymd: string): number {
-  const [y, m, d] = ymd.split("-").map(Number)
-  return Date.UTC(y, m - 1, d)
-}
-function daysBetween(fromYMD: string, toYMD: string): number {
-  return Math.round((ymdToUTC(toYMD) - ymdToUTC(fromYMD)) / 86_400_000)
-}
 // Render an offset as T±N (negative = before the event); null → "no date".
 function fmtOffset(n: number | null): string {
   if (n === null) return "no date"
@@ -126,8 +119,8 @@ export function EventCompileModal({
       setRows(
         src.map((t) => ({
           task: t,
-          planned: t.due_date ? daysBetween(eventDate, t.due_date) : null,
-          actual: t.completed && t.completed_at ? daysBetween(eventDate, instantToZoned(t.completed_at, timeZone).ymd) : null,
+          planned: t.due_date ? daysBetweenYMD(eventDate, t.due_date) : null,
+          actual: t.completed && t.completed_at ? daysBetweenYMD(eventDate, instantToZoned(t.completed_at, timeZone).ymd) : null,
           brief: "",
           useActual: false,
         })),

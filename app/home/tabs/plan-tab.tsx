@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase"
 import { useNavState } from "../nav-state"
 import { useOpenMemberProfile } from "../member-profile-context"
 import { useMinistryTimezone } from "../ministry-timezone-context"
-import { eventDateColumnsFromInputs, eventDateInputsFromRow, formatInZone, instantToZoned, startOfTodayInstantISO, todayInZone } from "@/lib/tz"
+import { addDaysYMD, daysBetweenYMD, eventDateColumnsFromInputs, eventDateInputsFromRow, formatInZone, instantToZoned, startOfTodayInstantISO, todayInZone } from "@/lib/tz"
 import { useSubpageCrumbs, useBreadcrumbExtra } from "../breadcrumb-context"
 import { runAlgorithm, runSmallGroupAlgorithm, type PoolPerson, type GeneratedGroup, type PrevPairing, type DGLLeader, type SGGeneratedGroup } from "@/lib/group-algorithm"
 import {
@@ -53,7 +53,7 @@ import { getReimbursementInbox, getPendingReceiptCount } from "@/app/actions/rec
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
-import { EVENT_TYPE_CONFIGS, nextAnchorYMD, addDaysToYMD, ymdOf, lineageKeyOf, seasonLabelOf } from "../event-presets"
+import { EVENT_TYPE_CONFIGS, nextAnchorYMD, ymdOf, lineageKeyOf, seasonLabelOf } from "../event-presets"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventConfirmation, EventBlock,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -6492,14 +6492,6 @@ export function TimelineView({
 
 // Whole-day difference between two "YYYY-MM-DD" strings (to − from), computed
 // on local-noon dates so DST transitions can never round to ±1.
-function daysBetweenYMD(fromYMD: string, toYMD: string): number {
-  const [fy, fm, fd] = fromYMD.split("-").map(Number)
-  const [ty, tm, td] = toYMD.split("-").map(Number)
-  const from = new Date(fy, fm - 1, fd, 12, 0, 0)
-  const to = new Date(ty, tm - 1, td, 12, 0, 0)
-  return Math.round((to.getTime() - from.getTime()) / 86400000)
-}
-
 export function AddEventModal({
   ministryId,
   teamId,
@@ -6558,7 +6550,7 @@ export function AddEventModal({
   const [endDateStr, setEndDateStr] = useState(() =>
     initialInputs
       ? initialInputs.endYMD
-      : addDaysToYMD(nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay), initialDefaults.durationDays - 1))
+      : addDaysYMD(nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay), initialDefaults.durationDays - 1))
   const [endTimeStr, setEndTimeStr] = useState(() => initialInputs ? initialInputs.endHHMM : initialDefaults.endTime)
   const [allDay, setAllDay] = useState(existing?.all_day ?? initialDefaults.allDay)
 
@@ -6578,7 +6570,7 @@ export function AddEventModal({
       ? ymdOf(new Date(Date.now() + d.relativeDays * 86_400_000))
       : nextAnchorYMD(d.anchorMonth, d.anchorDay)
     setStartDateStr(start)
-    setEndDateStr(addDaysToYMD(start, d.durationDays - 1))
+    setEndDateStr(addDaysYMD(start, d.durationDays - 1))
     setStartTimeStr(d.startTime)
     setEndTimeStr(d.endTime)
     setAllDay(d.allDay)
@@ -6674,7 +6666,7 @@ export function AddEventModal({
       // idiom as the checklist window anchors below.
       const ev = new Date(`${eventStartYMD(existing, timeZone)}T12:00:00`)
       setPlanStartDate((data?.plan_start_date as string | null) || addMonthsYMD(ev, -1))
-      setCrunchDate((data?.crunch_date as string | null) || addDaysYMD(ev, -7))
+      setCrunchDate((data?.crunch_date as string | null) || addDaysFromDateYMD(ev, -7))
       setPlanDatesSeeded(true)
     })()
     return () => { cancelled = true }
@@ -6754,7 +6746,7 @@ export function AddEventModal({
       id: t.id,
       res: await supabase
         .from("event_tasks")
-        .update({ due_date: addDaysToYMD(t.due_date, delta) })
+        .update({ due_date: addDaysYMD(t.due_date, delta) })
         .eq("id", t.id)
         .eq("event_plan_id", planId)
         .select("id"),
@@ -6849,7 +6841,7 @@ export function AddEventModal({
         // `sectionOf` buckets a task by comparing its due_date to `crunch_date`, so
         // moving the tasks and not the anchors collapses every task into Crunch and
         // empties Planning. Relative benchmarks make this whole shift unnecessary.
-        const shiftYMD = (ymd: string) => (ymd && dayDelta !== 0 ? addDaysToYMD(ymd, dayDelta) : ymd)
+        const shiftYMD = (ymd: string) => (ymd && dayDelta !== 0 ? addDaysYMD(ymd, dayDelta) : ymd)
         const planWindow = planDatesSeeded
           ? { plan_start_date: shiftYMD(planStartDate) || null, crunch_date: shiftYMD(crunchDate) || null }
           : null
@@ -6980,7 +6972,7 @@ export function AddEventModal({
               for (const task of phase.tasks) {
                 let due: string | null = null
                 if (task.off !== null && eventYMD) {
-                  const computed = addDaysToYMD(eventYMD, task.off)
+                  const computed = addDaysYMD(eventYMD, task.off)
                   due = computed < todayYMD ? todayYMD : computed
                 }
                 taskRows.push({ event_plan_id: planId, title: task.title, phase: phase.key, due_date: due, sort_order: sortIdx++, completed: false, created_by: userId })
@@ -7544,7 +7536,7 @@ function toLocalYMD(d: Date): string {
 function addMonthsYMD(d: Date, n: number): string {
   return toLocalYMD(new Date(d.getFullYear(), d.getMonth() + n, d.getDate()))
 }
-function addDaysYMD(d: Date, n: number): string {
+function addDaysFromDateYMD(d: Date, n: number): string {
   return toLocalYMD(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n))
 }
 
@@ -8290,7 +8282,7 @@ export function EventPlanWorkspace({
         // ±month / ±7-day arithmetic can't slip a day.
         const eventDate = new Date(`${eventStart}T12:00:00`)
         psd = addMonthsYMD(eventDate, -1)
-        cd = addDaysYMD(eventDate, -7)
+        cd = addDaysFromDateYMD(eventDate, -7)
         await supabase.from("event_plans").update({ plan_start_date: psd, crunch_date: cd }).eq("id", planId).eq("ministry_id", ministryId)
         planData = { ...planData, plan_start_date: psd, crunch_date: cd }
       }
@@ -8776,7 +8768,7 @@ export function EventPlanWorkspace({
   // checklist a day off from the dates the leader typed.
   const eventYMD = eventStart
   const eventAnchor = new Date(`${eventStart}T12:00:00`)
-  const eventPlusOneYMD = addDaysYMD(eventAnchor, 1)
+  const eventPlusOneYMD = addDaysFromDateYMD(eventAnchor, 1)
   const eventPlusTwoMonthsYMD = addMonthsYMD(eventAnchor, 2)
   const fmtMD = (ymd: string) => new Date(ymd + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
 
@@ -10994,7 +10986,7 @@ function RunSheetTab({
   const days: string[] = []
   const startYMD = eventStartYMD(event, timeZone)
   const endYMD = eventEndYMD(event, timeZone)
-  for (let ymd = startYMD; ymd <= endYMD; ymd = addDaysToYMD(ymd, 1)) days.push(ymd)
+  for (let ymd = startYMD; ymd <= endYMD; ymd = addDaysYMD(ymd, 1)) days.push(ymd)
   if (days.length === 0) days.push(startYMD)
   const todayIdx = days.indexOf(todayInZone(timeZone))
   // Blocks stranded past the current span (the end date was shortened after they
