@@ -257,7 +257,17 @@ test.describe("Countdown tab (feat/run-sheet-countdown)", () => {
 
     // NOTE: the desktop + mobile trees are BOTH mounted (Tailwind hides one via
     // CSS), so scope CRUD locators to the visible (desktop) tree + the rail.
+    //
+    // Re-expand first. The screenshot block above flips the viewport to 390 and
+    // back, which remounts the desktop tree — and CollapsibleRail seeds its state
+    // with `useState(defaultCollapsed)`, so the rail comes back FOLDED even though
+    // it was opened earlier in this test. Without this the <aside> is not in the
+    // DOM at all and every rail assertion below fails with "element(s) not found"
+    // rather than a wrong count, which reads misleadingly like a data bug.
+    const refoldedTab = page.getByRole("button", { name: /show readiness/i })
+    if (await refoldedTab.count()) await refoldedTab.click()
     const rail2 = page.getByRole("complementary") // desktop-only <aside>
+    await expect(rail2.getByText("2 of 8 done")).toBeVisible() // baseline before the toggle
 
     // ── Reused CRUD #1: toggle a task complete (optimistic + persisted), then restore ──
     const toggleTitle = page.getByText(TOGGLE_TITLE, { exact: true }).filter({ visible: true }).first()
