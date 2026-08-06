@@ -22,7 +22,7 @@ import { MONO_STYLE } from "@/components/central/typography"
 import { CentralCard, ActionMenu, CollapsibleRail, PocketKicker, PocketProgress } from "@/components/central"
 import { instantToZoned, todayInZone } from "@/lib/tz"
 import { useMinistryTimezone } from "../ministry-timezone-context"
-import type { EventTask } from "../types"
+import type { EventTask, CountdownPhaseDef } from "../types"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -50,8 +50,15 @@ export interface RowAug {
   reassign?: ReactNode
 }
 
-// The existing checklist windows the drag/section-move + add-row machinery targets.
-export type ChecklistSection = "planning" | "crunch" | "day_of" | "post"
+// A plan's ladder rung is typed in ../types (CountdownPhaseDef) and its data
+// lives in COUNTDOWN_PRESETS (app/home/event-presets-data.mjs) — the single
+// source shared by the app and the seed scripts. Re-exported here so consumers
+// of the countdown module get the type without a second import path.
+export type { CountdownPhaseDef }
+
+// The computed catch-all for tasks carrying no due_date. Never stored in a
+// ladder — it is the ABSENCE of a date, not a window.
+export const UNSCHEDULED_KEY = "unscheduled"
 
 export interface CountdownPhase {
   key: string
@@ -63,7 +70,7 @@ export interface CountdownPhase {
   tasks: EventTask[]    // top-level, non-pinned tasks in this phase, sorted
   defaultDue: string    // representative YMD to seed the phase's inline add-row
   eventPhase: EventTask["phase"]
-  sectionKey: ChecklistSection  // maps to the existing section-move / add-row window
+  sectionKey: string    // the phase's own key — what drag/add-row targets
 }
 
 // ── Pure date helpers ──────────────────────────────────────────────────────────
@@ -95,47 +102,58 @@ function weekday(ymd: string): string {
 }
 
 // ── Phase model ────────────────────────────────────────────────────────────────
-// Bucket a task by days-before-event (d). Discrete buckets matching the mock's
-// four named phases, plus post/unscheduled catch-alls so no task is dropped.
-type PhaseKey = "far" | "three" | "one" | "twodays" | "post" | "unscheduled"
+// The ladder is DATA now (event_plans.countdown_phases), not a hardcoded const —
+// seeded from a preset and editable per plan. This replaced the old
+// plan_start_date / crunch_date anchors entirely: because every boundary is a
+// relative offset, moving an event re-buckets nothing and needs no date shift.
+//
+// Bucketing contract (see COUNTDOWN_PRESETS in event-presets-data.mjs): a phase
+// covers d ∈ (nextPhase.startDaysBefore, startDaysBefore], the first phase is
+// open upward, the last covers everything below it.
 
-const PHASE_META: Record<PhaseKey, { tk: string; rank: number; eventPhase: EventTask["phase"]; dayOffset: number }> = {
-  far:         { tk: "T−4 WEEKS",  rank: 5, eventPhase: "pre_event",  dayOffset: -28 },
-  three:       { tk: "T−3 WEEKS",  rank: 4, eventPhase: "pre_event",  dayOffset: -18 },
-  one:         { tk: "T−1 WEEK",   rank: 3, eventPhase: "pre_event",  dayOffset: -7 },
-  twodays:     { tk: "T−2 DAYS",   rank: 2, eventPhase: "day_of",     dayOffset: -1 },
-  post:        { tk: "AFTER",      rank: 1, eventPhase: "post_event", dayOffset: 1 },
-  unscheduled: { tk: "UNSCHEDULED", rank: 0, eventPhase: "pre_event", dayOffset: 0 },
+/** The phase a task falls in, given days-to-event `d`. Ladder is earliest→latest. */
+export function phaseKeyForDays(ladder: CountdownPhaseDef[], d: number): string {
+  if (ladder.length === 0) return UNSCHEDULED_KEY
+  for (let i = 0; i < ladder.length; i++) {
+    const next = ladder[i + 1]
+    // Last rung swallows everything below its predecessor.
+    if (!next) return ladder[i].key
+    if (d > next.startDaysBefore) return ladder[i].key
+  }
+  return ladder[ladder.length - 1].key
 }
 
-// Map a display phase onto the existing checklist window (drag re-date + add-row).
-function sectionKeyForPhase(key: PhaseKey, hasCrunch: boolean): ChecklistSection {
-  if (key === "twodays") return "day_of"
-  if (key === "post") return "post"
-  if (key === "one") return hasCrunch ? "crunch" : "planning"
-  return "planning"
-}
-
-const PHASE_ORDER: PhaseKey[] = ["far", "three", "one", "twodays", "post", "unscheduled"]
-
-function phaseKeyForDays(d: number): PhaseKey {
-  if (d < 0) return "post"
-  if (d <= 2) return "twodays"
-  if (d <= 14) return "one"
-  if (d <= 21) return "three"
-  return "far"
+/**
+ * Rank a phase for past/current comparison — earlier phases rank HIGHER, matching
+ * the old PHASE_META ranks (far:5 … post:1). Index 0 is the earliest rung.
+ */
+function rankOf(ladder: CountdownPhaseDef[], key: string): number {
+  const i = ladder.findIndex((p) => p.key === key)
+  return i === -1 ? 0 : ladder.length - i
 }
 
 // Group top-level tasks into ordered T-minus phases. Children render nested by the
 // caller's renderRow (renderTaskTree), so only parent_id === null is bucketed here.
-export function bucketCountdownPhases(tasks: EventTask[], eventYMD: string, todayYMD: string, hasCrunch: boolean): CountdownPhase[] {
+export function bucketCountdownPhases(
+  tasks: EventTask[],
+  eventYMD: string,
+  todayYMD: string,
+  ladder: CountdownPhaseDef[],
+): CountdownPhase[] {
   const tops = tasks.filter((t) => t.parent_id === null && !t.pinned)
-  const groups = new Map<PhaseKey, EventTask[]>()
+  const groups = new Map<string, EventTask[]>()
   for (const t of tops) {
-    const key: PhaseKey = t.due_date ? phaseKeyForDays(daysBetweenYMD(t.due_date, eventYMD)) : "unscheduled"
+    const key = t.due_date ? phaseKeyForDays(ladder, daysBetweenYMD(t.due_date, eventYMD)) : UNSCHEDULED_KEY
     const arr = groups.get(key) ?? []
     arr.push(t)
     groups.set(key, arr)
+  }
+  // Render order: the ladder as stored, then the computed unscheduled catch-all.
+  const PHASE_ORDER: string[] = [...ladder.map((p) => p.key), UNSCHEDULED_KEY]
+  const metaFor = (key: string): { tk: string; eventPhase: EventTask["phase"]; dayOffset: number } => {
+    const def = ladder.find((p) => p.key === key)
+    if (def) return { tk: def.label, eventPhase: def.eventPhase, dayOffset: def.seedOffsetDays }
+    return { tk: "UNSCHEDULED", eventPhase: "pre_event", dayOffset: 0 }
   }
   // "Current" lead-up phase = the phase holding the NEXT upcoming deadline
   // (earliest due_date on/after today). This lands "· this week" on the bucket that
@@ -145,10 +163,10 @@ export function bucketCountdownPhases(tasks: EventTask[], eventYMD: string, toda
     .map((t) => t.due_date)
     .filter((d): d is string => !!d && d >= todayYMD)
     .sort()[0]
-  const currentKey: PhaseKey = nextUpcoming
-    ? phaseKeyForDays(daysBetweenYMD(nextUpcoming, eventYMD))
-    : phaseKeyForDays(daysBetweenYMD(todayYMD, eventYMD))
-  const currentRank = PHASE_META[currentKey].rank
+  const currentKey: string = nextUpcoming
+    ? phaseKeyForDays(ladder, daysBetweenYMD(nextUpcoming, eventYMD))
+    : phaseKeyForDays(ladder, daysBetweenYMD(todayYMD, eventYMD))
+  const currentRank = rankOf(ladder, currentKey)
 
   return PHASE_ORDER.flatMap((key): CountdownPhase[] => {
     const arr = groups.get(key)
@@ -159,11 +177,11 @@ export function bucketCountdownPhases(tasks: EventTask[], eventYMD: string, toda
         (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999") ||
         a.sort_order - b.sort_order,
     )
-    const meta = PHASE_META[key]
+    const meta = metaFor(key)
     const dated = arr.map((t) => t.due_date).filter(Boolean) as string[]
     dated.sort()
     const dateLabel =
-      key === "unscheduled" || dated.length === 0
+      key === UNSCHEDULED_KEY || dated.length === 0
         ? ""
         : dated[0] === dated[dated.length - 1]
           ? fmtMD(dated[0])
@@ -175,12 +193,12 @@ export function bucketCountdownPhases(tasks: EventTask[], eventYMD: string, toda
         tk: meta.tk,
         dateLabel,
         doneLabel: `${done} of ${arr.length} done`,
-        isCurrent: key !== "unscheduled" && key === currentKey,
-        isPast: key !== "unscheduled" && meta.rank > currentRank,
+        isCurrent: key !== UNSCHEDULED_KEY && key === currentKey,
+        isPast: key !== UNSCHEDULED_KEY && rankOf(ladder, key) > currentRank,
         tasks: arr,
-        defaultDue: key === "unscheduled" ? "" : addDaysToYMD(eventYMD, meta.dayOffset),
+        defaultDue: key === UNSCHEDULED_KEY ? "" : addDaysToYMD(eventYMD, meta.dayOffset),
         eventPhase: meta.eventPhase,
-        sectionKey: sectionKeyForPhase(key, hasCrunch),
+        sectionKey: key,
       },
     ]
   })
@@ -625,7 +643,8 @@ export interface CountdownTabProps {
   firedIds: Set<string>
   canEdit: boolean
   isMobile: boolean
-  hasCrunch: boolean
+  /** The plan's stored T-minus ladder (event_plans.countdown_phases). */
+  ladder: CountdownPhaseDef[]
   countdownPill: ReactNode
   pinnedBand?: ReactNode
   // Render-props into EventPlanWorkspace's closure-bound row machinery.
@@ -645,7 +664,10 @@ export interface CountdownTabProps {
 
 export function CountdownTab(props: CountdownTabProps) {
   const {
-    tasks, eventStartISO, teamId, assigneePool, firedIds, canEdit, isMobile, hasCrunch,
+    // `ladder` replaces main's `hasCrunch` (the boolean only existed to pick
+    // between two hardcoded phase sets). `onGoRunSheet` is NOT taken from the
+    // ladder branch — main deleted that button and its prop.
+    tasks, eventStartISO, teamId, assigneePool, firedIds, canEdit, isMobile, ladder,
     countdownPill, pinnedBand, renderRow, renderMobileRow, renderAddRow, onReassign,
     dragActive, dragOverPhaseKey, onPhaseDragOver, onPhaseDrop, stickyTop = 52,
   } = props
@@ -656,7 +678,7 @@ export function CountdownTab(props: CountdownTabProps) {
   const timeZone = useMinistryTimezone()
   const eventYMD = instantToZoned(eventStartISO, timeZone).ymd
   const todayYMD = todayInZone(timeZone)
-  const phases = bucketCountdownPhases(tasks, eventYMD, todayYMD, hasCrunch)
+  const phases = bucketCountdownPhases(tasks, eventYMD, todayYMD, ladder)
   const loadCounts = useLoadCounts(teamId)
 
   const done = tasks.filter((t) => t.completed).length
