@@ -37,6 +37,14 @@ export interface Profile {
 // Only what the user has explicitly changed is persisted.
 export type GroupNotifyMode = "smart" | "all" | "mentions" | "off"
 
+/**
+ * PER-CHAT notification override (`group_members.notify_mode`). NULL in the DB
+ * means "inherit the global GroupNotifyMode"; "smart" is deliberately NOT a
+ * per-chat value — smart is the global default's adaptive behaviour, and a
+ * per-chat choice is always explicit.
+ */
+export type ChatNotifyMode = "all" | "mentions" | "off"
+
 export interface NotificationSettings {
   /** Tier 1 — direct messages. Default on. */
   dms?: boolean

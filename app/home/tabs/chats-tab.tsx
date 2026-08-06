@@ -15,7 +15,7 @@ import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocke
 import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
-import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
+import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData, ChatNotifyMode, NotificationSettings } from "../types"
 import { useNavState } from "../nav-state"
 import { useOpenMemberProfile } from "../member-profile-context"
 import { InsetHairline } from "@/components/central/hairline"
@@ -406,6 +406,12 @@ function ChatPrefsCard({ pendingMuted, pendingPinned, onToggleMuted, onTogglePin
 const SHARED_URL_RE = /https?:\/\/[^\s<>"']+/gi
 const SHARED_LIMIT = 200
 
+// Mirrors SMART_THRESHOLD in app/api/push/dispatch/route.ts (and the read-receipt
+// large-room threshold, Convention #18) — the room size at which the global
+// "smart" notification mode stops pushing every message. Used only to LABEL what
+// the inherited setting currently resolves to; delivery is decided server-side.
+const SMART_ROOM_THRESHOLD = 30
+
 interface SharedRow {
   id: string
   content: string | null
@@ -454,6 +460,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // pending; nothing writes until Save (settings never apply immediately).
   const [muted, setMuted] = useState(false)
   const [pinned, setPinned] = useState(false)
+  // Per-chat notification override. NULL = inherit the global mode; `muted` is
+  // the DB's synced cache of (notifyMode === "off") and is written alongside it.
+  const [notifyMode, setNotifyMode] = useState<ChatNotifyMode | null>(null)
+  const [pendingNotifyMode, setPendingNotifyMode] = useState<ChatNotifyMode | null>(null)
   const [pendingMuted, setPendingMuted] = useState(false)
   const [pendingPinned, setPendingPinned] = useState(false)
   // Church-chat SECTION ("Presets + reassign"): baseline mirrors groups.category,
@@ -517,14 +527,14 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const { data: settingsData, mutate: mutateSettings } = useSWR(
     groupId ? ["group-settings", groupId] : null,
     async () => {
-      const [{ data }, { data: prefData }, { data: groupRow }, { data: nicks }] = await Promise.all([
+      const [{ data }, { data: prefData }, { data: groupRow }, { data: nicks }, { data: meProf }] = await Promise.all([
         supabase
           .from("group_members")
           .select("user_id, profiles!user_id(name, role, graduation_year, avatar_url)")
           .eq("group_id", groupId),
         supabase
           .from("group_members")
-          .select("muted, pinned")
+          .select("muted, pinned, notify_mode")
           .eq("group_id", groupId)
           .eq("user_id", userId)
           .maybeSingle(),
@@ -537,6 +547,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           .from("chat_nicknames")
           .select("target_user_id, nickname")
           .eq("group_id", groupId),
+        // The user's GLOBAL chat-notification mode — needed to show which option
+        // is actually in force when this chat has no override (notify_mode NULL).
+        supabase
+          .from("profiles")
+          .select("notification_settings")
+          .eq("id", userId)
+          .maybeSingle(),
       ])
       const nickById: Record<string, string> = {}
       for (const n of (nicks ?? []) as { target_user_id: string; nickname: string }[]) nickById[n.target_user_id] = n.nickname
@@ -556,10 +573,26 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       })
       const cat = (groupRow as { category: string | null } | null)?.category
       const category: ChurchSection = cat === "team" ? "team" : cat === "group" ? "group" : "general"
-      return { members: mapped, pref: (prefData as { muted: boolean | null; pinned: boolean | null } | null) ?? null, category }
+      const globalMode = ((meProf as { notification_settings: NotificationSettings | null } | null)
+        ?.notification_settings?.group_mode) ?? "smart"
+      return {
+        members: mapped,
+        pref: (prefData as { muted: boolean | null; pinned: boolean | null; notify_mode: ChatNotifyMode | null } | null) ?? null,
+        category,
+        globalMode,
+      }
     }
   )
   const loading = !settingsData
+
+  // What the user gets today when this chat carries no override. "smart" is
+  // adaptive, so resolve it the same way the dispatcher does — all messages in
+  // small rooms, mentions only once a room crosses the smart threshold.
+  const inheritedNotify: ChatNotifyMode =
+    settingsData?.globalMode === "off" ? "off"
+      : settingsData?.globalMode === "mentions" ? "mentions"
+      : settingsData?.globalMode === "all" ? "all"
+      : members.length >= SMART_ROOM_THRESHOLD ? "mentions" : "all"
 
   // Shared-items load (mobile "Media, links & files"). Lazy — the key stays null
   // until the screen is opened, so settings never pays for it. Two bounded reads:
@@ -619,11 +652,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     setMembers(settingsData.members)
     setMuted(settingsData.pref?.muted ?? false)
     setPinned(settingsData.pref?.pinned ?? false)
+    setNotifyMode(settingsData.pref?.notify_mode ?? null)
     setCategory(settingsData.category)
     if (!prefsSeeded.current) {
       prefsSeeded.current = true
       setPendingMuted(settingsData.pref?.muted ?? false)
       setPendingPinned(settingsData.pref?.pinned ?? false)
+      setPendingNotifyMode(settingsData.pref?.notify_mode ?? null)
       setPendingCategory(settingsData.category)
     }
   }, [settingsData])
@@ -656,7 +691,15 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // ── Chat prefs (mute/pin): stage locally, commit on Save. Member changes still
   //    persist immediately (optimistic + rollback); only prefs are staged. ──
   const canReassignSection = churchManage && !isCentralChat
-  const prefsDirty = pendingMuted !== muted || pendingPinned !== pinned || (canReassignSection && pendingCategory !== category)
+  const prefsDirty = pendingMuted !== muted || pendingPinned !== pinned || pendingNotifyMode !== notifyMode || (canReassignSection && pendingCategory !== category)
+
+  // Choosing a mode always writes an EXPLICIT per-chat value (never back to
+  // NULL/inherit) and keeps `muted` in lockstep — the DB has a CHECK constraint
+  // asserting muted = (notify_mode = 'off'), so the two must move together.
+  function chooseNotifyMode(mode: ChatNotifyMode) {
+    setPendingNotifyMode(mode)
+    setPendingMuted(mode === "off")
+  }
 
   // Patch the shared chat-list SWR cache so the list's muted/pinned indicators +
   // pinned-float + muted-badge-suppression react instantly (Convention #4), the
@@ -672,26 +715,39 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   function handleCancelPrefs() {
     setPendingMuted(muted)
     setPendingPinned(pinned)
+    setPendingNotifyMode(notifyMode)
     setPendingCategory(category)
     setPrefError(null)
   }
 
   async function handleSavePrefs() {
     const mutedChanged = pendingMuted !== muted
+    const notifyChanged = pendingNotifyMode !== notifyMode
     const pinnedChanged = pendingPinned !== pinned
     const categoryChanged = canReassignSection && pendingCategory !== category
-    if (!mutedChanged && !pinnedChanged && !categoryChanged) return
+    if (!mutedChanged && !notifyChanged && !pinnedChanged && !categoryChanged) return
     setSavingPrefs(true)
     setPrefError(null)
     // Per-user prefs live on group_members; the SECTION lives on groups. Patch the
     // shared chat-list cache optimistically (category re-buckets the list instantly),
     // then commit each changed store. Any failure rolls cache + pending back.
-    const memberUpdate: { muted?: boolean; pinned?: boolean } = {}
-    if (mutedChanged) memberUpdate.muted = pendingMuted
+    // muted + notify_mode must move together (DB CHECK). Send BOTH whenever
+    // either changed, so the row can never land half-updated.
+    const memberUpdate: { muted?: boolean; pinned?: boolean; notify_mode?: ChatNotifyMode | null } = {}
+    if (mutedChanged || notifyChanged) {
+      memberUpdate.notify_mode = pendingNotifyMode
+      memberUpdate.muted = pendingNotifyMode === "off"
+    }
     if (pinnedChanged) memberUpdate.pinned = pendingPinned
-    patchChatListPref({ ...memberUpdate, ...(categoryChanged ? { category: pendingCategory } : {}) })
+    // Only the CHANGED keys go into the cache patch — a `muted: undefined` would
+    // blank the cached value rather than leave it alone.
+    patchChatListPref({
+      ...(memberUpdate.muted !== undefined ? { muted: memberUpdate.muted } : {}),
+      ...(memberUpdate.pinned !== undefined ? { pinned: memberUpdate.pinned } : {}),
+      ...(categoryChanged ? { category: pendingCategory } : {}),
+    })
     let err: { message: string } | null = null
-    if (mutedChanged || pinnedChanged) {
+    if (mutedChanged || notifyChanged || pinnedChanged) {
       const res = await supabase.from("group_members").update(memberUpdate).eq("group_id", groupId).eq("user_id", userId)
       err = res.error
     }
@@ -704,6 +760,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       patchChatListPref({ muted, pinned, category })
       setPendingMuted(muted)
       setPendingPinned(pinned)
+      setPendingNotifyMode(notifyMode)
       setPendingCategory(category)
       setPrefError("Couldn't save. Please try again.")
       setSavingPrefs(false)
@@ -716,8 +773,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     }
     setMuted(pendingMuted)
     setPinned(pendingPinned)
+    setNotifyMode(pendingNotifyMode)
     setCategory(pendingCategory)
-    mutateSettings((cur) => cur ? { ...cur, pref: { muted: pendingMuted, pinned: pendingPinned }, category: pendingCategory } : cur, { revalidate: false })
+    mutateSettings((cur) => cur ? { ...cur, pref: { muted: pendingMuted, pinned: pendingPinned, notify_mode: pendingNotifyMode }, category: pendingCategory } : cur, { revalidate: false })
     setSavingPrefs(false)
   }
 
@@ -1080,17 +1138,42 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           {/* Preferences — mobile (staged; commits on Save, never on toggle — the
               existing per-user pref write semantics are preserved). Pocket §4:
               mono kicker + tonal row-card with 46×28 PocketSwitch rows. */}
+          {/* Notifications — a per-chat OVERRIDE of the global mode, not a binary
+              mute. Until the user picks one the chat inherits the global setting,
+              so the chip shown active is the mode actually in force ("smart"
+              resolved by room size). A DM carries no group traffic, so "Mentions"
+              would be meaningless there. Chips sit on the PAGE, not inside a card
+              — the off-state fill is --ivory, which is invisible on an --ivory
+              card (same reason SECTION above renders its chips on the page). */}
+          {!loading && (
+            <div className="mb-6">
+              <PocketKicker label="Notifications" style={{ margin: "0 4px 12px" }} />
+              <div className="flex flex-wrap gap-2">
+                {(isDM ? (["all", "off"] as const) : (["all", "mentions", "off"] as const)).map((mode) => (
+                  <PocketFilterChip
+                    key={mode}
+                    label={mode === "all" ? "All" : mode === "mentions" ? "Mentions" : "Off"}
+                    active={(pendingNotifyMode ?? inheritedNotify) === mode}
+                    onClick={() => chooseNotifyMode(mode)}
+                  />
+                ))}
+              </div>
+              <p className="text-[13px] mt-2.5" style={{ color: "var(--muted-text)", paddingLeft: 4 }}>
+                {pendingNotifyMode === null
+                  ? "Following your default for this chat."
+                  : pendingNotifyMode === "off"
+                    ? "Nothing from this chat will reach you."
+                    : pendingNotifyMode === "mentions"
+                      ? "Only when someone @mentions or replies to you."
+                      : "Every message in this chat."}
+              </p>
+            </div>
+          )}
+
           {!loading && (
             <div className="mb-6">
               <PocketKicker label="Preferences" style={{ margin: "0 4px 12px" }} />
               <PocketRowCard>
-                <div className="flex items-center gap-3.5" style={{ padding: "13px 0", borderBottom: "1px solid var(--line-3)" }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[14.5px] font-semibold" style={{ color: "var(--ink)" }}>Mute notifications</p>
-                    <p className="text-[13px] mt-0.5" style={{ color: "var(--muted-text)" }}>Stay in the chat. Just stop the buzz.</p>
-                  </div>
-                  <PocketSwitch checked={pendingMuted} onChange={() => setPendingMuted((v) => !v)} ariaLabel="Mute notifications" />
-                </div>
                 <div className="flex items-center gap-3.5" style={{ padding: "13px 0" }}>
                   <div className="flex-1 min-w-0">
                     <p className="text-[14.5px] font-semibold" style={{ color: "var(--ink)" }}>Pin to top of chats</p>
@@ -1174,7 +1257,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             {/* Preferences — staged; toggles edit pending state, committed on Save */}
             <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Preferences</p>
             <div style={{ marginBottom: prefsDirty ? 14 : 28 }}>
-              <ChatPrefsCard pendingMuted={pendingMuted} pendingPinned={pendingPinned} onToggleMuted={() => setPendingMuted((v) => !v)} onTogglePinned={() => setPendingPinned((v) => !v)} />
+              {/* Desktop keeps the binary Mute switch (unchanged surface), but it
+                  now routes through chooseNotifyMode so muted and notify_mode stay
+                  in lockstep — the DB CHECK requires muted = (notify_mode='off'),
+                  so a bare setPendingMuted would fail the write. */}
+              <ChatPrefsCard pendingMuted={pendingMuted} pendingPinned={pendingPinned} onToggleMuted={() => chooseNotifyMode(pendingMuted ? "all" : "off")} onTogglePinned={() => setPendingPinned((v) => !v)} />
             </div>
 
             {/* Staged-save affordance — settings commit on Save, never on toggle */}
