@@ -53,6 +53,8 @@ export { BackChevron } from "./back-chevron"
 export { SuperSwitcher } from "./super-switcher"
 export {
   POCKET_KICKER_STYLE,
+  POCKET_CHROME_PAD_Y,
+  POCKET_CHROME_PAD_X,
   PocketKicker,
   PocketCard,
   PocketRowCard,
