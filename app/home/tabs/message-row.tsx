@@ -106,6 +106,7 @@ function highlightText(text: string, query: string, isCurrent: boolean): React.R
 function MessageRowBase({
   msg,
   isOwn,
+  isFirstMessage,
   isFirstInGroup,
   isLastInGroup,
   showDateSep,
@@ -201,6 +202,14 @@ function MessageRowBase({
 
   const groupGap = showGroupGap ? "mt-3" : ""
 
+  // Date separator spacing. The 24px above earns its keep BETWEEN days — it
+  // separates the previous day's messages from this stamp. At the very top of a
+  // thread there is nothing above it to separate from, so that space is unearned
+  // and just leaves the first message floating below the header.
+  const dateSepClass = showDateSep
+    ? `flex justify-center mb-2 ${isFirstMessage ? "mt-1" : "mt-6"}`
+    : ""
+
   const incomingRadius = isFirstInGroup && isLastInGroup
     ? "rounded-[14px] rounded-tl-[4px]"
     : isFirstInGroup
@@ -245,7 +254,7 @@ function MessageRowBase({
     return (
       <div ref={(el) => { registerMessageRef(msg.id, el) }}>
         {showDateSep && (
-          <div className="flex justify-center mt-6 mb-2">
+          <div className={dateSepClass}>
             <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
               {formatDateLabel(msg.created_at)}
             </span>
@@ -354,7 +363,7 @@ function MessageRowBase({
     return (
       <div ref={(el) => { registerMessageRef(msg.id, el) }}>
         {showDateSep && (
-          <div className="flex justify-center mt-6 mb-2">
+          <div className={dateSepClass}>
             <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
               {formatDateLabel(msg.created_at)}
             </span>
@@ -375,7 +384,7 @@ function MessageRowBase({
     <div ref={(el) => { registerMessageRef(msg.id, el) }}>
       {/* Date separator */}
       {showDateSep && (
-        <div className="flex justify-center mt-6 mb-2">
+        <div className={dateSepClass}>
           <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
             {formatDateLabel(msg.created_at)}
           </span>

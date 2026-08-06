@@ -3210,7 +3210,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       )}
 
       {/* ── Messages area ── */}
-      <div ref={scrollContainerRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
+      <div ref={scrollContainerRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto px-4 md:px-6 pt-2 pb-4 md:py-4">
         {loading ? (
           <Spinner />
         ) : messages.length === 0 ? (
