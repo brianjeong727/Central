@@ -441,11 +441,16 @@ export function PocketSwitch({ checked, onChange, ariaLabel }: {
 }
 
 // Ivory search pill: leading search glyph + borderless input, faint placeholder.
-export function PocketSearchField({ value, onChange, placeholder = "Search", style }: {
+export function PocketSearchField({ value, onChange, placeholder = "Search", style, onFocus, trailing, autoFocus }: {
   value: string
   onChange: (v: string) => void
   placeholder?: string
   style?: CSSProperties
+  /** Fired on focus — search surfaces use it to enter their search mode. */
+  onFocus?: () => void
+  /** Optional right-slot node (a clear/close control while searching). */
+  trailing?: ReactNode
+  autoFocus?: boolean
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--ivory)", borderRadius: "var(--r-pocket-sm)", padding: "12px 16px", ...style }}>
@@ -453,10 +458,13 @@ export function PocketSearchField({ value, onChange, placeholder = "Search", sty
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={onFocus}
+        autoFocus={autoFocus}
         placeholder={placeholder}
         className="pocket-search-input"
         style={{ flex: 1, minWidth: 0, border: "none", background: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 15.5, color: "var(--ink)" }}
       />
+      {trailing}
       <style>{`.pocket-search-input::placeholder{color:var(--faint)}`}</style>
     </div>
   )

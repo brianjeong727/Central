@@ -14,6 +14,8 @@ import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
 import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
+import { ChatSearchView } from "../components/chat-search"
+import { findExistingDm } from "../dm"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData, ChatNotifyMode, NotificationSettings } from "../types"
@@ -1611,7 +1613,10 @@ const sameMinute = (a: Message, b: Message) =>
   a.sender_id === b.sender_id &&
   Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 60000
 
-export function ChatScreen({ groupId, groupName, userId, userName, ministryId, ministryName, userRole, onClose, onRead, onNameChange, inline = false }: ChatScreenProps) {
+export function ChatScreen({ groupId, groupName, userId, userName, ministryId, ministryName, userRole, onClose, onRead, onNameChange, inline = false, draftRecipient = null, onDmCreated }: ChatScreenProps) {
+  // Draft DM (no group yet). Guards the create so a double-tap on Send can't
+  // race two groups into existence.
+  const creatingDraftRef = useRef(false)
   const supabase = createClient()
   const { mutate: mutateGlobal } = useSWRConfig()
 
@@ -2246,6 +2251,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // channel there. Wait until the roster is known before deciding, and tear the
   // channel down if isLargeRoom flips true after a late roster load.
   useEffect(() => {
+    if (!groupId) return // draft DM — no group to watch yet
     if (!rosterLoaded || isLargeRoom) return
     const channel = supabase
       .channel(`read-receipts-${groupId}`)
@@ -2274,6 +2280,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
   // Typing indicator — broadcast channel
   useEffect(() => {
+    if (!groupId) return // draft DM — nobody to broadcast to yet
     const channel = supabase.channel(`typing-${groupId}`)
       .on("broadcast", { event: "typing" }, ({ payload }) => {
         const { senderId, name, avatarUrl, isTyping } = payload as { senderId: string; name: string; avatarUrl: string | null; isTyping: boolean }
@@ -2424,6 +2431,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       }
       setLoading(false)
     }
+    // Draft DM: there is no group yet, so there is nothing to load. Land in the
+    // empty state immediately rather than firing a query against an empty id.
+    if (!groupId) { setMessages([]); setLoading(false); return }
     loadMessages()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId])
@@ -2506,6 +2516,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // socket, and falls back to postgres_changes on subscribe error. Handlers below are the
   // same ones the old group-messages-{id} / reactions-{id} channels used.
   useEffect(() => {
+    if (!groupId) return // draft DM — no topic to subscribe to yet
     const handleIncomingMessage = async (raw: { id: string; group_id: string; sender_id: string | null; content: string; created_at: string; reply_to_id: string | null; message_type?: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null; attachment_size?: number | null; poll_id?: string | null }) => {
           // System messages: just append directly for everyone
           if (raw.message_type === "system") {
@@ -2705,6 +2716,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const handleSend = useCallback(async ({ content, attachment, replyTo }: { content: string; attachment: File | null; replyTo: Message | null }) => {
     if (!content && !attachment) return
 
+    // `gid` — NOT the groupId prop — is the id every write below uses. For a
+    // draft DM it stays empty until the moderation gate has passed (see below):
+    // a message that gets blocked must not bring a conversation into existence.
+    let gid = groupId
+
     // Moderation gate — runs before anything is sent. When enabled AND in-scope
     // for this room, flag words per the ministry's rules. On a flag: record an
     // offense (fire-and-forget), surface the warning banner, and either block the
@@ -2716,7 +2732,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       ) {
         const { cleaned, flaggedCount } = moderateText(raw, { strictness: modSettings.strictness, behavior: modSettings.behavior })
         if (flaggedCount > 0) {
-          void recordChatOffense(groupId, raw)
+          // A draft has no group to attribute the offense to yet; the gate still
+          // blocks/softens the text, which is what actually matters here.
+          if (gid) void recordChatOffense(gid, raw)
           setModerationWarning("Your message was filtered for language against ministry guidelines. Repeated flags are reported to admins.")
           if (modSettings.behavior === "block") return { text: raw, blocked: true }
           return { text: cleaned, blocked: false }
@@ -2727,6 +2745,27 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     const contentMod = content ? applyModeration(content) : { text: "", blocked: false }
     // Text-only + block mode → refuse to send outright.
     if (!attachment && contentMod.blocked) return
+
+    // ── Draft DM: THIS send is what brings the conversation into existence. ──
+    // Deliberately after the moderation gate, so a blocked message can't leave a
+    // conversation behind. Created here and then used by every write below in the
+    // SAME call, so the typed message is never lost. onDmCreated hands the real
+    // id to the parent; home-app keys the draft on the recipient, so this
+    // component stays mounted through the swap rather than remounting mid-send.
+    if (!gid) {
+      if (!draftRecipient || creatingDraftRef.current) return
+      creatingDraftRef.current = true
+      const { group, error: dmErr } = await createGroup({
+        name: draftRecipient.name,
+        type: "dm",
+        memberIds: [draftRecipient.id],
+        createdBy: userId,
+      })
+      creatingDraftRef.current = false
+      if (dmErr || !group) { setModerationWarning("Couldn't start this chat. Please try again."); return }
+      gid = group.id
+      onDmCreated?.(group.id, draftRecipient.name)
+    }
 
     // Reverent capitalization — a SEPARATE, silent transform: auto-caps God /
     // Jesus / Holy Spirit. Independent of the language filter (works even when
@@ -2746,7 +2785,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     if (attachment) {
       setUploading(true)
       const ext = attachment.name.split(".").pop() ?? "bin"
-      const path = `${groupId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const path = `${gid}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
       const { data: storageData, error } = await supabase.storage
         .from("chat-attachments")
         .upload(path, attachment, { cacheControl: "3600", upsert: false })
@@ -2754,7 +2793,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         const { data: { publicUrl } } = supabase.storage.from("chat-attachments").getPublicUrl(path)
         const optimisticId = `optimistic-att-${Date.now()}`
         const optimisticMsg: Message = {
-          id: optimisticId, group_id: groupId, sender_id: userId,
+          id: optimisticId, group_id: gid, sender_id: userId,
           content: "", created_at: new Date().toISOString(), sender_name: userName,
           reply_to_id: replyTarget?.id ?? null, reply_to_content: replyTarget ? replyPreviewLabel(replyTarget.content, replyTarget.attachment_type, replyTarget.attachment_name) : null,
           reply_to_sender: replyTarget?.sender_name ?? null,
@@ -2766,7 +2805,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         setMessages(prev => [...prev, optimisticMsg])
         bumpChatListForOwnSend(captionText || attachment.name)
         const { data } = await supabase.from("messages").insert({
-          group_id: groupId, sender_id: userId, content: "",
+          group_id: gid, sender_id: userId, content: "",
           reply_to_id: replyTarget?.id ?? null,
           attachment_url: publicUrl, attachment_type: attachment.type,
           attachment_name: attachment.name, attachment_size: attachment.size,
@@ -2777,7 +2816,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         if (captionText) {
           const captionOptimisticId = `optimistic-cap-${Date.now()}`
           const captionMsg: Message = {
-            id: captionOptimisticId, group_id: groupId, sender_id: userId,
+            id: captionOptimisticId, group_id: gid, sender_id: userId,
             content: captionText, created_at: new Date().toISOString(), sender_name: userName,
             reply_to_id: null, reply_to_content: null, reply_to_sender: null,
             message_type: "user", attachment_url: null,
@@ -2785,7 +2824,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           }
           setMessages(prev => [...prev, captionMsg])
           const { data: capData } = await supabase.from("messages").insert({
-            group_id: groupId, sender_id: userId, content: captionText,
+            group_id: gid, sender_id: userId, content: captionText,
           }).select("id").single()
           if (capData) setMessages(prev => prev.map(m => m.id === captionOptimisticId ? { ...m, id: capData.id } : m))
         }
@@ -2801,7 +2840,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     const sendText = applyReverent(contentMod.text)
     const optimisticId = `optimistic-${Date.now()}`
     const optimisticMsg: Message = {
-      id: optimisticId, group_id: groupId, sender_id: userId, content: sendText,
+      id: optimisticId, group_id: gid, sender_id: userId, content: sendText,
       created_at: new Date().toISOString(), sender_name: userName,
       reply_to_id: replyTarget?.id ?? null,
       reply_to_content: replyTarget ? replyPreviewLabel(replyTarget.content, replyTarget.attachment_type, replyTarget.attachment_name) : null,
@@ -2812,7 +2851,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
     const { data, error } = await supabase
       .from("messages")
-      .insert({ group_id: groupId, sender_id: userId, content: sendText, reply_to_id: replyTarget?.id ?? null })
+      .insert({ group_id: gid, sender_id: userId, content: sendText, reply_to_id: replyTarget?.id ?? null })
       .select("id")
       .single()
 
@@ -2822,7 +2861,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       setMessages((prev) => prev.map((m) => m.id === optimisticId ? { ...m, id: data.id } : m))
     }
     setSending(false)
-  }, [supabase, groupId, userId, userName, bumpChatListForOwnSend, modSettings, modIsChurch, modIsPersonal, modIsMinistryDefault])
+  }, [supabase, groupId, userId, userName, bumpChatListForOwnSend, modSettings, modIsChurch, modIsPersonal, modIsMinistryDefault, draftRecipient, onDmCreated])
 
   // For each own message: which other members have it as their most-recently-read own message.
   // Reuses the PRIOR array reference for any message whose receipts didn't change, so
@@ -3684,7 +3723,7 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
   )
 }
 
-export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, onGoToProfile, activeGroupId, canCreateChurchChat, fallbackChats, onComposerOpenChange }: ChatsTabProps) {
+export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, onGoToProfile, activeGroupId, canCreateChurchChat, fallbackChats, onComposerOpenChange, onOpenDraftDm }: ChatsTabProps) {
   const { setParam } = useNavState()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
@@ -3706,8 +3745,39 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   const [createChatCategory, setCreateChatCategory] = useState<ChurchSection | undefined>(undefined)
   const [showArchived, setShowArchived] = useState(false)
   const [search, setSearch] = useState("")
+  // Mobile search: the field is always mounted; `searchOpen` swaps the body below
+  // it to the search view. Kept separate from `search` (the desktop panel's own
+  // filter) so the two surfaces never share a stale query.
+  const [mobileSearch, setMobileSearch] = useState("")
+  const [searchOpen, setSearchOpen] = useState(false)
+  const closeMobileSearch = useCallback(() => { setSearchOpen(false); setMobileSearch("") }, [])
+
+  // Escape leaves search, mirroring the X.
+  useEffect(() => {
+    if (!searchOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeMobileSearch() }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [searchOpen, closeMobileSearch])
+
+  // While searching, the floating pill nav hides — same rule the full-screen
+  // composer uses (mobile §3: nav hidden on composers).
+  useEffect(() => {
+    onComposerOpenChange?.(searchOpen)
+    return () => onComposerOpenChange?.(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchOpen])
 
   const isAdminOrLeader = isChatManageRole(userRole)
+
+  // Tapping a person in search: reuse the DM you already share, otherwise open a
+  // draft. The group is only created on the first send (app/home/dm.ts).
+  const searchSupabase = useMemo(() => createClient(), [])
+  const handleOpenPerson = useCallback(async (p: { id: string; name: string }) => {
+    const existing = await findExistingDm(searchSupabase, userId, p.id)
+    if (existing) onOpenChat(existing, p.name, "dm")
+    else onOpenDraftDm?.({ id: p.id, name: p.name })
+  }, [searchSupabase, userId, onOpenChat, onOpenDraftDm])
 
   // Stable key (no refreshKey) so revisits dedupe to one cache entry and paint instantly.
   const { data, error, isLoading, mutate } = useSWR<ChatGroup[]>(
@@ -3843,7 +3913,9 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       <div className="px-5 pt-1 pb-2 md:pt-2 md:px-0 md:flex-1 md:overflow-y-auto">
       {/* Mobile scope pills (B3 Pocket) — Church / My chats; the new-chat + sits
           right-aligned on the same row, My chats scope only. */}
-      <div className="flex items-center gap-2 mb-4 md:hidden">
+      {/* Scope pills hide while searching — search spans BOTH scopes, so leaving a
+          scope filter on screen would imply results are filtered by it. */}
+      <div className={`items-center gap-2 mb-4 md:hidden ${searchOpen ? "hidden" : "flex"}`}>
         <PocketFilterChip label="Church" active={subTab === "church"} onClick={() => { setSubTab("church"); setSearch(""); setParam("chats", null) }} />
         <PocketFilterChip label="My chats" active={subTab === "my"} onClick={() => { setSubTab("my"); setSearch(""); setParam("chats", "my") }} />
         {canShowNewChat && (
@@ -3855,6 +3927,41 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         )}
       </div>
 
+      {/* Search (mobile) — the field is always present; focusing it swaps the body
+          below to the search view IN PLACE, so the field stays pinned and the
+          change reads as a transition rather than a navigation. Chats + people,
+          so you can reach someone you have never messaged. */}
+      <div className="md:hidden mb-4">
+        <PocketSearchField
+          value={mobileSearch}
+          onChange={setMobileSearch}
+          placeholder="Search"
+          onFocus={() => setSearchOpen(true)}
+          trailing={searchOpen ? (
+            <button
+              onClick={closeMobileSearch}
+              aria-label="Close search"
+              style={{ background: "none", border: "none", padding: 0, display: "grid", placeItems: "center", color: "var(--muted-text)", cursor: "pointer", flexShrink: 0 }}
+            >
+              <X style={{ width: 17, height: 17 }} />
+            </button>
+          ) : undefined}
+        />
+      </div>
+
+      {searchOpen ? (
+        <div className="md:hidden chat-search-enter">
+          <ChatSearchView
+            query={mobileSearch}
+            chats={data ?? []}
+            userId={userId}
+            ministryId={ministryId}
+            onOpenChat={(id, name) => { closeMobileSearch(); handleOpenChat(id, name) }}
+            onOpenPerson={(p) => { closeMobileSearch(); handleOpenPerson(p) }}
+          />
+        </div>
+      ) : (
+      <>
       {/* Push-notification prompt — self-hides unless permission is 'default' & unsubscribed & not dismissed */}
       <div className="md:px-4">
         <PushSubscribeCard userId={userId} ministryId={ministryId} notificationSettings={userProfile.notification_settings} variant="pocket" style={{ marginBottom: 16 }} />
@@ -3912,6 +4019,8 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             </div>
           )}
         </div>
+      )}
+      </>
       )}
 
       {showCreateChat && (
@@ -4050,9 +4159,11 @@ export interface ChatListPanelProps {
   userProfile: Profile
   userRole: string
   fallbackChats?: ChatGroup[]
+  /** Open a draft DM (no group row until the first send) — see app/home/dm.ts. */
+  onOpenDraftDm?: (person: { id: string; name: string }) => void
 }
 
-export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole, fallbackChats }: ChatListPanelProps) {
+export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole, fallbackChats, onOpenDraftDm }: ChatListPanelProps) {
   const { setParam } = useNavState()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
@@ -4064,6 +4175,15 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
   const [pendingCategory, setPendingCategory] = useState<ChurchSection | undefined>(undefined)
   const [showArchived, setShowArchived] = useState(false)
   const [search, setSearch] = useState("")
+  // Focusing the field consumes the panel with the shared search body.
+  const [searchOpen, setSearchOpen] = useState(false)
+  const closePanelSearch = useCallback(() => { setSearchOpen(false); setSearch("") }, [])
+  const panelSupabase = useMemo(() => createClient(), [])
+  const handleOpenPersonPanel = useCallback(async (p: { id: string; name: string }) => {
+    const existing = await findExistingDm(panelSupabase, userId, p.id)
+    if (existing) onOpenChat(existing, p.name)
+    else onOpenDraftDm?.({ id: p.id, name: p.name })
+  }, [panelSupabase, userId, onOpenChat, onOpenDraftDm])
 
   // Same stable key + fetcher as mobile ChatsTab → SWR dedupes both to one cache
   // entry; revisits paint instantly from cache (no skeleton).
@@ -4130,7 +4250,10 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      {/* Search — matches DirectoryMemberListPanel */}
+      {/* Search — matches DirectoryMemberListPanel. Focusing it consumes the
+          panel below with the SAME search body the mobile overlay uses, so this
+          reaches people you've never messaged instead of only name-filtering the
+          chats you're already in. The X restores the list. */}
       <div className="px-3 py-3 flex-shrink-0">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "var(--muted-text)" }} />
@@ -4138,12 +4261,39 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search chats"
-            className="w-full pl-9 pr-3 py-2 rounded-lg border text-[12.5px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20"
+            onFocus={() => setSearchOpen(true)}
+            onKeyDown={(e) => { if (e.key === "Escape") closePanelSearch() }}
+            placeholder="Search chats and people"
+            className="w-full pl-9 pr-9 py-2 rounded-lg border text-[12.5px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20"
             style={{ background: "var(--cream)", borderColor: "var(--line-2)", color: "var(--ink)" }}
           />
+          {searchOpen && (
+            <button
+              onClick={closePanelSearch}
+              aria-label="Close search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2"
+              style={{ background: "none", border: "none", padding: 2, display: "grid", placeItems: "center", color: "var(--muted-text)", cursor: "pointer" }}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
+
+      {searchOpen && (
+        <div className="flex-1 overflow-y-auto px-3 pb-3">
+          <ChatSearchView
+            query={search}
+            chats={data ?? []}
+            userId={userId}
+            ministryId={ministryId}
+            onOpenChat={(id, name) => { closePanelSearch(); handleOpenChatPanel(id, name) }}
+            onOpenPerson={(p) => { closePanelSearch(); handleOpenPersonPanel(p) }}
+          />
+        </div>
+      )}
+      {!searchOpen && (
+      <>
 
       {/* Church / My mode switcher — exclusive filter, SegmentedControl (R4/R12) */}
       <div className="px-3 flex-shrink-0">
@@ -4262,6 +4412,8 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
             New message
           </button>
         </div>
+      )}
+      </>
       )}
 
       {showCreateChat && (

@@ -144,10 +144,23 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // is undefined on the server, so SSR rendered the "no chat" branch while the client
   // restored the chat → hydration mismatch. searchParams is SSR-consistent (same source
   // as initialTab), so server and client agree on the first render.
-  const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(() => {
+  // `id: ""` + `draftUserId` == a DRAFT direct message: the conversation has no
+  // group row yet, and won't until the first message is actually sent. Drafts are
+  // deliberately NOT restored from ?chat — there is nothing to restore.
+  const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string; draftUserId?: string } | null>(() => {
     const chatId = searchParams.get("chat")
     return chatId && initialTab === "chats" ? { id: chatId, name: "" } : null
   })
+  // Open a draft DM with someone the user doesn't yet share a DM with.
+  const openDraftDm = useCallback((person: { id: string; name: string }) => {
+    setGlobalOpenChat({ id: "", name: person.name, draftUserId: person.id })
+  }, [])
+  // The draft's group now exists. Swap in the real id WITHOUT changing the React
+  // key (see the ChatScreen mounts below), so the in-flight send finishes in the
+  // same mounted component instead of being lost to a remount.
+  const handleDmCreated = useCallback((groupId: string, name: string) => {
+    setGlobalOpenChat((cur) => cur ? { ...cur, id: groupId, name } : { id: groupId, name })
+  }, [])
   // Announcement detail is a read view → restore from ?ann on reload (overlay can sit over any tab).
   const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(() =>
     searchParams.get("ann")
@@ -1098,6 +1111,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             userProfile={initialProfile}
             userRole={initialProfile.role}
             fallbackChats={chatListData}
+            onOpenDraftDm={openDraftDm}
           />
         }
         planContextContent={planContextContent}
@@ -1203,6 +1217,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                   canCreateChurchChat={canCreateChurchChat}
                   fallbackChats={chatListData}
                   onComposerOpenChange={setComposerOpen}
+                  onOpenDraftDm={openDraftDm}
                 />
               </div>
               {/* Desktop only: thread content area (list lives in DesktopSidebar panel) */}
@@ -1214,7 +1229,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
               <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
                 {isDesktop && globalOpenChat ? (
                   <ChatScreen
-                    key={globalOpenChat.id}
+                    key={globalOpenChat.draftUserId ?? globalOpenChat.id}
                     groupId={globalOpenChat.id}
                     groupName={globalOpenChat.name}
                     userId={userId}
@@ -1225,6 +1240,8 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                     onClose={handleChatClose}
                     onRead={recountTotalUnread}
                     onNameChange={handleChatNameChange}
+                    draftRecipient={globalOpenChat.draftUserId ? { id: globalOpenChat.draftUserId, name: globalOpenChat.name } : null}
+                    onDmCreated={handleDmCreated}
                     inline
                   />
                 ) : (
@@ -1402,7 +1419,9 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       {/* Global ChatScreen overlay — mobile always, desktop only when not on chats tab */}
       {globalOpenChat && !(isDesktop && activeTab === "chats") && (
         <ChatScreen
-          key={globalOpenChat.id}
+          // Keyed on the draft recipient while drafting, so the draft→real id
+          // swap does NOT remount and drop the message being sent.
+          key={globalOpenChat.draftUserId ?? globalOpenChat.id}
           groupId={globalOpenChat.id}
           groupName={globalOpenChat.name}
           userId={userId}
@@ -1413,6 +1432,8 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
           onClose={handleChatClose}
           onRead={recountTotalUnread}
           onNameChange={handleChatNameChange}
+          draftRecipient={globalOpenChat.draftUserId ? { id: globalOpenChat.draftUserId, name: globalOpenChat.name } : null}
+          onDmCreated={handleDmCreated}
         />
       )}
 

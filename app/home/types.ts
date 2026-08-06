@@ -438,6 +438,7 @@ export interface ChatSettingsProps {
 }
 
 export interface ChatScreenProps {
+  /** Empty string == DRAFT: no group exists yet (see `draftRecipient`). */
   groupId: string
   groupName: string
   userId: string
@@ -449,6 +450,13 @@ export interface ChatScreenProps {
   onRead?: () => void
   onNameChange?: (name: string) => void
   inline?: boolean
+  /**
+   * Draft DM target. When set (with `groupId === ""`) ChatScreen mounts with no
+   * history and NO subscriptions; the group is created on the first send.
+   */
+  draftRecipient?: { id: string; name: string } | null
+  /** Fired once the draft's group actually exists, so the parent can re-key. */
+  onDmCreated?: (groupId: string, name: string) => void
 }
 
 // Message composer (bottom input area) — extracted from ChatScreen so per-keystroke
@@ -491,6 +499,12 @@ export interface ChatsTabProps {
   // Reports whether the full-screen CreateChatScreen is up, so home-app can
   // suppress the floating pill nav (mobile design system §2.2).
   onComposerOpenChange?: (open: boolean) => void
+  /**
+   * Open a DRAFT direct message with someone you don't yet share a DM with. No
+   * group row exists until the first message is actually sent, so browsing
+   * search can't litter chat lists with empty conversations.
+   */
+  onOpenDraftDm?: (person: { id: string; name: string }) => void
 }
 
 // Slim list-row + detail-header shape — fetched for EVERY member on directory
