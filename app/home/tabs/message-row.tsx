@@ -245,7 +245,7 @@ function MessageRowBase({
     return (
       <div ref={(el) => { registerMessageRef(msg.id, el) }}>
         {showDateSep && (
-          <div className="flex justify-center my-6">
+          <div className="flex justify-center mt-6 mb-2">
             <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
               {formatDateLabel(msg.created_at)}
             </span>
@@ -354,7 +354,7 @@ function MessageRowBase({
     return (
       <div ref={(el) => { registerMessageRef(msg.id, el) }}>
         {showDateSep && (
-          <div className="flex justify-center my-6">
+          <div className="flex justify-center mt-6 mb-2">
             <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
               {formatDateLabel(msg.created_at)}
             </span>
@@ -375,7 +375,7 @@ function MessageRowBase({
     <div ref={(el) => { registerMessageRef(msg.id, el) }}>
       {/* Date separator */}
       {showDateSep && (
-        <div className="flex justify-center my-6">
+        <div className="flex justify-center mt-6 mb-2">
           <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
             {formatDateLabel(msg.created_at)}
           </span>
