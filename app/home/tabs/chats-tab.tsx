@@ -12,7 +12,7 @@ import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
+import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
@@ -408,6 +408,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const [renaming, setRenaming] = useState(false)
   const [newName, setNewName] = useState(groupName)
   const [showAddMembers, setShowAddMembers] = useState(false)
+  // Mobile only: the roster moved off the settings screen (it buried Preferences
+  // and Danger zone below an unbounded list) onto its own drilled-in Members
+  // screen with an All/Leaders filter + search. Desktop keeps its inline roster.
+  const [showAllMembers, setShowAllMembers] = useState(false)
+  const [memberFilter, setMemberFilter] = useState<"all" | "leaders">("all")
+  const [memberSearch, setMemberSearch] = useState("")
   const [allProfiles, setAllProfiles] = useState<Profile[]>([])
   const [searchAdd, setSearchAdd] = useState("")
   const [selectedToAdd, setSelectedToAdd] = useState<string[]>([])
@@ -704,11 +710,22 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   )
   const typeLabel = isDM ? "Direct message" : isChurch ? "Church chat" : "Group chat"
 
-  // Body-swap + extend-crumbs: a SINGLE SubpageShell renders either the settings
-  // body or the add-members body; the trail lengthens rather than nesting a shell.
+  // Body-swap + extend-crumbs: a SINGLE SubpageShell renders the settings, the
+  // add-members, or the members body; the trail lengthens rather than nesting a shell.
+  const backToSettings = () => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) }
   const crumbs: Crumb[] = showAddMembers
-    ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) } }, { label: "Add members" }]
-    : [{ label: displayGroupName, onClick: onBack }, { label: "Settings" }]
+    ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: backToSettings }, { label: "Add members" }]
+    : showAllMembers
+      ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowAllMembers(false); setMemberSearch(""); setMemberFilter("all") } }, { label: "Members" }]
+      : [{ label: displayGroupName, onClick: onBack }, { label: "Settings" }]
+
+  // Members screen (mobile) — All | Leaders, then name/nickname search.
+  const visibleMembers = members.filter((m) => {
+    if (memberFilter === "leaders" && !isLeaderRole((m.role ?? "").toLowerCase())) return false
+    const q = memberSearch.trim().toLowerCase()
+    if (!q) return true
+    return (m.nickname ?? "").toLowerCase().includes(q) || m.name.toLowerCase().includes(q)
+  })
 
   // Mobile role tag (Pocket §4): plum "role" pill for admin/leader tier, hairline
   // "outline" for visitor, tonal "default" otherwise. Label via the same roleLabel
@@ -739,7 +756,25 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   }
 
   return (
-    <SubpageShell title={showAddMembers ? "Add members" : "Settings"} crumbs={crumbs} width="full">
+    <SubpageShell
+      title={showAddMembers ? "Add members" : "Settings"}
+      crumbs={crumbs}
+      width="full"
+      // Mobile-only chrome for the drilled-in Members screen: title + count under
+      // it, and the add-member "+" in the row's right slot (§3 chrome-row carve-out).
+      mobileTitle={showAllMembers ? "Members" : undefined}
+      mobileMeta={showAllMembers ? `${members.length} member${members.length !== 1 ? "s" : ""}` : undefined}
+      mobileAction={showAllMembers && canManage ? (
+        <button
+          type="button"
+          onClick={() => { setShowAllMembers(false); setShowAddMembers(true); loadAllProfiles() }}
+          aria-label="Add members"
+          style={{ width: 34, height: 34, borderRadius: 999, display: "grid", placeItems: "center", background: "none", border: "none", color: "var(--plum)", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+        >
+          <Plus style={{ width: 19, height: 19 }} strokeWidth={2} />
+        </button>
+      ) : undefined}
+    >
       {error && (
         <div className="rounded-xl px-4 py-3 mb-4 text-[13px] font-medium" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>
           {error}
@@ -812,6 +847,47 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         <>
         {/* Mobile (SubpageShell title is desktop-only, so mobile keeps its own header) */}
         <div className="md:hidden">
+          {showAllMembers ? (
+          /* ── Members screen (mobile drill-in) ── chrome (title + count + "+")
+             is owned by SubpageShell; body is filter · search · roster. */
+          <div className="pb-4">
+            <PocketFilterChipRow style={{ marginBottom: 12 }}>
+              <PocketFilterChip label="All" active={memberFilter === "all"} onClick={() => setMemberFilter("all")} />
+              <PocketFilterChip label="Leaders" active={memberFilter === "leaders"} onClick={() => setMemberFilter("leaders")} />
+            </PocketFilterChipRow>
+            <PocketSearchField value={memberSearch} onChange={setMemberSearch} placeholder="Search members" style={{ marginBottom: 16 }} />
+            {loading ? <Spinner /> : visibleMembers.length === 0 ? (
+              <EmptyState
+                icon={<Users className="w-7 h-7" />}
+                title="No members match"
+                subtitle={memberFilter === "leaders" ? "No leaders in this chat yet. Try the All filter." : "Try a different name."}
+              />
+            ) : (
+              <PocketRowCard>
+                {visibleMembers.map((member, i) => (
+                  <MobileMemberRow
+                    key={member.user_id}
+                    member={member}
+                    isLast={i === visibleMembers.length - 1}
+                    userId={userId}
+                    canManage={canManage}
+                    canNickname={canNickname}
+                    isConfirming={confirmRemoveMemberId === member.user_id}
+                    isRevealed={mobileRevealMemberId === member.user_id}
+                    roleVariant={pocketRoleVariant}
+                    onOpenProfile={openMemberProfile}
+                    onToggleReveal={() => setMobileRevealMemberId((id) => id === member.user_id ? null : member.user_id)}
+                    onStartRemove={() => { setConfirmRemoveMemberId(member.user_id); setMobileRevealMemberId(null) }}
+                    onCancelRemove={() => setConfirmRemoveMemberId(null)}
+                    onConfirmRemove={() => handleRemoveMember(member.user_id)}
+                    onEditNickname={() => { setNicknameEditor({ userId: member.user_id, name: member.name, current: member.nickname ?? "" }); setNicknameInput(member.nickname ?? ""); setNicknameError(null) }}
+                  />
+                ))}
+              </PocketRowCard>
+            )}
+          </div>
+          ) : (
+          <>
           <div className="flex items-center gap-3.5 mb-7" style={{ paddingTop: 4 }}>
             <MonogramChip initials={getInitials(displayGroupName)} className="w-14 h-14 font-medium text-[18px]" />
             <div className="flex-1 min-w-0">
@@ -856,66 +932,26 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   <span className="text-[15px] font-semibold" style={{ color: "var(--plum)", letterSpacing: "-0.01em" }}>Add members</span>
                 </button>
               )}
-              {members.map((member, i) => {
-                const isConfirming = confirmRemoveMemberId === member.user_id
-                const isRevealed = mobileRevealMemberId === member.user_id
-                return (
-                  <div
-                    key={member.user_id}
-                    className="flex items-center gap-3"
-                    style={{ padding: "13px 0", borderBottom: i < members.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--ivory))" : "transparent", transition: "background 0.1s" }}
-                    onClick={() => { if (canManage && member.user_id !== userId && !isConfirming) setMobileRevealMemberId((id) => id === member.user_id ? null : member.user_id) }}
-                  >
-                    <span onClick={(e) => { e.stopPropagation(); openMemberProfile(member.user_id) }} style={{ cursor: "pointer", display: "inline-flex", flexShrink: 0 }}>
-                      <MonogramChip initials={getInitials(member.nickname ?? member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-medium text-[10px]" />
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <p onClick={(e) => { e.stopPropagation(); openMemberProfile(member.user_id) }} className="text-[15px] font-semibold truncate cursor-pointer" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>{member.nickname ?? member.name}</p>
-                        {member.user_id === userId && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
-                        {canNickname && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setNicknameEditor({ userId: member.user_id, name: member.name, current: member.nickname ?? "" }); setNicknameInput(member.nickname ?? ""); setNicknameError(null) }}
-                            aria-label={`Set nickname for ${member.name}`}
-                            className="flex-shrink-0"
-                            style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)" }}
-                          >
-                            <Pencil style={{ width: 13, height: 13 }} />
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        {member.nickname && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>{member.name}</span>}
-                        {member.role && <PocketTag label={roleLabel(member.role, member.user_id)} variant={pocketRoleVariant(member.role)} />}
-                        {member.graduation_year && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
-                      </div>
-                    </div>
-                    {canManage && member.user_id !== userId && (
-                      isConfirming ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
-                          <button onClick={(e) => { e.stopPropagation(); handleRemoveMember(member.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--danger)" }}><Check className="w-4 h-4" /></button>
-                          <button onClick={(e) => { e.stopPropagation(); setConfirmRemoveMemberId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X className="w-4 h-4" /></button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setConfirmRemoveMemberId(member.user_id); setMobileRevealMemberId(null) }}
-                          style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "var(--muted-text)", opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
-                        >
-                          <X style={{ width: 14, height: 14 }} />
-                        </button>
-                      )
-                    )}
-                  </div>
-                )
-              })}
+              {/* The roster itself lives on its own screen — an unbounded list here
+                  pushed Preferences and Danger zone off the bottom of the phone. */}
+              <PocketRow
+                leading={
+                  <span className="w-9 h-9 rounded-full inline-flex items-center justify-center flex-shrink-0" style={{ background: "var(--pocket-track)", color: "var(--plum)" }}>
+                    <Users style={{ width: 17, height: 17 }} strokeWidth={1.7} />
+                  </span>
+                }
+                title="See all members"
+                sub={`${members.length} member${members.length !== 1 ? "s" : ""} in this chat`}
+                chevron
+                isLast
+                onClick={() => { setShowAllMembers(true); setMemberSearch(""); setMemberFilter("all") }}
+              />
             </div>
           )}
-          {isChurch && canManage && (
-            <p className="mb-6" style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.55 }}>Member changes sync to the small group home page if this chat is linked to a group.</p>
-          )}
-          {isCentralChat && (
-            <p className="mb-6" style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.55 }}>Your ministry&apos;s main chat. Everyone is automatically a member — it can&apos;t be renamed, archived, or deleted.</p>
-          )}
+          {/* Mobile drops the small-group-sync and ministry-chat footnotes — the
+              constraints they described are already evident from the disabled
+              affordances, and the prose pushed the real controls down. Desktop
+              keeps them. */}
 
           {/* Section — church chats can be moved between General / Groups / Teams
               after creation (staged; commits on the shared Save bar). Locked for the
@@ -973,6 +1009,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               {canLeave && <button onClick={() => setConfirmAction("leave")} className="w-full py-3.5 rounded-xl font-medium text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Leave chat</button>}
               {canDelete && <button onClick={() => setConfirmAction("delete")} className="w-full py-3.5 rounded-xl font-medium text-[13px]" style={{ background: "transparent", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)" }}>Delete chat</button>}
             </div>
+          )}
+          </>
           )}
         </div>
 
@@ -1187,6 +1225,80 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         document.body
       )}
     </SubpageShell>
+  )
+}
+
+// One roster row on the mobile Members screen. Extracted from the settings body
+// when the roster moved onto its own screen — same affordances as before: tap the
+// avatar/name for the member profile, tap the row to reveal remove (managers only,
+// never on yourself), pencil for a per-chat nickname.
+function MobileMemberRow({
+  member, isLast, userId, canManage, canNickname, isConfirming, isRevealed, roleVariant,
+  onOpenProfile, onToggleReveal, onStartRemove, onCancelRemove, onConfirmRemove, onEditNickname,
+}: {
+  member: GroupMember
+  isLast: boolean
+  userId: string
+  canManage: boolean
+  canNickname: boolean
+  isConfirming: boolean
+  isRevealed: boolean
+  roleVariant: (role: string) => "default" | "role" | "outline"
+  onOpenProfile: (id: string) => void
+  onToggleReveal: () => void
+  onStartRemove: () => void
+  onCancelRemove: () => void
+  onConfirmRemove: () => void
+  onEditNickname: () => void
+}) {
+  const isSelf = member.user_id === userId
+  return (
+    <div
+      className="flex items-center gap-3"
+      style={{ padding: "13px 0", borderBottom: isLast ? "none" : "1px solid var(--line-3)", background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--ivory))" : "transparent", transition: "background 0.1s" }}
+      onClick={() => { if (canManage && !isSelf && !isConfirming) onToggleReveal() }}
+    >
+      <span onClick={(e) => { e.stopPropagation(); onOpenProfile(member.user_id) }} style={{ cursor: "pointer", display: "inline-flex", flexShrink: 0 }}>
+        <MonogramChip initials={getInitials(member.nickname ?? member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-medium text-[10px]" />
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p onClick={(e) => { e.stopPropagation(); onOpenProfile(member.user_id) }} className="text-[15px] font-semibold truncate cursor-pointer" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>{member.nickname ?? member.name}</p>
+          {isSelf && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
+          {canNickname && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onEditNickname() }}
+              aria-label={`Set nickname for ${member.name}`}
+              className="flex-shrink-0"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)" }}
+            >
+              <Pencil style={{ width: 13, height: 13 }} />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+          {member.nickname && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>{member.name}</span>}
+          {member.role && <PocketTag label={roleLabel(member.role, member.user_id)} variant={roleVariant(member.role)} />}
+          {member.graduation_year && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
+        </div>
+      </div>
+      {canManage && !isSelf && (
+        isConfirming ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+            <button onClick={(e) => { e.stopPropagation(); onConfirmRemove() }} aria-label={`Remove ${member.name}`} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--danger)" }}><Check className="w-4 h-4" /></button>
+            <button onClick={(e) => { e.stopPropagation(); onCancelRemove() }} aria-label="Cancel remove" style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X className="w-4 h-4" /></button>
+          </div>
+        ) : (
+          <button
+            onClick={(e) => { e.stopPropagation(); onStartRemove() }}
+            aria-label={`Remove ${member.name}`}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "var(--muted-text)", opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
+          >
+            <X style={{ width: 14, height: 14 }} />
+          </button>
+        )
+      )}
+    </div>
   )
 }
 
