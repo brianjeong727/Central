@@ -13,6 +13,7 @@ import type { ReactNode } from "react"
 import { Settings } from "lucide-react"
 import {
   IconButton, MonogramChip, PocketHeroCard, PocketKicker, PocketRow, PocketRowCard, BackChevron,
+  POCKET_CHROME_PAD_Y,
 } from "@/components/central"
 import { PlanLineIcon } from "./shared"
 import { getInitials } from "../utils"
@@ -42,7 +43,13 @@ export function PocketHubChrome({ title, onBack, onSettings, avatar, action }: {
   action?: ReactNode
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+    // Owns its own chrome rhythm (Convention #27) rather than inheriting whatever
+    // paddingTop the host wrapper happens to carry — the workspace hub used to sit
+    // at 24px because StudentOrgTeamHome's content wrapper supplied it, so the title
+    // jumped when you drilled into an event (12px) and back. `marginBottom` keeps
+    // the existing 18px gap to the first section, minus the 10px this now owns.
+    // No horizontal padding: the host wrapper supplies the gutter (Convention #26).
+    <div style={{ display: "flex", alignItems: "center", gap: 10, ...POCKET_CHROME_PAD_Y, marginBottom: 8 }}>
       {onBack && (
         <BackChevron onClick={onBack} />
       )}

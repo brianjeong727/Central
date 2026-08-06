@@ -1629,7 +1629,11 @@ export function StudentOrgTeamHome({
         <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} openNoteId={openNoteId} onOpenNote={setOpenNoteAndUrl}
               query={notesQuery} onOpenEvent={(eventId) => { void openLinkedEvent(eventId) }} />
       ) : (
-      <div className="md:px-14" style={{ paddingTop: 24, paddingBottom: 60 }}>
+      // Mobile top gap belongs to the chrome row (PocketHubChrome owns 12px,
+      // Convention #27) — a wrapper paddingTop stacked on it and pushed the hub
+      // title to 24px, so drilling into an event (12px) visibly jumped. Desktop
+      // keeps its 24 via md:pt-6.
+      <div className="md:px-14 pt-0 md:pt-6" style={{ paddingBottom: 60 }}>
 
         {/* MOBILE HUB — Daybreak landing (ruling B-1/B-3). Rows drill into the
             existing section surfaces below. Never rendered on desktop. */}

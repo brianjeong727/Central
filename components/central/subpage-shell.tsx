@@ -14,6 +14,7 @@ import { createPortal } from "react-dom"
 import { BackChevron } from "./back-chevron"
 import { InsetHairline } from "./hairline"
 import { PageTitle } from "./page-title"
+import { POCKET_CHROME_PAD_Y, POCKET_CHROME_PAD_X } from "./pocket"
 import { useScrollResetOn } from "./scroll-reset"
 import { useEdgeSwipeBack } from "./use-edge-swipe-back"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ context hook); flagged Phase 2, refactor pending
@@ -169,7 +170,7 @@ export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact
       {(back || chromeTitle) && (
         // md:hidden must win on desktop — keep `display` in the class, NOT inline
         // (an inline `display` would override md:hidden and leak onto desktop).
-        <div className="md:hidden flex items-center" style={{ gap: 8, padding: "12px 20px 10px" }}>
+        <div className="md:hidden flex items-center" style={{ gap: 8, ...POCKET_CHROME_PAD_Y, paddingLeft: POCKET_CHROME_PAD_X, paddingRight: POCKET_CHROME_PAD_X }}>
           {back && <BackChevron onClick={back.onClick} label={`Back to ${back.label}`} />}
           {chromeTitle ? (
             <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
