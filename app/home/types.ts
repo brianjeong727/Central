@@ -633,10 +633,32 @@ export interface EventPlan {
   budget_category_id: string | null
   type_data: Record<string, unknown>
   planning_group_id: string | null
-  plan_start_date: string | null
-  crunch_date: string | null
+  /**
+   * The plan's T-minus countdown ladder — ordered earliest→latest. Replaced the
+   * old absolute `plan_start_date` / `crunch_date` anchors: every boundary is a
+   * RELATIVE offset, so moving an event carries the whole plan with it and needs
+   * no date arithmetic. Seeded from COUNTDOWN_PRESETS (app/home/event-presets-data.mjs)
+   * and editable per plan. Null only for rows predating the column.
+   */
+  countdown_phases: CountdownPhaseDef[] | null
   /** Provenance: set when this plan was instantiated from a playbook (Run Sheet P2). */
   template_id?: string | null
+}
+
+/**
+ * One rung of a countdown ladder. A phase covers
+ *   d ∈ (nextPhase.startDaysBefore, startDaysBefore]
+ * where d = whole days from a task's due_date to the event day (positive =
+ * before). The first rung is open upward; the last covers everything below it.
+ */
+export interface CountdownPhaseDef {
+  key: string
+  label: string
+  /** Phase boundary, in days before the event. Negative = after the event. */
+  startDaysBefore: number
+  /** Offset from the event date used to prefill this phase's inline add-row. */
+  seedOffsetDays: number
+  eventPhase: EventTask["phase"]
 }
 
 export interface EventTask {

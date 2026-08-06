@@ -51,9 +51,12 @@ import { MobilePocketHub, PocketHubChrome } from "../components/mobile-pocket-hu
 import { teamIconKey } from "../workspace-presets"
 import { getReimbursementInbox, getPendingReceiptCount } from "@/app/actions/receipts"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
+import { CountdownLadderEditor } from "../components/countdown-ladder-editor"
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
-import { EVENT_TYPE_CONFIGS, nextAnchorYMD, addDaysToYMD, ymdOf, lineageKeyOf, seasonLabelOf } from "../event-presets"
+import { EVENT_TYPE_CONFIGS, nextAnchorYMD, addDaysToYMD, ymdOf, lineageKeyOf, seasonLabelOf,
+  countdownPresetPhases, ladderOf, DEFAULT_COUNTDOWN_PRESET,
+  type CountdownPhaseDef } from "../event-presets"
 import type {
   PlanTabProps, UserTeam, Team, CalendarEvent, EventPlan, EventTask, EventRole, EventConfirmation, EventBlock,
   TeamRole, TeamMemberDisplay, DraftRole, RoleDescription, RoleLink, MeetingNote,
@@ -70,7 +73,7 @@ import {
 import { getFinanceFunds, type FinanceFund } from "@/app/actions/finance-funds"
 import { normalizeMoneyInput } from "../utils"
 import { teamAccessLevel, type TeamAccess } from "../governance"
-import { CountdownTab, TriggerBadge, CountdownWhisper, CountdownPill, type RowAug, type CountdownPhase } from "./countdown-tab"
+import { CountdownTab, TriggerBadge, CountdownWhisper, CountdownPill, phaseKeyForDays, UNSCHEDULED_KEY, type RowAug, type CountdownPhase } from "./countdown-tab"
 
 // Rich-text / collaborative note editors are lazy-loaded so the heavy @tiptap/*
 // and yjs runtime deps stay OUT of plan-tab's static module graph. They sit behind
@@ -1264,13 +1267,28 @@ export function StudentOrgTeamHome({
   const { data: heroProgress } = useSWR(
     nextEvent ? (["hub-hero-progress", nextEvent.id] as const) : null,
     async () => {
-      const { data: planRow } = await supabase.from("event_plans").select("id, crunch_date").eq("calendar_event_id", nextEvent!.id).maybeSingle()
-      if (!planRow) return { done: 0, total: 0, crunch: null as string | null }
+      const { data: planRow } = await supabase.from("event_plans").select("id, countdown_phases").eq("calendar_event_id", nextEvent!.id).maybeSingle()
+      if (!planRow) return { done: 0, total: 0, phases: null as CountdownPhaseDef[] | null }
       const { data: taskRows } = await supabase.from("event_tasks").select("completed").eq("event_plan_id", (planRow as { id: string }).id)
       const list = (taskRows ?? []) as { completed: boolean }[]
-      return { done: list.filter(t => t.completed).length, total: list.length, crunch: (planRow as { crunch_date: string | null }).crunch_date }
+      return {
+        done: list.filter(t => t.completed).length,
+        total: list.length,
+        phases: (planRow as { countdown_phases: CountdownPhaseDef[] | null }).countdown_phases,
+      }
     },
   )
+  // Where the plan sits on its own ladder right now ("T−3 WEEKS"). Replaced the
+  // old "crunch <date>" marker: crunch was one hardcoded anchor, this is the
+  // plan's actual current rung, whatever ladder it runs.
+  const heroPhaseLabel = useMemo(() => {
+    if (!nextEvent || !heroProgress) return null
+    const ladder = ladderOf(heroProgress.phases)
+    const eventYMD = instantToZoned(nextEvent.start_date, timeZone).ymd
+    if (!eventYMD) return null
+    const key = phaseKeyForDays(ladder, daysBetweenYMD(todayInZone(timeZone), eventYMD))
+    return ladder.find(p => p.key === key)?.label ?? null
+  }, [nextEvent, heroProgress, timeZone])
 
   // Add / delete
   const [showAddModal, setShowAddModal] = useState(false)
@@ -1293,7 +1311,7 @@ export function StudentOrgTeamHome({
   // withhold.
   const [showEditEvent, setShowEditEvent] = useState(false)
   // Bumped after the edit modal writes, so EventPlanWorkspace re-reads the plan's
-  // plan_start_date / crunch_date and its (possibly shifted) task due dates.
+  // countdown ladder and its (possibly shifted) task due dates.
   const [eventRefresh, setEventRefresh] = useState(0)
   // Mobile drilled-section crumb reported by EventPlanWorkspace (null at the
   // hub and always on desktop) — appended as the tail crumb so the SubpageShell
@@ -1646,7 +1664,7 @@ export function StudentOrgTeamHome({
             hero={nextEvent ? {
               eyebrow: "Up next",
               title: nextEvent.title,
-              meta: [monthDay(nextEvent.start_date, timeZone), heroProgress?.crunch ? `crunch ${monthDay(heroProgress.crunch, timeZone)}` : null].filter(Boolean).join(" · "),
+              meta: [monthDay(nextEvent.start_date, timeZone), heroPhaseLabel].filter(Boolean).join(" · "),
               progress: heroProgress ? { done: heroProgress.done, total: heroProgress.total } : null,
               onClick: () => onPlanningEventChange(nextEvent),
             } : null}
@@ -6616,13 +6634,18 @@ export function AddEventModal({
     const scroller = bodyTopRef.current?.parentElement
     if (scroller) scroller.scrollTop = 0
   }, [createPath])
-  // Plan/crunch dates live on the event's event_plans row, edited here in EDIT
-  // mode only (a new event's plan is seeded lazily by the overview). Crunch is
-  // optional — an empty string saves as null (no crunch phase).
-  const [planStartDate, setPlanStartDate] = useState("")
-  const [crunchDate, setCrunchDate] = useState("")
-  // False until the async plan/crunch seed resolves. Gates the plan-window WRITE.
-  const [planDatesSeeded, setPlanDatesSeeded] = useState(false)
+  // The event's T-minus countdown ladder, stored on its event_plans row. In
+  // CREATE mode this is the preset the new plan is seeded with; in EDIT mode it
+  // is loaded from the plan and written back on Save. There are no dates here by
+  // design — every rung is a RELATIVE offset, which is what let the old
+  // plan_start_date / crunch_date pair (and their date-shift dance) go away.
+  const [countdownPhases, setCountdownPhases] = useState<CountdownPhaseDef[]>(
+    () => countdownPresetPhases(DEFAULT_COUNTDOWN_PRESET),
+  )
+  // False until the async ladder load resolves (edit mode only — create mode has
+  // nothing to wait for). Gates the WRITE so a Save that beats the fetch never
+  // stamps the default ladder over a customized one.
+  const [ladderLoaded, setLadderLoaded] = useState(!isEditing)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
@@ -6655,33 +6678,24 @@ export function AddEventModal({
     ref.current?.focus({ preventScroll: true })
   }
 
-  // Seed plan/crunch from the event's plan (or the event−1mo / event−1wk defaults)
-  // when editing an existing event. This is ASYNC and Save does not wait for it —
-  // `planDatesSeeded` records whether it landed, so a Save that beats the fetch
-  // omits both columns rather than writing the empty state as NULL and wiping
-  // dates the user never saw (tester WARN-1: reproduced live, both columns → null).
+  // Load the plan's ladder when editing an existing event. ASYNC, and Save does
+  // not wait for it — `ladderLoaded` records whether it landed (see the write).
+  // Unlike the plan/crunch dates this replaced, nothing here is derived from the
+  // event's calendar day, so there is no ministry-zone hazard to guard against:
+  // the ladder means the same thing in every timezone.
   useEffect(() => {
     if (!isEditing || !existing) return
     let cancelled = false
     ;(async () => {
       const { data } = await supabase
         .from("event_plans")
-        .select("plan_start_date, crunch_date")
+        .select("countdown_phases")
         .eq("calendar_event_id", existing.id)
         .eq("ministry_id", ministryId)
         .maybeSingle()
       if (cancelled) return
-      // `plan_start_date` / `crunch_date` are DATE columns DERIVED from the event's
-      // calendar day, so the day they count back from must be the MINISTRY's, not
-      // the viewer's: `new Date(existing.start_date)` + device-local getters seeded
-      // a Tokyo leader's plan window a day off from the one an ET leader saw for the
-      // same event. `eventStartYMD` prefers `start_day` for all-day rows; the noon
-      // anchor keeps the ±month / ±7-day arithmetic clear of any boundary. Same
-      // idiom as the checklist window anchors below.
-      const ev = new Date(`${eventStartYMD(existing, timeZone)}T12:00:00`)
-      setPlanStartDate((data?.plan_start_date as string | null) || addMonthsYMD(ev, -1))
-      setCrunchDate((data?.crunch_date as string | null) || addDaysYMD(ev, -7))
-      setPlanDatesSeeded(true)
+      setCountdownPhases(ladderOf((data?.countdown_phases as CountdownPhaseDef[] | null) ?? null))
+      setLadderLoaded(true)
     })()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -6846,26 +6860,24 @@ export function AddEventModal({
         const prevStartYMD = savedStartYMDRef.current
         const dayDelta = prevStartYMD ? daysBetweenYMD(prevStartYMD, startDateStr) : 0
 
-        // Plan/crunch window. Written ONLY once the async seed (above) has landed:
-        // before that `planStartDate`/`crunchDate` are still "" and `|| null` would
-        // silently wipe two columns the user never saw.
+        // The countdown ladder. Written ONLY once the async load (above) has
+        // landed, so a Save that beats the fetch can't overwrite a customized
+        // ladder with the default one.
         //
-        // STOPGAP — delete when T-minus benchmarks land (followup-benchmarks.md).
-        // The window rides the date move by the SAME delta the tasks do. It has to:
-        // `sectionOf` buckets a task by comparing its due_date to `crunch_date`, so
-        // moving the tasks and not the anchors collapses every task into Crunch and
-        // empties Planning. Relative benchmarks make this whole shift unnecessary.
-        const shiftYMD = (ymd: string) => (ymd && dayDelta !== 0 ? addDaysToYMD(ymd, dayDelta) : ymd)
-        const planWindow = planDatesSeeded
-          ? { plan_start_date: shiftYMD(planStartDate) || null, crunch_date: shiftYMD(crunchDate) || null }
-          : null
+        // NOTE what is NOT here any more: the old plan_start_date / crunch_date
+        // pair had to be shifted by `dayDelta` alongside the tasks, because
+        // `sectionOf` bucketed by comparing a due_date to those absolute anchors —
+        // move the tasks and not the anchors and every task collapsed into Crunch.
+        // The ladder is RELATIVE offsets, so it rides a date move untouched and
+        // that whole stopgap is gone.
+        const planLadder = ladderLoaded ? { countdown_phases: countdownPhases } : null
 
         let planId: string | null = null
-        if (planWindow) {
+        if (planLadder) {
           // Update first; if no plan exists yet (0 rows), insert one.
           const { data: planUpd } = await supabase
             .from("event_plans")
-            .update(planWindow)
+            .update(planLadder)
             .eq("calendar_event_id", existing.id)
             .eq("ministry_id", ministryId)
             .select("id")
@@ -6874,22 +6886,14 @@ export function AddEventModal({
               ministry_id: ministryId,
               calendar_event_id: existing.id,
               created_by: userId,
-              ...planWindow,
+              ...planLadder,
             })
           } else {
             planId = (planUpd[0] as { id: string }).id
           }
-          // Re-seed the fields from what we just wrote. Without this the modal's
-          // state still holds the values seeded at MOUNT — i.e. pre-shift — and a
-          // second save in the same session (notably the partial-failure retry,
-          // where dayDelta is then 0 so shiftYMD is the identity) would write the
-          // OLD anchors back over the shifted ones while the tasks stayed shifted.
-          // Same failure shape savedStartYMDRef already fixes for the start date.
-          setPlanStartDate(planWindow.plan_start_date ?? "")
-          setCrunchDate(planWindow.crunch_date ?? "")
         } else {
-          // Seed still in flight: touch no plan column, just resolve the plan id so
-          // the task shift can still run.
+          // Load still in flight: touch no plan column, just resolve the plan id
+          // so the task shift can still run.
           const { data: planRow } = await supabase
             .from("event_plans")
             .select("id")
@@ -6954,6 +6958,10 @@ export function AddEventModal({
             ministry_id: ministryId,
             calendar_event_id: evData.id,
             created_by: userId,
+            // The countdown ladder chosen in the modal. Seeded HERE so a plan is
+            // never created without one — a phase-less plan would bucket every
+            // task into UNSCHEDULED.
+            countdown_phases: countdownPhases,
             ...(createPath === "custom" && extras.length > 0 ? { type_data: { extras } } : {}),
           })
           .select("id")
@@ -7153,26 +7161,14 @@ export function AddEventModal({
             </FormField>
           </div>
 
-          {/* Planning window — edit mode only; persisted to the event's plan row */}
-          {isEditing && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <FormField label="Plan start date">
-                <Input type="date" value={planStartDate} onChange={(e) => setPlanStartDate(e.target.value)} />
-              </FormField>
-              <FormField label={<>Crunch date <span style={{ textTransform: "none", letterSpacing: 0, fontSize: 10, color: "var(--muted-text)" }}>optional</span></>}>
-                <Input type="date" value={crunchDate} onChange={(e) => setCrunchDate(e.target.value)} />
-                {crunchDate && (
-                  <button
-                    type="button"
-                    onClick={() => setCrunchDate("")}
-                    style={{ background: "none", border: "none", padding: 0, fontSize: 12, color: "var(--muted-text)", cursor: "pointer" }}
-                  >
-                    Clear crunch date
-                  </button>
-                )}
-              </FormField>
-            </div>
-          )}
+          {/* Countdown planning structure — persisted to the event's plan row.
+              Shown on CREATE too (it seeds the new plan's ladder), unlike the
+              plan-start/crunch pair it replaced, which was edit-only. */}
+          <CountdownLadderEditor
+            phases={countdownPhases}
+            onChange={setCountdownPhases}
+            disabled={!ladderLoaded}
+          />
 
           {/* Free-form capability modules — persisted to the plan's type_data.extras */}
           {!isEditing && createPath === "custom" && (
@@ -7932,8 +7928,8 @@ export function EventPlanWorkspace({
   // while already viewing a child, which caps nesting at one level.
   onOpenChild?: (ev: CalendarEvent) => void
   // Bumped by the parent after the Edit-event modal saves; re-fetches the plan's
-  // plan_start_date / crunch_date so the overview facts + checklist windows
-  // reflect edits made in the modal without a manual reload.
+  // countdown ladder so the Countdown tab's phases reflect edits made in the
+  // modal without a manual reload.
   refreshSignal?: number
   // Mobile chrome-back integration (mobile spec §2.3/§5.3 — ONE back affordance,
   // one level up): while a section is drilled at phone width this reports
@@ -8090,8 +8086,11 @@ export function EventPlanWorkspace({
 
   // Plan/crunch date state — drives the checklist section windows. Display-only
   // in the overview facts now; edited via the Edit-event modal (AddEventModal).
-  const [planStartDate, setPlanStartDate] = useState("")
-  const [crunchDate, setCrunchDate] = useState("")
+  // The plan's T-minus ladder — the single structure the checklist buckets by.
+  // `ladderOf` guarantees a usable ladder even for a row predating the column.
+  const [countdownPhases, setCountdownPhases] = useState<CountdownPhaseDef[]>(
+    () => countdownPresetPhases(DEFAULT_COUNTDOWN_PRESET),
+  )
 
   // Task inline edit state
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
@@ -8246,6 +8245,14 @@ export function EventPlanWorkspace({
   const eventDayLong = isMultiDayEvent
     ? `${formatYMD(eventStart, { weekday: "long", month: "long", day: "numeric" })} – ${formatYMD(eventEnd, { weekday: "long", month: "long", day: "numeric" })}`
     : formatYMD(eventStart, { weekday: "long", month: "long", day: "numeric" })
+  // Numeric form for DENSE rows (the mobile hub's facts grid), where the editorial
+  // label wraps to three lines on a multi-day event: "Tuesday, August 18 – Saturday,
+  // August 29" → "8/18/26 – 8/29/26". Same YMD source and the same noon-anchored,
+  // zone-immune formatter as the long form — only the Intl options differ, so the
+  // two can never disagree about WHICH day they name (Convention #23).
+  const eventDayNumeric = isMultiDayEvent
+    ? `${formatYMD(eventStart, { month: "numeric", day: "numeric", year: "2-digit" })} – ${formatYMD(eventEnd, { month: "numeric", day: "numeric", year: "2-digit" })}`
+    : formatYMD(eventStart, { month: "numeric", day: "numeric", year: "2-digit" })
   // A multi-day event's clock times belong to DIFFERENT days — rendering them as
   // one bare range reads as nonsense ("5:00 PM – 2:00 PM"), so qualify each end
   // with its date.
@@ -8271,7 +8278,13 @@ export function EventPlanWorkspace({
       if (!planData) {
         const { data: newPlan } = await supabase
           .from("event_plans")
-          .insert({ ministry_id: ministryId, calendar_event_id: calendarEvent.id, created_by: userId })
+          .insert({
+            ministry_id: ministryId,
+            calendar_event_id: calendarEvent.id,
+            created_by: userId,
+            // A lazily-created plan still gets a ladder — see the modal's insert.
+            countdown_phases: countdownPresetPhases(DEFAULT_COUNTDOWN_PRESET),
+          })
           .select("*")
           .single()
         planData = newPlan
@@ -8281,27 +8294,13 @@ export function EventPlanWorkspace({
 
       const planId = planData.id
 
-      // Plan/crunch dates. First-time init: when plan_start_date is null, seed
-      // plan-start = event − 1 month and crunch = event − 1 week (local YMD),
-      // persist once, and use them. After this one-time write plan_start_date is
-      // always set; a later null crunch_date means the user REMOVED the crunch phase.
-      let psd = planData.plan_start_date as string | null
-      let cd = planData.crunch_date as string | null
-      if (!psd) {
-        // Count back from the event's MINISTRY-zone calendar day (`eventStart`,
-        // :7795), not from device-local getters on the instant — these two DATE
-        // columns are the checklist's window anchors, and seeding them off the
-        // viewer's day made the same event produce different phase boundaries
-        // depending on who happened to open it first. Noon-anchored so the
-        // ±month / ±7-day arithmetic can't slip a day.
-        const eventDate = new Date(`${eventStart}T12:00:00`)
-        psd = addMonthsYMD(eventDate, -1)
-        cd = addDaysYMD(eventDate, -7)
-        await supabase.from("event_plans").update({ plan_start_date: psd, crunch_date: cd }).eq("id", planId).eq("ministry_id", ministryId)
-        planData = { ...planData, plan_start_date: psd, crunch_date: cd }
-      }
-      setPlanStartDate(psd ?? "")
-      setCrunchDate(cd ?? "")
+      // The countdown ladder. Rows predating the column read as the default via
+      // `ladderOf`; no first-time write-back is needed the way the old
+      // plan_start_date / crunch_date seeding was, because a ladder is not
+      // derived from the event's calendar day — it means the same thing for
+      // every viewer in every timezone, so there is nothing to pin down once.
+      const ladder = ladderOf(planData.countdown_phases as CountdownPhaseDef[] | null)
+      setCountdownPhases(ladder)
 
       setPlan(planData as EventPlan)
       const pgid = (planData as EventPlan).planning_group_id ?? null
@@ -8424,7 +8423,7 @@ export function EventPlanWorkspace({
     saveOverviewField({ overview_notes: overviewNotes || null })
   }
 
-  // Re-fetch plan/crunch dates AND the checklist when the parent bumps
+  // Re-fetch the countdown ladder AND the checklist when the parent bumps
   // refreshSignal (after the Edit-event modal saves). Skips the initial mount run
   // (plan not yet loaded). The checklist is re-read because moving the event's
   // date shifts every open task's due_date server-side — without this the
@@ -8435,15 +8434,12 @@ export function EventPlanWorkspace({
     ;(async () => {
       const { data } = await supabase
         .from("event_plans")
-        .select("plan_start_date, crunch_date")
+        .select("countdown_phases")
         .eq("calendar_event_id", calendarEvent.id)
         .eq("ministry_id", ministryId)
         .maybeSingle()
       if (cancelled) return
-      if (data) {
-        setPlanStartDate((data.plan_start_date as string | null) ?? "")
-        setCrunchDate((data.crunch_date as string | null) ?? "")
-      }
+      if (data) setCountdownPhases(ladderOf(data.countdown_phases as CountdownPhaseDef[] | null))
       const { data: tasksData } = await supabase
         .from("event_tasks")
         .select("*, profiles!event_tasks_assigned_to_fkey(name)")
@@ -8587,11 +8583,12 @@ export function EventPlanWorkspace({
     await supabase.from("event_tasks").update({ parent_id: newParent, phase, pinned: false }).eq("id", dragId)
   }
 
-  // Drop onto a section → promote to a standalone (top-level) task in that
-  // section, reseeding its due_date to the section's default so it actually
-  // lands in that date window (sections are date-driven). Children inherit the
-  // new phase. Callers gate the date-change warning via requestMoveToSection.
-  async function moveToSection(dragId: string, sectionKey: ChecklistSection) {
+  // Drop onto a phase → promote to a standalone (top-level) task on that rung,
+  // reseeding its due_date to the rung's seed offset so it actually lands there
+  // (rungs are date-driven). Dropping onto UNSCHEDULED clears the date instead —
+  // that rung has no window, which is precisely what makes a task unscheduled.
+  // Children inherit the new phase. Callers gate the warning via requestMoveToSection.
+  async function moveToSection(dragId: string, sectionKey: string) {
     if (!canEdit) return
     const def = sectionDefs.find((s) => s.key === sectionKey)
     const drag = tasks.find((t) => t.id === dragId)
@@ -8612,7 +8609,7 @@ export function EventPlanWorkspace({
   // section would have its due_date overwritten — warn first (pending state). A
   // dateless task (e.g. a promoted subtask) has nothing to overwrite, so move
   // immediately.
-  function requestMoveToSection(dragId: string, sectionKey: ChecklistSection) {
+  function requestMoveToSection(dragId: string, sectionKey: string) {
     if (!canEdit) return
     const drag = tasks.find((t) => t.id === dragId)
     if (!drag) return
@@ -8626,7 +8623,7 @@ export function EventPlanWorkspace({
   async function confirmSectionMove() {
     if (!pendingSectionMove) return
     setSectionMoveBusy(true)
-    await moveToSection(pendingSectionMove.taskId, pendingSectionMove.sectionKey as ChecklistSection)
+    await moveToSection(pendingSectionMove.taskId, pendingSectionMove.sectionKey)
     setSectionMoveBusy(false)
     setPendingSectionMove(null)
   }
@@ -8782,37 +8779,36 @@ export function EventPlanWorkspace({
   // checklist a day off from the dates the leader typed.
   const eventYMD = eventStart
   const eventAnchor = new Date(`${eventStart}T12:00:00`)
-  const eventPlusOneYMD = addDaysYMD(eventAnchor, 1)
   const eventPlusTwoMonthsYMD = addMonthsYMD(eventAnchor, 2)
   const fmtMD = (ymd: string) => new Date(ymd + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
 
-  // Map a task to its section. If dated, compare day-granularity YMD strings to
-  // the plan-start / crunch / event anchors; otherwise fall back to the stored
-  // phase (dateless tasks never land in "crunch").
-  type ChecklistSection = "planning" | "crunch" | "day_of" | "post"
-  function sectionOf(task: EventTask): ChecklistSection {
-    const due = task.due_date
-    if (due) {
-      if (due >= eventPlusOneYMD) return "post"
-      if (due === eventYMD) return "day_of"
-      if (crunchDate && due >= crunchDate && due < eventYMD) return "crunch"
-      return "planning"
-    }
-    switch (task.phase) {
-      case "day_of": return "day_of"
-      case "post_event":
-      case "followup": return "post"
-      default: return "planning" // pre_event
-    }
+  // The day the plan's FIRST rung opens — the floor for every task-date picker.
+  // This is the ladder's answer to the old `plan_start_date`, except it is
+  // derived from the structure rather than stored as a second source of truth.
+  const ladderStartYMD = countdownPhases.length > 0
+    ? addDaysYMD(eventAnchor, -Math.max(...countdownPhases.map((p) => p.startDaysBefore)))
+    : ""
+
+  // Map a task to its rung on the plan's ladder — the SAME bucketer the Countdown
+  // renders with, so what you drag onto and what you see can never disagree. A
+  // dateless task has no rung by definition: it is UNSCHEDULED, not "planning"
+  // (the old absolute model had to guess from `task.phase` because it had no
+  // relative position to read).
+  function sectionOf(task: EventTask): string {
+    if (!task.due_date) return UNSCHEDULED_KEY
+    return phaseKeyForDays(countdownPhases, daysBetweenYMD(task.due_date, eventYMD))
   }
 
-  // Rendered sections in order — Crunch only appears when a crunch date is set.
-  // defaultDue/phase seed the section's inline add-row so a new task lands here.
-  const sectionDefs: { key: ChecklistSection; label: string; defaultDue: string; phase: EventTask["phase"] }[] = [
-    { key: "planning", label: "Planning phase", defaultDue: planStartDate, phase: "pre_event" },
-    ...(crunchDate ? [{ key: "crunch" as ChecklistSection, label: "Crunch phase", defaultDue: crunchDate, phase: "day_of" as EventTask["phase"] }] : []),
-    { key: "day_of", label: "Day of", defaultDue: eventYMD, phase: "day_of" },
-    { key: "post", label: "Post week", defaultDue: eventPlusOneYMD, phase: "post_event" },
+  // Rendered sections in order — the ladder itself, plus the computed
+  // unscheduled catch-all. defaultDue/phase seed each section's inline add-row.
+  const sectionDefs: { key: string; label: string; defaultDue: string; phase: EventTask["phase"] }[] = [
+    ...countdownPhases.map((p) => ({
+      key: p.key,
+      label: p.label,
+      defaultDue: addDaysYMD(eventAnchor, p.seedOffsetDays),
+      phase: p.eventPhase,
+    })),
+    { key: UNSCHEDULED_KEY, label: "Unscheduled", defaultDue: "", phase: "pre_event" as EventTask["phase"] },
   ]
 
   // ── Checklist hierarchy helpers ────────────────────────────────────────────
@@ -8843,7 +8839,7 @@ export function EventPlanWorkspace({
           </label>
           <label style={{ display: "block" }}>
             <span style={{ ...MONO_STYLE, display: "block", marginBottom: 6 }}>Due date</span>
-            <Input size="sm" type="date" value={editTaskDue} min={planStartDate || undefined} max={eventPlusTwoMonthsYMD} onChange={(e) => setEditTaskDue(e.target.value)} style={{ cursor: "pointer" }} />
+            <Input size="sm" type="date" value={editTaskDue} min={ladderStartYMD || undefined} max={eventPlusTwoMonthsYMD} onChange={(e) => setEditTaskDue(e.target.value)} style={{ cursor: "pointer" }} />
           </label>
           <div>
             <span style={{ ...MONO_STYLE, display: "block", marginBottom: 6 }}>Priority</span>
@@ -9202,12 +9198,17 @@ export function EventPlanWorkspace({
               }
               return (
                 <div>
+                  {/* Numeric dates here, not the editorial label — this grid is one
+                      row per fact and a multi-day range wrapped to three lines.
+                      TIME is OMITTED rather than dashed when there is none: an
+                      all-day event or a container week has no clock time, so the row
+                      is inapplicable, not blank. LOCATION keeps its em-dash — unset
+                      is not the same as inapplicable, and the dash is the prompt to
+                      fill it in. */}
                   <MobileFactsGrid facts={[
-                    { label: "Date", value: eventDayLong },
-                    { label: "Time", value: hubTime || "—" },
+                    { label: "Date", value: eventDayNumeric },
+                    ...(hubTime ? [{ label: "Time", value: hubTime }] : []),
                     { label: "Location", value: calendarEvent.location?.trim() || "—" },
-                    { label: "Plan start", value: planStartDate ? fmtMD(planStartDate) : "—" },
-                    { label: "Crunch", value: crunchDate ? fmtMD(crunchDate) : "—" },
                   ]} />
                   {taskTotal > 0 && (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 2px 24px" }}>
@@ -9263,6 +9264,11 @@ export function EventPlanWorkspace({
               const timeVal = eventTimeRange
               const locationVal = calendarEvent.location?.trim() || ""
               const descVal = calendarEvent.description?.trim() || ""
+              // The countdown structure is NOT an Overview fact: it is configured in
+              // the Edit-event modal and read on the Countdown tab. Surfacing it here
+              // would restate it a third time, backing no decision the reader makes.
+              // (The desktop facts grid this note used to guard is itself gone — see
+              // spec D5 above.)
 
               const monoLabel: React.CSSProperties = { ...MONO_STYLE, margin: 0 }
               const eyebrow: React.CSSProperties = { ...monoLabel, marginBottom: 14 }
@@ -9289,8 +9295,11 @@ export function EventPlanWorkspace({
                     : []),
                   ...(timeVal ? [{ key: "Time", value: timeVal }] : []),
                   { key: "Location", value: locationVal },
-                  { key: "Plan start", value: planStartDate ? fmtMD(planStartDate) : "" },
-                  { key: "Crunch start", value: crunchDate ? fmtMD(crunchDate) : "" },
+                  // No "Plan start" / "Crunch start": the countdown structure is a
+                  // ladder of RELATIVE offsets now, configured in the Edit-event
+                  // modal and read on the Countdown tab. It is not an Overview fact
+                  // at either width — restating it here backs no decision the
+                  // reader makes (same call the desktop pane already made).
                 ]
                 return (
                   <div>
@@ -9627,7 +9636,7 @@ export function EventPlanWorkspace({
                         <input
                           type="date"
                           value={newTaskDue}
-                          min={planStartDate || undefined}
+                          min={ladderStartYMD || undefined}
                           max={eventPlusTwoMonthsYMD}
                           onChange={(e) => setNewTaskDue(e.target.value)}
                           style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, fontFamily: "var(--font-inter)", cursor: "pointer" }}
@@ -9673,7 +9682,7 @@ export function EventPlanWorkspace({
                   firedIds={firedTaskIds}
                   canEdit={canEdit}
                   isMobile={isMobile}
-                  hasCrunch={!!crunchDate}
+                  ladder={countdownPhases}
                   countdownPill={pillNode}
                   pinnedBand={pinnedBand}
                   renderRow={(task, aug) => renderTaskTree(task, aug)}

@@ -14,6 +14,7 @@ import { createClient } from "@supabase/supabase-js"
 import ws from "ws" // supabase-js needs a WebSocket impl under Node < 22
 // The app's OWN date/time conversion layer — not a copy. See scripts/lib/app-tz.mjs.
 import tz from "./lib/app-tz.mjs"
+import { countdownPresetPhases } from "../app/home/event-presets-data.mjs"
 
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -296,13 +297,13 @@ if (leadershipTeamId) {
     let { data: plan } = await db.from("event_plans")
       .select("id").eq("calendar_event_id", fridayEv.id).maybeSingle()
     if (!plan) {
-      const ymd = (d) => d.toISOString().split("T")[0]
-      const crunch = new Date(fridayEv.start_date); crunch.setDate(crunch.getDate() - 2)
-      const planStart = new Date(fridayEv.start_date); planStart.setDate(planStart.getDate() - 14)
+      // A weekly worship night is a SHORT-planning event — one week out, counted
+      // in days. (This used to derive a plan_start_date / crunch_date pair from
+      // the event date; the ladder is relative, so nothing is derived.)
       const { data: np, error: pErr } = await db.from("event_plans").insert({
         ministry_id: mid, calendar_event_id: fridayEv.id, created_by: reviewerId,
         overview_notes: "Weekly worship + fellowship night in the campus chapel. Aim for a warm, welcoming room — extra effort on greeting first-time students.",
-        expected_turnout: 80, plan_start_date: ymd(planStart), crunch_date: ymd(crunch),
+        expected_turnout: 80, countdown_phases: countdownPresetPhases("short"),
       }).select("id").single()
       if (pErr) throw pErr
       plan = np
