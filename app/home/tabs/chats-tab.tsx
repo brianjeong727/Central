@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from "react"
+import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff, Paperclip, FileDown, LinkIcon, ImageIcon } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff, Paperclip, FileDown, LinkIcon, ImageIcon, Folder } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -399,6 +400,25 @@ function ChatPrefsCard({ pendingMuted, pendingPinned, onToggleMuted, onTogglePin
   )
 }
 
+// The one leading chip for every settings row — 36px tonal circle, plum stroke
+// glyph. Defined once so the settings list can't drift into three chip styles.
+function SettingsRowIcon({ children }: { children: ReactNode }) {
+  return (
+    <span
+      className="w-9 h-9 rounded-full inline-flex items-center justify-center flex-shrink-0"
+      style={{ background: "var(--pocket-track)", color: "var(--plum)" }}
+    >
+      {children}
+    </span>
+  )
+}
+
+// Row VALUE for the notification mode — the word the user picked, not a sentence
+// about it.
+function notifyLabel(mode: ChatNotifyMode): string {
+  return mode === "all" ? "All" : mode === "mentions" ? "Mentions" : "Off"
+}
+
 // ── Shared items ("Media, links & files") ────────────────────────────────────
 // Same URL shape the in-chat link previews use, so the two never disagree about
 // what counts as a link. SHARED_LIMIT bounds each read — a chat's history is
@@ -451,6 +471,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // Mobile only: "Media, links & files" — everything shared into this chat, in one
   // place (finding a flyer or a sign-up link weeks later is the recurring ask).
   const [showShared, setShowShared] = useState(false)
+  // Multi-option settings push a picker screen instead of inlining chips, so the
+  // settings list stays one repeated shape.
+  const [showNotifyPicker, setShowNotifyPicker] = useState(false)
+  const [showSectionPicker, setShowSectionPicker] = useState(false)
   const [sharedTab, setSharedTab] = useState<"media" | "files" | "links">("media")
   const [sharedLightbox, setSharedLightbox] = useState<string | null>(null)
   const [allProfiles, setAllProfiles] = useState<Profile[]>([])
@@ -858,8 +882,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     : showAllMembers
       ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowAllMembers(false); setMemberSearch(""); setMemberFilter("all") } }, { label: "Members" }]
       : showShared
-        ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowShared(false); setSharedLightbox(null) } }, { label: "Media, links & files" }]
-        : [{ label: displayGroupName, onClick: onBack }, { label: "Settings" }]
+        ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowShared(false); setSharedLightbox(null) } }, { label: "Media & files" }]
+        : showNotifyPicker
+          ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => setShowNotifyPicker(false) }, { label: "Notifications" }]
+          : showSectionPicker
+            ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => setShowSectionPicker(false) }, { label: "Section" }]
+            : [{ label: displayGroupName, onClick: onBack }, { label: "Settings" }]
 
   // Members screen (mobile) — All | Leaders, then name/nickname search.
   const visibleMembers = members.filter((m) => {
@@ -904,7 +932,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       width="full"
       // Mobile-only chrome for the drilled-in Members screen: title + count under
       // it, and the add-member "+" in the row's right slot (§3 chrome-row carve-out).
-      mobileTitle={showAllMembers ? "Members" : showShared ? "Media, links & files" : undefined}
+      mobileTitle={showAllMembers ? "Members" : showShared ? "Media & files" : showNotifyPicker ? "Notifications" : showSectionPicker ? "Section" : undefined}
       mobileMeta={showAllMembers ? `${members.length} member${members.length !== 1 ? "s" : ""}` : undefined}
       mobileAction={showAllMembers && canManage ? (
         <button
@@ -989,8 +1017,43 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         <>
         {/* Mobile (SubpageShell title is desktop-only, so mobile keeps its own header) */}
         <div className="md:hidden">
-          {showShared ? (
-          /* ── Media, links & files (mobile drill-in) ── */
+          {showNotifyPicker ? (
+          /* ── Notifications picker ── one option per row, plum check on the one
+             in force. Staged like every other pref (Convention #21); the parent's
+             Save bar commits it. */
+          <div className="pb-4">
+            <PocketRowCard>
+              {(isDM ? (["all", "off"] as const) : (["all", "mentions", "off"] as const)).map((mode, i, arr) => {
+                const active = (pendingNotifyMode ?? inheritedNotify) === mode
+                return (
+                  <PocketRow
+                    key={mode}
+                    title={notifyLabel(mode)}
+                    titleAccessory={active ? <Check style={{ width: 16, height: 16, color: "var(--plum)", flexShrink: 0 }} /> : undefined}
+                    isLast={i === arr.length - 1}
+                    onClick={() => { chooseNotifyMode(mode); setShowNotifyPicker(false) }}
+                  />
+                )
+              })}
+            </PocketRowCard>
+          </div>
+          ) : showSectionPicker ? (
+          /* ── Section picker (church chats) ── */
+          <div className="pb-4">
+            <PocketRowCard>
+              {CHURCH_SECTION_DEFS.map(({ key, label }, i) => (
+                <PocketRow
+                  key={key}
+                  title={label}
+                  titleAccessory={pendingCategory === key ? <Check style={{ width: 16, height: 16, color: "var(--plum)", flexShrink: 0 }} /> : undefined}
+                  isLast={i === CHURCH_SECTION_DEFS.length - 1}
+                  onClick={() => { setPendingCategory(key); setShowSectionPicker(false) }}
+                />
+              ))}
+            </PocketRowCard>
+          </div>
+          ) : showShared ? (
+          /* ── Media & files (mobile drill-in) ── */
           <SharedItemsScreen
             tab={sharedTab}
             onTab={setSharedTab}
@@ -1061,7 +1124,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             </div>
           </div>
 
-          <PocketKicker label="Members" style={{ margin: "0 4px 12px" }} />
+          {/* TWO sections only — ACTIONS (things you do here) and PRIVACY & SUPPORT
+              (how this chat reaches you). Every row is the same long tappable
+              rectangle: title + optional right-aligned VALUE + chevron, and NO
+              description line. Multi-option settings push a screen rather than
+              inlining chips — a settings list reads as one shape or it reads as
+              noise. See mobile_design_system §4 "Settings rows". */}
+          <PocketKicker label="Actions" style={{ margin: "0 4px 12px" }} />
           {loading ? <Spinner /> : (
             /* Borderless tonal rows-card (Pocket grammar): one --ivory surface at
                --r-pocket, rows divided by the --line-3 hairline. */
@@ -1082,104 +1151,55 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   <span className="text-[15px] font-semibold" style={{ color: "var(--plum)", letterSpacing: "-0.01em" }}>Add members</span>
                 </button>
               )}
-              {/* The roster itself lives on its own screen — an unbounded list here
-                  pushed Preferences and Danger zone off the bottom of the phone. */}
               <PocketRow
-                leading={
-                  <span className="w-9 h-9 rounded-full inline-flex items-center justify-center flex-shrink-0" style={{ background: "var(--pocket-track)", color: "var(--plum)" }}>
-                    <Users style={{ width: 17, height: 17 }} strokeWidth={1.7} />
-                  </span>
-                }
-                title="See all members"
-                sub={`${members.length} member${members.length !== 1 ? "s" : ""} in this chat`}
+                leading={<SettingsRowIcon><Users style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
+                title="Members"
                 chevron
-                isLast
                 onClick={() => { setShowAllMembers(true); setMemberSearch(""); setMemberFilter("all") }}
               />
-            </div>
-          )}
-          {/* Mobile drops the small-group-sync and ministry-chat footnotes — the
-              constraints they described are already evident from the disabled
-              affordances, and the prose pushed the real controls down. Desktop
-              keeps them. */}
-
-          <PocketKicker label="Shared" style={{ margin: "0 4px 12px" }} />
-          <div className="mb-6">
-            <PocketRowCard>
               <PocketRow
-                leading={
-                  <span className="w-9 h-9 rounded-full inline-flex items-center justify-center flex-shrink-0" style={{ background: "var(--pocket-track)", color: "var(--plum)" }}>
-                    <Paperclip style={{ width: 17, height: 17 }} strokeWidth={1.7} />
-                  </span>
-                }
-                title="Media, links & files"
-                sub="Everything shared in this chat"
+                leading={<SettingsRowIcon><Paperclip style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
+                title="Media & files"
                 chevron
-                isLast
+                isLast={!canReassignSection}
                 onClick={() => { setShowShared(true); setSharedTab("media") }}
               />
-            </PocketRowCard>
-          </div>
-
-          {/* Section — church chats can be moved between General / Groups / Teams
-              after creation (staged; commits on the shared Save bar). Locked for the
-              ministry chat (stays General, same rationale as archive). */}
-          {canReassignSection && !loading && (
-            <div className="mb-6">
-              <PocketKicker label="Section" style={{ margin: "0 4px 12px" }} />
-              <div className="flex flex-wrap gap-2">
-                {CHURCH_SECTION_DEFS.map(({ key, label }) => (
-                  <PocketFilterChip key={key} label={label} active={pendingCategory === key} onClick={() => setPendingCategory(key)} />
-                ))}
-              </div>
+              {/* Church chats move between General / Groups / Teams. Staged like
+                  every other pref; commits on the shared Save bar. */}
+              {canReassignSection && (
+                <PocketRow
+                  leading={<SettingsRowIcon><Folder style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
+                  title="Section"
+                  meta={CHURCH_SECTION_DEFS.find((s) => s.key === pendingCategory)?.label}
+                  chevron
+                  isLast
+                  onClick={() => setShowSectionPicker(true)}
+                />
+              )}
             </div>
           )}
 
           {/* Preferences — mobile (staged; commits on Save, never on toggle — the
               existing per-user pref write semantics are preserved). Pocket §4:
               mono kicker + tonal row-card with 46×28 PocketSwitch rows. */}
-          {/* Notifications — a per-chat OVERRIDE of the global mode, not a binary
-              mute. Until the user picks one the chat inherits the global setting,
-              so the chip shown active is the mode actually in force ("smart"
-              resolved by room size). A DM carries no group traffic, so "Mentions"
-              would be meaningless there. Chips sit on the PAGE, not inside a card
-              — the off-state fill is --ivory, which is invisible on an --ivory
-              card (same reason SECTION above renders its chips on the page). */}
           {!loading && (
             <div className="mb-6">
-              <PocketKicker label="Notifications" style={{ margin: "0 4px 12px" }} />
-              <div className="flex flex-wrap gap-2">
-                {(isDM ? (["all", "off"] as const) : (["all", "mentions", "off"] as const)).map((mode) => (
-                  <PocketFilterChip
-                    key={mode}
-                    label={mode === "all" ? "All" : mode === "mentions" ? "Mentions" : "Off"}
-                    active={(pendingNotifyMode ?? inheritedNotify) === mode}
-                    onClick={() => chooseNotifyMode(mode)}
-                  />
-                ))}
-              </div>
-              <p className="text-[13px] mt-2.5" style={{ color: "var(--muted-text)", paddingLeft: 4 }}>
-                {pendingNotifyMode === null
-                  ? "Following your default for this chat."
-                  : pendingNotifyMode === "off"
-                    ? "Nothing from this chat will reach you."
-                    : pendingNotifyMode === "mentions"
-                      ? "Only when someone @mentions or replies to you."
-                      : "Every message in this chat."}
-              </p>
-            </div>
-          )}
-
-          {!loading && (
-            <div className="mb-6">
-              <PocketKicker label="Preferences" style={{ margin: "0 4px 12px" }} />
+              <PocketKicker label="Privacy & support" style={{ margin: "0 4px 12px" }} />
               <PocketRowCard>
-                <div className="flex items-center gap-3.5" style={{ padding: "13px 0" }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[14.5px] font-semibold" style={{ color: "var(--ink)" }}>Pin to top of chats</p>
-                    <p className="text-[13px] mt-0.5" style={{ color: "var(--muted-text)" }}>Keeps it above the fold.</p>
-                  </div>
-                  <PocketSwitch checked={pendingPinned} onChange={() => setPendingPinned((v) => !v)} ariaLabel="Pin to top of chats" />
+                {/* Per-chat OVERRIDE of the global mode. The right-aligned value is
+                    the mode actually in force — the inherited one until the user
+                    picks, with "smart" resolved by room size. */}
+                <PocketRow
+                  leading={<SettingsRowIcon><BellOff style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
+                  title="Notifications"
+                  meta={notifyLabel(pendingNotifyMode ?? inheritedNotify)}
+                  chevron
+                  onClick={() => setShowNotifyPicker(true)}
+                />
+                <div className="flex items-center gap-3" style={{ padding: "13px 0" }}>
+                  <SettingsRowIcon><Pin style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>
+                  <p className="flex-1 min-w-0 text-[15px] font-semibold" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>Pin chat</p>
+                  <PocketSwitch checked={pendingPinned} onChange={() => setPendingPinned((v) => !v)} ariaLabel="Pin chat" />
                 </div>
               </PocketRowCard>
               {prefsDirty && (
