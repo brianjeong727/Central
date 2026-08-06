@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff, Paperclip, FileDown, LinkIcon, ImageIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -22,7 +22,7 @@ import { InsetHairline } from "@/components/central/hairline"
 import { fetchChatList } from "../chat-list"
 import { subscribeChatTopic } from "../chat-broadcast"
 import { PushSubscribeCard } from "../components/notifications"
-import { MessageRow } from "./message-row"
+import { MessageRow, formatFileSize } from "./message-row"
 import { Composer } from "./composer"
 import { ReportModal } from "../components/report-modal"
 import { useBlocks } from "../use-blocks"
@@ -399,6 +399,34 @@ function ChatPrefsCard({ pendingMuted, pendingPinned, onToggleMuted, onTogglePin
   )
 }
 
+// ── Shared items ("Media, links & files") ────────────────────────────────────
+// Same URL shape the in-chat link previews use, so the two never disagree about
+// what counts as a link. SHARED_LIMIT bounds each read — a chat's history is
+// unbounded and this screen is a finder, not an archive.
+const SHARED_URL_RE = /https?:\/\/[^\s<>"']+/gi
+const SHARED_LIMIT = 200
+
+interface SharedRow {
+  id: string
+  content: string | null
+  created_at: string
+  sender_id: string
+  attachment_url: string | null
+  attachment_type: string | null
+  attachment_name: string | null
+  attachment_size: number | null
+  profiles: { name: string } | { name: string }[] | null
+}
+
+interface SharedItem {
+  key: string
+  url: string
+  name: string
+  size: number | null
+  sender: string
+  at: string
+}
+
 export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, isCentral = false, userId, userName, ministryId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
   const supabase = createClient()
   const { mutate: mutateGlobal } = useSWRConfig()
@@ -414,6 +442,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const [showAllMembers, setShowAllMembers] = useState(false)
   const [memberFilter, setMemberFilter] = useState<"all" | "leaders">("all")
   const [memberSearch, setMemberSearch] = useState("")
+  // Mobile only: "Media, links & files" — everything shared into this chat, in one
+  // place (finding a flyer or a sign-up link weeks later is the recurring ask).
+  const [showShared, setShowShared] = useState(false)
+  const [sharedTab, setSharedTab] = useState<"media" | "files" | "links">("media")
+  const [sharedLightbox, setSharedLightbox] = useState<string | null>(null)
   const [allProfiles, setAllProfiles] = useState<Profile[]>([])
   const [searchAdd, setSearchAdd] = useState("")
   const [selectedToAdd, setSelectedToAdd] = useState<string[]>([])
@@ -527,6 +560,55 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     }
   )
   const loading = !settingsData
+
+  // Shared-items load (mobile "Media, links & files"). Lazy — the key stays null
+  // until the screen is opened, so settings never pays for it. Two bounded reads:
+  // every attachment, and the messages whose body looks like it carries a URL
+  // (the ilike keeps the link scan off the full history; the exact extraction is
+  // the same regex the in-chat link previews use).
+  const { data: sharedData } = useSWR(
+    showShared && groupId ? ["chat-shared", groupId] : null,
+    async () => {
+      const sel = "id, content, created_at, sender_id, attachment_url, attachment_type, attachment_name, attachment_size, profiles!sender_id(name)"
+      const [{ data: withFiles }, { data: withLinks }] = await Promise.all([
+        supabase.from("messages").select(sel)
+          .eq("group_id", groupId).eq("deleted", false)
+          .not("attachment_url", "is", null)
+          .order("created_at", { ascending: false }).limit(SHARED_LIMIT),
+        supabase.from("messages").select(sel)
+          .eq("group_id", groupId).eq("deleted", false)
+          .or("content.ilike.%http://%,content.ilike.%https://%")
+          .order("created_at", { ascending: false }).limit(SHARED_LIMIT),
+      ])
+      const senderName = (r: SharedRow) => {
+        const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles
+        return p?.name ?? "Someone"
+      }
+      const atts = (withFiles ?? []) as SharedRow[]
+      const media: SharedItem[] = []
+      const files: SharedItem[] = []
+      for (const r of atts) {
+        if (!r.attachment_url) continue
+        const item: SharedItem = {
+          key: r.id, url: r.attachment_url, name: r.attachment_name ?? "Attachment",
+          size: r.attachment_size ?? null, sender: senderName(r), at: r.created_at,
+        }
+        ;(r.attachment_type?.startsWith("image/") ? media : files).push(item)
+      }
+      const links: SharedItem[] = []
+      const seen = new Set<string>()
+      for (const r of (withLinks ?? []) as SharedRow[]) {
+        for (const url of r.content?.match(SHARED_URL_RE) ?? []) {
+          if (seen.has(url)) continue
+          seen.add(url)
+          let host = url
+          try { host = new URL(url).hostname.replace(/^www\./, "") } catch { /* keep raw */ }
+          links.push({ key: `${r.id}-${url}`, url, name: host, size: null, sender: senderName(r), at: r.created_at })
+        }
+      }
+      return { media, files, links }
+    },
+  )
 
   useEffect(() => {
     if (!settingsData) return
@@ -717,7 +799,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: backToSettings }, { label: "Add members" }]
     : showAllMembers
       ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowAllMembers(false); setMemberSearch(""); setMemberFilter("all") } }, { label: "Members" }]
-      : [{ label: displayGroupName, onClick: onBack }, { label: "Settings" }]
+      : showShared
+        ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowShared(false); setSharedLightbox(null) } }, { label: "Media, links & files" }]
+        : [{ label: displayGroupName, onClick: onBack }, { label: "Settings" }]
 
   // Members screen (mobile) — All | Leaders, then name/nickname search.
   const visibleMembers = members.filter((m) => {
@@ -762,7 +846,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       width="full"
       // Mobile-only chrome for the drilled-in Members screen: title + count under
       // it, and the add-member "+" in the row's right slot (§3 chrome-row carve-out).
-      mobileTitle={showAllMembers ? "Members" : undefined}
+      mobileTitle={showAllMembers ? "Members" : showShared ? "Media, links & files" : undefined}
       mobileMeta={showAllMembers ? `${members.length} member${members.length !== 1 ? "s" : ""}` : undefined}
       mobileAction={showAllMembers && canManage ? (
         <button
@@ -847,7 +931,15 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         <>
         {/* Mobile (SubpageShell title is desktop-only, so mobile keeps its own header) */}
         <div className="md:hidden">
-          {showAllMembers ? (
+          {showShared ? (
+          /* ── Media, links & files (mobile drill-in) ── */
+          <SharedItemsScreen
+            tab={sharedTab}
+            onTab={setSharedTab}
+            data={sharedData}
+            onOpenImage={setSharedLightbox}
+          />
+          ) : showAllMembers ? (
           /* ── Members screen (mobile drill-in) ── chrome (title + count + "+")
              is owned by SubpageShell; body is filter · search · roster. */
           <div className="pb-4">
@@ -952,6 +1044,24 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               constraints they described are already evident from the disabled
               affordances, and the prose pushed the real controls down. Desktop
               keeps them. */}
+
+          <PocketKicker label="Shared" style={{ margin: "0 4px 12px" }} />
+          <div className="mb-6">
+            <PocketRowCard>
+              <PocketRow
+                leading={
+                  <span className="w-9 h-9 rounded-full inline-flex items-center justify-center flex-shrink-0" style={{ background: "var(--pocket-track)", color: "var(--plum)" }}>
+                    <Paperclip style={{ width: 17, height: 17 }} strokeWidth={1.7} />
+                  </span>
+                }
+                title="Media, links & files"
+                sub="Everything shared in this chat"
+                chevron
+                isLast
+                onClick={() => { setShowShared(true); setSharedTab("media") }}
+              />
+            </PocketRowCard>
+          </div>
 
           {/* Section — church chats can be moved between General / Groups / Teams
               after creation (staged; commits on the shared Save bar). Locked for the
@@ -1224,7 +1334,87 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         </CentralModal>,
         document.body
       )}
+
+      {/* Shared-media lightbox — same treatment as the in-chat one (tap anywhere
+          to dismiss), portaled so the subpage's scroll container can't clip it. */}
+      {mounted && sharedLightbox && createPortal(
+        <div className="fixed inset-0 z-[300] bg-black/92 flex items-center justify-center" onClick={() => setSharedLightbox(null)}>
+          <button
+            className="absolute top-[max(env(safe-area-inset-top),1rem)] right-4 w-10 h-10 rounded-full bg-[var(--cream-panel)]/10 flex items-center justify-center text-white"
+            onClick={() => setSharedLightbox(null)}
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img src={sharedLightbox} alt="" className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+        </div>,
+        document.body
+      )}
     </SubpageShell>
+  )
+}
+
+// "Media, links & files" body (mobile). Three exclusive tabs → Pocket fchips
+// (§3: ≤3 exclusive options stay chips). Media is a 3-col thumbnail grid; files
+// and links are row-cards. The chrome (back + title) is owned by SubpageShell.
+function SharedItemsScreen({ tab, onTab, data, onOpenImage }: {
+  tab: "media" | "files" | "links"
+  onTab: (t: "media" | "files" | "links") => void
+  data: { media: SharedItem[]; files: SharedItem[]; links: SharedItem[] } | undefined
+  onOpenImage: (url: string) => void
+}) {
+  const items = data ? data[tab] : []
+  const emptyCopy: Record<typeof tab, { title: string; subtitle: string }> = {
+    media: { title: "No photos yet", subtitle: "Photos and GIFs shared in this chat collect here." },
+    files: { title: "No files yet", subtitle: "Documents shared in this chat collect here." },
+    links: { title: "No links yet", subtitle: "Links anyone sends in this chat collect here." },
+  }
+  return (
+    <div className="pb-4">
+      <PocketFilterChipRow style={{ marginBottom: 16 }}>
+        <PocketFilterChip label="Media" active={tab === "media"} onClick={() => onTab("media")} />
+        <PocketFilterChip label="Files" active={tab === "files"} onClick={() => onTab("files")} />
+        <PocketFilterChip label="Links" active={tab === "links"} onClick={() => onTab("links")} />
+      </PocketFilterChipRow>
+
+      {!data ? <Spinner /> : items.length === 0 ? (
+        <EmptyState
+          icon={tab === "media" ? <ImageIcon className="w-7 h-7" /> : tab === "files" ? <FileDown className="w-7 h-7" /> : <LinkIcon className="w-7 h-7" />}
+          title={emptyCopy[tab].title}
+          subtitle={emptyCopy[tab].subtitle}
+        />
+      ) : tab === "media" ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+          {items.map((it) => (
+            <button
+              key={it.key}
+              onClick={() => onOpenImage(it.url)}
+              aria-label={`Open ${it.name}`}
+              style={{ aspectRatio: "1", borderRadius: 12, overflow: "hidden", border: "none", padding: 0, background: "var(--ivory)", cursor: "pointer" }}
+            >
+              <img src={it.url} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <PocketRowCard>
+          {items.map((it, i) => (
+            <PocketRow
+              key={it.key}
+              leading={
+                <span className="w-9 h-9 rounded-full inline-flex items-center justify-center flex-shrink-0" style={{ background: "var(--pocket-track)", color: "var(--plum)" }}>
+                  {tab === "files" ? <FileDown style={{ width: 16, height: 16 }} strokeWidth={1.7} /> : <LinkIcon style={{ width: 16, height: 16 }} strokeWidth={1.7} />}
+                </span>
+              }
+              title={it.name}
+              sub={tab === "files" && it.size ? `${it.sender} · ${formatFileSize(it.size)}` : `${it.sender} · ${formatRelativeTime(it.at)}`}
+              isLast={i === items.length - 1}
+              onClick={() => window.open(it.url, "_blank", "noopener,noreferrer")}
+            />
+          ))}
+        </PocketRowCard>
+      )}
+    </div>
   )
 }
 
