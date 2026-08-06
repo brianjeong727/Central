@@ -300,7 +300,9 @@ Public routes allowed through: `/`, `/landing`, `/ministries`, `/login`, `/signu
 ### Multi-tenant model
 Every workspace is a **ministry**. All tenant data carries a `ministry_id` FK. RLS policies enforce isolation. Two SECURITY DEFINER helpers bypass profile-table RLS without recursion:
 - `auth_ministry_id()` — returns current user's `ministry_id`
-- `auth_is_admin_or_leader()` — returns `true` if role is admin or leader. ⚠️ **Unpinned `search_path`** (and it references `profiles` unqualified), and it is called by ~104 policies across 44 tables. A new helper that pins `set search_path = ''` and calls this WILL raise `42P01` for every caller — pin new helpers to `public` instead (see `tasks/lessons/inbox/2026-08-06-search-path-pin-does-not-propagate.md`).
+- `auth_is_admin_or_leader()` — returns `true` if role is admin or leader (called by ~104 policies across 44 tables)
+
+⚠️ **Every SECURITY DEFINER policy helper must be `set search_path = public, pg_temp`.** Bare `public` does NOT close the shadowing vector — `pg_temp` is searched FIRST for relations unless listed explicitly, so a planted `pg_temp.profiles` can make a member report as admin, or relocate them into another ministry via `auth_ministry_id()`. And `''` is worse than useless when the helper calls an unpinned one: the empty path propagates INTO the callee and raises `42P01` for every caller. Only pin `''` when the body is fully qualified AND calls nothing (`event_plan_ministry_id`). See `tasks/lessons/inbox/2026-08-06-search-path-pin-does-not-propagate.md`.
 
 Two more scope the event-planning tables (Convention #9):
 - `event_plan_ministry_id(plan_id)` — the ministry that owns an `event_plans` row. `event_tasks`/`event_roles`/`event_blocks`/`event_notes` intentionally carry no `ministry_id` (Convention #8), so their INSERT/UPDATE/DELETE policies scope through this.

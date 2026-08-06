@@ -1,46 +1,75 @@
-## A `search_path` pin does NOT propagate to the functions you call (2026-08-06)
+## `search_path` on SECURITY DEFINER helpers: two traps, one correct form (2026-08-06)
 
-Writing a new policy helper, I did the correct hardening:
+The correct pin for a policy helper in this codebase is:
+
+```sql
+set search_path = public, pg_temp
+```
+
+Not `''`, and **not bare `public`**. Both of the obvious choices are wrong, for
+opposite reasons, and both were hit in one task.
+
+### Trap 1 — `''` does not propagate INTO your callees, it propagates OUT
+
+A new helper was written with the hardening the Supabase linter asks for:
 
 ```sql
 create function public.auth_can_plan_events() returns boolean
 language sql stable security definer
-set search_path = ''          -- the Supabase linter asks for this
+set search_path = ''
 as $$ select (select public.auth_is_admin_or_leader()) or exists (...) $$;
 ```
 
 Body fully qualified, so it looked airtight. It raised
 `42P01: relation "profiles" does not exist` **for every caller**.
 
-**Why:** `auth_is_admin_or_leader()` has NO `search_path` setting of its own
-(`proconfig IS NULL`) and references `profiles` unqualified. A callee without its
-own pin executes under the **caller's** `search_path`. My empty path therefore
-propagated into it and broke a function that has worked for years. All 12 new
-policies routed through the helper, so applying it would have taken the entire
-Run Sheet / plan-tab authoring surface offline. It failed closed and loudly, but
-it was still a hard outage — caught only by the mandatory before-apply review.
+`auth_is_admin_or_leader()` had NO `search_path` of its own (`proconfig IS NULL`)
+and referenced `profiles` unqualified. **A callee without its own pin runs under
+the caller's `search_path`** — so the empty path propagated into a function that
+had worked for years. All 12 new policies routed through the helper: applying it
+would have taken the whole Run Sheet / plan-tab authoring surface offline.
 
-**The rule:** `set search_path = ''` is only safe if EVERY function you call is
-also pinned. Before pinning a new helper to `''`, check its callees:
+Before pinning a new helper to `''`, check its callees:
 
 ```sql
-select proname, proconfig from pg_proc
-where proname in ('the','callees','you','use');   -- proconfig NULL = unpinned
+select proname, proconfig from pg_proc where proname in ('the','callees');
+-- proconfig IS NULL  => unpinned => it will inherit YOUR path
 ```
 
-If any callee is unpinned, pin the new helper to `public` instead — which is what
-`auth_ministry_id`, `group_ministry_id` and `is_group_member` all already do.
-Fully qualifying your own body is necessary but NOT sufficient.
+### Trap 2 — bare `public` does NOT close the shadowing vector it exists to close
 
-**Corollary — test a policy helper inside an actual policy evaluation, not just
-as a direct `select helper()`.** Both paths hit this one, but a direct call is
-not proof that the policy path works.
+The obvious correction is `set search_path = public`. **That is still exploitable.**
+Postgres searches `pg_temp` **first for relations** unless `pg_temp` is listed
+explicitly. Proven live with a planted `pg_temp.profiles` claiming a plain member
+is an admin:
 
-**Left open deliberately:** `auth_is_admin_or_leader()` is still unpinned, so the
-next correctly-pinned helper hits this again. It is called by **104 policies
-across 44 tables** — the widest blast radius in the codebase — so pinning it is
-its own migration with its own review, never a drive-by. Not exploitable today
-(neither `authenticated` nor `anon` can CREATE in `public`/`auth`/`extensions`,
-so there is no shadowing vector); this is hardening, not a live hole.
+| pin | result |
+|---|---|
+| unpinned | `true` — shadowed |
+| `public` | **`true` — still shadowed** |
+| `public, pg_temp` | `false` — closed (real leader still `true`) |
+
+All three client roles hold `TEMPORARY` on the database. Listing `pg_temp` LAST is
+the entire fix.
+
+**The worst case is not role escalation — it is tenant relocation.** Shadowing
+`auth_ministry_id()` (bare `public`, unqualified `profiles`) doesn't make you an
+admin, it moves you into another ministry. Any helper that resolves the tenant
+boundary is the highest-value target on the list.
+
+### Two more things this cost
+
+- **Test a policy helper inside a real policy evaluation**, not just as
+  `select helper()`. Both paths broke here, but a direct call is not proof.
+- **Negative controls or it didn't happen.** Five `false` results after a fix look
+  identical to a broken probe. The proof only counted because the same session
+  showed the attack still working against an unpinned function.
+
+`event_plan_ministry_id()` is the one exception worth keeping at `''`: fully
+qualified body, calls nothing. That is the strongest form when you can get it.
+
+**Still open:** 12 policy helpers remain on bare `public` across ~70 call sites
+(`is_team_member`, `is_group_member`, `auth_has_finance_permission`,
+`auth_can_manage_team`, …), plus 3 unpinned non-policy functions.
 
 Related: [[update-policy-missing-with-check]].
