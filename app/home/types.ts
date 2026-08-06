@@ -347,8 +347,6 @@ export interface HomeTabProps {
   // directory / announcements) + the mobile chrome Settings gear (settings).
   // Wired to the shell's handleNavClick so navigation stays one atomic param replace.
   onGoToTab?: (tab: "give" | "plan" | "directory" | "announcements" | "settings") => void
-  // Current user's team memberships — drives the Pocket quick-grid contextual tile.
-  userTeams?: UserTeam[]
   avatarUrl?: string | null
   activeQuestion?: CongregationQuestion | null
   hasResponded?: boolean
