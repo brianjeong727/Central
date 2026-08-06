@@ -2632,11 +2632,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
   return (
     <>
-    <AnimateIn animate={!inline} className={inline ? "flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 z-[100] bg-[var(--cream-panel)] flex flex-col md:left-[var(--shell-offset)]"}>
+    {/* Mobile chat is ONE continuous cream surface — header, message body and
+        composer share --cream so the chrome/composer controls read as floating
+        (iMessage/Messenger). Desktop keeps its --cream-panel overlay. */}
+    <AnimateIn animate={!inline} className={inline ? "flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 z-[100] bg-[var(--cream)] md:bg-[var(--cream-panel)] flex flex-col md:left-[var(--shell-offset)]"}>
     <div ref={chatSwipeRef} className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
-      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-[max(env(safe-area-inset-top),48px)] pb-3 md:py-3.5 border-b border-[var(--line)]"} bg-[var(--cream)]`}>
+      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-[max(env(safe-area-inset-top),48px)] pb-3 md:py-3.5 md:border-b md:border-[var(--line)]"} bg-[var(--cream)]`}>
         {searchMode ? (
           <>
             {/* Search bar mode */}
@@ -2693,7 +2696,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
               onClick={() => { if (window.matchMedia("(max-width: 767px)").matches) setShowSettings(true) }}
             >
               <div className="flex items-center gap-2">
-                <h2 className="truncate leading-none text-[17px] font-semibold md:text-[16px] md:font-normal" style={{ fontFamily: "var(--serif)", color: "var(--ink)", letterSpacing: "-0.01em" }}>{displayName}</h2>
+                {/* Mobile: the name is the whole title block (no member-count sub),
+                    so it takes the chrome-title size and centers against the avatar. */}
+                <h2 className="truncate leading-[1.2] text-[20px] font-semibold md:leading-none md:text-[16px] md:font-normal" style={{ fontFamily: "var(--serif)", color: "var(--ink)", letterSpacing: "-0.01em" }}>{displayName}</h2>
                 <div className="hidden md:flex items-center flex-shrink-0">
                   {memberFirstNames.slice(0, 4).map((name, i) => (
                     <span
@@ -2714,9 +2719,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   {memberCount} member{memberCount !== 1 ? "s" : ""} · {memberFirstNames.slice(0, 8).join(", ")}
                 </p>
               </div>
-              <p className="md:hidden text-[12px] text-[var(--muted-text)] mt-0.5">
-                {memberCount} member{memberCount !== 1 ? "s" : ""}
-              </p>
             </div>
             {/* Desktop action buttons — Search + User only */}
             <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
@@ -2727,13 +2729,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 <User size={14} />
               </button>
             </div>
-            {/* Mobile: search only — settings is reached by tapping the chat name
-                above (iMessage/Messenger pattern). 34px chrome hit box (mobile §1.3). */}
-            <div className="flex items-center gap-1 flex-shrink-0 md:hidden">
-              <button onClick={openSearch} className="w-[34px] h-[34px] flex items-center justify-center hover:bg-[var(--cream-2)] rounded-full transition-colors">
-                <Search className="w-4 h-4 text-[var(--muted-text)]" />
-              </button>
-            </div>
+            {/* Mobile carries NO chrome actions — settings is reached by tapping the
+                chat name above (iMessage/Messenger pattern); message search stays a
+                desktop affordance. */}
           </>
         )}
       </div>
@@ -2771,7 +2769,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <p className="text-[14px] font-medium text-[var(--ink)]/40">No messages yet</p>
-              <p className="text-[12px] text-[var(--muted-text)]/40 mt-1">Say hello! 👋</p>
             </div>
           </div>
         ) : (
@@ -3246,6 +3243,10 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
   onOpen: (id: string, name: string) => void
   onAddInSection: (category: ChurchSection) => void
 }) {
+  // The FIRST rendered section sits tight under the scope pills — the 20px
+  // section gap is a between-sections rhythm, not a lead-in (empty sections
+  // self-hide, so "first" is the first section that actually renders).
+  const visibleKeys = CHURCH_SECTION_DEFS.filter(({ key }) => sections[key].length > 0).map(({ key }) => key)
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
       {CHURCH_SECTION_DEFS.map(({ key, label }) => {
@@ -3255,7 +3256,7 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
           <div key={key}>
             <PocketKicker
               label={label}
-              style={{ margin: "20px 4px 8px" }}
+              style={{ margin: `${key === visibleKeys[0] ? 2 : 20}px 4px 8px` }}
               action={canCreate ? (
                 <button
                   onClick={() => onAddInSection(key)}

@@ -210,9 +210,11 @@ export function PocketBackRow({ label, onBack, style }: { label: string; onBack:
   )
 }
 
-// 40px squircle monogram chip (mockup `.chip`): --line-2 tonal with a plum
-// letter; `solid` inverts to a plum fill with a cream letter (ministry-wide chat).
-export function PocketChip({ letter, solid = false, size = 40 }: { letter: string; solid?: boolean; size?: number }) {
+// 40px squircle chip (mockup `.chip`): --pocket-track tonal holding a plum
+// letter OR a plum stroked icon (§4 Row contract — "plum stroke icon or
+// initial"); `solid` inverts to a plum fill with cream content (ministry-wide
+// chat). `icon` wins over `letter` when both are passed.
+export function PocketChip({ letter, icon, solid = false, size = 40 }: { letter?: string; icon?: ReactNode; solid?: boolean; size?: number }) {
   return (
     <span
       style={{
@@ -223,7 +225,7 @@ export function PocketChip({ letter, solid = false, size = 40 }: { letter: strin
         color: solid ? "var(--cream-on-dark)" : "var(--plum)",
       }}
     >
-      {letter}
+      {icon ?? letter}
     </span>
   )
 }
