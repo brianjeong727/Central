@@ -355,8 +355,6 @@ export interface HomeTabProps {
   // directory / announcements) + the mobile chrome Settings gear (settings).
   // Wired to the shell's handleNavClick so navigation stays one atomic param replace.
   onGoToTab?: (tab: "give" | "plan" | "directory" | "announcements" | "settings") => void
-  // Current user's team memberships — drives the Pocket quick-grid contextual tile.
-  userTeams?: UserTeam[]
   avatarUrl?: string | null
   activeQuestion?: CongregationQuestion | null
   hasResponded?: boolean
@@ -779,7 +777,15 @@ export interface TeamRole {
 export interface TeamMemberDisplay {
   user_id: string
   name: string
-  role_id: string
+  /**
+   * NULLABLE — `team_members.role_id` has no NOT NULL constraint and roleless rows
+   * exist in production (a member added before the team had roles, or whose role
+   * was deleted: `team_roles` deletion leaves the membership behind). Declaring it
+   * `string` made every consumer assume a role and fed `value={null}` into the
+   * settings `<select>`, which React silently downgrades to UNCONTROLLED — so a
+   * roleless member rendered as holding whichever role happened to be listed first.
+   */
+  role_id: string | null
   role_name: string
   joined_at: string
 }

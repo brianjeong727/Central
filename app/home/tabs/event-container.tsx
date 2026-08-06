@@ -223,9 +223,20 @@ function nightLabel(ev: CalendarEvent): string {
   return eventDayHeaderLabel(new Date(ev.start_date))
 }
 
-export function SectionKicker({ label, hint, isMobile }: { label: string; hint?: string; isMobile: boolean }) {
+export function SectionKicker({ label, hint, isMobile, first }: {
+  label: string
+  hint?: string
+  isMobile: boolean
+  /**
+   * This kicker LEADS its pane, so it drops the 30px section-separation margin —
+   * that gap exists to part two sibling sections, and at the top of a screen it
+   * just pushes the content down under the chrome row. Mirrors the desktop
+   * `EventRuledSection spaced={false}` flag.
+   */
+  first?: boolean
+}) {
   return (
-    <div style={{ marginTop: 30, marginBottom: hint ? 6 : 12 }}>
+    <div style={{ marginTop: first ? 0 : 30, marginBottom: hint ? 6 : 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span style={isMobile
           ? { ...MONO_STYLE, margin: 0 }

@@ -13,7 +13,7 @@ import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
+import { MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
 import { ChatSearchView } from "../components/chat-search"
 import { findExistingDm } from "../dm"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
@@ -932,21 +932,28 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       title={showAddMembers ? "Add members" : "Settings"}
       crumbs={crumbs}
       width="full"
-      // Mobile-only chrome for the drilled-in Members screen: title + count under
-      // it, and the add-member "+" in the row's right slot (§3 chrome-row carve-out).
+      // Mobile-only chrome for the drilled-in screens: title, plus the member count
+      // under it on Members. The chrome-row "+" goes through SubpageChromeActions
+      // (the shell's portal slot) rather than a prop — see below.
       mobileTitle={showAllMembers ? "Members" : showShared ? "Media & files" : showNotifyPicker ? "Notifications" : showSectionPicker ? "Section" : undefined}
       mobileMeta={showAllMembers ? `${members.length} member${members.length !== 1 ? "s" : ""}` : undefined}
-      mobileAction={showAllMembers && canManage ? (
-        <button
-          type="button"
-          onClick={() => { setShowAllMembers(false); setShowAddMembers(true); loadAllProfiles() }}
-          aria-label="Add members"
-          style={{ width: 34, height: 34, borderRadius: 999, display: "grid", placeItems: "center", background: "none", border: "none", color: "var(--plum)", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
-        >
-          <Plus style={{ width: 19, height: 19 }} strokeWidth={2} />
-        </button>
-      ) : undefined}
     >
+      {/* Add-member "+" in the mobile chrome row (§3 carve-out from Convention
+          #15). Portals into the shell's chrome slot, so it renders here — with
+          live closures over the screen state — and lands up in the header. */}
+      {showAllMembers && canManage && (
+        <SubpageChromeActions>
+          <button
+            type="button"
+            onClick={() => { setShowAllMembers(false); setShowAddMembers(true); loadAllProfiles() }}
+            aria-label="Add members"
+            style={{ width: 34, height: 34, borderRadius: 999, display: "grid", placeItems: "center", background: "none", border: "none", color: "var(--plum)", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+          >
+            <Plus style={{ width: 19, height: 19 }} strokeWidth={2} />
+          </button>
+        </SubpageChromeActions>
+      )}
+
       {error && (
         <div className="rounded-xl px-4 py-3 mb-4 text-[13px] font-medium" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>
           {error}

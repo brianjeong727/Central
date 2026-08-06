@@ -45,7 +45,7 @@ import { useIsMobile } from "../use-is-mobile"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, ContentHeader, ContentActionButton, EventSectionHeader, EventMetaLine, NightDivider, InlineAddRow, InlineAddCard, ActionCard, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, PocketRoundButton, PocketButton, PocketSheet, PocketSearchField, POCKET_KICKER_STYLE, MONO_METRIC_STYLE, useScrollResetOn } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, EventSectionHeader, EventMetaLine, NightDivider, InlineAddRow, InlineAddCard, ActionCard, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, PocketRoundButton, PocketButton, PocketFactsGrid, PocketStatCard, PocketSheet, PocketSearchField, POCKET_KICKER_STYLE, MONO_METRIC_STYLE, useScrollResetOn } from "@/components/central"
 import { FinanceWorkspace, MobileFactsGrid, type FinanceSection } from "../components/finance-workspace"
 import { MobilePocketHub, PocketHubChrome } from "../components/mobile-pocket-hub"
 import { teamIconKey } from "../workspace-presets"
@@ -731,7 +731,9 @@ function EventRuledSection({
   if (isMobile) {
     return (
       <div>
-        <SectionKicker label={title} hint={hint} isMobile />
+        {/* `spaced` is the sibling-separation flag; at phone width the same idea
+            is the kicker's own top margin, so the two stay in lockstep. */}
+        <SectionKicker label={title} hint={hint} isMobile first={!spaced} />
         {children}
       </div>
     )
@@ -1627,7 +1629,11 @@ export function StudentOrgTeamHome({
         <MeetingNotesSection teamId={teamId} userId={userId} userName={userName} canWrite={canEdit} startNewTrigger={notesTrigger} openNoteId={openNoteId} onOpenNote={setOpenNoteAndUrl}
               query={notesQuery} onOpenEvent={(eventId) => { void openLinkedEvent(eventId) }} />
       ) : (
-      <div className="md:px-14" style={{ paddingTop: 24, paddingBottom: 60 }}>
+      // Mobile top gap belongs to the chrome row (PocketHubChrome owns 12px,
+      // Convention #27) — a wrapper paddingTop stacked on it and pushed the hub
+      // title to 24px, so drilling into an event (12px) visibly jumped. Desktop
+      // keeps its 24 via md:pt-6.
+      <div className="md:px-14 pt-0 md:pt-6" style={{ paddingBottom: 60 }}>
 
         {/* MOBILE HUB — Daybreak landing (ruling B-1/B-3). Rows drill into the
             existing section surfaces below. Never rendered on desktop. */}
@@ -9153,8 +9159,13 @@ export function EventPlanWorkspace({
         />
       </div>
 
-      {/* Content */}
-      <div className={bare ? "" : "px-5 md:px-14"} style={{ paddingTop: 24, paddingBottom: 80 }}>
+      {/* Content. The top gap is viewport-split: desktop keeps its 24px under the
+          tab strip, phone width drops to 8px because SubpageShell's chrome row
+          already contributes 10px of bottom padding — stacking 24 on top of that
+          opened every spoke ~34px below its own title (and Overview a further 28
+          on top of THAT). Classes, not `isMobile`, so there is no first-paint
+          jump before the viewport state resolves. */}
+      <div className={`${bare ? "" : "px-5 md:px-14"} pt-2 md:pt-6`} style={{ paddingBottom: 80 }}>
         {loading ? (
           <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>
         ) : (
@@ -9244,88 +9255,175 @@ export function EventPlanWorkspace({
                 ? { color: "var(--muted-text)", label: "No checklist yet" }
                 : pct === 100 ? { color: "var(--success)", label: "Ready" }
                 : pct >= 50 ? { color: "var(--sage)", label: "In progress" }
-                : { color: isMobile ? "var(--danger)" : "var(--gold)", label: "Needs attention" }
-              // Identity facts — display-only. Two columns: LEFT Dates/Time + Location,
-              // RIGHT Plan start + Crunch start (dates are edited in the Edit-event
-              // modal, not here). Time omits when empty (all-day); Location and
-              // Crunch start show a muted em-dash when unset.
+                : { color: "var(--gold)", label: "Needs attention" }
+              // Identity facts. Desktop states date / duration / location in the L1
+              // meta line under the title (spec D5), so only the mobile branch below
+              // builds a facts grid; both widths share the prose + notes values.
               const dateOnly = eventDayLong
               const timeVal = eventTimeRange
               const locationVal = calendarEvent.location?.trim() || ""
               const descVal = calendarEvent.description?.trim() || ""
-              // `nowrap` marks facts whose value is a short date that must never break
-              // mid-value ("Aug / 6"). Free-text facts (Location, What) still wrap.
-              type Fact = { k: string; v: string; muted?: boolean; nowrap?: boolean }
-              const leftFacts: Fact[] = [
-                ...(isMultiDayEvent
-                  ? [{ k: "Dates", v: `${formatYMD(eventStart, { month: "short", day: "numeric" })} – ${formatYMD(eventEnd, { month: "short", day: "numeric" })} · ${eventSpanDays} days`, nowrap: true }]
-                  : []),
-                ...(timeVal ? [{ k: "Time", v: timeVal }] : []),
-                { k: "Location", v: locationVal || "—", muted: !locationVal },
-              ]
-              const rightFacts: Fact[] = [
-                { k: "Plan start", v: planStartDate ? fmtMD(planStartDate) : "—", muted: !planStartDate, nowrap: true },
-                { k: "Crunch start", v: crunchDate ? fmtMD(crunchDate) : "—", muted: !crunchDate, nowrap: true },
-              ]
 
               const monoLabel: React.CSSProperties = { ...MONO_STYLE, margin: 0 }
               const eyebrow: React.CSSProperties = { ...monoLabel, marginBottom: 14 }
               // 34px stat serifs are desktop type — phone width caps at the 22px serif stat tier.
               const bigNumber: React.CSSProperties = { fontFamily: "var(--font-instrument-serif)", fontSize: isMobile ? 22 : 34, fontWeight: 400, letterSpacing: isMobile ? -0.3 : -0.6, lineHeight: 1.05, marginTop: 10 }
               const bigInput: React.CSSProperties = { ...bigNumber, color: "var(--ink)", background: "transparent", border: "none", outline: "none", padding: 0, width: "100%" }
-              const factKey: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: "10.5px", letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }
-              const renderFact = (f: Fact, keyW: number) => (
-                <div key={f.k} style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-                  <span style={{ ...factKey, width: keyW, flexShrink: 0 }}>{f.k}</span>
-                  <span style={{ fontSize: 15, color: f.muted ? "var(--faint)" : "var(--ink)", lineHeight: 1.5, ...(f.nowrap ? { whiteSpace: "nowrap" as const } : null) }}>{f.v}</span>
-                </div>
-              )
 
-              return (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 336px", gap: "var(--space-10)", alignItems: "start", marginTop: isMobile ? "var(--space-9)" : 0 }} className="max-md:!block">
-                {/* ── LEFT column ── */}
-                <section>
-                  {/* Event identity header — MOBILE ONLY. The desktop facts grid is
-                      GONE (spec D5): date / duration / location now live in the L1
-                      meta line under the title, where they are visible on every pane
-                      instead of only here, and "What" folds into the "About this
-                      event" prose below. Phone width keeps this card (it has no L1
-                      meta line — the Pocket chrome owns the title). §4.22's Overview
-                      edit button is deleted with it (D6): "Edit event" is the header
-                      right-slot action now, not a second copy in the body. */}
-                  {isMobile && (
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, paddingBottom: 24, marginBottom: "var(--space-9)", borderBottom: "1px solid var(--line)" }}>
-                    <div>
-                      <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 600, color: "var(--ink)", lineHeight: 1.1, letterSpacing: -0.3 }}>{dateOnly}</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "300px auto", columnGap: "var(--space-12)", rowGap: 16, marginTop: 18, justifyContent: "start" }} className="max-md:!grid-cols-1">
-                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                          {leftFacts.map(f => renderFact(f, 72))}
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                          {rightFacts.map(f => renderFact(f, 104))}
-                        </div>
-                      </div>
-                      {descVal && (
-                        <div style={{ marginTop: 16 }}>{renderFact({ k: "What", v: descVal }, 72)}</div>
+              // ── MOBILE Overview ──────────────────────────────────────────────
+              // Its own tree, not the desktop grid squeezed to one column. The old
+              // shared render stacked ~2100px at 390px because it (a) put the whole
+              // description in a 178px-wide fact column, (b) re-rendered the SAME
+              // "Jump into planning" launchpad the hub already is — you tapped
+              // through that list to get here — and (c) stacked four full-width
+              // 22px-padded stat cards.
+              //
+              // The hub owns navigation; Overview owns the event's facts and
+              // numbers. So: real 2-col facts grid (§4 PocketFactsGrid), the
+              // description promoted to a full-width ABOUT prose block, no
+              // launchpad, and the small numbers paired into a 2-col stat row.
+              if (isMobile) {
+                const factItems = [
+                  ...(isMultiDayEvent
+                    ? [{ key: "Dates", value: `${formatYMD(eventStart, { month: "short", day: "numeric" })} – ${formatYMD(eventEnd, { month: "short", day: "numeric" })} · ${eventSpanDays} days` }]
+                    : []),
+                  ...(timeVal ? [{ key: "Time", value: timeVal }] : []),
+                  { key: "Location", value: locationVal },
+                  { key: "Plan start", value: planStartDate ? fmtMD(planStartDate) : "" },
+                  { key: "Crunch start", value: crunchDate ? fmtMD(crunchDate) : "" },
+                ]
+                return (
+                  <div>
+                    {/* Identity — the one place the event's own date is stated at
+                        phone width (mobile has no L1 meta line; the chrome row owns
+                        the title). */}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+                      <div style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 22, fontWeight: 600, color: "var(--ink)", lineHeight: 1.15, letterSpacing: -0.3, minWidth: 0 }}>{dateOnly}</div>
+                      {canEdit && onEditEvent && (
+                        <span style={{ flexShrink: 0 }}>
+                          <PocketButton variant="quiet" onClick={onEditEvent}>
+                            <Pencil style={{ width: 14, height: 14 }} /> Edit
+                          </PocketButton>
+                        </span>
                       )}
                     </div>
-                    {canEdit && onEditEvent && (
-                      // Mobile takes the Pocket primitive, not the desktop bordered
-                      // button: mobile_design_system.md §4 states desktop primitives
-                      // are not reused on mobile, and §5's identity-card edit
-                      // affordance is a quiet pill labelled "Edit" (same as Profile).
-                      <span style={{ flexShrink: 0 }}>
-                        <PocketButton variant="quiet" onClick={onEditEvent}>
-                          <Pencil style={{ width: 14, height: 14 }} /> Edit
+                    <PocketFactsGrid items={factItems} style={{ marginTop: 16 }} />
+
+                    {/* About — reading copy at full width, never a fact-grid value.
+                        This is the line that used to wrap one word per line. */}
+                    {descVal && (
+                      <div style={{ marginTop: 26 }}>
+                        <p style={eyebrow}>About</p>
+                        <p style={{ fontFamily: "var(--serif)", fontSize: 15.5, lineHeight: 1.6, color: "var(--body)", margin: 0, overflowWrap: "anywhere" }}>{descVal}</p>
+                      </div>
+                    )}
+
+                    {/* Readiness — the bar, not a card. */}
+                    <div style={{ marginTop: 26 }}>
+                      <p style={eyebrow}>Readiness</p>
+                      {taskTotal > 0 ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <PocketProgress done={taskDone} total={taskTotal} />
+                          <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{taskDone}/{taskTotal} done</span>
+                        </div>
+                      ) : (
+                        <p style={{ fontSize: 13.5, color: "var(--muted-text)", margin: 0 }}>No checklist yet.</p>
+                      )}
+                    </div>
+
+                    {/* Numbers — paired, not stacked. Turnout is editable in place
+                        (tap the figure), matching the desktop card's affordance. */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 26 }}>
+                      <PocketStatCard
+                        kicker="Expected turnout"
+                        value={canEdit && editingTurnout ? (
+                          <input
+                            type="number"
+                            autoFocus
+                            value={turnout}
+                            onChange={(e) => setTurnout(e.target.value)}
+                            onBlur={() => { handleSaveTurnout(); setEditingTurnout(false) }}
+                            onKeyDown={(e) => { if (e.key === "Enter") { handleSaveTurnout(); setEditingTurnout(false) } }}
+                            placeholder="—"
+                            style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", background: "transparent", border: "none", outline: "none", padding: 0, width: "100%" }}
+                          />
+                        ) : (
+                          <span
+                            onClick={() => { if (canEdit) setEditingTurnout(true) }}
+                            style={{ color: turnout ? "var(--ink)" : "var(--faint)", cursor: canEdit ? "pointer" : "default" }}
+                          >{turnout || "—"}</span>
+                        )}
+                        sub={rsvpCount !== null ? `${rsvpCount} RSVPed` : "guests"}
+                      />
+                      <PocketStatCard
+                        kicker="Roles staffed"
+                        value={`${rolesAssigned}/${rolesTotal}`}
+                        sub={rolesTotal === 0 ? "none yet" : rolesAssigned === rolesTotal ? "all covered" : `${rolesTotal - rolesAssigned} open`}
+                      />
+                    </div>
+
+                    {/* Budget keeps its own full-width card — it carries a category
+                        selector and per-fund draws, not a single figure. */}
+                    <div style={{ marginTop: 10 }}>
+                      <EventBudgetCard
+                        ministryId={ministryId}
+                        plan={plan}
+                        canEditBudget={canEditBudget}
+                        isMobile
+                        isContainer={isContainer}
+                        containerDrawTotal={containerRollup.drawTotal}
+                        containerUnplanned={containerRollup.unplannedCount}
+                        containerChildCount={containerRollup.children.length}
+                        monoLabel={monoLabel}
+                        bigNumber={bigNumber}
+                      />
+                    </div>
+
+                    {/* Planning notes */}
+                    <div style={{ marginTop: 26 }}>
+                      <p style={eyebrow}>Planning notes</p>
+                      {canEdit ? (
+                        <textarea
+                          value={overviewNotes}
+                          onChange={e => setOverviewNotes(e.target.value)}
+                          onBlur={handleSaveNotes}
+                          placeholder="Add context, key decisions, or reminders for this event…"
+                          style={{ width: "100%", minHeight: 74, background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)", lineHeight: 1.6, resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                        />
+                      ) : overviewNotes ? (
+                        <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.7, whiteSpace: "pre-wrap", margin: 0 }}>{overviewNotes}</p>
+                      ) : (
+                        <p style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic", margin: 0 }}>No planning notes yet.</p>
+                      )}
+                    </div>
+
+                    {/* Run Sheet P2 — Compile playbook (leader-only, once passed) */}
+                    {canEdit && plan && new Date(calendarEvent.start_date).getTime() < Date.now() && (
+                      <div style={{ marginTop: 26 }}>
+                        <p style={eyebrow}>Playbook</p>
+                        <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.55, margin: "0 0 12px" }}>
+                          Save this event&apos;s tasks, roles, and timing as a reusable playbook — next year&apos;s team can &ldquo;Run it back.&rdquo;
+                        </p>
+                        <PocketButton variant="quiet" surface="page" onClick={() => setCompileOpen(true)} style={{ width: "100%" }}>
+                          Compile playbook
                         </PocketButton>
-                      </span>
+                      </div>
                     )}
                   </div>
-                  )}
+                )
+              }
 
-                  {/* About this event — desktop only, and only when there is prose to
-                      show. This is where "What" landed once the facts grid went. */}
-                  {!isMobile && descVal && (
+              return (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 336px", gap: "var(--space-10)", alignItems: "start" }} className="max-md:!block">
+                {/* ── LEFT column ── */}
+                <section>
+                  {/* About this event — only when there is prose to show. This is
+                      where "What" landed once the desktop facts grid went (spec D5):
+                      date / duration / location live in the L1 meta line under the
+                      title, visible on every pane instead of only here. §4.22's
+                      Overview edit button went with it (D6) — "Edit event" is the
+                      header right-slot action, not a second copy in the body. */}
+                  {descVal && (
                     <div style={{ marginBottom: 36 }}>
                       <EventSectionHeader title="About this event" />
                       <p style={{ fontFamily: "var(--serif)", fontSize: 17, lineHeight: 1.6, color: "var(--body)", maxWidth: "56ch", margin: 0 }}>{descVal}</p>
@@ -9334,9 +9432,7 @@ export function EventPlanWorkspace({
 
                   {/* Launchpad */}
                   <div>
-                    {isMobile
-                      ? <p style={eyebrow}>Jump into planning</p>
-                      : <EventSectionHeader title="Jump into planning" />}
+                    <EventSectionHeader title="Jump into planning" />
                     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
                       <LaunchpadRow
                         icon={ClipboardList}
@@ -9391,10 +9487,8 @@ export function EventPlanWorkspace({
 
                   {/* Planning notes (demoted). §1.3's `.sect + .sect { margin-top: 36 }`
                       — a sibling relationship, so it lands here at the call site. */}
-                  <div style={{ marginTop: isMobile ? "var(--space-9)" : 36 }}>
-                    {isMobile
-                      ? <p style={eyebrow}>Planning notes</p>
-                      : <EventSectionHeader title="Planning notes" />}
+                  <div style={{ marginTop: 36 }}>
+                    <EventSectionHeader title="Planning notes" />
                     {canEdit ? (
                       <textarea
                         value={overviewNotes}
@@ -9415,7 +9509,7 @@ export function EventPlanWorkspace({
                 {/* ── RIGHT column — stat cards ── */}
                 <aside style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }} className="max-md:mt-8">
                   {/* Expected turnout */}
-                  <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22} style={isMobile ? { border: "none" } : undefined}>
+                  <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
                     <p style={monoLabel}>Expected turnout</p>
                     {canEdit && editingTurnout ? (
                       <input
@@ -9449,7 +9543,7 @@ export function EventPlanWorkspace({
                     ministryId={ministryId}
                     plan={plan}
                     canEditBudget={canEditBudget}
-                    isMobile={isMobile}
+                    isMobile={false}
                     isContainer={isContainer}
                     containerDrawTotal={containerRollup.drawTotal}
                     containerUnplanned={containerRollup.unplannedCount}
@@ -9459,7 +9553,7 @@ export function EventPlanWorkspace({
                   />
 
                   {/* Readiness */}
-                  <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22} style={isMobile ? { border: "none" } : undefined}>
+                  <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
                     <p style={monoLabel}>Readiness</p>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
                       <span style={{ width: 8, height: 8, borderRadius: 99, background: readiness.color, flexShrink: 0 }} />
@@ -9482,7 +9576,7 @@ export function EventPlanWorkspace({
 
                   {/* Run Sheet P2 — Compile playbook (leader-only, once the event has passed) */}
                   {canEdit && plan && new Date(calendarEvent.start_date).getTime() < Date.now() && (
-                    <CentralCard variant="callout" radius={isMobile ? "var(--r-pocket-sm)" : "var(--r-callout)"} padding={22} style={isMobile ? { border: "none" } : undefined}>
+                    <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
                       <p style={monoLabel}>Playbook</p>
                       <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5, margin: "10px 0 14px" }}>
                         Save this event&apos;s tasks, roles, and timing as a reusable playbook — next year&apos;s team can &ldquo;Run it back.&rdquo;
@@ -9733,7 +9827,12 @@ export function EventPlanWorkspace({
               // keeps the mono kicker it already had.
               const GroupHeader = ({ label, count, allSet, first }: { label: string; count?: number; allSet?: boolean; first?: boolean }) => (
                 isMobile ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "28px 0 4px" }}>
+                  // `first` already existed for the desktop NightDivider; mobile now
+                  // honours it too. The 28px is group-to-group separation — on the
+                  // FIRST group it just re-opened the gap under the chrome row that
+                  // this pass closed. On a container the "Event Level" kicker sits
+                  // above, so the leading group keeps its separation there.
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, margin: `${first && !isContainer ? 8 : 28}px 0 4px` }}>
                     <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{label}</span>
                     {allSet ? (
                       <span style={{ fontStyle: "italic", fontSize: 13, color: "var(--muted-text)", fontFamily: "var(--font-inter)" }}>All roles covered</span>
@@ -9782,12 +9881,19 @@ export function EventPlanWorkspace({
                 const isCovered = !!role.assigned_to
                 const initials = role.assigned_name?.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase() ?? ""
 
-                // ── Mobile display row (Pocket §Row grammar) ─────────────────
+                // ── Mobile display row (Pocket §Row grammar, notes carve-out) ──
                 // The desktop grid packs assignee + edit/delete/confirm icons
                 // into the right column, which squeezes the title to a per-word
                 // wrap at 390px. Mobile instead gives the title a flex:1 column
                 // and a minimal right rail (confirm status), tap → the edit form
                 // (assign / rename / delete all live there).
+                //
+                // DELIBERATE deviation from §4's "13 muted 1-line-ellipsis sub":
+                // a role's notes ARE the role ("Church PA + Ideate loans (5× SM-58,
+                // 3× DI boxes)") — clipping them to one line meant opening the edit
+                // form to read the job. Worse, the sub-line used to be assignee OR
+                // notes, so assigning someone DELETED the description from the
+                // screen. Both now render, notes wrapping in full.
                 if (isMobile) {
                   const c = confirmations[role.id]
                   const cMeta: Record<EventConfirmation["status"], { label: string; color: string }> | null = c ? {
@@ -9798,14 +9904,21 @@ export function EventPlanWorkspace({
                   } : null
                   const canReRequest = !!c && canEdit && (c.status === "declined" || c.status === "escalated")
                   const openEdit = () => { setShowAddRole(false); setEditingRoleId(role.id); setEditRoleName(role.role_name); setEditRoleAssignee(role.assigned_to ?? ""); setEditRoleNotes(role.notes ?? "") }
-                  const subText = isCovered
+                  // Covered rows lead with WHO (the thing you scan for), then the
+                  // notes. Unassigned rows skip the "Tap to assign someone" hint
+                  // whenever there are notes to show: two muted 13px lines stacked
+                  // read at one weight, and the dashed "+" chip already states the
+                  // row is unstaffed and tappable. The hint only appears when it
+                  // would otherwise be the row's only sub-line.
+                  const whoText = isCovered
                     ? role.assigned_name
-                    : (role.notes || (canEdit ? "Tap to assign someone" : "Unassigned"))
+                    : role.notes ? null
+                    : (canEdit ? "Tap to assign someone" : "Unassigned")
                   return (
                     <div
                       key={role.id}
                       onClick={canEdit ? openEdit : undefined}
-                      style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 0", borderBottom: isLast ? "none" : "1px solid var(--line-3)", cursor: canEdit ? "pointer" : "default", width: "100%" }}
+                      style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 0", borderBottom: isLast ? "none" : "1px solid var(--line-3)", cursor: canEdit ? "pointer" : "default", width: "100%" }}
                     >
                       {isCovered ? (
                         <MonogramChip initials={initials} style={{ width: 40, height: 40, fontSize: 13, fontWeight: 500, flexShrink: 0 }} />
@@ -9815,11 +9928,18 @@ export function EventPlanWorkspace({
                         </div>
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{role.role_name}</div>
-                        <div style={{ fontSize: 13, color: isCovered ? "var(--body)" : "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{subText}</div>
+                        <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", lineHeight: 1.3, overflowWrap: "anywhere" }}>{role.role_name}</div>
+                        {whoText && (
+                          <div style={{ fontSize: 13, color: isCovered ? "var(--body)" : "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{whoText}</div>
+                        )}
+                        {role.notes && (
+                          // 5px when it follows the assignee line (a grouped pair),
+                          // 2px when it IS the sub-line (matches the Row grammar).
+                          <div style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, marginTop: whoText ? 5 : 2, overflowWrap: "anywhere" }}>{role.notes}</div>
+                        )}
                       </div>
                       {cMeta && (
-                        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
+                        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0, marginTop: 2 }}>
                           <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.6px", textTransform: "uppercase", color: cMeta[c!.status].color, whiteSpace: "nowrap" }}>{cMeta[c!.status].label}</span>
                           {canReRequest && (
                             <button
@@ -9918,14 +10038,16 @@ export function EventPlanWorkspace({
                 `}</style>
                 {/* Desktop: the shared EventSectionHeader with its full action
                     row. Mobile: the SubpageShell chrome already carries the
-                    "Roles" title (via mobileTitle), so the spoke shows
-                    only a compact right-aligned action rail — the planning-chat
-                    icon + a single plum "+" create — that fits 390px without
-                    clipping. "Request confirmations" drops to a full-width quiet
-                    button below (glance-and-act). */}
+                    "Roles" title (via mobileTitle), so these two actions — the
+                    planning-chat icon + a single plum "+" create — PORTAL into
+                    that same chrome row (mobile_design_system §3's chrome-row
+                    carve-out). They used to sit in a right-aligned rail of their
+                    own directly below the chrome, which read as a stray floating
+                    row and pushed the list down by the button height.
+                    "Request confirmations" stays a full-width quiet button below
+                    (glance-and-act; it is a section action, not a create). */}
                 {isMobile ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ flex: 1, minWidth: 0 }} />
+                  <SubpageChromeActions>
                     {planChatBtn}
                     {canEdit && !showAddRole && !editingRoleId && (
                       <PocketRoundButton
@@ -9936,7 +10058,7 @@ export function EventPlanWorkspace({
                         <Plus style={{ width: 18, height: 18 }} strokeWidth={2.2} />
                       </PocketRoundButton>
                     )}
-                  </div>
+                  </SubpageChromeActions>
                 ) : (
                   // DESKTOP L3. On a container this section IS the event-level list —
                   // its per-night sibling is the "Sub-event Level" section below. The
@@ -10077,6 +10199,10 @@ export function EventPlanWorkspace({
                     label="Event Level"
                     hint="Roles that cover the whole week. A lead for one night belongs to that night — staff those below."
                     isMobile={isMobile}
+                    // Leads the pane whenever "Request confirmations" isn't above
+                    // it (same condition as that button) — without this the kicker
+                    // opened the screen 30px below the chrome row.
+                    first={!(canEdit && covered.length > 0 && !showAddRole && !editingRoleId)}
                   />
                 )}
 
@@ -12723,7 +12849,8 @@ async function fetchTeamSettings([, teamId]: readonly [string, string]) {
   ])
   type RawMember = {
     user_id: string
-    role_id: string
+    /** Nullable in the DB — see TeamMemberDisplay.role_id. */
+    role_id: string | null
     joined_at: string
     profiles: { name: string } | { name: string }[] | null
     team_roles: { name: string } | { name: string }[] | null
@@ -12732,7 +12859,9 @@ async function fetchTeamSettings([, teamId]: readonly [string, string]) {
   const members: TeamMemberDisplay[] = (membersData ?? []).map((m: RawMember) => {
     const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
     const r = Array.isArray(m.team_roles) ? m.team_roles[0] : m.team_roles
-    return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id, role_name: r?.name ?? "Member", joined_at: m.joined_at }
+    // role_name must not claim "Member" for a roleless row — that is exactly the
+    // fiction the null role_id was producing in the editable branch.
+    return { user_id: m.user_id, name: p?.name ?? "Unknown", role_id: m.role_id ?? null, role_name: r?.name ?? (m.role_id ? "Member" : "No role"), joined_at: m.joined_at }
   })
   return { roles, members }
 }
@@ -13390,11 +13519,17 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                               <p onClick={(e) => { e.stopPropagation(); openMemberProfile(m.user_id) }} className="text-[14px] font-medium text-[var(--ink)] truncate cursor-pointer">{m.name}</p>
                               {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
                                 <select
-                                  value={m.role_id}
+                                  // `?? ""` + the matching placeholder option keeps this
+                                  // CONTROLLED for a roleless member. Binding null made
+                                  // React fall back to uncontrolled, which renders the
+                                  // first option — so someone with no role was shown as
+                                  // holding whatever role sorted first.
+                                  value={m.role_id ?? ""}
                                   onChange={e => { e.stopPropagation(); handleChangeRole(m.user_id, e.target.value) }}
                                   onClick={e => e.stopPropagation()}
-                                  style={{ fontSize: 12, color: "var(--body)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0, marginTop: 1 }}
+                                  style={{ fontSize: 12, color: m.role_id ? "var(--body)" : "var(--faint)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0, marginTop: 1 }}
                                 >
+                                  {!m.role_id && <option value="" disabled>No role</option>}
                                   {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                                 </select>
                               ) : (
@@ -13692,10 +13827,12 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         <span onClick={() => openMemberProfile(m.user_id)} style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500, cursor: "pointer" }}>{m.name}</span>
                         {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
                           <select
-                            value={m.role_id}
+                            // Controlled for a roleless member — see the mobile twin above.
+                            value={m.role_id ?? ""}
                             onChange={e => handleChangeRole(m.user_id, e.target.value)}
-                            style={{ fontSize: 13, color: "var(--body)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0 }}
+                            style={{ fontSize: 13, color: m.role_id ? "var(--body)" : "var(--faint)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0 }}
                           >
+                            {!m.role_id && <option value="" disabled>No role</option>}
                             {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                           </select>
                         ) : (

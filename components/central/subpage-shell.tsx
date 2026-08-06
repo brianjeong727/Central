@@ -9,10 +9,12 @@
 // var(--space-8) · InsetHairline — butting the breadcrumb with NO extra top gap.
 // Never hand-roll a header inside the body; the gaps will not match other pages.
 
-import { ReactNode } from "react"
+import { ReactNode, createContext, useContext, useState, useCallback, useEffect, useLayoutEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import { BackChevron } from "./back-chevron"
 import { InsetHairline } from "./hairline"
 import { PageTitle } from "./page-title"
+import { POCKET_CHROME_PAD_Y, POCKET_CHROME_PAD_X } from "./pocket"
 import { useScrollResetOn } from "./scroll-reset"
 import { useEdgeSwipeBack } from "./use-edge-swipe-back"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ context hook); flagged Phase 2, refactor pending
@@ -20,7 +22,83 @@ import { useSubpageCrumbs } from "@/app/home/breadcrumb-context"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ type import); flagged Phase 2, refactor pending
 import type { Crumb } from "@/app/home/types"
 
-export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, mobileAction, titleScale = "compact", titleMeta, titleAction, width = "full", maxWidth = 820, children }: {
+// ── Mobile chrome-row action slot ──────────────────────────────────────────────
+// mobile_design_system §3 puts a phone-width screen's create (and up to one
+// sibling action) in the chrome row itself — the carve-out from desktop
+// Convention #15. The controls that belong there are usually rendered DEEP inside
+// the subpage body (the event workspace's Roles pane is ~7 levels down) and close
+// over live state, so hoisting them through a prop or an effect would either
+// require threading or risk a stale closure. Instead the shell publishes a DOM
+// slot and the deep child portals into it: the child keeps rendering in its own
+// place in the tree with fresh closures, the pixels land in the chrome row.
+const ChromeSlotContext = createContext<HTMLElement | null>(null)
+
+// Layout effect on the client (runs before paint, so the de-bleed lands in the
+// SAME frame the shell mounts — no visible snap from 40px to 20px); plain effect
+// on the server to avoid the SSR useLayoutEffect warning.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect
+
+/**
+ * PHONE-WIDTH GUTTER ENFORCEMENT.
+ *
+ * A SubpageShell is a FULL-BLEED subpage (mobile_design_system §3): it replaces the
+ * parent screen, so its own 20px screen padding must be the ONLY horizontal inset —
+ * content sits 20px from the mobile container's edge on every subpage, matching the
+ * tab roots.
+ *
+ * That held only by CONVENTION: the host had to remember to mount the shell outside
+ * its own padded wrapper (Plan does this for team settings and Receipts, with a
+ * comment saying so). The Plan tab's `md:hidden px-5 pb-28` body wrapper broke it
+ * for anything opened from INSIDE a team — the event workspace and its spokes
+ * rendered at 40px, visibly narrower than the events list they were opened from,
+ * with the chrome row doubled to match.
+ *
+ * So the shell now enforces it instead of trusting the mount site: it measures the
+ * horizontal padding its ancestors impose and cancels exactly that much with a
+ * negative margin. Mounted correctly (no padded ancestor) the sum is 0 and this is
+ * a no-op; mounted inside a padded wrapper it still lands at 20px. Desktop is
+ * untouched — the shell's desktop inset is `md:px-14`, and this returns 0 at ≥768px.
+ */
+function useDeBleed(ref: React.RefObject<HTMLDivElement | null>): number {
+  const [bleed, setBleed] = useState(0)
+  useIsoLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const compute = () => {
+      // Desktop owns its own inset (md:px-14) and is never nested this way.
+      if (window.matchMedia("(min-width: 768px)").matches) { setBleed(0); return }
+      let sum = 0
+      let cur = el.parentElement
+      while (cur && cur !== document.body) {
+        const s = getComputedStyle(cur)
+        // Only symmetric padding is a "screen gutter". An asymmetric ancestor is
+        // doing something deliberate that this must not fight.
+        const l = parseFloat(s.paddingLeft) || 0
+        const r = parseFloat(s.paddingRight) || 0
+        if (l > 0 && l === r) sum += l
+        cur = cur.parentElement
+      }
+      setBleed(sum)
+    }
+    compute()
+    window.addEventListener("resize", compute)
+    return () => window.removeEventListener("resize", compute)
+  }, [ref])
+  return bleed
+}
+
+/**
+ * Render actions into the nearest `SubpageShell`'s MOBILE chrome row. Renders
+ * nothing outside a SubpageShell, and nothing on desktop (the slot lives inside
+ * the shell's `md:hidden` row) — desktop actions go through `titleAction`.
+ */
+export function SubpageChromeActions({ children }: { children: ReactNode }) {
+  const host = useContext(ChromeSlotContext)
+  if (!host) return null
+  return createPortal(children, host)
+}
+
+export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, titleScale = "compact", titleMeta, titleAction, width = "full", maxWidth = 820, children }: {
   crumbs: Crumb[]
   /** Optional page title — renders the canonical TabPageHeader rhythm at the top. */
   title?: string
@@ -59,12 +137,6 @@ export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, mobileAct
    * rule holds.
    */
   mobileMeta?: string
-  /**
-   * Optional action in the MOBILE chrome row's right slot (§3's "chrome row:
-   * (chevron) title … 0–2 actions"). Mobile-only. Per §3 the chrome-row "+"
-   * create is an explicit mobile carve-out from desktop Convention #15.
-   */
-  mobileAction?: ReactNode
   width?: "full" | "centered"
   maxWidth?: number
   children: ReactNode
@@ -85,12 +157,27 @@ export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, mobileAct
   const swipeRef = useEdgeSwipeBack<HTMLDivElement>(back?.onClick)
   // Mobile chrome uses the override when supplied; desktop always uses `title`.
   const chromeTitle = mobileTitle ?? title
+  // State (not a plain ref) so the one re-render that publishes the slot happens
+  // after it is in the DOM — a ref would leave the first portal render with null.
+  const [chromeSlot, setChromeSlot] = useState<HTMLElement | null>(null)
+  // Phone-width gutter enforcement (see useDeBleed). The root carries BOTH refs:
+  // the swipe hook's (it animates this element) and our own for measuring.
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const setRoot = useCallback((node: HTMLDivElement | null) => {
+    rootRef.current = node
+    swipeRef.current = node
+  }, [swipeRef])
+  const bleed = useDeBleed(rootRef)
   return (
-    <div ref={swipeRef} className="md:flex md:flex-col md:h-full md:overflow-hidden" style={{ background: "var(--cream)" }}>
+    <div
+      ref={setRoot}
+      className="md:flex md:flex-col md:h-full md:overflow-hidden"
+      style={{ background: "var(--cream)", marginLeft: -bleed, marginRight: -bleed }}
+    >
       {(back || chromeTitle) && (
         // md:hidden must win on desktop — keep `display` in the class, NOT inline
         // (an inline `display` would override md:hidden and leak onto desktop).
-        <div className="md:hidden flex items-center" style={{ gap: 8, padding: "12px 20px 10px" }}>
+        <div className="md:hidden flex items-center" style={{ gap: 8, ...POCKET_CHROME_PAD_Y, paddingLeft: POCKET_CHROME_PAD_X, paddingRight: POCKET_CHROME_PAD_X }}>
           {back && <BackChevron onClick={back.onClick} label={`Back to ${back.label}`} />}
           {chromeTitle ? (
             <span style={{ flex: 1, minWidth: 0 }}>
@@ -112,7 +199,13 @@ export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, mobileAct
               {back.label}
             </button>
           ) : null}
-          {mobileAction && <span style={{ flexShrink: 0, display: "inline-flex" }}>{mobileAction}</span>}
+          {/* Action slot. `marginLeft: auto` (not the title's flex:1) does the
+              pushing, so actions still sit hard right on the titleless fallback
+              row. Empty when nothing portals in — a zero-width flex item. */}
+          <div
+            ref={setChromeSlot}
+            style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: "auto" }}
+          />
         </div>
       )}
       {/* Canonical page header — identical rhythm to TabPageHeader, butting the
@@ -140,9 +233,11 @@ export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, mobileAct
       <div
         className={`md:flex-1 md:overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+110px)] md:pb-14 ${title ? "pt-0" : "pt-4 md:pt-7"}`}
       >
-        {width === "centered"
-          ? <div className="mx-auto w-full px-5" style={{ maxWidth }}>{children}</div>
-          : <div className="w-full px-5 md:px-14">{children}</div>}
+        <ChromeSlotContext.Provider value={chromeSlot}>
+          {width === "centered"
+            ? <div className="mx-auto w-full px-5" style={{ maxWidth }}>{children}</div>
+            : <div className="w-full px-5 md:px-14">{children}</div>}
+        </ChromeSlotContext.Provider>
       </div>
     </div>
   )

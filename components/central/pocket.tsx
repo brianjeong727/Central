@@ -25,6 +25,22 @@ import { ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react"
 //   PocketChip        40px squircle letter monogram
 //   PocketRoundButton 34px round chrome action (ghost | plum create)
 
+// ── THE chrome-row box (Convention #27) ───────────────────────────────────────
+// Every phone-width screen opens with ONE chrome row, and every one of them sits
+// at the same height: 12px above the title, 10px below, 20px in from the edge.
+// This was four hand-typed copies and they drifted — Home sat at 14, the workspace
+// hub inherited its parent's 24, and Directory shipped `pt-14` (56px), so drilling
+// between screens visibly bounced the title up and down. One constant now, consumed
+// by PocketChrome, PocketHeader, PocketHubChrome and SubpageShell's mobile row.
+//
+// PAD_Y is the part that must never vary — it is the vertical rhythm Brian ratified
+// (2026-08-05, "the Welcome Week view has less space above it, I like that better").
+// PAD_X is separate because a chrome row nested inside an already-inset wrapper
+// (PocketHubChrome, PocketHeader) must NOT re-apply the horizontal gutter — see
+// Convention #26.
+export const POCKET_CHROME_PAD_Y = { paddingTop: 12, paddingBottom: 10 } as const
+export const POCKET_CHROME_PAD_X = 20
+
 // Mobile kicker label: 10px mono, +1.4px tracking. Deliberately NOT flattened
 // into EYEBROW_STYLE (11px desktop eyebrow) — the pocket scale is one step down.
 export const POCKET_KICKER_STYLE: CSSProperties = {

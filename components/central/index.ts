@@ -16,7 +16,7 @@ export { CardTitle } from "./card-title"
 export { ChatStrip } from "./chat-strip"
 export { InsetHairline } from "./hairline"
 export { TabPageHeader } from "./tab-page-header"
-export { SubpageShell } from "./subpage-shell"
+export { SubpageShell, SubpageChromeActions } from "./subpage-shell"
 export { ContentHeader } from "./content-header"
 export { EventSectionHeader } from "./event-section-header"
 export { NightDivider } from "./night-divider"
@@ -53,6 +53,8 @@ export { BackChevron } from "./back-chevron"
 export { SuperSwitcher } from "./super-switcher"
 export {
   POCKET_KICKER_STYLE,
+  POCKET_CHROME_PAD_Y,
+  POCKET_CHROME_PAD_X,
   PocketKicker,
   PocketCard,
   PocketRowCard,
