@@ -68,8 +68,23 @@ boundary is the highest-value target on the list.
 `event_plan_ministry_id()` is the one exception worth keeping at `''`: fully
 qualified body, calls nothing. That is the strongest form when you can get it.
 
-**Still open:** 12 policy helpers remain on bare `public` across ~70 call sites
-(`is_team_member`, `is_group_member`, `auth_has_finance_permission`,
-`auth_can_manage_team`, …), plus 3 unpinned non-policy functions.
+### The whole class is now closed — keep it that way
+
+All 48 `SECURITY DEFINER` functions in `public` either list `pg_temp` explicitly
+or pin `''` with a fully qualified body. **Any new one must too** — that is the
+standing rule this lesson exists to create.
+
+Two things learned while finishing the sweep:
+
+- **A function that was already pinned to bare `public` cannot need `extensions`** —
+  bare `public` already excluded it, so a body calling `uuid_generate_*` / `crypt`
+  unqualified would already be broken. Only a genuinely UNPINNED function can
+  silently lose `extensions` when you pin it. Pin those to
+  `public, extensions, pg_temp`.
+- **The path you pin is inherited by unpinned triggers your writes fire.**
+  `handle_new_user` is fully qualified and needs nothing extra, but its INSERT
+  fires `guard_profiles_deleted_at`, an unpinned SECURITY INVOKER trigger that
+  runs under whatever path it inherits. Look one level down from the body you are
+  reading.
 
 Related: [[update-policy-missing-with-check]].
