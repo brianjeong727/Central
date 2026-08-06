@@ -8245,6 +8245,14 @@ export function EventPlanWorkspace({
   const eventDayLong = isMultiDayEvent
     ? `${formatYMD(eventStart, { weekday: "long", month: "long", day: "numeric" })} – ${formatYMD(eventEnd, { weekday: "long", month: "long", day: "numeric" })}`
     : formatYMD(eventStart, { weekday: "long", month: "long", day: "numeric" })
+  // Numeric form for DENSE rows (the mobile hub's facts grid), where the editorial
+  // label wraps to three lines on a multi-day event: "Tuesday, August 18 – Saturday,
+  // August 29" → "8/18/26 – 8/29/26". Same YMD source and the same noon-anchored,
+  // zone-immune formatter as the long form — only the Intl options differ, so the
+  // two can never disagree about WHICH day they name (Convention #23).
+  const eventDayNumeric = isMultiDayEvent
+    ? `${formatYMD(eventStart, { month: "numeric", day: "numeric", year: "2-digit" })} – ${formatYMD(eventEnd, { month: "numeric", day: "numeric", year: "2-digit" })}`
+    : formatYMD(eventStart, { month: "numeric", day: "numeric", year: "2-digit" })
   // A multi-day event's clock times belong to DIFFERENT days — rendering them as
   // one bare range reads as nonsense ("5:00 PM – 2:00 PM"), so qualify each end
   // with its date.
@@ -9190,9 +9198,16 @@ export function EventPlanWorkspace({
               }
               return (
                 <div>
+                  {/* Numeric dates here, not the editorial label — this grid is one
+                      row per fact and a multi-day range wrapped to three lines.
+                      TIME is OMITTED rather than dashed when there is none: an
+                      all-day event or a container week has no clock time, so the row
+                      is inapplicable, not blank. LOCATION keeps its em-dash — unset
+                      is not the same as inapplicable, and the dash is the prompt to
+                      fill it in. */}
                   <MobileFactsGrid facts={[
-                    { label: "Date", value: eventDayLong },
-                    { label: "Time", value: hubTime || "—" },
+                    { label: "Date", value: eventDayNumeric },
+                    ...(hubTime ? [{ label: "Time", value: hubTime }] : []),
                     { label: "Location", value: calendarEvent.location?.trim() || "—" },
                   ]} />
                   {taskTotal > 0 && (
