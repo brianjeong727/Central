@@ -37,6 +37,14 @@ export interface Profile {
 // Only what the user has explicitly changed is persisted.
 export type GroupNotifyMode = "smart" | "all" | "mentions" | "off"
 
+/**
+ * PER-CHAT notification override (`group_members.notify_mode`). NULL in the DB
+ * means "inherit the global GroupNotifyMode"; "smart" is deliberately NOT a
+ * per-chat value — smart is the global default's adaptive behaviour, and a
+ * per-chat choice is always explicit.
+ */
+export type ChatNotifyMode = "all" | "mentions" | "off"
+
 export interface NotificationSettings {
   /** Tier 1 — direct messages. Default on. */
   dms?: boolean
@@ -428,6 +436,7 @@ export interface ChatSettingsProps {
 }
 
 export interface ChatScreenProps {
+  /** Empty string == DRAFT: no group exists yet (see `draftRecipient`). */
   groupId: string
   groupName: string
   userId: string
@@ -439,6 +448,13 @@ export interface ChatScreenProps {
   onRead?: () => void
   onNameChange?: (name: string) => void
   inline?: boolean
+  /**
+   * Draft DM target. When set (with `groupId === ""`) ChatScreen mounts with no
+   * history and NO subscriptions; the group is created on the first send.
+   */
+  draftRecipient?: { id: string; name: string } | null
+  /** Fired once the draft's group actually exists, so the parent can re-key. */
+  onDmCreated?: (groupId: string, name: string) => void
 }
 
 // Message composer (bottom input area) — extracted from ChatScreen so per-keystroke
@@ -481,6 +497,12 @@ export interface ChatsTabProps {
   // Reports whether the full-screen CreateChatScreen is up, so home-app can
   // suppress the floating pill nav (mobile design system §2.2).
   onComposerOpenChange?: (open: boolean) => void
+  /**
+   * Open a DRAFT direct message with someone you don't yet share a DM with. No
+   * group row exists until the first message is actually sent, so browsing
+   * search can't litter chat lists with empty conversations.
+   */
+  onOpenDraftDm?: (person: { id: string; name: string }) => void
 }
 
 // Slim list-row + detail-header shape — fetched for EVERY member on directory

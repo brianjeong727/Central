@@ -5,7 +5,7 @@ import { apnsReady, sendApnsNotification } from "@/lib/apns"
 import { getMinistryTimezone } from "@/lib/ministry-timezone"
 import { formatInZone, resolveMinistryTimezone, todayInZone } from "@/lib/tz"
 import { isAdminRole } from "@/lib/roles"
-import type { NotificationSettings } from "@/app/home/types"
+import type { NotificationSettings, ChatNotifyMode } from "@/app/home/types"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -113,7 +113,7 @@ async function resolveMessage(
 
   const { data: members } = await admin
     .from("group_members")
-    .select("user_id, muted")
+    .select("user_id, muted, notify_mode")
     .eq("group_id", msg.group_id)
   if (!members || members.length === 0) return []
 
@@ -164,12 +164,21 @@ async function resolveMessage(
   }
 
   const muteMap = new Map(members.map((m) => [m.user_id, !!m.muted]))
+  // Per-chat override of the global group_mode (group_members.notify_mode).
+  // NULL = inherit. 'off' is a hard override, same as the legacy `muted` (which
+  // the DB keeps as a synced cache of exactly this value).
+  const chatModeMap = new Map(
+    members.map((m) => [m.user_id, (m.notify_mode as ChatNotifyMode | null) ?? null]),
+  )
   const isDM = group.type === "dm"
   const body = preview(msg.content, 120)
   const results: Resolved[] = []
 
   for (const uid of recipientIds) {
-    if (muteMap.get(uid)) continue // per-chat mute is a hard override
+    const chatMode = chatModeMap.get(uid) ?? null
+    // 'off' (and its legacy `muted` mirror) is a hard override — it silences
+    // DMs, replies and mentions too, which is what mute has always meant here.
+    if (chatMode === "off" || muteMap.get(uid)) continue
     const settings: NotificationSettings =
       (profMap.get(uid)?.notification_settings as NotificationSettings) ?? {}
     const firstName = (profMap.get(uid)?.name ?? "").split(" ")[0].toLowerCase()
@@ -179,14 +188,18 @@ async function resolveMessage(
 
     let reason: string | null = null
     if (isDM) {
-      if (settings.dms === false) continue
+      // An explicit per-chat "all" is a deliberate opt-IN for this one thread,
+      // so it beats a global dms:false the same way it beats group_mode below.
+      if (chatMode !== "all" && settings.dms === false) continue
       reason = "dm"
     } else if (isReply && settings.replies !== false) {
       reason = "reply"
     } else if (isMention && settings.mentions !== false) {
       reason = "mention"
     } else {
-      const mode = settings.group_mode ?? "smart"
+      // Per-chat choice wins over the global mode. 'mentions' lands here only
+      // for plain group traffic — replies and mentions already returned above.
+      const mode = chatMode ?? settings.group_mode ?? "smart"
       if (mode === "off" || mode === "mentions") continue
       if (mode === "smart" && memberCount >= SMART_THRESHOLD) continue
       reason = "group"

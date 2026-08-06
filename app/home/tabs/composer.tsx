@@ -2,8 +2,8 @@
 
 import { memo, useState, useEffect, useRef, useMemo } from "react"
 import type { ChangeEvent, KeyboardEvent } from "react"
-import { X, Send, CornerUpLeft, Smile, Paperclip, FileDown, BarChart2 } from "lucide-react"
-import { MonogramChip } from "@/components/central"
+import { X, Send, CornerUpLeft, Smile, Paperclip, FileDown, BarChart2, Plus } from "lucide-react"
+import { MonogramChip, ActionMenu } from "@/components/central"
 import { LazyEmojiPicker, formatFileSize } from "./message-row"
 import { replyPreviewLabel } from "../utils"
 import type { ComposerProps } from "../types"
@@ -202,7 +202,7 @@ function ComposerImpl({
 
       {/* ── GIF Picker panel ── */}
       {showGifPicker && !groupArchived && (
-        <div className="flex-shrink-0 bg-[var(--cream-panel)] border-t border-[var(--line)] z-[156] relative" style={{ height: 240 }}>
+        <div className="flex-shrink-0 bg-[var(--cream)] md:bg-[var(--cream-panel)] border-t border-transparent md:border-[var(--line)] z-[156] relative" style={{ height: 240 }}>
           <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 border-b border-[var(--line-3)]">
             <input
               autoFocus
@@ -284,12 +284,42 @@ function ComposerImpl({
               className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) stagePendingAttachment(f); e.target.value = "" }}
             />
-            {/* Left icons — outside the bubble; ≥34px tap boxes, negative x-margin
-                trims the gap so the icons read as tight as before. */}
+            {/* Mobile: the three send-options collapse into one "+". The menu is the
+                shared flip-aware ActionMenu (Convention #20) anchored to the button —
+                at the screen bottom it flips ABOVE, so it opens as a compact panel
+                sitting on the composer (iMessage), not a full-height sheet. The width
+                it frees goes to the message pill. */}
+            <div className="md:hidden flex-shrink-0">
+              <ActionMenu
+                align="left"
+                minWidth={190}
+                panelClassName="bg-[var(--ivory)] rounded-[var(--r-pocket-sm)]"
+                items={[
+                  { key: "file", label: "Photo or file", icon: <Paperclip className="w-4 h-4" />, onSelect: () => fileInputRef.current?.click() },
+                  { key: "gif", label: "GIF", icon: <span className="w-4 text-[9px] font-bold tracking-tight text-center">GIF</span>, onSelect: () => { onSetPollOpen(false); setShowGifPicker(true) } },
+                  { key: "poll", label: "Poll", icon: <BarChart2 className="w-4 h-4" />, onSelect: () => { setShowGifPicker(false); onSetPollOpen(true) } },
+                ]}
+                renderTrigger={({ toggle }) => (
+                  <button
+                    onClick={toggle}
+                    disabled={uploading}
+                    className="w-11 h-11 flex items-center justify-center rounded-full text-[var(--body)] active:bg-[var(--ivory)] transition-colors disabled:opacity-40"
+                    aria-label="Add to message"
+                  >
+                    {uploading
+                      ? <div className="w-4 h-4 border-2 border-[var(--body)] border-t-transparent rounded-full animate-spin" />
+                      : <Plus className="w-[22px] h-[22px]" strokeWidth={1.8} />
+                    }
+                  </button>
+                )}
+              />
+            </div>
+            {/* Desktop left icons — outside the bubble; ≥34px tap boxes, negative
+                x-margin trims the gap so the icons read as tight as before. */}
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="flex-shrink-0 w-9 h-9 -mr-1 flex items-center justify-center rounded-full text-[var(--body)] hover:text-[var(--ink)] hover:bg-[var(--ivory)] transition-colors disabled:opacity-40"
+              className="hidden md:flex flex-shrink-0 w-9 h-9 -mr-1 items-center justify-center rounded-full text-[var(--body)] hover:text-[var(--ink)] hover:bg-[var(--ivory)] transition-colors disabled:opacity-40"
               title="Attach file"
             >
               {uploading
@@ -299,14 +329,14 @@ function ComposerImpl({
             </button>
             <button
               onClick={() => { setShowGifPicker(p => !p); onSetPollOpen(false) }}
-              className={`flex-shrink-0 h-9 -mr-0.5 flex items-center text-[11px] font-medium px-2.5 rounded-full border transition-colors ${showGifPicker ? "bg-[var(--plum)] text-[var(--cream-on-dark)] border-[var(--plum)]" : "text-[var(--body)] border-[var(--line-2)] hover:border-[var(--plum)]/30 hover:text-[var(--ink)]"}`}
+              className={`hidden md:flex flex-shrink-0 h-9 -mr-0.5 items-center text-[11px] font-medium px-2.5 rounded-full border transition-colors ${showGifPicker ? "bg-[var(--plum)] text-[var(--cream-on-dark)] border-[var(--plum)]" : "text-[var(--body)] border-[var(--line-2)] hover:border-[var(--plum)]/30 hover:text-[var(--ink)]"}`}
               title="Send a GIF"
             >
               GIF
             </button>
             <button
               onClick={() => { setShowGifPicker(false); onSetPollOpen(!pollActive) }}
-              className={`flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-full transition-colors hover:bg-[var(--ivory)] ${pollActive ? "text-[var(--plum)]" : "text-[var(--body)] hover:text-[var(--ink)]"}`}
+              className={`hidden md:flex flex-shrink-0 w-9 h-9 items-center justify-center rounded-full transition-colors hover:bg-[var(--ivory)] ${pollActive ? "text-[var(--plum)]" : "text-[var(--body)] hover:text-[var(--ink)]"}`}
               title="Create a poll"
             >
               <BarChart2 className="w-4 h-4" />
@@ -358,8 +388,9 @@ function ComposerImpl({
                 style={{ lineHeight: "1.5", paddingTop: 0, paddingBottom: 0, height: "auto" }}
               />
             </div>
-            {/* Right icons — outside the bubble */}
-            <div className="relative">
+            {/* Right icons — outside the bubble. Desktop only: the phone keyboard
+                ships its own emoji key, so mobile doesn't spend composer width on one. */}
+            <div className="relative hidden md:block">
               <button
                 onClick={() => setShowComposerEmojiPicker(p => !p)}
                 className="w-9 h-9 flex items-center justify-center rounded-full text-[var(--body)] hover:bg-[var(--ivory)] transition-colors"

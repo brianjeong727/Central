@@ -418,6 +418,8 @@ The push dispatch route (`app/api/push/dispatch/route.ts`) gained 3 cron/action-
 **Messaging**
 `polls`, `poll_votes`, `message_reactions`, `group_sessions`, `chat_offenses` (per-user profanity-filter offense counter; written only via the service-role `recordChatOffense` action + `increment_chat_offense` RPC; admins read), `chat_nicknames` (shared per-chat nicknames — one per `(group_id, target_user_id)` — in personal group chats + DMs only; SELECT = any group member, writes are service-role-only via the `setChatNickname`/`clearChatNickname` action which moderates server-side; the `group_is_personal()` helper (`type IN ('my','dm')`) gates the write RLS; `replica identity full` for realtime)
 
+`group_members` per-chat prefs: `muted`, `pinned`, `last_read_at`, `notify_mode` (`all`/`mentions`/`off`, NULL = inherit the global `notification_settings.group_mode`). **`muted` is OUTPUT-ONLY** — the `sync_group_member_notify_mode` BEFORE INSERT/UPDATE trigger derives it from `notify_mode`, so express intent via `notify_mode`; a contradicting `muted` is silently discarded. The table has **no table-level UPDATE grant** — clients hold `GRANT UPDATE (last_read_at, muted, pinned, notify_mode)` only, so **a new column is silently non-updatable until it is added to that list** (same trap as `ministries.timezone`).
+
 **Announcements & Forms**
 `announcement_forms`, `form_fields`, `form_responses`, `form_answers`
 

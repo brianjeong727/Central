@@ -98,7 +98,7 @@ export function SubpageChromeActions({ children }: { children: ReactNode }) {
   return createPortal(children, host)
 }
 
-export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact", titleMeta, titleAction, width = "full", maxWidth = 820, children }: {
+export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, titleScale = "compact", titleMeta, titleAction, width = "full", maxWidth = 820, children }: {
   crumbs: Crumb[]
   /** Optional page title — renders the canonical TabPageHeader rhythm at the top. */
   title?: string
@@ -130,6 +130,13 @@ export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact
    * settings → "Team settings"). Desktop (`title` / PageTitle) is untouched.
    */
   mobileTitle?: string
+  /**
+   * Optional meta line under the MOBILE chrome title (13px muted) — e.g. a
+   * collection's count on a drilled-in list screen. Mobile-only; the desktop
+   * header is untouched. Still ONE header row, so §1's no-two-header-screens
+   * rule holds.
+   */
+  mobileMeta?: string
   width?: "full" | "centered"
   maxWidth?: number
   children: ReactNode
@@ -173,8 +180,15 @@ export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact
         <div className="md:hidden flex items-center" style={{ gap: 8, ...POCKET_CHROME_PAD_Y, paddingLeft: POCKET_CHROME_PAD_X, paddingRight: POCKET_CHROME_PAD_X }}>
           {back && <BackChevron onClick={back.onClick} label={`Back to ${back.label}`} />}
           {chromeTitle ? (
-            <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {chromeTitle}
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {chromeTitle}
+              </span>
+              {mobileMeta && (
+                <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {mobileMeta}
+                </span>
+              )}
             </span>
           ) : back ? (
             <button
