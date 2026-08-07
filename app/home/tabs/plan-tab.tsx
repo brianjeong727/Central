@@ -3326,7 +3326,7 @@ export function PlanTab({
         /* ── Mobile workspace picker (no team selected) — mirrors desktop 2604-2727
            gating: 2+ member teams OR any governance-visible team → card list; else
            the 0-team empty state. The 1-team case is auto-entered upstream. ── */
-        <div className="md:hidden px-5 pb-28">
+        <div className="md:hidden px-5">
           {(userTeams.length >= 2 || govTeams.length > 0) ? (
             <>
               <PocketKicker label="Your workspaces" style={{ margin: "6px 4px 0" }} />
@@ -3399,7 +3399,7 @@ export function PlanTab({
           )}
         </div>
       ) : activeTeamId === "receipts" ? (
-        <div className="md:hidden pb-28">
+        <div className="md:hidden">
           <ReceiptsWorkspace
             ministryId={ministryId}
             userId={userId}
@@ -3414,7 +3414,7 @@ export function PlanTab({
           />
         </div>
       ) : teamKind === "finance" && activeTeamId && financeCanAccess ? (
-        <div className="md:hidden pb-28">
+        <div className="md:hidden">
           {/* Hub-first (sim ruling 2026-07-15): entering the workspace lands on a
               MobilePocketHub whose rows are the finance sections (same set as the
               retired fchip strip — mirrors the desktop FinanceSectionNav); drilling
@@ -3473,7 +3473,7 @@ export function PlanTab({
           )}
         </div>
       ) : (
-      <div className="md:hidden px-5 pb-28">
+      <div className="md:hidden px-5">
         {/* Back to the picker — only meaningful when the picker would offer >1 option
             (a single-workspace user is auto-re-entered upstream). Suppressed for the
             hub-bearing team views (student-org / DGL / standard): the hub's own

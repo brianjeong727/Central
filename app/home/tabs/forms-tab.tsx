@@ -927,7 +927,7 @@ export function FormsTab({ ministryId, userId, onViewChange, onBack }: FormsTabP
   // ── Body-swap dispatch (Responses only; builder is a modal overlay below) ──
   if (view.mode === "responses") {
     return (
-      <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
+      <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
         <FormResponsesView formId={view.formId} title={view.title} onClose={backToList} />
       </div>
     )
@@ -987,7 +987,7 @@ export function FormsTab({ ministryId, userId, onViewChange, onBack }: FormsTabP
 
   return (
     <>
-    <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
+    <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile: single chrome row + the screen's ONE plum create (§3.3) */}
       <PocketChrome
         title="Forms"

@@ -62,7 +62,7 @@ export function HomeHeroSkeleton({ showLabel = true }: { showLabel?: boolean }) 
         <SkeletonBlock width={84} height={11} radius="var(--r-pill)" style={{ marginBottom: "var(--space-6)" }} />
       )}
       <HeroFrame style={{ border: "1px solid var(--line-2)" }}>
-        <SkeletonBlock width="100%" height="100%" radius={0} className="" style={{ background: "var(--cream-3)" }} />
+        <SkeletonBlock width="100%" height="100%" radius={0} style={{ background: "var(--cream-3)" }} />
       </HeroFrame>
     </div>
   )
@@ -98,7 +98,7 @@ export function AnnouncementsListSkeleton() {
 // ── Announcements — full skeleton (header + list) for the dynamic fallback ────
 export function AnnouncementsTabSkeleton() {
   return (
-    <div className="pb-28 md:pb-0">
+    <div>
       <TabPageHeader>
         <SkeletonTitleBlock />
       </TabPageHeader>

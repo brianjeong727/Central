@@ -1095,8 +1095,14 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
           baseVisible={openAnnouncementId != null || (activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId))}
         />
 
-        {/* Scrollable content area */}
-        <div className="overflow-y-auto pb-28 min-h-screen md:flex-1 md:pb-0 md:min-h-0 md:overflow-hidden">
+        {/* Scrollable content area.
+            This is the SOLE scroll region on mobile (mobile_design_system.md §3),
+            so it is the only place the nav-pill clearance belongs. Tabs and
+            sections must NOT add their own bottom padding — stacking them is
+            what left ~260px of dead scroll below the last row when the pill
+            needs ~74px. --nav-clearance derives from the pill's real geometry;
+            see app/globals.css. Desktop drops it entirely (md:pb-0). */}
+        <div className="shell-scroll overflow-y-auto min-h-screen md:flex-1 md:min-h-0 md:overflow-hidden">
 
           {/* Shared on-load entrance — keyed by activeTab so this single element
               remounts and replays the fade+rise on every top-level tab switch

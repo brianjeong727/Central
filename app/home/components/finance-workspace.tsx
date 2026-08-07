@@ -1370,9 +1370,7 @@ export function FinanceWorkspace({
       {/* ── Allocation ── */}
       {/* Non-detail views own their inset (workspace is mounted full-bleed). */}
       {section === "allocation" && budgetAccess && (
-        // pb-28 on phone width clears the floating nav pill — without it the last
-        // category row sits under the pill with nothing left to scroll to.
-        <div className="px-5 md:px-14 py-7 pb-28 md:pb-7">
+        <div className="px-5 md:px-14 py-7 md:pb-7">
           <AllocationSection
             ministryId={ministryId}
             canEdit={canManage}
@@ -1387,8 +1385,7 @@ export function FinanceWorkspace({
 
       {/* ── Budget ── */}
       {section === "budget" && budgetAccess && (
-        // pb-28 for the nav pill, same as Allocation above.
-        <div className="px-5 md:px-14 py-7 pb-28 md:pb-7">
+        <div className="px-5 md:px-14 py-7 md:pb-7">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
             <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>Expense ledger</p>
             {canManage && (
