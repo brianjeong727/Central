@@ -489,4 +489,4 @@ Permission tiers:
 - **Full-screen overlays:** `fixed inset-0 z-[N]` outer wrapper.
 - **Overlay inner:** `max-w-[390px] mx-auto w-full h-full flex flex-col`.
 - **Safe area:** `pt-12` on all full-screen overlay headers (iOS status bar).
-- **Scrollable pages:** `pb-28` to clear the bottom nav.
+- **Scrollable pages:** never add bottom padding for the nav. The shell's sole scroll region (`.shell-scroll`) owns it via `--nav-clearance`, derived from the pill's own geometry in `bottom-nav.tsx`; a page adding its own double-counts (that bug cost ~190px of dead scroll). Desktop resets it to 0.
