@@ -120,6 +120,12 @@ export function PocketRow({
   return (
     <button
       onClick={onClick}
+      // `data-pocket-row` is how e2e/mobile-screen-sweep DISCOVERS screens. This is
+      // the one drill-in primitive on phone width, so walking every row reachable
+      // from a hub reaches every hub-and-spoke screen — the sweep never has to keep
+      // a hand-written list of screen names in sync with the app, and a NEW section
+      // is covered by the margin rules the day it ships.
+      data-pocket-row={title}
       style={{
         display: "flex", alignItems: "center", gap: 12, width: "100%",
         background: "none", border: "none", textAlign: "left", cursor: "pointer",

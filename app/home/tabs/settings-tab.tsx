@@ -109,6 +109,14 @@ const CARD: React.CSSProperties = {
 // inline border/bg/radius below md while desktop renders CARD untouched.
 const CARD_CLS = "max-md:!border-0 max-md:!bg-[var(--ivory)] max-md:!rounded-[var(--r-pocket)]"
 
+// Every settings section body: the gutter (Convention #26) plus ONE gap above it.
+// This shipped as nine hand-typed `marginTop: 40` copies — a DESKTOP number, sized
+// to clear the tab strip. Phone width has no tab strip (§2.3), so those 40px were
+// dead air below the chrome row and pushed every section's content to 96px while
+// the rest of the app starts around 64 (Convention #27). One constant, so the two
+// widths can't drift apart again.
+const SETTINGS_BODY_CLS = "px-5 md:px-14 mt-2 md:mt-10"
+
 // 40px tonal chip holding a settings section glyph — the leading element in the
 // mobile hub rows.
 function SettingsIconChip({ icon }: { icon: React.ReactNode }) {
@@ -1230,13 +1238,13 @@ export function SettingsTab({
         {/* ── Section bodies: desktop always; mobile only when a section is drilled ── */}
         <div className={mobileSection === null ? "hidden md:block" : undefined}>
         {loading ? (
-          <div className="px-5 md:px-14" style={{ color: "var(--muted-text)", fontSize: "14px", marginTop: 40 }}>Loading…</div>
+          <div className={SETTINGS_BODY_CLS} style={{ color: "var(--muted-text)", fontSize: "14px" }}>Loading…</div>
         ) : (
           <>
 
           {/* ══════════════════ GENERAL TAB ══════════════════ */}
           {activeSettingsTab === "general" && (
-            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
+            <div className={SETTINGS_BODY_CLS} style={{ display: "flex", flexDirection: "column", gap: 32 }}>
 
               {/* Ministry Profile */}
               <section>
@@ -1534,7 +1542,7 @@ export function SettingsTab({
 
           {/* ══════════════════ PEOPLE TAB ══════════════════ */}
           {activeSettingsTab === "people" && (
-            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
+            <div className={SETTINGS_BODY_CLS} style={{ display: "flex", flexDirection: "column", gap: 32 }}>
               <div>
                 <SectionHeader eyebrow={`People · ${totalMembers}`} title="Members and roles" titleSize={20} hideTitleOnMobile />
                 <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>Every person in {ministryInfo?.name ?? ministryName}, the role they hold, and how they joined.</p>
@@ -1682,7 +1690,7 @@ export function SettingsTab({
 
           {/* ══════════════════ GOVERNANCE TAB ══════════════════ */}
           {activeSettingsTab === "governance" && isAdmin && (
-            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
+            <div className={SETTINGS_BODY_CLS} style={{ display: "flex", flexDirection: "column", gap: 32 }}>
 
               {govError && (
                 <div style={{ borderRadius: 10, border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 8%, transparent)", padding: "10px 14px", display: "flex", alignItems: "center", gap: 10 }}>
@@ -1789,7 +1797,7 @@ export function SettingsTab({
 
           {/* ══════════════════ AUTOMATIONS TAB ══════════════════ */}
           {activeSettingsTab === "automations" && (
-            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
+            <div className={SETTINGS_BODY_CLS} style={{ display: "flex", flexDirection: "column", gap: 28 }}>
               <div>
                 <SectionHeader eyebrow="Automations" title="Chat & membership rules" titleSize={20} hideTitleOnMobile action={
                   <SectionEditControls editing={automationsEditing} dirty={hasAutomationChanges} saving={savingAutomations} saved={automationsSaved} disabled={!isAdmin}
@@ -1883,7 +1891,7 @@ export function SettingsTab({
 
           {/* ══════════════════ CHAT TAB ══════════════════ */}
           {activeSettingsTab === "chat" && (
-            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 28, marginTop: 40 }}>
+            <div className={SETTINGS_BODY_CLS} style={{ display: "flex", flexDirection: "column", gap: 28 }}>
               <div>
                 <SectionHeader eyebrow="Chat" title="Chat moderation" titleSize={20} hideTitleOnMobile action={
                   <SectionEditControls editing={moderationEditing} dirty={hasModerationChanges} saving={savingModeration} saved={moderationSaved} disabled={!isAdmin}
@@ -1973,7 +1981,7 @@ export function SettingsTab({
 
           {/* ══════════════════ REPORTS TAB ══════════════════ */}
           {activeSettingsTab === "reports" && isAdmin && (
-            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 20, marginTop: 40 }}>
+            <div className={SETTINGS_BODY_CLS} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div>
                 <SectionHeader eyebrow="Moderation" title="Reports" titleSize={20} hideTitleOnMobile />
                 <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", maxWidth: 640, lineHeight: 1.55 }}>Messages, announcements, and profiles your members have reported. Review each one, then mark it reviewed or dismiss it.</p>
@@ -2023,7 +2031,7 @@ export function SettingsTab({
 
           {/* ══════════════════ WORKSPACE TAB ══════════════════ */}
           {activeSettingsTab === "workspace" && (
-            <div className="px-5 md:px-14" style={{ display: "flex", flexDirection: "column", gap: 32, marginTop: 40 }}>
+            <div className={SETTINGS_BODY_CLS} style={{ display: "flex", flexDirection: "column", gap: 32 }}>
 
               {/* Join codes */}
               <section>
@@ -2241,7 +2249,7 @@ export function SettingsTab({
           )}
 
           {activeSettingsTab === "audit" && isAdmin && (
-            <div className="px-5 md:px-14" style={{ marginTop: 40 }}>
+            <div className={SETTINGS_BODY_CLS}>
               <div style={{ marginBottom: 24 }}>
                 <SectionHeader eyebrow="Audit Log" title="Admin activity" titleSize={20} hideTitleOnMobile />
                 <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>A read-only record of administrative actions taken in your ministry. Last 100 entries.</p>
