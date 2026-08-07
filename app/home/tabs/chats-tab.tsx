@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from "react"
+import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff, Paperclip, FileDown, LinkIcon, ImageIcon, Folder } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -12,17 +13,19 @@ import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SubpageShell, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
+import { MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
+import { ChatSearchView } from "../components/chat-search"
+import { findExistingDm } from "../dm"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
-import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData } from "../types"
+import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData, ChatNotifyMode, NotificationSettings } from "../types"
 import { useNavState } from "../nav-state"
 import { useOpenMemberProfile } from "../member-profile-context"
 import { InsetHairline } from "@/components/central/hairline"
 import { fetchChatList } from "../chat-list"
 import { subscribeChatTopic } from "../chat-broadcast"
 import { PushSubscribeCard } from "../components/notifications"
-import { MessageRow } from "./message-row"
+import { MessageRow, formatFileSize } from "./message-row"
 import { Composer } from "./composer"
 import { ReportModal } from "../components/report-modal"
 import { useBlocks } from "../use-blocks"
@@ -399,6 +402,59 @@ function ChatPrefsCard({ pendingMuted, pendingPinned, onToggleMuted, onTogglePin
   )
 }
 
+// The one leading chip for every settings row — 36px tonal circle, plum stroke
+// glyph. Defined once so the settings list can't drift into three chip styles.
+function SettingsRowIcon({ children }: { children: ReactNode }) {
+  return (
+    <span
+      className="w-9 h-9 rounded-full inline-flex items-center justify-center flex-shrink-0"
+      style={{ background: "var(--pocket-track)", color: "var(--plum)" }}
+    >
+      {children}
+    </span>
+  )
+}
+
+// Row VALUE for the notification mode — the word the user picked, not a sentence
+// about it.
+function notifyLabel(mode: ChatNotifyMode): string {
+  return mode === "all" ? "All" : mode === "mentions" ? "Mentions" : "Off"
+}
+
+// ── Shared items ("Media, links & files") ────────────────────────────────────
+// Same URL shape the in-chat link previews use, so the two never disagree about
+// what counts as a link. SHARED_LIMIT bounds each read — a chat's history is
+// unbounded and this screen is a finder, not an archive.
+const SHARED_URL_RE = /https?:\/\/[^\s<>"']+/gi
+const SHARED_LIMIT = 200
+
+// Mirrors SMART_THRESHOLD in app/api/push/dispatch/route.ts (and the read-receipt
+// large-room threshold, Convention #18) — the room size at which the global
+// "smart" notification mode stops pushing every message. Used only to LABEL what
+// the inherited setting currently resolves to; delivery is decided server-side.
+const SMART_ROOM_THRESHOLD = 30
+
+interface SharedRow {
+  id: string
+  content: string | null
+  created_at: string
+  sender_id: string
+  attachment_url: string | null
+  attachment_type: string | null
+  attachment_name: string | null
+  attachment_size: number | null
+  profiles: { name: string } | { name: string }[] | null
+}
+
+interface SharedItem {
+  key: string
+  url: string
+  name: string
+  size: number | null
+  sender: string
+  at: string
+}
+
 export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, isCentral = false, userId, userName, ministryId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
   const supabase = createClient()
   const { mutate: mutateGlobal } = useSWRConfig()
@@ -408,6 +464,21 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const [renaming, setRenaming] = useState(false)
   const [newName, setNewName] = useState(groupName)
   const [showAddMembers, setShowAddMembers] = useState(false)
+  // Mobile only: the roster moved off the settings screen (it buried Preferences
+  // and Danger zone below an unbounded list) onto its own drilled-in Members
+  // screen with an All/Leaders filter + search. Desktop keeps its inline roster.
+  const [showAllMembers, setShowAllMembers] = useState(false)
+  const [memberFilter, setMemberFilter] = useState<"all" | "leaders">("all")
+  const [memberSearch, setMemberSearch] = useState("")
+  // Mobile only: "Media, links & files" — everything shared into this chat, in one
+  // place (finding a flyer or a sign-up link weeks later is the recurring ask).
+  const [showShared, setShowShared] = useState(false)
+  // Multi-option settings push a picker screen instead of inlining chips, so the
+  // settings list stays one repeated shape.
+  const [showNotifyPicker, setShowNotifyPicker] = useState(false)
+  const [showSectionPicker, setShowSectionPicker] = useState(false)
+  const [sharedTab, setSharedTab] = useState<"media" | "files" | "links">("media")
+  const [sharedLightbox, setSharedLightbox] = useState<string | null>(null)
   const [allProfiles, setAllProfiles] = useState<Profile[]>([])
   const [searchAdd, setSearchAdd] = useState("")
   const [selectedToAdd, setSelectedToAdd] = useState<string[]>([])
@@ -415,6 +486,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // pending; nothing writes until Save (settings never apply immediately).
   const [muted, setMuted] = useState(false)
   const [pinned, setPinned] = useState(false)
+  // Per-chat notification override. NULL = inherit the global mode; `muted` is
+  // the DB's synced cache of (notifyMode === "off") and is written alongside it.
+  const [notifyMode, setNotifyMode] = useState<ChatNotifyMode | null>(null)
+  const [pendingNotifyMode, setPendingNotifyMode] = useState<ChatNotifyMode | null>(null)
   const [pendingMuted, setPendingMuted] = useState(false)
   const [pendingPinned, setPendingPinned] = useState(false)
   // Church-chat SECTION ("Presets + reassign"): baseline mirrors groups.category,
@@ -478,14 +553,14 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const { data: settingsData, mutate: mutateSettings } = useSWR(
     groupId ? ["group-settings", groupId] : null,
     async () => {
-      const [{ data }, { data: prefData }, { data: groupRow }, { data: nicks }] = await Promise.all([
+      const [{ data }, { data: prefData }, { data: groupRow }, { data: nicks }, { data: meProf }] = await Promise.all([
         supabase
           .from("group_members")
           .select("user_id, profiles!user_id(name, role, graduation_year, avatar_url)")
           .eq("group_id", groupId),
         supabase
           .from("group_members")
-          .select("muted, pinned")
+          .select("muted, pinned, notify_mode")
           .eq("group_id", groupId)
           .eq("user_id", userId)
           .maybeSingle(),
@@ -498,6 +573,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           .from("chat_nicknames")
           .select("target_user_id, nickname")
           .eq("group_id", groupId),
+        // The user's GLOBAL chat-notification mode — needed to show which option
+        // is actually in force when this chat has no override (notify_mode NULL).
+        supabase
+          .from("profiles")
+          .select("notification_settings")
+          .eq("id", userId)
+          .maybeSingle(),
       ])
       const nickById: Record<string, string> = {}
       for (const n of (nicks ?? []) as { target_user_id: string; nickname: string }[]) nickById[n.target_user_id] = n.nickname
@@ -517,10 +599,75 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       })
       const cat = (groupRow as { category: string | null } | null)?.category
       const category: ChurchSection = cat === "team" ? "team" : cat === "group" ? "group" : "general"
-      return { members: mapped, pref: (prefData as { muted: boolean | null; pinned: boolean | null } | null) ?? null, category }
+      const globalMode = ((meProf as { notification_settings: NotificationSettings | null } | null)
+        ?.notification_settings?.group_mode) ?? "smart"
+      return {
+        members: mapped,
+        pref: (prefData as { muted: boolean | null; pinned: boolean | null; notify_mode: ChatNotifyMode | null } | null) ?? null,
+        category,
+        globalMode,
+      }
     }
   )
   const loading = !settingsData
+
+  // What the user gets today when this chat carries no override. "smart" is
+  // adaptive, so resolve it the same way the dispatcher does — all messages in
+  // small rooms, mentions only once a room crosses the smart threshold.
+  const inheritedNotify: ChatNotifyMode =
+    settingsData?.globalMode === "off" ? "off"
+      : settingsData?.globalMode === "mentions" ? "mentions"
+      : settingsData?.globalMode === "all" ? "all"
+      : members.length >= SMART_ROOM_THRESHOLD ? "mentions" : "all"
+
+  // Shared-items load (mobile "Media, links & files"). Lazy — the key stays null
+  // until the screen is opened, so settings never pays for it. Two bounded reads:
+  // every attachment, and the messages whose body looks like it carries a URL
+  // (the ilike keeps the link scan off the full history; the exact extraction is
+  // the same regex the in-chat link previews use).
+  const { data: sharedData } = useSWR(
+    showShared && groupId ? ["chat-shared", groupId] : null,
+    async () => {
+      const sel = "id, content, created_at, sender_id, attachment_url, attachment_type, attachment_name, attachment_size, profiles!sender_id(name)"
+      const [{ data: withFiles }, { data: withLinks }] = await Promise.all([
+        supabase.from("messages").select(sel)
+          .eq("group_id", groupId).eq("deleted", false)
+          .not("attachment_url", "is", null)
+          .order("created_at", { ascending: false }).limit(SHARED_LIMIT),
+        supabase.from("messages").select(sel)
+          .eq("group_id", groupId).eq("deleted", false)
+          .or("content.ilike.%http://%,content.ilike.%https://%")
+          .order("created_at", { ascending: false }).limit(SHARED_LIMIT),
+      ])
+      const senderName = (r: SharedRow) => {
+        const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles
+        return p?.name ?? "Someone"
+      }
+      const atts = (withFiles ?? []) as SharedRow[]
+      const media: SharedItem[] = []
+      const files: SharedItem[] = []
+      for (const r of atts) {
+        if (!r.attachment_url) continue
+        const item: SharedItem = {
+          key: r.id, url: r.attachment_url, name: r.attachment_name ?? "Attachment",
+          size: r.attachment_size ?? null, sender: senderName(r), at: r.created_at,
+        }
+        ;(r.attachment_type?.startsWith("image/") ? media : files).push(item)
+      }
+      const links: SharedItem[] = []
+      const seen = new Set<string>()
+      for (const r of (withLinks ?? []) as SharedRow[]) {
+        for (const url of r.content?.match(SHARED_URL_RE) ?? []) {
+          if (seen.has(url)) continue
+          seen.add(url)
+          let host = url
+          try { host = new URL(url).hostname.replace(/^www\./, "") } catch { /* keep raw */ }
+          links.push({ key: `${r.id}-${url}`, url, name: host, size: null, sender: senderName(r), at: r.created_at })
+        }
+      }
+      return { media, files, links }
+    },
+  )
 
   useEffect(() => {
     if (!settingsData) return
@@ -531,11 +678,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     setMembers(settingsData.members)
     setMuted(settingsData.pref?.muted ?? false)
     setPinned(settingsData.pref?.pinned ?? false)
+    setNotifyMode(settingsData.pref?.notify_mode ?? null)
     setCategory(settingsData.category)
     if (!prefsSeeded.current) {
       prefsSeeded.current = true
       setPendingMuted(settingsData.pref?.muted ?? false)
       setPendingPinned(settingsData.pref?.pinned ?? false)
+      setPendingNotifyMode(settingsData.pref?.notify_mode ?? null)
       setPendingCategory(settingsData.category)
     }
   }, [settingsData])
@@ -568,7 +717,15 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // ── Chat prefs (mute/pin): stage locally, commit on Save. Member changes still
   //    persist immediately (optimistic + rollback); only prefs are staged. ──
   const canReassignSection = churchManage && !isCentralChat
-  const prefsDirty = pendingMuted !== muted || pendingPinned !== pinned || (canReassignSection && pendingCategory !== category)
+  const prefsDirty = pendingMuted !== muted || pendingPinned !== pinned || pendingNotifyMode !== notifyMode || (canReassignSection && pendingCategory !== category)
+
+  // Choosing a mode always writes an EXPLICIT per-chat value (never back to
+  // NULL/inherit) and keeps `muted` in lockstep — the DB has a CHECK constraint
+  // asserting muted = (notify_mode = 'off'), so the two must move together.
+  function chooseNotifyMode(mode: ChatNotifyMode) {
+    setPendingNotifyMode(mode)
+    setPendingMuted(mode === "off")
+  }
 
   // Patch the shared chat-list SWR cache so the list's muted/pinned indicators +
   // pinned-float + muted-badge-suppression react instantly (Convention #4), the
@@ -584,26 +741,39 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   function handleCancelPrefs() {
     setPendingMuted(muted)
     setPendingPinned(pinned)
+    setPendingNotifyMode(notifyMode)
     setPendingCategory(category)
     setPrefError(null)
   }
 
   async function handleSavePrefs() {
     const mutedChanged = pendingMuted !== muted
+    const notifyChanged = pendingNotifyMode !== notifyMode
     const pinnedChanged = pendingPinned !== pinned
     const categoryChanged = canReassignSection && pendingCategory !== category
-    if (!mutedChanged && !pinnedChanged && !categoryChanged) return
+    if (!mutedChanged && !notifyChanged && !pinnedChanged && !categoryChanged) return
     setSavingPrefs(true)
     setPrefError(null)
     // Per-user prefs live on group_members; the SECTION lives on groups. Patch the
     // shared chat-list cache optimistically (category re-buckets the list instantly),
     // then commit each changed store. Any failure rolls cache + pending back.
-    const memberUpdate: { muted?: boolean; pinned?: boolean } = {}
-    if (mutedChanged) memberUpdate.muted = pendingMuted
+    // muted + notify_mode must move together (DB CHECK). Send BOTH whenever
+    // either changed, so the row can never land half-updated.
+    const memberUpdate: { muted?: boolean; pinned?: boolean; notify_mode?: ChatNotifyMode | null } = {}
+    if (mutedChanged || notifyChanged) {
+      memberUpdate.notify_mode = pendingNotifyMode
+      memberUpdate.muted = pendingNotifyMode === "off"
+    }
     if (pinnedChanged) memberUpdate.pinned = pendingPinned
-    patchChatListPref({ ...memberUpdate, ...(categoryChanged ? { category: pendingCategory } : {}) })
+    // Only the CHANGED keys go into the cache patch — a `muted: undefined` would
+    // blank the cached value rather than leave it alone.
+    patchChatListPref({
+      ...(memberUpdate.muted !== undefined ? { muted: memberUpdate.muted } : {}),
+      ...(memberUpdate.pinned !== undefined ? { pinned: memberUpdate.pinned } : {}),
+      ...(categoryChanged ? { category: pendingCategory } : {}),
+    })
     let err: { message: string } | null = null
-    if (mutedChanged || pinnedChanged) {
+    if (mutedChanged || notifyChanged || pinnedChanged) {
       const res = await supabase.from("group_members").update(memberUpdate).eq("group_id", groupId).eq("user_id", userId)
       err = res.error
     }
@@ -616,6 +786,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       patchChatListPref({ muted, pinned, category })
       setPendingMuted(muted)
       setPendingPinned(pinned)
+      setPendingNotifyMode(notifyMode)
       setPendingCategory(category)
       setPrefError("Couldn't save. Please try again.")
       setSavingPrefs(false)
@@ -628,8 +799,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     }
     setMuted(pendingMuted)
     setPinned(pendingPinned)
+    setNotifyMode(pendingNotifyMode)
     setCategory(pendingCategory)
-    mutateSettings((cur) => cur ? { ...cur, pref: { muted: pendingMuted, pinned: pendingPinned }, category: pendingCategory } : cur, { revalidate: false })
+    mutateSettings((cur) => cur ? { ...cur, pref: { muted: pendingMuted, pinned: pendingPinned, notify_mode: pendingNotifyMode }, category: pendingCategory } : cur, { revalidate: false })
     setSavingPrefs(false)
   }
 
@@ -704,11 +876,28 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   )
   const typeLabel = isDM ? "Direct message" : isChurch ? "Church chat" : "Group chat"
 
-  // Body-swap + extend-crumbs: a SINGLE SubpageShell renders either the settings
-  // body or the add-members body; the trail lengthens rather than nesting a shell.
+  // Body-swap + extend-crumbs: a SINGLE SubpageShell renders the settings, the
+  // add-members, or the members body; the trail lengthens rather than nesting a shell.
+  const backToSettings = () => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) }
   const crumbs: Crumb[] = showAddMembers
-    ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) } }, { label: "Add members" }]
-    : [{ label: displayGroupName, onClick: onBack }, { label: "Settings" }]
+    ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: backToSettings }, { label: "Add members" }]
+    : showAllMembers
+      ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowAllMembers(false); setMemberSearch(""); setMemberFilter("all") } }, { label: "Members" }]
+      : showShared
+        ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowShared(false); setSharedLightbox(null) } }, { label: "Media & files" }]
+        : showNotifyPicker
+          ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => setShowNotifyPicker(false) }, { label: "Notifications" }]
+          : showSectionPicker
+            ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => setShowSectionPicker(false) }, { label: "Section" }]
+            : [{ label: displayGroupName, onClick: onBack }, { label: "Settings" }]
+
+  // Members screen (mobile) — All | Leaders, then name/nickname search.
+  const visibleMembers = members.filter((m) => {
+    if (memberFilter === "leaders" && !isLeaderRole((m.role ?? "").toLowerCase())) return false
+    const q = memberSearch.trim().toLowerCase()
+    if (!q) return true
+    return (m.nickname ?? "").toLowerCase().includes(q) || m.name.toLowerCase().includes(q)
+  })
 
   // Mobile role tag (Pocket §4): plum "role" pill for admin/leader tier, hairline
   // "outline" for visitor, tonal "default" otherwise. Label via the same roleLabel
@@ -739,7 +928,32 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   }
 
   return (
-    <SubpageShell title={showAddMembers ? "Add members" : "Settings"} crumbs={crumbs} width="full">
+    <SubpageShell
+      title={showAddMembers ? "Add members" : "Settings"}
+      crumbs={crumbs}
+      width="full"
+      // Mobile-only chrome for the drilled-in screens: title, plus the member count
+      // under it on Members. The chrome-row "+" goes through SubpageChromeActions
+      // (the shell's portal slot) rather than a prop — see below.
+      mobileTitle={showAllMembers ? "Members" : showShared ? "Media & files" : showNotifyPicker ? "Notifications" : showSectionPicker ? "Section" : undefined}
+      mobileMeta={showAllMembers ? `${members.length} member${members.length !== 1 ? "s" : ""}` : undefined}
+    >
+      {/* Add-member "+" in the mobile chrome row (§3 carve-out from Convention
+          #15). Portals into the shell's chrome slot, so it renders here — with
+          live closures over the screen state — and lands up in the header. */}
+      {showAllMembers && canManage && (
+        <SubpageChromeActions>
+          <button
+            type="button"
+            onClick={() => { setShowAllMembers(false); setShowAddMembers(true); loadAllProfiles() }}
+            aria-label="Add members"
+            style={{ width: 34, height: 34, borderRadius: 999, display: "grid", placeItems: "center", background: "none", border: "none", color: "var(--plum)", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+          >
+            <Plus style={{ width: 19, height: 19 }} strokeWidth={2} />
+          </button>
+        </SubpageChromeActions>
+      )}
+
       {error && (
         <div className="rounded-xl px-4 py-3 mb-4 text-[13px] font-medium" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>
           {error}
@@ -812,6 +1026,90 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         <>
         {/* Mobile (SubpageShell title is desktop-only, so mobile keeps its own header) */}
         <div className="md:hidden">
+          {showNotifyPicker ? (
+          /* ── Notifications picker ── one option per row, plum check on the one
+             in force. Staged like every other pref (Convention #21); the parent's
+             Save bar commits it. */
+          <div className="pb-4">
+            <PocketRowCard>
+              {(isDM ? (["all", "off"] as const) : (["all", "mentions", "off"] as const)).map((mode, i, arr) => {
+                const active = (pendingNotifyMode ?? inheritedNotify) === mode
+                return (
+                  <PocketRow
+                    key={mode}
+                    title={notifyLabel(mode)}
+                    titleAccessory={active ? <Check style={{ width: 16, height: 16, color: "var(--plum)", flexShrink: 0 }} /> : undefined}
+                    isLast={i === arr.length - 1}
+                    onClick={() => { chooseNotifyMode(mode); setShowNotifyPicker(false) }}
+                  />
+                )
+              })}
+            </PocketRowCard>
+          </div>
+          ) : showSectionPicker ? (
+          /* ── Section picker (church chats) ── */
+          <div className="pb-4">
+            <PocketRowCard>
+              {CHURCH_SECTION_DEFS.map(({ key, label }, i) => (
+                <PocketRow
+                  key={key}
+                  title={label}
+                  titleAccessory={pendingCategory === key ? <Check style={{ width: 16, height: 16, color: "var(--plum)", flexShrink: 0 }} /> : undefined}
+                  isLast={i === CHURCH_SECTION_DEFS.length - 1}
+                  onClick={() => { setPendingCategory(key); setShowSectionPicker(false) }}
+                />
+              ))}
+            </PocketRowCard>
+          </div>
+          ) : showShared ? (
+          /* ── Media & files (mobile drill-in) ── */
+          <SharedItemsScreen
+            tab={sharedTab}
+            onTab={setSharedTab}
+            data={sharedData}
+            onOpenImage={setSharedLightbox}
+          />
+          ) : showAllMembers ? (
+          /* ── Members screen (mobile drill-in) ── chrome (title + count + "+")
+             is owned by SubpageShell; body is filter · search · roster. */
+          <div className="pb-4">
+            <PocketFilterChipRow style={{ marginBottom: 12 }}>
+              <PocketFilterChip label="All" active={memberFilter === "all"} onClick={() => setMemberFilter("all")} />
+              <PocketFilterChip label="Leaders" active={memberFilter === "leaders"} onClick={() => setMemberFilter("leaders")} />
+            </PocketFilterChipRow>
+            <PocketSearchField value={memberSearch} onChange={setMemberSearch} placeholder="Search members" style={{ marginBottom: 16 }} />
+            {loading ? <Spinner /> : visibleMembers.length === 0 ? (
+              <EmptyState
+                icon={<Users className="w-7 h-7" />}
+                title="No members match"
+                subtitle={memberFilter === "leaders" ? "No leaders in this chat yet. Try the All filter." : "Try a different name."}
+              />
+            ) : (
+              <PocketRowCard>
+                {visibleMembers.map((member, i) => (
+                  <MobileMemberRow
+                    key={member.user_id}
+                    member={member}
+                    isLast={i === visibleMembers.length - 1}
+                    userId={userId}
+                    canManage={canManage}
+                    canNickname={canNickname}
+                    isConfirming={confirmRemoveMemberId === member.user_id}
+                    isRevealed={mobileRevealMemberId === member.user_id}
+                    roleVariant={pocketRoleVariant}
+                    onOpenProfile={openMemberProfile}
+                    onToggleReveal={() => setMobileRevealMemberId((id) => id === member.user_id ? null : member.user_id)}
+                    onStartRemove={() => { setConfirmRemoveMemberId(member.user_id); setMobileRevealMemberId(null) }}
+                    onCancelRemove={() => setConfirmRemoveMemberId(null)}
+                    onConfirmRemove={() => handleRemoveMember(member.user_id)}
+                    onEditNickname={() => { setNicknameEditor({ userId: member.user_id, name: member.name, current: member.nickname ?? "" }); setNicknameInput(member.nickname ?? ""); setNicknameError(null) }}
+                  />
+                ))}
+              </PocketRowCard>
+            )}
+          </div>
+          ) : (
+          <>
           <div className="flex items-center gap-3.5 mb-7" style={{ paddingTop: 4 }}>
             <MonogramChip initials={getInitials(displayGroupName)} className="w-14 h-14 font-medium text-[18px]" />
             <div className="flex-1 min-w-0">
@@ -835,7 +1133,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             </div>
           </div>
 
-          <PocketKicker label="Members" style={{ margin: "0 4px 12px" }} />
+          {/* TWO sections only — ACTIONS (things you do here) and PRIVACY & SUPPORT
+              (how this chat reaches you). Every row is the same long tappable
+              rectangle: title + optional right-aligned VALUE + chevron, and NO
+              description line. Multi-option settings push a screen rather than
+              inlining chips — a settings list reads as one shape or it reads as
+              noise. See mobile_design_system §4 "Settings rows". */}
+          <PocketKicker label="Actions" style={{ margin: "0 4px 12px" }} />
           {loading ? <Spinner /> : (
             /* Borderless tonal rows-card (Pocket grammar): one --ivory surface at
                --r-pocket, rows divided by the --line-3 hairline. */
@@ -856,78 +1160,31 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   <span className="text-[15px] font-semibold" style={{ color: "var(--plum)", letterSpacing: "-0.01em" }}>Add members</span>
                 </button>
               )}
-              {members.map((member, i) => {
-                const isConfirming = confirmRemoveMemberId === member.user_id
-                const isRevealed = mobileRevealMemberId === member.user_id
-                return (
-                  <div
-                    key={member.user_id}
-                    className="flex items-center gap-3"
-                    style={{ padding: "13px 0", borderBottom: i < members.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--ivory))" : "transparent", transition: "background 0.1s" }}
-                    onClick={() => { if (canManage && member.user_id !== userId && !isConfirming) setMobileRevealMemberId((id) => id === member.user_id ? null : member.user_id) }}
-                  >
-                    <span onClick={(e) => { e.stopPropagation(); openMemberProfile(member.user_id) }} style={{ cursor: "pointer", display: "inline-flex", flexShrink: 0 }}>
-                      <MonogramChip initials={getInitials(member.nickname ?? member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-medium text-[10px]" />
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <p onClick={(e) => { e.stopPropagation(); openMemberProfile(member.user_id) }} className="text-[15px] font-semibold truncate cursor-pointer" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>{member.nickname ?? member.name}</p>
-                        {member.user_id === userId && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
-                        {canNickname && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setNicknameEditor({ userId: member.user_id, name: member.name, current: member.nickname ?? "" }); setNicknameInput(member.nickname ?? ""); setNicknameError(null) }}
-                            aria-label={`Set nickname for ${member.name}`}
-                            className="flex-shrink-0"
-                            style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)" }}
-                          >
-                            <Pencil style={{ width: 13, height: 13 }} />
-                          </button>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        {member.nickname && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>{member.name}</span>}
-                        {member.role && <PocketTag label={roleLabel(member.role, member.user_id)} variant={pocketRoleVariant(member.role)} />}
-                        {member.graduation_year && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
-                      </div>
-                    </div>
-                    {canManage && member.user_id !== userId && (
-                      isConfirming ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
-                          <button onClick={(e) => { e.stopPropagation(); handleRemoveMember(member.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--danger)" }}><Check className="w-4 h-4" /></button>
-                          <button onClick={(e) => { e.stopPropagation(); setConfirmRemoveMemberId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X className="w-4 h-4" /></button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setConfirmRemoveMemberId(member.user_id); setMobileRevealMemberId(null) }}
-                          style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "var(--muted-text)", opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
-                        >
-                          <X style={{ width: 14, height: 14 }} />
-                        </button>
-                      )
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-          {isChurch && canManage && (
-            <p className="mb-6" style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.55 }}>Member changes sync to the small group home page if this chat is linked to a group.</p>
-          )}
-          {isCentralChat && (
-            <p className="mb-6" style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.55 }}>Your ministry&apos;s main chat. Everyone is automatically a member — it can&apos;t be renamed, archived, or deleted.</p>
-          )}
-
-          {/* Section — church chats can be moved between General / Groups / Teams
-              after creation (staged; commits on the shared Save bar). Locked for the
-              ministry chat (stays General, same rationale as archive). */}
-          {canReassignSection && !loading && (
-            <div className="mb-6">
-              <PocketKicker label="Section" style={{ margin: "0 4px 12px" }} />
-              <div className="flex flex-wrap gap-2">
-                {CHURCH_SECTION_DEFS.map(({ key, label }) => (
-                  <PocketFilterChip key={key} label={label} active={pendingCategory === key} onClick={() => setPendingCategory(key)} />
-                ))}
-              </div>
+              <PocketRow
+                leading={<SettingsRowIcon><Users style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
+                title="Members"
+                chevron
+                onClick={() => { setShowAllMembers(true); setMemberSearch(""); setMemberFilter("all") }}
+              />
+              <PocketRow
+                leading={<SettingsRowIcon><Paperclip style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
+                title="Media & files"
+                chevron
+                isLast={!canReassignSection}
+                onClick={() => { setShowShared(true); setSharedTab("media") }}
+              />
+              {/* Church chats move between General / Groups / Teams. Staged like
+                  every other pref; commits on the shared Save bar. */}
+              {canReassignSection && (
+                <PocketRow
+                  leading={<SettingsRowIcon><Folder style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
+                  title="Section"
+                  meta={CHURCH_SECTION_DEFS.find((s) => s.key === pendingCategory)?.label}
+                  chevron
+                  isLast
+                  onClick={() => setShowSectionPicker(true)}
+                />
+              )}
             </div>
           )}
 
@@ -936,21 +1193,22 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               mono kicker + tonal row-card with 46×28 PocketSwitch rows. */}
           {!loading && (
             <div className="mb-6">
-              <PocketKicker label="Preferences" style={{ margin: "0 4px 12px" }} />
+              <PocketKicker label="Privacy & support" style={{ margin: "0 4px 12px" }} />
               <PocketRowCard>
-                <div className="flex items-center gap-3.5" style={{ padding: "13px 0", borderBottom: "1px solid var(--line-3)" }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[14.5px] font-semibold" style={{ color: "var(--ink)" }}>Mute notifications</p>
-                    <p className="text-[13px] mt-0.5" style={{ color: "var(--muted-text)" }}>Stay in the chat. Just stop the buzz.</p>
-                  </div>
-                  <PocketSwitch checked={pendingMuted} onChange={() => setPendingMuted((v) => !v)} ariaLabel="Mute notifications" />
-                </div>
-                <div className="flex items-center gap-3.5" style={{ padding: "13px 0" }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[14.5px] font-semibold" style={{ color: "var(--ink)" }}>Pin to top of chats</p>
-                    <p className="text-[13px] mt-0.5" style={{ color: "var(--muted-text)" }}>Keeps it above the fold.</p>
-                  </div>
-                  <PocketSwitch checked={pendingPinned} onChange={() => setPendingPinned((v) => !v)} ariaLabel="Pin to top of chats" />
+                {/* Per-chat OVERRIDE of the global mode. The right-aligned value is
+                    the mode actually in force — the inherited one until the user
+                    picks, with "smart" resolved by room size. */}
+                <PocketRow
+                  leading={<SettingsRowIcon><BellOff style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
+                  title="Notifications"
+                  meta={notifyLabel(pendingNotifyMode ?? inheritedNotify)}
+                  chevron
+                  onClick={() => setShowNotifyPicker(true)}
+                />
+                <div className="flex items-center gap-3" style={{ padding: "13px 0" }}>
+                  <SettingsRowIcon><Pin style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>
+                  <p className="flex-1 min-w-0 text-[15px] font-semibold" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>Pin chat</p>
+                  <PocketSwitch checked={pendingPinned} onChange={() => setPendingPinned((v) => !v)} ariaLabel="Pin chat" />
                 </div>
               </PocketRowCard>
               {prefsDirty && (
@@ -973,6 +1231,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               {canLeave && <button onClick={() => setConfirmAction("leave")} className="w-full py-3.5 rounded-xl font-medium text-[13px] border" style={{ background: "var(--cream)", color: "var(--body)", borderColor: "var(--line)" }}>Leave chat</button>}
               {canDelete && <button onClick={() => setConfirmAction("delete")} className="w-full py-3.5 rounded-xl font-medium text-[13px]" style={{ background: "transparent", color: "var(--danger)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)" }}>Delete chat</button>}
             </div>
+          )}
+          </>
           )}
         </div>
 
@@ -1026,7 +1286,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             {/* Preferences — staged; toggles edit pending state, committed on Save */}
             <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 12 }}>Preferences</p>
             <div style={{ marginBottom: prefsDirty ? 14 : 28 }}>
-              <ChatPrefsCard pendingMuted={pendingMuted} pendingPinned={pendingPinned} onToggleMuted={() => setPendingMuted((v) => !v)} onTogglePinned={() => setPendingPinned((v) => !v)} />
+              {/* Desktop keeps the binary Mute switch (unchanged surface), but it
+                  now routes through chooseNotifyMode so muted and notify_mode stay
+                  in lockstep — the DB CHECK requires muted = (notify_mode='off'),
+                  so a bare setPendingMuted would fail the write. */}
+              <ChatPrefsCard pendingMuted={pendingMuted} pendingPinned={pendingPinned} onToggleMuted={() => chooseNotifyMode(pendingMuted ? "all" : "off")} onTogglePinned={() => setPendingPinned((v) => !v)} />
             </div>
 
             {/* Staged-save affordance — settings commit on Save, never on toggle */}
@@ -1186,7 +1450,161 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         </CentralModal>,
         document.body
       )}
+
+      {/* Shared-media lightbox — same treatment as the in-chat one (tap anywhere
+          to dismiss), portaled so the subpage's scroll container can't clip it. */}
+      {mounted && sharedLightbox && createPortal(
+        <div className="fixed inset-0 z-[300] bg-black/92 flex items-center justify-center" onClick={() => setSharedLightbox(null)}>
+          <button
+            className="absolute top-[max(env(safe-area-inset-top),1rem)] right-4 w-10 h-10 rounded-full bg-[var(--cream-panel)]/10 flex items-center justify-center text-white"
+            onClick={() => setSharedLightbox(null)}
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img src={sharedLightbox} alt="" className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg" onClick={(e) => e.stopPropagation()} />
+        </div>,
+        document.body
+      )}
     </SubpageShell>
+  )
+}
+
+// "Media, links & files" body (mobile). Three exclusive tabs → Pocket fchips
+// (§3: ≤3 exclusive options stay chips). Media is a 3-col thumbnail grid; files
+// and links are row-cards. The chrome (back + title) is owned by SubpageShell.
+function SharedItemsScreen({ tab, onTab, data, onOpenImage }: {
+  tab: "media" | "files" | "links"
+  onTab: (t: "media" | "files" | "links") => void
+  data: { media: SharedItem[]; files: SharedItem[]; links: SharedItem[] } | undefined
+  onOpenImage: (url: string) => void
+}) {
+  const items = data ? data[tab] : []
+  const emptyCopy: Record<typeof tab, { title: string; subtitle: string }> = {
+    media: { title: "No photos yet", subtitle: "Photos and GIFs shared in this chat collect here." },
+    files: { title: "No files yet", subtitle: "Documents shared in this chat collect here." },
+    links: { title: "No links yet", subtitle: "Links anyone sends in this chat collect here." },
+  }
+  return (
+    <div className="pb-4">
+      <PocketFilterChipRow style={{ marginBottom: 16 }}>
+        <PocketFilterChip label="Media" active={tab === "media"} onClick={() => onTab("media")} />
+        <PocketFilterChip label="Files" active={tab === "files"} onClick={() => onTab("files")} />
+        <PocketFilterChip label="Links" active={tab === "links"} onClick={() => onTab("links")} />
+      </PocketFilterChipRow>
+
+      {!data ? <Spinner /> : items.length === 0 ? (
+        <EmptyState
+          icon={tab === "media" ? <ImageIcon className="w-7 h-7" /> : tab === "files" ? <FileDown className="w-7 h-7" /> : <LinkIcon className="w-7 h-7" />}
+          title={emptyCopy[tab].title}
+          subtitle={emptyCopy[tab].subtitle}
+        />
+      ) : tab === "media" ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+          {items.map((it) => (
+            <button
+              key={it.key}
+              onClick={() => onOpenImage(it.url)}
+              aria-label={`Open ${it.name}`}
+              style={{ aspectRatio: "1", borderRadius: 12, overflow: "hidden", border: "none", padding: 0, background: "var(--ivory)", cursor: "pointer" }}
+            >
+              <img src={it.url} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <PocketRowCard>
+          {items.map((it, i) => (
+            <PocketRow
+              key={it.key}
+              leading={
+                <span className="w-9 h-9 rounded-full inline-flex items-center justify-center flex-shrink-0" style={{ background: "var(--pocket-track)", color: "var(--plum)" }}>
+                  {tab === "files" ? <FileDown style={{ width: 16, height: 16 }} strokeWidth={1.7} /> : <LinkIcon style={{ width: 16, height: 16 }} strokeWidth={1.7} />}
+                </span>
+              }
+              title={it.name}
+              sub={tab === "files" && it.size ? `${it.sender} · ${formatFileSize(it.size)}` : `${it.sender} · ${formatRelativeTime(it.at)}`}
+              isLast={i === items.length - 1}
+              onClick={() => window.open(it.url, "_blank", "noopener,noreferrer")}
+            />
+          ))}
+        </PocketRowCard>
+      )}
+    </div>
+  )
+}
+
+// One roster row on the mobile Members screen. Extracted from the settings body
+// when the roster moved onto its own screen — same affordances as before: tap the
+// avatar/name for the member profile, tap the row to reveal remove (managers only,
+// never on yourself), pencil for a per-chat nickname.
+function MobileMemberRow({
+  member, isLast, userId, canManage, canNickname, isConfirming, isRevealed, roleVariant,
+  onOpenProfile, onToggleReveal, onStartRemove, onCancelRemove, onConfirmRemove, onEditNickname,
+}: {
+  member: GroupMember
+  isLast: boolean
+  userId: string
+  canManage: boolean
+  canNickname: boolean
+  isConfirming: boolean
+  isRevealed: boolean
+  roleVariant: (role: string) => "default" | "role" | "outline"
+  onOpenProfile: (id: string) => void
+  onToggleReveal: () => void
+  onStartRemove: () => void
+  onCancelRemove: () => void
+  onConfirmRemove: () => void
+  onEditNickname: () => void
+}) {
+  const isSelf = member.user_id === userId
+  return (
+    <div
+      className="flex items-center gap-3"
+      style={{ padding: "13px 0", borderBottom: isLast ? "none" : "1px solid var(--line-3)", background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--ivory))" : "transparent", transition: "background 0.1s" }}
+      onClick={() => { if (canManage && !isSelf && !isConfirming) onToggleReveal() }}
+    >
+      <span onClick={(e) => { e.stopPropagation(); onOpenProfile(member.user_id) }} style={{ cursor: "pointer", display: "inline-flex", flexShrink: 0 }}>
+        <MonogramChip initials={getInitials(member.nickname ?? member.name)} avatarUrl={member.avatar_url} className="w-9 h-9 font-medium text-[10px]" />
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <p onClick={(e) => { e.stopPropagation(); onOpenProfile(member.user_id) }} className="text-[15px] font-semibold truncate cursor-pointer" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>{member.nickname ?? member.name}</p>
+          {isSelf && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
+          {canNickname && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onEditNickname() }}
+              aria-label={`Set nickname for ${member.name}`}
+              className="flex-shrink-0"
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, color: "var(--muted-text)" }}
+            >
+              <Pencil style={{ width: 13, height: 13 }} />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+          {member.nickname && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>{member.name}</span>}
+          {member.role && <PocketTag label={roleLabel(member.role, member.user_id)} variant={roleVariant(member.role)} />}
+          {member.graduation_year && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
+        </div>
+      </div>
+      {canManage && !isSelf && (
+        isConfirming ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
+            <button onClick={(e) => { e.stopPropagation(); onConfirmRemove() }} aria-label={`Remove ${member.name}`} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--danger)" }}><Check className="w-4 h-4" /></button>
+            <button onClick={(e) => { e.stopPropagation(); onCancelRemove() }} aria-label="Cancel remove" style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X className="w-4 h-4" /></button>
+          </div>
+        ) : (
+          <button
+            onClick={(e) => { e.stopPropagation(); onStartRemove() }}
+            aria-label={`Remove ${member.name}`}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "var(--muted-text)", opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
+          >
+            <X style={{ width: 14, height: 14 }} />
+          </button>
+        )
+      )}
+    </div>
   )
 }
 
@@ -1202,7 +1620,10 @@ const sameMinute = (a: Message, b: Message) =>
   a.sender_id === b.sender_id &&
   Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 60000
 
-export function ChatScreen({ groupId, groupName, userId, userName, ministryId, ministryName, userRole, onClose, onRead, onNameChange, inline = false }: ChatScreenProps) {
+export function ChatScreen({ groupId, groupName, userId, userName, ministryId, ministryName, userRole, onClose, onRead, onNameChange, inline = false, draftRecipient = null, onDmCreated }: ChatScreenProps) {
+  // Draft DM (no group yet). Guards the create so a double-tap on Send can't
+  // race two groups into existence.
+  const creatingDraftRef = useRef(false)
   const supabase = createClient()
   const { mutate: mutateGlobal } = useSWRConfig()
 
@@ -1837,6 +2258,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // channel there. Wait until the roster is known before deciding, and tear the
   // channel down if isLargeRoom flips true after a late roster load.
   useEffect(() => {
+    if (!groupId) return // draft DM — no group to watch yet
     if (!rosterLoaded || isLargeRoom) return
     const channel = supabase
       .channel(`read-receipts-${groupId}`)
@@ -1865,6 +2287,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
   // Typing indicator — broadcast channel
   useEffect(() => {
+    if (!groupId) return // draft DM — nobody to broadcast to yet
     const channel = supabase.channel(`typing-${groupId}`)
       .on("broadcast", { event: "typing" }, ({ payload }) => {
         const { senderId, name, avatarUrl, isTyping } = payload as { senderId: string; name: string; avatarUrl: string | null; isTyping: boolean }
@@ -2015,6 +2438,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       }
       setLoading(false)
     }
+    // Draft DM: there is no group yet, so there is nothing to load. Land in the
+    // empty state immediately rather than firing a query against an empty id.
+    if (!groupId) { setMessages([]); setLoading(false); return }
     loadMessages()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId])
@@ -2097,6 +2523,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // socket, and falls back to postgres_changes on subscribe error. Handlers below are the
   // same ones the old group-messages-{id} / reactions-{id} channels used.
   useEffect(() => {
+    if (!groupId) return // draft DM — no topic to subscribe to yet
     const handleIncomingMessage = async (raw: { id: string; group_id: string; sender_id: string | null; content: string; created_at: string; reply_to_id: string | null; message_type?: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null; attachment_size?: number | null; poll_id?: string | null }) => {
           // System messages: just append directly for everyone
           if (raw.message_type === "system") {
@@ -2296,6 +2723,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const handleSend = useCallback(async ({ content, attachment, replyTo }: { content: string; attachment: File | null; replyTo: Message | null }) => {
     if (!content && !attachment) return
 
+    // `gid` — NOT the groupId prop — is the id every write below uses. For a
+    // draft DM it stays empty until the moderation gate has passed (see below):
+    // a message that gets blocked must not bring a conversation into existence.
+    let gid = groupId
+
     // Moderation gate — runs before anything is sent. When enabled AND in-scope
     // for this room, flag words per the ministry's rules. On a flag: record an
     // offense (fire-and-forget), surface the warning banner, and either block the
@@ -2307,7 +2739,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       ) {
         const { cleaned, flaggedCount } = moderateText(raw, { strictness: modSettings.strictness, behavior: modSettings.behavior })
         if (flaggedCount > 0) {
-          void recordChatOffense(groupId, raw)
+          // A draft has no group to attribute the offense to yet; the gate still
+          // blocks/softens the text, which is what actually matters here.
+          if (gid) void recordChatOffense(gid, raw)
           setModerationWarning("Your message was filtered for language against ministry guidelines. Repeated flags are reported to admins.")
           if (modSettings.behavior === "block") return { text: raw, blocked: true }
           return { text: cleaned, blocked: false }
@@ -2318,6 +2752,27 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     const contentMod = content ? applyModeration(content) : { text: "", blocked: false }
     // Text-only + block mode → refuse to send outright.
     if (!attachment && contentMod.blocked) return
+
+    // ── Draft DM: THIS send is what brings the conversation into existence. ──
+    // Deliberately after the moderation gate, so a blocked message can't leave a
+    // conversation behind. Created here and then used by every write below in the
+    // SAME call, so the typed message is never lost. onDmCreated hands the real
+    // id to the parent; home-app keys the draft on the recipient, so this
+    // component stays mounted through the swap rather than remounting mid-send.
+    if (!gid) {
+      if (!draftRecipient || creatingDraftRef.current) return
+      creatingDraftRef.current = true
+      const { group, error: dmErr } = await createGroup({
+        name: draftRecipient.name,
+        type: "dm",
+        memberIds: [draftRecipient.id],
+        createdBy: userId,
+      })
+      creatingDraftRef.current = false
+      if (dmErr || !group) { setModerationWarning("Couldn't start this chat. Please try again."); return }
+      gid = group.id
+      onDmCreated?.(group.id, draftRecipient.name)
+    }
 
     // Reverent capitalization — a SEPARATE, silent transform: auto-caps God /
     // Jesus / Holy Spirit. Independent of the language filter (works even when
@@ -2337,7 +2792,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     if (attachment) {
       setUploading(true)
       const ext = attachment.name.split(".").pop() ?? "bin"
-      const path = `${groupId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+      const path = `${gid}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
       const { data: storageData, error } = await supabase.storage
         .from("chat-attachments")
         .upload(path, attachment, { cacheControl: "3600", upsert: false })
@@ -2345,7 +2800,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         const { data: { publicUrl } } = supabase.storage.from("chat-attachments").getPublicUrl(path)
         const optimisticId = `optimistic-att-${Date.now()}`
         const optimisticMsg: Message = {
-          id: optimisticId, group_id: groupId, sender_id: userId,
+          id: optimisticId, group_id: gid, sender_id: userId,
           content: "", created_at: new Date().toISOString(), sender_name: userName,
           reply_to_id: replyTarget?.id ?? null, reply_to_content: replyTarget ? replyPreviewLabel(replyTarget.content, replyTarget.attachment_type, replyTarget.attachment_name) : null,
           reply_to_sender: replyTarget?.sender_name ?? null,
@@ -2357,7 +2812,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         setMessages(prev => [...prev, optimisticMsg])
         bumpChatListForOwnSend(captionText || attachment.name)
         const { data } = await supabase.from("messages").insert({
-          group_id: groupId, sender_id: userId, content: "",
+          group_id: gid, sender_id: userId, content: "",
           reply_to_id: replyTarget?.id ?? null,
           attachment_url: publicUrl, attachment_type: attachment.type,
           attachment_name: attachment.name, attachment_size: attachment.size,
@@ -2368,7 +2823,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         if (captionText) {
           const captionOptimisticId = `optimistic-cap-${Date.now()}`
           const captionMsg: Message = {
-            id: captionOptimisticId, group_id: groupId, sender_id: userId,
+            id: captionOptimisticId, group_id: gid, sender_id: userId,
             content: captionText, created_at: new Date().toISOString(), sender_name: userName,
             reply_to_id: null, reply_to_content: null, reply_to_sender: null,
             message_type: "user", attachment_url: null,
@@ -2376,7 +2831,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           }
           setMessages(prev => [...prev, captionMsg])
           const { data: capData } = await supabase.from("messages").insert({
-            group_id: groupId, sender_id: userId, content: captionText,
+            group_id: gid, sender_id: userId, content: captionText,
           }).select("id").single()
           if (capData) setMessages(prev => prev.map(m => m.id === captionOptimisticId ? { ...m, id: capData.id } : m))
         }
@@ -2392,7 +2847,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     const sendText = applyReverent(contentMod.text)
     const optimisticId = `optimistic-${Date.now()}`
     const optimisticMsg: Message = {
-      id: optimisticId, group_id: groupId, sender_id: userId, content: sendText,
+      id: optimisticId, group_id: gid, sender_id: userId, content: sendText,
       created_at: new Date().toISOString(), sender_name: userName,
       reply_to_id: replyTarget?.id ?? null,
       reply_to_content: replyTarget ? replyPreviewLabel(replyTarget.content, replyTarget.attachment_type, replyTarget.attachment_name) : null,
@@ -2403,7 +2858,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
     const { data, error } = await supabase
       .from("messages")
-      .insert({ group_id: groupId, sender_id: userId, content: sendText, reply_to_id: replyTarget?.id ?? null })
+      .insert({ group_id: gid, sender_id: userId, content: sendText, reply_to_id: replyTarget?.id ?? null })
       .select("id")
       .single()
 
@@ -2413,7 +2868,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       setMessages((prev) => prev.map((m) => m.id === optimisticId ? { ...m, id: data.id } : m))
     }
     setSending(false)
-  }, [supabase, groupId, userId, userName, bumpChatListForOwnSend, modSettings, modIsChurch, modIsPersonal, modIsMinistryDefault])
+  }, [supabase, groupId, userId, userName, bumpChatListForOwnSend, modSettings, modIsChurch, modIsPersonal, modIsMinistryDefault, draftRecipient, onDmCreated])
 
   // For each own message: which other members have it as their most-recently-read own message.
   // Reuses the PRIOR array reference for any message whose receipts didn't change, so
@@ -2632,11 +3087,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
   return (
     <>
-    <AnimateIn animate={!inline} className={inline ? "flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 z-[100] bg-[var(--cream-panel)] flex flex-col md:left-[var(--shell-offset)]"}>
+    {/* Mobile chat is ONE continuous cream surface — header, message body and
+        composer share --cream so the chrome/composer controls read as floating
+        (iMessage/Messenger). Desktop keeps its --cream-panel overlay. */}
+    <AnimateIn animate={!inline} className={inline ? "flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 z-[100] bg-[var(--cream)] md:bg-[var(--cream-panel)] flex flex-col md:left-[var(--shell-offset)]"}>
     <div ref={chatSwipeRef} className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
-      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-[max(env(safe-area-inset-top),48px)] pb-3 md:py-3.5 border-b border-[var(--line)]"} bg-[var(--cream)]`}>
+      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-[max(env(safe-area-inset-top),48px)] pb-3 md:py-3.5 md:border-b md:border-[var(--line)]"} bg-[var(--cream)]`}>
         {searchMode ? (
           <>
             {/* Search bar mode */}
@@ -2693,7 +3151,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
               onClick={() => { if (window.matchMedia("(max-width: 767px)").matches) setShowSettings(true) }}
             >
               <div className="flex items-center gap-2">
-                <h2 className="truncate leading-none text-[17px] font-semibold md:text-[16px] md:font-normal" style={{ fontFamily: "var(--serif)", color: "var(--ink)", letterSpacing: "-0.01em" }}>{displayName}</h2>
+                {/* Mobile: the name is the whole title block (no member-count sub),
+                    so it takes the chrome-title size and centers against the avatar. */}
+                <h2 className="truncate leading-[1.2] text-[20px] font-semibold md:leading-none md:text-[16px] md:font-normal" style={{ fontFamily: "var(--serif)", color: "var(--ink)", letterSpacing: "-0.01em" }}>{displayName}</h2>
                 <div className="hidden md:flex items-center flex-shrink-0">
                   {memberFirstNames.slice(0, 4).map((name, i) => (
                     <span
@@ -2714,9 +3174,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   {memberCount} member{memberCount !== 1 ? "s" : ""} · {memberFirstNames.slice(0, 8).join(", ")}
                 </p>
               </div>
-              <p className="md:hidden text-[12px] text-[var(--muted-text)] mt-0.5">
-                {memberCount} member{memberCount !== 1 ? "s" : ""}
-              </p>
             </div>
             {/* Desktop action buttons — Search + User only */}
             <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
@@ -2727,13 +3184,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 <User size={14} />
               </button>
             </div>
-            {/* Mobile: search only — settings is reached by tapping the chat name
-                above (iMessage/Messenger pattern). 34px chrome hit box (mobile §1.3). */}
-            <div className="flex items-center gap-1 flex-shrink-0 md:hidden">
-              <button onClick={openSearch} className="w-[34px] h-[34px] flex items-center justify-center hover:bg-[var(--cream-2)] rounded-full transition-colors">
-                <Search className="w-4 h-4 text-[var(--muted-text)]" />
-              </button>
-            </div>
+            {/* Mobile carries NO chrome actions — settings is reached by tapping the
+                chat name above (iMessage/Messenger pattern); message search stays a
+                desktop affordance. */}
           </>
         )}
       </div>
@@ -2764,14 +3217,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       )}
 
       {/* ── Messages area ── */}
-      <div ref={scrollContainerRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
+      <div ref={scrollContainerRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto px-4 md:px-6 pt-2 pb-4 md:py-4">
         {loading ? (
           <Spinner />
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <p className="text-[14px] font-medium text-[var(--ink)]/40">No messages yet</p>
-              <p className="text-[12px] text-[var(--muted-text)]/40 mt-1">Say hello! 👋</p>
             </div>
           </div>
         ) : (
@@ -3246,6 +3698,10 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
   onOpen: (id: string, name: string) => void
   onAddInSection: (category: ChurchSection) => void
 }) {
+  // The FIRST rendered section sits tight under the scope pills — the 20px
+  // section gap is a between-sections rhythm, not a lead-in (empty sections
+  // self-hide, so "first" is the first section that actually renders).
+  const visibleKeys = CHURCH_SECTION_DEFS.filter(({ key }) => sections[key].length > 0).map(({ key }) => key)
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
       {CHURCH_SECTION_DEFS.map(({ key, label }) => {
@@ -3255,7 +3711,7 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
           <div key={key}>
             <PocketKicker
               label={label}
-              style={{ margin: "20px 4px 8px" }}
+              style={{ margin: `${key === visibleKeys[0] ? 2 : 20}px 4px 8px` }}
               action={canCreate ? (
                 <button
                   onClick={() => onAddInSection(key)}
@@ -3274,7 +3730,7 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
   )
 }
 
-export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, onGoToProfile, activeGroupId, canCreateChurchChat, fallbackChats, onComposerOpenChange }: ChatsTabProps) {
+export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, onGoToProfile, activeGroupId, canCreateChurchChat, fallbackChats, onComposerOpenChange, onOpenDraftDm }: ChatsTabProps) {
   const { setParam } = useNavState()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
@@ -3296,8 +3752,39 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   const [createChatCategory, setCreateChatCategory] = useState<ChurchSection | undefined>(undefined)
   const [showArchived, setShowArchived] = useState(false)
   const [search, setSearch] = useState("")
+  // Mobile search: the field is always mounted; `searchOpen` swaps the body below
+  // it to the search view. Kept separate from `search` (the desktop panel's own
+  // filter) so the two surfaces never share a stale query.
+  const [mobileSearch, setMobileSearch] = useState("")
+  const [searchOpen, setSearchOpen] = useState(false)
+  const closeMobileSearch = useCallback(() => { setSearchOpen(false); setMobileSearch("") }, [])
+
+  // Escape leaves search, mirroring the X.
+  useEffect(() => {
+    if (!searchOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closeMobileSearch() }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [searchOpen, closeMobileSearch])
+
+  // While searching, the floating pill nav hides — same rule the full-screen
+  // composer uses (mobile §3: nav hidden on composers).
+  useEffect(() => {
+    onComposerOpenChange?.(searchOpen)
+    return () => onComposerOpenChange?.(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchOpen])
 
   const isAdminOrLeader = isChatManageRole(userRole)
+
+  // Tapping a person in search: reuse the DM you already share, otherwise open a
+  // draft. The group is only created on the first send (app/home/dm.ts).
+  const searchSupabase = useMemo(() => createClient(), [])
+  const handleOpenPerson = useCallback(async (p: { id: string; name: string }) => {
+    const existing = await findExistingDm(searchSupabase, userId, p.id)
+    if (existing) onOpenChat(existing, p.name, "dm")
+    else onOpenDraftDm?.({ id: p.id, name: p.name })
+  }, [searchSupabase, userId, onOpenChat, onOpenDraftDm])
 
   // Stable key (no refreshKey) so revisits dedupe to one cache entry and paint instantly.
   const { data, error, isLoading, mutate } = useSWR<ChatGroup[]>(
@@ -3433,7 +3920,9 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       <div className="px-5 pt-1 pb-2 md:pt-2 md:px-0 md:flex-1 md:overflow-y-auto">
       {/* Mobile scope pills (B3 Pocket) — Church / My chats; the new-chat + sits
           right-aligned on the same row, My chats scope only. */}
-      <div className="flex items-center gap-2 mb-4 md:hidden">
+      {/* Scope pills hide while searching — search spans BOTH scopes, so leaving a
+          scope filter on screen would imply results are filtered by it. */}
+      <div className={`items-center gap-2 mb-4 md:hidden ${searchOpen ? "hidden" : "flex"}`}>
         <PocketFilterChip label="Church" active={subTab === "church"} onClick={() => { setSubTab("church"); setSearch(""); setParam("chats", null) }} />
         <PocketFilterChip label="My chats" active={subTab === "my"} onClick={() => { setSubTab("my"); setSearch(""); setParam("chats", "my") }} />
         {canShowNewChat && (
@@ -3445,6 +3934,41 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         )}
       </div>
 
+      {/* Search (mobile) — the field is always present; focusing it swaps the body
+          below to the search view IN PLACE, so the field stays pinned and the
+          change reads as a transition rather than a navigation. Chats + people,
+          so you can reach someone you have never messaged. */}
+      <div className="md:hidden mb-4">
+        <PocketSearchField
+          value={mobileSearch}
+          onChange={setMobileSearch}
+          placeholder="Search"
+          onFocus={() => setSearchOpen(true)}
+          trailing={searchOpen ? (
+            <button
+              onClick={closeMobileSearch}
+              aria-label="Close search"
+              style={{ background: "none", border: "none", padding: 0, display: "grid", placeItems: "center", color: "var(--muted-text)", cursor: "pointer", flexShrink: 0 }}
+            >
+              <X style={{ width: 17, height: 17 }} />
+            </button>
+          ) : undefined}
+        />
+      </div>
+
+      {searchOpen ? (
+        <div className="md:hidden chat-search-enter">
+          <ChatSearchView
+            query={mobileSearch}
+            chats={data ?? []}
+            userId={userId}
+            ministryId={ministryId}
+            onOpenChat={(id, name) => { closeMobileSearch(); handleOpenChat(id, name) }}
+            onOpenPerson={(p) => { closeMobileSearch(); handleOpenPerson(p) }}
+          />
+        </div>
+      ) : (
+      <>
       {/* Push-notification prompt — self-hides unless permission is 'default' & unsubscribed & not dismissed */}
       <div className="md:px-4">
         <PushSubscribeCard userId={userId} ministryId={ministryId} notificationSettings={userProfile.notification_settings} variant="pocket" style={{ marginBottom: 16 }} />
@@ -3502,6 +4026,8 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             </div>
           )}
         </div>
+      )}
+      </>
       )}
 
       {showCreateChat && (
@@ -3640,9 +4166,11 @@ export interface ChatListPanelProps {
   userProfile: Profile
   userRole: string
   fallbackChats?: ChatGroup[]
+  /** Open a draft DM (no group row until the first send) — see app/home/dm.ts. */
+  onOpenDraftDm?: (person: { id: string; name: string }) => void
 }
 
-export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole, fallbackChats }: ChatListPanelProps) {
+export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole, fallbackChats, onOpenDraftDm }: ChatListPanelProps) {
   const { setParam } = useNavState()
   const [subTab, setSubTab] = useState<"church" | "my">(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chats") : null
@@ -3654,6 +4182,15 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
   const [pendingCategory, setPendingCategory] = useState<ChurchSection | undefined>(undefined)
   const [showArchived, setShowArchived] = useState(false)
   const [search, setSearch] = useState("")
+  // Focusing the field consumes the panel with the shared search body.
+  const [searchOpen, setSearchOpen] = useState(false)
+  const closePanelSearch = useCallback(() => { setSearchOpen(false); setSearch("") }, [])
+  const panelSupabase = useMemo(() => createClient(), [])
+  const handleOpenPersonPanel = useCallback(async (p: { id: string; name: string }) => {
+    const existing = await findExistingDm(panelSupabase, userId, p.id)
+    if (existing) onOpenChat(existing, p.name)
+    else onOpenDraftDm?.({ id: p.id, name: p.name })
+  }, [panelSupabase, userId, onOpenChat, onOpenDraftDm])
 
   // Same stable key + fetcher as mobile ChatsTab → SWR dedupes both to one cache
   // entry; revisits paint instantly from cache (no skeleton).
@@ -3720,7 +4257,10 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
-      {/* Search — matches DirectoryMemberListPanel */}
+      {/* Search — matches DirectoryMemberListPanel. Focusing it consumes the
+          panel below with the SAME search body the mobile overlay uses, so this
+          reaches people you've never messaged instead of only name-filtering the
+          chats you're already in. The X restores the list. */}
       <div className="px-3 py-3 flex-shrink-0">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "var(--muted-text)" }} />
@@ -3728,12 +4268,39 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search chats"
-            className="w-full pl-9 pr-3 py-2 rounded-lg border text-[12.5px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20"
+            onFocus={() => setSearchOpen(true)}
+            onKeyDown={(e) => { if (e.key === "Escape") closePanelSearch() }}
+            placeholder="Search chats and people"
+            className="w-full pl-9 pr-9 py-2 rounded-lg border text-[12.5px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20"
             style={{ background: "var(--cream)", borderColor: "var(--line-2)", color: "var(--ink)" }}
           />
+          {searchOpen && (
+            <button
+              onClick={closePanelSearch}
+              aria-label="Close search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2"
+              style={{ background: "none", border: "none", padding: 2, display: "grid", placeItems: "center", color: "var(--muted-text)", cursor: "pointer" }}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
+
+      {searchOpen && (
+        <div className="flex-1 overflow-y-auto px-3 pb-3">
+          <ChatSearchView
+            query={search}
+            chats={data ?? []}
+            userId={userId}
+            ministryId={ministryId}
+            onOpenChat={(id, name) => { closePanelSearch(); handleOpenChatPanel(id, name) }}
+            onOpenPerson={(p) => { closePanelSearch(); handleOpenPersonPanel(p) }}
+          />
+        </div>
+      )}
+      {!searchOpen && (
+      <>
 
       {/* Church / My mode switcher — exclusive filter, SegmentedControl (R4/R12) */}
       <div className="px-3 flex-shrink-0">
@@ -3852,6 +4419,8 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
             New message
           </button>
         </div>
+      )}
+      </>
       )}
 
       {showCreateChat && (

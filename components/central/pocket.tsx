@@ -226,9 +226,11 @@ export function PocketBackRow({ label, onBack, style }: { label: string; onBack:
   )
 }
 
-// 40px squircle monogram chip (mockup `.chip`): --line-2 tonal with a plum
-// letter; `solid` inverts to a plum fill with a cream letter (ministry-wide chat).
-export function PocketChip({ letter, solid = false, size = 40 }: { letter: string; solid?: boolean; size?: number }) {
+// 40px squircle chip (mockup `.chip`): --pocket-track tonal holding a plum
+// letter OR a plum stroked icon (§4 Row contract — "plum stroke icon or
+// initial"); `solid` inverts to a plum fill with cream content (ministry-wide
+// chat). `icon` wins over `letter` when both are passed.
+export function PocketChip({ letter, icon, solid = false, size = 40 }: { letter?: string; icon?: ReactNode; solid?: boolean; size?: number }) {
   return (
     <span
       style={{
@@ -239,7 +241,7 @@ export function PocketChip({ letter, solid = false, size = 40 }: { letter: strin
         color: solid ? "var(--cream-on-dark)" : "var(--plum)",
       }}
     >
-      {letter}
+      {icon ?? letter}
     </span>
   )
 }
@@ -455,11 +457,16 @@ export function PocketSwitch({ checked, onChange, ariaLabel }: {
 }
 
 // Ivory search pill: leading search glyph + borderless input, faint placeholder.
-export function PocketSearchField({ value, onChange, placeholder = "Search", style }: {
+export function PocketSearchField({ value, onChange, placeholder = "Search", style, onFocus, trailing, autoFocus }: {
   value: string
   onChange: (v: string) => void
   placeholder?: string
   style?: CSSProperties
+  /** Fired on focus — search surfaces use it to enter their search mode. */
+  onFocus?: () => void
+  /** Optional right-slot node (a clear/close control while searching). */
+  trailing?: ReactNode
+  autoFocus?: boolean
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--ivory)", borderRadius: "var(--r-pocket-sm)", padding: "12px 16px", ...style }}>
@@ -467,10 +474,13 @@ export function PocketSearchField({ value, onChange, placeholder = "Search", sty
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={onFocus}
+        autoFocus={autoFocus}
         placeholder={placeholder}
         className="pocket-search-input"
         style={{ flex: 1, minWidth: 0, border: "none", background: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 15.5, color: "var(--ink)" }}
       />
+      {trailing}
       <style>{`.pocket-search-input::placeholder{color:var(--faint)}`}</style>
     </div>
   )
