@@ -715,7 +715,11 @@ function SignupContent() {
         <button type="button" onClick={handleAdminApple} style={{ ...pocketPillCard, marginTop: 22 }}>
           <AppleGlyph size={18}/> Continue with Apple
         </button>
-        {!nativeShell && (
+        {/* Same gate as the desktop branch above: hidden in the shell ONLY while
+            no iOS OAuth client is configured. This read `!nativeShell` alone, which
+            hid Google on phone-width signup even once the client ID existed — the
+            desktop branch would offer it and this would not. */}
+        {(!nativeShell || googleInShell) && (
           <button type="button" onClick={handleAdminGoogle} style={{ ...pocketPillCard, marginTop: 10 }}>
             <GoogleGlyph size={18}/> Continue with Google
           </button>
@@ -838,11 +842,15 @@ function SignupContent() {
           <h1 style={{ ...pocketH1, marginTop: 8 }}>Create your account.</h1>
         </div>
         <p style={{ ...pocketSub, marginTop: 14 }}>Get started with Central in minutes.</p>
-        {/* Apple first + Google hidden in the native shell — mirrors desktop. */}
+        {/* Apple first, then Google — and Google is hidden in the shell ONLY while
+            no iOS OAuth client is configured, exactly as the desktop branch does.
+            The comment here used to claim it mirrored desktop while gating on
+            `!nativeShell` alone, so a configured client showed Google on desktop
+            signup and never on the phone. */}
         <button type="button" onClick={handleMemberApple} style={{ ...pocketPillCard, marginTop: 22 }}>
           <AppleGlyph size={18}/> Continue with Apple
         </button>
-        {!nativeShell && (
+        {(!nativeShell || googleInShell) && (
           <button type="button" onClick={handleMemberGoogle} style={{ ...pocketPillCard, marginTop: 10 }}>
             <GoogleGlyph size={18}/> Continue with Google
           </button>
