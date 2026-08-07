@@ -50,6 +50,9 @@ const ChatScreen = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatScre
 const ChatListPanel = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatListPanel), { loading: () => <ChatListSkeleton />, ssr: false })
 
 const PlanTab = dynamic(() => import("./tabs/plan-tab").then(m => m.PlanTab), { loading: () => <Spinner />, ssr: false })
+// Split separately from PlanTab: the volunteer who sees this is exactly the user
+// who must NEVER download the 16k-line team workspace.
+const VolunteerWorkspace = dynamic(() => import("./components/volunteer-workspace").then(m => m.VolunteerWorkspace), { loading: () => <Spinner />, ssr: false })
 const StudentOrgSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.StudentOrgSectionNav), { loading: () => <Spinner />, ssr: false })
 const SmallGroupSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.SmallGroupSectionNav), { loading: () => <Spinner />, ssr: false })
 const FinanceSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.FinanceSectionNav), { loading: () => <Spinner />, ssr: false })
@@ -1047,7 +1050,14 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
 
   // Leaders reach Plan even with no team membership so the Receipts workspace stays
   // available to them (they oversee receipts); Receipts is the only surface they'll see.
-  const showPlanTab = userTeams.length > 0 || isGovernanceAdmin || isLeaderOrAdmin
+  const hasRealWorkspace = userTeams.length > 0 || isGovernanceAdmin || isLeaderOrAdmin
+  // The Workspace tab is now ALWAYS present (2026-08-06). It used to render only
+  // for `hasRealWorkspace`, which meant a volunteer staffed on an event had no way
+  // to see that event: their only trace of it was task rows in Home's My Deadlines,
+  // stripped of the event they belonged to. Everyone else gets VolunteerWorkspace —
+  // the events they're staffed on, or a "nothing assigned yet" state that says what
+  // the tab is FOR. See app/home/components/volunteer-workspace.tsx.
+  const showPlanTab = true
   // Church chat creation: admins/leaders + users with planning, member, or small-group permissions.
   const canCreateChurchChat = isAdmin ||
     userTeams.some(t => {
@@ -1256,7 +1266,18 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             </div>
           )}
 
-          {activeTab === "plan" && showPlanTab && (
+          {/* Someone with no team, no governance seat and no leader role gets the
+              volunteer view instead of the team workspace — PlanTab's whole surface
+              (picker, sidebar, team tabs) is meaningless without a team, and
+              threading a "no workspace" mode through its 16k lines would be worse
+              than branching here. */}
+          {activeTab === "plan" && !hasRealWorkspace && (
+            <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
+              <VolunteerWorkspace ministryId={ministryId} userId={userId} />
+            </div>
+          )}
+
+          {activeTab === "plan" && hasRealWorkspace && (
             <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
               <PlanTab
                 userId={userId}
