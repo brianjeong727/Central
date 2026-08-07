@@ -13,7 +13,7 @@ import type { ReactNode } from "react"
 import { Settings } from "lucide-react"
 import {
   IconButton, MonogramChip, PocketHeroCard, PocketKicker, PocketRow, PocketRowCard, BackChevron,
-  POCKET_CHROME_PAD_Y,
+  POCKET_CHROME_PAD_Y, useChromeSlotRef,
 } from "@/components/central"
 import { PlanLineIcon } from "./shared"
 import { getInitials } from "../utils"
@@ -42,6 +42,11 @@ export function PocketHubChrome({ title, onBack, onSettings, avatar, action }: {
   // primary pill). When present the title shrinks to 20 (§2, two-content row).
   action?: ReactNode
 }) {
+  // Deep children can also drop controls in here via <MobileChromeActions>, which
+  // is how a control that lives inside the screen BODY (the Allocation year picker,
+  // several levels down inside FinanceWorkspace) reaches the header without being
+  // threaded through as a prop. See components/central/mobile-chrome-slot.tsx.
+  const slotRef = useChromeSlotRef()
   return (
     // Owns its own chrome rhythm (Convention #27) rather than inheriting whatever
     // paddingTop the host wrapper happens to carry — the workspace hub used to sit
@@ -55,6 +60,8 @@ export function PocketHubChrome({ title, onBack, onSettings, avatar, action }: {
       )}
       <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: action ? 20 : 22, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
       {action}
+      {/* Portal target — empty (zero-width) until a child renders into it. */}
+      <div ref={slotRef} style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }} />
       {onSettings && (
         <IconButton dim={34} onClick={onSettings} title="Team settings"><Settings className="w-4 h-4" /></IconButton>
       )}

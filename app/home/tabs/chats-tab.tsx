@@ -173,7 +173,7 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
 
         {/* Header — one chrome row (X + 22px title), subtitle below (mobile §2.1) */}
         <div className="flex-shrink-0 border-b border-[var(--line)]">
-          <div className="flex items-center gap-3 px-5 pt-[max(env(safe-area-inset-top),48px)] pb-3 md:pt-6">
+          <div className="flex items-center gap-3 px-5 pt-[calc(env(safe-area-inset-top)+12px)] pb-3 md:pt-6">
             <button
               onClick={onClose}
               className="size-9 bg-[var(--ivory)] rounded-full flex items-center justify-center hover:bg-[var(--line-2)] transition-colors flex-shrink-0"
@@ -3078,8 +3078,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         onClose={() => { setShowSettings(false); onClose() }}
       />
     )
+    // Inset ONLY — ChatSettings renders a SubpageShell, whose chrome row already
+    // owns the 12px (POCKET_OVERLAY_INSET_CLS, not …PAD_TOP_CLS). Stacking both
+    // put chat settings at 24-30px instead of 12-19.
     return inline ? settingsEl : (
-      <div className="fixed inset-0 z-[110] overflow-y-auto pt-[max(env(safe-area-inset-top),48px)] md:pt-0 md:left-[var(--shell-offset)]" style={{ background: "var(--cream)" }}>
+      <div className="fixed inset-0 z-[110] overflow-y-auto pt-[env(safe-area-inset-top)] md:pt-0 md:left-[var(--shell-offset)]" style={{ background: "var(--cream)" }}>
         {settingsEl}
       </div>
     )
@@ -3094,7 +3097,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     <div ref={chatSwipeRef} className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
-      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-[max(env(safe-area-inset-top),48px)] pb-3 md:py-3.5 md:border-b md:border-[var(--line)]"} bg-[var(--cream)]`}>
+      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-[calc(env(safe-area-inset-top)+12px)] pb-3 md:py-3.5 md:border-b md:border-[var(--line)]"} bg-[var(--cream)]`}>
         {searchMode ? (
           <>
             {/* Search bar mode */}
@@ -3217,7 +3220,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       )}
 
       {/* ── Messages area ── */}
-      <div ref={scrollContainerRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto px-4 md:px-6 pt-2 pb-4 md:py-4">
+      {/* `data-bottom-anchored`: a transcript stacks from the BOTTOM, so "how far
+          down does content start" is not a meaningful reading here — a quiet chat
+          legitimately begins near the bottom of the viewport. Marked at the
+          component so e2e/mobile-screen-sweep skips it by property rather than by
+          keeping a list of screen names (same shape as `data-empty-state`). */}
+      <div data-bottom-anchored ref={scrollContainerRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto px-4 md:px-6 pt-2 pb-4 md:py-4">
         {loading ? (
           <Spinner />
         ) : messages.length === 0 ? (
