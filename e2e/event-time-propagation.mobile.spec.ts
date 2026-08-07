@@ -15,16 +15,28 @@
 // crosses into EST.
 import { test, expect, type Page, type Locator } from "@playwright/test"
 import { adminState, sandbox, E2E_PREFIX } from "./fixtures"
-import { resolveMinistryTimezone, zonedTimeToISO } from "../lib/tz"
+import { addDaysYMD, resolveMinistryTimezone, todayInZone, zonedTimeToISO } from "../lib/tz"
 
 const TEAM_ID = "63a47f06-fdc2-49e1-9703-9ee5dca1ccae"
 const PARENT_TITLE = `${E2E_PREFIX}TP Mobile Week`
 const CHILD_TITLE = `${E2E_PREFIX}TP Mobile Child`
 // Fixture baseline as MINISTRY-ZONE WALL CLOCKS.
-const PARENT_START_LOCAL = { ymd: "2026-08-03", hhmm: "14:00" }
-const PARENT_END_LOCAL = { ymd: "2026-08-07", hhmm: "20:00" }
-const CHILD_START_LOCAL = { ymd: "2026-08-04", hhmm: "16:00" }
-const CHILD_END_LOCAL = { ymd: "2026-08-04", hhmm: "18:00" }
+// ANCHORED TO TODAY — same treatment as the desktop sibling
+// (event-time-propagation.spec.ts). These were hardcoded absolute dates, which
+// worked until real time walked past them: the child night fell into the past
+// and stopped rendering in the timeline. ANCHOR is the child night; every offset
+// is preserved exactly as authored against the original 2026-08-04 literal.
+//
+// +2 days is load-bearing: "up next" means the next event that STARTS in the
+// future, so the parent (ANCHOR−1) must still be ahead of today, and it must
+// also start before the other seeded event on this team ("Summer Retreat 2026").
+const ANCHOR = addDaysYMD(todayInZone(resolveMinistryTimezone(process.env.E2E_TZ ?? null)), 2)
+const d = (offset: number) => addDaysYMD(ANCHOR, offset)
+
+const PARENT_START_LOCAL = { ymd: d(-1), hhmm: "14:00" }
+const PARENT_END_LOCAL = { ymd: d(+3), hhmm: "20:00" }
+const CHILD_START_LOCAL = { ymd: d(0), hhmm: "16:00" }
+const CHILD_END_LOCAL = { ymd: d(0), hhmm: "18:00" }
 
 /** The sandbox ministry's IANA zone, read from the DB in beforeAll. */
 let zone = ""
@@ -175,7 +187,7 @@ test.describe("event time propagation — mobile Edit affordance (016069e)", () 
     await vis(page.getByRole("button", { name: "Save changes" })).click()
     await expectModalClosed(page)
 
-    expect(iso((await readEvent(childId)).start_date)).toBe(iso(at("2026-08-04", "11:45")))
+    expect(iso((await readEvent(childId)).start_date)).toBe(iso(at(CHILD_START_LOCAL.ymd, "11:45")))
     expect((await readEvent(parentId)).start_date, "PARENT must not move").toBe(parentBefore.start_date)
     await page.screenshot({ path: `${SHOTS}/mobile-390-07-after-save.png`, fullPage: false, animations: "disabled" })
   })

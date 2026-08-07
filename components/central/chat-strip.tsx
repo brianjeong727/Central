@@ -1,9 +1,28 @@
 "use client"
 
 import { CSSProperties } from "react"
-import type { ChatPreview } from "@/components/ui/chats-section"
 import { EYEBROW_STYLE } from "./typography"
 import { MonogramChip } from "./MonogramChip"
+
+// Lives here rather than in app/home/types.ts: components/central is a LEAF and
+// must not import from app/. ChatStrip is this type's live consumer — it moved
+// here when the retired ChatsSection (its original home) was deleted.
+export interface ChatPreview {
+  id: string
+  groupName: string
+  lastMessage: string
+  lastMessageSender: string
+  unreadCount: number
+  initials: string
+  time: string
+  // Group category — drives the Messages church/my subtab when opening from here.
+  type?: string
+  // Per-user chat prefs. `muted` suppresses the unread badge (same rule as the
+  // chat list). `pinned` is carried for symmetry but unused here — the Home strip
+  // is a recency feed and never reorders by pinned.
+  muted?: boolean
+  pinned?: boolean
+}
 
 interface ChatStripProps {
   chats: ChatPreview[]

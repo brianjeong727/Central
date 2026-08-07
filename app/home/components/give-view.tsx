@@ -116,7 +116,7 @@ export function GiveView({
   const displayAmount = amount || "0"
 
   return (
-    <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
+    <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile: single chrome row (no two-header) */}
       <PocketChrome title="Give" back={onBack} hideAvatar userName="" onAvatarClick={() => {}} />
 

@@ -71,11 +71,13 @@ radius: `--r-pocket` 20 cards · `--r-pocket-sm` 16 search/stats/composer · `--
 ```
 [ safe-area top ]
 [ chrome row: (chevron) title ....... 0–2 actions · avatar ]
-[ .scroll — sole scroll region, ~120px bottom pad ]
+[ .scroll — sole scroll region, bottom pad = var(--nav-clearance) ]
 [ floating plum pill nav — hidden on composers, chat screen, sheets ]
 ```
 
 - **Nav:** 4 tabs — Home · Chats · Announcements (bell) · Workspace (clipboard). Active = cream circle + plum icon. Parent tab stays lit on every pushed screen. `--shadow-nav` is the **one** ambient shadow allowed anywhere on mobile.
+- **Nav clearance belongs to the shell, and ONLY to the shell.** The sole scroll region (`.shell-scroll` in `app/globals.css`, applied in `home-app.tsx`) carries `padding-bottom: var(--nav-clearance)`; it resets to `0` at ≥768px, where there is no pill. **A tab, section, or card must never add its own bottom pad for the nav** — that double-counts. Before this was enforced the shell's `pb-28` and every tab's `pb-28` stacked into ~260px of dead scroll below the last row when the pill needs ~74px, so on every scrollable screen you could scroll ~190px past your own content (ratified 2026-08-07).
+  `--nav-clearance` is DERIVED from the pill's real geometry in `components/ui/bottom-nav.tsx` — `env(safe-area-inset-bottom) + 14px (its bottom offset) + 60px (48 button + 2×6 padding) + var(--space-7)` — so the two can never drift. ≈92px flat-bottom, ≈126px notched: the "~120px" this spec used to quote, now exact per device rather than a fixed 112px that was wrong on both. Change the pill's size or offset and update the token, never a page.
 - **Avatar** (34 plum circle) sits in the chrome on tab roots → Profile. Sub-screens drop the avatar and show the back chevron instead.
 - **Full-bleed subpages** replace the parent screen entirely; their own chrome is the only header. Every navigation resets scroll to top.
 - **Single chrome-row header — no two-header screens.** A screen title never appears twice.

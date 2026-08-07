@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase"
 import { useNavState } from "../nav-state"
 import { useOpenMemberProfile } from "../member-profile-context"
 import { useMinistryTimezone } from "../ministry-timezone-context"
-import { eventDateColumnsFromInputs, eventDateInputsFromRow, formatInZone, instantToZoned, startOfTodayInstantISO, todayInZone } from "@/lib/tz"
+import { addDaysYMD, daysBetweenYMD, eventDateColumnsFromInputs, eventDateInputsFromRow, formatInZone, instantToZoned, startOfTodayInstantISO, todayInZone } from "@/lib/tz"
 import { useSubpageCrumbs, useBreadcrumbExtra } from "../breadcrumb-context"
 import { runAlgorithm, runSmallGroupAlgorithm, type PoolPerson, type GeneratedGroup, type PrevPairing, type DGLLeader, type SGGeneratedGroup } from "@/lib/group-algorithm"
 import {
@@ -54,7 +54,7 @@ import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-
 import { CountdownLadderEditor } from "../components/countdown-ladder-editor"
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
-import { EVENT_TYPE_CONFIGS, nextAnchorYMD, addDaysToYMD, ymdOf, lineageKeyOf, seasonLabelOf,
+import { EVENT_TYPE_CONFIGS, nextAnchorYMD, ymdOf, lineageKeyOf, seasonLabelOf,
   countdownPresetPhases, ladderOf, DEFAULT_COUNTDOWN_PRESET,
   type CountdownPhaseDef } from "../event-presets"
 import type {
@@ -3350,7 +3350,7 @@ export function PlanTab({
         /* ── Mobile workspace picker (no team selected) — mirrors desktop 2604-2727
            gating: 2+ member teams OR any governance-visible team → card list; else
            the 0-team empty state. The 1-team case is auto-entered upstream. ── */
-        <div className="md:hidden px-5 pb-28">
+        <div className="md:hidden px-5">
           {(userTeams.length >= 2 || govTeams.length > 0) ? (
             <>
               <PocketKicker label="Your workspaces" style={{ margin: "6px 4px 0" }} />
@@ -3423,7 +3423,7 @@ export function PlanTab({
           )}
         </div>
       ) : activeTeamId === "receipts" ? (
-        <div className="md:hidden pb-28">
+        <div className="md:hidden">
           <ReceiptsWorkspace
             ministryId={ministryId}
             userId={userId}
@@ -3438,7 +3438,7 @@ export function PlanTab({
           />
         </div>
       ) : teamKind === "finance" && activeTeamId && financeCanAccess ? (
-        <div className="md:hidden pb-28">
+        <div className="md:hidden">
           {/* Hub-first (sim ruling 2026-07-15): entering the workspace lands on a
               MobilePocketHub whose rows are the finance sections (same set as the
               retired fchip strip — mirrors the desktop FinanceSectionNav); drilling
@@ -3497,7 +3497,7 @@ export function PlanTab({
           )}
         </div>
       ) : (
-      <div className="md:hidden px-5 pb-28">
+      <div className="md:hidden px-5">
         {/* Back to the picker — only meaningful when the picker would offer >1 option
             (a single-workspace user is auto-re-entered upstream). Suppressed for the
             hub-bearing team views (student-org / DGL / standard): the hub's own
@@ -6516,14 +6516,6 @@ export function TimelineView({
 
 // Whole-day difference between two "YYYY-MM-DD" strings (to − from), computed
 // on local-noon dates so DST transitions can never round to ±1.
-function daysBetweenYMD(fromYMD: string, toYMD: string): number {
-  const [fy, fm, fd] = fromYMD.split("-").map(Number)
-  const [ty, tm, td] = toYMD.split("-").map(Number)
-  const from = new Date(fy, fm - 1, fd, 12, 0, 0)
-  const to = new Date(ty, tm - 1, td, 12, 0, 0)
-  return Math.round((to.getTime() - from.getTime()) / 86400000)
-}
-
 export function AddEventModal({
   ministryId,
   teamId,
@@ -6582,7 +6574,7 @@ export function AddEventModal({
   const [endDateStr, setEndDateStr] = useState(() =>
     initialInputs
       ? initialInputs.endYMD
-      : addDaysToYMD(nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay), initialDefaults.durationDays - 1))
+      : addDaysYMD(nextAnchorYMD(initialDefaults.anchorMonth, initialDefaults.anchorDay), initialDefaults.durationDays - 1))
   const [endTimeStr, setEndTimeStr] = useState(() => initialInputs ? initialInputs.endHHMM : initialDefaults.endTime)
   const [allDay, setAllDay] = useState(existing?.all_day ?? initialDefaults.allDay)
 
@@ -6602,7 +6594,7 @@ export function AddEventModal({
       ? ymdOf(new Date(Date.now() + d.relativeDays * 86_400_000))
       : nextAnchorYMD(d.anchorMonth, d.anchorDay)
     setStartDateStr(start)
-    setEndDateStr(addDaysToYMD(start, d.durationDays - 1))
+    setEndDateStr(addDaysYMD(start, d.durationDays - 1))
     setStartTimeStr(d.startTime)
     setEndTimeStr(d.endTime)
     setAllDay(d.allDay)
@@ -6774,7 +6766,7 @@ export function AddEventModal({
       id: t.id,
       res: await supabase
         .from("event_tasks")
-        .update({ due_date: addDaysToYMD(t.due_date, delta) })
+        .update({ due_date: addDaysYMD(t.due_date, delta) })
         .eq("id", t.id)
         .eq("event_plan_id", planId)
         .select("id"),
@@ -6994,7 +6986,7 @@ export function AddEventModal({
               for (const task of phase.tasks) {
                 let due: string | null = null
                 if (task.off !== null && eventYMD) {
-                  const computed = addDaysToYMD(eventYMD, task.off)
+                  const computed = addDaysYMD(eventYMD, task.off)
                   due = computed < todayYMD ? todayYMD : computed
                 }
                 taskRows.push({ event_plan_id: planId, title: task.title, phase: phase.key, due_date: due, sort_order: sortIdx++, completed: false, created_by: userId })
@@ -7546,7 +7538,7 @@ function toLocalYMD(d: Date): string {
 function addMonthsYMD(d: Date, n: number): string {
   return toLocalYMD(new Date(d.getFullYear(), d.getMonth() + n, d.getDate()))
 }
-function addDaysYMD(d: Date, n: number): string {
+function addDaysFromDateYMD(d: Date, n: number): string {
   return toLocalYMD(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n))
 }
 
@@ -8786,7 +8778,7 @@ export function EventPlanWorkspace({
   // This is the ladder's answer to the old `plan_start_date`, except it is
   // derived from the structure rather than stored as a second source of truth.
   const ladderStartYMD = countdownPhases.length > 0
-    ? addDaysYMD(eventAnchor, -Math.max(...countdownPhases.map((p) => p.startDaysBefore)))
+    ? addDaysFromDateYMD(eventAnchor, -Math.max(...countdownPhases.map((p) => p.startDaysBefore)))
     : ""
 
   // Map a task to its rung on the plan's ladder — the SAME bucketer the Countdown
@@ -8805,7 +8797,7 @@ export function EventPlanWorkspace({
     ...countdownPhases.map((p) => ({
       key: p.key,
       label: p.label,
-      defaultDue: addDaysYMD(eventAnchor, p.seedOffsetDays),
+      defaultDue: addDaysFromDateYMD(eventAnchor, p.seedOffsetDays),
       phase: p.eventPhase,
     })),
     { key: UNSCHEDULED_KEY, label: "Unscheduled", defaultDue: "", phase: "pre_event" as EventTask["phase"] },
@@ -11129,7 +11121,7 @@ function RunSheetTab({
   const days: string[] = []
   const startYMD = eventStartYMD(event, timeZone)
   const endYMD = eventEndYMD(event, timeZone)
-  for (let ymd = startYMD; ymd <= endYMD; ymd = addDaysToYMD(ymd, 1)) days.push(ymd)
+  for (let ymd = startYMD; ymd <= endYMD; ymd = addDaysYMD(ymd, 1)) days.push(ymd)
   if (days.length === 0) days.push(startYMD)
   const todayIdx = days.indexOf(todayInZone(timeZone))
   // Blocks stranded past the current span (the end date was shortened after they

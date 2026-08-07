@@ -105,16 +105,29 @@ export async function requirePlanPlanner(eventPlanId: string): Promise<AuthzResu
     .maybeSingle()
   if (!plan || plan.ministry_id !== ctx.ministryId) return deny("Not authorized.")
 
-  if (isLeaderRole(ctx.role)) return ctx
+  return (await hasCanPlanEvents(admin, ctx)) ? ctx : deny("Not authorized.")
+}
 
+// The plan-AGNOSTIC half of requirePlanPlanner: admin-tier/leader OR holds
+// `can_plan_events` on any team role. Deliberately carries NO tenant check —
+// it is only ever the second half of a gate whose caller has already proven
+// same-ministry (requirePlanPlanner via the plan row; the callers below via the
+// block's / plan's / team's own ministry_id).
+//
+// Exported because three actions (season-rollover, event-blocks, event-templates)
+// need this arm without a plan id, and each had hand-rolled a byte-identical
+// private copy — four copies of one authorization predicate, so a tightening in
+// one silently left three open (found by the 2026-08-04 audit).
+export async function hasCanPlanEvents(
+  admin: ReturnType<typeof createAdminClient>,
+  ctx: AuthzContext,
+): Promise<boolean> {
+  if (isLeaderRole(ctx.role)) return true
   const { data: memberships } = await admin
     .from("team_members")
     .select("id, team_roles!role_id(permissions)")
     .eq("user_id", ctx.userId)
-  const canPlan = ((memberships ?? []) as { team_roles: { permissions?: string[] } | null }[]).some(
+  return ((memberships ?? []) as { team_roles: { permissions?: string[] } | null }[]).some(
     (m) => (m.team_roles?.permissions ?? []).includes("can_plan_events"),
   )
-  if (canPlan) return ctx
-
-  return deny("Not authorized.")
 }

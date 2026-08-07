@@ -1070,7 +1070,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
   return (
     <>
-    <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
+    <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile chrome (B3 Pocket) — title stays "Announcements" (ruling #1) + plum
           create (leader/admin) + avatar. */}
       <PocketChrome
