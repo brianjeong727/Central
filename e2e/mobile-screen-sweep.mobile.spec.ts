@@ -24,27 +24,74 @@ type Probe = { title: number | null; titleText: string; content: number | null; 
 
 async function probe(page: Page): Promise<Probe> {
   return page.evaluate(() => {
-    let title: { top: number; text: string } | null = null
-    for (const el of Array.from(document.querySelectorAll("span, div, h1, h2, p"))) {
-      const r = el.getBoundingClientRect()
-      if (r.top < 0 || r.top > 260 || r.height < 12 || r.width < 40) continue
+    const vis = (el: Element) => {
       const s = getComputedStyle(el)
-      if (s.display === "none" || s.visibility === "hidden") continue
-      if (parseFloat(s.fontSize) < 19) continue
-      const text = (el.textContent ?? "").trim()
-      if (!text || el.children.length > 1) continue
-      title = { top: Math.round(r.top), text: text.slice(0, 28) }
-      break
+      return s.display !== "none" && s.visibility !== "hidden"
     }
+    // The thing being measured is the CHROME ROW, not "the biggest text near the
+    // top". A screen that headlines itself in the body (an announcement article, a
+    // member's identity card) correctly carries the "← Parent" grammar instead of a
+    // serif title — font-size sniffing missed that row entirely and latched onto the
+    // avatar's initials further down, inventing a 90px "title" on a fine screen.
+    // Anchor on the back chevron, which every stacked header routes through.
+    // Take the HIGHEST back chevron, not the first in DOM order. A full-screen
+    // overlay (ChatScreen) sits above a tab tree that is still mounted and still
+    // has its own chevron — first-in-DOM picked the buried one and measured the
+    // wrong row, reading a 48px "title" on a screen whose header is at 17.
+    let row: Element | null = null
+    let rowTop = Infinity
+    for (const bc of Array.from(document.querySelectorAll(".back-chevron"))) {
+      const r = bc.getBoundingClientRect()
+      if (r.top < 0 || r.top > 100 || !vis(bc) || r.width === 0) continue
+      if (r.top < rowTop) { rowTop = r.top; row = bc.parentElement }
+    }
+    let title: { top: number; text: string } | null = null
+    if (row) {
+      // The row's leading text — a serif title, or the back-label when that's the grammar.
+      for (const el of Array.from(row.querySelectorAll("span, div, h1, h2, p, button"))) {
+        const r = el.getBoundingClientRect()
+        if (r.height < 12 || r.width < 20 || !vis(el)) continue
+        const text = (el.textContent ?? "").trim()
+        if (!text || el.children.length > 1) continue
+        title = { top: Math.round(r.top), text: text.slice(0, 28) }
+        break
+      }
+    }
+    if (!title) {
+      for (const el of Array.from(document.querySelectorAll("span, div, h1, h2, p"))) {
+        const r = el.getBoundingClientRect()
+        if (r.top < 0 || r.top > 260 || r.height < 12 || r.width < 40) continue
+        if (!vis(el)) continue
+        if (parseFloat(getComputedStyle(el).fontSize) < 19) continue
+        const text = (el.textContent ?? "").trim()
+        if (!text || el.children.length > 1) continue
+        title = { top: Math.round(r.top), text: text.slice(0, 28) }
+        row = el.parentElement
+        break
+      }
+    }
+    // Content starts below the chrome ROW, not below the title — on a back-label
+    // row the title is short and the row is taller than it.
+    const rowBottom = row ? row.getBoundingClientRect().bottom : (title ? title.top + 34 : 0)
     let content: { top: number; text: string } | null = null
     if (title) {
       for (const el of Array.from(document.querySelectorAll("body *"))) {
+        // <style>/<script> have textContent (CSS source!) and a zero box, but they
+        // slipped through as "leaf text" and got reported as a screen's content —
+        // ".pocket-search-input::pl" is not a design defect.
+        if (el.tagName === "STYLE" || el.tagName === "SCRIPT" || el.tagName === "LINK") continue
         const r = el.getBoundingClientRect()
-        if (r.top <= title.top + 24 || r.top > 400) continue
-        if (r.width < 80 || r.height < 12) continue
+        if (r.top < rowBottom - 2 || r.top > 400) continue
+        // 40, not 80: a date kicker ("FRI, AUG 7") IS the first content and is
+        // narrow. The 80 floor skipped it and reported the headline below instead,
+        // inventing a 124px start on a screen that really begins at ~89.
+        if (r.width < 40 || r.height < 12) continue
         const s = getComputedStyle(el)
         if (s.display === "none" || s.visibility === "hidden") continue
         if (el.closest("[data-empty-state]")) continue
+        // A bottom-anchored region (a chat transcript) fills upward from the
+        // bottom — where it "starts" from the top says nothing about margins.
+        if (el.closest("[data-bottom-anchored]")) continue
         const painted = s.backgroundColor !== "rgba(0, 0, 0, 0)" || s.borderTopWidth !== "0px"
         const text = (el.textContent ?? "").trim()
         const isLeafText = text.length > 0 && el.children.length === 0
@@ -107,13 +154,36 @@ async function rowTitles(page: Page): Promise<string[]> {
  * because nothing failed. A genuinely row-less screen just costs the timeout.
  */
 async function waitForRows(page: Page): Promise<string[]> {
-  for (let i = 0; i < 12; i++) {
+  // Budget matters: this also runs on LEAF screens that legitimately have no rows,
+  // once per screen. At 6s × ~40 leaves it alone blew the whole run past its cap.
+  for (let i = 0; i < 5; i++) {
     const t = await rowTitles(page)
     if (t.length) return t
-    await page.waitForTimeout(500)
+    await page.waitForTimeout(400)
   }
   return []
 }
+
+// A row list can be DATA rather than navigation — chat settings → Members is one
+// row per person, and walking 30 of them adds nothing the first three don't. Cap,
+// and always log what was dropped: a silent truncation reads as full coverage.
+// 12, not 6: a hub legitimately has ~8 navigation rows (Church Settings has
+// exactly 8), and a cap of 6 silently dropped Workspace and Audit Log — two of the
+// screens that were violating in the first place. The cap is only a backstop
+// against DATA lists (one row per person); those are now handled by named
+// navigation instead, so it can sit well above any real hub.
+const MAX_ROWS_PER_SCREEN = 12
+
+// Never tap these, whatever screen they appear on.
+const DESTRUCTIVE = /\b(leave|delete|remove|clear|archive|reset|revoke|sign out|log out|unlink|disband)\b/i
+
+// Hard wall-clock ceiling on the DISCOVERY walks. Two runs died at the Playwright
+// timeout mid-walk, which kills the process before the summary prints — so a run
+// that found 40 clean screens reported nothing at all. Stopping early and printing
+// what we have (with the truncation logged) beats losing the whole result.
+const WALK_BUDGET_MS = 8 * 60_000
+let walkDeadline = Number.POSITIVE_INFINITY
+function outOfBudget() { return Date.now() > walkDeadline }
 
 async function tapRow(page: Page, title: string): Promise<boolean> {
   const el = page.locator(`[data-pocket-row="${title.replace(/"/g, '\\"')}"]`).filter({ visible: true }).first()
@@ -136,17 +206,37 @@ async function goBack(page: Page) {
  * which is as deep as the mobile hub-and-spoke model goes.
  */
 async function walkRows(page: Page, label: string, depth = 1) {
-  const titles = await waitForRows(page)
+  if (outOfBudget()) return
+  const all = await waitForRows(page)
+  const titles = all.slice(0, MAX_ROWS_PER_SCREEN)
+  if (all.length > titles.length) {
+    visited.push(`${label} — walked ${titles.length} of ${all.length} rows (capped)`)
+  }
+  const home = all.join("|")
   for (const t of titles) {
+    if (outOfBudget()) { visited.push(`${label} — walk stopped early (time budget)`); return }
+    // The sweep runs against the REAL sandbox, and this walk taps every row it
+    // finds. A row whose label reads destructive is not worth a margin reading —
+    // measuring a screen must never be able to mutate Brian's data.
+    if (DESTRUCTIVE.test(t)) { visited.push(`${label} → ${t}  SKIPPED (destructive label)`); continue }
     if (!(await tapRow(page, t))) continue
     // A row that opened nothing (an inline toggle, an external link) leaves the
     // rows unchanged — don't record it as a screen, and don't try to back out.
-    const nowRows = await rowTitles(page)
-    const moved = nowRows.join("|") !== titles.join("|")
-    if (!moved) continue
+    // Compare against the FULL list, not the capped one — on a screen with more
+    // rows than the cap, a no-op tap would otherwise look like navigation.
+    if ((await rowTitles(page)).join("|") === home) continue
     await check(page, `${label} → ${t}`)
     if (depth > 0) await walkRows(page, `${label} → ${t}`, depth - 1)
     await goBack(page)
+    // Confirm we actually landed back HERE before tapping the next row. Without
+    // this the walk WANDERS: a back that overshoots (closing the chat overlay
+    // outright, say) leaves us on some unrelated screen whose rows happen to share
+    // a title — chat NAMES are rows too — and the loop drills onward through the
+    // app indefinitely. That burned a whole 900s budget without reaching Plan.
+    if ((await rowTitles(page)).join("|") !== home) {
+      visited.push(`${label} — back overshot after "${t}"; stopped walking this screen`)
+      return
+    }
   }
 }
 
@@ -158,6 +248,7 @@ test.describe("mobile screen sweep — one margin rule, every screen", () => {
   let financeTeamId = ""
   let memberId = ""
   let announcementId = ""
+  let chatId = ""
 
   test.beforeAll(async () => {
     const sb = sandbox()
@@ -168,11 +259,30 @@ test.describe("mobile screen sweep — one margin rule, every screen", () => {
 
     // Older rows predate `status`, so a strict published filter finds nothing and
     // the detail screen silently goes unchecked — which looks exactly like a pass.
-    const { data: ann } = await sb.client
-      .from("announcements").select("id").eq("ministry_id", sb.ministryId)
-      .or("status.eq.published,status.is.null")
-      .order("created_at", { ascending: false }).limit(1).maybeSingle()
-    if (ann) announcementId = (ann as { id: string }).id
+    // A chat the admin is actually in — ChatScreen is a full-screen overlay opened
+    // from a card, not a PocketRow, so the walk can't discover it on its own.
+    const adminForChat = await sb.adminUserId()
+    const { data: myGroups } = await sb.client
+      .from("group_members").select("group_id").eq("user_id", adminForChat).limit(20)
+    const ids = (myGroups ?? []).map((g: { group_id: string }) => g.group_id)
+    if (ids.length) {
+      // Prefer a CHURCH chat: the settings "Section" row only exists where the
+      // chat can be reassigned, so a personal chat leaves that screen unmeasured.
+      const { data: grps } = await sb.client
+        .from("groups").select("id, type").eq("ministry_id", sb.ministryId).in("id", ids)
+      const list = (grps ?? []) as { id: string; type: string }[]
+      chatId = (list.find((g) => g.type === "church") ?? list[0])?.id ?? ""
+    }
+
+    // SEED it rather than hunt for one. Querying whatever happens to be in the
+    // sandbox made this screen's coverage depend on that data — the first version
+    // filtered status='published', matched nothing, and silently skipped the
+    // screen. A seeded row is always present and is cleaned up by prefix.
+    const ann = await sb.createAnnouncement({
+      title: "Sweep detail",
+      body: "Seeded so the announcement detail screen is always measured.",
+    })
+    announcementId = (ann as { id: string } | null)?.id ?? ""
 
     const { data: ev } = await sb.client
       .from("calendar_events").select("title, team_id")
@@ -198,6 +308,7 @@ test.describe("mobile screen sweep — one margin rule, every screen", () => {
 
   test.afterAll(async () => {
     const sb = sandbox()
+    await sb.deleteAnnouncementsByPrefix()
     if (financeTeamId) {
       await sb.client.from("team_members").delete().eq("team_id", financeTeamId)
       await sb.client.from("team_roles").delete().eq("team_id", financeTeamId)
@@ -206,7 +317,8 @@ test.describe("mobile screen sweep — one margin rule, every screen", () => {
   })
 
   test("every reachable mobile screen obeys the margin rules", async ({ page }) => {
-    test.setTimeout(600_000)
+    test.setTimeout(900_000)
+    walkDeadline = Date.now() + WALK_BUDGET_MS
 
     // ── Tab roots ──
     for (const [tab, label] of [
@@ -242,6 +354,33 @@ test.describe("mobile screen sweep — one margin rule, every screen", () => {
       await page.goto(`/home?tab=announcements&ann=${announcementId}`)
       await check(page, "Announcement → detail")
     } else visited.push("Announcement → detail       SKIPPED (no announcement seeded)")
+
+    // ── Chat: the overlay, then its settings and every settings sub-screen ──
+    // ChatScreen is not a SubpageShell and opens from a card, so it needs the one
+    // explicit hop; from chat settings onward everything is PocketRows again.
+    if (chatId) {
+      await page.goto(`/home?tab=chats&chat=${chatId}`)
+      await check(page, "Chat screen")
+      // Tapping the name block opens settings (the iMessage pattern that replaced
+      // the gear at phone width) — the same affordance a user has.
+      const nameBlock = page.locator("h2").filter({ visible: true }).first()
+      if (await nameBlock.count()) {
+        await nameBlock.click().catch(() => {})
+        await page.waitForTimeout(1400)
+        await check(page, "Chat → Settings")
+        // NAMED rows, not the generic walk. Chat settings mixes navigation rows
+        // with rows that MUTATE (the notify/section pickers stage a pref, member
+        // rows expose remove controls), and the sweep runs against the real
+        // sandbox — a walk that taps everything is the wrong tool on a surface
+        // where a tap can change data. These four are pure navigation.
+        for (const row of ["Members", "Media & files", "Section"]) {
+          if (await tapRow(page, row)) {
+            await check(page, `Chat → Settings → ${row}`)
+            await goBack(page)
+          } else visited.push(`Chat → Settings → ${row}  SKIPPED (row not present)`)
+        }
+      } else visited.push("Chat → Settings             SKIPPED (name block not found)")
+    } else visited.push("Chat screen                 SKIPPED (no chat seeded)")
 
     // ── Plan: team hub → its sections → the event workspace → its spokes ──
     if (teamId) {

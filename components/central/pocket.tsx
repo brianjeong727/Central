@@ -41,6 +41,28 @@ import { ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react"
 export const POCKET_CHROME_PAD_Y = { paddingTop: 12, paddingBottom: 10 } as const
 export const POCKET_CHROME_PAD_X = 20
 
+// Top padding for a chrome row inside a SHELL-ESCAPING overlay (`fixed inset-0`:
+// ChatScreen, chat settings, the create-chat screen). The app shell root owns
+// `env(safe-area-inset-top)` for everything mounted inside it — an overlay pinned
+// to the viewport escapes that, so it must add the inset itself, then the SAME
+// 12px the chrome row gets everywhere else.
+//
+// This shipped as three hand-typed copies of `max(env(safe-area-inset-top),48px)`.
+// The 48px FLOOR was the bug: wherever the inset reports 0 (browser, simulator, a
+// notchless device) chat opened 36px lower than every other screen, which is the
+// one place the app visibly broke its own chrome rhythm (Convention #27).
+// A Tailwind class rather than an inline style so per-site `md:` overrides still win.
+//
+// Use this when the element IS the chrome row (ChatScreen's own header).
+export const POCKET_OVERLAY_PAD_TOP_CLS = "pt-[calc(env(safe-area-inset-top)+12px)]"
+
+// Use this when the overlay HOSTS a chrome component that already owns its 12px
+// (a `SubpageShell` / `PocketChrome` inside a `fixed inset-0` wrapper). Adding the
+// full pad at both levels stacks them — chat settings landed at 24-30px instead of
+// 12-19 — which is Convention #26's double-gutter bug in the vertical direction.
+// The wrapper contributes the safe-area inset ONLY; the chrome row contributes the 12.
+export const POCKET_OVERLAY_INSET_CLS = "pt-[env(safe-area-inset-top)]"
+
 // Mobile kicker label: 10px mono, +1.4px tracking. Deliberately NOT flattened
 // into EYEBROW_STYLE (11px desktop eyebrow) — the pocket scale is one step down.
 export const POCKET_KICKER_STYLE: CSSProperties = {

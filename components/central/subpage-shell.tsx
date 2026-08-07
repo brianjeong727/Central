@@ -152,20 +152,15 @@ export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, titleScal
   const swipeRef = useEdgeSwipeBack<HTMLDivElement>(back?.onClick)
   // Mobile chrome uses the override when supplied; desktop always uses `title`.
   //
-  // Falling back to the TERMINAL crumb is what makes a titleless chrome row
-  // impossible. A crumb trail's last entry is by definition the screen you are on,
-  // and every subpage already passes one — so the name is always available and a
-  // screen can't ship without it. Five subpages (member sheet, both receipt
-  // details, meeting-note detail, announcement detail) passed crumbs and no title,
-  // and silently got the old "← Parent" grammar instead: a 15px plum back-label
-  // where every other screen shows a serif 20/600 title, with the screen's real
-  // name pushed into the body. The member sheet measured a 124px content start
-  // against ~64 everywhere else.
-  //
-  // Only the terminal crumb qualifies. A crumb WITH an onClick is a parent (it is
-  // the back target) — titling the row with it would name the screen you came from.
-  const terminal = crumbs[crumbs.length - 1]
-  const chromeTitle = mobileTitle ?? title ?? (terminal && !terminal.onClick ? terminal.label : undefined)
+  // Deliberately NOT derived from the terminal crumb. Tried that — it removes the
+  // titleless chrome row, but the five subpages that pass no title (member sheet,
+  // both receipt details, meeting-note detail, announcement detail) HEADLINE
+  // THEMSELVES in the body: the announcement is an editorial article with a date
+  // kicker and a large serif headline, the member sheet leads with an avatar +
+  // name identity card. Adding a chrome title there renders the same words twice,
+  // stacked. The "← Parent" grammar is the correct chrome for a screen whose body
+  // already names it — there the chrome's only job is navigation.
+  const chromeTitle = mobileTitle ?? title
   // State (not a plain ref) so the one re-render that publishes the slot happens
   // after it is in the DOM — a ref would leave the first portal render with null.
   const chromeSlotRef = useChromeSlotRef()
