@@ -10,7 +10,7 @@ import { EYEBROW_STYLE } from "../components/shared"
 // eventually any church on Central). No schema/RLS yet — this is a teaser card.
 export function NetworkTab({ onBack }: { onBack?: () => void }) {
   return (
-    <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
+    <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile: single chrome row (no two-header) */}
       <PocketChrome title="Network" back={onBack} hideAvatar userName="" onAvatarClick={() => {}} />
 

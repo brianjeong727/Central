@@ -20,7 +20,7 @@ import { Radio, Send, AlertTriangle, ArrowLeftRight } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { MONO_STYLE } from "@/components/central/typography"
 import { CentralCard, ActionMenu, CollapsibleRail, PocketKicker, PocketProgress } from "@/components/central"
-import { instantToZoned, todayInZone } from "@/lib/tz"
+import { addDaysYMD, daysBetweenYMD, instantToZoned, todayInZone } from "@/lib/tz"
 import { useMinistryTimezone } from "../ministry-timezone-context"
 import type { EventTask, CountdownPhaseDef } from "../types"
 
@@ -81,17 +81,10 @@ export interface CountdownPhase {
 // America/Los_Angeles put every Eastern ministry's T-minus math a day off for
 // any event or deadline near midnight.
 
-// Whole calendar days from a → b (b − a), both "YYYY-MM-DD".
-export function daysBetweenYMD(a: string, b: string): number {
-  const [ay, am, ad] = a.split("-").map(Number)
-  const [by, bm, bd] = b.split("-").map(Number)
-  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000)
-}
-
-function addDaysToYMD(ymd: string, n: number): string {
-  const [y, m, d] = ymd.split("-").map(Number)
-  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
-}
+// Calendar-day arithmetic lives in lib/tz.ts (Convention #23) — these were two
+// of six private copies across three incompatible strategies. Re-exported so any
+// existing `from "./countdown-tab"` import keeps resolving to the ONE impl.
+export { daysBetweenYMD }
 
 function fmtMD(ymd: string): string {
   return new Date(ymd + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
@@ -196,7 +189,7 @@ export function bucketCountdownPhases(
         isCurrent: key !== UNSCHEDULED_KEY && key === currentKey,
         isPast: key !== UNSCHEDULED_KEY && rankOf(ladder, key) > currentRank,
         tasks: arr,
-        defaultDue: key === UNSCHEDULED_KEY ? "" : addDaysToYMD(eventYMD, meta.dayOffset),
+        defaultDue: key === UNSCHEDULED_KEY ? "" : addDaysYMD(eventYMD, meta.dayOffset),
         eventPhase: meta.eventPhase,
         sectionKey: key,
       },
@@ -227,7 +220,7 @@ export function badgeCopyFor(task: EventTask, kind: TriggerKind | null, eventYMD
     if (task.due_date) {
       const d = daysBetweenYMD(task.due_date, eventYMD)
       if (d >= 0 && d <= 2) return "Confirm-taps go out T−2 days"
-      const fire = addDaysToYMD(task.due_date, -1)
+      const fire = addDaysYMD(task.due_date, -1)
       return `Auto-DM fires ${weekday(fire)}`
     }
     return "Auto-DM armed"
@@ -246,7 +239,7 @@ export function deriveFiresNext(
 ): { task: EventTask; fireYMD: string; copy: string }[] {
   return tasks
     .filter((t) => t.due_date && badgeFor(t, firedIds, todayYMD) === "armed")
-    .map((t) => ({ task: t, fireYMD: addDaysToYMD(t.due_date!, -1), copy: badgeCopyFor(t, "armed", eventYMD) }))
+    .map((t) => ({ task: t, fireYMD: addDaysYMD(t.due_date!, -1), copy: badgeCopyFor(t, "armed", eventYMD) }))
     .sort((a, b) => a.fireYMD.localeCompare(b.fireYMD))
     .slice(0, cap)
 }

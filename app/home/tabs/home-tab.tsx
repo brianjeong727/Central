@@ -829,7 +829,7 @@ export function HomeTab({
   }
 
   return (
-    <div className="pb-28 md:pb-0">
+    <div>
       {/* ── Mobile chrome header (Pocket) ── */}
       <div className="md:hidden px-5">
         <PocketHeader

@@ -1180,7 +1180,7 @@ export function SettingsTab({
   ]
 
   return (
-    <div className="pb-28 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
+    <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile: single chrome row — hub shows "Church Settings" + back; a drilled
           section shows that section's title + back one level to the hub (§1/§3). */}
       {mobileSection === null ? (

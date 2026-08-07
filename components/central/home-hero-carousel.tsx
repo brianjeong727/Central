@@ -4,7 +4,17 @@ import { useState, useRef, useEffect, CSSProperties, ReactNode, TransitionEvent 
 import Image from "next/image"
 import { ChevronLeft, ChevronRight, ClipboardList } from "lucide-react"
 import { formatInZone, instantToZoned } from "@/lib/tz"
-import { UpNextEventDetail } from "./up-next-card"
+// Live event-detail data, pulled from a referenced calendar_events row.
+// When provided, the reference slide shows a real two-column detail panel; when
+// absent the slide fills editorially (single column) — there is NO hollow
+// "nothing set yet" placeholder anymore (retired in the hero carousel, Phase 2).
+// Moved here from the retired up-next-card.tsx, which this carousel replaced.
+export interface UpNextEventDetail {
+  startDate: string
+  endDate: string
+  allDay: boolean
+  location: string | null
+}
 
 // A curated hero slide resolves to LIVE data from the entity it references
 // (an announcement, a calendar_event), or is a standalone uploaded photo.

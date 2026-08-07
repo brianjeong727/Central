@@ -8,11 +8,11 @@ import { useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase"
 import { BottomNav } from "@/components/ui/bottom-nav"
 import { EntrySplash } from "@/app/home/components/entry-splash"
-import type { ChatPreview } from "@/components/ui/chats-section"
+import type { ChatPreview } from "@/components/central/chat-strip"
 
 // Types
 import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings, ChatGroup, Crumb } from "./types"
-import { formatRelativeTime, getInitials, chatPreviewLabel } from "./utils"
+import { formatRelativeTime, getInitials, chatPreviewLabel, rowsToChatPreviews, type ChatPreviewRow } from "./utils"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 import { classifyTeam } from "./team-type"
 import { useNavState, ALL_FOLDED_PARAMS } from "./nav-state"
@@ -574,15 +574,6 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     }
   }
 
-  type ChatPreviewRow = {
-    group_id: string; group_name: string; group_type: string
-    last_read_at: string | null; last_msg_content: string | null
-    last_msg_sender_name: string | null; last_msg_at: string | null
-    last_msg_type: string | null; unread_count: number
-    last_msg_attachment_type: string | null; last_msg_has_poll: boolean | null
-    muted: boolean | null; pinned: boolean | null
-  }
-
   // Single DB round-trip via get_chat_previews function (replaces unbounded messages fetch)
   const loadRecentChats = useCallback(async () => {
     const { data } = await supabase.rpc("get_chat_previews", {
@@ -591,29 +582,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     })
     if (!data) return
 
-    const previews = ((data as ChatPreviewRow[])
-      .map((row) => ({
-        id: row.group_id,
-        groupName: row.group_name,
-        type: row.group_type,
-        lastMessage: chatPreviewLabel(row.last_msg_content, row.last_msg_attachment_type, row.last_msg_has_poll),
-        lastMessageSender: row.last_msg_sender_name ?? "",
-        unreadCount: Number(row.unread_count),
-        initials: getInitials(row.group_name),
-        time: row.last_msg_at ? formatRelativeTime(row.last_msg_at) : "",
-        muted: row.muted ?? false,
-        pinned: row.pinned ?? false,
-        _ts: row.last_msg_at ?? "",
-      }))
-      .sort((a, b) => {
-        if (!a._ts && !b._ts) return 0
-        if (!a._ts) return 1
-        if (!b._ts) return -1
-        return b._ts.localeCompare(a._ts)
-      })
-      .map(({ _ts: _, ...rest }) => rest)) as ChatPreview[]
-
-    setRecentChats(previews)
+    setRecentChats(rowsToChatPreviews(data as ChatPreviewRow[]))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, ministryId])
 
@@ -1150,8 +1119,14 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
           baseVisible={openAnnouncementId != null || (activeTab !== "chats" && !(activeTab === "plan" && !activeTeamId))}
         />
 
-        {/* Scrollable content area */}
-        <div className="overflow-y-auto pb-28 min-h-screen md:flex-1 md:pb-0 md:min-h-0 md:overflow-hidden">
+        {/* Scrollable content area.
+            This is the SOLE scroll region on mobile (mobile_design_system.md §3),
+            so it is the only place the nav-pill clearance belongs. Tabs and
+            sections must NOT add their own bottom padding — stacking them is
+            what left ~260px of dead scroll below the last row when the pill
+            needs ~74px. --nav-clearance derives from the pill's real geometry;
+            see app/globals.css. Desktop drops it entirely (md:pb-0). */}
+        <div className="shell-scroll overflow-y-auto min-h-screen md:flex-1 md:min-h-0 md:overflow-hidden">
 
           {/* Shared on-load entrance — keyed by activeTab so this single element
               remounts and replays the fade+rise on every top-level tab switch

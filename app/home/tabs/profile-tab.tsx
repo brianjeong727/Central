@@ -1379,7 +1379,7 @@ export function ProfileTab({
     <div className="pb-6 md:pb-0 md:flex md:flex-col md:min-h-full">
 
       {activeSection === "journal" && (
-        <div className="pb-28 md:pb-0">
+        <div>
           {/* Mobile header — compact, gear inline right.
               NB: Tailwind flex CLASSES, not inline display:flex — an inline display
               would override md:hidden and leak the mobile header onto desktop. */}

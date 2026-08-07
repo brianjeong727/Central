@@ -83,6 +83,7 @@ BUILD_STATUS="skipped"
 LINT_STATUS="n/a"
 HEX_STATUS="n/a"
 DEDUP_STATUS="n/a"
+COPIES_STATUS="n/a"
 SERVER_STATUS="fail"
 E2E_STATUS="n/a"
 
@@ -188,6 +189,25 @@ else
   exit 1
 fi
 
+# ── (c4) committed iCloud/Finder conflict copies (BLOCKING) ──────────────────
+# The repo lives under an iCloud-synced ~/Desktop, so sync races leave "dm 2.ts"
+# beside "dm.ts". Untracked ones show up in git status; COMMITTED ones don't, and
+# two had already landed — one of them a duplicate Playwright spec that ran as a
+# second copy of its whole file in every suite run.
+echo "▶ scripts/check-conflict-copies.sh"
+COPIES_LOG="$(mktemp)"
+if bash scripts/check-conflict-copies.sh >"$COPIES_LOG" 2>&1; then
+  COPIES_STATUS="pass"
+  tail -n 1 "$COPIES_LOG"
+else
+  COPIES_STATUS="fail"
+  echo "── conflict-copies FAILED (BLOCKING) ────────────────"
+  cat "$COPIES_LOG"
+  echo "─────────────────────────────────────────────────────"
+  echo "════════ VERIFY RESULT: FAIL (conflict-copies) ════════"
+  exit 1
+fi
+
 # ── (d) restart dev server ───────────────────────────────────────────────────
 case "$PORT" in
   3000) SLOT="main" ;;
@@ -246,6 +266,7 @@ printf '  %-8s %s\n' "lint"   "$LINT_STATUS"
 printf '  %-8s %s\n' "lockfile" "$LOCK_STATUS"
 printf '  %-8s %s\n' "hex"    "$HEX_STATUS"
 printf '  %-8s %s\n' "dedup"  "$DEDUP_STATUS"
+printf '  %-8s %s\n' "copies" "$COPIES_STATUS"
 printf '  %-8s %s (:%s)\n' "server" "$SERVER_STATUS" "$PORT"
 printf '  %-8s %s\n' "e2e"    "$E2E_STATUS"
 echo "════════════════════════════════════════"

@@ -10,19 +10,10 @@
 // Pattern (Convention #2/#6/#8): session authz guard → createAdminClient() → ministry-rescoped.
 
 import { createAdminClient } from "@/lib/supabase-admin"
-import { requireMinistryMember, type AuthzContext } from "@/app/actions/authz"
-import { isLeaderRole } from "@/lib/roles"
+import { requireMinistryMember, hasCanPlanEvents, type AuthzContext } from "@/app/actions/authz"
 
 type AdminClient = ReturnType<typeof createAdminClient>
 type BlockStatus = "pending" | "active" | "done" | "skipped"
-
-async function canPlanEvents(admin: AdminClient, ctx: AuthzContext): Promise<boolean> {
-  if (isLeaderRole(ctx.role)) return true
-  const { data } = await admin.from("team_members").select("id, team_roles!role_id(permissions)").eq("user_id", ctx.userId)
-  return ((data ?? []) as { team_roles: { permissions?: string[] } | null }[]).some(
-    (m) => (m.team_roles?.permissions ?? []).includes("can_plan_events"),
-  )
-}
 
 // Load the block, verify same ministry (via its plan), and return it + whether the caller may act.
 async function loadBlock(admin: AdminClient, ctx: AuthzContext, blockId: string) {
@@ -32,7 +23,7 @@ async function loadBlock(admin: AdminClient, ctx: AuthzContext, blockId: string)
     .eq("id", blockId)
     .maybeSingle()
   if (!block || block.ministry_id !== ctx.ministryId) return { block: null, canManage: false, isOwner: false }
-  const canManage = await canPlanEvents(admin, ctx)
+  const canManage = await hasCanPlanEvents(admin, ctx)
   return { block, canManage, isOwner: block.owner_id === ctx.userId }
 }
 
