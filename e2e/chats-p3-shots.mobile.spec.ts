@@ -91,11 +91,13 @@ test.describe("mobile Chats family (P3) screenshots", () => {
     // Open settings by tapping the chat-header title (mobile has no gear — the
     // header row carries the setShowSettings tap handler at phone width).
     await page.locator("h2").filter({ visible: true }).first().click()
+    // Two sections of one repeated row shape. "Mute notifications" is gone —
+    // it became the Notifications row (All | Mentions | Off picker), and the
+    // roster moved behind the Members row.
+    await expect(vis(page, "Actions").first()).toBeVisible({ timeout: 10000 })
+    await expect(vis(page, "Privacy & support").first()).toBeVisible({ timeout: 10000 })
     await expect(vis(page, "Members").first()).toBeVisible({ timeout: 10000 })
-    // Wait for the members query to resolve so the role tags + Preferences
-    // switches render (both are gated behind the loading spinner).
-    await expect(vis(page, "Preferences").first()).toBeVisible({ timeout: 10000 })
-    await expect(vis(page, "Mute notifications").first()).toBeVisible({ timeout: 10000 })
+    await expect(vis(page, "Notifications").first()).toBeVisible({ timeout: 10000 })
     await shot(page, "settings")
   })
 
@@ -113,10 +115,11 @@ test.describe("mobile Chats family (P3) screenshots", () => {
     await page.goto("/home?tab=chats&chats=church")
     await vis(page, GROUP, false).first().click()
     await page.locator("h2").filter({ visible: true }).first().click()
-    // SECTION control renders with the seeded "Groups" preset active.
+    // SECTION is now a row showing its current value, which pushes a picker.
+    await expect(vis(page, "Privacy & support").first()).toBeVisible({ timeout: 10000 })
     await expect(vis(page, "Section").first()).toBeVisible({ timeout: 10000 })
-    await expect(vis(page, "Preferences").first()).toBeVisible({ timeout: 10000 })
     await shot(page, "settings-church")
+    await vis(page, "Section").first().click()
 
     // Move Groups → Teams, Save, and confirm the DB flipped + a system note posted.
     // exact:true so the SECTION chip isn't confused with the church-list "New teams
@@ -136,6 +139,8 @@ test.describe("mobile Chats family (P3) screenshots", () => {
     }, { timeout: 8000 }).toBe("Chat moved to Teams")
 
     // Move back Teams → Groups to restore, confirming re-bucket both ways.
+    // Choosing pops back to settings, so re-enter the picker first.
+    await vis(page, "Section").first().click()
     await page.getByRole("button", { name: "Groups", exact: true }).click()
     await page.getByRole("button", { name: "Save changes" }).click()
     await expect(page.getByRole("button", { name: "Save changes" })).toHaveCount(0, { timeout: 10000 })
