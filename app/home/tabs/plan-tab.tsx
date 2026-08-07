@@ -2628,8 +2628,32 @@ function monthDay(dateStr: string, timeZone: string): string {
 
 // Back row shown when a hub row is drilled into on mobile — "← {section}" returns
 // to the hub. Sits above the existing section content.
-function MobileHubBackRow({ label, onBack }: { label: string; onBack: () => void }) {
-  return <PocketBackRow label={label} onBack={onBack} />
+/**
+ * The chrome row for a drilled-in workspace SECTION (Finance → Allocation, a
+ * standard team → Calendar, DGL → Schedule).
+ *
+ * This used to be `PocketBackRow label={teamName}` — a small "← Finance" row. Two
+ * things were wrong with it. It named the place you came FROM rather than the
+ * screen you are ON, so every Finance section's header read "Finance"; and it is a
+ * different, shorter component than the chrome every other drilled screen uses, so
+ * the header visibly shrank on the way in. The event spokes (Overview, Roles) and
+ * the section screens inside StudentOrgTeamHome already used PocketHubChrome; these
+ * three were the stragglers.
+ *
+ * `PocketHubChrome` carries POCKET_CHROME_PAD_Y (Convention #27), so routing
+ * through it is also what puts these screens on the one shared vertical rhythm.
+ */
+function MobileSectionChrome({ title, onBack }: { title: string; onBack: () => void }) {
+  return <PocketHubChrome title={title} onBack={onBack} />
+}
+
+// Finance section titles. ONE source for the hub row that opens a section and the
+// chrome title of the section itself — typing them twice is how a door and a room
+// end up disagreeing about where you are.
+const FINANCE_SECTION_LABELS: Record<FinanceSection, string> = {
+  allocation: "Allocation",
+  budget: "Budget",
+  reimbursements: "Reimbursements",
 }
 
 // Mobile workspace card (B3 Pocket Daybreak): tonal --ivory card, squircle letter
@@ -3459,9 +3483,9 @@ export function PlanTab({
                 groups={[{
                   label: "Sections",
                   rows: [
-                    { iconKey: "sliders", title: "Allocation", subtitle: "Plan the fiscal year's budget", onClick: () => setFinanceMobileSectionAndUrl("allocation") },
-                    { iconKey: "dollar", title: "Budget", subtitle: "Expense ledger & category totals", onClick: () => setFinanceMobileSectionAndUrl("budget") },
-                    { iconKey: "clipboard", title: "Reimbursements", subtitle: financeReimbSub, onClick: () => setFinanceMobileSectionAndUrl("reimbursements") },
+                    { iconKey: "sliders", title: FINANCE_SECTION_LABELS.allocation, subtitle: "Plan the fiscal year's budget", onClick: () => setFinanceMobileSectionAndUrl("allocation") },
+                    { iconKey: "dollar", title: FINANCE_SECTION_LABELS.budget, subtitle: "Expense ledger & category totals", onClick: () => setFinanceMobileSectionAndUrl("budget") },
+                    { iconKey: "clipboard", title: FINANCE_SECTION_LABELS.reimbursements, subtitle: financeReimbSub, onClick: () => setFinanceMobileSectionAndUrl("reimbursements") },
                   ],
                 }]}
               />
@@ -3473,7 +3497,13 @@ export function PlanTab({
                   must not stack above it. */}
               {!financeDetailOpen && (
                 <div className="px-5">
-                  <MobileHubBackRow label={activeTeamName} onBack={() => setFinanceMobileSectionAndUrl(null)} />
+                  {/* Names the SECTION, matching the hub row that opened it — the
+                      three labels are the same strings as the MobilePocketHub rows
+                      above, so the door and the room agree. */}
+                  <MobileSectionChrome
+                    title={FINANCE_SECTION_LABELS[financeMobileSection]}
+                    onBack={() => setFinanceMobileSectionAndUrl(null)}
+                  />
                   {govView && (
                     <div style={{ marginBottom: 16 }}>
                       <ReadOnlyPill />
@@ -3624,7 +3654,7 @@ export function PlanTab({
                   row, so suppress the section back-row while it owns the screen. */}
               {!stdCalendarEventOpen && (
                 <>
-                  <MobileHubBackRow label={activeTeamName} onBack={() => setStdMobileSectionAndUrl(null)} />
+                  <MobileSectionChrome title="Calendar" onBack={() => setStdMobileSectionAndUrl(null)} />
                   {govView && (
                     <div style={{ marginBottom: 16 }}>
                       <ReadOnlyPill />
@@ -14667,7 +14697,10 @@ function SmallGroupLeadersTab({
       {/* Mobile hub back row (ruling B-1) — the strip nav is replaced by a heroless
           hub; a drilled-in section shows a back-to-hub row. */}
       {!isDesktopView && !atMobileHub && (
-        <MobileHubBackRow label={teamName} onBack={() => setMobileDrillAndUrl(null)} />
+        <MobileSectionChrome
+          title={mobileDrill === "home" ? "Home" : mobileDrill === "schedule" ? "Schedule" : "Bible Study"}
+          onBack={() => setMobileDrillAndUrl(null)}
+        />
       )}
 
       <div className={isDesktopView ? "flex-1 overflow-y-auto px-14 py-6 pb-20" : "md:px-14"}>

@@ -14,7 +14,7 @@
 // one screen: if it fails, a screen has hand-rolled its chrome padding again — fix
 // it to use POCKET_CHROME_PAD_Y, never loosen the band.
 import { test, expect, type Page } from "@playwright/test"
-import { adminState, sandbox } from "./fixtures"
+import { adminState, sandbox, E2E_PREFIX } from "./fixtures"
 
 const MOBILE = { viewport: { width: 390, height: 844 } } as const
 
@@ -57,6 +57,9 @@ test.describe("mobile chrome rhythm (one 12px top gap, every screen)", () => {
 
   let teamId = ""
   let eventTitle = ""
+  // Seeded, not discovered: a skipped test proves nothing, and this file's whole
+  // job is to catch a screen drifting off the shared rhythm.
+  let financeTeamId = ""
 
   test.beforeAll(async () => {
     const sb = sandbox()
@@ -65,6 +68,32 @@ test.describe("mobile chrome rhythm (one 12px top gap, every screen)", () => {
       .eq("ministry_id", sb.ministryId).not("team_id", "is", null).is("parent_event_id", null)
       .order("start_date", { ascending: false }).limit(1).maybeSingle()
     if (ev) { teamId = (ev as { team_id: string }).team_id; eventTitle = (ev as { title: string }).title }
+
+    const adminId = await sb.adminUserId()
+    const { data: team } = await sb.client
+      .from("teams")
+      .insert({ ministry_id: sb.ministryId, name: `${E2E_PREFIX}Rhythm Finance`, description: "e2e", team_type: "finance", created_by: adminId })
+      .select("id").single()
+    if (team) {
+      financeTeamId = (team as { id: string }).id
+      const { data: role } = await sb.client
+        .from("team_roles")
+        .insert({ team_id: financeTeamId, name: "Treasurer", permissions: ["can_view_finances"], is_president: true })
+        .select("id").single()
+      if (role) {
+        await sb.client.from("team_members")
+          .insert({ team_id: financeTeamId, user_id: adminId, role_id: (role as { id: string }).id, added_by: adminId })
+      }
+    }
+  })
+
+  test.afterAll(async () => {
+    const sb = sandbox()
+    if (financeTeamId) {
+      await sb.client.from("team_members").delete().eq("team_id", financeTeamId)
+      await sb.client.from("team_roles").delete().eq("team_id", financeTeamId)
+      await sb.client.from("teams").delete().eq("id", financeTeamId)
+    }
   })
 
   test("every tab root opens its title at the same height", async ({ page }) => {
@@ -102,5 +131,36 @@ test.describe("mobile chrome rhythm (one 12px top gap, every screen)", () => {
     await page.getByText("Overview", { exact: true }).filter({ visible: true }).first().click()
     await page.waitForTimeout(1500)
     await expectRhythm(page, "Overview spoke")
+  })
+
+  // Finance drills through a DIFFERENT component than the event workspace, and it
+  // was the gap this spec missed on its first pass: its sections used a short
+  // `PocketBackRow` labelled with the TEAM name, so the header both shrank and read
+  // "Finance" on every section. Covered explicitly now — a contract only holds over
+  // the screens the test actually walks.
+  test("finance sections hold the rhythm and name themselves", async ({ page }) => {
+    test.setTimeout(180_000)
+    test.skip(!financeTeamId, "finance team could not be seeded")
+
+    await page.goto(`/home?tab=plan&team=${financeTeamId}`)
+    await page.waitForTimeout(2500)
+    await expectRhythm(page, "finance hub")
+
+    for (const section of ["Allocation", "Budget", "Reimbursements"] as const) {
+      const row = page.getByText(section, { exact: true }).filter({ visible: true }).first()
+      await row.waitFor({ state: "visible", timeout: 20_000 })
+      await row.click()
+      await page.waitForTimeout(1600)
+      await expectRhythm(page, `finance → ${section}`)
+
+      // …and the header must name the SECTION, not the team it belongs to.
+      const t = await titleTop(page)
+      expect(t?.text, `finance → ${section}: header should say "${section}", not the team name`)
+        .toContain(section)
+
+      await page.getByLabel(/^Back$|^Back to /).filter({ visible: true }).first().click()
+        .catch(async () => { await page.goBack() })
+      await page.waitForTimeout(1400)
+    }
   })
 })

@@ -535,10 +535,17 @@ function ReimbursementInbox({
   return (
     <div className="px-5 md:px-14 py-7">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
-        <h2 style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, letterSpacing: -0.2, color: "var(--ink)", margin: 0 }}>
+        {/* Desktop-only title — the mobile chrome row already says "Reimbursements"
+            (§1, no two-header screens). The COUNT survives on mobile as a bare
+            muted line: it is live state worth stating, and the hub row's own
+            pending count is a screen away once you are in here. */}
+        <h2 className="hidden md:block" style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, letterSpacing: -0.2, color: "var(--ink)", margin: 0 }}>
           Reimbursements inbox
           <span style={{ color: "var(--muted-text)", fontWeight: 400 }}>{` · ${items.length}`}</span>
         </h2>
+        <span className="md:hidden" style={{ fontSize: 13, color: "var(--muted-text)" }}>
+          {items.length} {items.length === 1 ? "receipt" : "receipts"}
+        </span>
         <FilterDropdown
           options={[
             { id: "needs", label: `Needs action${needsAction.length ? ` · ${needsAction.length}` : ""}` },
@@ -1802,9 +1809,13 @@ function AllocationSection({
 
   return (
     <div>
-      {/* Section header */}
+      {/* Section header. The title is DESKTOP-ONLY: at phone width the chrome row
+          already reads "Allocation", and repeating it as "Annual Allocation" right
+          underneath is the two-header screen mobile_design_system §1 forbids — the
+          screen title lives in the single chrome row, full stop. The year picker
+          stays on both widths; it is a control, not a heading. */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-        <h2 style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 500, color: "var(--ink)", margin: 0, letterSpacing: -0.2 }}>
+        <h2 className="hidden md:block" style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 500, color: "var(--ink)", margin: 0, letterSpacing: -0.2 }}>
           Annual Allocation
         </h2>
         <FilterDropdown
