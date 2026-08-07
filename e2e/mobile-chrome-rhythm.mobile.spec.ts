@@ -41,7 +41,54 @@ async function titleTop(page: Page): Promise<{ top: number; text: string } | nul
   })
 }
 
+/**
+ * Where the screen's BODY starts — the top of the first painted thing below the
+ * chrome row. This is the half the spec kept missing: the title can sit at a
+ * perfect 12px while the content below it floats 90px down, either because a
+ * control opened a row of its own under the header (§3 — controls belong IN the
+ * chrome row) or because a wrapper added its own top margin.
+ */
+async function contentTop(page: Page, titleY: number): Promise<{ top: number; text: string } | null> {
+  return page.evaluate((ty) => {
+    let best: { top: number; text: string } | null = null
+    for (const el of Array.from(document.querySelectorAll("body *"))) {
+      const r = el.getBoundingClientRect()
+      // Below the title's row, still near the top, and actually substantial.
+      if (r.top <= ty + 24 || r.top > 400) continue
+      // 12px floor, not 16: a section kicker or date line is ~15px tall and IS the
+      // first content. Skipping it made this latch onto the card below and report a
+      // gap that wasn't there (Home measured 95 when its body really starts at 58).
+      if (r.width < 80 || r.height < 12) continue
+      const s = getComputedStyle(el)
+      if (s.display === "none" || s.visibility === "hidden") continue
+      // An empty state is a deliberately CENTRED placeholder, not the start of a
+      // content flow — an empty screen legitimately begins low. Marked at the
+      // component (data-empty-state) so this stays a property of the design system
+      // rather than a list of screen names in a test.
+      if (el.closest("[data-empty-state]")) continue
+      const painted = s.backgroundColor !== "rgba(0, 0, 0, 0)" || s.borderTopWidth !== "0px"
+      const text = (el.textContent ?? "").trim()
+      const isLeafText = text.length > 0 && el.children.length === 0
+      if (!painted && !isLeafText) continue
+      if (!best || r.top < best.top) best = { top: Math.round(r.top), text: text.slice(0, 28) }
+    }
+    return best
+  }, titleY)
+}
+
+// The body may start right under the chrome (title ~12–19, row ~34 tall, 10px
+// below) — call it ~56 — and a section kicker or card can sit a little lower.
+// Anything past this is a stray row or an unowned margin.
+const MAX_CONTENT_TOP = 92
+
 async function expectRhythm(page: Page, label: string) {
+  // Poll rather than sleep. Fixed waits made this spec's failures WANDER between
+  // runs — a slow dev-server compile meant a screen hadn't painted yet and the
+  // miss was reported as "no header title", which reads like a real defect. Wait
+  // on the condition and a failure means what it says.
+  await expect
+    .poll(async () => (await titleTop(page))?.text ?? null, { timeout: 25_000 })
+    .not.toBeNull()
   const t = await titleTop(page)
   expect(t, `${label}: no header title found — navigation missed, not a pass`).not.toBeNull()
   expect(
@@ -49,7 +96,23 @@ async function expectRhythm(page: Page, label: string) {
     `${label}: header title "${t!.text}" starts at ${t!.top}px; the chrome row is 12px ` +
     `(POCKET_CHROME_PAD_Y) so it must land in [${MIN_TOP}, ${MAX_TOP}]`,
   ).toBeGreaterThanOrEqual(MIN_TOP)
-  expect(t!.top).toBeLessThanOrEqual(MAX_TOP)
+  expect(
+    t!.top,
+    `${label}: header title "${t!.text}" starts at ${t!.top}px — deeper than the ` +
+    `${MAX_TOP}px ceiling. Route the screen's chrome through PocketChrome / ` +
+    `PocketHubChrome / SubpageShell so it inherits POCKET_CHROME_PAD_Y.`,
+  ).toBeLessThanOrEqual(MAX_TOP)
+
+  const c = await contentTop(page, t!.top)
+  if (c) {
+    expect(
+      c.top,
+      `${label}: the body starts ${c.top}px down (at "${c.text}"). A screen's content ` +
+      `follows its chrome row — if a control opened a row of its own, move it into ` +
+      `the chrome via <MobileChromeActions> (§3); if a wrapper added a top margin, ` +
+      `remove it. Do NOT raise this ceiling.`,
+    ).toBeLessThanOrEqual(MAX_CONTENT_TOP)
+  }
 }
 
 test.describe("mobile chrome rhythm (one 12px top gap, every screen)", () => {

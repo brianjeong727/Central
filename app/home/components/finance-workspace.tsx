@@ -13,7 +13,7 @@ import { normalizeMoneyInput } from "../utils"
 import { useIsMobile } from "../use-is-mobile"
 import { useMinistryTimezone } from "../ministry-timezone-context"
 import { todayInZone } from "@/lib/tz"
-import { MonogramChip, FilterDropdown, FilterChip, CentralButton, SubpageShell, CentralModal, ConfirmDialog, PocketRowCard, PocketRow, Toast, useScrollResetOn } from "@/components/central"
+import { MonogramChip, FilterDropdown, FilterChip, CentralButton, SubpageShell, CentralModal, ConfirmDialog, PocketRowCard, PocketRow, Toast, MobileChromeActions, useScrollResetOn } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
   getReimbursementInbox,
@@ -1809,13 +1809,13 @@ function AllocationSection({
 
   return (
     <div>
-      {/* Section header. The title is DESKTOP-ONLY: at phone width the chrome row
-          already reads "Allocation", and repeating it as "Annual Allocation" right
-          underneath is the two-header screen mobile_design_system §1 forbids — the
-          screen title lives in the single chrome row, full stop. The year picker
-          stays on both widths; it is a control, not a heading. */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
-        <h2 className="hidden md:block" style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 500, color: "var(--ink)", margin: 0, letterSpacing: -0.2 }}>
+      {/* DESKTOP section header. Both halves are desktop-only at phone width:
+          the title because the chrome row already says "Allocation" (§1, no
+          two-header screens), and the year picker because it belongs IN that
+          chrome row (§3) rather than opening a row of its own under it — a lone
+          control row reads as stray and pushes the whole body down by its height. */}
+      <div className="hidden md:flex" style={{ alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
+        <h2 style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 500, color: "var(--ink)", margin: 0, letterSpacing: -0.2 }}>
           Annual Allocation
         </h2>
         <FilterDropdown
@@ -1825,6 +1825,17 @@ function AllocationSection({
           align="right"
         />
       </div>
+
+      {/* MOBILE: the same picker, portaled into the screen's chrome row. Renders
+          nothing when no mobile chrome is mounted, so this is inert on desktop. */}
+      <MobileChromeActions>
+        <FilterDropdown
+          options={yearOptions.map(y => ({ id: y, label: y }))}
+          value={fiscalYear}
+          onSelect={setFiscalYear}
+          align="right"
+        />
+      </MobileChromeActions>
 
       {loading ? (
         <div style={{ textAlign: "center", padding: "48px 0", color: "var(--muted-text)", fontSize: 13 }}>Loading…</div>

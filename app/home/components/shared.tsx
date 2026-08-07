@@ -100,8 +100,12 @@ export function EmptyState({
   subtitle: string
   variant?: "quiet" | "bordered"
 }) {
+  // `data-empty-state` marks this as a deliberately centred placeholder rather
+  // than the start of the screen's content flow. e2e/mobile-chrome-rhythm skips it
+  // when measuring where a body begins — an empty screen legitimately starts low,
+  // and without the marker that reads as the stray-row defect the spec hunts for.
   const interior = (
-    <div className="flex flex-col items-center justify-center gap-3 text-center">
+    <div data-empty-state className="flex flex-col items-center justify-center gap-3 text-center">
       <div
         className="flex items-center justify-center text-[var(--muted-text)] border border-[var(--line)]"
         style={{
