@@ -93,11 +93,21 @@ export function EmptyState({
   icon,
   title,
   subtitle,
+  action,
   variant = "quiet",
 }: {
   icon: React.ReactNode
   title: string
   subtitle: string
+  /**
+   * The empty state's own call-to-action ("New semester", "Add your first…").
+   * It belongs INSIDE the placeholder: callers used to wrap EmptyState in a
+   * flex column and hang the button underneath, which put the CTA outside the
+   * `data-empty-state` marker — so the margin sweep read it as a stray control
+   * row 316px down the screen. Passing it here keeps the whole placeholder one
+   * centred unit, and keeps that reading honest.
+   */
+  action?: React.ReactNode
   variant?: "quiet" | "bordered"
 }) {
   // `data-empty-state` marks this as a deliberately centred placeholder rather
@@ -121,6 +131,7 @@ export function EmptyState({
         <p className="text-[15px] font-medium text-[var(--ink)]">{title}</p>
         <p className="text-[13px] text-[var(--muted-text)] mt-0.5">{subtitle}</p>
       </div>
+      {action && <div className="mt-1">{action}</div>}
     </div>
   )
 

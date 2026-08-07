@@ -100,6 +100,21 @@ async function rowTitles(page: Page): Promise<string[]> {
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-pocket-row") ?? "").filter(Boolean))
 }
 
+/**
+ * Rows, once they've had a chance to paint. A hub whose data is still loading has
+ * no rows yet, and reading it straight away silently drops its whole subtree — the
+ * Finance sections vanished from a run exactly this way, which reads as "covered"
+ * because nothing failed. A genuinely row-less screen just costs the timeout.
+ */
+async function waitForRows(page: Page): Promise<string[]> {
+  for (let i = 0; i < 12; i++) {
+    const t = await rowTitles(page)
+    if (t.length) return t
+    await page.waitForTimeout(500)
+  }
+  return []
+}
+
 async function tapRow(page: Page, title: string): Promise<boolean> {
   const el = page.locator(`[data-pocket-row="${title.replace(/"/g, '\\"')}"]`).filter({ visible: true }).first()
   if (!(await el.count())) return false
@@ -121,7 +136,7 @@ async function goBack(page: Page) {
  * which is as deep as the mobile hub-and-spoke model goes.
  */
 async function walkRows(page: Page, label: string, depth = 1) {
-  const titles = await rowTitles(page)
+  const titles = await waitForRows(page)
   for (const t of titles) {
     if (!(await tapRow(page, t))) continue
     // A row that opened nothing (an inline toggle, an external link) leaves the
@@ -151,9 +166,12 @@ test.describe("mobile screen sweep — one margin rule, every screen", () => {
       .from("profiles").select("id").eq("ministry_id", sb.ministryId).limit(1).maybeSingle()
     if (mem) memberId = (mem as { id: string }).id
 
+    // Older rows predate `status`, so a strict published filter finds nothing and
+    // the detail screen silently goes unchecked — which looks exactly like a pass.
     const { data: ann } = await sb.client
       .from("announcements").select("id").eq("ministry_id", sb.ministryId)
-      .eq("status", "published").order("created_at", { ascending: false }).limit(1).maybeSingle()
+      .or("status.eq.published,status.is.null")
+      .order("created_at", { ascending: false }).limit(1).maybeSingle()
     if (ann) announcementId = (ann as { id: string }).id
 
     const { data: ev } = await sb.client
@@ -213,14 +231,17 @@ test.describe("mobile screen sweep — one margin rule, every screen", () => {
     }
 
     // ── Detail screens reachable by deep link (more reliable than tapping a card) ──
+    // A screen that was never reached must be VISIBLE in the report — an unchecked
+    // screen and a passing screen look identical otherwise, which is how the first
+    // pass "covered" Directory→member and the event spokes without ever loading them.
     if (memberId) {
       await page.goto(`/home?tab=directory&member=${memberId}`)
       await check(page, "Directory → member")
-    }
+    } else visited.push("Directory → member          SKIPPED (no member seeded)")
     if (announcementId) {
       await page.goto(`/home?tab=announcements&ann=${announcementId}`)
       await check(page, "Announcement → detail")
-    }
+    } else visited.push("Announcement → detail       SKIPPED (no announcement seeded)")
 
     // ── Plan: team hub → its sections → the event workspace → its spokes ──
     if (teamId) {

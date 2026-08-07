@@ -2258,18 +2258,16 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
 
       {/* ── No semesters at all ── */}
       {semesters.length === 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-          <EmptyState
-            icon={<Calendar className="w-6 h-6" />}
-            title="No rotation semesters yet."
-            subtitle={canEdit ? "Create a semester to open up sign-up slots." : "Ask a leader to set up a semester."}
-          />
-          {canEdit && (
+        <EmptyState
+          icon={<Calendar className="w-6 h-6" />}
+          title="No rotation semesters yet."
+          subtitle={canEdit ? "Create a semester to open up sign-up slots." : "Ask a leader to set up a semester."}
+          action={canEdit && (
             <CentralButton variant="secondary" size="sm" onClick={() => setShowNewSemester(true)}>
               <Plus className="w-4 h-4" /> New semester
             </CentralButton>
           )}
-        </div>
+        />
       ) : slotsLoading ? (
         <div style={{ textAlign: "center", padding: "24px 0", color: "var(--muted-text)", fontSize: 14 }}>Loading…</div>
       ) : groups.length === 0 ? (
