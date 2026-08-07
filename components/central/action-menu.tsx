@@ -44,6 +44,12 @@ interface ActionMenuProps {
   renderTrigger?: (args: { open: boolean; toggle: (e: React.MouseEvent) => void }) => ReactNode
   /** Accessible label for the default kebab trigger. */
   triggerLabel?: string
+  /** Override the panel's surface classes (fill/radius/border) only — positioning,
+   *  flip and z-index stay owned here. Phone-width callers use it to swap the
+   *  desktop --cream-panel skin for the mobile --ivory tonal card, which is the
+   *  only fill that reads on a flat --cream surface (mobile allows no shadow but
+   *  --shadow-nav). */
+  panelClassName?: string
 }
 
 const GAP = 4
@@ -60,6 +66,7 @@ export function ActionMenu({
   minWidth = 176,
   renderTrigger,
   triggerLabel = "More actions",
+  panelClassName = "bg-[var(--cream-panel)] rounded-xl border border-[var(--line)]",
 }: ActionMenuProps) {
   const [open, setOpen] = useState(false)
   const anchorRef = useRef<HTMLSpanElement>(null)
@@ -147,7 +154,7 @@ export function ActionMenu({
           <div
             ref={menuRef}
             data-testid="action-menu"
-            className="bg-[var(--cream-panel)] rounded-xl border border-[var(--line)] py-1 z-[200]"
+            className={`${panelClassName} py-1 z-[200]`}
             style={{
               position: "fixed",
               top: pos ? pos.top : 0,

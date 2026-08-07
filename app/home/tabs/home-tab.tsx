@@ -5,10 +5,9 @@ import dynamic from "next/dynamic"
 import useSWR from "swr"
 import { Bell, Calendar, Gift, Settings } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { EYEBROW_STYLE, PlanLineIcon } from "../components/shared"
+import { EYEBROW_STYLE } from "../components/shared"
 import { PocketHeader } from "../components/pocket-header"
 import { PocketUpNext, type PocketCard as UpNextCard } from "../components/pocket-up-next"
-import { teamIconKey } from "../workspace-presets"
 import { getInitials, previewBody } from "../utils"
 import { useMinistryTimezone } from "../ministry-timezone-context"
 import { formatInZone } from "@/lib/tz"
@@ -164,12 +163,15 @@ function PocketSectionHeader({ title, onSeeAll }: { title: string; onSeeAll: () 
   )
 }
 
-// A single quick-action tile in the Pocket 2-up grid (ivory borderless).
+// The Pocket quick-action tile (ivory borderless). Full-width since the workspace
+// tile that used to sit beside it was removed — a lone half-width tile floating
+// left reads as a broken 2-up grid, and every other Home card is full-bleed.
 function PocketQuickTile({ icon, label, subtitle, onClick }: { icon: React.ReactNode; label: string; subtitle: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
       style={{
+        width: "100%",
         textAlign: "left",
         background: "var(--ivory)",
         border: "none",
@@ -203,7 +205,6 @@ export function HomeTab({
   onGoToProfile,
   onOpenAnnouncement,
   onGoToTab,
-  userTeams = [],
   avatarUrl,
   activeQuestion,
   hasResponded,
@@ -827,11 +828,6 @@ export function HomeTab({
     })
   }
 
-  // Contextual quick-grid second tile: the user's first team (icon + role) when on a
-  // team. No fabricated progress metric — label + subtitle. (Directory shortcut
-  // removed — directory access lives in the Chats chrome.)
-  const firstTeam = userTeams[0]
-
   return (
     <div>
       {/* ── Mobile chrome header (Pocket) ── */}
@@ -1233,27 +1229,19 @@ export function HomeTab({
             </section>
           )}
 
-          {/* ── Quick grid — mobile (Give + contextual tile; Give is web-only in the shell) ── */}
-          {(!nativeShell || firstTeam) && (
+          {/* ── Quick tile — mobile. Give only; web-only (the native shell hides it).
+              The "first workspace" tile that used to share this row is GONE (Brian,
+              2026-08-05): Workspace is a bottom-nav destination, so the tile was a
+              second door to a place already one tap away, and it arbitrarily showed
+              userTeams[0] — meaningless for anyone on more than one team. ── */}
+          {!nativeShell && (
           <section>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              {!nativeShell && (
-              <PocketQuickTile
-                icon={<div style={{ width: 44, height: 44, borderRadius: 999, background: "var(--plum)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Gift style={{ width: 19, height: 19, color: "var(--cream-on-dark)" }} strokeWidth={1.7} /></div>}
-                label="Give"
-                subtitle="Support the ministry"
-                onClick={() => onGoToTab?.("give")}
-              />
-              )}
-              {firstTeam && (
-                <PocketQuickTile
-                  icon={<PlanLineIcon iconKey={teamIconKey({ team_type: firstTeam.teamType, name: firstTeam.teamName })} size={44} />}
-                  label={firstTeam.teamName}
-                  subtitle={firstTeam.roleName}
-                  onClick={() => onGoToTab?.("plan")}
-                />
-              )}
-            </div>
+            <PocketQuickTile
+              icon={<div style={{ width: 44, height: 44, borderRadius: 999, background: "var(--plum)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Gift style={{ width: 19, height: 19, color: "var(--cream-on-dark)" }} strokeWidth={1.7} /></div>}
+              label="Give"
+              subtitle="Support the ministry"
+              onClick={() => onGoToTab?.("give")}
+            />
           </section>
           )}
 

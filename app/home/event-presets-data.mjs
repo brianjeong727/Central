@@ -40,6 +40,77 @@ export function seasonLabelOf(eventYMD) {
   return `${startYear}–${String((startYear + 1) % 100).padStart(2, "0")}`
 }
 
+// ── Countdown ladders (T-minus planning structure) ───────────────────────────
+// The per-plan phase ladder stored on `event_plans.countdown_phases`. This
+// REPLACED the old absolute `plan_start_date` / `crunch_date` anchors: phases are
+// RELATIVE offsets, so moving an event carries its whole plan along with it and
+// no date arithmetic is needed anywhere.
+//
+// A phase covers  d ∈ (nextPhase.startDaysBefore, startDaysBefore]
+// where d = whole calendar days from a task's due_date to the event day
+// (positive = before the event, negative = after). The FIRST phase is open
+// upward (anything earlier still lands in it); the LAST covers everything below.
+//
+//   startDaysBefore — the phase boundary, in days before the event.
+//   seedOffsetDays  — offset from the event date used to prefill that phase's
+//                     inline add-row. Carried explicitly rather than derived,
+//                     because the long ladder's seeds are not its boundaries
+//                     (T−3 WEEKS starts at 21 but seeds at −18).
+//   eventPhase      — the `event_tasks.phase` value a task added here gets.
+//
+// Tasks with NO due_date are never stored in a phase — they surface in a
+// computed "UNSCHEDULED" bucket, which is the absence of a date, not a window.
+export const COUNTDOWN_PRESETS = {
+  long: {
+    id: "long",
+    label: "Long planning",
+    hint: "Four weeks out — the rhythm every traditional event follows.",
+    phases: [
+      { key: "t4w",   label: "T−4 WEEKS", startDaysBefore: 28, seedOffsetDays: -28, eventPhase: "pre_event" },
+      { key: "t3w",   label: "T−3 WEEKS", startDaysBefore: 21, seedOffsetDays: -18, eventPhase: "pre_event" },
+      { key: "t1w",   label: "T−1 WEEK",  startDaysBefore: 14, seedOffsetDays: -7,  eventPhase: "pre_event" },
+      { key: "t2d",   label: "T−2 DAYS",  startDaysBefore: 2,  seedOffsetDays: -1,  eventPhase: "day_of" },
+      { key: "after", label: "AFTER",     startDaysBefore: -1, seedOffsetDays: 1,   eventPhase: "post_event" },
+    ],
+  },
+  short: {
+    id: "short",
+    label: "Short planning",
+    hint: "One week out, counted in days — for socials and quick turnarounds.",
+    phases: [
+      { key: "t1w",   label: "T−1 WEEK", startDaysBefore: 7,  seedOffsetDays: -7, eventPhase: "pre_event" },
+      { key: "t3d",   label: "T−3 DAYS", startDaysBefore: 3,  seedOffsetDays: -3, eventPhase: "pre_event" },
+      { key: "t1d",   label: "T−1 DAY",  startDaysBefore: 1,  seedOffsetDays: -1, eventPhase: "day_of" },
+      { key: "after", label: "AFTER",    startDaysBefore: -1, seedOffsetDays: 1,  eventPhase: "post_event" },
+    ],
+  },
+}
+
+/** The ladder a plan gets when nothing else is specified. */
+export const DEFAULT_COUNTDOWN_PRESET = "long"
+
+/** Fresh deep copy of a preset's phases — never hand callers the shared literal. */
+export function countdownPresetPhases(id = DEFAULT_COUNTDOWN_PRESET) {
+  const preset = COUNTDOWN_PRESETS[id] ?? COUNTDOWN_PRESETS[DEFAULT_COUNTDOWN_PRESET]
+  return preset.phases.map((p) => ({ ...p }))
+}
+
+/**
+ * Which preset a ladder matches, or "custom" once it diverges. "Custom" is a
+ * DERIVED label — it is never stored, so a ladder edited back into preset shape
+ * correctly reads as that preset again.
+ */
+export function countdownPresetIdOf(phases) {
+  if (!Array.isArray(phases)) return DEFAULT_COUNTDOWN_PRESET
+  const sig = (list) =>
+    list.map((p) => `${p.label}:${p.startDaysBefore}:${p.seedOffsetDays}:${p.eventPhase}`).join("|")
+  const target = sig(phases)
+  for (const id of Object.keys(COUNTDOWN_PRESETS)) {
+    if (sig(COUNTDOWN_PRESETS[id].phases) === target) return id
+  }
+  return "custom"
+}
+
 export const EVENT_PRESET_DATA = {
   welcome_week: {
     label: "Welcome Week", icon: "🎉", dot: "var(--plum)", bg: "var(--plum-tint)", text: "var(--plum)",

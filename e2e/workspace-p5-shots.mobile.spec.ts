@@ -10,6 +10,7 @@
 // locator is narrowed with .filter({ visible: true }) (mirrors mobile-plan-workspace).
 import { test, expect, type Page } from "@playwright/test"
 import { adminState, sandbox, E2E_PREFIX } from "./fixtures"
+import { countdownPresetPhases } from "../app/home/event-presets-data.mjs"
 import { promises as fs } from "node:fs"
 import { join } from "node:path"
 
@@ -87,7 +88,7 @@ test.describe("workspace p5 shots (mobile)", () => {
 
     // Plan + tasks + roles + showtime blocks on the Kickoff event
     const { data: plan } = await db.from("event_plans")
-      .insert({ ministry_id: sb.ministryId, calendar_event_id: kickoffEventId, created_by: adminId, plan_start_date: ymd(-10), crunch_date: ymd(1) })
+      .insert({ ministry_id: sb.ministryId, calendar_event_id: kickoffEventId, created_by: adminId, countdown_phases: countdownPresetPhases("long") })
       .select().single()
     planId = plan!.id
     await db.from("event_roles").insert([

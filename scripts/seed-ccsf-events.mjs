@@ -30,7 +30,7 @@
 
 import { createClient } from "@supabase/supabase-js"
 import ws from "ws"
-import { EVENT_PRESET_DATA, BOARD_ROLE_RESOURCES, lineageKeyOf, seasonLabelOf } from "../app/home/event-presets-data.mjs"
+import { EVENT_PRESET_DATA, BOARD_ROLE_RESOURCES, lineageKeyOf, seasonLabelOf, countdownPresetPhases } from "../app/home/event-presets-data.mjs"
 // The app's OWN conversion layer — not a copy of it. See scripts/lib/app-tz.mjs.
 import tz from "./lib/app-tz.mjs"
 
@@ -438,15 +438,16 @@ async function seedEvent(ev, { ministryId, teamId, createdBy, parentId = null })
 
   const groups = ev.tasks ?? presetTaskGroups(ev.type)
   const roles = ev.roles ?? presetRoles(ev.type)
-  const offsets = groups.flatMap((g) => g.items.map((i) => i.off)).filter((o) => o !== null)
-  const earliest = offsets.length ? Math.min(...offsets) : -30
 
+  // Countdown ladder: the LONG preset, matching every traditional CCSF event.
+  // The old plan_start_date / crunch_date pair used to be derived here from the
+  // earliest task offset — the ladder needs no such derivation, because its rungs
+  // are relative to the event rather than absolute dates counted back from it.
   const { data: plan, error: planErr } = await db.from("event_plans").insert({
     ministry_id: ministryId, calendar_event_id: event.id, created_by: createdBy,
     expected_turnout: ev.turnout ?? null,
     budget_allocated: ev.budget ?? null,
-    plan_start_date: addDays(ev.date, Math.min(earliest, -14)),
-    crunch_date: addDays(ev.date, -7),
+    countdown_phases: countdownPresetPhases("long"),
   }).select("id").single()
   if (planErr) throw new Error(`${ev.title} plan: ${planErr.message}`)
 

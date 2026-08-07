@@ -6,7 +6,7 @@ import { Search, MessageCircle, Heart, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { EmptyState } from "../components/shared"
-import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, PocketRow, PocketRowCard, PocketKicker, PocketSearchField, BackChevron } from "@/components/central"
+import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, PocketRow, PocketRowCard, PocketKicker, PocketSearchField, BackChevron, POCKET_CHROME_PAD_Y } from "@/components/central"
 import { getInitials } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { DirectoryMember } from "../types"
@@ -241,9 +241,12 @@ export function DirectoryTab({
       {/* ── Mobile: member list (hidden while a member subpage is open) ── */}
       {!mobileSelected && (
       <div className="md:hidden">
-        {/* Chrome row (mobile spec §2.1): back chevron + 22px serif title inline */}
-        <div className="px-5 pt-14 pb-5">
-          <div className="flex items-center gap-2 mb-4">
+        {/* Chrome row (mobile spec §2.1): back chevron + 22px serif title inline.
+            Vertical rhythm is the shared constant (Convention #27) — this shipped
+            `pt-14` (56px), by far the deepest header in the app, so Directory sat
+            a full title-height lower than every other tab root. */}
+        <div className="px-5 pb-5" style={{ paddingTop: POCKET_CHROME_PAD_Y.paddingTop }}>
+          <div className="flex items-center gap-2" style={{ marginBottom: POCKET_CHROME_PAD_Y.paddingBottom + 6 }}>
             {onBack && <BackChevron onClick={onBack} />}
             <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.1, fontWeight: 600 }}>Directory</span>
           </div>

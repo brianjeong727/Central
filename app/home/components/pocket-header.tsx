@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react"
 import { RingCrossLogo } from "./shared"
-import { MonogramChip, BackChevron } from "@/components/central"
+import { MonogramChip, BackChevron, POCKET_CHROME_PAD_Y, POCKET_CHROME_PAD_X } from "@/components/central"
 import { getInitials } from "../utils"
 
 interface PocketHeaderProps {
@@ -24,7 +24,10 @@ export function PocketHeader({ ministryName, userName, avatarUrl, action, onAvat
   return (
     <div
       className="flex items-center"
-      style={{ gap: 10, paddingTop: "var(--space-6)", paddingBottom: "var(--space-5)" }}
+      // Chrome rhythm is the shared constant (Convention #27). Home used to sit at
+      // --space-6 (14px), one step deeper than every other tab root.
+      // No PAD_X: Home mounts this inside its own px-5 wrapper.
+      style={{ gap: 10, ...POCKET_CHROME_PAD_Y }}
     >
       <RingCrossLogo size={26} color="var(--plum)" />
       <span
@@ -86,7 +89,7 @@ export function PocketChrome({
 }) {
   const twoActions = Boolean(action && action2)
   return (
-    <div className="flex items-center md:hidden" style={{ gap: 10, padding: "12px 20px 10px" }}>
+    <div className="flex items-center md:hidden" style={{ gap: 10, ...POCKET_CHROME_PAD_Y, paddingLeft: POCKET_CHROME_PAD_X, paddingRight: POCKET_CHROME_PAD_X }}>
       {back && <BackChevron onClick={back} />}
       <span
         style={{

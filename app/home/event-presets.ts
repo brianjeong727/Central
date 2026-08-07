@@ -5,8 +5,16 @@
 // This wrapper applies the TS types and hosts the small date helpers the app
 // and the Add-Event modal use to turn offsets/anchors into concrete dates.
 
-import type { EventType, EventExtraTab } from "./types"
-import { EVENT_PRESET_DATA, BOARD_ROLE_RESOURCES, lineageKeyOf as _lineageKeyOf, seasonLabelOf as _seasonLabelOf } from "./event-presets-data.mjs"
+import type { EventType, EventExtraTab, CountdownPhaseDef } from "./types"
+import {
+  EVENT_PRESET_DATA, BOARD_ROLE_RESOURCES,
+  lineageKeyOf as _lineageKeyOf, seasonLabelOf as _seasonLabelOf,
+  COUNTDOWN_PRESETS, DEFAULT_COUNTDOWN_PRESET,
+  countdownPresetPhases as _countdownPresetPhases,
+  countdownPresetIdOf as _countdownPresetIdOf,
+} from "./event-presets-data.mjs"
+
+export type { CountdownPhaseDef }
 
 // A checklist task with its due-date offset in days relative to the event start
 // (negative = before, 0 = day-of, null = unscheduled).
@@ -40,6 +48,43 @@ export const EVENT_TYPE_CONFIGS = EVENT_PRESET_DATA as Record<EventType, EventTy
 
 export type RoleResource = { summary: string; responsibilities: string[] }
 export const BOARD_ROLE_RESOURCE_MAP = BOARD_ROLE_RESOURCES as Record<string, RoleResource>
+
+// ── Countdown ladders ────────────────────────────────────────────────────────
+// Typed view of the shared preset data. The ladder REPLACED plan_start_date /
+// crunch_date — see COUNTDOWN_PRESETS in event-presets-data.mjs for the shape
+// and the bucketing contract.
+
+export type CountdownPreset = {
+  id: string
+  label: string
+  hint: string
+  phases: CountdownPhaseDef[]
+}
+
+export const COUNTDOWN_PRESET_MAP = COUNTDOWN_PRESETS as Record<string, CountdownPreset>
+
+/** Ordered for pickers: long first, then short. "Custom" is derived, never listed. */
+export const COUNTDOWN_PRESET_LIST: CountdownPreset[] = [
+  COUNTDOWN_PRESET_MAP.long,
+  COUNTDOWN_PRESET_MAP.short,
+]
+
+/** Fresh deep copy of a preset's phases — callers mutate freely. */
+export const countdownPresetPhases = _countdownPresetPhases as (id?: string) => CountdownPhaseDef[]
+
+/** Which preset a ladder matches, or "custom" once it diverges. Derived, never stored. */
+export const countdownPresetIdOf = _countdownPresetIdOf as (phases: CountdownPhaseDef[] | null | undefined) => string
+
+export { DEFAULT_COUNTDOWN_PRESET }
+
+/**
+ * A plan's ladder, falling back to the default preset. Rows created before the
+ * column existed (and any row whose jsonb failed to shape) read as the long
+ * ladder rather than rendering an eventless, phase-less checklist.
+ */
+export function ladderOf(phases: CountdownPhaseDef[] | null | undefined): CountdownPhaseDef[] {
+  return Array.isArray(phases) && phases.length > 0 ? phases : countdownPresetPhases(DEFAULT_COUNTDOWN_PRESET)
+}
 
 // ── Date helpers (local-time YMD strings, matching the modal's date inputs) ──
 

@@ -128,7 +128,7 @@ async function copyEventForward(
 
   const { data: srcPlan } = await admin
     .from("event_plans")
-    .select("id, expected_turnout, budget_allocated, type_data, plan_start_date, crunch_date")
+    .select("id, expected_turnout, budget_allocated, type_data, countdown_phases")
     .eq("calendar_event_id", src.id)
     .maybeSingle()
 
@@ -142,8 +142,11 @@ async function copyEventForward(
         expected_turnout: srcPlan.expected_turnout,
         budget_allocated: srcPlan.budget_allocated,
         type_data: srcPlan.type_data ?? {},
-        plan_start_date: srcPlan.plan_start_date ? addDaysYMD(srcPlan.plan_start_date as string, delta) : null,
-        crunch_date: srcPlan.crunch_date ? addDaysYMD(srcPlan.crunch_date as string, delta) : null,
+        // The countdown ladder copies VERBATIM — no `delta` shift. Every rung is
+        // an offset relative to the event, so a season moved a year forward keeps
+        // the identical structure. (The plan_start_date / crunch_date pair this
+        // replaced were absolute dates and had to be re-based on every rollover.)
+        countdown_phases: srcPlan.countdown_phases,
       })
       .select("id")
       .single()

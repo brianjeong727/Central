@@ -25,6 +25,22 @@ import { ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react"
 //   PocketChip        40px squircle letter monogram
 //   PocketRoundButton 34px round chrome action (ghost | plum create)
 
+// ── THE chrome-row box (Convention #27) ───────────────────────────────────────
+// Every phone-width screen opens with ONE chrome row, and every one of them sits
+// at the same height: 12px above the title, 10px below, 20px in from the edge.
+// This was four hand-typed copies and they drifted — Home sat at 14, the workspace
+// hub inherited its parent's 24, and Directory shipped `pt-14` (56px), so drilling
+// between screens visibly bounced the title up and down. One constant now, consumed
+// by PocketChrome, PocketHeader, PocketHubChrome and SubpageShell's mobile row.
+//
+// PAD_Y is the part that must never vary — it is the vertical rhythm Brian ratified
+// (2026-08-05, "the Welcome Week view has less space above it, I like that better").
+// PAD_X is separate because a chrome row nested inside an already-inset wrapper
+// (PocketHubChrome, PocketHeader) must NOT re-apply the horizontal gutter — see
+// Convention #26.
+export const POCKET_CHROME_PAD_Y = { paddingTop: 12, paddingBottom: 10 } as const
+export const POCKET_CHROME_PAD_X = 20
+
 // Mobile kicker label: 10px mono, +1.4px tracking. Deliberately NOT flattened
 // into EYEBROW_STYLE (11px desktop eyebrow) — the pocket scale is one step down.
 export const POCKET_KICKER_STYLE: CSSProperties = {
@@ -210,9 +226,11 @@ export function PocketBackRow({ label, onBack, style }: { label: string; onBack:
   )
 }
 
-// 40px squircle monogram chip (mockup `.chip`): --line-2 tonal with a plum
-// letter; `solid` inverts to a plum fill with a cream letter (ministry-wide chat).
-export function PocketChip({ letter, solid = false, size = 40 }: { letter: string; solid?: boolean; size?: number }) {
+// 40px squircle chip (mockup `.chip`): --pocket-track tonal holding a plum
+// letter OR a plum stroked icon (§4 Row contract — "plum stroke icon or
+// initial"); `solid` inverts to a plum fill with cream content (ministry-wide
+// chat). `icon` wins over `letter` when both are passed.
+export function PocketChip({ letter, icon, solid = false, size = 40 }: { letter?: string; icon?: ReactNode; solid?: boolean; size?: number }) {
   return (
     <span
       style={{
@@ -223,7 +241,7 @@ export function PocketChip({ letter, solid = false, size = 40 }: { letter: strin
         color: solid ? "var(--cream-on-dark)" : "var(--plum)",
       }}
     >
-      {letter}
+      {icon ?? letter}
     </span>
   )
 }
@@ -439,11 +457,16 @@ export function PocketSwitch({ checked, onChange, ariaLabel }: {
 }
 
 // Ivory search pill: leading search glyph + borderless input, faint placeholder.
-export function PocketSearchField({ value, onChange, placeholder = "Search", style }: {
+export function PocketSearchField({ value, onChange, placeholder = "Search", style, onFocus, trailing, autoFocus }: {
   value: string
   onChange: (v: string) => void
   placeholder?: string
   style?: CSSProperties
+  /** Fired on focus — search surfaces use it to enter their search mode. */
+  onFocus?: () => void
+  /** Optional right-slot node (a clear/close control while searching). */
+  trailing?: ReactNode
+  autoFocus?: boolean
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--ivory)", borderRadius: "var(--r-pocket-sm)", padding: "12px 16px", ...style }}>
@@ -451,10 +474,13 @@ export function PocketSearchField({ value, onChange, placeholder = "Search", sty
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={onFocus}
+        autoFocus={autoFocus}
         placeholder={placeholder}
         className="pocket-search-input"
         style={{ flex: 1, minWidth: 0, border: "none", background: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 15.5, color: "var(--ink)" }}
       />
+      {trailing}
       <style>{`.pocket-search-input::placeholder{color:var(--faint)}`}</style>
     </div>
   )

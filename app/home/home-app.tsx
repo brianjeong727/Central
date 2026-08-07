@@ -50,6 +50,9 @@ const ChatScreen = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatScre
 const ChatListPanel = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatListPanel), { loading: () => <ChatListSkeleton />, ssr: false })
 
 const PlanTab = dynamic(() => import("./tabs/plan-tab").then(m => m.PlanTab), { loading: () => <Spinner />, ssr: false })
+// Split separately from PlanTab: the volunteer who sees this is exactly the user
+// who must NEVER download the 16k-line team workspace.
+const VolunteerWorkspace = dynamic(() => import("./components/volunteer-workspace").then(m => m.VolunteerWorkspace), { loading: () => <Spinner />, ssr: false })
 const StudentOrgSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.StudentOrgSectionNav), { loading: () => <Spinner />, ssr: false })
 const SmallGroupSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.SmallGroupSectionNav), { loading: () => <Spinner />, ssr: false })
 const FinanceSectionNav = dynamic(() => import("./tabs/plan-tab").then(m => m.FinanceSectionNav), { loading: () => <Spinner />, ssr: false })
@@ -144,10 +147,23 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // is undefined on the server, so SSR rendered the "no chat" branch while the client
   // restored the chat → hydration mismatch. searchParams is SSR-consistent (same source
   // as initialTab), so server and client agree on the first render.
-  const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string } | null>(() => {
+  // `id: ""` + `draftUserId` == a DRAFT direct message: the conversation has no
+  // group row yet, and won't until the first message is actually sent. Drafts are
+  // deliberately NOT restored from ?chat — there is nothing to restore.
+  const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string; draftUserId?: string } | null>(() => {
     const chatId = searchParams.get("chat")
     return chatId && initialTab === "chats" ? { id: chatId, name: "" } : null
   })
+  // Open a draft DM with someone the user doesn't yet share a DM with.
+  const openDraftDm = useCallback((person: { id: string; name: string }) => {
+    setGlobalOpenChat({ id: "", name: person.name, draftUserId: person.id })
+  }, [])
+  // The draft's group now exists. Swap in the real id WITHOUT changing the React
+  // key (see the ChatScreen mounts below), so the in-flight send finishes in the
+  // same mounted component instead of being lost to a remount.
+  const handleDmCreated = useCallback((groupId: string, name: string) => {
+    setGlobalOpenChat((cur) => cur ? { ...cur, id: groupId, name } : { id: groupId, name })
+  }, [])
   // Announcement detail is a read view → restore from ?ann on reload (overlay can sit over any tab).
   const [openAnnouncementId, setOpenAnnouncementId] = useState<string | null>(() =>
     searchParams.get("ann")
@@ -1003,7 +1019,14 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
 
   // Leaders reach Plan even with no team membership so the Receipts workspace stays
   // available to them (they oversee receipts); Receipts is the only surface they'll see.
-  const showPlanTab = userTeams.length > 0 || isGovernanceAdmin || isLeaderOrAdmin
+  const hasRealWorkspace = userTeams.length > 0 || isGovernanceAdmin || isLeaderOrAdmin
+  // The Workspace tab is now ALWAYS present (2026-08-06). It used to render only
+  // for `hasRealWorkspace`, which meant a volunteer staffed on an event had no way
+  // to see that event: their only trace of it was task rows in Home's My Deadlines,
+  // stripped of the event they belonged to. Everyone else gets VolunteerWorkspace —
+  // the events they're staffed on, or a "nothing assigned yet" state that says what
+  // the tab is FOR. See app/home/components/volunteer-workspace.tsx.
+  const showPlanTab = true
   // Church chat creation: admins/leaders + users with planning, member, or small-group permissions.
   const canCreateChurchChat = isAdmin ||
     userTeams.some(t => {
@@ -1067,6 +1090,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             userProfile={initialProfile}
             userRole={initialProfile.role}
             fallbackChats={chatListData}
+            onOpenDraftDm={openDraftDm}
           />
         }
         planContextContent={planContextContent}
@@ -1143,7 +1167,6 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 onGoToProfile={() => handleNavClick("profile")}
                 onOpenAnnouncement={handleOpenAnnouncement}
                 onGoToTab={(t) => handleNavClick(t)}
-                userTeams={userTeams}
                 avatarUrl={avatarUrl}
                 activeQuestion={activeQuestion}
                 hasResponded={hasResponded}
@@ -1178,6 +1201,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                   canCreateChurchChat={canCreateChurchChat}
                   fallbackChats={chatListData}
                   onComposerOpenChange={setComposerOpen}
+                  onOpenDraftDm={openDraftDm}
                 />
               </div>
               {/* Desktop only: thread content area (list lives in DesktopSidebar panel) */}
@@ -1189,7 +1213,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
               <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
                 {isDesktop && globalOpenChat ? (
                   <ChatScreen
-                    key={globalOpenChat.id}
+                    key={globalOpenChat.draftUserId ?? globalOpenChat.id}
                     groupId={globalOpenChat.id}
                     groupName={globalOpenChat.name}
                     userId={userId}
@@ -1200,6 +1224,8 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                     onClose={handleChatClose}
                     onRead={recountTotalUnread}
                     onNameChange={handleChatNameChange}
+                    draftRecipient={globalOpenChat.draftUserId ? { id: globalOpenChat.draftUserId, name: globalOpenChat.name } : null}
+                    onDmCreated={handleDmCreated}
                     inline
                   />
                 ) : (
@@ -1215,7 +1241,18 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             </div>
           )}
 
-          {activeTab === "plan" && showPlanTab && (
+          {/* Someone with no team, no governance seat and no leader role gets the
+              volunteer view instead of the team workspace — PlanTab's whole surface
+              (picker, sidebar, team tabs) is meaningless without a team, and
+              threading a "no workspace" mode through its 16k lines would be worse
+              than branching here. */}
+          {activeTab === "plan" && !hasRealWorkspace && (
+            <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
+              <VolunteerWorkspace ministryId={ministryId} userId={userId} />
+            </div>
+          )}
+
+          {activeTab === "plan" && hasRealWorkspace && (
             <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
               <PlanTab
                 userId={userId}
@@ -1377,7 +1414,9 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       {/* Global ChatScreen overlay — mobile always, desktop only when not on chats tab */}
       {globalOpenChat && !(isDesktop && activeTab === "chats") && (
         <ChatScreen
-          key={globalOpenChat.id}
+          // Keyed on the draft recipient while drafting, so the draft→real id
+          // swap does NOT remount and drop the message being sent.
+          key={globalOpenChat.draftUserId ?? globalOpenChat.id}
           groupId={globalOpenChat.id}
           groupName={globalOpenChat.name}
           userId={userId}
@@ -1388,6 +1427,8 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
           onClose={handleChatClose}
           onRead={recountTotalUnread}
           onNameChange={handleChatNameChange}
+          draftRecipient={globalOpenChat.draftUserId ? { id: globalOpenChat.draftUserId, name: globalOpenChat.name } : null}
+          onDmCreated={handleDmCreated}
         />
       )}
 

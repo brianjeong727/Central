@@ -187,7 +187,18 @@ export async function signInWithGoogleNative(flow: "signin" | "signup"): Promise
     }
     const { result } = await SocialLogin.login({
       provider: "google",
-      options: { scopes: ["email", "profile"] },
+      options: {
+        scopes: ["email", "profile"],
+        // ALWAYS show the account chooser. Without this the plugin takes its
+        // `hasPreviousSignIn() && !forceAuthCode` branch and calls
+        // restorePreviousSignIn(), silently re-authenticating whoever signed in
+        // last — so a second Google account is unreachable, "Sign up with Google"
+        // signs you into the existing account instead of making a new one, and a
+        // shared or handed-over phone signs in the wrong person with no way to
+        // switch. Silent restore is right for a launch-time session refresh; it is
+        // wrong for an explicit button tap, which is a request to CHOOSE.
+        forcePrompt: true,
+      },
     })
     idToken = "idToken" in result ? result.idToken : null
   } catch (err) {
