@@ -224,6 +224,56 @@
      ≈ 92px flat-bottom, ≈ 126px notched — the ~120px the spec describes, now
      exact per device instead of a fixed 112px that was wrong on both. */
   --nav-clearance: calc(env(safe-area-inset-bottom) + 14px + 60px + var(--space-7));
+
+  /* ── Software-keyboard occlusion — written by lib/keyboard-inset.ts ────────
+     How much of the layout viewport the on-screen keyboard covers. 0 with no
+     keyboard, and 0 in the Capacitor shell (there the WebView itself shrinks —
+     see the file header). Declared here so a surface can read it during SSR and
+     on the first frame, before the bridge has measured anything.
+
+     Paired with html[data-kb-open], which is "a keyboard is showing" in EITHER
+     container — the two are NOT interchangeable. */
+  --kb-inset: 0px;
+}
+
+/* The bottom safe area is the home indicator, and while the keyboard is up the
+   keyboard is drawn over it — so reserving that band leaves a dead strip
+   between the composer and the keys. Collapse it wherever it is claimed with
+   this class; the pad falls back to its own floor. */
+/* Phone width only. These rules sit OUTSIDE Tailwind's layers (that is what lets
+   them beat the utilities), which also means they would outrank a `md:pb-*`
+   utility on the same element — so the desktop half of a shared component would
+   silently inherit the mobile pad. Scoping the whole block below md keeps
+   desktop's own padding utilities in charge. */
+@media (max-width: 767px) {
+  .kb-safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
+  }
+  html[data-kb-open] .kb-safe-bottom {
+    padding-bottom: 0.75rem;
+  }
+}
+
+/* Floating chrome that would otherwise land ON the composer while typing. The
+   super-switcher chip is fixed at bottom:80 — with the keyboard up that is
+   exactly the input pill. Hidden, not moved: there is nowhere above the composer
+   for it to go that isn't the transcript. */
+html[data-kb-open] .kb-hide {
+  display: none;
+}
+
+/* Lift a `fixed inset-0` surface's BOTTOM edge off the keyboard, so the surface
+   gets shorter instead of the document scrolling out from under it. A CLASS, not
+   an inline style, for the same reason as .shell-scroll: it has to lose to the
+   desktop reset below, and an inline style outranks every media query. Unlayered
+   on purpose — that is what beats Tailwind's `inset-0` in the utilities layer. */
+.kb-lift {
+  bottom: var(--kb-inset);
+}
+@media (min-width: 768px) {
+  .kb-lift {
+    bottom: 0;
+  }
 }
 
 /* Compact shell — context panel hidden; rail only. Re-declares BOTH vars because

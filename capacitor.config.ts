@@ -1,4 +1,5 @@
 import type { CapacitorConfig } from "@capacitor/cli"
+import { KeyboardResize } from "@capacitor/keyboard"
 
 // Remote-URL shell: the native iOS app is a thin WebView that loads the deployed
 // web app at https://www.joincentral.app (the CANONICAL origin — the apex 307s to www,
@@ -56,6 +57,24 @@ const config: CapacitorConfig = {
       // overlay with no flash. When the overlay is skipped (web/desktop/warm nav)
       // EntrySplash's always-mounted effect still calls hide(), so the splash never sticks.
       launchAutoHide: false,
+    },
+    Keyboard: {
+      // "native": iOS shrinks the WKWebView frame to the region ABOVE the
+      // keyboard, so the web layer's viewport IS the visible area — a
+      // `fixed inset-0` surface (ChatScreen) lands flush on the keyboard with
+      // no arithmetic, exactly like iMessage/Messenger. The alternative
+      // ("none") leaves the WebView full-height and lets WKWebView scroll the
+      // whole document up to reveal the caret, which is the bug this fixes:
+      // the header scrolls off the top and the composer floats mid-screen over
+      // blank cream.
+      //
+      // The occluded-height math in lib/keyboard-inset.ts still runs and still
+      // reports 0 here — deliberately, and that is what keeps ONE code path
+      // serving both this shell and mobile Safari (where nothing resizes).
+      //
+      // NOTE: this is native config — it takes effect only after
+      // `npx cap sync ios` and a new app build, NOT on a web deploy.
+      resize: KeyboardResize.Native,
     },
   },
 }
