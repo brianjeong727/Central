@@ -279,17 +279,35 @@ html[data-kb-open] .kb-hide {
   display: none;
 }
 
-/* Lift a `fixed inset-0` surface's BOTTOM edge off the keyboard, so the surface
-   gets shorter instead of the document scrolling out from under it. A CLASS, not
-   an inline style, for the same reason as .shell-scroll: it has to lose to the
-   desktop reset below, and an inline style outranks every media query. Unlayered
-   on purpose — that is what beats Tailwind's `inset-0` in the utilities layer. */
+/* Make room for the keyboard inside a `fixed inset-0` surface, so its content
+   gets shorter instead of the document scrolling out from under it.
+
+   PADDING, not `bottom`. Both land the composer in the same place, but padding
+   keeps the element covering the whole screen, so its cream still paints behind
+   the keyboard's transparent rounded top corners. Shrinking with `bottom` leaves
+   that sliver showing whatever sits underneath — which is what put black notches
+   in the chat.
+
+   A CLASS, not an inline style, for the same reason as .shell-scroll: it has to
+   lose to the desktop reset below, and an inline style outranks every media
+   query. Unlayered on purpose — that is what beats Tailwind's utilities. */
 .kb-lift {
-  bottom: var(--kb-inset);
+  padding-bottom: var(--kb-inset);
+}
+/* Shell only. There the height arrives as ONE discrete jump on the keyboard's
+   first frame, so the surface has to animate itself to travel alongside the keys
+   — roughly iOS's own keyboard curve and duration. On the web the value streams
+   in from visual-viewport events that already describe the motion, and a
+   transition on top of that would chase a moving target and lag behind it. */
+html[data-kb-native] .kb-lift {
+  transition: padding-bottom 250ms cubic-bezier(0.17, 0.59, 0.4, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-kb-native] .kb-lift { transition: none; }
 }
 @variant md {
   .kb-lift {
-    bottom: 0;
+    padding-bottom: 0;
   }
 }
 
