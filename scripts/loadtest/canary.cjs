@@ -4,10 +4,11 @@
 // it running throughout. Alerts to stderr when latency exceeds 3× its own baseline.
 //
 //   node scripts/loadtest/canary.cjs [--run-id burstA] [--interval 15000]
-const { loadEnv, userClient, ndjsonLogger, sleep, pct } = require("./lib.cjs")
+const { loadEnv, userClient, ndjsonLogger, sleep, pct, ensureThreadpool } = require("./lib.cjs")
 const { createClient } = require("@supabase/supabase-js")
 const ws = require("ws")
 
+ensureThreadpool()
 loadEnv()
 const args = process.argv.slice(2)
 const flag = (name, dflt) => { const i = args.indexOf(name); return i === -1 ? dflt : args[i + 1] }

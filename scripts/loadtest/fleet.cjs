@@ -13,7 +13,10 @@
 const { fork } = require("node:child_process")
 const fs = require("node:fs")
 const path = require("node:path")
-const { MINISTRY_ID, serviceClient, readTokens, writeTokens, ndjsonLogger, sleep } = require("./lib.cjs")
+const { MINISTRY_ID, serviceClient, readTokens, writeTokens, ndjsonLogger, sleep, ensureThreadpool } = require("./lib.cjs")
+// Re-exec with a large libuv threadpool BEFORE forking workers, so every worker
+// inherits it (fleet-worker fetches too: last_read_at writes).
+ensureThreadpool()
 const { createClient } = require("@supabase/supabase-js")
 const ws = require("ws")
 
