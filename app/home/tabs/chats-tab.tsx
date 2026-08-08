@@ -33,7 +33,7 @@ import { MODERATION_DEFAULTS, moderateText, scopeApplies, reverentCapitalize } f
 import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
 import { isChatManageRole, isLeaderRole } from "@/lib/roles"
-import { useKeyboardInset } from "@/lib/keyboard-inset"
+import { useKeyboardInset, useSwipeDownToDismissKeyboard } from "@/lib/keyboard-inset"
 
 // Hydration-safe "are we mounted on the client yet?" flag with no set-state-in-
 // effect. useSyncExternalStore returns the server snapshot (false) during SSR
@@ -2612,6 +2612,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // WITH the keyboard slide, once after it settles because the final height is only
   // known at the end of the animation (~250ms on iOS).
   const { open: keyboardOpen } = useKeyboardInset()
+  // Drag down over the transcript to put the keyboard away. Gated on being pinned to
+  // the bottom so it never steals the flick that scrolls back through history — and
+  // the bottom is exactly where the effect below leaves you when the keyboard opens.
+  useSwipeDownToDismissKeyboard(scrollContainerRef, { whenScrolledToBottom: true })
   useEffect(() => {
     if (!keyboardOpen || loading || searchMode) return
     const frame = requestAnimationFrame(() => scrollToBottom(false))
