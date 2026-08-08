@@ -33,6 +33,7 @@ import { MODERATION_DEFAULTS, moderateText, scopeApplies, reverentCapitalize } f
 import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
 import { isChatManageRole, isLeaderRole } from "@/lib/roles"
+import { useKeyboardInset } from "@/lib/keyboard-inset"
 
 // Hydration-safe "are we mounted on the client yet?" flag with no set-state-in-
 // effect. useSyncExternalStore returns the server snapshot (false) during SSR
@@ -2516,6 +2517,20 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     if (!loading) scrollToBottom(false)
   }, [loading, scrollToBottom])
 
+  // Opening the keyboard shortens the transcript. Without this the viewport keeps
+  // whatever offset it had and the newest messages — the ones you are replying to —
+  // slide up under the composer, which is the other half of "I can't see what I'm
+  // responding to". Twice on purpose: once on the leading edge so the pin happens
+  // WITH the keyboard slide, once after it settles because the final height is only
+  // known at the end of the animation (~250ms on iOS).
+  const { open: keyboardOpen } = useKeyboardInset()
+  useEffect(() => {
+    if (!keyboardOpen || loading || searchMode) return
+    const frame = requestAnimationFrame(() => scrollToBottom(false))
+    const settled = window.setTimeout(() => scrollToBottom(false), 320)
+    return () => { cancelAnimationFrame(frame); window.clearTimeout(settled) }
+  }, [keyboardOpen, loading, searchMode, scrollToBottom])
+
   // Realtime — all chat events for this thread flow through the shared private-broadcast
   // hub (chat:{groupId}): new messages (INSERT), edits + unsends/soft-deletes (UPDATE),
   // hard deletes (DELETE), and reaction add/remove. The hub keeps ONE private channel per
@@ -3093,7 +3108,18 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     {/* Mobile chat is ONE continuous cream surface — header, message body and
         composer share --cream so the chrome/composer controls read as floating
         (iMessage/Messenger). Desktop keeps its --cream-panel overlay. */}
-    <AnimateIn animate={!inline} className={inline ? "flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 z-[100] bg-[var(--cream)] md:bg-[var(--cream-panel)] flex flex-col md:left-[var(--shell-offset)]"}>
+    {/* The overlay's bottom edge rides the keyboard rather than staying pinned to
+        the screen floor. `inset-0` alone leaves the composer under the keys, which
+        is what makes iOS scroll the whole document up to reveal the caret — the
+        header disappears off the top and the composer floats over blank cream.
+        Lifting `bottom` by --kb-inset means the flex column simply gets shorter:
+        header stays put, the flex-1 transcript shrinks, composer sits on the keys
+        (iMessage/Messenger). In the native shell --kb-inset is 0 because the
+        WebView already shrank — same markup, both containers. Desktop resets it. */}
+    <AnimateIn
+      animate={!inline}
+      className={inline ? "flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 kb-lift z-[100] bg-[var(--cream)] md:bg-[var(--cream-panel)] flex flex-col md:left-[var(--shell-offset)]"}
+    >
     <div ref={chatSwipeRef} className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
