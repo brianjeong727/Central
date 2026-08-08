@@ -7,7 +7,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Cream (--cream #FBF8F2, DESIGN_SYSTEM) behind the WebView.
+        //
+        // `ios.backgroundColor` in capacitor.config.ts CANNOT cover this: Capacitor
+        // applies that value to the web view and its scroll view only, and
+        // CAPBridgeViewController sets `view = webView` — so the web view IS the
+        // controller's view and the next layer down is this window.
+        //
+        // That never mattered while the web view filled the screen. It does now: the
+        // Keyboard plugin's resize "native" shrinks the web view to sit above the
+        // keyboard, and the keyboard's rounded top corners are transparent — so the
+        // window shows through them. Unset, a UIWindow is black, which rendered as two
+        // black notches biting into the cream chat surface.
+        window?.backgroundColor = UIColor(red: 251.0 / 255.0, green: 248.0 / 255.0, blue: 242.0 / 255.0, alpha: 1.0)
         return true
     }
 

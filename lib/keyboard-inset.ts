@@ -31,7 +31,8 @@
 // `^ v Done` strip that iMessage and Messenger don't show. That is native-only
 // surface; there is no web equivalent and no web fallback.
 
-import { useSyncExternalStore } from "react"
+import { useEffect, useSyncExternalStore } from "react"
+import type { RefObject } from "react"
 
 // A keyboard is hundreds of px. Anything smaller is browser chrome settling
 // (the mobile-Safari URL bar collapsing on scroll moves the visual viewport by
@@ -148,4 +149,93 @@ export function useKeyboardInset(): { inset: number; open: boolean } {
   const snapshotInset = useSyncExternalStore(subscribe, () => inset, () => 0)
   const snapshotOpen = useSyncExternalStore(subscribe, () => open, () => false)
   return { inset: snapshotInset, open: snapshotOpen }
+}
+
+/** Dismiss the keyboard by blurring whatever text field currently owns it. */
+export function dismissKeyboard(): void {
+  const el = document.activeElement as HTMLElement | null
+  if (!el) return
+  const tag = el.tagName
+  if (tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable) el.blur()
+}
+
+// A keyboard dismiss must not fire on the flick that STARTS a scroll up through
+// history, so it takes a deliberate drag — further than a scroll nudge, and
+// clearly vertical.
+const SWIPE_DOWN_PX = 44
+const SWIPE_SLOP_PX = 30
+
+/**
+ * Swipe DOWN to dismiss the keyboard (iMessage/Messenger). Pass the ref of a surface
+ * that sits against the keyboard.
+ *
+ * `whenScrolledToBottom` is the disambiguator for a scroller: inside a transcript a
+ * downward drag already MEANS "scroll toward older messages", so the gesture is only
+ * claimed when there is nothing further to reveal — which is exactly where the view
+ * sits after the keyboard opens (it re-pins to the newest message). On a non-scroller
+ * like the composer bar there is no competing meaning, so it is claimed anywhere.
+ *
+ * Deliberately NOT iOS's interactive `keyboardDismissMode`, where the keyboard tracks
+ * the finger: that lives on the WebView's OWN scroll view, and the transcript here is
+ * an inner overflow div the WebView knows nothing about. This blurs on intent and lets
+ * the keyboard play its normal dismiss animation.
+ *
+ * Takes the ref rather than returning one so it can ride an element that already has
+ * one (the transcript's `scrollContainerRef`) without merging two refs onto a node.
+ */
+export function useSwipeDownToDismissKeyboard<T extends HTMLElement>(
+  ref: RefObject<T | null>,
+  opts: { whenScrolledToBottom?: boolean } = {},
+): void {
+  const { whenScrolledToBottom = false } = opts
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    // Coarse pointer only — a trackpad drag is not a keyboard gesture.
+    if (!window.matchMedia("(pointer: coarse)").matches) return
+
+    let startX = 0
+    let startY = 0
+    let armed = false
+    let fired = false
+
+    function onStart(e: TouchEvent) {
+      if (e.touches.length !== 1 || !open) { armed = false; return }
+      const node = ref.current
+      if (!node) { armed = false; return }
+      if (whenScrolledToBottom && node.scrollHeight - node.scrollTop - node.clientHeight > 8) {
+        armed = false
+        return
+      }
+      startX = e.touches[0].clientX
+      startY = e.touches[0].clientY
+      armed = true
+      fired = false
+    }
+
+    function onMove(e: TouchEvent) {
+      if (!armed || fired || e.touches.length !== 1) return
+      const dy = e.touches[0].clientY - startY
+      const dx = Math.abs(e.touches[0].clientX - startX)
+      if (dy > SWIPE_DOWN_PX && dx < SWIPE_SLOP_PX) {
+        fired = true
+        armed = false
+        dismissKeyboard()
+      }
+    }
+
+    function onEnd() { armed = false }
+
+    el.addEventListener("touchstart", onStart, { passive: true })
+    el.addEventListener("touchmove", onMove, { passive: true })
+    el.addEventListener("touchend", onEnd, { passive: true })
+    el.addEventListener("touchcancel", onEnd, { passive: true })
+    return () => {
+      el.removeEventListener("touchstart", onStart)
+      el.removeEventListener("touchmove", onMove)
+      el.removeEventListener("touchend", onEnd)
+      el.removeEventListener("touchcancel", onEnd)
+    }
+  }, [ref, whenScrolledToBottom])
 }

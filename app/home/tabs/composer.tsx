@@ -7,6 +7,7 @@ import { MonogramChip, ActionMenu } from "@/components/central"
 import { LazyEmojiPicker, formatFileSize } from "./message-row"
 import { replyPreviewLabel } from "../utils"
 import type { ComposerProps } from "../types"
+import { useSwipeDownToDismissKeyboard } from "@/lib/keyboard-inset"
 
 // Bottom input area of ChatScreen. Owns ALL per-keystroke state (inputText, the
 // @mention autocomplete, GIF search) so typing re-renders only this subtree — not
@@ -41,6 +42,11 @@ function ComposerImpl({
   const gifDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // The input bar sits directly on the keyboard, so a downward drag across it is the
+  // most literal reading of "swipe the keyboard down". Not a scroller, so unlike the
+  // transcript there is no competing gesture to disambiguate against.
+  const inputBarRef = useRef<HTMLDivElement>(null)
+  useSwipeDownToDismissKeyboard(inputBarRef)
 
   const filteredMentions = useMemo(() => {
     if (mentionQuery === null) return []
@@ -262,7 +268,7 @@ function ComposerImpl({
           <p className="text-[13px] text-[var(--muted-text)]">This chat is archived</p>
         </div>
       ) : (
-        <div className="flex-shrink-0 bg-[var(--cream)] px-4 pt-3 kb-safe-bottom md:px-10 md:py-3.5 md:pb-3.5 relative">
+        <div ref={inputBarRef} className="flex-shrink-0 bg-[var(--cream)] px-4 pt-3 kb-safe-bottom md:px-10 md:py-3.5 md:pb-3.5 relative">
           {/* @mention dropdown */}
           {mentionQuery !== null && filteredMentions.length > 0 && (
             <div className="absolute bottom-full left-4 mb-1 bg-[var(--ivory)] rounded-xl overflow-hidden min-w-[180px] z-10">
