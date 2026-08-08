@@ -3,6 +3,7 @@ import { Bricolage_Grotesque } from "next/font/google";
 import "./globals.css";
 import PWARegister from "@/components/pwa-register";
 import NativeSplashRelease from "@/components/native-splash-release";
+import KeyboardInsetBridge from "@/components/keyboard-inset-bridge";
 
 const bricolageGrotesque = Bricolage_Grotesque({
   variable: "--font-bricolage-grotesque",
@@ -46,6 +47,10 @@ export default function RootLayout({
       </head>
       <body className="antialiased font-sans">
         <PWARegister />
+        {/* Publishes --kb-inset / [data-kb-open] for every route (lib/keyboard-inset.ts).
+            Before {children} so the vars are live on the first frame a text field
+            can be focused. */}
+        <KeyboardInsetBridge />
         {children}
         {/* After {children} so EntrySplash's effect (deeper in the tree, on /home and
             /login) runs first and can claim the splash handoff. */}

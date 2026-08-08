@@ -276,3 +276,21 @@ Trigger → route → resolver → APNs lane all verified working.
 Notifications calls the WEB unsubscribe path, which does nothing to an APNs row,
 and the "Blocked" copy says "in your browser settings" inside the iOS shell. Both
 are real but separate from the reported bugs — flagged, not fixed.
+
+### Verification
+
+- `scripts/verify.sh --port 3003` — build / lint / lockfile / hex / dedup / copies
+  / server all PASS (after merging `origin/main`, which added `@capacitor/keyboard`).
+- Full suite: **190 passed, 19 failed**. Every failure attributed:
+  - 4 push specs — `PUSH_WEBHOOK_SECRET` absent from this slot's `.env.local`.
+    Added it (gitignored); **20/21 push tests now pass**. The last one needs the
+    `APNS_*` keys, which exist only on Vercel prod.
+  - 12 — contention timeouts in a 31-min single-worker run. **All pass warm.**
+  - 3 (`mobile-pocket-sweep` ×2, `announcements-p4-shots` ×1) — **reproduced
+    identically on `origin/main`**, so pre-existing and unrelated.
+- Targeted: `dm-identity` 6/6, `chat-nicknames` 8/8, `chat-keyboard-inset`,
+  `mobile-screen-sweep` (49 screens, 0 violations), gutter + chrome-rhythm.
+- DB probes (rolled back): idempotent, stable across calls, self-heals a deleted
+  membership, rejects self-DM (22023) and cross-ministry (42501); the unique index
+  rejects a hand-inserted duplicate; both RPCs pinned `search_path=public, pg_temp`
+  and granted to `authenticated` only.
