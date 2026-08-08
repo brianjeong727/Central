@@ -84,10 +84,30 @@ const USER_ID_TABLES = [
   "bible_study_progress",
   "bible_study_annotations",
   "team_members",
-  "group_members",
   "user_ministries",
   "push_subscriptions",
 ] as const
+
+// ⚠️ `group_members` is deliberately NOT in the list above.
+//
+// The product promise (and the copy on the delete screen) is that messages you
+// sent STAY in their chats, shown as "Former member". Deleting the membership row
+// broke exactly that: every membership-based join lost the person, so a DM with
+// them fell back to the stale `groups.name` — which showed the SURVIVING user
+// their own name as the conversation title. The roster and read receipts lost
+// them too.
+//
+// The row is kept as the tombstone's anchor in each chat and its BEHAVIOURAL
+// columns are scrubbed instead: read position, mute/pin, and per-chat notify
+// preference are the only personal data it carries.
+const GROUP_MEMBER_SCRUB = {
+  last_read_at: null,
+  // muted is NOT NULL and is a derived mirror of notify_mode (CHECK + the
+  // sync_group_member_notify_mode trigger) — the two must move together.
+  muted: false,
+  pinned: false,
+  notify_mode: null,
+} as const
 
 export async function deleteMyAccount(emailConfirmation: string): Promise<DeleteAccountResult> {
   // (0) Authn + own identity.
@@ -192,8 +212,23 @@ export async function deleteMyAccount(emailConfirmation: string): Promise<Delete
     }
   }
 
+  // Chat memberships are KEPT (see GROUP_MEMBER_SCRUB) so the tombstone still
+  // resolves as "Former member" in every chat it posted to — only the behavioural
+  // columns are cleared.
+  {
+    const { error } = await admin
+      .from("group_members")
+      .update(GROUP_MEMBER_SCRUB)
+      .eq("user_id", userId)
+    if (error) console.error("[deleteMyAccount] group_members scrub:", error.message)
+  }
+
   // Sever leadership pointers that would otherwise dangle on the tombstone.
   await admin.from("small_groups").update({ leader_id: null }).eq("leader_id", userId)
+
+  // Finance audit pointers: the FKs are ON DELETE SET NULL, so the auth delete
+  // below nulls these on its own. Left to the FK deliberately — the finance rows
+  // must survive with an anonymous actor, not be deleted.
 
   // Content-moderation cleanup: remove this user's blocks in BOTH directions and
   // the reports they filed. content_reports.reported_user_id / reviewed_by are

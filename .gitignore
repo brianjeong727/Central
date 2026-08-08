@@ -17,6 +17,11 @@
 e2e/.auth/
 test-results/
 playwright-report/
+# iCloud duplicates the repo lives under ~/Desktop, so it spawns " 2" copies of
+# build/test output ("test-results 2/"). The bare names above don't match those,
+# and a Playwright trace dump is thousands of files — it landed in a commit once.
+test-results*/
+playwright-report*/
 
 # next.js
 /.next/

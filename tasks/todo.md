@@ -294,3 +294,77 @@ are real but separate from the reported bugs — flagged, not fixed.
   membership, rejects self-DM (22023) and cross-ministry (42501); the unique index
   rejects a hand-inserted duplicate; both RPCs pinned `search_path=public, pg_temp`
   and granted to `authenticated` only.
+# Account deletion — fix/account-deletion-visibility
+
+Brian: "my friend deleted his account and nothing changed — I expected my
+messages with him to become unknown and his DM title to become unknown."
+
+## What the database says
+
+- Exactly ONE deleted account exists platform-wide: `3505c4bf` (tombstone
+  "Former member", deleted 2026-08-08 04:27, auth.users row gone). It has **0
+  messages and 0 chat memberships**, and shares no group with Brian.
+- Every other profile in Central still has a live auth user.
+- So the account Brian is thinking of either never completed deletion, or is
+  `3505c4bf` and genuinely had no shared content. **Needs his confirmation.**
+
+## Confirmed bugs (reproduced, not inferred)
+
+### 1. Deletion severs chat identity → DM keeps a stale title
+`deleteMyAccount` deletes the user's `group_members` rows. Every
+membership-based join then breaks. Simulated on the sandbox DM (rolled back):
+
+| after deletion | result |
+|---|---|
+| message author | "Former member" ✓ |
+| **DM title** | **"Brian Jeong"** ✗ — the viewer's OWN name |
+
+The per-viewer DM title looks for "the other member"; with that row gone it
+falls back to the stale `groups.name`. So a deleted friend's DM keeps their old
+name (Brian's report), or worse shows you yourself.
+
+### 2. Finance history BLOCKS the hard delete — after the profile is destroyed
+Three FKs to `auth.users` are `NO ACTION`: `finance_funds.created_by`,
+`receipt_fund_allocations.reviewed_by`, `.signed_off_by`. Proven:
+
+```
+delete from auth.users where id='6254ff08…'
+ERROR: 23503 violates foreign key constraint "finance_funds_created_by_fkey"
+```
+
+`deleteMyAccount` scrubs the profile (step 4) and deletes all personal rows
+(step 5) BEFORE the auth delete (step 8). So any treasurer/president who touched
+a fund or receipt ends up: data destroyed, login still alive. Recoverable (they
+can log back in and retry — `deleted_at` does not gate auth) but wrong.
+
+## Fixes
+
+- [ ] Migration: the 3 NO ACTION FKs → `ON DELETE SET NULL` (all nullable).
+- [ ] `delete-account.ts`: stop deleting `group_members`; scrub its behavioral
+      columns instead, so the tombstone stays resolvable everywhere.
+- [ ] Chat roster: carry `deleted_at`; drop deleted people from @mention
+      candidates (can't mention someone who's gone).
+- [ ] Verify by re-simulating; extend `account-deletion.spec.ts`.
+
+### Result
+
+All four surfaces now resolve to "Former member" after a deletion (verified by
+rolled-back simulation and by `account-deletion.spec.ts`): DM title on BOTH the
+client and SSR RPC paths, the message author, and the chat roster. The blocked
+hard-delete now succeeds and the finance rows survive with a null actor.
+
+Also found + fixed while testing: the mobile `/login` gates the email form behind
+"Continue with email", so the shared `loginAsThrowaway` helper never worked at
+phone width — no mobile deletion test could have run before.
+
+RESOLVED (Brian confirmed): the 04:27 tombstone WAS the friend. His deletion ran
+correctly and completely — auth identity gone, PII nulled, journal/RSVPs/push all
+removed. "Nothing changed" because he had never sent a message and shared no DM
+with Brian, so none of his content was on screen to change.
+
+The two bugs above are real regardless, and would have bitten the moment ANY
+account with actual chat history was deleted. What Brian could legitimately have
+noticed under the old code: the friend vanishing from chat member lists instead
+of remaining as "Former member" — his memberships were deleted outright. Those
+rows are gone and are not recoverable (which groups he belonged to wasn't
+recorded anywhere else); the fix only applies to future deletions.

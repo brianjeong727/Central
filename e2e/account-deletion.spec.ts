@@ -21,6 +21,9 @@ const THROWAWAY_NAME = `${E2E_PREFIX}Deletable Member`
 
 let userId = ""
 let groupId = ""
+let dmId = ""
+let dmKey = ""
+let adminId = ""
 
 test.beforeAll(async () => {
   const box = sandbox()
@@ -45,9 +48,30 @@ test.beforeAll(async () => {
   if (upErr) throw new Error(`[account-deletion] profile attach failed: ${upErr.message}`)
 
   // 3. Arrange a message from them (must survive as "Former member").
-  const group = await box.createGroup({ name: "Delete Trail", memberIds: [userId, await box.adminUserId()] })
+  adminId = await box.adminUserId()
+  const group = await box.createGroup({ name: "Delete Trail", memberIds: [userId, adminId] })
   groupId = group.id
   await box.insertMessage({ groupId, senderId: userId, content: `${E2E_PREFIX}I was here` })
+
+  // 4. And a DM with the admin. This is the surface the bug actually showed on:
+  //    deletion used to remove the throwaway's group_members row, so the
+  //    per-viewer DM title lost "the other member" and fell back to the stale
+  //    groups.name — showing the SURVIVING user their own name.
+  dmKey = [userId, adminId].sort().join(":")
+  await box.client.from("groups").delete()
+    .eq("ministry_id", box.ministryId).eq("type", "dm").eq("dm_key", dmKey)
+  const { data: dm, error: dmErr } = await box.client
+    .from("groups")
+    // Stored name is the ADMIN's id-side value on purpose — nothing should read it.
+    .insert({ ministry_id: box.ministryId, name: THROWAWAY_NAME, type: "dm", created_by: adminId, dm_key: dmKey })
+    .select("id").single()
+  if (dmErr) throw new Error(`[account-deletion] dm insert failed: ${dmErr.message}`)
+  dmId = dm.id
+  await box.client.from("group_members").insert([
+    { group_id: dmId, user_id: userId },
+    { group_id: dmId, user_id: adminId },
+  ])
+  await box.insertMessage({ groupId: dmId, senderId: userId, content: `${E2E_PREFIX}dm from the deletable one` })
 })
 
 test.afterAll(async () => {
@@ -55,15 +79,31 @@ test.afterAll(async () => {
   // Group delete cascades group_members + messages, so the throwaway no longer
   // references anything; then remove the profile + auth identity. Idempotent.
   await box.deleteGroupsByPrefix()
+  // The DM is named after the throwaway, not the E2E prefix — drop it by pair key.
+  if (dmKey) {
+    await box.client.from("groups").delete()
+      .eq("ministry_id", box.ministryId).eq("type", "dm").eq("dm_key", dmKey)
+  }
   await box.client.from("profiles").delete().eq("id", userId)
   await box.client.auth.admin.deleteUser(userId).catch(() => {})
 })
 
 async function loginAsThrowaway(page: Page) {
   await page.goto("/login")
-  await page.getByPlaceholder("you@university.edu").fill(THROWAWAY_EMAIL)
-  await page.getByPlaceholder("••••••••").fill(THROWAWAY_PASSWORD)
-  await page.getByRole("button", { name: "Sign in" }).click()
+  // Phone width opens on a provider-choice screen (Apple / Google / email); the
+  // email+password form is behind "Continue with email". Desktop shows the form
+  // directly, so this step is conditional rather than unconditional.
+  const emailEntry = page.getByRole("button", { name: "Continue with email" })
+  if (await emailEntry.isVisible().catch(() => false)) await emailEntry.click()
+  // The provider screen swaps to the form; fill the VISIBLE field only, and wait
+  // for it — filling during the transition silently targets the outgoing node and
+  // leaves the form empty (which then just times out at waitForURL).
+  const emailField = page.getByPlaceholder("you@university.edu").filter({ visible: true }).first()
+  await emailField.waitFor({ state: "visible", timeout: 15_000 })
+  await emailField.fill(THROWAWAY_EMAIL)
+  await page.getByPlaceholder("••••••••").filter({ visible: true }).first().fill(THROWAWAY_PASSWORD)
+  await expect(emailField).toHaveValue(THROWAWAY_EMAIL)
+  await page.getByRole("button", { name: "Sign in" }).filter({ visible: true }).first().click()
   await page.waitForURL(/\/home/, { timeout: 30_000 })
 }
 
@@ -93,6 +133,35 @@ test.describe("account deletion — confirm surface + guards (live)", () => {
     // Exact email → armed (we do NOT click — execution is migration-gated).
     await page.getByPlaceholder("you@university.edu").fill(THROWAWAY_EMAIL)
     await expect(confirm).toBeEnabled()
+  })
+})
+
+// Phone width drives a DIFFERENT render branch: the Danger zone is its own
+// settings subpage (?pset=danger) and the confirm button is labelled "Delete",
+// not "Permanently delete". The desktop test below therefore proves nothing
+// about mobile — this walks the real phone-width path up to the armed button.
+test.describe("account deletion — mobile confirm surface (390x844)", () => {
+  test.use({ storageState: { cookies: [], origins: [] }, viewport: { width: 390, height: 844 } })
+
+  test("Danger zone subpage arms the delete only on an exact email match", async ({ page }) => {
+    await loginAsThrowaway(page)
+    await page.goto("/home?tab=profile&pset=danger")
+
+    const deleteBtn = page.getByRole("button", { name: "Delete account" }).filter({ visible: true }).first()
+    await expect(deleteBtn).toBeVisible({ timeout: 15000 })
+    await deleteBtn.click()
+    await expect(page.getByText("Delete your account?").filter({ visible: true })).toBeVisible()
+
+    const confirm = page.getByRole("button", { name: "Delete", exact: true }).filter({ visible: true }).first()
+    const field = page.getByPlaceholder("you@university.edu").filter({ visible: true }).first()
+
+    await field.fill("not-my@email.com")
+    await expect(confirm).toBeDisabled()
+
+    await field.fill(THROWAWAY_EMAIL)
+    await expect(confirm).toBeEnabled()
+    // Not clicked — the destructive execution is covered once, below, and the
+    // throwaway can only be deleted a single time.
   })
 })
 
@@ -143,5 +212,38 @@ test.describe("account deletion — full execution", () => {
       .eq("sender_id", userId)
       .maybeSingle()
     expect(msg?.id).toBeTruthy()
+
+    // ── The reported bug: what the SURVIVING person sees ──────────────────────
+    // Deleting used to remove the tombstone's group_members rows, which severed
+    // every membership-based join: the DM fell back to the stale groups.name and
+    // showed the survivor their OWN name as the conversation title.
+
+    // The membership is KEPT (so the tombstone stays resolvable) but scrubbed.
+    const { data: mem } = await box.client
+      .from("group_members")
+      .select("group_id, last_read_at, muted, pinned, notify_mode")
+      .eq("user_id", userId)
+    expect(mem?.length).toBeGreaterThan(0)
+    for (const row of mem ?? []) {
+      expect(row.last_read_at).toBeNull()
+      expect(row.muted).toBe(false)
+      expect(row.pinned).toBe(false)
+      expect(row.notify_mode).toBeNull()
+    }
+
+    // Both title producers must now say "Former member" for the admin's view of
+    // that DM — get_chat_list (client SWR) and get_chat_previews (SSR/boot, which
+    // also backfills the ChatScreen header on a deep link).
+    for (const fn of ["get_chat_list", "get_chat_previews"] as const) {
+      const { data: rows, error } = await box.client.rpc(fn, {
+        p_user_id: adminId,
+        p_ministry_id: box.ministryId,
+      })
+      expect(error).toBeNull()
+      const row = (rows as { group_id: string; group_name: string }[] | null)
+        ?.find((r) => r.group_id === dmId)
+      expect(row, `${fn} did not return the DM`).toBeTruthy()
+      expect(row!.group_name, `${fn} DM title`).toBe("Former member")
+    }
   })
 })
