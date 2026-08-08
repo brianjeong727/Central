@@ -202,6 +202,40 @@ test.describe("chat keyboard inset (mobile)", () => {
     expect(await focused()).toBe(false)
   })
 
+  // Guards the WEB half of the double-count fix. The bug was the shell measuring an
+  // inset it should have pinned to 0 (iOS resizes the WKWebView itself, so applying a
+  // measured inset lifted the chat a SECOND time and dropped the composer off-screen
+  // for the frames where innerHeight and visualViewport.height disagreed). The obvious
+  // wrong fix is to pin 0 everywhere — which silently breaks mobile Safari, where
+  // nothing resizes and the inset is the only thing making room. This asserts the
+  // measured path still measures.
+  //
+  // The native pin itself is NOT asserted here and cannot be: Playwright has no
+  // Capacitor bridge, so isNativePlatform() is false and that branch never runs.
+  // Faking it would mean exporting a test-only backdoor into the production bundle.
+  test("web path still measures the keyboard (the pin must not become global)", async ({ page }) => {
+    await page.goto(`/home?tab=chats&chat=${chatId}`)
+    await page.locator("h2", { hasText: CHAT }).filter({ visible: true }).first()
+      .waitFor({ state: "visible", timeout: 15000 })
+
+    const measured = await page.evaluate(async () => {
+      const vv = window.visualViewport!
+      const proto = Object.getPrototypeOf(vv)
+      const real = Object.getOwnPropertyDescriptor(proto, "height")!
+      const target = window.innerHeight - 336
+      Object.defineProperty(vv, "height", { configurable: true, get: () => target })
+      vv.dispatchEvent(new Event("resize"))
+      await new Promise(r => requestAnimationFrame(() => r(null)))
+      const read = getComputedStyle(document.documentElement).getPropertyValue("--kb-inset").trim()
+      delete (vv as unknown as Record<string, unknown>).height
+      Object.defineProperty(proto, "height", real)
+      vv.dispatchEvent(new Event("resize"))
+      return read
+    })
+
+    expect(measured).toBe("336px")
+  })
+
   test("--kb-inset defaults to 0 and no keyboard flag is set at rest", async ({ page }) => {
     await page.goto("/home?tab=chats")
     const state = await page.evaluate(() => ({
