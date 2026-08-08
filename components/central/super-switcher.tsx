@@ -198,7 +198,7 @@ export function SuperSwitcher({
           trigger is the rail pill. */}
       <div
         style={variant === "rail" ? railWrapper : chip}
-        className={variant === "floating" ? "md:hidden" : undefined}
+        className={variant === "floating" ? "md:hidden kb-hide" : undefined}
       >
         {open && (
           <div style={popoverStyle}>
