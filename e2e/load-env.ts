@@ -59,4 +59,62 @@ export function loadEnv(): void {
       process.env[k] = v
     }
   }
+
+  applySupabaseTarget()
+}
+
+// ── Supabase target overlay ───────────────────────────────────────────────────
+// Point the harness at a DIFFERENT Supabase project (a branch database, or a
+// throwaway one) instead of production.
+//
+// Why this exists: the suite is not a read-only observer. Every run signs in
+// twice, creates chat groups and seeds messages — one spec seeds 40 rows per
+// run. Run the full suite a dozen times in an afternoon and that is a burst of
+// database writes far heavier than real usage, aimed at the same project real
+// users are on. On 2026-08-08 that contributed to draining the project's disk
+// IO budget, which drops the instance to baseline throughput and made Supabase
+// Auth stop responding — the live app hung on launch for everyone, because it
+// waits on auth before it can render.
+//
+// Set E2E_SUPABASE_URL (plus the two keys) in .env.local and the harness AND the
+// dev server it drives both point elsewhere. Unset — the default — nothing
+// changes and it runs against the same project as before.
+function applySupabaseTarget(): void {
+  const url = process.env.E2E_SUPABASE_URL
+  if (!url) return
+
+  // All three or none. A half-applied target is the worst outcome: fixtures
+  // writing to the branch while the app reads production reads as "the data I
+  // just seeded isn't there", which looks like a product bug for as long as it
+  // takes to notice.
+  const anon = process.env.E2E_SUPABASE_ANON_KEY
+  const service = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY
+  const missing = [
+    !anon && "E2E_SUPABASE_ANON_KEY",
+    !service && "E2E_SUPABASE_SERVICE_ROLE_KEY",
+  ].filter(Boolean)
+  if (missing.length) {
+    throw new Error(
+      `[e2e] E2E_SUPABASE_URL is set but ${missing.join(" and ")} missing — ` +
+      `refusing to run half-targeted (fixtures would write to one project while the app reads another).`,
+    )
+  }
+
+  process.env.NEXT_PUBLIC_SUPABASE_URL = url
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = anon
+  process.env.SUPABASE_SERVICE_ROLE_KEY = service
+
+  // Loud on purpose. The failure mode of a silent target switch — seeding one
+  // project and asserting against another — costs far more than a log line.
+  console.log(`[e2e] Supabase target: ${new URL(url).host} (E2E_SUPABASE_URL override)`)
+}
+
+/**
+ * The Supabase project the harness will use, for callers that need to show or
+ * check it (scripts/dev-e2e.sh mirrors this into the dev server's env).
+ */
+export function e2eSupabaseHost(): string {
+  loadEnv()
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  return url ? new URL(url).host : "(unset)"
 }
