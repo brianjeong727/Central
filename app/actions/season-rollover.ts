@@ -28,37 +28,16 @@
 // ministry-rescoped writes; actor is always the authz userId.
 
 import { createAdminClient } from "@/lib/supabase-admin"
-import { requireMinistryMember, type AuthzContext } from "@/app/actions/authz"
+import { requireMinistryMember, hasCanPlanEvents } from "@/app/actions/authz"
 import { getMinistryTimezone } from "@/lib/ministry-timezone"
-import { eventDateColumnsFromInputs, eventDateInputsFromRow, instantToZoned, todayInZone, type EventDateColumns } from "@/lib/tz"
-import { isLeaderRole } from "@/lib/roles"
+import { addDaysYMD, daysBetweenYMD, eventDateColumnsFromInputs, eventDateInputsFromRow, instantToZoned, todayInZone, type EventDateColumns } from "@/lib/tz"
 import { lineageKeyOf, seasonLabelOf } from "@/app/home/event-presets"
 
 type AdminClient = ReturnType<typeof createAdminClient>
 
-// Same gate as event planning (mirrors event-templates.ts).
-async function canPlanEvents(admin: AdminClient, ctx: AuthzContext): Promise<boolean> {
-  if (isLeaderRole(ctx.role)) return true
-  const { data: memberships } = await admin
-    .from("team_members")
-    .select("id, team_roles!role_id(permissions)")
-    .eq("user_id", ctx.userId)
-  return ((memberships ?? []) as { team_roles: { permissions?: string[] } | null }[]).some(
-    (m) => (m.team_roles?.permissions ?? []).includes("can_plan_events"),
-  )
-}
-
 // ── date helpers ─────────────────────────────────────────────────────────────
 // Bare "YYYY-MM-DD" arithmetic — zone-immune by construction. The zone only enters
 // where an INSTANT is involved (`eventYMD` / `shiftEventDates` below).
-function ymdToUTC(ymd: string): number {
-  const [y, m, d] = ymd.split("-").map(Number)
-  return Date.UTC(y, m - 1, d)
-}
-function addDaysYMD(ymd: string, days: number): string {
-  const dt = new Date(ymdToUTC(ymd) + days * 86_400_000)
-  return dt.toISOString().slice(0, 10)
-}
 /** The ministry-local calendar day an event instant falls on. The ONE projection
  *  used for season bucketing, the double-press guard, and the weekday delta — so
  *  every one of them agrees on which day an event "is". */
@@ -104,7 +83,7 @@ function weekdayMatchDelta(sourceYMD: string): number {
   const daysInMonth = new Date(Date.UTC(y + 1, m, 0)).getUTCDate()
   if (day > daysInMonth) day -= 7 // 5th occurrence missing → last occurrence
   const target = `${y + 1}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-  return Math.round((ymdToUTC(target) - ymdToUTC(sourceYMD)) / 86_400_000)
+  return daysBetweenYMD(sourceYMD, target)
 }
 
 type SourceEvent = {
@@ -149,7 +128,7 @@ async function copyEventForward(
 
   const { data: srcPlan } = await admin
     .from("event_plans")
-    .select("id, expected_turnout, budget_allocated, type_data, plan_start_date, crunch_date")
+    .select("id, expected_turnout, budget_allocated, type_data, countdown_phases")
     .eq("calendar_event_id", src.id)
     .maybeSingle()
 
@@ -163,8 +142,11 @@ async function copyEventForward(
         expected_turnout: srcPlan.expected_turnout,
         budget_allocated: srcPlan.budget_allocated,
         type_data: srcPlan.type_data ?? {},
-        plan_start_date: srcPlan.plan_start_date ? addDaysYMD(srcPlan.plan_start_date as string, delta) : null,
-        crunch_date: srcPlan.crunch_date ? addDaysYMD(srcPlan.crunch_date as string, delta) : null,
+        // The countdown ladder copies VERBATIM — no `delta` shift. Every rung is
+        // an offset relative to the event, so a season moved a year forward keeps
+        // the identical structure. (The plan_start_date / crunch_date pair this
+        // replaced were absolute dates and had to be re-based on every rollover.)
+        countdown_phases: srcPlan.countdown_phases,
       })
       .select("id")
       .single()
@@ -235,7 +217,7 @@ export async function startNextSeasonAction(
   const ctx = await requireMinistryMember()
   if (ctx.error !== null) return { error: ctx.error }
   const admin = createAdminClient()
-  if (!(await canPlanEvents(admin, ctx))) return { error: "Not authorized." }
+  if (!(await hasCanPlanEvents(admin, ctx))) return { error: "Not authorized." }
 
   // The one zone every date decision below resolves in.
   const timeZone = await getMinistryTimezone(admin, ctx.ministryId)

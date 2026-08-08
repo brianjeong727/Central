@@ -207,6 +207,23 @@
   /* ── Home hero carousel — single source of truth for the shared frame height.
      Every slide type (photo / event / announcement) reads this; never hardcode. */
   --hero-h: 375px;
+
+  /* ── Mobile nav clearance — the ONE bottom pad on the sole scroll region ────
+     mobile_design_system.md §3: ".scroll — sole scroll region, ~120px bottom pad".
+     The shell scroller owns this; a tab/section MUST NOT add its own bottom pad.
+     Doing so double-counts — that is exactly the bug this replaced, where the
+     shell's pb-28 and every tab's pb-28 stacked into ~260px of dead scroll under
+     the last row when the pill only needs ~74px.
+
+     DERIVED from the pill's own geometry (components/ui/bottom-nav.tsx) rather
+     than guessed, so the two can never drift:
+       env(safe-area-inset-bottom)  the pill's own inset on notched phones
+       + 14px                       the pill's `bottom:` offset
+       + 60px                       the pill's height (48 button + 2×6 padding)
+       + var(--space-7)             breathing room between content and pill
+     ≈ 92px flat-bottom, ≈ 126px notched — the ~120px the spec describes, now
+     exact per device instead of a fixed 112px that was wrong on both. */
+  --nav-clearance: calc(env(safe-area-inset-bottom) + 14px + 60px + var(--space-7));
 }
 
 /* Compact shell — context panel hidden; rail only. Re-declares BOTH vars because
@@ -215,6 +232,19 @@
 .shell-compact {
   --sidebar-width: 0px;
   --shell-offset: calc(var(--rail-width) + 4px);
+}
+
+/* The shell's sole scroll region. Owns the mobile nav-pill clearance so no tab
+   has to (and so none may — see --nav-clearance above). A CLASS rather than an
+   inline style on purpose: inline padding would outrank the desktop reset below
+   and leave the pad on ≥768px, where there is no pill to clear. */
+.shell-scroll {
+  padding-bottom: var(--nav-clearance);
+}
+@media (min-width: 768px) {
+  .shell-scroll {
+    padding-bottom: 0;
+  }
 }
 
 /* ── Dark mode ───────────────────────────────────────────────────────────── */
@@ -321,6 +351,18 @@
 }
 .pocket-chiprow::-webkit-scrollbar { display: none; }
 .pocket-chiprow > * { flex: 0 0 auto; }
+
+/* Chat search — the body swaps IN PLACE under a pinned search field, so the
+   change should read as the page settling, not as a navigation. Short, and the
+   same ease-out curve PocketSheet uses. */
+@keyframes chatSearchEnter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.chat-search-enter { animation: chatSearchEnter 180ms cubic-bezier(0.23, 1, 0.32, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .chat-search-enter { animation: none; }
+}
 
 /* ── Design tokens ───────────────────────────────────────────────────────── */
 :root {

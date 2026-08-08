@@ -71,3 +71,7 @@ scripts/loadtest/logs/
 # session.sh still runs `npm install --legacy-peer-deps` locally, which regenerates
 # this file — that's fine, it just must never be committed again.
 package-lock.json
+
+# Stray editor / R console artifacts (untracked 2026-08-04, audit)
+.Rhistory
+.cursorrules

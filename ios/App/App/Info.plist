@@ -18,6 +18,22 @@
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<!-- Google Sign-In callback. Google's SDK hands control to Safari/the Google
+	     app and returns via this custom scheme, which MUST be the reversed iOS
+	     OAuth client ID exactly — it is how iOS routes the response back to us.
+	     Pairs with NEXT_PUBLIC_GOOGLE_IOS_CLIENT_ID; the app hides the Google
+	     button entirely when that env var is unset (lib/native-auth.ts).
+	     NOT a secret: an OAuth client ID is public by design, and this same value
+	     is visible in any installed app's bundle. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.1011783368208-4mqkjs2h2lcvlmar319m35kahr0dn1pk</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>

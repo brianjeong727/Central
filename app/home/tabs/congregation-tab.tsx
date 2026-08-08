@@ -252,7 +252,7 @@ export function CongregationTab({ userId, ministryId, onViewChange, onBack }: Co
   }
 
   return (
-    <div className="pb-28 md:pb-0">
+    <div>
       {/* Mobile: single chrome row + the screen's ONE plum create (§3.3) */}
       {view === "list" && (
         <PocketChrome

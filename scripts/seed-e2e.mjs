@@ -89,6 +89,29 @@ for (const u of USERS) {
   if (error) throw error
 }
 
+// Baseline budget category. THREE finance specs (budget-fund-post,
+// finance-allocation-workspace, finance-split-allocations) pick "DG Dinner" out
+// of the approve-time category <select> by label, but none of them creates it —
+// budget-fund-post moved to isolated per-test categories and left the hardcoded
+// selectOption calls behind. With no such row the option never renders and all
+// of them sit on the select until Playwright's 30s timeout, which reads as an
+// app hang rather than a missing fixture. Seeded here because it is tenant
+// baseline, like the users above, not per-test data.
+{
+  const { data: existing } = await db
+    .from("budget_categories")
+    .select("id")
+    .eq("ministry_id", ministry.id)
+    .eq("name", "DG Dinner")
+    .maybeSingle()
+  if (!existing) {
+    const { error } = await db
+      .from("budget_categories")
+      .insert({ ministry_id: ministry.id, name: "DG Dinner", created_by: ids[USERS[0].email] })
+    if (error) throw error
+  }
+}
+
 console.log(`✓ E2E sandbox ready`)
 console.log(`  ministry: ${MINISTRY_NAME} (${ministry.id})`)
 for (const u of USERS) console.log(`  ${u.role.padEnd(6)} ${u.email}`)

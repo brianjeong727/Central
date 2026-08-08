@@ -41,6 +41,28 @@ import { ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react"
 export const POCKET_CHROME_PAD_Y = { paddingTop: 12, paddingBottom: 10 } as const
 export const POCKET_CHROME_PAD_X = 20
 
+// Top padding for a chrome row inside a SHELL-ESCAPING overlay (`fixed inset-0`:
+// ChatScreen, chat settings, the create-chat screen). The app shell root owns
+// `env(safe-area-inset-top)` for everything mounted inside it — an overlay pinned
+// to the viewport escapes that, so it must add the inset itself, then the SAME
+// 12px the chrome row gets everywhere else.
+//
+// This shipped as three hand-typed copies of `max(env(safe-area-inset-top),48px)`.
+// The 48px FLOOR was the bug: wherever the inset reports 0 (browser, simulator, a
+// notchless device) chat opened 36px lower than every other screen, which is the
+// one place the app visibly broke its own chrome rhythm (Convention #27).
+// A Tailwind class rather than an inline style so per-site `md:` overrides still win.
+//
+// Use this when the element IS the chrome row (ChatScreen's own header).
+export const POCKET_OVERLAY_PAD_TOP_CLS = "pt-[calc(env(safe-area-inset-top)+12px)]"
+
+// Use this when the overlay HOSTS a chrome component that already owns its 12px
+// (a `SubpageShell` / `PocketChrome` inside a `fixed inset-0` wrapper). Adding the
+// full pad at both levels stacks them — chat settings landed at 24-30px instead of
+// 12-19 — which is Convention #26's double-gutter bug in the vertical direction.
+// The wrapper contributes the safe-area inset ONLY; the chrome row contributes the 12.
+export const POCKET_OVERLAY_INSET_CLS = "pt-[env(safe-area-inset-top)]"
+
 // Mobile kicker label: 10px mono, +1.4px tracking. Deliberately NOT flattened
 // into EYEBROW_STYLE (11px desktop eyebrow) — the pocket scale is one step down.
 export const POCKET_KICKER_STYLE: CSSProperties = {
@@ -120,6 +142,12 @@ export function PocketRow({
   return (
     <button
       onClick={onClick}
+      // `data-pocket-row` is how e2e/mobile-screen-sweep DISCOVERS screens. This is
+      // the one drill-in primitive on phone width, so walking every row reachable
+      // from a hub reaches every hub-and-spoke screen — the sweep never has to keep
+      // a hand-written list of screen names in sync with the app, and a NEW section
+      // is covered by the margin rules the day it ships.
+      data-pocket-row={title}
       style={{
         display: "flex", alignItems: "center", gap: 12, width: "100%",
         background: "none", border: "none", textAlign: "left", cursor: "pointer",
@@ -226,9 +254,11 @@ export function PocketBackRow({ label, onBack, style }: { label: string; onBack:
   )
 }
 
-// 40px squircle monogram chip (mockup `.chip`): --line-2 tonal with a plum
-// letter; `solid` inverts to a plum fill with a cream letter (ministry-wide chat).
-export function PocketChip({ letter, solid = false, size = 40 }: { letter: string; solid?: boolean; size?: number }) {
+// 40px squircle chip (mockup `.chip`): --pocket-track tonal holding a plum
+// letter OR a plum stroked icon (§4 Row contract — "plum stroke icon or
+// initial"); `solid` inverts to a plum fill with cream content (ministry-wide
+// chat). `icon` wins over `letter` when both are passed.
+export function PocketChip({ letter, icon, solid = false, size = 40 }: { letter?: string; icon?: ReactNode; solid?: boolean; size?: number }) {
   return (
     <span
       style={{
@@ -239,7 +269,7 @@ export function PocketChip({ letter, solid = false, size = 40 }: { letter: strin
         color: solid ? "var(--cream-on-dark)" : "var(--plum)",
       }}
     >
-      {letter}
+      {icon ?? letter}
     </span>
   )
 }
@@ -455,11 +485,16 @@ export function PocketSwitch({ checked, onChange, ariaLabel }: {
 }
 
 // Ivory search pill: leading search glyph + borderless input, faint placeholder.
-export function PocketSearchField({ value, onChange, placeholder = "Search", style }: {
+export function PocketSearchField({ value, onChange, placeholder = "Search", style, onFocus, trailing, autoFocus }: {
   value: string
   onChange: (v: string) => void
   placeholder?: string
   style?: CSSProperties
+  /** Fired on focus — search surfaces use it to enter their search mode. */
+  onFocus?: () => void
+  /** Optional right-slot node (a clear/close control while searching). */
+  trailing?: ReactNode
+  autoFocus?: boolean
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--ivory)", borderRadius: "var(--r-pocket-sm)", padding: "12px 16px", ...style }}>
@@ -467,10 +502,13 @@ export function PocketSearchField({ value, onChange, placeholder = "Search", sty
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={onFocus}
+        autoFocus={autoFocus}
         placeholder={placeholder}
         className="pocket-search-input"
         style={{ flex: 1, minWidth: 0, border: "none", background: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 15.5, color: "var(--ink)" }}
       />
+      {trailing}
       <style>{`.pocket-search-input::placeholder{color:var(--faint)}`}</style>
     </div>
   )

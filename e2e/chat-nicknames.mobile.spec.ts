@@ -18,6 +18,17 @@ function vis(page: Page, text: string, exact = false) {
 async function openSettings(page: Page, chatName: string) {
   // Mobile: tapping the chat title (h2) opens ChatSettings (Messenger pattern).
   await page.locator("h2", { hasText: chatName }).filter({ visible: true }).first().click()
+  await openMemberList(page)
+}
+
+// The roster no longer sits on the settings screen — it moved behind the
+// ACTIONS > Members row, so an unbounded member list can't push Preferences and
+// Danger zone off the bottom of the phone. Every nickname assertion lives on
+// that screen now.
+async function openMemberList(page: Page) {
+  const members = page.getByText("Members", { exact: true }).filter({ visible: true }).first()
+  await members.waitFor({ state: "visible", timeout: 15000 })
+  await members.click()
 }
 
 // The nickname pencil is an icon-only button — locate it by its aria-label attr
@@ -126,6 +137,7 @@ test.describe("chat nicknames (personal group chats)", () => {
     await expect(vis(page, "dm hello there")).toBeVisible({ timeout: 15000 })
     // DM header title varies (partner name) — tap the visible header h2 to open settings.
     await page.locator("h2").filter({ visible: true }).first().click()
+    await openMemberList(page)
     const pencil = pencilFor(page, MEMBER)
     await expect(pencil).toBeVisible({ timeout: 10000 })
     await pencil.click()

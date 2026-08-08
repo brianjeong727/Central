@@ -9,8 +9,8 @@
 // var(--space-8) · InsetHairline — butting the breadcrumb with NO extra top gap.
 // Never hand-roll a header inside the body; the gaps will not match other pages.
 
-import { ReactNode, createContext, useContext, useState, useCallback, useEffect, useLayoutEffect, useRef } from "react"
-import { createPortal } from "react-dom"
+import { ReactNode, useState, useCallback, useEffect, useLayoutEffect, useRef } from "react"
+import { useChromeSlotRef } from "./mobile-chrome-slot"
 import { BackChevron } from "./back-chevron"
 import { InsetHairline } from "./hairline"
 import { PageTitle } from "./page-title"
@@ -31,7 +31,9 @@ import type { Crumb } from "@/app/home/types"
 // require threading or risk a stale closure. Instead the shell publishes a DOM
 // slot and the deep child portals into it: the child keeps rendering in its own
 // place in the tree with fresh closures, the pixels land in the chrome row.
-const ChromeSlotContext = createContext<HTMLElement | null>(null)
+// Registers into the SHARED mobile chrome registry (mobile-chrome-slot.tsx) so a
+// deep child's <MobileChromeActions> lands here too — one mechanism across
+// SubpageShell, PocketChrome and PocketHubChrome instead of three.
 
 // Layout effect on the client (runs before paint, so the de-bleed lands in the
 // SAME frame the shell mounts — no visible snap from 40px to 20px); plain effect
@@ -87,18 +89,11 @@ function useDeBleed(ref: React.RefObject<HTMLDivElement | null>): number {
   return bleed
 }
 
-/**
- * Render actions into the nearest `SubpageShell`'s MOBILE chrome row. Renders
- * nothing outside a SubpageShell, and nothing on desktop (the slot lives inside
- * the shell's `md:hidden` row) — desktop actions go through `titleAction`.
- */
-export function SubpageChromeActions({ children }: { children: ReactNode }) {
-  const host = useContext(ChromeSlotContext)
-  if (!host) return null
-  return createPortal(children, host)
-}
+/** @deprecated Use `MobileChromeActions` — it works with every mobile chrome, not
+ *  just SubpageShell. Kept as an alias so existing call sites keep working. */
+export { MobileChromeActions as SubpageChromeActions } from "./mobile-chrome-slot"
 
-export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact", titleMeta, titleAction, width = "full", maxWidth = 820, children }: {
+export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, titleScale = "compact", titleMeta, titleAction, width = "full", maxWidth = 820, children }: {
   crumbs: Crumb[]
   /** Optional page title — renders the canonical TabPageHeader rhythm at the top. */
   title?: string
@@ -130,6 +125,13 @@ export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact
    * settings → "Team settings"). Desktop (`title` / PageTitle) is untouched.
    */
   mobileTitle?: string
+  /**
+   * Optional meta line under the MOBILE chrome title (13px muted) — e.g. a
+   * collection's count on a drilled-in list screen. Mobile-only; the desktop
+   * header is untouched. Still ONE header row, so §1's no-two-header-screens
+   * rule holds.
+   */
+  mobileMeta?: string
   width?: "full" | "centered"
   maxWidth?: number
   children: ReactNode
@@ -149,10 +151,19 @@ export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact
   // desktop (coarse-pointer gated inside the hook).
   const swipeRef = useEdgeSwipeBack<HTMLDivElement>(back?.onClick)
   // Mobile chrome uses the override when supplied; desktop always uses `title`.
+  //
+  // Deliberately NOT derived from the terminal crumb. Tried that — it removes the
+  // titleless chrome row, but the five subpages that pass no title (member sheet,
+  // both receipt details, meeting-note detail, announcement detail) HEADLINE
+  // THEMSELVES in the body: the announcement is an editorial article with a date
+  // kicker and a large serif headline, the member sheet leads with an avatar +
+  // name identity card. Adding a chrome title there renders the same words twice,
+  // stacked. The "← Parent" grammar is the correct chrome for a screen whose body
+  // already names it — there the chrome's only job is navigation.
   const chromeTitle = mobileTitle ?? title
   // State (not a plain ref) so the one re-render that publishes the slot happens
   // after it is in the DOM — a ref would leave the first portal render with null.
-  const [chromeSlot, setChromeSlot] = useState<HTMLElement | null>(null)
+  const chromeSlotRef = useChromeSlotRef()
   // Phone-width gutter enforcement (see useDeBleed). The root carries BOTH refs:
   // the swipe hook's (it animates this element) and our own for measuring.
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -173,8 +184,15 @@ export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact
         <div className="md:hidden flex items-center" style={{ gap: 8, ...POCKET_CHROME_PAD_Y, paddingLeft: POCKET_CHROME_PAD_X, paddingRight: POCKET_CHROME_PAD_X }}>
           {back && <BackChevron onClick={back.onClick} label={`Back to ${back.label}`} />}
           {chromeTitle ? (
-            <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {chromeTitle}
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {chromeTitle}
+              </span>
+              {mobileMeta && (
+                <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {mobileMeta}
+                </span>
+              )}
             </span>
           ) : back ? (
             <button
@@ -189,7 +207,7 @@ export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact
               pushing, so actions still sit hard right on the titleless fallback
               row. Empty when nothing portals in — a zero-width flex item. */}
           <div
-            ref={setChromeSlot}
+            ref={chromeSlotRef}
             style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: "auto" }}
           />
         </div>
@@ -219,11 +237,9 @@ export function SubpageShell({ crumbs, title, mobileTitle, titleScale = "compact
       <div
         className={`md:flex-1 md:overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+110px)] md:pb-14 ${title ? "pt-0" : "pt-4 md:pt-7"}`}
       >
-        <ChromeSlotContext.Provider value={chromeSlot}>
           {width === "centered"
             ? <div className="mx-auto w-full px-5" style={{ maxWidth }}>{children}</div>
             : <div className="w-full px-5 md:px-14">{children}</div>}
-        </ChromeSlotContext.Provider>
       </div>
     </div>
   )
