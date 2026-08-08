@@ -14,7 +14,7 @@ import { useChromeSlotRef } from "./mobile-chrome-slot"
 import { BackChevron } from "./back-chevron"
 import { InsetHairline } from "./hairline"
 import { PageTitle } from "./page-title"
-import { POCKET_CHROME_PAD_Y, POCKET_CHROME_PAD_X } from "./pocket"
+import { POCKET_CHROME_PAD_Y, POCKET_CHROME_PAD_X, POCKET_CHROME_TITLE } from "./pocket"
 import { useScrollResetOn } from "./scroll-reset"
 import { useEdgeSwipeBack } from "./use-edge-swipe-back"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ context hook); flagged Phase 2, refactor pending
@@ -186,7 +186,7 @@ export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, titleScal
           {back && <BackChevron onClick={back.onClick} label={`Back to ${back.label}`} />}
           {chromeTitle ? (
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "block", fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ display: "block", ...POCKET_CHROME_TITLE }}>
                 {chromeTitle}
               </span>
               {mobileMeta && (
@@ -199,7 +199,7 @@ export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, titleScal
             <button
               type="button"
               onClick={back.onClick}
-              style={{ background: "none", border: "none", padding: 0, marginLeft: -2, color: "var(--plum)", fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, cursor: "pointer" }}
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", flex: 1, minWidth: 0, display: "block", ...POCKET_CHROME_TITLE }}
             >
               {back.label}
             </button>

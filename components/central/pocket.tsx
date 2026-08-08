@@ -41,6 +41,29 @@ import { ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react"
 export const POCKET_CHROME_PAD_Y = { paddingTop: 12, paddingBottom: 10 } as const
 export const POCKET_CHROME_PAD_X = 20
 
+// The chrome row's TITLE type. PAD_Y pinned where the row sits; nothing pinned how
+// the title looks, so five chromes drifted apart: tab roots at 22, the announcements
+// row and SubpageShell at 20, PocketHubChrome silently dropping 22→20 whenever it
+// carried an action, and the SubpageShell back-label at 15 in PLUM — which read as a
+// small link where every sibling screen has a header (ratified 22/600 ink, 2026-08-08).
+//
+// A back-label consumes this TOO. "‹ Directory" is the same header as the Directory
+// root's, not a lesser thing: the chrome names the SECTION you came from while the
+// body names the page (an announcement's date kicker + headline, a member's identity
+// card). That is what keeps the two grammars from ever duplicating words — and why
+// the fix is one type ramp, not one title source.
+export const POCKET_CHROME_TITLE = {
+  fontFamily: "var(--serif)",
+  fontSize: 22,
+  fontWeight: 600,
+  letterSpacing: "-0.02em",
+  lineHeight: 1.1,
+  color: "var(--ink)",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+} as const
+
 // Top padding for a chrome row inside a SHELL-ESCAPING overlay (`fixed inset-0`:
 // ChatScreen, chat settings, the create-chat screen). The app shell root owns
 // `env(safe-area-inset-top)` for everything mounted inside it — an overlay pinned

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react"
 import { RingCrossLogo } from "./shared"
-import { MonogramChip, BackChevron, POCKET_CHROME_PAD_Y, POCKET_CHROME_PAD_X } from "@/components/central"
+import { MonogramChip, BackChevron, POCKET_CHROME_PAD_Y, POCKET_CHROME_PAD_X, POCKET_CHROME_TITLE } from "@/components/central"
 import { getInitials } from "../utils"
 
 interface PocketHeaderProps {
@@ -31,19 +31,7 @@ export function PocketHeader({ ministryName, userName, avatarUrl, action, onAvat
     >
       <RingCrossLogo size={26} color="var(--plum)" />
       <span
-        style={{
-          flex: 1,
-          minWidth: 0,
-          fontFamily: "var(--serif)",
-          fontSize: 22,
-          fontWeight: 600,
-          color: "var(--ink)",
-          letterSpacing: "-0.01em",
-          lineHeight: 1,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-        }}
+        style={{ flex: 1, minWidth: 0, ...POCKET_CHROME_TITLE }}
       >
         {ministryName}
       </span>

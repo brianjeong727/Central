@@ -55,6 +55,7 @@ export {
   POCKET_KICKER_STYLE,
   POCKET_CHROME_PAD_Y,
   POCKET_CHROME_PAD_X,
+  POCKET_CHROME_TITLE,
   PocketKicker,
   PocketCard,
   PocketRowCard,

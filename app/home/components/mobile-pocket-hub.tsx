@@ -13,7 +13,7 @@ import type { ReactNode } from "react"
 import { Settings } from "lucide-react"
 import {
   IconButton, MonogramChip, PocketHeroCard, PocketKicker, PocketRow, PocketRowCard, BackChevron,
-  POCKET_CHROME_PAD_Y, useChromeSlotRef,
+  POCKET_CHROME_PAD_Y, POCKET_CHROME_TITLE, useChromeSlotRef,
 } from "@/components/central"
 import { PlanLineIcon } from "./shared"
 import { getInitials } from "../utils"
@@ -58,7 +58,7 @@ export function PocketHubChrome({ title, onBack, onSettings, avatar, action }: {
       {onBack && (
         <BackChevron onClick={onBack} />
       )}
-      <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: action ? 20 : 22, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
+      <span style={{ flex: 1, minWidth: 0, ...POCKET_CHROME_TITLE }}>{title}</span>
       {action}
       {/* Portal target — empty (zero-width) until a child renders into it. */}
       <div ref={slotRef} style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }} />
