@@ -7,6 +7,7 @@ import { TabPageHeader, PageTitle, FormField, Input, CentralButton, POCKET_KICKE
 import { PocketChrome } from "./pocket-header"
 import { Spinner, EYEBROW_STYLE, EmptyState } from "./shared"
 import { isAdminRole } from "@/lib/roles"
+import { isMobileViewport } from "@/lib/breakpoints"
 
 // Member-facing "Give" surface. This is the donation/Zelle info that used to live as
 // the `give` section of the Finance (giving) tab. It now stands on its own as a
@@ -15,7 +16,7 @@ import { isAdminRole } from "@/lib/roles"
 
 // Opens the Zelle app on mobile (with a graceful web fallback), or zellepay.com on desktop.
 function openZelle(onFallback: () => void) {
-  if (window.innerWidth < 768) {
+  if (isMobileViewport()) {
     window.location.href = "zelle://"
     const t = setTimeout(onFallback, 500)
     const onHide = () => { clearTimeout(t); document.removeEventListener("visibilitychange", onHide) }

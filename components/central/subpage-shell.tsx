@@ -21,6 +21,7 @@ import { useEdgeSwipeBack } from "./use-edge-swipe-back"
 import { useSubpageCrumbs } from "@/app/home/breadcrumb-context"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ type import); flagged Phase 2, refactor pending
 import type { Crumb } from "@/app/home/types"
+import { isDesktopViewport } from "@/lib/breakpoints"
 
 // ── Mobile chrome-row action slot ──────────────────────────────────────────────
 // mobile_design_system §3 puts a phone-width screen's create (and up to one
@@ -68,7 +69,7 @@ function useDeBleed(ref: React.RefObject<HTMLDivElement | null>): number {
     if (!el) return
     const compute = () => {
       // Desktop owns its own inset (md:px-14) and is never nested this way.
-      if (window.matchMedia("(min-width: 768px)").matches) { setBleed(0); return }
+      if (isDesktopViewport()) { setBleed(0); return }
       let sum = 0
       let cur = el.parentElement
       while (cur && cur !== document.body) {
