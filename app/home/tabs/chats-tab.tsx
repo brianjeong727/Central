@@ -33,7 +33,7 @@ import { MODERATION_DEFAULTS, moderateText, scopeApplies, reverentCapitalize } f
 import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
 import { isChatManageRole, isLeaderRole } from "@/lib/roles"
-import { useKeyboardInset, useSwipeDownToDismissKeyboard } from "@/lib/keyboard-inset"
+import { subscribeKeyboard, useSwipeDownToDismissKeyboard } from "@/lib/keyboard-inset"
 
 // Hydration-safe "are we mounted on the client yet?" flag with no set-state-in-
 // effect. useSyncExternalStore returns the server snapshot (false) during SSR
@@ -2621,17 +2621,29 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // responding to". Twice on purpose: once on the leading edge so the pin happens
   // WITH the keyboard slide, once after it settles because the final height is only
   // known at the end of the animation (~250ms on iOS).
-  const { open: keyboardOpen } = useKeyboardInset()
   // Drag down over the transcript to put the keyboard away. Gated on being pinned to
   // the bottom so it never steals the flick that scrolls back through history — and
   // the bottom is exactly where the effect below leaves you when the keyboard opens.
   useSwipeDownToDismissKeyboard(scrollContainerRef, { whenScrolledToBottom: true })
+
+  // SUBSCRIBED, not rendered: re-pinning the transcript is a side effect, and reading
+  // keyboard state through a hook instead would re-render this whole component on every
+  // step of the keyboard's slide — stutter in the exact frames that must stay smooth.
   useEffect(() => {
-    if (!keyboardOpen || loading || searchMode) return
-    const frame = requestAnimationFrame(() => scrollToBottom(false))
-    const settled = window.setTimeout(() => scrollToBottom(false), 320)
-    return () => { cancelAnimationFrame(frame); window.clearTimeout(settled) }
-  }, [keyboardOpen, loading, searchMode, scrollToBottom])
+    if (loading || searchMode) return
+    let frame = 0
+    let settled = 0
+    const stop = subscribeKeyboard(({ open }) => {
+      if (!open) return
+      cancelAnimationFrame(frame)
+      window.clearTimeout(settled)
+      frame = requestAnimationFrame(() => scrollToBottom(false))
+      // The final height is only known once the keyboard finishes animating (~250ms
+      // on iOS), so pin once on the leading edge and once after it settles.
+      settled = window.setTimeout(() => scrollToBottom(false), 320)
+    })
+    return () => { stop(); cancelAnimationFrame(frame); window.clearTimeout(settled) }
+  }, [loading, searchMode, scrollToBottom])
 
   // Realtime — all chat events for this thread flow through the shared private-broadcast
   // hub (chat:{groupId}): new messages (INSERT), edits + unsends/soft-deletes (UPDATE),

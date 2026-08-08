@@ -17,9 +17,14 @@
 // already lands exactly on top of the keyboard, and the occluded amount is
 // genuinely zero. In mobile Safari nothing resizes: the layout viewport keeps
 // its full height and the keyboard sits OVER the bottom of it, so the occluded
-// amount is real and layout has to subtract it. One var covers both because
-// `innerHeight - visualViewport.height` naturally reports 0 under a resized
-// WebView and the true height under an overlaid one — same expression, no fork.
+// amount is real and layout has to subtract it.
+//
+// Those are two different WORLDS, not one expression that happens to cover both.
+// `innerHeight - visualViewport.height` does settle to 0 under a resized WebView,
+// but only at REST: mid-animation the two properties update on different frames,
+// and the transient reads a full keyboard height — which the layout then applies
+// on top of the resize that already happened. So the shell PINS the inset to 0
+// (nativeManagesResize) and only measures where nothing else is resizing.
 //
 // `data-kb-open` exists because things other than height depend on the keyboard:
 // `env(safe-area-inset-bottom)` must collapse (the home indicator is behind the
@@ -31,7 +36,7 @@
 // `^ v Done` strip that iMessage and Messenger don't show. That is native-only
 // surface; there is no web equivalent and no web fallback.
 
-import { useEffect, useSyncExternalStore } from "react"
+import { useEffect } from "react"
 import type { RefObject } from "react"
 
 // A keyboard is hundreds of px. Anything smaller is browser chrome settling
@@ -64,8 +69,24 @@ function setOpen(next: boolean) {
   emit()
 }
 
-// ── Visual-viewport tracking (web; inert-but-harmless in the native shell) ────
+// Set once the native Keyboard plugin is confirmed to be managing resize. From
+// then on the inset is PINNED to 0 rather than measured — see measure().
+let nativeManagesResize = false
+
+// ── Visual-viewport tracking (web only — see why it must not run natively) ────
 function measure() {
+  // In the shell, iOS resizes the WKWebView itself, so the occluded amount is 0
+  // by construction. It is NOT enough to let the measurement arrive at 0 on its
+  // own: `window.innerHeight` and `visualViewport.height` do not update on the
+  // same frame during the keyboard animation. In the window where innerHeight
+  // still reports the full screen but vv.height has already shrunk, this
+  // computes a full keyboard height — and .kb-lift then lifts the chat by that
+  // much AGAIN, on top of a WebView iOS already shrank by exactly that much.
+  // The composer is shoved a keyboard's height below the screen and snaps back
+  // when innerHeight catches up, which reads as the composer taking a second or
+  // two to "load in". Measuring is only correct where nothing else is resizing.
+  if (nativeManagesResize) { setInset(0); return }
+
   const vv = window.visualViewport
   if (!vv) return
   // offsetTop is how far the visual viewport has been scrolled down inside the
@@ -90,6 +111,12 @@ async function startNative() {
     // to remove it, and it is why the composer looked wrong even when the
     // heights were right.
     Keyboard.setAccessoryBarVisible({ isVisible: false }).catch(() => {})
+
+    // Hand the inset over to the native resize BEFORE any keyboard can appear.
+    // Set only after the plugin import resolves, so an older shell binary without
+    // it keeps the measured path (there nothing resizes, so measuring is right).
+    nativeManagesResize = true
+    setInset(0)
 
     // willShow/willHide (not didShow/didHide) so the layout change rides the
     // SAME animation frame budget as the keyboard's own slide — waiting for
@@ -135,20 +162,21 @@ export function startKeyboardInset(): void {
   void startNative()
 }
 
-function subscribe(cb: () => void) {
-  listeners.add(cb)
-  return () => { listeners.delete(cb) }
-}
-
 /**
- * Keyboard state for components that need it in JS (scroll-to-bottom on open,
- * hiding floating chrome). Pure-CSS consumers should read `var(--kb-inset)` /
- * `html[data-kb-open]` instead and skip the re-render entirely.
+ * React to the keyboard. Deliberately a subscription and NOT a hook: on the web path
+ * the inset lands over several visual-viewport events as the keyboard slides, so a
+ * component reading this through `useSyncExternalStore` re-renders once per event,
+ * mid-animation — a self-inflicted stutter in the one moment the frame budget is
+ * already spoken for. ChatScreen (this module's only JS consumer) just needs to
+ * re-pin its scroll, which is a side effect, not a render.
+ *
+ * Anything that only needs to LOOK different should read `var(--kb-inset)` /
+ * `html[data-kb-open]` in CSS and not subscribe at all.
  */
-export function useKeyboardInset(): { inset: number; open: boolean } {
-  const snapshotInset = useSyncExternalStore(subscribe, () => inset, () => 0)
-  const snapshotOpen = useSyncExternalStore(subscribe, () => open, () => false)
-  return { inset: snapshotInset, open: snapshotOpen }
+export function subscribeKeyboard(cb: (state: { inset: number; open: boolean }) => void): () => void {
+  const wrapped = () => cb({ inset, open })
+  listeners.add(wrapped)
+  return () => { listeners.delete(wrapped) }
 }
 
 /** Dismiss the keyboard by blurring whatever text field currently owns it. */
