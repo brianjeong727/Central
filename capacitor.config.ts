@@ -59,22 +59,32 @@ const config: CapacitorConfig = {
       launchAutoHide: false,
     },
     Keyboard: {
-      // "native": iOS shrinks the WKWebView frame to the region ABOVE the
-      // keyboard, so the web layer's viewport IS the visible area — a
-      // `fixed inset-0` surface (ChatScreen) lands flush on the keyboard with
-      // no arithmetic, exactly like iMessage/Messenger. The alternative
-      // ("none") leaves the WebView full-height and lets WKWebView scroll the
-      // whole document up to reveal the caret, which is the bug this fixes:
-      // the header scrolls off the top and the composer floats mid-screen over
-      // blank cream.
+      // "none" — the web layer owns the layout; the plugin only reports.
       //
-      // The occluded-height math in lib/keyboard-inset.ts still runs and still
-      // reports 0 here — deliberately, and that is what keeps ONE code path
-      // serving both this shell and mobile Safari (where nothing resizes).
+      // "native" was tried and is WRONG for a chat surface, for a reason visible
+      // only in the plugin source (ios/.../Keyboard.m, onKeyboardWillShow):
       //
-      // NOTE: this is native config — it takes effect only after
-      // `npx cap sync ios` and a new app build, NOT on a web deploy.
-      resize: KeyboardResize.Native,
+      //   double duration = [...AnimationDuration...] + 0.2;
+      //   [self setKeyboardHeight:(int)height delay:duration];
+      //
+      // The WKWebView frame change is scheduled with performSelector:afterDelay:
+      // for the keyboard's animation duration PLUS 200ms — so ~450ms after the
+      // keys start moving, as a hard snap, and later still if the main thread is
+      // busy. For that entire window the WebView is full height and the composer
+      // sits BEHIND the keyboard. That is the "composer takes a second to appear"
+      // report, and no amount of web-side work can fix it while the viewport
+      // itself arrives late.
+      //
+      // With "none" the WebView stays full screen and `keyboardWillShow` fires
+      // immediately, carrying keyboardHeight — so lib/keyboard-inset.ts moves the
+      // chat on the FIRST frame, in lockstep with the keys. Safe because the
+      // plugin removes WKWebView's own keyboard observers unconditionally (not
+      // just in native mode), which is what would otherwise scroll the whole
+      // document up to chase the caret.
+      //
+      // NOTE: native config — takes effect only after `npx cap sync ios` and a
+      // new app build, NOT on a web deploy.
+      resize: KeyboardResize.None,
     },
   },
 }

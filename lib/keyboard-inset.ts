@@ -69,23 +69,19 @@ function setOpen(next: boolean) {
   emit()
 }
 
-// Set once the native Keyboard plugin is confirmed to be managing resize. From
-// then on the inset is PINNED to 0 rather than measured — see measure().
-let nativeManagesResize = false
+// Set once the native Keyboard plugin is confirmed present. From then on the
+// height arrives from its events and measurement is ignored entirely — see below.
+let nativeReportsHeight = false
 
-// ── Visual-viewport tracking (web only — see why it must not run natively) ────
+// ── Visual-viewport tracking (web only) ──────────────────────────────────────
 function measure() {
-  // In the shell, iOS resizes the WKWebView itself, so the occluded amount is 0
-  // by construction. It is NOT enough to let the measurement arrive at 0 on its
-  // own: `window.innerHeight` and `visualViewport.height` do not update on the
-  // same frame during the keyboard animation. In the window where innerHeight
-  // still reports the full screen but vv.height has already shrunk, this
-  // computes a full keyboard height — and .kb-lift then lifts the chat by that
-  // much AGAIN, on top of a WebView iOS already shrank by exactly that much.
-  // The composer is shoved a keyboard's height below the screen and snaps back
-  // when innerHeight catches up, which reads as the composer taking a second or
-  // two to "load in". Measuring is only correct where nothing else is resizing.
-  if (nativeManagesResize) { setInset(0); return }
+  // In the shell the height comes from `keyboardWillShow`, which fires on the
+  // first frame of the animation and carries an exact value. Measuring there is
+  // both unnecessary and actively wrong: `window.innerHeight` and
+  // `visualViewport.height` do not update on the same frame while the keyboard
+  // moves, so mid-animation this computes garbage and fights the event-driven
+  // value. Measure only where there is nothing better to go on.
+  if (nativeReportsHeight) return
 
   const vv = window.visualViewport
   if (!vv) return
@@ -112,17 +108,28 @@ async function startNative() {
     // heights were right.
     Keyboard.setAccessoryBarVisible({ isVisible: false }).catch(() => {})
 
-    // Hand the inset over to the native resize BEFORE any keyboard can appear.
-    // Set only after the plugin import resolves, so an older shell binary without
-    // it keeps the measured path (there nothing resizes, so measuring is right).
-    nativeManagesResize = true
-    setInset(0)
+    // Take over from measurement. Set only after the plugin import resolves, so
+    // an older shell binary without it keeps the measured path.
+    nativeReportsHeight = true
+    // Marks the shell for CSS: there the inset arrives as ONE discrete jump, so
+    // the surface has to animate itself to ride the keys. On the web it arrives
+    // as a stream of visual-viewport events that already describe the motion,
+    // and adding a transition on top would animate toward a moving target.
+    document.documentElement.setAttribute("data-kb-native", "")
 
-    // willShow/willHide (not didShow/didHide) so the layout change rides the
-    // SAME animation frame budget as the keyboard's own slide — waiting for
-    // `did` lands the composer a visible beat after the keys.
-    Keyboard.addListener("keyboardWillShow", () => setOpen(true)).catch(() => {})
-    Keyboard.addListener("keyboardWillHide", () => setOpen(false)).catch(() => {})
+    // willShow/willHide, NOT didShow/didHide. These fire on the first frame of
+    // the keyboard's animation and carry the exact height, which is the entire
+    // reason resize is "none": the plugin's own WebView resize is deferred by
+    // (animation duration + 200ms), and waiting for it is what made the composer
+    // appear a beat late. `did` would be just as late.
+    Keyboard.addListener("keyboardWillShow", (info: { keyboardHeight: number }) => {
+      setOpen(true)
+      setInset(info?.keyboardHeight ?? 0)
+    }).catch(() => {})
+    Keyboard.addListener("keyboardWillHide", () => {
+      setOpen(false)
+      setInset(0)
+    }).catch(() => {})
   } catch {
     // Not native, or an older shell without the plugin. The web path covers it.
   }
