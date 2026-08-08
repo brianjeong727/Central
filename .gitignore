@@ -80,3 +80,18 @@ package-lock.json
 # Stray editor / R console artifacts (untracked 2026-08-04, audit)
 .Rhistory
 .cursorrules
+
+# iCloud/Finder conflict copies — "config 2.xml", "dm 2.ts", "report 3.sql".
+# The repo lives under ~/Desktop, which is iCloud-synced, so these reappear on
+# their own: deleting one is whack-a-mole (config 2.xml came back and brought
+# config 3.xml with it). Ignoring them keeps `git status` honest — which matters
+# beyond tidiness, because session.sh refuses to reclaim a slot whose worktree
+# looks dirty — and makes `git add -A` unable to sweep one in.
+#
+# scripts/check-conflict-copies.sh stays: it catches copies ALREADY TRACKED,
+# which this cannot (gitignore does not apply to tracked files). The two are
+# complements — this stops new ones entering, that one finds the ones that got in.
+#
+# Tradeoff, same one the guard script documents: a legitimate "<name> <digit>.<ext>"
+# would be ignored too. None exist in the repo; `git add -f` overrides if one ever does.
+* [0-9].*
