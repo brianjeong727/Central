@@ -31,6 +31,10 @@ test.describe("DM identity — per-viewer name + one thread per pair", () => {
   let dmKey = ""
   let dmId = ""
   let thirdId = ""
+  // Groups the fork test creates. Tracked so teardown removes them even when an
+  // assertion fails mid-test — an in-test delete only runs on the happy path, and
+  // the leftovers then poisoned the NEXT run's "exactly one" check.
+  const createdForkIds: string[] = []
 
   test.beforeAll(async () => {
     const sb = sandbox()
@@ -75,6 +79,8 @@ test.describe("DM identity — per-viewer name + one thread per pair", () => {
     const db = sb.client
     await sb.deleteGroupsByPrefix()
     await db.from("groups").delete().eq("ministry_id", sb.ministryId).eq("type", "dm").eq("dm_key", dmKey)
+    // Forks are named from first names, so the prefix sweep above misses them.
+    if (createdForkIds.length > 0) await db.from("groups").delete().in("id", createdForkIds)
     if (thirdId) {
       await db.from("profiles").delete().eq("id", thirdId)
       await db.auth.admin.deleteUser(thirdId).catch(() => {})
@@ -101,11 +107,17 @@ test.describe("DM identity — per-viewer name + one thread per pair", () => {
     const title = page.locator("h2").filter({ visible: true }).first()
     await expect(title).not.toHaveText(memberName, { timeout: 15000 })
 
-    const groups = await db
-      .from("groups").select("id, type, name")
-      .eq("ministry_id", sb.ministryId).eq("type", "my").ilike("name", "%Third%")
-    expect(groups.data).toHaveLength(1)
-    const forkId = groups.data![0].id
+    // Identify the fork by its MEMBER SET, not its generated name. The name is
+    // built from first names, so it neither contains a stable token nor stays
+    // unique across runs — matching on it made this assertion depend on leftover
+    // fixtures from previous runs rather than on what the fork actually did.
+    const thirdsGroups = await db
+      .from("group_members").select("group_id, groups!inner(id, type, ministry_id)")
+      .eq("user_id", thirdId).eq("groups.type", "my").eq("groups.ministry_id", sb.ministryId)
+    const candidateIds = (thirdsGroups.data ?? []).map((r) => r.group_id as string)
+    expect(candidateIds.length, "the third person should be in exactly one forked group").toBe(1)
+    const forkId = candidateIds[0]
+    createdForkIds.push(forkId)
     const forkMembers = await db.from("group_members").select("user_id").eq("group_id", forkId)
     expect(new Set((forkMembers.data ?? []).map((m) => m.user_id)))
       .toEqual(new Set([adminId, memberId, thirdId]))
@@ -118,7 +130,6 @@ test.describe("DM identity — per-viewer name + one thread per pair", () => {
       .eq("ministry_id", sb.ministryId).eq("type", "dm").eq("dm_key", dmKey)
     expect(dmCount.data).toHaveLength(1)
 
-    await db.from("groups").delete().eq("id", forkId)
   })
 
   // The admin created the thread, so the STORED name is already correct for them

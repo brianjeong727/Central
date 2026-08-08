@@ -1801,7 +1801,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       const [{ data }, { data: nicks }] = await Promise.all([
         supabase
           .from("group_members")
-          .select("user_id, last_read_at, profiles!user_id(name, avatar_url)")
+          // deleted_at rides along so a deleted account still RESOLVES here (it
+          // keeps its membership so its messages stay attributable — see
+          // app/actions/delete-account.ts) while being excluded from anything
+          // that treats a member as reachable, like @mentions.
+          .select("user_id, last_read_at, profiles!user_id(name, avatar_url, deleted_at)")
           .eq("group_id", groupId),
         supabase
           .from("chat_nicknames")
@@ -1811,18 +1815,24 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       const nickById: Record<string, string | undefined> = {}
       for (const n of (nicks ?? []) as { target_user_id: string; nickname: string }[]) nickById[n.target_user_id] = n.nickname
       return (data ?? [])
-        .map((m: { user_id: string; last_read_at: string | null; profiles: { name: string; avatar_url: string | null } | { name: string; avatar_url: string | null }[] | null }) => {
+        .map((m: { user_id: string; last_read_at: string | null; profiles: { name: string; avatar_url: string | null; deleted_at: string | null } | { name: string; avatar_url: string | null; deleted_at: string | null }[] | null }) => {
           const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
           if (!p) return null
-          const nickname: string | null = nickById[m.user_id] ?? null
-          return { id: m.user_id, name: p.name, nickname, displayName: nickname ?? p.name, avatarUrl: p.avatar_url ?? null, lastReadAt: m.last_read_at ?? null }
+          const deleted = !!p.deleted_at
+          // A deleted account keeps no nickname identity — it is "Former member"
+          // (the scrubbed profiles.name) to everyone, whatever it was called before.
+          const nickname: string | null = deleted ? null : (nickById[m.user_id] ?? null)
+          return { id: m.user_id, name: p.name, nickname, displayName: nickname ?? p.name, avatarUrl: deleted ? null : (p.avatar_url ?? null), lastReadAt: m.last_read_at ?? null, deleted }
         })
-        .filter((m): m is { id: string; name: string; nickname: string | null; displayName: string; avatarUrl: string | null; lastReadAt: string | null } => m !== null)
+        .filter((m): m is { id: string; name: string; nickname: string | null; displayName: string; avatarUrl: string | null; lastReadAt: string | null; deleted: boolean } => m !== null)
     }
   )
   const roster = useMemo(() => rosterData ?? [], [rosterData])
   const rosterLoaded = rosterData !== undefined
-  const mentionMembers = useMemo(() => roster.filter(m => m.id !== userId), [roster, userId])
+  // Deleted accounts stay in `roster` (so their messages and the DM title still
+  // resolve to "Former member") but are NOT mentionable — there is nobody left to
+  // notify, and offering "@Former member" in the autocomplete is nonsense.
+  const mentionMembers = useMemo(() => roster.filter(m => m.id !== userId && !m.deleted), [roster, userId])
   // senderId → nickname-aware display name; drives message senders, typing, header.
   const displayNameById = useMemo(() => {
     const map: Record<string, string> = {}
