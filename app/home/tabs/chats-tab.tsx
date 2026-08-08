@@ -16,6 +16,7 @@ import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocke
 import { MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
 import { ChatSearchView } from "../components/chat-search"
 import { findExistingDm, getOrCreateDm } from "../dm"
+import { isMobileViewport } from "@/lib/breakpoints"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData, ChatNotifyMode, NotificationSettings } from "../types"
@@ -3279,7 +3280,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 the tap is gated to phone width and the cursor stays default there. */}
             <div
               className="flex-1 min-w-0 cursor-pointer md:cursor-default"
-              onClick={() => { if (window.matchMedia("(max-width: 767px)").matches) setShowSettings(true) }}
+              onClick={() => { if (isMobileViewport()) setShowSettings(true) }}
             >
               <div className="flex items-center gap-2">
                 {/* Mobile: the name is the whole title block (no member-count sub),

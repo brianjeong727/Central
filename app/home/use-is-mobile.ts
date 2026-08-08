@@ -1,10 +1,14 @@
 "use client"
 
 import { useSyncExternalStore } from "react"
+import { MOBILE_QUERY } from "@/lib/breakpoints"
 
-const QUERY = "(max-width: 767px)"
+// The exact complement of the `max-md:` variant — NOT a bare width test. A phone
+// in landscape is wider than 768px, so the old "(max-width: 767px)" reported
+// desktop on a rotated iPhone while the layout around it stayed mobile.
+const QUERY = MOBILE_QUERY
 
-// Shared viewport hook — true below the md (768px) breakpoint. SSR-safe and
+// Shared viewport hook — true whenever the MOBILE layout is in force. SSR-safe and
 // lint-clean via useSyncExternalStore: the server snapshot is always false (so
 // hydration matches), the client snapshot reads matchMedia live, and the store
 // re-subscribes on breakpoint changes. Use it to branch MOBILE-ONLY behavior that

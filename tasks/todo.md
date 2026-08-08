@@ -368,3 +368,45 @@ noticed under the old code: the friend vanishing from chat member lists instead
 of remaining as "Former member" — his memberships were deleted outright. Those
 rows are gone and are not recoverable (which groups he belonged to wasn't
 recorded anywhere else); the fix only applies to future deletions.
+
+
+# Mobile landscape showed the desktop shell — fix/mobile-landscape
+
+Brian: "when u turn the mobile app horizontal, it shows the web view. it should
+just show a adjusted view of the mobile version."
+
+## Cause
+
+The mobile/desktop split was a bare `min-width: 768px`. An iPhone in landscape is
+874–956px, so every `md:` rule fired and the desktop shell (rail + context panel +
+breadcrumb) rendered into a 402px-tall screen. Reproduced at 874×402.
+
+## Decision (Brian chose)
+
+`desktop = (min-width: 768px) and ((hover: hover) or (min-width: 1024px))`
+
+Phones can never reach 1024px in any rotation, so they never get the desktop
+shell; tablets keep it. Landscape renders the mobile layout as a 390px centered
+column — the shell's existing `max-w-[390px] mx-auto`.
+
+## The real work: the predicate existed SEVEN times
+
+- [x] `lib/breakpoints.ts` — one definition (no imports, LEAF-safe).
+- [x] `globals.css` — `@custom-variant md` AND `@custom-variant max-md` (Tailwind
+      derives max-md from --breakpoint-md, so it would otherwise stay the
+      complement of the OLD query and drift in the 768–1023 touch band).
+- [x] 4 hand-written `@media` blocks in globals.css → `@variant md/max-md`, so they
+      consume the same definition. One of them (`.shell-scroll` nav clearance)
+      would otherwise have reset to 0 in landscape while the mobile nav pill was
+      still showing — content under the pill.
+- [x] 6 JS call sites (`use-is-mobile`, `home-app` isDesktop, `subpage-shell`,
+      `entry-splash`, `give-view`, `chats-tab`) → shared helpers.
+- [x] Verified the compiled CSS: zero bare `(min-width:768px)` / `(max-width:767px)`
+      left; only the new query and its complement.
+
+## Verify
+
+- [x] `e2e/landscape-layout.mobile.spec.ts` — rotated phone stays mobile, laptop
+      still desktop, 1024px touch tablet still desktop.
+- [x] Screenshots at 874×402 (home + chats) reviewed before handing back.
+- [x] verify.sh PASS; full suite run.

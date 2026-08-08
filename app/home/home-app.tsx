@@ -26,6 +26,7 @@ import { DesktopSidebar, DesktopTopbar, ReceiptsSidebarNav } from "./components/
 import { BreadcrumbProvider, useBreadcrumbExtra } from "./breadcrumb-context"
 import { MemberProfileProvider } from "./member-profile-context"
 import { DraftDmProvider } from "./draft-dm-context"
+import { DESKTOP_QUERY } from "@/lib/breakpoints"
 import { MinistryTimezoneProvider } from "./ministry-timezone-context"
 
 // Tabs
@@ -415,7 +416,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   }, [])
 
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)")
+    const mq = window.matchMedia(DESKTOP_QUERY)
     setIsDesktop(mq.matches)
     const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
     mq.addEventListener("change", handler)

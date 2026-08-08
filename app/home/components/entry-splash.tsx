@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { isNativeShell } from "@/lib/native-auth"
 import { claimNativeSplash, hideNativeSplash } from "@/lib/native-splash"
+import { isMobileViewport } from "@/lib/breakpoints"
 
 // ── EntrySplash — native-only "One Body" FIRST-RUN splash ──────────────────────
 // Renders ONLY on the native shell (Capacitor UA "CentralShell"), ONLY at mobile
@@ -115,7 +116,7 @@ export function EntrySplash() {
     const eligible =
       isNativeShell() &&
       !splashConsumed &&
-      window.matchMedia("(max-width: 767px)").matches
+      isMobileViewport()
 
     if (!eligible) {
       // Overlay is skipped (web, desktop, or a warm nav) — `show` stays false so we

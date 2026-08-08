@@ -4,6 +4,23 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── md / max-md: "desktop" is not a width ───────────────────────────────────
+   A phone in landscape is 874–956px wide, so the stock width-only `md:` fired on
+   a rotated iPhone and rendered the whole desktop shell into a 402px-tall screen.
+
+   desktop = wide enough AND (has a real pointer OR genuinely large). The
+   `hover: hover` arm catches laptops (including touchscreen ones); the 1024px arm
+   keeps tablets on desktop. No iPhone reaches 1024px in any rotation.
+
+   MUST stay byte-identical to DESKTOP_QUERY / MOBILE_QUERY in lib/breakpoints.ts —
+   those are the JS half of the same decision, and a drift between them means a
+   component that lays out as mobile while its logic thinks it is desktop.
+   `max-md` is overridden too: Tailwind derives it from --breakpoint-md, so
+   without this it would stay the complement of the OLD query and the two
+   variants could both apply (or neither) in the 768–1023px touch band. */
+@custom-variant md (@media (min-width: 768px) and ((hover: hover) or (min-width: 1024px)));
+@custom-variant max-md (@media not all and (min-width: 768px) and ((hover: hover) or (min-width: 1024px)));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -245,7 +262,7 @@
    utility on the same element — so the desktop half of a shared component would
    silently inherit the mobile pad. Scoping the whole block below md keeps
    desktop's own padding utilities in charge. */
-@media (max-width: 767px) {
+@variant max-md {
   .kb-safe-bottom {
     padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
   }
@@ -270,7 +287,7 @@ html[data-kb-open] .kb-hide {
 .kb-lift {
   bottom: var(--kb-inset);
 }
-@media (min-width: 768px) {
+@variant md {
   .kb-lift {
     bottom: 0;
   }
@@ -291,7 +308,7 @@ html[data-kb-open] .kb-hide {
 .shell-scroll {
   padding-bottom: var(--nav-clearance);
 }
-@media (min-width: 768px) {
+@variant md {
   .shell-scroll {
     padding-bottom: 0;
   }
@@ -491,7 +508,7 @@ html[data-kb-open] .kb-hide {
    escaping the transformed .content-enter tab wrapper). Mobile keeps the
    full-screen 390px column from Tailwind classes; on md+ the overlay is pinned
    from the shell offset to the right viewport edge, filling the content body. */
-@media (min-width: 768px) {
+@variant md {
   .team-overlay-desktop {
     top: 0;
     right: 0;
