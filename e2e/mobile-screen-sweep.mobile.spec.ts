@@ -73,9 +73,18 @@ async function probe(page: Page): Promise<Probe> {
     // Content starts below the chrome ROW, not below the title — on a back-label
     // row the title is short and the row is taller than it.
     const rowBottom = row ? row.getBoundingClientRect().bottom : (title ? title.top + 34 : 0)
+    // Scope to the LAYER the chrome row belongs to. A full-screen overlay covers a
+    // tab tree that is still mounted and still measurable — the chats list's search
+    // field sits at 114 behind ChatScreen and was reported as ChatScreen's content.
+    // Climb to the nearest `position: fixed` ancestor (the overlay itself); screens
+    // with no overlay have none and correctly fall back to the whole document.
+    let scope: Element = document.body
+    for (let a: Element | null = row; a && a !== document.body; a = a.parentElement) {
+      if (getComputedStyle(a).position === "fixed") { scope = a; break }
+    }
     let content: { top: number; text: string } | null = null
     if (title) {
-      for (const el of Array.from(document.querySelectorAll("body *"))) {
+      for (const el of Array.from(scope.querySelectorAll("*"))) {
         // <style>/<script> have textContent (CSS source!) and a zero box, but they
         // slipped through as "leaf text" and got reported as a screen's content —
         // ".pocket-search-input::pl" is not a design defect.

@@ -1837,7 +1837,12 @@ export function AnnouncementDetailView({
         )}
         {/* Body — single column, or 1.7fr / 1fr when an aside is present.
             Horizontal inset comes from SubpageShell; keep only vertical py + gaps. */}
-        <div className={`py-6 md:py-11 ${hasAside ? "grid grid-cols-1 md:grid-cols-[1.7fr_1fr] gap-9 md:gap-[60px] items-start" : ""}`}>
+        {/* No mobile top padding: SubpageShell already adds `pt-4` under a
+            back-label chrome row, and stacking this wrapper's `py-6` on top put
+            the date kicker 96px down against ~72 on comparable subpages — the
+            same "wrapper adds a gap the chrome already owns" bug as Church
+            Settings. Desktop `md:py-11` is unchanged. */}
+        <div className={`pb-6 md:py-11 ${hasAside ? "grid grid-cols-1 md:grid-cols-[1.7fr_1fr] gap-9 md:gap-[60px] items-start" : ""}`}>
           {/* Main */}
           <div className="min-w-0">
             {eyebrowRow}
