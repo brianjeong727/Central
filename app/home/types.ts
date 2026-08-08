@@ -433,6 +433,11 @@ export interface ChatSettingsProps {
   onNameChange: (name: string) => void
   onClose: () => void
   onGroupDeleted?: () => void
+  /**
+   * Navigate to a DIFFERENT chat. Used by the DM "Start a group chat" fork,
+   * which creates a new group rather than adding anyone to the DM.
+   */
+  onOpenChat?: (id: string, name: string, type?: string) => void
 }
 
 export interface ChatScreenProps {
@@ -455,6 +460,8 @@ export interface ChatScreenProps {
   draftRecipient?: { id: string; name: string } | null
   /** Fired once the draft's group actually exists, so the parent can re-key. */
   onDmCreated?: (groupId: string, name: string) => void
+  /** Navigate to a different chat — threaded to ChatSettings' DM group-fork. */
+  onOpenChat?: (id: string, name: string, type?: string) => void
 }
 
 // Message composer (bottom input area) — extracted from ChatScreen so per-keystroke
@@ -1011,6 +1018,7 @@ export interface PaletteItem {
 export interface CommandPaletteProps {
   open: boolean
   onClose: () => void
+  userId: string
   ministryId: string
   onTabChange: (tab: Tab) => void
   onOpenChat: (id: string, name: string, type?: string) => void

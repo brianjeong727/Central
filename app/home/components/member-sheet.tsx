@@ -10,7 +10,8 @@ import { useState, useEffect } from "react"
 import useSWR from "swr"
 import { X, MoreHorizontal, Flag, Ban, UserCheck, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { createGroup } from "@/app/actions/create-group"
+import { findExistingDm } from "../dm"
+import { useOpenDraftDm } from "../draft-dm-context"
 import { EmptyState, Spinner } from "./shared"
 import { SubpageShell, ActionMenu, PocketCard, PocketKicker, MonogramChip } from "@/components/central"
 import type { ActionMenuItem } from "@/components/central"
@@ -144,6 +145,7 @@ export function MemberSheet({
   onOpenChat: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
+  const openDraftDm = useOpenDraftDm()
   const [dmLoading, setDmLoading] = useState(false)
   const isOwnProfile = member.id === currentUserId
   // Identity block renders instantly from the slim `member` row; heavy profile
@@ -153,46 +155,21 @@ export function MemberSheet({
     () => loadMemberDetail(supabase, member.id, ministryId)
   )
 
+  // Existing thread → open it. No thread yet → open a DRAFT; the group is born on
+  // the first send (app/home/dm.ts), so browsing people never leaves empty
+  // conversations in anyone's chat list. This used to create the group eagerly
+  // AND carry its own copy of the pair lookup — the copy that could miss an
+  // existing DM and mint a duplicate.
   async function handleSendMessage() {
     setDmLoading(true)
-
-    const { data: myGroups } = await supabase
-      .from("group_members")
-      .select("group_id, groups!inner(type)")
-      .eq("user_id", currentUserId)
-
-    const myDmGroupIds = (myGroups ?? [])
-      .filter((m: { groups: { type: string } | { type: string }[] | null }) => {
-        const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
-        return g?.type === "dm"
-      })
-      .map((m: { group_id: string }) => m.group_id)
-
-    if (myDmGroupIds.length > 0) {
-      const { data: shared } = await supabase
-        .from("group_members")
-        .select("group_id")
-        .eq("user_id", member.id)
-        .in("group_id", myDmGroupIds)
-        .limit(1)
-
-      if (shared && shared.length > 0) {
-        setDmLoading(false)
-        onOpenChat(shared[0].group_id, member.name)
-        return
-      }
-    }
-
-    const { group: newGroup, error: dmErr } = await createGroup({
-      name: member.name,
-      type: "dm",
-      memberIds: [member.id],
-      createdBy: currentUserId,
-    })
-
+    const existing = await findExistingDm(supabase, currentUserId, member.id)
     setDmLoading(false)
-    if (dmErr || !newGroup) return
-    onOpenChat(newGroup.id, newGroup.name)
+    if (existing) {
+      onOpenChat(existing, member.name, "dm")
+      return
+    }
+    onClose()
+    openDraftDm({ id: member.id, name: member.name })
   }
 
   return (

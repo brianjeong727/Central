@@ -25,6 +25,7 @@ import { CommandPalette } from "./components/command-palette"
 import { DesktopSidebar, DesktopTopbar, ReceiptsSidebarNav } from "./components/desktop-nav"
 import { BreadcrumbProvider, useBreadcrumbExtra } from "./breadcrumb-context"
 import { MemberProfileProvider } from "./member-profile-context"
+import { DraftDmProvider } from "./draft-dm-context"
 import { MinistryTimezoneProvider } from "./ministry-timezone-context"
 
 // Tabs
@@ -154,10 +155,17 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     const chatId = searchParams.get("chat")
     return chatId && initialTab === "chats" ? { id: chatId, name: "" } : null
   })
-  // Open a draft DM with someone the user doesn't yet share a DM with.
+  // Open a draft DM with someone the user doesn't yet share a DM with. Lands in
+  // Chats exactly like handleOpenChat does for an EXISTING thread — a draft is
+  // reached from the directory too, and having "message someone new" leave you on
+  // Directory while "message someone you know" moved you to Chats read as a bug.
+  // No ?chat param: a draft has no group id yet, so there is nothing to restore
+  // (setParams for the tab only — one atomic write, Convention #5).
   const openDraftDm = useCallback((person: { id: string; name: string }) => {
+    setActiveTabState("chats")
     setGlobalOpenChat({ id: "", name: person.name, draftUserId: person.id })
-  }, [])
+    setParams({ tab: "chats", chat: null, chats: "my" })
+  }, [setParams])
   // The draft's group now exists. Swap in the real id WITHOUT changing the React
   // key (see the ChatScreen mounts below), so the in-flight send finishes in the
   // same mounted component instead of being lost to a remount.
@@ -1044,6 +1052,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
       <MemberProfileProvider open={openMemberProfile}>
+      <DraftDmProvider open={openDraftDm}>
 
       {/* Desktop sidebar — hidden on mobile */}
       <DesktopSidebar
@@ -1226,6 +1235,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                     onNameChange={handleChatNameChange}
                     draftRecipient={globalOpenChat.draftUserId ? { id: globalOpenChat.draftUserId, name: globalOpenChat.name } : null}
                     onDmCreated={handleDmCreated}
+                    onOpenChat={handleOpenChat}
                     inline
                   />
                 ) : (
@@ -1429,6 +1439,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
           onNameChange={handleChatNameChange}
           draftRecipient={globalOpenChat.draftUserId ? { id: globalOpenChat.draftUserId, name: globalOpenChat.name } : null}
           onDmCreated={handleDmCreated}
+          onOpenChat={handleOpenChat}
         />
       )}
 
@@ -1450,6 +1461,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
+        userId={userId}
         ministryId={ministryId}
         onTabChange={(tab) => { setPaletteOpen(false); handleNavClick(tab) }}
         onOpenChat={(id, name, type) => { setPaletteOpen(false); handleOpenChat(id, name, type) }}
@@ -1507,6 +1519,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       {/* Native cold-launch splash (self-gated: no-ops on web/desktop/warm nav, and
           releases the native launch splash even when it skips rendering). */}
       <EntrySplash />
+      </DraftDmProvider>
       </MemberProfileProvider>
     </div>
   )

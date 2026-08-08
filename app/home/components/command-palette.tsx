@@ -1,8 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import useSWR from "swr"
 import { Search, X, Home, MessageCircle, Bell, Users, ClipboardList, User, List, ChevronRight } from "lucide-react"
 import { createClient } from "@/lib/supabase"
+import { fetchChatList } from "../chat-list"
 import type { CommandPaletteProps, PaletteItem, PaletteItemType, Tab } from "../types"
 
 const NAV_ITEMS: PaletteItem[] = [
@@ -14,8 +16,23 @@ const NAV_ITEMS: PaletteItem[] = [
   { type: "nav", id: "profile",       label: "Profile",       tab: "profile" },
 ]
 
-export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenChat }: CommandPaletteProps) {
+export function CommandPalette({ open, onClose, userId, ministryId, onTabChange, onOpenChat }: CommandPaletteProps) {
   const supabase = createClient()
+  // Chats come from the SHARED chat-list cache, not a `groups` name search. A DM
+  // has no single stored name — groups.name is the creator's side of it — so an
+  // ilike over that column showed the recipient their OWN name and matched on the
+  // wrong string. get_chat_list derives the title per viewer; reading the same
+  // key home-app already populates means this is a cache hit, not a query.
+  const { data: chatList } = useSWR(
+    open && userId && ministryId ? ["chat-list", userId, ministryId] : null,
+    fetchChatList,
+    { revalidateIfStale: false },
+  )
+  // Read through a ref inside the debounced search effect: that effect keys on
+  // the query alone (see its dep array), so closing over `chatList` directly
+  // would leave it holding whatever the list was on the first keystroke.
+  const chatListRef = useRef(chatList)
+  chatListRef.current = chatList
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<PaletteItem[]>(NAV_ITEMS)
   const [selectedIdx, setSelectedIdx] = useState(0)
@@ -42,20 +59,22 @@ export function CommandPalette({ open, onClose, ministryId, onTabChange, onOpenC
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
       const q = query.toLowerCase()
-      const [profilesRes, groupsRes, announcementsRes] = await Promise.all([
+      const [profilesRes, announcementsRes] = await Promise.all([
         supabase.from("profiles").select("id, name, email, role").eq("ministry_id", ministryId).is("deleted_at", null).ilike("name", `%${q}%`).limit(5),
-        supabase.from("groups").select("id, name, type").eq("ministry_id", ministryId).eq("archived", false).ilike("name", `%${q}%`).limit(5),
         // Published-only: drafts must never surface outside the authors' DRAFTS tray
         // (announcements RLS is status-agnostic — app-code WHERE is the enforcement line).
         supabase.from("announcements").select("id, title").eq("ministry_id", ministryId).or("status.is.null,status.eq.published").ilike("title", `%${q}%`).limit(5),
       ])
+      const groupMatches = (chatListRef.current ?? [])
+        .filter((c) => !c.archived && c.name.toLowerCase().includes(q))
+        .slice(0, 5)
       const items: PaletteItem[] = []
       const navMatches = NAV_ITEMS.filter((n) => n.label.toLowerCase().includes(q))
       items.push(...navMatches)
       for (const p of (profilesRes.data ?? []) as { id: string; name: string; email: string; role: string }[]) {
         items.push({ type: "person", id: p.id, label: p.name, sublabel: p.email })
       }
-      for (const g of (groupsRes.data ?? []) as { id: string; name: string; type: string }[]) {
+      for (const g of groupMatches) {
         items.push({ type: "chat", id: g.id, label: g.name, chatType: g.type, sublabel: g.type === "church" ? "Church chat" : g.type === "dm" ? "Direct message" : "Group chat" })
       }
       for (const a of (announcementsRes.data ?? []) as { id: string; title: string }[]) {

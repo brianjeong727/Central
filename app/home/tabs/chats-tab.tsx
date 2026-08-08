@@ -15,7 +15,7 @@ import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
 import { MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
 import { ChatSearchView } from "../components/chat-search"
-import { findExistingDm } from "../dm"
+import { findExistingDm, getOrCreateDm } from "../dm"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData, ChatNotifyMode, NotificationSettings } from "../types"
@@ -456,7 +456,7 @@ interface SharedItem {
   at: string
 }
 
-export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, isCentral = false, userId, userName, ministryId, userRole, onBack, onNameChange, onClose }: ChatSettingsProps) {
+export function ChatSettings({ groupId, groupName, groupType, groupArchived = false, isCentral = false, userId, userName, ministryId, userRole, onBack, onNameChange, onClose, onOpenChat }: ChatSettingsProps) {
   const supabase = createClient()
   const { mutate: mutateGlobal } = useSWRConfig()
   const openMemberProfile = useOpenMemberProfile()
@@ -544,10 +544,21 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const isMemberOfChat = members.some((m) => m.user_id === userId)
   const churchManage = isChurch && isLeaderRole(userRole) && isMemberOfChat
   const canManage = churchManage || isMy
-  const canLeave = isMy || isDM
+  // A DM is a PAIR, not a room you happen to be in — you cannot leave it, archive
+  // it, delete it, rename it, or change who is in it. Leaving in particular used
+  // to be offered here, and taking it deleted the leaver's group_members row:
+  // they stopped receiving DM pushes, the thread vanished on their side, and the
+  // other person's "does a DM exist?" lookup started minting duplicates.
+  const canLeave = isMy
   const canArchive = churchManage && !groupArchived && !isCentralChat
   const canUnarchive = churchManage && groupArchived
   const canDelete = churchManage && !isCentralChat
+  // The one other participant. A DM's roster is not a list — it is a person.
+  const dmPartner = isDM ? members.find((m) => m.user_id !== userId) ?? null : null
+  // Adding someone to a DM FORKS: the pair keeps its thread untouched and a new
+  // group chat is created with both of them plus whoever was picked (iMessage's
+  // model). Reuses the add-members picker; only the commit differs.
+  const [forking, setForking] = useState(false)
 
   // SWR-cached settings load — members + this user's mute/pin prefs. Pure fetcher;
   // local state is populated via the effect below so re-opening a chat paints from cache.
@@ -819,6 +830,32 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     mutateSettings((cur) => cur ? { ...cur, members: cur.members.filter((m) => m.user_id !== memberId) } : cur, { revalidate: false })
   }
 
+  // DM + people → a NEW group chat. The DM itself is never mutated: no members
+  // added, no system message, no rename. Named after the other participants
+  // (never yourself), like every messaging app, and renameable afterwards.
+  async function handleForkToGroupChat() {
+    if (!dmPartner || selectedToAdd.length === 0 || forking) return
+    setForking(true)
+    setError(null)
+    const picked = allProfiles.filter((p) => selectedToAdd.includes(p.id))
+    const firstNames = [dmPartner.name, ...picked.map((p) => p.name)].map((n) => n.split(" ")[0])
+    const { group, error: err } = await createGroup({
+      name: firstNames.join(", "),
+      type: "my",
+      memberIds: [dmPartner.user_id, ...picked.map((p) => p.id)],
+      createdBy: userId,
+    })
+    setForking(false)
+    if (err || !group) { setError(err ?? "Couldn't start the group chat. Please try again."); return }
+    setSelectedToAdd([])
+    setSearchAdd("")
+    setShowAddMembers(false)
+    // Land the user in the chat they just made. Without a navigator wired up,
+    // close out to the list rather than stranding them in the DM's settings.
+    if (onOpenChat) onOpenChat(group.id, group.name, "my")
+    else onClose()
+  }
+
   async function handleAddMembers() {
     if (selectedToAdd.length === 0) return
     const toAdd = allProfiles
@@ -880,8 +917,11 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // Body-swap + extend-crumbs: a SINGLE SubpageShell renders the settings, the
   // add-members, or the members body; the trail lengthens rather than nesting a shell.
   const backToSettings = () => { setShowAddMembers(false); setSearchAdd(""); setSelectedToAdd([]) }
+  // In a DM the same picker means something different — it starts a NEW chat
+  // rather than growing this one — so it says so everywhere it is labelled.
+  const addScreenTitle = isDM ? "New group chat" : "Add members"
   const crumbs: Crumb[] = showAddMembers
-    ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: backToSettings }, { label: "Add members" }]
+    ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: backToSettings }, { label: addScreenTitle }]
     : showAllMembers
       ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => { setShowAllMembers(false); setMemberSearch(""); setMemberFilter("all") } }, { label: "Members" }]
       : showShared
@@ -930,7 +970,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
   return (
     <SubpageShell
-      title={showAddMembers ? "Add members" : "Settings"}
+      title={showAddMembers ? addScreenTitle : "Settings"}
       crumbs={crumbs}
       width="full"
       // Mobile-only chrome for the drilled-in screens: title, plus the member count
@@ -964,8 +1004,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       {showAddMembers ? (
         /* ── Add-members body (body-swap; single shell) ── */
         <div className="md:pt-7">
-          {/* Title is owned by SubpageShell ("Add members"); no hand-rolled header (§4.18). */}
-          <p className="mb-5" style={{ fontSize: 15, color: "var(--body)" }}>Select people from your ministry to add to this chat.</p>
+          {/* Title is owned by SubpageShell; no hand-rolled header (§4.18). */}
+          <p className="mb-5" style={{ fontSize: 15, color: "var(--body)" }}>
+            {isDM
+              ? `Pick who to add. This starts a new group chat with you and ${dmPartner?.name.split(" ")[0] ?? "them"} — your direct message stays as it is.`
+              : "Select people from your ministry to add to this chat."}
+          </p>
           <div className="relative mb-3">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "var(--muted-text)" }} />
             <input
@@ -1015,9 +1059,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             <div className="py-4 pb-8 md:pb-5 mt-5" style={{ borderTop: "1px solid var(--line)" }}>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[14px]" style={{ color: "var(--body)", margin: 0 }}>
-                  <span style={{ fontWeight: 500, color: "var(--ink)" }}>{selectedToAdd.length}</span> {selectedToAdd.length === 1 ? "person" : "people"} selected
+                  <span style={{ fontWeight: 500, color: "var(--ink)" }}>{isDM ? selectedToAdd.length + 2 : selectedToAdd.length}</span> {isDM ? "people in the group" : `${selectedToAdd.length === 1 ? "person" : "people"} selected`}
                 </p>
-                <ContentActionButton label={saving ? "Adding…" : `Add ${selectedToAdd.length} ${selectedToAdd.length === 1 ? "member" : "members"}`} onClick={handleAddMembers} disabled={saving} />
+                {isDM ? (
+                  <ContentActionButton label={forking ? "Creating…" : "Create group chat"} onClick={handleForkToGroupChat} disabled={forking} />
+                ) : (
+                  <ContentActionButton label={saving ? "Adding…" : `Add ${selectedToAdd.length} ${selectedToAdd.length === 1 ? "member" : "members"}`} onClick={handleAddMembers} disabled={saving} />
+                )}
               </div>
             </div>
           )}
@@ -1130,7 +1178,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   {canManage && !isCentralChat && <Pencil style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />}
                 </div>
               )}
-              <p className="text-[13.5px] mt-0.5" style={{ color: "var(--muted-text)" }}>{typeLabel} · {members.length} member{members.length !== 1 ? "s" : ""}</p>
+              {/* A DM has no meaningful member count — it is always the two of you. */}
+              <p className="text-[13.5px] mt-0.5" style={{ color: "var(--muted-text)" }}>
+                {isDM ? typeLabel : `${typeLabel} · ${members.length} member${members.length !== 1 ? "s" : ""}`}
+              </p>
             </div>
           </div>
 
@@ -1148,25 +1199,59 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               {/* Obvious add-members affordance (iMessage-style) — the first row of the
                   roster, plum chip + label so it reads clearly as an action. Replaces
                   the subtle kicker "+ Add" that was easy to miss on phone. */}
-              {canManage && (
+              {(canManage || isDM) && (
                 <button
                   type="button"
                   onClick={() => { setShowAddMembers(true); loadAllProfiles() }}
                   className="flex items-center gap-3 w-full text-left"
-                  style={{ padding: "13px 0", borderBottom: "1px solid var(--line-3)", background: "transparent", border: "none", WebkitTapHighlightColor: "transparent" }}
+                  // `border: none` must come BEFORE borderBottom — the shorthand
+                  // resets it, so the original order silently dropped this row's
+                  // divider and left it floating away from the rest of the card.
+                  style={{ padding: "13px 0", background: "transparent", border: "none", borderBottom: "1px solid var(--line-3)", WebkitTapHighlightColor: "transparent" }}
                 >
                   <span className="w-9 h-9 rounded-full inline-flex items-center justify-center flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 10%, transparent)", color: "var(--plum)" }}>
                     <Plus style={{ width: 17, height: 17 }} strokeWidth={2.2} />
                   </span>
-                  <span className="text-[15px] font-semibold" style={{ color: "var(--plum)", letterSpacing: "-0.01em" }}>Add members</span>
+                  <span className="text-[15px] font-semibold" style={{ color: "var(--plum)", letterSpacing: "-0.01em" }}>
+                    {isDM ? "Start a group chat" : "Add members"}
+                  </span>
                 </button>
               )}
-              <PocketRow
-                leading={<SettingsRowIcon><Users style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
-                title="Members"
-                chevron
-                onClick={() => { setShowAllMembers(true); setMemberSearch(""); setMemberFilter("all") }}
-              />
+              {/* A DM's "roster" is one person — show them, don't make the user
+                  drill into a filterable list of two to reach a profile. */}
+              {isDM ? (
+                dmPartner && (
+                  <>
+                    <PocketRow
+                      leading={<MonogramChip initials={getInitials(dmPartner.nickname ?? dmPartner.name)} avatarUrl={dmPartner.avatar_url} className="w-9 h-9 font-medium text-[10px]" />}
+                      title={dmPartner.nickname ?? dmPartner.name}
+                      meta={dmPartner.nickname ? dmPartner.name : undefined}
+                      chevron
+                      onClick={() => openMemberProfile(dmPartner.user_id)}
+                    />
+                    {/* Nicknames are allowed in DMs (canNickname), and their only
+                        phone-width home used to be the Members roster — which a DM
+                        no longer has. It gets its own settings row rather than a
+                        second button crammed into the person row above. */}
+                    {canNickname && (
+                      <PocketRow
+                        leading={<SettingsRowIcon><Pencil style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
+                        title="Nickname"
+                        meta={dmPartner.nickname ?? "None"}
+                        chevron
+                        onClick={() => { setNicknameEditor({ userId: dmPartner.user_id, name: dmPartner.name, current: dmPartner.nickname ?? "" }); setNicknameInput(dmPartner.nickname ?? ""); setNicknameError(null) }}
+                      />
+                    )}
+                  </>
+                )
+              ) : (
+                <PocketRow
+                  leading={<SettingsRowIcon><Users style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
+                  title="Members"
+                  chevron
+                  onClick={() => { setShowAllMembers(true); setMemberSearch(""); setMemberFilter("all") }}
+                />
+              )}
               <PocketRow
                 leading={<SettingsRowIcon><Paperclip style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
                 title="Media & files"
@@ -1262,7 +1347,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     {canManage && !isCentralChat && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0, marginTop: 6 }} />}
                   </div>
                 )}
-                <p style={{ color: "var(--body)", fontSize: 14, marginTop: 6 }}>{members.length} {members.length === 1 ? "member" : "members"}</p>
+                {/* A DM is always the two of you — the count says nothing. */}
+                {!isDM && <p style={{ color: "var(--body)", fontSize: 14, marginTop: 6 }}>{members.length} {members.length === 1 ? "member" : "members"}</p>}
               </div>
             </div>
 
@@ -1308,14 +1394,16 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             {/* Members — Add lives in the ContentHeader action slot (§3.2) */}
             <div style={{ marginBottom: 12 }}>
               <ContentHeader
-                label="Members"
-                action={canManage ? (
-                  <ContentActionButton variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} label="Add members" onClick={() => { setShowAddMembers(true); loadAllProfiles() }} />
+                label={isDM ? "Conversation with" : "Members"}
+                action={(canManage || isDM) ? (
+                  <ContentActionButton variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} label={isDM ? "Start a group chat" : "Add members"} onClick={() => { setShowAddMembers(true); loadAllProfiles() }} />
                 ) : undefined}
               />
             </div>
             <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
-              {members.map((member, i) => {
+              {/* In a DM the roster is the one other person — never a list that
+                  includes you, and never removable. */}
+              {(isDM ? members.filter((m) => m.user_id !== userId) : members).map((member, i, list) => {
                 const isConfirming = confirmRemoveMemberId === member.user_id
                 const isHovered = hoveredMemberId === member.user_id
                 return (
@@ -1323,7 +1411,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     key={member.user_id}
                     onMouseEnter={() => setHoveredMemberId(member.user_id)}
                     onMouseLeave={() => setHoveredMemberId(null)}
-                    style={{ display: "grid", gridTemplateColumns: "40px 1fr auto auto", alignItems: "center", gap: 14, padding: "15px 20px", borderBottom: i < members.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--cream))" : isHovered ? "var(--cream-2)" : "transparent", transition: "background 0.1s" }}
+                    style={{ display: "grid", gridTemplateColumns: "40px 1fr auto auto", alignItems: "center", gap: 14, padding: "15px 20px", borderBottom: i < list.length - 1 ? "1px solid var(--line-3)" : "none", background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--cream))" : isHovered ? "var(--cream-2)" : "transparent", transition: "background 0.1s" }}
                   >
                     <span onClick={() => openMemberProfile(member.user_id)} style={{ cursor: "pointer", display: "inline-flex" }}>
                       <MonogramChip initials={getInitials(member.nickname ?? member.name)} avatarUrl={member.avatar_url} className="w-10 h-10 font-medium text-[11px]" />
@@ -1621,7 +1709,7 @@ const sameMinute = (a: Message, b: Message) =>
   a.sender_id === b.sender_id &&
   Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 60000
 
-export function ChatScreen({ groupId, groupName, userId, userName, ministryId, ministryName, userRole, onClose, onRead, onNameChange, inline = false, draftRecipient = null, onDmCreated }: ChatScreenProps) {
+export function ChatScreen({ groupId, groupName, userId, userName, ministryId, ministryName, userRole, onClose, onRead, onNameChange, inline = false, draftRecipient = null, onDmCreated, onOpenChat }: ChatScreenProps) {
   // Draft DM (no group yet). Guards the create so a double-tap on Send can't
   // race two groups into existence.
   const creatingDraftRef = useRef(false)
@@ -2777,16 +2865,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     if (!gid) {
       if (!draftRecipient || creatingDraftRef.current) return
       creatingDraftRef.current = true
-      const { group, error: dmErr } = await createGroup({
-        name: draftRecipient.name,
-        type: "dm",
-        memberIds: [draftRecipient.id],
-        createdBy: userId,
-      })
+      // get_or_create_dm, not createGroup: it is keyed on the PAIR, so two people
+      // who draft at each other simultaneously land in ONE thread instead of two.
+      const { groupId: dmId, error: dmErr } = await getOrCreateDm(supabase, draftRecipient.id)
       creatingDraftRef.current = false
-      if (dmErr || !group) { setModerationWarning("Couldn't start this chat. Please try again."); return }
-      gid = group.id
-      onDmCreated?.(group.id, draftRecipient.name)
+      if (dmErr || !dmId) { setModerationWarning("Couldn't start this chat. Please try again."); return }
+      gid = dmId
+      onDmCreated?.(dmId, draftRecipient.name)
     }
 
     // Reverent capitalization — a SEPARATE, silent transform: auto-caps God /
@@ -3091,6 +3176,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         onBack={() => setShowSettings(false)}
         onNameChange={(name) => { setDisplayName(name); onNameChange?.(name) }}
         onClose={() => { setShowSettings(false); onClose() }}
+        // DM → "Start a group chat" forks into a NEW group; close this chat's
+        // settings and open the new one in the same slot.
+        onOpenChat={onOpenChat ? (id, name, type) => { setShowSettings(false); onOpenChat(id, name, type) } : undefined}
       />
     )
     // Inset ONLY — ChatSettings renders a SubpageShell, whose chrome row already

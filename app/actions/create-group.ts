@@ -7,7 +7,11 @@ type ChurchChatCategory = "general" | "group" | "team"
 
 interface CreateGroupInput {
   name: string
-  type: "my" | "church" | "dm"
+  // DMs are NOT creatable here. A DM is keyed on its participant PAIR
+  // (groups.dm_key) and is born only through the get_or_create_dm RPC — see
+  // app/home/dm.ts. Routing them through this generic creator is what allowed
+  // three separate threads to exist between the same two people.
+  type: "my" | "church"
   memberIds: string[]
   createdBy: string
   // Section for church chats only (my/dm ignore it → NULL). Defaults to

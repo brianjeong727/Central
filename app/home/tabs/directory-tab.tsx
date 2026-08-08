@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from "react"
 import useSWR from "swr"
 import { Search, MessageCircle, Heart, Users } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { createGroup } from "@/app/actions/create-group"
+import { findExistingDm } from "../dm"
+import { useOpenDraftDm } from "../draft-dm-context"
 import { EmptyState } from "../components/shared"
 import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, PocketRow, PocketRowCard, PocketKicker, PocketSearchField, BackChevron, POCKET_CHROME_PAD_Y } from "@/components/central"
 import { getInitials } from "../utils"
@@ -323,6 +324,7 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
   onOpenChat: (id: string, name: string, type?: string) => void
 }) {
   const supabase = createClient()
+  const openDraftDm = useOpenDraftDm()
   const [dmLoading, setDmLoading] = useState(false)
   const [prayingFor, setPrayingFor] = useState(false)
   const isOwnProfile = member.id === currentUserId
@@ -333,44 +335,19 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
     () => loadMemberDetail(supabase, member.id, ministryId)
   )
 
+  // Existing thread → open it; otherwise a DRAFT (the group is created on the
+  // first send). Shares the one pair lookup in app/home/dm.ts — this was a
+  // verbatim copy of the member sheet's, and copies are how the two surfaces
+  // drifted into minting duplicate DMs.
   async function handleMessage() {
     setDmLoading(true)
-    const { data: myGroups } = await supabase
-      .from("group_members")
-      .select("group_id, groups!inner(type)")
-      .eq("user_id", currentUserId)
-
-    const myDmGroupIds = (myGroups ?? [])
-      .filter((m: { groups: { type: string } | { type: string }[] | null }) => {
-        const g = Array.isArray(m.groups) ? m.groups[0] : m.groups
-        return g?.type === "dm"
-      })
-      .map((m: { group_id: string }) => m.group_id)
-
-    if (myDmGroupIds.length > 0) {
-      const { data: shared } = await supabase
-        .from("group_members")
-        .select("group_id")
-        .eq("user_id", member.id)
-        .in("group_id", myDmGroupIds)
-        .limit(1)
-
-      if (shared && shared.length > 0) {
-        setDmLoading(false)
-        onOpenChat(shared[0].group_id, member.name)
-        return
-      }
-    }
-
-    const { group: newGroup, error: dmErr } = await createGroup({
-      name: member.name,
-      type: "dm",
-      memberIds: [member.id],
-      createdBy: currentUserId,
-    })
+    const existing = await findExistingDm(supabase, currentUserId, member.id)
     setDmLoading(false)
-    if (dmErr || !newGroup) return
-    onOpenChat(newGroup.id, newGroup.name)
+    if (existing) {
+      onOpenChat(existing, member.name, "dm")
+      return
+    }
+    openDraftDm({ id: member.id, name: member.name })
   }
 
   const infoRows = [
