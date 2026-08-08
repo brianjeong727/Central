@@ -185,3 +185,94 @@ migration (rls APPROVE ×2, applied live) → build → 6-test spec → full gat
   list also revalidates from the surviving instance on visibility (dual-mount swap).
 - UNSURE (Brian to ratify): multi-hue vs uniform-plum avatars · gold decision dots
   vs plum · 21px vs 19px date numeral. Defaults shipped: uniform plum, gold dots, 19px.
+
+
+# DM semantics + push — fix/dm-semantics-and-push
+
+Five reported bugs. Investigation collapsed them to **one root cause plus three
+independent DM-shape gaps**.
+
+## Root cause (found)
+
+A DM inherited the group-chat "Leave chat" affordance. Caleb tapped it at
+04:36 today (`messages` row `3e1a4b81…`, `message_type='system'`, content
+"Caleb left"). Leaving deletes the `group_members` row, which then causes:
+
+- **no DM push** — `resolveMessage` fans out to group members; a non-member is
+  not a recipient. Verified: dryRun on the orphaned group returns
+  `recipients: []`.
+- **duplicate DMs** — the "does a DM already exist?" lookup is a two-hop
+  membership query. With the partner's row gone it finds nothing and creates a
+  new group. Three Brian↔Caleb DMs exist in prod (04:21 / 04:30 / 04:39).
+
+**Push infrastructure is NOT broken.** Live dispatch test returned
+`{"sent":4,"failed":1,"pruned":1}` — APNs delivers; the one failure was a stale
+July token, auto-pruned. Trigger → route → resolver → APNs lane all verified.
+
+## Plan
+
+### 1. Production data repair (before the unique index)
+- [x] Merge the three Brian↔Caleb DMs into the oldest (`ca0026c4`), preserving
+      `created_at` order; drop the now-meaningless "Caleb left" system message.
+- [x] Restore missing `group_members` rows so every DM has both participants.
+- [x] Delete the emptied duplicate groups.
+
+### 2. Schema — make duplicate DMs structurally impossible
+- [x] `groups.dm_key text` — `least(a,b)||':'||greatest(a,b)` for DMs, NULL otherwise.
+- [x] Unique index on `(ministry_id, dm_key) where type='dm'`.
+- [x] Backfill `dm_key` for existing DMs.
+- [x] `get_or_create_dm(p_other_user_id uuid)` SECURITY DEFINER RPC — one
+      atomic find-or-create; self-heals a missing membership row; same-ministry
+      check; `set search_path = public, pg_temp` (CLAUDE.md SECURITY DEFINER rule).
+
+### 3. Per-viewer DM names
+- [x] `get_chat_list` returns the OTHER member's name for `type='dm'` rows
+      (falls back to `groups.name`). Fixes mobile list, desktop panel, home-app
+      recent chats, chat search, and any ChatScreen opened from them — one place.
+- [x] Command palette reads the shared `["chat-list"]` SWR cache instead of its
+      own `groups` ilike, so DM rows carry the derived name (and one less query).
+
+### 4. DM ≠ group chat (ChatSettings)
+- [x] No "Leave chat" for DMs → a DM has no Danger zone at all.
+- [x] "Members" drill-in replaced by ONE row: the other person → their profile.
+- [x] Subtitle drops the member count for DMs.
+- [x] "Add members" becomes **"Start a group chat"** — forks a NEW `my` group
+      with both participants + the selected people; the DM is left untouched.
+
+### 5. One DM entry path
+- [x] `app/home/dm.ts` exposes `getOrCreateDm` over the RPC; delete the three
+      inline copies (member-sheet, directory-tab, chats-tab search).
+- [x] Draft-DM first send routes through it too.
+
+### 6. Verify
+- [x] `scripts/verify.sh --port 3003 --e2e`
+- [x] Mobile screenshots of DM settings (self-review before Brian sees it).
+- [x] Seed + self-test in Brian's Sandbox; hand back "How to test it yourself".
+
+## Review
+
+**Five reported bugs → one root cause + three DM-shape gaps.** "Leave chat" on a
+DM deleted the leaver's `group_members` row, which alone produced both the missing
+DM notification and the duplicate threads.
+
+**Push needed no code change.** Live dispatch test: `{"sent":4,"failed":1,
+"pruned":1}` — APNs delivers; the failure was a stale July token, auto-pruned.
+Trigger → route → resolver → APNs lane all verified working.
+
+**Two things the e2e caught that self-review had not:**
+1. `get_chat_previews` is a near-twin of `get_chat_list` feeding the SSR/boot path
+   and the ChatScreen header backfill. Fixing only `get_chat_list` left a
+   deep-linked DM (`?chat=<id>`) still showing the viewer their own name.
+2. Removing the Members drill-in removed the ONLY phone-width home of the DM
+   nickname pencil. Added a dedicated "Nickname" settings row.
+
+**Fixed in passing (both pre-existing):**
+- `border: "none"` sat AFTER `borderBottom` in the add-members row's inline style,
+  so the shorthand silently cancelled its divider.
+- `e2e/chat-nicknames.mobile.spec.ts` hardcoded `"E2E Member 2"`, which fails all
+  four identity assertions on sandbox lane 1. Now derives via `sb.memberName()`.
+
+**Not done / deliberately out of scope:** the native "Turn off" button in Profile →
+Notifications calls the WEB unsubscribe path, which does nothing to an APNs row,
+and the "Blocked" copy says "in your browser settings" inside the iOS shell. Both
+are real but separate from the reported bugs — flagged, not fixed.
