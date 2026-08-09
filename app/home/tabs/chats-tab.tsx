@@ -1710,6 +1710,11 @@ const sameMinute = (a: Message, b: Message) =>
   a.sender_id === b.sender_id &&
   Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 60000
 
+// How long read progress may sit unwritten while a thread is open. Short enough
+// that a background tab-switch still lands quickly, long enough that a fast
+// conversation collapses into one write instead of one per message.
+const READ_COALESCE_MS = 4000
+
 export function ChatScreen({ groupId, groupName, userId, userName, ministryId, ministryName, userRole, onClose, onRead, onNameChange, inline = false, draftRecipient = null, onDmCreated, onOpenChat }: ChatScreenProps) {
   // Draft DM (no group yet). Guards the create so a double-tap on Send can't
   // race two groups into existence.
@@ -2427,22 +2432,83 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId])
 
-  // Mark messages as read on open (clears the badge). No unmount fire: the realtime
-  // INSERT handler below already advances last_read_at = raw.created_at for every
-  // message received while viewing, so live-received messages stay read without an
-  // extra write on close (and without every close hitting group_members at scale).
-  useEffect(() => {
-    const markRead = () =>
-      supabase
-        .from("group_members")
-        .update({ last_read_at: new Date().toISOString() })
-        .eq("group_id", groupId)
-        .eq("user_id", userId)
-        .then(() => { if (onRead) onRead() })
+  // ── last_read_at: coalesced, not per-message ────────────────────────────────
+  // This used to write group_members on EVERY message received while the thread
+  // was open, deliberately, to avoid a write on close. That trade is inverted: a
+  // chat that receives 20 messages while you read it paid 20 writes instead of 1.
+  //
+  // It also fed back on itself. group_members is in the supabase_realtime
+  // publication, so each write goes through the WAL decoder and fans out to the
+  // read-receipt subscribers — and the decoder was 44% of all database time, with
+  // group_members (16.5k writes) nearly matching messages (19.3k). One message in
+  // meant N read-receipt writes, each decoded and fanned out again.
+  //
+  // So: remember the newest read timestamp locally, flush at most once per
+  // COALESCE_MS, and always flush on close. The badge only has to be right by the
+  // time you leave the thread, which is exactly what the flush guarantees.
+  const pendingReadRef = useRef<string | null>(null)
+  const readFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // What we last actually wrote, and the newest message we know about by ANY
+  // route. The close flush compares them: tracking only what the realtime handler
+  // saw misses messages that arrived on the initial load, which is a real race —
+  // a message landing ~80ms after open stayed unread through close.
+  const lastWrittenReadRef = useRef<string | null>(null)
+  const newestMsgAtRef = useRef<string | null>(null)
 
-    markRead()
+  const flushRead = useCallback(() => {
+    const stamp = pendingReadRef.current
+    if (!stamp) return
+    pendingReadRef.current = null
+    lastWrittenReadRef.current = stamp
+    supabase
+      .from("group_members")
+      .update({ last_read_at: stamp })
+      .eq("group_id", groupId)
+      .eq("user_id", userId)
+      .then(() => { if (onRead) onRead() })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, userId])
+
+  /** Record progress; the write itself is coalesced. */
+  const markRead = useCallback((stamp: string) => {
+    // Keep the LATEST timestamp — messages can arrive out of order.
+    if (!pendingReadRef.current || stamp > pendingReadRef.current) pendingReadRef.current = stamp
+    if (readFlushTimer.current) return
+    readFlushTimer.current = setTimeout(() => {
+      readFlushTimer.current = null
+      flushRead()
+    }, READ_COALESCE_MS)
+  }, [flushRead])
+
+  // Open marks read immediately — that is the one write worth doing eagerly,
+  // because it clears the unread badge the user just tapped past.
+  useEffect(() => {
+    pendingReadRef.current = new Date().toISOString()
+    flushRead()
+    return () => {
+      if (readFlushTimer.current) { clearTimeout(readFlushTimer.current); readFlushTimer.current = null }
+      // Everything visible up to this moment counts as read — stamp NOW rather
+      // than replaying per-message timestamps, so the flush covers messages that
+      // arrived by any route. Skipped when nothing newer than the last write
+      // exists, so opening and closing a quiet thread is not a second write.
+      const newest = newestMsgAtRef.current
+      const written = lastWrittenReadRef.current
+      if (pendingReadRef.current || (newest && (!written || newest > written))) {
+        pendingReadRef.current = new Date().toISOString()
+        flushRead()
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId, userId])
+
+  // Newest message by any route (initial load, realtime, load-older) — the close
+  // flush reads this to decide whether a write is owed.
+  useEffect(() => {
+    const newest = messages.length ? messages[messages.length - 1]?.created_at ?? null : null
+    if (newest && (!newestMsgAtRef.current || newest > newestMsgAtRef.current)) {
+      newestMsgAtRef.current = newest
+    }
+  }, [messages])
 
   // Shared row→Message enrichment (initial load AND load-older). Side effect:
   // populates profilesCache/avatarCache. Otherwise a pure transform.
@@ -2720,14 +2786,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           setMessages((prev) => prev.some((m) => m.id === newMsg.id) ? prev : [...prev, newMsg])
           if (raw.poll_id) loadPollsData([raw.poll_id])
 
-          // Keep last_read_at current as messages arrive so the badge is
-          // already cleared in the DB by the time the user navigates back.
-          supabase
-            .from("group_members")
-            .update({ last_read_at: raw.created_at })
-            .eq("group_id", groupId)
-            .eq("user_id", userId)
-            .then()
+          // Coalesced (see markRead) — a burst of messages is one write, not one
+          // per message, and the close flush guarantees the badge is right.
+          markRead(raw.created_at)
     }
 
     // Message edit / unsend (soft-delete) — arrives as a messages UPDATE.
