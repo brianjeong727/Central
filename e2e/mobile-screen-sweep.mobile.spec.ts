@@ -3,6 +3,11 @@
 //   1. the chrome title starts 12px down (POCKET_CHROME_PAD_Y, Convention #27)
 //   2. the body starts directly under that chrome row — no stray control row,
 //      no unowned top margin (Convention #26/§3)
+//   3. the chrome title is serif 22/600 ink (POCKET_CHROME_TITLE, ratified
+//      2026-08-08) — INCLUDING the "‹ Parent" back-label grammar, which is the
+//      same header, not a lesser one. Rule 1 pinned only WHERE the row sits, so
+//      five chromes drifted to 22/20/15 and the back-label to plum while every
+//      position assertion kept passing.
 //
 // mobile-chrome-rhythm.mobile.spec.ts guards the CONTRACT on a handful of
 // representative screens. This file is the SWEEP: it walks everything reachable
@@ -19,8 +24,16 @@ const MOBILE = { viewport: { width: 390, height: 844 } } as const
 const MIN_TITLE = 12
 const MAX_TITLE = 19
 const MAX_CONTENT = 92
+// POCKET_CHROME_TITLE (components/central/pocket.tsx). Kept as literals so this
+// spec fails if the constant is edited without a deliberate re-ratification.
+const TITLE_SIZE = 22
+const TITLE_COLOR = "rgb(19, 16, 26)" // --ink
 
-type Probe = { title: number | null; titleText: string; content: number | null; contentText: string }
+type Probe = {
+  title: number | null; titleText: string
+  titleSize: number | null; titleColor: string | null
+  content: number | null; contentText: string
+}
 
 async function probe(page: Page): Promise<Probe> {
   return page.evaluate(() => {
@@ -51,9 +64,18 @@ async function probe(page: Page): Promise<Probe> {
       for (const el of Array.from(row.querySelectorAll("span, div, h1, h2, p, button"))) {
         const r = el.getBoundingClientRect()
         if (r.height < 12 || r.width < 20 || !vis(el)) continue
+        // The AVATAR is leaf text too ("ES", 13px cream) and sits in the chrome row
+        // — it was being measured as the title. Skip it by marker, not by size:
+        // sniffing dimensions is how this detector got fooled before.
+        if (el.closest("[data-monogram]")) continue
         const text = (el.textContent ?? "").trim()
-        if (!text || el.children.length > 1) continue
-        title = { top: Math.round(r.top), text: text.slice(0, 28) }
+        // Must be the LEAF that carries the type. The title sits inside a
+        // flex wrapper span which INHERITS 16px; allowing one child picked that
+        // wrapper and reported every SubpageShell screen as 16px — eight false
+        // violations that all pointed at healthy screens.
+        if (!text || el.children.length > 0) continue
+        const cs = getComputedStyle(el)
+        title = { top: Math.round(r.top), text: text.slice(0, 28), size: parseFloat(cs.fontSize), color: cs.color }
         break
       }
     }
@@ -65,7 +87,8 @@ async function probe(page: Page): Promise<Probe> {
         if (parseFloat(getComputedStyle(el).fontSize) < 19) continue
         const text = (el.textContent ?? "").trim()
         if (!text || el.children.length > 1) continue
-        title = { top: Math.round(r.top), text: text.slice(0, 28) }
+        const cs2 = getComputedStyle(el)
+        title = { top: Math.round(r.top), text: text.slice(0, 28), size: parseFloat(cs2.fontSize), color: cs2.color }
         row = el.parentElement
         break
       }
@@ -110,6 +133,7 @@ async function probe(page: Page): Promise<Probe> {
     }
     return {
       title: title?.top ?? null, titleText: title?.text ?? "",
+      titleSize: title?.size ?? null, titleColor: title?.color ?? null,
       content: content?.top ?? null, contentText: content?.text ?? "",
     }
   })
@@ -144,6 +168,12 @@ async function check(page: Page, label: string) {
   if (p.title === null) { violations.push(`${label}: no chrome title found`); return }
   if (p.title < MIN_TITLE || p.title > MAX_TITLE) {
     violations.push(`${label}: title "${p.titleText}" at ${p.title}px (must be ${MIN_TITLE}–${MAX_TITLE}) — route its chrome through PocketChrome / PocketHubChrome / SubpageShell`)
+  }
+  if (p.titleSize !== null && Math.round(p.titleSize) !== TITLE_SIZE) {
+    violations.push(`${label}: title "${p.titleText}" is ${p.titleSize}px (must be ${TITLE_SIZE}) — spread POCKET_CHROME_TITLE instead of hand-writing the type`)
+  }
+  if (p.titleColor !== null && p.titleColor !== TITLE_COLOR) {
+    violations.push(`${label}: title "${p.titleText}" is ${p.titleColor} (must be ${TITLE_COLOR}, --ink) — a back-label is the same header as a root title, not a plum link`)
   }
   if (p.content !== null && p.content > MAX_CONTENT) {
     violations.push(`${label}: body starts ${p.content}px down at "${p.contentText}" (max ${MAX_CONTENT}) — move any control into the chrome via <MobileChromeActions>, or drop the wrapper's top margin`)

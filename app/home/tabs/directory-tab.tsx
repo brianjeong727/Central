@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase"
 import { findExistingDm } from "../dm"
 import { useOpenDraftDm } from "../draft-dm-context"
 import { EmptyState } from "../components/shared"
-import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, PocketRow, PocketRowCard, PocketKicker, PocketSearchField, BackChevron, POCKET_CHROME_PAD_Y } from "@/components/central"
+import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, PocketRow, PocketRowCard, PocketKicker, PocketSearchField, BackChevron, POCKET_CHROME_PAD_Y, POCKET_CHROME_TITLE } from "@/components/central"
 import { getInitials } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { DirectoryMember } from "../types"
@@ -249,7 +249,7 @@ export function DirectoryTab({
         <div className="px-5 pb-5" style={{ paddingTop: POCKET_CHROME_PAD_Y.paddingTop }}>
           <div className="flex items-center gap-2" style={{ marginBottom: POCKET_CHROME_PAD_Y.paddingBottom + 6 }}>
             {onBack && <BackChevron onClick={onBack} />}
-            <span style={{ flex: 1, minWidth: 0, fontFamily: "var(--serif)", fontSize: 22, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.1, fontWeight: 600 }}>Directory</span>
+            <span style={{ flex: 1, minWidth: 0, ...POCKET_CHROME_TITLE }}>Directory</span>
           </div>
           {/* Tonal search pill (§3.6): PocketSearchField, --ivory borderless */}
           <PocketSearchField value={mobileSearch} onChange={setMobileSearch} placeholder="Search members…" />
