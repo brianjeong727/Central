@@ -121,9 +121,22 @@ async function startNative() {
     // The `^ v Done` accessory bar. Purely native chrome — no web equivalent.
     Keyboard.setAccessoryBarVisible({ isVisible: false }).catch(() => {})
 
-    // ASK the binary what it does with the keyboard. This is the whole point:
-    // the answer differs per installed app version, and a web deploy cannot pick
-    // which version it lands in.
+    // CLAIM the layout, then verify the claim took.
+    //
+    // `resize: "native"` — what 1.0.3–1.0.5 shipped — defers its own WebView
+    // resize by (keyboard animation duration + 200ms) via performSelector, so the
+    // composer appears a beat after the keys no matter what the web layer does.
+    // The mode is not fixed at build time though: setResizeMode flips it live, so
+    // an OLD binary can be asked to stop resizing and hand the layout over here,
+    // where `keyboardWillShow` lands it on the first frame. No new build needed.
+    //
+    // Ask, then CONFIRM with getResizeMode rather than assuming the set worked —
+    // the whole reason this module reads the container instead of trusting
+    // capacitor.config.ts is that the binary is the authority, not the source
+    // tree. If the claim silently failed we would position for a viewport nobody
+    // is shrinking, which is the composer-under-the-keyboard bug all over again.
+    await Keyboard.setResizeMode({ mode: "none" as never }).catch(() => {})
+
     let mode = "none"
     try {
       const res = await Keyboard.getResizeMode()
@@ -137,9 +150,11 @@ async function startNative() {
     }
 
     if (mode !== "none") {
-      // World 3: native already shrinks the viewport (1.0.3–1.0.5 shipped
-      // `resize: "native"`). Adding an inset on top puts the composer a full
-      // keyboard-height too high. Track open/closed only.
+      // The claim did not take — an older plugin build that exposes
+      // getResizeMode but not setResizeMode, or a mode we were refused. Native
+      // still shrinks the viewport, so adding an inset on top would put the
+      // composer a full keyboard-height too high. Track open/closed only and
+      // accept the deferred-resize delay; correct beats fast.
       world = "shell-resizes"
       setInset(0)
       Keyboard.addListener("keyboardWillShow", () => setOpen(true)).catch(() => {})
