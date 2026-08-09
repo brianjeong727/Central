@@ -159,6 +159,40 @@ export function formatMessageTime(dateStr: string): string {
   })
 }
 
+// Chat-LIST timestamp: the clock time a conversation last moved, not "5m ago".
+// Knowing a message landed at 11:47 PM is more useful at a glance than knowing it
+// was 38 minutes back, and it doesn't silently go stale while the list sits open.
+//
+// Deliberately NOT formatRelativeTime: that one still serves the surfaces where
+// recency IS the point (an archive request, a moderation report, a shared file),
+// so the two must stay separate rather than one being retuned into the other.
+//
+// The ramp past today is the standard messaging one — a bare "11:47 PM" on a
+// three-day-old thread reads as today and is worse than useless:
+//   today      → 11:47 PM
+//   yesterday  → Yesterday
+//   this week  → Tue
+//   older      → 8/1/26
+//
+// DEVICE-LOCAL on purpose. Convention #23 routes event times through the
+// MINISTRY's zone, and explicitly exempts chat timestamps — "when did this arrive
+// for ME" is a question about the reader's own clock.
+export function formatChatListTime(dateStr: string): string {
+  const d = new Date(dateStr)
+  const now = new Date()
+  // Calendar-day distance, not a 24h window: a message at 11:50 PM is "yesterday"
+  // at 12:10 AM, not "20 minutes ago rounded to today". Both ends are snapped to
+  // LOCAL midnight, and the rounding absorbs the 23/25-hour DST days.
+  const midnightToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const midnightThen = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const days = Math.round((midnightToday - midnightThen) / 86400000)
+
+  if (days <= 0) return formatMessageTime(dateStr) // today (<0 = clock skew ahead)
+  if (days === 1) return "Yesterday"
+  if (days < 7) return d.toLocaleDateString("en-US", { weekday: "short" })
+  return d.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" })
+}
+
 export function audienceLabel(audience: string | null): string {
   if (!audience || audience === "all") return "Everyone"
   if (audience.match(/^\d{4}$/)) return `Class of ${audience}`
@@ -230,7 +264,7 @@ export function rowsToChatPreviews(rows: ChatPreviewRow[]): ChatPreview[] {
       lastMessageSender: row.last_msg_sender_name ?? "",
       unreadCount: Number(row.unread_count),
       initials: getInitials(row.group_name),
-      time: row.last_msg_at ? formatRelativeTime(row.last_msg_at) : "",
+      time: row.last_msg_at ? formatChatListTime(row.last_msg_at) : "",
       muted: row.muted ?? false,
       pinned: row.pinned ?? false,
       _ts: row.last_msg_at ?? "",
