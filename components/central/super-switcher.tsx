@@ -18,9 +18,52 @@ import { useEffect, useState } from "react"
 import { switchMinistryRole, resetToSuper, getSandboxTeams, switchWorkspaceRole, type SandboxTeam } from "@/app/actions/super"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ constants); flagged Phase 2, refactor pending
 import { SUPER_UUID, HOME_ROLE, MINISTRY_ROLES, roleLabel } from "@/app/actions/super-constants"
+import { keyboardDiagnostics } from "@/lib/keyboard-inset"
 
 function cap(role: string): string {
   return role.charAt(0).toUpperCase() + role.slice(1)
+}
+
+// ── Build + keyboard diagnostics (super-only) ────────────────────────────────
+// Which BUNDLE a device is running, and what the keyboard layer decided, are the
+// two facts that repeatedly could not be established from a bug report — an
+// evening went into inferring them from symptoms and getting it wrong. Both are
+// now readable in two taps, on the device itself.
+//
+// NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA is injected by Vercel at build time, so it
+// identifies the deployed bundle exactly — "did my phone pick up the fix?" stops
+// being a guess. Empty in local dev, where it is not a question worth asking.
+function BuildDiagnostics() {
+  const [kb, setKb] = useState<ReturnType<typeof keyboardDiagnostics> | null>(null)
+  useEffect(() => {
+    const tick = () => setKb(keyboardDiagnostics())
+    tick()
+    const id = setInterval(tick, 500)
+    return () => clearInterval(id)
+  }, [])
+
+  const sha = (process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ?? "").slice(0, 7) || "local"
+  const row: React.CSSProperties = { display: "flex", justifyContent: "space-between", gap: 8 }
+
+  return (
+    <div
+      style={{
+        padding: "7px 10px",
+        marginBottom: 6,
+        borderRadius: "var(--r-input)",
+        background: "var(--ivory)",
+        fontFamily: "var(--mono), ui-monospace, monospace",
+        fontSize: 10,
+        lineHeight: 1.6,
+        color: "var(--body)",
+      }}
+    >
+      <div style={row}><span>bundle</span><span>{sha}</span></div>
+      <div style={row}><span>kb world</span><span>{kb?.world ?? "…"}</span></div>
+      <div style={row}><span>resize</span><span>{kb?.reportedMode ?? "…"}</span></div>
+      <div style={row}><span>inset</span><span>{kb ? `${kb.inset}px` : "…"}</span></div>
+    </div>
+  )
 }
 
 export function SuperSwitcher({
@@ -207,6 +250,7 @@ export function SuperSwitcher({
                 {error}
               </div>
             )}
+            <BuildDiagnostics />
             {MINISTRY_ROLES.map((role) => {
               const active = role === currentRole
               return (

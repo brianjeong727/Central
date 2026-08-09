@@ -457,6 +457,14 @@ assertion kept passing while five chromes drifted:
 - The sweep found 11 violations, of which 9 were DETECTOR faults (it measured the
   wrapper span that inherits 16px, and the avatar). Fixed the detector; the 2 real
   ones were the chat header, now fixed.
-- ⚠️ **NOT re-run after the chat-header fix**: Supabase Auth went down
-  (`/auth/v1/health` times out; REST answers in 0.2s), and every spec depends on
-  auth.setup. The sweep must be re-run when auth recovers to confirm 0 violations.
+- Supabase Auth went down mid-task (`/auth/v1/health` timing out while REST
+  answered in 0.2s) and blocked every spec, since all of them need auth.setup.
+  Once it recovered the sweep ran: **49 screens checked, 0 violations.**
+- That final run surfaced one more thing worth recording. The chat header's title
+  sat at y=20 (band 12–19) because its row centred against a **40px** avatar where
+  every other chrome row uses 34 — `12 + (40-24)/2 = 20`. It had ALWAYS been there;
+  the sweep passed for years only because the old detector was measuring that
+  avatar's initials as the title. Fixing the detector exposed it. Avatar → 34px
+  (desktop unchanged), per "fix it to use the constant, never widen the band".
+- Regression set after the change: mobile-chrome-rhythm, mobile-subpage-gutter,
+  chat-keyboard-inset, chat-nicknames, chats-p3-shots — 25 passed.

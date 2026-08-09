@@ -3282,9 +3282,15 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             {!inline && <BackChevron onClick={onClose} className="md:hidden" />}
             {/* Group avatar — 40px on mobile (Pocket chat header), 32px on the
                 shared desktop inline panel (md: override keeps desktop untouched). */}
+            {/* 34px on mobile — the chrome row's avatar/chevron height (Convention
+                #27). At the old 40 the row was 6px taller than every other chrome,
+                so the vertically-centred title landed at y=20 and sat outside the
+                12–19 rhythm band. It passed the sweep for years only because the
+                detector was measuring THIS chip's initials as the title. Desktop
+                (md:w-8) is unchanged. */}
             <MonogramChip
               initials={getInitials(displayName)}
-              className="w-10 h-10 md:w-8 md:h-8"
+              className="w-[34px] h-[34px] md:w-8 md:h-8"
               style={{ fontFamily: "var(--serif)", fontSize: 13 }}
             />
             {/* Mobile: tapping the name/meta opens chat settings (iMessage/Messenger
