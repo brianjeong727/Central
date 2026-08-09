@@ -31,6 +31,7 @@ export function MonogramChip({ initials = "", avatarUrl, unassigned = false, cla
   if (unassigned) {
     return (
       <div
+        data-monogram
         className={`flex items-center justify-center flex-shrink-0 ${className}`}
         title={title}
         style={{
@@ -50,6 +51,7 @@ export function MonogramChip({ initials = "", avatarUrl, unassigned = false, cla
 
   const chip = (
     <div
+      data-monogram
       className={`relative flex items-center justify-center flex-shrink-0 ${className}`}
       title={title}
       style={{

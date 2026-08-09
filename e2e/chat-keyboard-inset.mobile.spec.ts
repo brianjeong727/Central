@@ -119,7 +119,15 @@ test.describe("chat keyboard inset (mobile)", () => {
     //    newest message is inside it (you can see what you are replying to).
     const gap = composerBox.y - (headerBox.y + headerBox.height)
     expect(gap).toBeGreaterThan(60)
-    const newest = page.getByText("second message", { exact: false }).filter({ visible: true }).first()
+    // Scoped to the TRANSCRIPT. Unscoped, this text also matches the chat-list
+    // preview row still mounted behind the overlay ("E2E Member 2: second
+    // message"), so `.first()` picked whichever the DOM happened to order first —
+    // stable in isolation, and not stable in the full suite once the sandbox has
+    // accumulated enough E2E chats. Same co-mounted-tree trap the mobile sweep
+    // documents.
+    const newest = page.locator("[data-bottom-anchored]")
+      .getByText("second message", { exact: false }).filter({ visible: true }).first()
+    await newest.waitFor({ state: "visible", timeout: 15000 })
     const newestBox = (await newest.boundingBox())!
     expect(newestBox.y + newestBox.height).toBeLessThanOrEqual(composerBox.y + 2)
 
@@ -165,12 +173,15 @@ test.describe("chat keyboard inset (mobile)", () => {
     await expect.poll(() => page.evaluate(() => {
       const el = document.querySelector("[data-bottom-anchored]") as HTMLElement | null
       return el ? el.scrollHeight - el.clientHeight : 0
-    }), { message: "transcript must actually scroll for this test to mean anything" })
+    }), { message: "transcript must actually scroll for this test to mean anything", timeout: 15000 })
       .toBeGreaterThan(200)
 
     // Wait on the CONDITION the gesture reads, never on elapsed time. The on-open
     // re-pin lands on a rAF plus a ~320ms settle, so a fixed sleep is a race that
     // only shows up on a loaded machine — which is exactly how this first failed.
+    // Generous budgets: these poll on APP READINESS (first paint after a cold
+    // Next compile), not on the behaviour under test. The 5s default expired once
+    // on the run right after a dev-server restart — a flaky guard is worse than none.
     const atBottom = () => page.evaluate(() => {
       const el = document.querySelector("[data-bottom-anchored]") as HTMLElement | null
       return !!el && el.scrollHeight - el.scrollTop - el.clientHeight <= 8
@@ -179,7 +190,7 @@ test.describe("chat keyboard inset (mobile)", () => {
     // A drag over the transcript, pinned at the bottom → dismisses.
     await composer.click()
     expect(await focused()).toBe(true)
-    await expect.poll(atBottom).toBe(true)
+    await expect.poll(atBottom, { timeout: 15000 }).toBe(true)
     await swipe(page, "[data-bottom-anchored]", 70)
     expect(await focused()).toBe(false)
 
@@ -187,12 +198,12 @@ test.describe("chat keyboard inset (mobile)", () => {
     // dragging down already means "show older messages".
     await composer.click()
     expect(await focused()).toBe(true)
-    await expect.poll(atBottom).toBe(true)   // let the re-pin finish BEFORE scrolling up…
+    await expect.poll(atBottom, { timeout: 15000 }).toBe(true)   // let the re-pin finish BEFORE scrolling up…
     await page.evaluate(() => {
       const el = document.querySelector("[data-bottom-anchored]") as HTMLElement | null
       if (el) el.scrollTop = 0
     })
-    await expect.poll(atBottom).toBe(false)  // …and confirm it stuck before swiping
+    await expect.poll(atBottom, { timeout: 15000 }).toBe(false)  // …and confirm it stuck before swiping
     await swipe(page, "[data-bottom-anchored]", 70)
     expect(await focused()).toBe(true)
 
@@ -234,6 +245,36 @@ test.describe("chat keyboard inset (mobile)", () => {
     })
 
     expect(measured).toBe("336px")
+  })
+
+  // The shell is a remote-URL WebView, so this bundle runs inside whatever binary
+  // the user has installed — a deploy cannot pick its version. 1.0.3–1.0.5 shipped
+  // `resize: "native"`, where iOS shrinks the WebView itself; a bundle that also
+  // applies an inset there double-counts and puts the composer a full keyboard
+  // height too high, under the header. The module must ASK (getResizeMode) rather
+  // than assume the newest binary.
+  //
+  // Playwright has no Capacitor bridge, so this asserts the invariant that makes
+  // the mismatch survivable: the CSS reads --kb-inset and nothing else, so a
+  // contributed 0 leaves the layout untouched and the native resize alone governs.
+  test("a zero inset leaves the layout exactly as if no keyboard were open", async ({ page }) => {
+    await page.goto(`/home?tab=chats&chat=${chatId}`)
+    const composer = page.locator("textarea, input[placeholder^='Message']").filter({ visible: true }).first()
+    await composer.waitFor({ state: "visible", timeout: 15000 })
+
+    const box = async () => (await composer.boundingBox())!
+    const atRest = await box()
+
+    // What world 3 does: flag the keyboard open, but contribute no height.
+    await page.evaluate(() => {
+      document.documentElement.setAttribute("data-kb-open", "")
+      document.documentElement.style.setProperty("--kb-inset", "0px")
+    })
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => r(null))))
+    const withOpenFlag = await box()
+
+    // Only the safe-area collapse may move it, and that is at most ~22px.
+    expect(Math.abs(withOpenFlag.y - atRest.y)).toBeLessThan(30)
   })
 
   test("--kb-inset defaults to 0 and no keyboard flag is set at rest", async ({ page }) => {
