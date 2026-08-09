@@ -88,6 +88,11 @@ type KeyboardWorld =
   | "shell-reports"  // 2 — take the height from the plugin's events
   | "shell-resizes"  // 3 — native already made the room; contribute nothing
 let world: KeyboardWorld = "web"
+// What the installed binary REPORTED, verbatim — kept for diagnostics. "" until
+// asked, "unavailable" if the call failed. The whole class of bug this module has
+// produced comes from guessing which container it is in, so the guess is now
+// inspectable rather than inferred from the symptom.
+let reportedMode = ""
 
 // ── Visual-viewport tracking (world 1 only) ──────────────────────────────────
 function measure() {
@@ -123,7 +128,9 @@ async function startNative() {
     try {
       const res = await Keyboard.getResizeMode()
       mode = res?.mode ?? "none"
+      reportedMode = mode
     } catch {
+      reportedMode = "unavailable"
       // Very old shell whose plugin predates getResizeMode. It also predates any
       // resize config, so nothing is making room natively — measuring is right.
       return
@@ -213,6 +220,19 @@ export function subscribeKeyboard(cb: (state: { inset: number; open: boolean }) 
   const wrapped = () => cb({ inset, open })
   listeners.add(wrapped)
   return () => { listeners.delete(wrapped) }
+}
+
+/**
+ * Everything this module decided, for on-screen inspection (super-only, in the
+ * switcher popover). Cheap to read; safe to call any time.
+ */
+export function keyboardDiagnostics(): {
+  world: KeyboardWorld
+  reportedMode: string
+  inset: number
+  open: boolean
+} {
+  return { world, reportedMode: reportedMode || "(not asked)", inset, open }
 }
 
 /** Dismiss the keyboard by blurring whatever text field currently owns it. */
