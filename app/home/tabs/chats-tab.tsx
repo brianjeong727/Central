@@ -13,7 +13,7 @@ import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron } from "@/components/central"
+import { MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE } from "@/components/central"
 import { ChatSearchView } from "../components/chat-search"
 import { findExistingDm, getOrCreateDm } from "../dm"
 import { isMobileViewport } from "@/lib/breakpoints"
@@ -3299,7 +3299,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     <div ref={chatSwipeRef} className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
       {/* ── Top bar ── */}
-      <div className={`flex-shrink-0 flex items-center gap-3 px-4 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-[calc(env(safe-area-inset-top)+12px)] pb-3 md:py-3.5 md:border-b md:border-[var(--line)]"} bg-[var(--cream)]`}>
+      <div className={`flex-shrink-0 flex items-center gap-3 px-5 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-[calc(env(safe-area-inset-top)+12px)] pb-3 md:py-3.5 md:border-b md:border-[var(--line)]"} bg-[var(--cream)]`}>
         {searchMode ? (
           <>
             {/* Search bar mode */}
@@ -3343,9 +3343,15 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             {!inline && <BackChevron onClick={onClose} className="md:hidden" />}
             {/* Group avatar — 40px on mobile (Pocket chat header), 32px on the
                 shared desktop inline panel (md: override keeps desktop untouched). */}
+            {/* 34px on mobile — the chrome row's avatar/chevron height (Convention
+                #27). At the old 40 the row was 6px taller than every other chrome,
+                so the vertically-centred title landed at y=20 and sat outside the
+                12–19 rhythm band. It passed the sweep for years only because the
+                detector was measuring THIS chip's initials as the title. Desktop
+                (md:w-8) is unchanged. */}
             <MonogramChip
               initials={getInitials(displayName)}
-              className="w-10 h-10 md:w-8 md:h-8"
+              className="w-[34px] h-[34px] md:w-8 md:h-8"
               style={{ fontFamily: "var(--serif)", fontSize: 13 }}
             />
             {/* Mobile: tapping the name/meta opens chat settings (iMessage/Messenger
@@ -3358,7 +3364,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
               <div className="flex items-center gap-2">
                 {/* Mobile: the name is the whole title block (no member-count sub),
                     so it takes the chrome-title size and centers against the avatar. */}
-                <h2 className="truncate leading-[1.2] text-[20px] font-semibold md:leading-none md:text-[16px] md:font-normal" style={{ fontFamily: "var(--serif)", color: "var(--ink)", letterSpacing: "-0.01em" }}>{displayName}</h2>
+                {/* Two nodes, not one: the mobile title takes POCKET_CHROME_TITLE
+                    (the ONE chrome type — spreading it inline would beat any
+                    `md:text-[…]` class, so desktop could never override it), while
+                    desktop keeps its 16/normal panel heading. */}
+                <h2 className="md:hidden truncate" style={{ ...POCKET_CHROME_TITLE }}>{displayName}</h2>
+                <h2 className="hidden md:block truncate leading-none text-[16px] font-normal" style={{ fontFamily: "var(--serif)", color: "var(--ink)", letterSpacing: "-0.01em" }}>{displayName}</h2>
                 <div className="hidden md:flex items-center flex-shrink-0">
                   {memberFirstNames.slice(0, 4).map((name, i) => (
                     <span

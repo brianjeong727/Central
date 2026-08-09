@@ -190,9 +190,26 @@ export function MeetingNoteDetail({
     window.addEventListener(`note-title-${note.id}`, handler)
     return () => window.removeEventListener(`note-title-${note.id}`, handler)
   }, [note.id])
-  function broadcastTitle(title: string) {
+  // ONE channel per note, reused for every keystroke and removed when the note
+  // changes or unmounts. It used to call supabase.channel() inside the function
+  // below — which fires on every keystroke in the title field, and each call
+  // registers a NEW channel object on the client that nothing ever removed. A
+  // 40-character title left 40 channels behind, plus one broadcast request each.
+  const titleChanRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  useEffect(() => {
     const ch = supabase.channel(`meeting-note-${note.id}`)
-    ch.send({ type: "broadcast", event: "title", payload: { title, userId } }).catch(() => {})
+    titleChanRef.current = ch
+    return () => {
+      titleChanRef.current = null
+      supabase.removeChannel(ch)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note.id])
+
+  function broadcastTitle(title: string) {
+    titleChanRef.current
+      ?.send({ type: "broadcast", event: "title", payload: { title, userId } })
+      .catch(() => {})
   }
 
   const { data: sections, mutate: mutateSections } = useSWR(

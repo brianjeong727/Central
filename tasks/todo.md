@@ -410,3 +410,61 @@ column — the shell's existing `max-w-[390px] mx-auto`.
       still desktop, 1024px touch tablet still desktop.
 - [x] Screenshots at 874×402 (home + chats) reviewed before handing back.
 - [x] verify.sh PASS; full suite run.
+
+
+# Subpage chrome titles didn't match the roots — fix/subpage-chrome-unify
+
+Brian: "clicking into announcements, the announcements header is really small
+along with the back arrow and the margins are different too… same for directory.
+unify it and make sure it cant be violated anywhere."
+
+## Why "it was enforced" was wrong
+
+Convention #27 pinned the chrome ROW's position (POCKET_CHROME_PAD_Y) and the e2e
+asserted the title's vertical POSITION. Nothing pinned the TYPE. So every
+assertion kept passing while five chromes drifted:
+
+| chrome | was | now |
+|---|---|---|
+| PocketHeader (tab roots) | 22 ink | 22 ink |
+| Directory root (hand-rolled) | 22 ink | 22 ink |
+| PocketHubChrome | 22 — **20 when it had an action** | 22 ink |
+| Announcements row (hand-rolled) | 20 ink | 22 ink |
+| SubpageShell WITH title | 20 ink | 22 ink |
+| SubpageShell back-label | **15 PLUM**, x−2px | 22 ink, same x |
+| Chat header (hand-rolled) | 20, px-4 gutter | 22, px-5 |
+
+## Done
+
+- [x] `POCKET_CHROME_TITLE` in components/central/pocket.tsx — one definition.
+- [x] All 6 chrome builders + the chat header consume it.
+- [x] Back-label lost its −2px nudge, so it starts on the same x as a root title.
+- [x] `scripts/check-chrome-title.sh`, wired into verify.sh (BLOCKING): any file
+      importing POCKET_CHROME_PAD_Y (= builds a chrome row) must consume the title
+      constant. Structural signal, not a font-size grep — grepping for "serif 22"
+      flags body headlines and modal titles and is useless.
+- [x] `mobile-screen-sweep` now measures the chrome row's font-size + colour on
+      every discovered screen, not just its position.
+- [x] MonogramChip tagged `data-monogram` so detectors can tell an avatar from a
+      title (the sweep was measuring the chat avatar's initials as a 13px title).
+- [x] mobile_design_system.md §1 updated (/designchange authorised).
+
+## Verified / NOT verified
+
+- verify.sh PASS (build, lint, hex, dedup, copies, chrome-title).
+- Measured directly before/after: directory root, member detail, announcement
+  detail all now 22px / rgb(19,16,26) / left 49 / top 17 — identical.
+- The sweep found 11 violations, of which 9 were DETECTOR faults (it measured the
+  wrapper span that inherits 16px, and the avatar). Fixed the detector; the 2 real
+  ones were the chat header, now fixed.
+- Supabase Auth went down mid-task (`/auth/v1/health` timing out while REST
+  answered in 0.2s) and blocked every spec, since all of them need auth.setup.
+  Once it recovered the sweep ran: **49 screens checked, 0 violations.**
+- That final run surfaced one more thing worth recording. The chat header's title
+  sat at y=20 (band 12–19) because its row centred against a **40px** avatar where
+  every other chrome row uses 34 — `12 + (40-24)/2 = 20`. It had ALWAYS been there;
+  the sweep passed for years only because the old detector was measuring that
+  avatar's initials as the title. Fixing the detector exposed it. Avatar → 34px
+  (desktop unchanged), per "fix it to use the constant, never widen the band".
+- Regression set after the change: mobile-chrome-rhythm, mobile-subpage-gutter,
+  chat-keyboard-inset, chat-nicknames, chats-p3-shots — 25 passed.
