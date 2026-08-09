@@ -17,7 +17,7 @@ import { MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, Conten
 import { ChatSearchView } from "../components/chat-search"
 import { findExistingDm, getOrCreateDm } from "../dm"
 import { isMobileViewport } from "@/lib/breakpoints"
-import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
+import { getInitials, formatRelativeTime, formatChatListTime, replyPreviewLabel } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatsTabProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData, ChatNotifyMode, NotificationSettings } from "../types"
 import { useNavState } from "../nav-state"
@@ -3890,7 +3890,7 @@ function PocketChatRow({ group, isLast, onClick }: { group: ChatGroup; isLast: b
       sub={group.last_message
         ? (group.last_sender ? `${group.last_sender}: ${group.last_message}` : group.last_message)
         : "No messages yet"}
-      time={group.last_message_time ? formatRelativeTime(group.last_message_time) : undefined}
+      time={group.last_message_time ? formatChatListTime(group.last_message_time) : undefined}
       showDot={group.unread_count > 0 && !group.muted}
       isLast={isLast}
       onClick={onClick}
@@ -4311,7 +4311,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
                 {group.muted && <BellOff className="w-3 h-3 flex-shrink-0" style={{ color: "var(--muted-text)" }} aria-label="Muted" />}
                 {showLock && <Lock className="w-3 h-3 flex-shrink-0" style={{ color: "var(--muted-text)" }} aria-label="Members only" />}
               </div>
-              {group.last_message_time && <span className="text-[11px] text-[var(--muted-text)] flex-shrink-0">{formatRelativeTime(group.last_message_time)}</span>}
+              {group.last_message_time && <span className="text-[11px] text-[var(--muted-text)] flex-shrink-0">{formatChatListTime(group.last_message_time)}</span>}
             </div>
             <div className="flex items-center justify-between gap-2">
               <p className="text-[13px] text-[var(--body)] truncate">
@@ -4354,7 +4354,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
             {showLock && <Lock style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0, alignSelf: "center" }} aria-label="Members only" />}
             {group.last_message_time && (
               <span style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.04em", color: "var(--muted-text)", flexShrink: 0 }}>
-                {formatRelativeTime(group.last_message_time)}
+                {formatChatListTime(group.last_message_time)}
               </span>
             )}
           </div>

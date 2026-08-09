@@ -12,7 +12,7 @@ import type { ChatPreview } from "@/components/central/chat-strip"
 
 // Types
 import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings, ChatGroup, Crumb } from "./types"
-import { formatRelativeTime, getInitials, chatPreviewLabel, rowsToChatPreviews, type ChatPreviewRow } from "./utils"
+import { formatChatListTime, getInitials, chatPreviewLabel, rowsToChatPreviews, type ChatPreviewRow } from "./utils"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 import { classifyTeam } from "./team-type"
 import { useNavState, ALL_FOLDED_PARAMS } from "./nav-state"
@@ -833,7 +833,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                   ...c,
                   lastMessage: chatPreviewLabel(msg.content, msg.attachment_type, !!msg.poll_id),
                   lastMessageSender: senderName,
-                  time: formatRelativeTime(msg.created_at),
+                  time: formatChatListTime(msg.created_at),
                   _ts: msg.created_at,
                   unreadCount: isOwnMessage ? c.unreadCount : c.unreadCount + 1,
                 } as ChatPreview & { _ts: string }

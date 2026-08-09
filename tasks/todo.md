@@ -468,3 +468,50 @@ assertion kept passing while five chromes drifted:
   (desktop unchanged), per "fix it to use the constant, never widen the band".
 - Regression set after the change: mobile-chrome-rhythm, mobile-subpage-gutter,
   chat-keyboard-inset, chat-nicknames, chats-p3-shots — 25 passed.
+
+
+# Chat-list timestamps show the clock time — feat/chat-list-exact-time
+
+Brian: "the time stamp on the main chat view for ur last message is xmin ago but
+i would want it to be time stamped like 12:00 AM… more useful to see the exact
+time the last notification was rather than how many min or hours ago."
+
+## Shape
+
+New `formatChatListTime` (app/home/utils.ts), NOT a retune of
+`formatRelativeTime` — that one still serves the surfaces where recency IS the
+point (archive request, moderation report, shared files), and those keep "5m".
+
+Ramp past today is the standard messaging one, because a bare "11:47 PM" on a
+three-day-old thread reads as today:
+
+| age | shows |
+|---|---|
+| today | `2:20 AM` |
+| yesterday | `Yesterday` |
+| this week | `Thu` |
+| older | `7/10/26` |
+
+Device-local on purpose — Convention #23 sends event times through the MINISTRY's
+zone and explicitly exempts chat timestamps ("when did this arrive for ME").
+Calendar-day distance, not 24h windows, so 11:50 PM is "Yesterday" at 12:10 AM;
+both ends snap to local midnight and the rounding absorbs 23/25-hour DST days.
+
+## Call sites (5, all chat-list; the realtime one matters)
+
+- [x] `rowsToChatPreviews` (Home recent-chats strip + both chat lists)
+- [x] `home-app` realtime patch — must match, or a live message would flip a row
+      from "11:47 PM" to "now" and back on the next refetch
+- [x] mobile chat list row · desktop chat list panel · compact sidebar row
+
+## Verified
+
+- Seeded one chat per band and read the RENDERED strings back: 2:20 AM /
+  Yesterday / Thu / 7/10/26, browser tz America/New_York.
+- First run showed "Fri" for the yesterday case — the SEED was wrong (30h ago is
+  two calendar days back in UTC−4), not the code. Re-seeded at 12h.
+- Desktop panel: no clipping; the chat NAME truncates to protect the timestamp,
+  which is the right priority. "Yesterday" is wider than the old "1d", so names
+  truncate slightly earlier in the narrow sidebar.
+- verify.sh PASS · 21 e2e passed · sweep 49 screens / 0 violations.
+- Fixtures cleaned up (incl. the earlier chrome-probe announcement).
