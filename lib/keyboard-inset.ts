@@ -11,20 +11,31 @@
 //   [data-kb-open]  (html attr) whether a keyboard is showing AT ALL, in either
 //                              container. This is NOT `--kb-inset > 0`.
 //
-// Why two values and not one: in the Capacitor shell the Keyboard plugin runs
-// `resize: "native"`, so iOS shrinks the WKWebView frame to the region above the
-// keyboard. The web layer's viewport IS the visible area — `fixed inset-0`
-// already lands exactly on top of the keyboard, and the occluded amount is
-// genuinely zero. In mobile Safari nothing resizes: the layout viewport keeps
-// its full height and the keyboard sits OVER the bottom of it, so the occluded
-// amount is real and layout has to subtract it.
+// There are THREE worlds, and the module asks which one it is in rather than
+// assuming — because the shell is a remote-URL WebView, so this bundle lands
+// inside whatever binary the user happens to have installed, including old ones:
 //
-// Those are two different WORLDS, not one expression that happens to cover both.
-// `innerHeight - visualViewport.height` does settle to 0 under a resized WebView,
-// but only at REST: mid-animation the two properties update on different frames,
-// and the transient reads a full keyboard height — which the layout then applies
-// on top of the resize that already happened. So the shell PINS the inset to 0
-// (nativeManagesResize) and only measures where nothing else is resizing.
+//   1. Plain web (no Capacitor). Nothing resizes; the keyboard covers the bottom
+//      of a full-height layout viewport. MEASURE it from visualViewport.
+//   2. Shell with `resize: "none"` (1.0.6+). The WebView stays full screen and
+//      the plugin only reports. Take the height from `keyboardWillShow`, which
+//      fires on the keyboard's first frame and carries an exact value.
+//   3. Shell with `resize: "native"|"body"|"ionic"` (1.0.3–1.0.5). The NATIVE
+//      side already shrinks the viewport. Contribute ZERO — anything else
+//      double-counts.
+//
+// World 3 is not hypothetical and not legacy-only: a web deploy reaches every
+// installed binary instantly, so on the day 1.0.6 shipped most users were still
+// on 1.0.5. Assuming the newest binary put the composer a full keyboard-height
+// too high — under the header — about 450ms after the keys appeared (the delay
+// `resize: "native"` schedules its own resize with). `Keyboard.getResizeMode()`
+// is what makes the bundle correct in all three, so never infer the mode from
+// the app version or from what the current source configures.
+//
+// Measuring is only right in world 1. In world 3 it double-counts, and even in
+// world 2 it is worse than the event: `innerHeight` and `visualViewport.height`
+// do not update on the same frame while the keyboard animates, so mid-flight the
+// difference reads garbage.
 //
 // `data-kb-open` exists because things other than height depend on the keyboard:
 // `env(safe-area-inset-bottom)` must collapse (the home indicator is behind the
@@ -69,19 +80,23 @@ function setOpen(next: boolean) {
   emit()
 }
 
-// Set once the native Keyboard plugin is confirmed present. From then on the
-// height arrives from its events and measurement is ignored entirely — see below.
-let nativeReportsHeight = false
+// Which of the three worlds we are in (see the header). Resolved once, by ASKING
+// the installed binary — never assumed from the app version or from what the
+// current capacitor.config.ts happens to say.
+type KeyboardWorld =
+  | "web"            // 1 — measure
+  | "shell-reports"  // 2 — take the height from the plugin's events
+  | "shell-resizes"  // 3 — native already made the room; contribute nothing
+let world: KeyboardWorld = "web"
+// What the installed binary REPORTED, verbatim — kept for diagnostics. "" until
+// asked, "unavailable" if the call failed. The whole class of bug this module has
+// produced comes from guessing which container it is in, so the guess is now
+// inspectable rather than inferred from the symptom.
+let reportedMode = ""
 
-// ── Visual-viewport tracking (web only) ──────────────────────────────────────
+// ── Visual-viewport tracking (world 1 only) ──────────────────────────────────
 function measure() {
-  // In the shell the height comes from `keyboardWillShow`, which fires on the
-  // first frame of the animation and carries an exact value. Measuring there is
-  // both unnecessary and actively wrong: `window.innerHeight` and
-  // `visualViewport.height` do not update on the same frame while the keyboard
-  // moves, so mid-animation this computes garbage and fights the event-driven
-  // value. Measure only where there is nothing better to go on.
-  if (nativeReportsHeight) return
+  if (world !== "web") return
 
   const vv = window.visualViewport
   if (!vv) return
@@ -103,25 +118,61 @@ async function startNative() {
     if (!Capacitor.isNativePlatform()) return
     const { Keyboard } = await import("@capacitor/keyboard")
 
-    // The `^ v Done` accessory bar. Purely native chrome — this is the only way
-    // to remove it, and it is why the composer looked wrong even when the
-    // heights were right.
+    // The `^ v Done` accessory bar. Purely native chrome — no web equivalent.
     Keyboard.setAccessoryBarVisible({ isVisible: false }).catch(() => {})
 
-    // Take over from measurement. Set only after the plugin import resolves, so
-    // an older shell binary without it keeps the measured path.
-    nativeReportsHeight = true
-    // Marks the shell for CSS: there the inset arrives as ONE discrete jump, so
-    // the surface has to animate itself to ride the keys. On the web it arrives
-    // as a stream of visual-viewport events that already describe the motion,
-    // and adding a transition on top would animate toward a moving target.
+    // CLAIM the layout, then verify the claim took.
+    //
+    // `resize: "native"` — what 1.0.3–1.0.5 shipped — defers its own WebView
+    // resize by (keyboard animation duration + 200ms) via performSelector, so the
+    // composer appears a beat after the keys no matter what the web layer does.
+    // The mode is not fixed at build time though: setResizeMode flips it live, so
+    // an OLD binary can be asked to stop resizing and hand the layout over here,
+    // where `keyboardWillShow` lands it on the first frame. No new build needed.
+    //
+    // Ask, then CONFIRM with getResizeMode rather than assuming the set worked —
+    // the whole reason this module reads the container instead of trusting
+    // capacitor.config.ts is that the binary is the authority, not the source
+    // tree. If the claim silently failed we would position for a viewport nobody
+    // is shrinking, which is the composer-under-the-keyboard bug all over again.
+    await Keyboard.setResizeMode({ mode: "none" as never }).catch(() => {})
+
+    let mode = "none"
+    try {
+      const res = await Keyboard.getResizeMode()
+      mode = res?.mode ?? "none"
+      reportedMode = mode
+    } catch {
+      reportedMode = "unavailable"
+      // Very old shell whose plugin predates getResizeMode. It also predates any
+      // resize config, so nothing is making room natively — measuring is right.
+      return
+    }
+
+    if (mode !== "none") {
+      // The claim did not take — an older plugin build that exposes
+      // getResizeMode but not setResizeMode, or a mode we were refused. Native
+      // still shrinks the viewport, so adding an inset on top would put the
+      // composer a full keyboard-height too high. Track open/closed only and
+      // accept the deferred-resize delay; correct beats fast.
+      world = "shell-resizes"
+      setInset(0)
+      Keyboard.addListener("keyboardWillShow", () => setOpen(true)).catch(() => {})
+      Keyboard.addListener("keyboardWillHide", () => setOpen(false)).catch(() => {})
+      return
+    }
+
+    // World 2: the WebView stays full screen and we own the layout.
+    world = "shell-reports"
+    // Marks the shell for CSS: here the inset arrives as ONE discrete jump, so
+    // the surface animates itself to ride the keys. On the web it arrives as a
+    // stream of visual-viewport events that already describe the motion, and a
+    // transition on top would chase a moving target.
     document.documentElement.setAttribute("data-kb-native", "")
 
-    // willShow/willHide, NOT didShow/didHide. These fire on the first frame of
-    // the keyboard's animation and carry the exact height, which is the entire
-    // reason resize is "none": the plugin's own WebView resize is deferred by
-    // (animation duration + 200ms), and waiting for it is what made the composer
-    // appear a beat late. `did` would be just as late.
+    // willShow/willHide, NOT didShow/didHide — these fire on the keyboard's
+    // FIRST frame and carry the exact height, which is the entire reason resize
+    // is "none". `did` is as late as the resize we are avoiding.
     Keyboard.addListener("keyboardWillShow", (info: { keyboardHeight: number }) => {
       setOpen(true)
       setInset(info?.keyboardHeight ?? 0)
@@ -184,6 +235,19 @@ export function subscribeKeyboard(cb: (state: { inset: number; open: boolean }) 
   const wrapped = () => cb({ inset, open })
   listeners.add(wrapped)
   return () => { listeners.delete(wrapped) }
+}
+
+/**
+ * Everything this module decided, for on-screen inspection (super-only, in the
+ * switcher popover). Cheap to read; safe to call any time.
+ */
+export function keyboardDiagnostics(): {
+  world: KeyboardWorld
+  reportedMode: string
+  inset: number
+  open: boolean
+} {
+  return { world, reportedMode: reportedMode || "(not asked)", inset, open }
 }
 
 /** Dismiss the keyboard by blurring whatever text field currently owns it. */

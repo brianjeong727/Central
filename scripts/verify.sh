@@ -84,6 +84,7 @@ LINT_STATUS="n/a"
 HEX_STATUS="n/a"
 DEDUP_STATUS="n/a"
 COPIES_STATUS="n/a"
+CHROME_STATUS="n/a"
 SERVER_STATUS="fail"
 E2E_STATUS="n/a"
 
@@ -208,6 +209,25 @@ else
   exit 1
 fi
 
+# ── (c5) mobile chrome-title constant (BLOCKING) ─────────────────────────────
+# Convention #27 pinned WHERE the chrome row sits; nothing pinned how its title
+# LOOKS, so five chromes drifted to 22/20/15 (and the back-label to plum) while
+# every position assertion kept passing. Any file that builds a chrome row must
+# take its title type from POCKET_CHROME_TITLE.
+echo "▶ scripts/check-chrome-title.sh"
+CHROME_LOG="$(mktemp)"
+if bash scripts/check-chrome-title.sh >"$CHROME_LOG" 2>&1; then
+  CHROME_STATUS="pass"
+  tail -n 1 "$CHROME_LOG"
+else
+  CHROME_STATUS="fail"
+  echo "── chrome-title FAILED (BLOCKING) ───────────────────"
+  cat "$CHROME_LOG"
+  echo "─────────────────────────────────────────────────────"
+  echo "════════ VERIFY RESULT: FAIL (chrome-title) ════════"
+  exit 1
+fi
+
 # ── (d) restart dev server ───────────────────────────────────────────────────
 case "$PORT" in
   3000) SLOT="main" ;;
@@ -267,6 +287,7 @@ printf '  %-8s %s\n' "lockfile" "$LOCK_STATUS"
 printf '  %-8s %s\n' "hex"    "$HEX_STATUS"
 printf '  %-8s %s\n' "dedup"  "$DEDUP_STATUS"
 printf '  %-8s %s\n' "copies" "$COPIES_STATUS"
+printf '  %-8s %s\n' "chrome" "$CHROME_STATUS"
 printf '  %-8s %s (:%s)\n' "server" "$SERVER_STATUS" "$PORT"
 printf '  %-8s %s\n' "e2e"    "$E2E_STATUS"
 echo "════════════════════════════════════════"

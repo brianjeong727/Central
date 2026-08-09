@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EmptyState, MONO_STYLE, EYEBROW_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
-import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu, PocketFilterChip, PocketFilterChipRow, PocketCard, PocketKicker, PocketButton, PocketSwitch, PocketTag, POCKET_KICKER_STYLE, useScrollResetOn, BackChevron } from "@/components/central"
+import { TabPageHeader, PageTitle, AnnouncementsListSkeleton, FilterDropdown, CentralButton, SubpageShell, ContentActionButton, ConfirmDialog, SegmentedControl, ActionMenu, PocketFilterChip, PocketFilterChipRow, PocketCard, PocketKicker, PocketButton, PocketSwitch, PocketTag, POCKET_KICKER_STYLE, useScrollResetOn, BackChevron, POCKET_CHROME_TITLE } from "@/components/central"
 import type { ActionMenuItem } from "@/components/central"
 import { audienceLabel, formatDate, previewBody } from "../utils"
 import { useOpenMemberProfile } from "../member-profile-context"
@@ -333,7 +333,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           rather than wrapping against Save draft + Publish. ── */}
       <div className="md:hidden flex items-center gap-3 px-5 pt-6 pb-4" style={{ borderBottom: "1px solid var(--line)" }}>
         <BackChevron onClick={onClose} />
-        <span className="flex-1 min-w-0 truncate" style={{ fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05 }}>{titleText}</span>
+        <span className="flex-1 min-w-0" style={{ ...POCKET_CHROME_TITLE }}>{titleText}</span>
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* "Save" (quiet) = save-as-draft — the full "Save draft" label crowds the
               one-line chrome and truncates the title (Brian, 2026-07-15). Publish =
