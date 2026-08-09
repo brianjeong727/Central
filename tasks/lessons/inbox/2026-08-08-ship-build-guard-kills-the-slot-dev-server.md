@@ -32,5 +32,15 @@ cleanup prompted by the hook.
 returning `307` is CORRECT (the auth redirect for an unauthenticated curl), not a
 failure. Reading that 307 as an error is its own small trap.
 
-`scripts/verify.sh` gets this right — it frees the port, builds, then restarts and
-polls. `/ship` does not, because its guard is a bare `npm run build`.
+`scripts/verify.sh` got this right from the start — it frees the port, builds, then
+restarts and polls. `/ship` did not, because its guard was a bare `npm run build`.
+
+**FIXED 2026-08-09** — `.claude/commands/ship.md` now frees the port before the
+build (step 3) and restarts + polls a rendered route before reporting (step 8).
+
+The part worth keeping after the fix: **writing this lesson down did not stop it
+happening again.** It was captured after the second occurrence, and the very next
+ship broke the server the same way — the lesson sat in a file nobody re-reads
+mid-task, while the failure sat in a command that ran unchanged. A recurring
+operational failure needs the fix in the RUNBOOK that executes, not a note about
+the runbook. Prefer editing the command over recording the mistake.
