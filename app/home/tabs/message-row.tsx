@@ -644,9 +644,20 @@ function MessageRowBase({
                       <div
                         className={msg.reply_to_id ? "mt-2 mb-0.5" : ""}
                       >
+                        {/* The long-press contract (Convention #7) lives on the
+                            bubble, but iOS ALSO opens its own Save/Copy/Share
+                            sheet on a long-pressed <img>, so both fired at once
+                            and the native one won the gesture. Suppressing the
+                            callout on the image leaves the bubble's handlers
+                            untouched — the timing contract is unchanged.
+                            onContextMenu covers Android/desktop, which use a
+                            context-menu event rather than the callout. */}
                         <img
                           src={msg.attachment_url}
                           alt="Image"
+                          draggable={false}
+                          onContextMenu={(e) => e.preventDefault()}
+                          style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
                           className="w-full max-h-[280px] object-cover cursor-pointer"
                         />
                       </div>

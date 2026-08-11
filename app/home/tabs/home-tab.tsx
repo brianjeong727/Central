@@ -338,19 +338,32 @@ export function HomeTab({
       { data: verses },
       { data: slideRows },
     ] = await Promise.all([
-      supabase
-        .from("announcements")
-        .select("*")
-        .eq("ministry_id", ministryId)
-        // Drafts are app-filtered everywhere (announcements RLS is ministry-scoped
-        // only — it does NOT gate on status, so a draft row is readable by any
-        // member). Home is a published-only glance surface: exclude drafts here for
-        // EVERYONE (hero, the recent-announcements digest, and the up-next fallback
-        // all read this list) so an unpublished draft can never surface on Home.
-        .or("status.is.null,status.eq.published")
-        .order("is_pinned", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(10),
+      (() => {
+        let q = supabase
+          .from("announcements")
+          .select("*")
+          .eq("ministry_id", ministryId)
+          // Drafts are app-filtered everywhere (announcements RLS is ministry-scoped
+          // only — it does NOT gate on status, so a draft row is readable by any
+          // member). Home is a published-only glance surface: exclude drafts here for
+          // EVERYONE (hero, the recent-announcements digest, and the up-next fallback
+          // all read this list) so an unpublished draft can never surface on Home.
+          .or("status.is.null,status.eq.published")
+        // AUDIENCE. This gate existed on the Announcements tab and NOT here, so a
+        // class-only announcement was correctly hidden from the feed and still
+        // surfaced on Home — in the hero, the digest, and the Featured fallback.
+        // Same expression as announcements-tab.tsx so the two cannot drift.
+        if (!isLeaderOrAdmin) {
+          const gradYear = profile.graduation_year
+          q = q.or(gradYear
+            ? `audience.is.null,audience.eq.all,audience.eq.${gradYear},audience.eq.group`
+            : `audience.is.null,audience.eq.all,audience.eq.group`)
+        }
+        return q
+          .order("is_pinned", { ascending: false })
+          .order("created_at", { ascending: false })
+          .limit(10)
+      })(),
       supabase
         .from("home_verses")
         .select("reference, text")
@@ -373,7 +386,12 @@ export function HomeTab({
       homeVerse = verses[dayOfYear % verses.length] as { reference: string; text: string }
     }
     const list = anns ?? []
-    const hero = list.find((a) => a.is_pinned) ?? list[0] ?? null
+    // Featured FALLBACK (used only when no slides are curated) is whole-church
+    // ONLY — a class-specific post is not "featured for the church" even for the
+    // leaders who can see it. Curated slides are unaffected: a leader who
+    // deliberately features something has already made that call.
+    const churchWide = list.filter((a) => a.audience == null || a.audience === "all")
+    const hero = churchWide.find((a) => a.is_pinned) ?? churchWide[0] ?? null
     const eventCount = list.filter((a) => a.is_event).length
     // Latest 2 by recency (list is pinned-first, so re-sort by created_at for "latest").
     const recentAnns = [...list]
@@ -1169,8 +1187,18 @@ export function HomeTab({
 
           {/* ── Up Next — mobile (Pocket scroll-snap carousel) ── */}
           <section>
-            {/* §4.1b constant "Featured" eyebrow above the carousel */}
-            <HeroSectionLabel breathe />
+            {/* §4.1b constant "Featured" eyebrow above the carousel.
+                Curate was desktop-only, so a leader on a phone had NO way to reach
+                HomeSlideManager — the carousel could only ever be edited from a
+                laptop. Same ghost action in the same section-label slot as desktop
+                (Convention #15: the action belongs to the section's own body header,
+                not the chrome row), gated on the same canCurateHome. */}
+            <HeroSectionLabel
+              breathe
+              action={canCurateHome
+                ? <ContentActionButton label="Curate" variant="ghost" onClick={() => setManagerOpen(true)} />
+                : undefined}
+            />
             {loading ? (
               <HomeHeroSkeleton showLabel={false} />
             ) : pocketCards.length > 0 ? (

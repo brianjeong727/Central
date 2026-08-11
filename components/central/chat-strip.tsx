@@ -22,6 +22,11 @@ export interface ChatPreview {
   // is a recency feed and never reorders by pinned.
   muted?: boolean
   pinned?: boolean
+  /** Raw last-message instant. `time` above is a RELATIVE label derived from it,
+   *  so it goes stale as time passes and not only as data changes — the app layer
+   *  re-derives the label from this on a timer (home-app.tsx). Kept on the type
+   *  rather than local to the mapper because that re-derivation needs it. */
+  _ts?: string
 }
 
 interface ChatStripProps {

@@ -1456,6 +1456,16 @@ export function AnnouncementCard({ announcement, ministryId, userRole, isDraft =
                 {announcement.is_event ? `Event · ${formatDate(eventDate)}` : formatDate(announcement.created_at)}
               </span>
               {isDraft && <PocketTag label="Draft" />}
+              {/* Pinned had NO signifier on the phone card — desktop shows a plum
+                  "📌 Pinned" pill and the detail view shows one even on mobile, so
+                  the list was the only place the state was invisible. Same plum
+                  fill as desktop; scaled to the card's 9–10px tag grammar. */}
+              {announcement.is_pinned && (
+                <span style={{ fontSize: 9, letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "var(--plum)", color: "var(--cream-on-dark)", textTransform: "uppercase", fontWeight: 500 }}>📌 Pinned</span>
+              )}
+              {announcement.is_sub_pinned && (
+                <span style={{ fontSize: 9, letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "var(--plum-tint)", border: "1px solid color-mix(in srgb, var(--plum) 25%, var(--cream))", color: "var(--plum)", textTransform: "uppercase", fontWeight: 500 }}>For You</span>
+              )}
               {announcement.audience && announcement.audience !== "all" && (
                 <span style={{ fontSize: 9, letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "var(--line-3)", color: "var(--body)", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
               )}

@@ -16,6 +16,11 @@ interface BottomNavProps {
   // (open chat overlay, CreateChatScreen, announcement compose). Spec: mobile
   // design system §2.2 "Hidden on full-screen composers".
   hidden?: boolean
+  // An announcement DETAIL overlay is open. It mounts over whatever tab you were
+  // on (Home, usually) without changing activeTab, so the pill would otherwise
+  // keep Home lit while the user is plainly reading an announcement. The pill
+  // reflects what is on screen, not which tab state happens to hold.
+  announcementOpen?: boolean
 }
 
 // Floating "Pocket" pill nav (ratified B3 mobile). Home / Announcements / Chats /
@@ -30,7 +35,7 @@ const TABS_BASE = [
 
 const PLAN_TAB = { id: "plan" as Tab, label: "Workspace", icon: ClipboardList }
 
-export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false, hidden = false }: BottomNavProps) {
+export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false, hidden = false, announcementOpen = false }: BottomNavProps) {
   // Plain member: Home/Chats/Announcements (3). Team member/leader/gov admin: +Workspace (4).
   const tabs = showPlan ? [...TABS_BASE, PLAN_TAB] : TABS_BASE
   if (hidden) return null
@@ -56,7 +61,7 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = 
           // otherwise resolve normally (Home wins for give/forms/settings/etc.). On the
           // profile tab nothing lights (Profile isn't in the pill — it's the avatar).
           const isActive =
-            activeTab === "announcements"
+            activeTab === "announcements" || announcementOpen
               ? tab.id === "announcements"
               : sectionForTab(activeTab)?.id === tab.id
           const Icon = tab.icon
