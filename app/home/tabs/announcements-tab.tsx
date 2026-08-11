@@ -168,6 +168,14 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const [isEvent, setIsEvent] = useState(existing?.is_event ?? false)
   const [eventDate, setEventDate] = useState(() => instantToDateTimeInput(existing?.event_date, timeZone))
   const [showAttendees, setShowAttendees] = useState(existing?.show_attendees ?? false)
+  // Feature on Home. The carousel is the church's front page, so this is offered
+  // ONLY for whole-church announcements — a class-only post being "featured" to
+  // everyone is the same audience leak the Home fallback had. Gating the CONTROL
+  // rather than filtering later keeps the rule visible to the person deciding.
+  const [featureOnHome, setFeatureOnHome] = useState(false)
+  // The slide row that already exists for this announcement, if any. Editing must
+  // be able to turn the toggle OFF, which means knowing what to delete.
+  const [existingSlideId, setExistingSlideId] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(existing?.image_url ?? null)
   const [submitting, setSubmitting] = useState(false)
@@ -178,6 +186,26 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const [attachedFormId, setAttachedFormId] = useState<string | null>(null)
   const [initialFormId, setInitialFormId] = useState<string | null>(null)
   const [availableForms, setAvailableForms] = useState<AttachableForm[]>([])
+
+  // On the edit path, reflect whether this announcement is ALREADY featured, so
+  // the toggle shows its real state and can be turned off.
+  useEffect(() => {
+    if (!isEditing || !existing) return
+    let cancelled = false
+    supabase
+      .from("home_slides")
+      .select("id")
+      .eq("ministry_id", ministryId)
+      .eq("announcement_id", existing.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return
+        setExistingSlideId(data?.id ?? null)
+        setFeatureOnHome(!!data)
+      })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, existing?.id, ministryId])
 
   // Load attachable forms: unarchived + (unattached OR already attached to THIS
   // announcement when editing). Prime the current attachment on the edit path.
@@ -273,6 +301,32 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
       if (insertError) { setError(insertError.message); setSubmitting(false); return }
       announcementId = data.id
       resultAnn = data as Announcement
+    }
+
+    // Reconcile the Featured slide. Deliberately the SAME home_slides row the
+    // Curate manager writes — one mechanism, so a slide added here is editable
+    // there and vice versa, rather than two paths writing the table differently.
+    // Only whole-church announcements can hold one, so a narrowed audience on an
+    // edit removes an existing slide even if the toggle was never touched.
+    const wantsFeature = featureOnHome && audience === "all" && status === "published"
+    if (wantsFeature && !existingSlideId) {
+      const { data: siblings } = await supabase
+        .from("home_slides")
+        .select("order_index")
+        .eq("ministry_id", ministryId)
+      const nextOrder = siblings && siblings.length
+        ? Math.max(...siblings.map((r) => (r as { order_index: number }).order_index)) + 1
+        : 0
+      await supabase.from("home_slides").insert({
+        ministry_id: ministryId,
+        slide_type: "announcement",
+        announcement_id: announcementId,
+        calendar_event_id: null,
+        order_index: nextOrder,
+        created_by: userId,
+      })
+    } else if (!wantsFeature && existingSlideId) {
+      await supabase.from("home_slides").delete().eq("id", existingSlideId).eq("ministry_id", ministryId)
     }
 
     // Reconcile the form attachment by flipping announcement_forms.announcement_id.
@@ -440,6 +494,19 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
               </div>
             </div>
           )}
+          {/* Feature on Home — whole-church only. Hidden rather than disabled for a
+              narrower audience: the carousel is the church's front page, so a
+              class-only post simply is not a candidate, and an explanation the
+              author cannot act on is noise. */}
+          {audience === "all" && (
+            <div className="flex items-center gap-3">
+              <PocketSwitch checked={featureOnHome} onChange={setFeatureOnHome} ariaLabel="Feature on Home" />
+              <div>
+                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Feature on Home</p>
+                <p className="text-[13px] text-[var(--muted-text)] mt-0.5">Shows in the Featured carousel</p>
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ borderTop: "1px solid var(--line-3)" }} />
@@ -574,6 +641,24 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                     <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
                     <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
                   </div>
+                </div>
+              </div>
+            )}
+            {/* Feature on Home — whole-church only (see the mobile twin). Same
+                switch grammar as the attendees toggle beside it. */}
+            {audience === "all" && (
+              <div className="flex items-start gap-3" style={{ marginTop: 16 }}>
+                <button
+                  type="button"
+                  onClick={() => setFeatureOnHome((v) => !v)}
+                  aria-label="Feature on Home"
+                  style={{ width: 34, height: 20, borderRadius: 999, background: featureOnHome ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
+                >
+                  <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.2s", left: featureOnHome ? "16px" : "2px" }} />
+                </button>
+                <div>
+                  <p className="text-[13px] font-medium text-[var(--ink)]">Feature on Home</p>
+                  <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Shows in the Featured carousel</p>
                 </div>
               </div>
             )}
