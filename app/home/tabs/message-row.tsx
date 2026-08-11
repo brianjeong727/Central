@@ -198,7 +198,13 @@ function MessageRowBase({
     const ro = new ResizeObserver(measure)
     ro.observe(menuEl)
     return () => ro.disconnect()
-  }, [anyMenuOpen])
+    // Depend on WHICH menu is open, not merely whether one is. `anyMenuOpen` stays
+    // true across emoji-bar → full-picker (the bar closes as the picker opens), so
+    // a boolean dep left this effect un-rerun: menuRef had swapped to the new node
+    // while the ResizeObserver was still watching the DETACHED bar, and placeBelow
+    // kept the ~44px bar's verdict. The 435px picker then rendered above a message
+    // 204px down and 235px of it sat off the top of the screen, unreachable.
+  }, [anyMenuOpen, isEmojiPickerOpen, isFullPickerOpen, isContextMenuOpen])
 
   const groupGap = showGroupGap ? "mt-3" : ""
 
