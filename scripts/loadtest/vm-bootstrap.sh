@@ -38,8 +38,16 @@ grep -q 'central-loadtest' /etc/security/limits.conf 2>/dev/null || cat >>/etc/s
 EOF
 sysctl -qw net.ipv4.ip_local_port_range="10000 65535"
 sysctl -qw net.core.somaxconn=4096
+# DO droplets ship with NO swap. 8 worker processes x ~25 realtime clients lands near
+# 1GB on a 2GB box — headroom, but an OOM kill 15min into the hold would waste the
+# whole window, and memory pressure also shows up as event-loop stall (which trips
+# fleet.cjs's own tripwire and invalidates the run). 2G of swap is cheap insurance.
+if ! swapon --show | grep -q swapfile; then
+  fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap -q /swapfile && swapon /swapfile
+  sysctl -qw vm.swappiness=10   # only under real pressure, never for cold pages
+fi
 mkdir -p /root/central/scripts
-node -v
+node -v; free -m | head -3
 REMOTE
 
 echo "==> [2/4] copy harness + env"

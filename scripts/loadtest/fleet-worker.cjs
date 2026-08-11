@@ -22,7 +22,11 @@ const loopDelay = monitorEventLoopDelay({ resolution: 20 })
 loopDelay.enable()
 
 const clients = new Map() // email -> {sb, channels: Map<topic, ch>, entry state}
-let stats = { connected: 0, joined: 0, joinFails: 0, fallbacks: 0, recoveries: 0, recv: 0, disconnects: 0, lrWrites: 0 }
+// churn* are tracked SEPARATELY from disconnects on purpose: a churned socket is an
+// intentional drop, and folding it into `disconnects` would trip fleet.cjs's >10%
+// tripwire and abort a healthy run. Real unexpected drops must stay visible.
+let stats = { connected: 0, joined: 0, joinFails: 0, fallbacks: 0, recoveries: 0, recv: 0, disconnects: 0, lrWrites: 0,
+              churnDrops: 0, churnRejoins: 0, churnRejoinFails: 0 }
 
 function log(rec) { out.log({ w: WORKER_ID, ...rec }) }
 
@@ -57,6 +61,14 @@ function subscribeChatTopic(state, gid) {
         if (status === "SUBSCRIBED") {
           stats.joined++
           log({ ev: "joined", c: state.email, topic, ms: Date.now() - t0, retry: retryAttempt })
+          // A churned client is only truly "back" once a chat topic re-subscribes —
+          // that's when the phone can receive again. Timing startClient()'s return
+          // instead measured ~2ms of local setup and told us nothing.
+          if (state.rejoinT0) {
+            stats.churnRejoins++
+            log({ ev: "churn_rejoin", c: state.email, ms: Date.now() - state.rejoinT0 })
+            state.rejoinT0 = null
+          }
           if (state.fallbacks.has(gid)) {
             state.sb.removeChannel(state.fallbacks.get(gid))
             state.fallbacks.delete(gid)
@@ -91,10 +103,15 @@ function subscribeChatTopic(state, gid) {
   attempt(0)
 }
 
-async function startClient(row) {
+// rejoinT0 is set at state CREATION, not after the await — subscribeChatTopic can
+// reach SUBSCRIBED before an assignment made after `await startClient()` lands.
+async function startClient(row, rejoinT0 = null) {
   const state = {
     email: row.email, userId: row.user_id, open: row.open, sb: userClient(row.access_token),
     channels: new Map(), fallbacks: new Map(), closed: false,
+    // Kept so churn can rebuild this client after its "backgrounded" gap. `token`
+    // tracks the coordinator's refreshes so a rejoin never uses a stale JWT.
+    row, token: row.access_token, rejoinT0,
   }
   clients.set(row.email, state)
   const t0 = Date.now()
@@ -124,6 +141,44 @@ async function startClient(row) {
 
 let shuttingDown = false
 
+// ── Socket churn: simulate phones backgrounding and resuming ──────────────────
+// iOS suspends a websocket when the app backgrounds and the client rejoins on
+// resume. During a service, 200 phones lock/unlock continuously, so the realtime
+// layer sees CONTINUOUS reconnect churn — a different stress from the one-time
+// cold join spike the ramp already covers. This drops a client the way a suspend
+// does (no clean unsubscribe) and rejoins it after an offline gap.
+function teardown(state, { intentional }) {
+  state.closed = intentional // suppresses the disconnect counter for churn only
+  for (const ch of state.channels.values()) { try { state.sb.removeChannel(ch) } catch { /* */ } }
+  for (const fb of state.fallbacks.values()) { try { state.sb.removeChannel(fb) } catch { /* */ } }
+  state.channels.clear()
+  state.fallbacks.clear()
+  try { state.sb.realtime.disconnect() } catch { /* */ }
+}
+
+async function churnClient(email, offlineMs) {
+  const state = clients.get(email)
+  if (!state || state.churning || shuttingDown) return
+  state.churning = true
+  const row = { ...state.row, access_token: state.token }
+  teardown(state, { intentional: true })
+  clients.delete(email)
+  stats.churnDrops++
+  log({ ev: "churn_drop", c: email, offlineMs })
+
+  setTimeout(async () => {
+    if (shuttingDown) return
+    const t0 = Date.now()
+    try {
+      // churn_rejoin is logged by subscribeChatTopic once a topic reaches SUBSCRIBED.
+      await startClient(row, t0)
+    } catch (e) {
+      stats.churnRejoinFails++
+      log({ ev: "churn_rejoin_fail", c: email, err: String(e.message).slice(0, 120) })
+    }
+  }, offlineMs)
+}
+
 ;(async () => {
   log({ ev: "worker_start", clients: slice.length })
   for (const row of slice) {
@@ -137,15 +192,24 @@ let shuttingDown = false
 process.on("message", (m) => {
   if (m.type === "refresh") {
     const state = clients.get(m.email)
-    if (state) void state.sb.realtime.setAuth(m.token)
+    if (state) { state.token = m.token; void state.sb.realtime.setAuth(m.token) }
+  } else if (m.type === "churn") {
+    // Coordinator names how many to cycle; we pick which, so the victims are
+    // spread across this worker's slice rather than always the same clients.
+    const pool = [...clients.keys()].filter((e) => !clients.get(e).churning)
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[pool[i], pool[j]] = [pool[j], pool[i]]
+    }
+    for (const email of pool.slice(0, m.count)) {
+      // Jitter the offline gap: phones don't resume in lockstep, and a synchronized
+      // rejoin would manufacture a thundering herd the real world doesn't have.
+      const offline = m.minOfflineMs + Math.floor(Math.random() * (m.maxOfflineMs - m.minOfflineMs))
+      void churnClient(email, offline)
+    }
   } else if (m.type === "shutdown") {
     shuttingDown = true
-    for (const state of clients.values()) {
-      state.closed = true
-      for (const ch of state.channels.values()) state.sb.removeChannel(ch)
-      for (const fb of state.fallbacks.values()) state.sb.removeChannel(fb)
-      state.sb.realtime.disconnect()
-    }
+    for (const state of clients.values()) teardown(state, { intentional: true })
     log({ ev: "worker_shutdown" })
     out.close()
     setTimeout(() => process.exit(0), 1500)

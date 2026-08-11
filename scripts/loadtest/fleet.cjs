@@ -27,6 +27,12 @@ const WORKERS = Number(flag("--workers", 8))
 const OPEN_RATIO = Number(flag("--open-ratio", 0.25))
 const STAGGER = Number(flag("--stagger", 50))
 const RUN_ID = String(flag("--run-id", `run${Date.now()}`))
+// Socket churn — the mobile shape. % of the live fleet that backgrounds and resumes
+// PER MINUTE. 0 = off (the stable-connection shape, comparable to the 160-conn run).
+const CHURN_PCT_PER_MIN = Number(flag("--churn", 0))
+const CHURN_MIN_OFFLINE = Number(flag("--churn-min-offline", 5000))
+const CHURN_MAX_OFFLINE = Number(flag("--churn-max-offline", 30000))
+const CHURN_TICK_MS = 20000 // spread the per-minute budget over 3 ticks
 
 ;(async () => {
   const db = serviceClient()
@@ -85,7 +91,8 @@ const RUN_ID = String(flag("--run-id", `run${Date.now()}`))
   }
 
   function totals() {
-    let t = { connected: 0, joined: 0, joinFails: 0, fallbacks: 0, recv: 0, disconnects: 0, clients: 0 }
+    let t = { connected: 0, joined: 0, joinFails: 0, fallbacks: 0, recv: 0, disconnects: 0, clients: 0,
+              churnDrops: 0, churnRejoins: 0, churnRejoinFails: 0 }
     for (const { lastStat } of workers.values()) {
       if (!lastStat) continue
       for (const k of Object.keys(t)) t[k] += lastStat[k] ?? 0
@@ -106,6 +113,11 @@ const RUN_ID = String(flag("--run-id", `run${Date.now()}`))
       if (t.disconnects > 0.1 * t.clients) return abort(`disconnects ${t.disconnects} > 10% of ${t.clients}`)
     }
     if (rec.highLoopCount >= 3) return abort(`worker ${w} event-loop p99 > 1s x3 — measurements invalid`)
+    // Churn has its own tripwire: dropping is intentional, FAILING TO COME BACK is
+    // the actual mobile risk (a phone that resumes into a dead chat).
+    if (t.churnDrops >= 20 && t.churnRejoinFails > 0.05 * t.churnDrops) {
+      return abort(`churn rejoin failures ${t.churnRejoinFails} > 5% of ${t.churnDrops} drops`)
+    }
   }
 
   function abort(reason) {
@@ -149,6 +161,32 @@ const RUN_ID = String(flag("--run-id", `run${Date.now()}`))
     }
   }, 5 * 60 * 1000)
 
+  // Churn driver: each tick, hand every worker its share of the per-minute budget.
+  // Workers choose WHICH of their clients to cycle, so victims spread rather than
+  // repeatedly hitting the same sockets.
+  if (CHURN_PCT_PER_MIN > 0) {
+    console.log(`[fleet] churn ON — ${CHURN_PCT_PER_MIN}%/min background+resume, offline ${CHURN_MIN_OFFLINE}-${CHURN_MAX_OFFLINE}ms`)
+    setInterval(() => {
+      if (aborted) return
+      const t = totals()
+      if (!t.clients) return
+      const perMin = (CHURN_PCT_PER_MIN / 100) * t.clients
+      const perTick = perMin * (CHURN_TICK_MS / 60000)
+      const live = [...workers.values()]
+      if (!live.length) return
+      // Fractional budget → probabilistic rounding, so e.g. 0.4/worker still churns.
+      const each = perTick / live.length
+      for (const { proc } of live) {
+        const count = Math.floor(each) + (Math.random() < each % 1 ? 1 : 0)
+        if (count > 0) {
+          try {
+            proc.send({ type: "churn", count, minOfflineMs: CHURN_MIN_OFFLINE, maxOfflineMs: CHURN_MAX_OFFLINE })
+          } catch { /* worker gone */ }
+        }
+      }
+    }, CHURN_TICK_MS)
+  }
+
   // run the plan
   for (const step of PLAN) {
     if (aborted) break
@@ -159,7 +197,8 @@ const RUN_ID = String(flag("--run-id", `run${Date.now()}`))
     while (Date.now() < holdUntil && !aborted) {
       await sleep(5000)
       const t = totals()
-      console.log(`[fleet] clients=${t.clients} joined=${t.joined} fails=${t.joinFails} fallbacks=${t.fallbacks} recv=${t.recv} disc=${t.disconnects}`)
+      const churn = CHURN_PCT_PER_MIN > 0 ? ` churn=${t.churnDrops}/${t.churnRejoins}${t.churnRejoinFails ? `/FAIL:${t.churnRejoinFails}` : ""}` : ""
+      console.log(`[fleet] clients=${t.clients} joined=${t.joined} fails=${t.joinFails} fallbacks=${t.fallbacks} recv=${t.recv} disc=${t.disconnects}${churn}`)
     }
   }
   if (!aborted) { console.log("[fleet] plan complete — tearing down"); out.log({ ev: "plan_complete" }); shutdown(0) }

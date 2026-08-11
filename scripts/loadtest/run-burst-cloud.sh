@@ -33,6 +33,10 @@ FLEET_PLAN="${FLEET_PLAN:-50x90,100x90,200x900}"      # reaches 200 at ~T+180s, 
 FLEET_WORKERS="${FLEET_WORKERS:-8}"
 FLEET_STAGGER="${FLEET_STAGGER:-55}"
 FLEET_OPEN_RATIO="${FLEET_OPEN_RATIO:-0.25}"
+# Mobile shape: % of the live fleet that backgrounds+resumes per minute. 15%/min at
+# 200 clients ≈ a phone cycling every ~7 min, which is what a service looks like.
+# Set CHURN=0 to reproduce the stable-connection shape of the 160-conn baseline.
+CHURN="${CHURN:-15}"
 RAMP_WAIT_S="${RAMP_WAIT_S:-200}"                     # fleet start -> 200 held (plan 180s + ramp slack)
 SEND_LADDER="${SEND_LADDER:-0.5x150,1x150,2x180,4x180,8x150}"   # 810s, fits inside the 900s hold
 SEND_SENDERS="${SEND_SENDERS:-10}"
@@ -87,7 +91,7 @@ sleep "$BASELINE_S"
 say "FLEET on $VM — plan $FLEET_PLAN"
 "${SSH[@]}" "cd /root/central && ulimit -n 65535 && nohup node scripts/loadtest/fleet.cjs \
   --run-id '$RUN_ID' --plan '$FLEET_PLAN' --workers $FLEET_WORKERS \
-  --open-ratio $FLEET_OPEN_RATIO --stagger $FLEET_STAGGER \
+  --open-ratio $FLEET_OPEN_RATIO --stagger $FLEET_STAGGER --churn $CHURN \
   > /root/central/fleet.out 2>&1 & echo started" || { teardown; exit 1; }
 
 say "ramping — waiting ${RAMP_WAIT_S}s for the fleet to hold at 200"
