@@ -66,7 +66,7 @@ export async function GET(
   // The ministry's IANA zone is fetched IN PARALLEL with the rest (no added latency).
   // A server route can't read the client MinistryTimezoneProvider, and the feed used
   // to hardcode America/New_York while every scheduler computed Pacific.
-  const [ministryRes, eventsRes, timeZone] = await Promise.all([
+  const [ministryRes, eventsRes, annRes, timeZone] = await Promise.all([
     admin.from("ministries").select("name").eq("id", ministryId).maybeSingle(),
     admin
       .from("calendar_events")
@@ -74,6 +74,21 @@ export async function GET(
       .eq("ministry_id", ministryId)
       .is("parent_event_id", null)
       .order("start_date", { ascending: true }),
+    // Announcement-events were never exported, so an event that only ever existed
+    // as an announcement (the common case for a one-off) simply never reached a
+    // subscribed calendar. Whole-church only: a subscribed .ics has no viewer
+    // identity, so it cannot honour a per-class audience — exporting a narrowed
+    // announcement would leak it to every subscriber. Published only, for the
+    // same reason drafts are filtered everywhere else.
+    admin
+      .from("announcements")
+      .select("id, title, body, event_date, event_end_date, audience, status, is_event")
+      .eq("ministry_id", ministryId)
+      .eq("is_event", true)
+      .not("event_date", "is", null)
+      .or("audience.is.null,audience.eq.all")
+      .or("status.is.null,status.eq.published")
+      .order("event_date", { ascending: true }),
     getMinistryTimezone(admin, ministryId),
   ])
 
@@ -92,6 +107,14 @@ export async function GET(
     start_day: string | null
     end_day: string | null
     all_day: boolean | null
+  }[]
+
+  const annEvents = (annRes.data ?? []) as {
+    id: string
+    title: string
+    body: string | null
+    event_date: string
+    event_end_date: string | null
   }[]
 
   const now = new Date()
@@ -149,6 +172,23 @@ export async function GET(
     lines.push(fold(`SUMMARY:${esc(ev.title)}`))
     if (ev.description) lines.push(fold(`DESCRIPTION:${esc(ev.description)}`))
     if (ev.location)    lines.push(fold(`LOCATION:${esc(ev.location)}`))
+    lines.push("END:VEVENT")
+  }
+
+  // Announcement-events. Always timed (announcements have no all-day concept) and
+  // never all-day, so this is the simple instant path. A missing end becomes a
+  // zero-length VEVENT, which clients render as a point in time — correct for
+  // "starts at 7, ends whenever" and better than inventing a duration.
+  // UID namespace is distinct from calendar events so the two can never collide.
+  for (const a of annEvents) {
+    const endInstant = a.event_end_date && a.event_end_date !== a.event_date ? a.event_end_date : a.event_date
+    lines.push("BEGIN:VEVENT")
+    lines.push(fold(`UID:central-ann-${a.id}@joincentral.app`))
+    lines.push(`DTSTAMP:${stamp}`)
+    lines.push(`DTSTART:${icalDateTime(a.event_date)}`)
+    lines.push(`DTEND:${icalDateTime(endInstant)}`)
+    lines.push(fold(`SUMMARY:${esc(a.title)}`))
+    if (a.body) lines.push(fold(`DESCRIPTION:${esc(a.body)}`))
     lines.push("END:VEVENT")
   }
 
