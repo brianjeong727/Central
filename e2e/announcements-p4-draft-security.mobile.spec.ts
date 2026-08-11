@@ -188,10 +188,15 @@ test.describe.serial("P4 manual click-through — draft visibility + feed intera
     await page.goto("/home?tab=announcements")
     await page.getByRole("button", { name: "New announcement" }).filter({ visible: true }).first().click()
     await expect(vis(page, "Headline").first()).toBeVisible({ timeout: 10000 })
-    await expect(vis(page, "Event date & time", false)).toHaveCount(0)
+    // Labels are "Starts" / "Ends" since the end time landed — the single
+    // "Event date & time" field became a pair. Both are asserted: the optional
+    // end is the half most likely to be dropped by a later refactor, precisely
+    // because nothing breaks without it.
+    await expect(vis(page, "Starts", false)).toHaveCount(0)
     const eventSwitch = page.getByRole("switch", { name: "This is an event" }).filter({ visible: true }).first()
     await eventSwitch.click()
-    await expect(vis(page, "Event date & time", false).first()).toBeVisible({ timeout: 5000 })
+    await expect(vis(page, "Starts", false).first()).toBeVisible({ timeout: 5000 })
+    await expect(vis(page, "Ends", false).first()).toBeVisible({ timeout: 5000 })
     // Leave compose without saving.
     await page.getByRole("button", { name: "Back", exact: true }).filter({ visible: true }).first().click().catch(async () => {
       await page.goBack()

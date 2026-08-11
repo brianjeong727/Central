@@ -428,8 +428,8 @@ export function HomeTab({
         ? supabase.from("rsvps").select("user_id").eq("announcement_id", hero.id)
         : Promise.resolve({ data: [] as { user_id: string }[], error: null }),
       slideAnnIds.length
-        ? supabase.from("announcements").select("id, title, body, is_event, image_url, event_date, created_at").in("id", slideAnnIds).eq("ministry_id", ministryId)
-        : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean; image_url: string | null; event_date: string | null; created_at: string }[] }),
+        ? supabase.from("announcements").select("id, title, body, is_event, image_url, event_date, event_end_date, created_at").in("id", slideAnnIds).eq("ministry_id", ministryId)
+        : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean; image_url: string | null; event_date: string | null; event_end_date: string | null; created_at: string }[] }),
       slideEvIds.length
         ? supabase
             .from("calendar_events")
@@ -485,7 +485,7 @@ export function HomeTab({
           isEvent: a.is_event,
           imageUrl: a.image_url ?? null,
           hasForm: slideFormSet.has(a.id),
-          eventDetail: a.is_event && a.event_date ? { startDate: a.event_date, endDate: a.event_date, allDay: false, location: null } : undefined,
+          eventDetail: a.is_event && a.event_date ? { startDate: a.event_date, endDate: a.event_end_date ?? a.event_date, allDay: false, location: null } : undefined,
           createdAt: a.created_at,
         })
       } else {
@@ -786,7 +786,7 @@ export function HomeTab({
           body={heroAnn.body}
           isEvent={heroAnn.is_event}
           postedDate={heroAnn.created_at}
-          eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
+          eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_end_date ?? heroAnn.event_date, allDay: false, location: null } : undefined}
           userHasRsvped={userHasRsvped}
           rsvping={rsvping}
           rsvpCount={rsvpCount}
@@ -838,7 +838,7 @@ export function HomeTab({
     })
   }
   for (const a of forYouItems.filter((it) => it.is_event && !slideAnnIdSet.has(it.id))) {
-    const ed: UpNextEventDetail | undefined = a.event_date ? { startDate: a.event_date, endDate: a.event_date, allDay: false, location: null } : undefined
+    const ed: UpNextEventDetail | undefined = a.event_date ? { startDate: a.event_date, endDate: a.event_end_date ?? a.event_date, allDay: false, location: null } : undefined
     const { eyebrow, meta } = ed ? fmtEvent(ed, timeZone) : { eyebrow: "Up next", meta: "" }
     pocketCards.push({
       key: a.id,
@@ -965,7 +965,7 @@ export function HomeTab({
               body={heroAnn.body}
               isEvent={heroAnn.is_event}
               postedDate={heroAnn.created_at}
-              eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_date, allDay: false, location: null } : undefined}
+              eventDetail={heroAnn.is_event && heroAnn.event_date ? { startDate: heroAnn.event_date, endDate: heroAnn.event_end_date ?? heroAnn.event_date, allDay: false, location: null } : undefined}
               userHasRsvped={userHasRsvped}
               rsvping={rsvping}
               rsvpCount={rsvpCount}

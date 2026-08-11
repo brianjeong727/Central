@@ -167,6 +167,9 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const [audience, setAudience] = useState(existing?.audience ?? "all")
   const [isEvent, setIsEvent] = useState(existing?.is_event ?? false)
   const [eventDate, setEventDate] = useState(() => instantToDateTimeInput(existing?.event_date, timeZone))
+  // Optional end. NULL-when-empty is meaningful: plenty of announcements are "we
+  // start at 7" with no defined finish, so an empty field must not be coerced.
+  const [eventEndDate, setEventEndDate] = useState(() => instantToDateTimeInput(existing?.event_end_date, timeZone))
   const [showAttendees, setShowAttendees] = useState(existing?.show_attendees ?? false)
   // Feature on Home. The carousel is the church's front page, so this is offered
   // ONLY for whole-church announcements — a class-only post being "featured" to
@@ -257,6 +260,14 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     e?.preventDefault()
     if (!title.trim() || !body.trim()) { setError("Title and body are required."); return }
     if (!asDraft && isEvent && !eventDate.trim()) { setError("Events need a date & time before publishing."); return }
+    // The DB CHECK (announcements_event_end_after_start) already rejects both of
+    // these, correctly — but there is no <form> in this modal, so `required` and
+    // `min` on the inputs are advisory and never run. Without these guards the
+    // author sees the raw Postgres string ("new row for relation ... violates
+    // check constraint ...") in the error slot. Catch it where a sentence can be
+    // written instead; the constraint stays as the backstop.
+    if (isEvent && eventEndDate && !eventDate) { setError("Add a start time before an end time."); return }
+    if (isEvent && eventDate && eventEndDate && eventEndDate < eventDate) { setError("The end time must be after the start time."); return }
     setSubmitting(true)
     setError(null)
     const status = asDraft ? "draft" : "published"
@@ -288,15 +299,15 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     if (isEditing && existing) {
       const { data, error: updateError } = await supabase
         .from("announcements")
-        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, show_attendees: showAttendees, image_url: imageUrl, status })
+        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, event_end_date: isEvent && eventEndDate ? dateTimeInputToISO(eventEndDate, timeZone) : null, show_attendees: showAttendees, image_url: imageUrl, status })
         .eq("id", existing.id).eq("ministry_id", ministryId).select().maybeSingle()
       if (updateError) { setError(updateError.message); setSubmitting(false); return }
       announcementId = existing.id
-      resultAnn = (data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, show_attendees: showAttendees, image_url: imageUrl }) as Announcement
+      resultAnn = (data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, event_end_date: isEvent && eventEndDate ? dateTimeInputToISO(eventEndDate, timeZone) : null, show_attendees: showAttendees, image_url: imageUrl }) as Announcement
     } else {
       const { data, error: insertError } = await supabase
         .from("announcements")
-        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId, status })
+        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, event_end_date: isEvent && eventEndDate ? dateTimeInputToISO(eventEndDate, timeZone) : null, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId, status })
         .select().single()
       if (insertError) { setError(insertError.message); setSubmitting(false); return }
       announcementId = data.id
@@ -472,7 +483,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           {isEvent && (
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-1.5">
-                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Event date &amp; time</p>
+                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Starts</p>
                 {/* minWidth:0 + maxWidth:100% + border-box are all load-bearing.
                     `width:100%` alone does NOT shrink a native datetime-local below
                     its INTRINSIC width, which is wider than the ~350px a 390px phone
@@ -482,6 +493,18 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                     rather than adding to it. */}
                 <input
                   type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required
+                  style={{ fontSize: 15.5, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", fontFamily: "var(--serif)" }}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Ends <span className="font-normal text-[var(--muted-text)]">· optional</span></p>
+                {/* Not `required`: "starts at 7, ends whenever" is a real event.
+                    `min` keeps the picker from offering an end before the start —
+                    the DB CHECK rejects it anyway, and being told at write time
+                    beats being told after you hit Publish. */}
+                <input
+                  type="datetime-local" value={eventEndDate} min={eventDate || undefined}
+                  onChange={(e) => setEventEndDate(e.target.value)}
                   style={{ fontSize: 15.5, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", fontFamily: "var(--serif)" }}
                 />
               </div>
@@ -626,6 +649,14 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                   <p className="text-[13px] font-medium text-[var(--ink)]">Event date &amp; time</p>
                   <input
                     type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required
+                    style={{ fontSize: 13, color: "var(--ink)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: "var(--r-input)", padding: "8px 10px", outline: "none", width: "100%", fontFamily: "inherit" }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-medium text-[var(--muted-text)] mb-1.5">Ends <span className="font-normal">· optional</span></label>
+                  <input
+                    type="datetime-local" value={eventEndDate} min={eventDate || undefined}
+                    onChange={(e) => setEventEndDate(e.target.value)}
                     style={{ fontSize: 13, color: "var(--ink)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: "var(--r-input)", padding: "8px 10px", outline: "none", width: "100%", fontFamily: "inherit" }}
                   />
                 </div>
@@ -1682,8 +1713,20 @@ function detailWeekday(dateStr: string, timeZone: string): string {
 function detailMonthDay(dateStr: string, timeZone: string): string {
   return formatInZone(dateStr, timeZone, { month: "short", day: "numeric" })
 }
-function detailTime(dateStr: string, timeZone: string): string {
-  return formatInZone(dateStr, timeZone, { hour: "numeric", minute: "2-digit", hour12: true })
+function detailTime(dateStr: string, timeZone: string, endStr?: string | null): string {
+  const start = formatInZone(dateStr, timeZone, { hour: "numeric", minute: "2-digit", hour12: true })
+  if (!endStr) return start
+  const end = formatInZone(endStr, timeZone, { hour: "numeric", minute: "2-digit", hour12: true })
+  // Same clock time start and end is a zero-length event, which reads as a
+  // mistake rather than information — show the single time instead of "7 – 7".
+  if (end === start) return start
+  // A multi-DAY event needs the end's date too, or "7:00 PM – 2:00 AM" silently
+  // claims it ends the same night.
+  const sameDay = formatInZone(dateStr, timeZone, { year: "numeric", month: "short", day: "numeric" })
+    === formatInZone(endStr, timeZone, { year: "numeric", month: "short", day: "numeric" })
+  return sameDay
+    ? `${start} – ${end}`
+    : `${start} – ${formatInZone(endStr, timeZone, { month: "short", day: "numeric" })}, ${end}`
 }
 function detailPosted(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -1695,6 +1738,7 @@ interface DetailAnnouncement {
   body: string
   created_at: string
   event_date: string | null
+  event_end_date: string | null
   is_pinned: boolean
   is_event: boolean
   image_url: string | null
@@ -1857,7 +1901,7 @@ export function AnnouncementDetailView({
             <>
               <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 14 }}>{detailWeekday(ann.event_date, detailZone)}</div>
               <div style={{ fontFamily: DETAIL_SERIF, fontSize: 42, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date, detailZone)}</div>
-              <div style={{ fontFamily: DETAIL_SANS, fontSize: 18, color: "var(--ink)", marginTop: 9 }}>{detailTime(ann.event_date, detailZone)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 18, color: "var(--ink)", marginTop: 9 }}>{detailTime(ann.event_date, detailZone, ann.event_end_date)}</div>
             </>
           )}
           <CentralButton
@@ -1916,7 +1960,7 @@ export function AnnouncementDetailView({
             <>
               <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 12 }}>{detailWeekday(ann.event_date, detailZone)}</div>
               <div style={{ fontFamily: DETAIL_SERIF, fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date, detailZone)}</div>
-              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, color: "var(--ink)", marginTop: 8 }}>{detailTime(ann.event_date, detailZone)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, color: "var(--ink)", marginTop: 8 }}>{detailTime(ann.event_date, detailZone, ann.event_end_date)}</div>
             </>
           )}
           <CentralButton

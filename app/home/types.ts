@@ -113,6 +113,9 @@ export interface Announcement {
   is_sub_pinned: boolean
   is_event: boolean
   event_date: string | null
+  /** End instant for an event announcement; NULL when no end time was set.
+   *  Render through lib/tz.ts in the ministry zone (Convention #23). */
+  event_end_date: string | null
   image_url: string | null
   audience: string | null
   created_by: string | null
