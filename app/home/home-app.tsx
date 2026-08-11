@@ -191,6 +191,30 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   )
   const [chatRefreshKey, setChatRefreshKey] = useState(0)
   const [recentChats, setRecentChats] = useState<ChatPreview[]>(initialRecentChats ?? [])
+
+  // `time` on a ChatPreview is a RELATIVE label ("now", "15m", "3h") computed once
+  // by rowsToChatPreviews. Data arriving is not the only thing that makes it wrong —
+  // so does time passing, and nothing was re-running it, so a chat opened at 9:00
+  // still read "15m" at noon. Re-derive the label every minute from the raw `_ts`
+  // each row already carries. Cheap: a handful of rows, one setState a minute, and
+  // it no-ops when every label is unchanged so it cannot cause a render loop.
+  // Done here rather than in <ChatStrip> because components/central is a LEAF and
+  // must not import formatChatListTime from app/.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setRecentChats(prev => {
+        let changed = false
+        const next = prev.map(c => {
+          const fresh = c._ts ? formatChatListTime(c._ts) : ""
+          if (fresh === c.time) return c
+          changed = true
+          return { ...c, time: fresh }
+        })
+        return changed ? next : prev
+      })
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [])
   const [userTeams, setUserTeams] = useState<UserTeam[]>(initialUserTeams ?? [])
   const [allTeams, setAllTeams] = useState<Team[]>([])
   // True once the governance team list (allTeams) has been fetched, so the
@@ -1417,6 +1441,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
           chatsUnread={totalChatsUnread}
           showPlan={showPlanTab}
           hidden={composerOpen || globalOpenChat !== null}
+          announcementOpen={openAnnouncementId !== null}
         />
 
       </div>

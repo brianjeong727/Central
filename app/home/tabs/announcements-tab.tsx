@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import Image from "next/image"
-import useSWR from "swr"
+import useSWR, { useSWRConfig } from "swr"
+import { useMinistryTimezone } from "../ministry-timezone-context"
+import { instantToZoned, zonedTimeToISO, formatInZone } from "@/lib/tz"
 import { X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, Pin, PinOff, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
@@ -87,14 +89,31 @@ function AttachFormSection({ attachedFormId, setAttachedFormId, availableForms, 
   )
 }
 
-// Convert a stored ISO timestamp to the local `YYYY-MM-DDTHH:mm` value a
-// <input type="datetime-local"> expects (local time, not UTC).
-function isoToLocalInput(iso: string | null | undefined): string {
+// Stored instant → the `YYYY-MM-DDTHH:mm` a <input type="datetime-local"> wants,
+// read in the MINISTRY's zone (Convention #23).
+//
+// This used to build the string from new Date(iso).getHours() — the DEVICE zone —
+// and the write path mirrored the mistake with new Date(value).toISOString(). So a
+// leader in Pittsburgh typing 7pm stored an instant that a viewer elsewhere
+// rendered as a different clock time, and editing an existing event silently
+// rewrote it to whatever zone the editor happened to be in. Convention #23 exists
+// because two conventions once landed in one column and the rows became
+// indistinguishable; this form was still writing the second one.
+function instantToDateTimeInput(iso: string | null | undefined, timeZone: string): string {
   if (!iso) return ""
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return ""
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  try {
+    const { ymd, hhmm } = instantToZoned(iso, timeZone)
+    return `${ymd}T${hhmm}`
+  } catch { return "" }
+}
+
+// `YYYY-MM-DDTHH:mm` from the input → a true instant, interpreting the typed wall
+// clock as the MINISTRY's local time, which is what the user meant.
+function dateTimeInputToISO(value: string, timeZone: string): string | null {
+  if (!value) return null
+  const [ymd, hhmm] = value.split("T")
+  if (!ymd || !hhmm) return null
+  try { return zonedTimeToISO(ymd, hhmm, timeZone) } catch { return null }
 }
 
 const AUDIENCE_OPTIONS = [
@@ -139,6 +158,7 @@ const MOBILE_FILTERS: { id: "all" | "events" | "updates"; label: string }[] = [
 
 export function CreateAnnouncementModal({ userId, ministryId, existing, onClose, onSuccess }: CreateAnnouncementModalProps) {
   const supabase = createClient()
+  const timeZone = useMinistryTimezone()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const isEditing = !!existing
 
@@ -146,8 +166,19 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const [body, setBody] = useState(existing?.body ?? "")
   const [audience, setAudience] = useState(existing?.audience ?? "all")
   const [isEvent, setIsEvent] = useState(existing?.is_event ?? false)
-  const [eventDate, setEventDate] = useState(isoToLocalInput(existing?.event_date))
+  const [eventDate, setEventDate] = useState(() => instantToDateTimeInput(existing?.event_date, timeZone))
+  // Optional end. NULL-when-empty is meaningful: plenty of announcements are "we
+  // start at 7" with no defined finish, so an empty field must not be coerced.
+  const [eventEndDate, setEventEndDate] = useState(() => instantToDateTimeInput(existing?.event_end_date, timeZone))
   const [showAttendees, setShowAttendees] = useState(existing?.show_attendees ?? false)
+  // Feature on Home. The carousel is the church's front page, so this is offered
+  // ONLY for whole-church announcements — a class-only post being "featured" to
+  // everyone is the same audience leak the Home fallback had. Gating the CONTROL
+  // rather than filtering later keeps the rule visible to the person deciding.
+  const [featureOnHome, setFeatureOnHome] = useState(false)
+  // The slide row that already exists for this announcement, if any. Editing must
+  // be able to turn the toggle OFF, which means knowing what to delete.
+  const [existingSlideId, setExistingSlideId] = useState<string | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(existing?.image_url ?? null)
   const [submitting, setSubmitting] = useState(false)
@@ -158,6 +189,26 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const [attachedFormId, setAttachedFormId] = useState<string | null>(null)
   const [initialFormId, setInitialFormId] = useState<string | null>(null)
   const [availableForms, setAvailableForms] = useState<AttachableForm[]>([])
+
+  // On the edit path, reflect whether this announcement is ALREADY featured, so
+  // the toggle shows its real state and can be turned off.
+  useEffect(() => {
+    if (!isEditing || !existing) return
+    let cancelled = false
+    supabase
+      .from("home_slides")
+      .select("id")
+      .eq("ministry_id", ministryId)
+      .eq("announcement_id", existing.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return
+        setExistingSlideId(data?.id ?? null)
+        setFeatureOnHome(!!data)
+      })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, existing?.id, ministryId])
 
   // Load attachable forms: unarchived + (unattached OR already attached to THIS
   // announcement when editing). Prime the current attachment on the edit path.
@@ -209,6 +260,14 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     e?.preventDefault()
     if (!title.trim() || !body.trim()) { setError("Title and body are required."); return }
     if (!asDraft && isEvent && !eventDate.trim()) { setError("Events need a date & time before publishing."); return }
+    // The DB CHECK (announcements_event_end_after_start) already rejects both of
+    // these, correctly — but there is no <form> in this modal, so `required` and
+    // `min` on the inputs are advisory and never run. Without these guards the
+    // author sees the raw Postgres string ("new row for relation ... violates
+    // check constraint ...") in the error slot. Catch it where a sentence can be
+    // written instead; the constraint stays as the backstop.
+    if (isEvent && eventEndDate && !eventDate) { setError("Add a start time before an end time."); return }
+    if (isEvent && eventDate && eventEndDate && eventEndDate < eventDate) { setError("The end time must be after the start time."); return }
     setSubmitting(true)
     setError(null)
     const status = asDraft ? "draft" : "published"
@@ -240,19 +299,45 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     if (isEditing && existing) {
       const { data, error: updateError } = await supabase
         .from("announcements")
-        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? new Date(eventDate).toISOString() : null, show_attendees: showAttendees, image_url: imageUrl, status })
+        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, event_end_date: isEvent && eventEndDate ? dateTimeInputToISO(eventEndDate, timeZone) : null, show_attendees: showAttendees, image_url: imageUrl, status })
         .eq("id", existing.id).eq("ministry_id", ministryId).select().maybeSingle()
       if (updateError) { setError(updateError.message); setSubmitting(false); return }
       announcementId = existing.id
-      resultAnn = (data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? new Date(eventDate).toISOString() : null, show_attendees: showAttendees, image_url: imageUrl }) as Announcement
+      resultAnn = (data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, event_end_date: isEvent && eventEndDate ? dateTimeInputToISO(eventEndDate, timeZone) : null, show_attendees: showAttendees, image_url: imageUrl }) as Announcement
     } else {
       const { data, error: insertError } = await supabase
         .from("announcements")
-        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? new Date(eventDate).toISOString() : null, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId, status })
+        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, event_end_date: isEvent && eventEndDate ? dateTimeInputToISO(eventEndDate, timeZone) : null, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId, status })
         .select().single()
       if (insertError) { setError(insertError.message); setSubmitting(false); return }
       announcementId = data.id
       resultAnn = data as Announcement
+    }
+
+    // Reconcile the Featured slide. Deliberately the SAME home_slides row the
+    // Curate manager writes — one mechanism, so a slide added here is editable
+    // there and vice versa, rather than two paths writing the table differently.
+    // Only whole-church announcements can hold one, so a narrowed audience on an
+    // edit removes an existing slide even if the toggle was never touched.
+    const wantsFeature = featureOnHome && audience === "all" && status === "published"
+    if (wantsFeature && !existingSlideId) {
+      const { data: siblings } = await supabase
+        .from("home_slides")
+        .select("order_index")
+        .eq("ministry_id", ministryId)
+      const nextOrder = siblings && siblings.length
+        ? Math.max(...siblings.map((r) => (r as { order_index: number }).order_index)) + 1
+        : 0
+      await supabase.from("home_slides").insert({
+        ministry_id: ministryId,
+        slide_type: "announcement",
+        announcement_id: announcementId,
+        calendar_event_id: null,
+        order_index: nextOrder,
+        created_by: userId,
+      })
+    } else if (!wantsFeature && existingSlideId) {
+      await supabase.from("home_slides").delete().eq("id", existingSlideId).eq("ministry_id", ministryId)
     }
 
     // Reconcile the form attachment by flipping announcement_forms.announcement_id.
@@ -398,10 +483,29 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           {isEvent && (
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-1.5">
-                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Event date &amp; time</p>
+                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Starts</p>
+                {/* minWidth:0 + maxWidth:100% + border-box are all load-bearing.
+                    `width:100%` alone does NOT shrink a native datetime-local below
+                    its INTRINSIC width, which is wider than the ~350px a 390px phone
+                    leaves after the form's px-5 gutters — so the control ran off the
+                    right edge. min-width:0 lets it shrink, max-width pins the
+                    ceiling, and border-box keeps the 16px padding inside the 100%
+                    rather than adding to it. */}
                 <input
                   type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required
-                  style={{ fontSize: 15.5, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", fontFamily: "var(--serif)" }}
+                  style={{ fontSize: 15.5, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", fontFamily: "var(--serif)" }}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Ends <span className="font-normal text-[var(--muted-text)]">· optional</span></p>
+                {/* Not `required`: "starts at 7, ends whenever" is a real event.
+                    `min` keeps the picker from offering an end before the start —
+                    the DB CHECK rejects it anyway, and being told at write time
+                    beats being told after you hit Publish. */}
+                <input
+                  type="datetime-local" value={eventEndDate} min={eventDate || undefined}
+                  onChange={(e) => setEventEndDate(e.target.value)}
+                  style={{ fontSize: 15.5, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", fontFamily: "var(--serif)" }}
                 />
               </div>
               <div className="flex items-center gap-3">
@@ -410,6 +514,19 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                   <p className="text-[14.5px] font-semibold text-[var(--ink)]">Show attendees publicly</p>
                   <p className="text-[13px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
                 </div>
+              </div>
+            </div>
+          )}
+          {/* Feature on Home — whole-church only. Hidden rather than disabled for a
+              narrower audience: the carousel is the church's front page, so a
+              class-only post simply is not a candidate, and an explanation the
+              author cannot act on is noise. */}
+          {audience === "all" && (
+            <div className="flex items-center gap-3">
+              <PocketSwitch checked={featureOnHome} onChange={setFeatureOnHome} ariaLabel="Feature on Home" />
+              <div>
+                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Feature on Home</p>
+                <p className="text-[13px] text-[var(--muted-text)] mt-0.5">Shows in the Featured carousel</p>
               </div>
             </div>
           )}
@@ -535,6 +652,14 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                     style={{ fontSize: 13, color: "var(--ink)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: "var(--r-input)", padding: "8px 10px", outline: "none", width: "100%", fontFamily: "inherit" }}
                   />
                 </div>
+                <div>
+                  <label className="block text-[12px] font-medium text-[var(--muted-text)] mb-1.5">Ends <span className="font-normal">· optional</span></label>
+                  <input
+                    type="datetime-local" value={eventEndDate} min={eventDate || undefined}
+                    onChange={(e) => setEventEndDate(e.target.value)}
+                    style={{ fontSize: 13, color: "var(--ink)", background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: "var(--r-input)", padding: "8px 10px", outline: "none", width: "100%", fontFamily: "inherit" }}
+                  />
+                </div>
                 <div className="flex items-start gap-3">
                   <button
                     type="button"
@@ -547,6 +672,24 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                     <p className="text-[13px] font-medium text-[var(--ink)]">Show attendees publicly</p>
                     <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
                   </div>
+                </div>
+              </div>
+            )}
+            {/* Feature on Home — whole-church only (see the mobile twin). Same
+                switch grammar as the attendees toggle beside it. */}
+            {audience === "all" && (
+              <div className="flex items-start gap-3" style={{ marginTop: 16 }}>
+                <button
+                  type="button"
+                  onClick={() => setFeatureOnHome((v) => !v)}
+                  aria-label="Feature on Home"
+                  style={{ width: 34, height: 20, borderRadius: 999, background: featureOnHome ? "var(--plum)" : "var(--dashed)", border: "none", cursor: "pointer", position: "relative", flexShrink: 0, marginTop: 2, transition: "background 0.2s" }}
+                >
+                  <span style={{ position: "absolute", top: 2, width: 16, height: 16, borderRadius: 999, background: "var(--cream)", transition: "left 0.2s", left: featureOnHome ? "16px" : "2px" }} />
+                </button>
+                <div>
+                  <p className="text-[13px] font-medium text-[var(--ink)]">Feature on Home</p>
+                  <p className="text-[12px] text-[var(--muted-text)] mt-0.5">Shows in the Featured carousel</p>
                 </div>
               </div>
             )}
@@ -983,7 +1126,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         return applyToggle(prev)
       },
       { optimisticData: applyToggle, rollbackOnError: true, revalidate: false, populateCache: true }
-    )
+    ).then(() => refreshHome())
   }
 
   function handleNewAnnouncement(newAnn: Announcement, formMeta: { has_form: boolean; form_id: string | null }) {
@@ -1012,6 +1155,15 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.delete", entityType: "announcement", entityId: ann.id, entityLabel: ann.title })
   }
 
+  // Home and Announcements are SEPARATE SWR caches (["home-tab", …] vs
+  // ["announcements", …]), so a pin or an RSVP here left Home showing the old
+  // state until it happened to revalidate — which is the "click off the page and
+  // come back" the report describes. Invalidate the sibling cache by key prefix
+  // rather than threading a callback through both tabs.
+  const { mutate: globalMutate } = useSWRConfig()
+  const refreshHome = () =>
+    globalMutate((key) => Array.isArray(key) && key[0] === "home-tab", undefined, { revalidate: true })
+
   async function handlePinToggle(annId: string, currentlyPinned: boolean) {
     const client = createClient()
     const target = announcements.find(a => a.id === annId)
@@ -1025,6 +1177,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         ? { ...a, is_pinned: !currentlyPinned }
         : { ...a, is_pinned: currentlyPinned ? a.is_pinned : false }
     ), { revalidate: false })
+    refreshHome()
     logAudit({ ministryId, actorId: userId, actorName: userName, action: currentlyPinned ? "announcement.unpin" : "announcement.pin", entityType: "announcement", entityId: annId, entityLabel: target?.title ?? null })
   }
 
@@ -1035,6 +1188,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     mutateAnnouncements(prev => (prev ?? []).map(a =>
       a.id === annId ? { ...a, is_sub_pinned: !currentlySubPinned } : a
     ), { revalidate: false })
+    refreshHome()
     logAudit({ ministryId, actorId: userId, actorName: userName, action: currentlySubPinned ? "announcement.unsubpin" : "announcement.subpin", entityType: "announcement", entityId: annId, entityLabel: target?.title ?? null })
   }
 
@@ -1456,6 +1610,16 @@ export function AnnouncementCard({ announcement, ministryId, userRole, isDraft =
                 {announcement.is_event ? `Event · ${formatDate(eventDate)}` : formatDate(announcement.created_at)}
               </span>
               {isDraft && <PocketTag label="Draft" />}
+              {/* Pinned had NO signifier on the phone card — desktop shows a plum
+                  "📌 Pinned" pill and the detail view shows one even on mobile, so
+                  the list was the only place the state was invisible. Same plum
+                  fill as desktop; scaled to the card's 9–10px tag grammar. */}
+              {announcement.is_pinned && (
+                <span style={{ fontSize: 9, letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "var(--plum)", color: "var(--cream-on-dark)", textTransform: "uppercase", fontWeight: 500 }}>📌 Pinned</span>
+              )}
+              {announcement.is_sub_pinned && (
+                <span style={{ fontSize: 9, letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "var(--plum-tint)", border: "1px solid color-mix(in srgb, var(--plum) 25%, var(--cream))", color: "var(--plum)", textTransform: "uppercase", fontWeight: 500 }}>For You</span>
+              )}
               {announcement.audience && announcement.audience !== "all" && (
                 <span style={{ fontSize: 9, letterSpacing: "0.08em", padding: "2px 7px", borderRadius: 999, background: "var(--line-3)", color: "var(--body)", textTransform: "uppercase", fontWeight: 500 }}>{audienceLabel(announcement.audience)}</span>
               )}
@@ -1537,15 +1701,32 @@ const DETAIL_SERIF = "var(--serif)"
 const DETAIL_SANS = "var(--font-inter)"
 const DETAIL_MONO = EYEBROW_STYLE
 
-// ── Detail date-part helpers (sync, local) ───────────────────────────────────
-function detailWeekday(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", { weekday: "long" })
+// ── Detail date-part helpers ─────────────────────────────────────────────────
+// EVENT parts take the ministry zone (Convention #23): event_date is a true
+// instant, so a bare toLocale* printed the VIEWER's clock — a student home for
+// the summer saw a different start time than the one the event actually starts
+// at. `posted` deliberately stays device-local: when something was published is
+// a fact about the reader's own timeline, not about the ministry's calendar.
+function detailWeekday(dateStr: string, timeZone: string): string {
+  return formatInZone(dateStr, timeZone, { weekday: "long" })
 }
-function detailMonthDay(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+function detailMonthDay(dateStr: string, timeZone: string): string {
+  return formatInZone(dateStr, timeZone, { month: "short", day: "numeric" })
 }
-function detailTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+function detailTime(dateStr: string, timeZone: string, endStr?: string | null): string {
+  const start = formatInZone(dateStr, timeZone, { hour: "numeric", minute: "2-digit", hour12: true })
+  if (!endStr) return start
+  const end = formatInZone(endStr, timeZone, { hour: "numeric", minute: "2-digit", hour12: true })
+  // Same clock time start and end is a zero-length event, which reads as a
+  // mistake rather than information — show the single time instead of "7 – 7".
+  if (end === start) return start
+  // A multi-DAY event needs the end's date too, or "7:00 PM – 2:00 AM" silently
+  // claims it ends the same night.
+  const sameDay = formatInZone(dateStr, timeZone, { year: "numeric", month: "short", day: "numeric" })
+    === formatInZone(endStr, timeZone, { year: "numeric", month: "short", day: "numeric" })
+  return sameDay
+    ? `${start} – ${end}`
+    : `${start} – ${formatInZone(endStr, timeZone, { month: "short", day: "numeric" })}, ${end}`
 }
 function detailPosted(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -1557,6 +1738,7 @@ interface DetailAnnouncement {
   body: string
   created_at: string
   event_date: string | null
+  event_end_date: string | null
   is_pinned: boolean
   is_event: boolean
   image_url: string | null
@@ -1589,6 +1771,8 @@ export function AnnouncementDetailView({
   onGoToList: () => void
 }) {
   const supabase = createClient()
+  // Event parts render in the MINISTRY's zone, never the device's (Convention #23).
+  const detailZone = useMinistryTimezone()
   const openMemberProfile = useOpenMemberProfile()
   const [ann, setAnn] = useState<DetailAnnouncement | null>(null)
   const [loading, setLoading] = useState(true)
@@ -1715,9 +1899,9 @@ export function AnnouncementDetailView({
           <div style={{ ...monoStyle }}>Event</div>
           {ann.event_date && (
             <>
-              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 14 }}>{detailWeekday(ann.event_date)}</div>
-              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 42, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date)}</div>
-              <div style={{ fontFamily: DETAIL_SANS, fontSize: 18, color: "var(--ink)", marginTop: 9 }}>{detailTime(ann.event_date)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 14 }}>{detailWeekday(ann.event_date, detailZone)}</div>
+              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 42, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date, detailZone)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 18, color: "var(--ink)", marginTop: 9 }}>{detailTime(ann.event_date, detailZone, ann.event_end_date)}</div>
             </>
           )}
           <CentralButton
@@ -1774,9 +1958,9 @@ export function AnnouncementDetailView({
           <div style={POCKET_KICKER_STYLE}>Event</div>
           {ann.event_date && (
             <>
-              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 12 }}>{detailWeekday(ann.event_date)}</div>
-              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date)}</div>
-              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, color: "var(--ink)", marginTop: 8 }}>{detailTime(ann.event_date)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 12 }}>{detailWeekday(ann.event_date, detailZone)}</div>
+              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date, detailZone)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, color: "var(--ink)", marginTop: 8 }}>{detailTime(ann.event_date, detailZone, ann.event_end_date)}</div>
             </>
           )}
           <CentralButton
