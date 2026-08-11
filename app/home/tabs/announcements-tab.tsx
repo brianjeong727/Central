@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import Image from "next/image"
 import useSWR, { useSWRConfig } from "swr"
+import { useMinistryTimezone } from "../ministry-timezone-context"
+import { instantToZoned, zonedTimeToISO, formatInZone } from "@/lib/tz"
 import { X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, Pin, PinOff, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
@@ -87,14 +89,31 @@ function AttachFormSection({ attachedFormId, setAttachedFormId, availableForms, 
   )
 }
 
-// Convert a stored ISO timestamp to the local `YYYY-MM-DDTHH:mm` value a
-// <input type="datetime-local"> expects (local time, not UTC).
-function isoToLocalInput(iso: string | null | undefined): string {
+// Stored instant → the `YYYY-MM-DDTHH:mm` a <input type="datetime-local"> wants,
+// read in the MINISTRY's zone (Convention #23).
+//
+// This used to build the string from new Date(iso).getHours() — the DEVICE zone —
+// and the write path mirrored the mistake with new Date(value).toISOString(). So a
+// leader in Pittsburgh typing 7pm stored an instant that a viewer elsewhere
+// rendered as a different clock time, and editing an existing event silently
+// rewrote it to whatever zone the editor happened to be in. Convention #23 exists
+// because two conventions once landed in one column and the rows became
+// indistinguishable; this form was still writing the second one.
+function instantToDateTimeInput(iso: string | null | undefined, timeZone: string): string {
   if (!iso) return ""
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return ""
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  try {
+    const { ymd, hhmm } = instantToZoned(iso, timeZone)
+    return `${ymd}T${hhmm}`
+  } catch { return "" }
+}
+
+// `YYYY-MM-DDTHH:mm` from the input → a true instant, interpreting the typed wall
+// clock as the MINISTRY's local time, which is what the user meant.
+function dateTimeInputToISO(value: string, timeZone: string): string | null {
+  if (!value) return null
+  const [ymd, hhmm] = value.split("T")
+  if (!ymd || !hhmm) return null
+  try { return zonedTimeToISO(ymd, hhmm, timeZone) } catch { return null }
 }
 
 const AUDIENCE_OPTIONS = [
@@ -139,6 +158,7 @@ const MOBILE_FILTERS: { id: "all" | "events" | "updates"; label: string }[] = [
 
 export function CreateAnnouncementModal({ userId, ministryId, existing, onClose, onSuccess }: CreateAnnouncementModalProps) {
   const supabase = createClient()
+  const timeZone = useMinistryTimezone()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const isEditing = !!existing
 
@@ -146,7 +166,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
   const [body, setBody] = useState(existing?.body ?? "")
   const [audience, setAudience] = useState(existing?.audience ?? "all")
   const [isEvent, setIsEvent] = useState(existing?.is_event ?? false)
-  const [eventDate, setEventDate] = useState(isoToLocalInput(existing?.event_date))
+  const [eventDate, setEventDate] = useState(() => instantToDateTimeInput(existing?.event_date, timeZone))
   const [showAttendees, setShowAttendees] = useState(existing?.show_attendees ?? false)
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(existing?.image_url ?? null)
@@ -240,15 +260,15 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
     if (isEditing && existing) {
       const { data, error: updateError } = await supabase
         .from("announcements")
-        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? new Date(eventDate).toISOString() : null, show_attendees: showAttendees, image_url: imageUrl, status })
+        .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, show_attendees: showAttendees, image_url: imageUrl, status })
         .eq("id", existing.id).eq("ministry_id", ministryId).select().maybeSingle()
       if (updateError) { setError(updateError.message); setSubmitting(false); return }
       announcementId = existing.id
-      resultAnn = (data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? new Date(eventDate).toISOString() : null, show_attendees: showAttendees, image_url: imageUrl }) as Announcement
+      resultAnn = (data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, show_attendees: showAttendees, image_url: imageUrl }) as Announcement
     } else {
       const { data, error: insertError } = await supabase
         .from("announcements")
-        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? new Date(eventDate).toISOString() : null, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId, status })
+        .insert({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, show_attendees: showAttendees, is_pinned: false, image_url: imageUrl, created_by: userId, ministry_id: ministryId, status })
         .select().single()
       if (insertError) { setError(insertError.message); setSubmitting(false); return }
       announcementId = data.id
@@ -1565,15 +1585,20 @@ const DETAIL_SERIF = "var(--serif)"
 const DETAIL_SANS = "var(--font-inter)"
 const DETAIL_MONO = EYEBROW_STYLE
 
-// ── Detail date-part helpers (sync, local) ───────────────────────────────────
-function detailWeekday(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", { weekday: "long" })
+// ── Detail date-part helpers ─────────────────────────────────────────────────
+// EVENT parts take the ministry zone (Convention #23): event_date is a true
+// instant, so a bare toLocale* printed the VIEWER's clock — a student home for
+// the summer saw a different start time than the one the event actually starts
+// at. `posted` deliberately stays device-local: when something was published is
+// a fact about the reader's own timeline, not about the ministry's calendar.
+function detailWeekday(dateStr: string, timeZone: string): string {
+  return formatInZone(dateStr, timeZone, { weekday: "long" })
 }
-function detailMonthDay(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+function detailMonthDay(dateStr: string, timeZone: string): string {
+  return formatInZone(dateStr, timeZone, { month: "short", day: "numeric" })
 }
-function detailTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+function detailTime(dateStr: string, timeZone: string): string {
+  return formatInZone(dateStr, timeZone, { hour: "numeric", minute: "2-digit", hour12: true })
 }
 function detailPosted(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
@@ -1617,6 +1642,8 @@ export function AnnouncementDetailView({
   onGoToList: () => void
 }) {
   const supabase = createClient()
+  // Event parts render in the MINISTRY's zone, never the device's (Convention #23).
+  const detailZone = useMinistryTimezone()
   const openMemberProfile = useOpenMemberProfile()
   const [ann, setAnn] = useState<DetailAnnouncement | null>(null)
   const [loading, setLoading] = useState(true)
@@ -1743,9 +1770,9 @@ export function AnnouncementDetailView({
           <div style={{ ...monoStyle }}>Event</div>
           {ann.event_date && (
             <>
-              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 14 }}>{detailWeekday(ann.event_date)}</div>
-              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 42, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date)}</div>
-              <div style={{ fontFamily: DETAIL_SANS, fontSize: 18, color: "var(--ink)", marginTop: 9 }}>{detailTime(ann.event_date)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 14 }}>{detailWeekday(ann.event_date, detailZone)}</div>
+              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 42, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date, detailZone)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 18, color: "var(--ink)", marginTop: 9 }}>{detailTime(ann.event_date, detailZone)}</div>
             </>
           )}
           <CentralButton
@@ -1802,9 +1829,9 @@ export function AnnouncementDetailView({
           <div style={POCKET_KICKER_STYLE}>Event</div>
           {ann.event_date && (
             <>
-              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 12 }}>{detailWeekday(ann.event_date)}</div>
-              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date)}</div>
-              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, color: "var(--ink)", marginTop: 8 }}>{detailTime(ann.event_date)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, fontWeight: 500, color: "var(--ink)", marginTop: 12 }}>{detailWeekday(ann.event_date, detailZone)}</div>
+              <div style={{ fontFamily: DETAIL_SERIF, fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1, color: "var(--ink)", marginTop: 4 }}>{detailMonthDay(ann.event_date, detailZone)}</div>
+              <div style={{ fontFamily: DETAIL_SANS, fontSize: 15, color: "var(--ink)", marginTop: 8 }}>{detailTime(ann.event_date, detailZone)}</div>
             </>
           )}
           <CentralButton
