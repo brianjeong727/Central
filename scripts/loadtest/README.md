@@ -52,7 +52,38 @@ prints explicit ABORT guidance when a real tenant degrades.
 DB-side snapshots (before/after, via Supabase MCP): `pg_stat_statements_reset()`,
 top statements, `pg_stat_activity` samples, realtime logs.
 
-## Which metrics to trust (co-location caveat — learned in the 20-conn dry run)
+## ROOT-CAUSED 2026-08-07: the "co-location caveat" was a libuv DNS bug
+
+The 12–15s HTTP p95 blamed below on "undici pool queueing" was mostly **libuv
+threadpool starvation**. libuv defaults to **4 threads**, `dns.lookup` runs on that
+pool, and `fetch` uses `dns.lookup` — so under concurrency DNS resolution queues and
+the wait is billed INSIDE the measured request time.
+
+Same 6rps run, only `UV_THREADPOOL_SIZE` changed:
+
+| probe | default (4) | 64 |
+|---|---|---|
+| `get_chat_list` p95 | 5215ms | **301ms** |
+| `directory_p1` p95 | 5773ms | **706ms** |
+| `next_home_auth` p95 | 8922ms | **1083ms** |
+| client skips | 150 | **0** |
+
+What isolated it: a strictly **sequential** probe was clean throughout — 353 requests,
+p50 48ms, p95 122ms, p99 333ms, **zero stalls >1s**. Fast at concurrency 1 and slow at
+concurrency N, against two unrelated hosts (Supabase *and* Vercel) at once, is a client
+symptom, never a server one.
+
+Two fixes are now baked in and cannot be forgotten:
+- `ensureThreadpool()` in `lib.cjs` re-execs every fetch-heavy entry point with
+  `UV_THREADPOOL_SIZE=64` (libuv reads it before JS runs, so `process.env` is too late).
+- `http-burst.cjs` bounds in-flight requests per tier and **skips rather than queues**,
+  so a recorded latency is always a real network measurement and client saturation shows
+  up as a separate, explicit skip count.
+
+Residual run-to-run variance on a home network is real (one of two back-to-back runs
+showed a ~1s tail, the other 92–111ms) — so still cross-check `pg_stat_statements`.
+
+### The original caveat (kept for context)
 
 Running the socket fleet + sender + http-burst on ONE machine means they share one
 undici connection pool. At 20 connections the **realtime path stayed instant**

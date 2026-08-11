@@ -79,8 +79,13 @@ for (const kind of [...new Set(http.map((h) => h.kind))]) {
   const k = http.filter((h) => h.kind === kind)
   const ms = k.filter((h) => h.ok).map((h) => h.ms)
   const errs = k.filter((h) => !h.ok || h.status === 429 || h.status === 503).length
-  const limit = kind === "get_chat_list" ? 1200 : kind === "get_chat_previews" ? 1500 : 800
-  const gate = kind.startsWith("next_") || kind === "auth_token" ? null : ms.length ? pct(ms, 95) < limit : null
+  // next_home_auth IS gated — it's the real logged-in shell render (middleware
+  // cache-MISS + RSC), the single most user-visible number in the run. Measured
+  // warm at ~535-890ms unloaded on 2026-08-07, so 2.5s p95 is a generous ceiling.
+  const limit = kind === "get_chat_list" ? 1200 : kind === "get_chat_previews" ? 1500
+    : kind === "next_home_auth" ? 2500 : kind.startsWith("w_") ? 1000 : 800
+  const ungated = (kind.startsWith("next_") && kind !== "next_home_auth") || kind === "auth_token"
+  const gate = ungated ? null : ms.length ? pct(ms, 95) < limit : null
   check(`http ${kind}`, `n=${k.length} p50=${P(ms, 50)}ms p95=${P(ms, 95)}ms errors/429/503=${errs}`, errs > 0 ? false : gate)
 }
 

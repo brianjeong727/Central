@@ -6,7 +6,8 @@
 //        [--senders 10] [--run-id burstA]
 //
 // Aborts (exit 2) if >20% of inserts error in any 30s window.
-const { readTokens, userClient, ndjsonLogger, sleep } = require("./lib.cjs")
+const { freshTokens, userClient, ndjsonLogger, sleep, ensureThreadpool } = require("./lib.cjs")
+ensureThreadpool()
 
 const args = process.argv.slice(2)
 const flag = (name, dflt) => { const i = args.indexOf(name); return i === -1 ? dflt : args[i + 1] }
@@ -17,9 +18,9 @@ const RUN_ID = String(flag("--run-id", `send${Date.now()}`))
 if (!GROUP) { console.error("--group required"); process.exit(1) }
 
 ;(async () => {
-  const tokens = readTokens()
+  const tokens = freshTokens()
   const fleet = Object.entries(tokens).filter(([e]) => e.startsWith("fleet")).slice(0, SENDERS)
-  if (fleet.length < SENDERS) throw new Error(`need ${SENDERS} warmed senders, have ${fleet.length}`)
+  if (fleet.length < SENDERS) throw new Error(`need ${SENDERS} UNEXPIRED senders, have ${fleet.length} — run warm-sessions.cjs`)
   const clients = fleet.map(([email, t]) => ({ email, userId: t.user_id, sb: userClient(t.access_token) }))
   const out = ndjsonLogger(`${RUN_ID}-sender.ndjson`)
 

@@ -6,7 +6,8 @@
 //     --count N   only warm the first N fleet users (smoke: 10)
 //     --pace MS   delay between token calls (default 1200ms ≈ 50/min — raise the
 //                 dashboard rate limit before warming all 200 faster)
-const { FLEET_EMAIL, FLEET_SIZE, loadEnv, readTokens, writeTokens, sleep, TOKENS_PATH } = require("./lib.cjs")
+const { FLEET_EMAIL, FLEET_SIZE, loadEnv, readTokens, writeTokens, sleep, TOKENS_PATH, ensureThreadpool } = require("./lib.cjs")
+ensureThreadpool()
 const { createClient } = require("@supabase/supabase-js")
 const ws = require("ws")
 
