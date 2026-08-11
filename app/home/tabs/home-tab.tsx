@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import dynamic from "next/dynamic"
-import useSWR from "swr"
+import useSWR, { useSWRConfig } from "swr"
 import { Bell, Calendar, Gift, Settings } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { EYEBROW_STYLE } from "../components/shared"
@@ -227,6 +227,12 @@ export function HomeTab({
   // ── Curated home hero carousel ──
   const [slideRsvping, setSlideRsvping] = useState(false)
   const [managerOpen, setManagerOpen] = useState(false)
+  // Mirror of the invalidation in announcements-tab: RSVPing from Featured must
+  // not leave the Announcements feed showing the opposite state. Two separate SWR
+  // caches, so neither learns about the other without this.
+  const { mutate: globalMutate } = useSWRConfig()
+  const refreshAnnouncements = () =>
+    globalMutate((key) => Array.isArray(key) && key[0] === "announcements", undefined, { revalidate: true })
   const canCurateHome = isLeaderRole(userRole)
 
   // ── Getting-started checklist (admin-tier, new ministries only) ──
@@ -636,6 +642,7 @@ export function HomeTab({
       },
       { optimisticData: optimistic, rollbackOnError: true, revalidate: false }
     )
+    refreshAnnouncements()
     setRsvping(false)
   }
 
@@ -659,6 +666,7 @@ export function HomeTab({
       },
       { optimisticData: optimistic, rollbackOnError: true, revalidate: false }
     )
+    refreshAnnouncements()
   }
 
   async function handleSlideRsvp(annId: string) {
@@ -690,6 +698,7 @@ export function HomeTab({
       },
       { optimisticData: optimistic, rollbackOnError: true, revalidate: false }
     )
+    refreshAnnouncements()
     setSlideRsvping(false)
   }
 

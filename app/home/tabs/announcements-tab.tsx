@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import Image from "next/image"
-import useSWR from "swr"
+import useSWR, { useSWRConfig } from "swr"
 import { X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, Pin, PinOff, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
@@ -399,9 +399,16 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-1.5">
                 <p className="text-[14.5px] font-semibold text-[var(--ink)]">Event date &amp; time</p>
+                {/* minWidth:0 + maxWidth:100% + border-box are all load-bearing.
+                    `width:100%` alone does NOT shrink a native datetime-local below
+                    its INTRINSIC width, which is wider than the ~350px a 390px phone
+                    leaves after the form's px-5 gutters — so the control ran off the
+                    right edge. min-width:0 lets it shrink, max-width pins the
+                    ceiling, and border-box keeps the 16px padding inside the 100%
+                    rather than adding to it. */}
                 <input
                   type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required
-                  style={{ fontSize: 15.5, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", fontFamily: "var(--serif)" }}
+                  style={{ fontSize: 15.5, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", fontFamily: "var(--serif)" }}
                 />
               </div>
               <div className="flex items-center gap-3">
@@ -983,7 +990,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         return applyToggle(prev)
       },
       { optimisticData: applyToggle, rollbackOnError: true, revalidate: false, populateCache: true }
-    )
+    ).then(() => refreshHome())
   }
 
   function handleNewAnnouncement(newAnn: Announcement, formMeta: { has_form: boolean; form_id: string | null }) {
@@ -1012,6 +1019,15 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.delete", entityType: "announcement", entityId: ann.id, entityLabel: ann.title })
   }
 
+  // Home and Announcements are SEPARATE SWR caches (["home-tab", …] vs
+  // ["announcements", …]), so a pin or an RSVP here left Home showing the old
+  // state until it happened to revalidate — which is the "click off the page and
+  // come back" the report describes. Invalidate the sibling cache by key prefix
+  // rather than threading a callback through both tabs.
+  const { mutate: globalMutate } = useSWRConfig()
+  const refreshHome = () =>
+    globalMutate((key) => Array.isArray(key) && key[0] === "home-tab", undefined, { revalidate: true })
+
   async function handlePinToggle(annId: string, currentlyPinned: boolean) {
     const client = createClient()
     const target = announcements.find(a => a.id === annId)
@@ -1025,6 +1041,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
         ? { ...a, is_pinned: !currentlyPinned }
         : { ...a, is_pinned: currentlyPinned ? a.is_pinned : false }
     ), { revalidate: false })
+    refreshHome()
     logAudit({ ministryId, actorId: userId, actorName: userName, action: currentlyPinned ? "announcement.unpin" : "announcement.pin", entityType: "announcement", entityId: annId, entityLabel: target?.title ?? null })
   }
 
@@ -1035,6 +1052,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     mutateAnnouncements(prev => (prev ?? []).map(a =>
       a.id === annId ? { ...a, is_sub_pinned: !currentlySubPinned } : a
     ), { revalidate: false })
+    refreshHome()
     logAudit({ ministryId, actorId: userId, actorName: userName, action: currentlySubPinned ? "announcement.unsubpin" : "announcement.subpin", entityType: "announcement", entityId: annId, entityLabel: target?.title ?? null })
   }
 
