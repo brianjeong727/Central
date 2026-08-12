@@ -93,10 +93,24 @@ CANARY_PID=$!
 sleep "$BASELINE_S"
 
 say "FLEET on $VM — plan $FLEET_PLAN"
-"${SSH[@]}" "cd /root/central && ulimit -n 65535 && nohup node scripts/loadtest/fleet.cjs \
+# MUST fully detach, or ssh holds the channel open for the fleet's whole lifetime and
+# the sender/http-burst never start (observed 2026-08-12: ssh blocked 17min, the fleet
+# ran its entire plan alone, and recv=0 — no message-path data at all).
+#   setsid + </dev/null  : new session, no controlling terminal, no stdin on the channel
+#   UV_THREADPOOL_SIZE   : set in the ENV so ensureThreadpool() does NOT re-exec here.
+#                          Its spawnSync(stdio:"inherit") kept the ssh fds alive, which
+#                          is what defeated nohup in the first place.
+"${SSH[@]}" "cd /root/central && ulimit -n 65535 && \
+  UV_THREADPOOL_SIZE=64 setsid nohup node scripts/loadtest/fleet.cjs \
   --run-id '$RUN_ID' --plan '$FLEET_PLAN' --workers $FLEET_WORKERS \
   --open-ratio $FLEET_OPEN_RATIO --stagger $FLEET_STAGGER --churn $CHURN \
-  > /root/central/fleet.out 2>&1 & echo started" || { teardown; exit 1; }
+  </dev/null > /root/central/fleet.out 2>&1 & echo started" || { teardown; exit 1; }
+
+# Prove it actually detached: ssh must have returned while the fleet is still alive.
+sleep 5
+"${SSH[@]}" "pgrep -f 'loadtest/fleet.cjs' >/dev/null" \
+  || { echo "fleet did not start — see /root/central/fleet.out"; "${SSH[@]}" 'tail -20 /root/central/fleet.out'; teardown; exit 1; }
+echo "fleet detached and running"
 
 say "ramping — waiting ${RAMP_WAIT_S}s for the fleet to hold at 200"
 for i in $(seq 1 $((RAMP_WAIT_S / 20))); do

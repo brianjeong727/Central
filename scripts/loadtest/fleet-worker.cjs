@@ -209,6 +209,7 @@ process.on("message", (m) => {
     }
   } else if (m.type === "shutdown") {
     shuttingDown = true
+    clearInterval(statTimer) // never race the post-close() grace period
     for (const state of clients.values()) teardown(state, { intentional: true })
     log({ ev: "worker_shutdown" })
     out.close()
@@ -216,7 +217,8 @@ process.on("message", (m) => {
   }
 })
 
-setInterval(() => {
+const statTimer = setInterval(() => {
+  if (shuttingDown) return
   const p99 = Math.round(loopDelay.percentile(99) / 1e6)
   loopDelay.reset()
   if (process.send) process.send({ type: "stat", w: WORKER_ID, ...stats, loopP99: p99, clients: clients.size })

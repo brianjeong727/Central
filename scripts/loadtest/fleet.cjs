@@ -150,14 +150,24 @@ const CHURN_TICK_MS = 20000 // spread the per-minute budget over 3 ticks
       if (!email.startsWith("fleet")) continue
       if (t.expires_at * 1000 - 20 * 60 * 1000 > Date.now()) continue
       const { data, error } = await anon.auth.refreshSession({ refresh_token: t.refresh_token })
-      if (error) { out.log({ ev: "refresh_fail", email, err: error.message }); continue }
+      if (error) {
+        out.log({ ev: "refresh_fail", email, err: error.message })
+        // 429 here would cascade: every subsequent refresh fails, clients age out
+        // mid-run and start throwing auth errors that look like server failures.
+        // Back off a full window rather than grinding through the whole store.
+        if (error.status === 429) { console.error("[fleet] refresh rate-limited — backing off 60s"); await sleep(60000) }
+        continue
+      }
       const s = data.session
       store[email] = { user_id: s.user.id, access_token: s.access_token, refresh_token: s.refresh_token, expires_at: s.expires_at }
       writeTokens(store)
       // broadcast to all workers — the owner looks itself up, others no-op
       for (const { proc } of workers.values()) { try { proc.send({ type: "refresh", email, token: s.access_token }) } catch { /* */ } }
       out.log({ ev: "refreshed", email })
-      await sleep(1500)
+      // Token refreshes are capped at 150/5min per IP = 0.5 req/s. 1500ms is 0.67/s
+      // (200 per 5min) — over the ceiling, and with 200 clients expiring together it
+      // WOULD have hit it mid-run. 2100ms ≈ 143/5min, just under.
+      await sleep(2100)
     }
   }, 5 * 60 * 1000)
 

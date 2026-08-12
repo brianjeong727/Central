@@ -70,12 +70,21 @@ function ndjsonLogger(name) {
   fs.mkdirSync(LOGS_DIR, { recursive: true })
   const file = path.join(LOGS_DIR, name)
   const stream = fs.createWriteStream(file, { flags: "a" })
+  let closed = false
+  // A write after close throws ERR_STREAM_WRITE_AFTER_END as an unhandled 'error'
+  // event, which KILLS the process. Shutdown calls close() and then grants a 1.5s
+  // grace period — any timer that fires inside it (the 5s stat interval, a churn
+  // rejoin) used to crash every worker instead of letting them exit cleanly. A
+  // dropped log line during teardown is harmless; a crashed teardown is not.
+  stream.on("error", () => { closed = true })
   return {
     file,
     log(rec) {
-      stream.write(JSON.stringify({ t: Date.now(), ...rec }) + "\n")
+      if (closed) return
+      try { stream.write(JSON.stringify({ t: Date.now(), ...rec }) + "\n") } catch { closed = true }
     },
     close() {
+      closed = true
       stream.end()
     },
   }
