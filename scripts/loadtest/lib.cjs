@@ -92,6 +92,29 @@ function ndjsonLogger(name) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+// Nothing in this harness had a timeout, and every startup step is awaited SERIALLY
+// before the measurement loops begin — so one stalled request silently killed the
+// whole tier. On 2026-08-12 http-burst hung twice this way (once in the cookie warm,
+// once in the fixture fetch) and produced ZERO samples across a 200-client window.
+// A load probe must degrade, never block: bound the wait, log the loss, carry on.
+function withTimeout(promise, ms, label) {
+  let timer
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`timeout after ${ms}ms: ${label}`)), ms) }),
+  ]).finally(() => clearTimeout(timer))
+}
+
+// fetch that cannot hang. Returns null on timeout/error rather than throwing, so a
+// caller can skip one probe instead of losing the run.
+async function safeFetch(url, opts = {}, ms = 15000) {
+  try {
+    return await fetch(url, { ...opts, signal: AbortSignal.timeout(ms) })
+  } catch {
+    return null
+  }
+}
+
 // libuv's threadpool defaults to FOUR threads, and DNS resolution (dns.lookup,
 // which fetch uses) runs on it. Under concurrency those lookups queue, and the
 // wait lands INSIDE the measured request time — so the probe reports multi-second
@@ -126,5 +149,5 @@ function pct(values, p) {
 module.exports = {
   MINISTRY_ID, FLEET_EMAIL, FLEET_SIZE, TOKENS_PATH, LOGS_DIR,
   loadEnv, serviceClient, userClient, readTokens, writeTokens, freshTokens, ndjsonLogger, sleep, pct,
-  ensureThreadpool,
+  ensureThreadpool, withTimeout, safeFetch,
 }

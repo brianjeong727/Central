@@ -13,7 +13,7 @@
 //      so it queried `group_id=eq.` (empty) — a malformed filter, not page 1.
 //   3. /home was fetched UNAUTHENTICATED, so it measured the login redirect rather
 //      than the real logged-in shell. Now driven by forged SSR session cookies.
-const { MINISTRY_ID, loadEnv, freshTokens, ndjsonLogger, sleep, FLEET_EMAIL, ensureThreadpool } = require("./lib.cjs")
+const { MINISTRY_ID, loadEnv, freshTokens, ndjsonLogger, sleep, FLEET_EMAIL, ensureThreadpool, withTimeout, safeFetch } = require("./lib.cjs")
 const { warmCookieSessions } = require("./session-cookies.cjs")
 
 ensureThreadpool()
@@ -86,9 +86,13 @@ async function timed(out, kind, fn) {
 
   // ── fixtures: resolve real target rows once, so every probe hits a live row ──
   const bootstrap = pick()
+  // Bounded + non-fatal: a stalled fixture fetch used to hang the entire HTTP tier
+  // before a single sample was taken. Losing one probe's targets beats losing the run.
   const getJson = async (path) => {
-    const r = await fetch(`${SB_URL()}/rest/v1/${path}`, { headers: H(bootstrap) })
-    return r.ok ? r.json() : []
+    const r = await safeFetch(`${SB_URL()}/rest/v1/${path}`, { headers: H(bootstrap) }, 15000)
+    if (!r) { console.error(`[http] fixture fetch timed out: ${path.split("?")[0]} — probes needing it will be skipped`); return [] }
+    if (!r.ok) { console.error(`[http] fixture ${path.split("?")[0]} -> ${r.status}`); return [] }
+    try { return await r.json() } catch { return [] }
   }
   const anns = await getJson(`announcements?ministry_id=eq.${MINISTRY_ID}&status=eq.published&select=id&limit=40`)
   const msgs = await getJson(`messages?group_id=eq.${CENTRAL_GID}&select=id&order=created_at.desc&limit=40`)
@@ -101,7 +105,18 @@ async function timed(out, kind, fn) {
   let COOKIES = []
   if (NEXT_RPS && COOKIE_SESSIONS) {
     const emails = Array.from({ length: COOKIE_SESSIONS }, (_, i) => FLEET_EMAIL(i + 1))
-    COOKIES = await warmCookieSessions(emails, process.env.E2E_PASSWORD, 350)
+    // Hard cap the whole warm. signInWithPassword has no timeout of its own, and one
+    // hung sign-in blocked http-burst entirely (2026-08-12) — no reads, no writes, no
+    // samples at all. Degrade to "no /home probes" instead of taking the tier down.
+    try {
+      COOKIES = await withTimeout(
+        warmCookieSessions(emails, process.env.E2E_PASSWORD, 1100),
+        60000, "cookie session warm"
+      )
+    } catch (e) {
+      console.error(`[http] ${e.message} — continuing WITHOUT authenticated /home probes`)
+      COOKIES = []
+    }
     console.log(`[http] ${COOKIES.length} authenticated cookie sessions ready`)
   }
 
