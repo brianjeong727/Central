@@ -30,6 +30,13 @@ const flag = (name, dflt) => {
 const COUNT = flag("--count", FLEET_SIZE)
 const PACE = flag("--pace", 1200)
 const SIGNIN_ONLY = args.includes("--signin-only")
+// Re-mint any token with less than N minutes left. Default 10 preserves the old
+// behavior; pass a run-length-aware value before a long burst (a token with 15min
+// left survives the default check but expires mid-run, and the in-run refresher then
+// races expiry across 200 clients at a rate the refresh ceiling won't allow).
+// Idempotent by design: repeated passes only top up what is actually short-dated,
+// which matters because the effective per-IP ceiling forces multi-pass warming.
+const MIN_REMAINING = flag("--min-remaining", 10)
 const PASS = process.env.E2E_PASSWORD
 
 ;(async () => {
@@ -45,7 +52,7 @@ const PASS = process.env.E2E_PASSWORD
   for (let i = 1; i <= COUNT; i++) {
     const email = FLEET_EMAIL(i)
     const entry = store[email]
-    const skew = 10 * 60 * 1000 // treat tokens expiring within 10min as expired
+    const skew = MIN_REMAINING * 60 * 1000
     if (entry && entry.expires_at * 1000 - skew > Date.now()) { kept++; continue }
 
     let res

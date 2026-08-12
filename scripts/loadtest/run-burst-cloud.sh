@@ -93,24 +93,41 @@ CANARY_PID=$!
 sleep "$BASELINE_S"
 
 say "FLEET on $VM — plan $FLEET_PLAN"
+FLEET_LAUNCH_T0=$(date +%s)
 # MUST fully detach, or ssh holds the channel open for the fleet's whole lifetime and
-# the sender/http-burst never start (observed 2026-08-12: ssh blocked 17min, the fleet
-# ran its entire plan alone, and recv=0 — no message-path data at all).
-#   setsid + </dev/null  : new session, no controlling terminal, no stdin on the channel
-#   UV_THREADPOOL_SIZE   : set in the ENV so ensureThreadpool() does NOT re-exec here.
-#                          Its spawnSync(stdio:"inherit") kept the ssh fds alive, which
-#                          is what defeated nohup in the first place.
-"${SSH[@]}" "cd /root/central && ulimit -n 65535 && \
+# the sender/http-burst never start (this cost TWO windows on 2026-08-12: ssh blocked
+# ~18min, the fleet ran its entire plan alone, and recv=0 — no message-path data).
+#
+# THE BRACES ARE LOAD-BEARING. `cmd1 && cmd2 &` backgrounds the ENTIRE and-list as one
+# job, and that wrapping subshell inherits ssh's stdout. Redirecting only `node` leaves
+# the subshell holding the channel, so ssh waits for node to exit either way. The group
+# redirect detaches the subshell too. Measured on this exact box:
+#   cd /tmp && true && setsid nohup node parent.cjs >f 2>&1 &      -> ssh returns 42.8s
+#   { cd /tmp && true && setsid nohup node parent.cjs; } >f 2>&1 & -> ssh returns  3.3s
+# (setsid/nohup alone do NOT fix it — they target the wrong process.)
+#
+# UV_THREADPOOL_SIZE is set in the ENV so ensureThreadpool() does not re-exec here;
+# its spawnSync(stdio:"inherit") would be one more holder of the ssh fds.
+"${SSH[@]}" "{ cd /root/central && ulimit -n 65535 && \
   UV_THREADPOOL_SIZE=64 setsid nohup node scripts/loadtest/fleet.cjs \
   --run-id '$RUN_ID' --plan '$FLEET_PLAN' --workers $FLEET_WORKERS \
-  --open-ratio $FLEET_OPEN_RATIO --stagger $FLEET_STAGGER --churn $CHURN \
+  --open-ratio $FLEET_OPEN_RATIO --stagger $FLEET_STAGGER --churn $CHURN ; } \
   </dev/null > /root/central/fleet.out 2>&1 & echo started" || { teardown; exit 1; }
 
-# Prove it actually detached: ssh must have returned while the fleet is still alive.
-sleep 5
+# Prove it actually detached. A LIVENESS check alone cannot catch a failed detach —
+# ssh blocks, so by the time we could probe, the fleet has already run its whole plan
+# and the check passes on a fleet that is about to exit. The TIMING is the signal:
+# a real detach returns in seconds. Fail loudly instead of silently burning a window.
+FLEET_LAUNCH_ELAPSED=$(( $(date +%s) - FLEET_LAUNCH_T0 ))
+if [ "$FLEET_LAUNCH_ELAPSED" -gt 30 ]; then
+  echo "ABORT: ssh took ${FLEET_LAUNCH_ELAPSED}s to return — the fleet did NOT detach."
+  echo "It ran (or is running) its whole plan with no sender/http-burst, so there is no"
+  echo "message-path data. Fix the detach (group-redirect braces) before re-running."
+  teardown; exit 1
+fi
 "${SSH[@]}" "pgrep -f 'loadtest/fleet.cjs' >/dev/null" \
   || { echo "fleet did not start — see /root/central/fleet.out"; "${SSH[@]}" 'tail -20 /root/central/fleet.out'; teardown; exit 1; }
-echo "fleet detached and running"
+echo "fleet detached in ${FLEET_LAUNCH_ELAPSED}s and is running"
 
 say "ramping — waiting ${RAMP_WAIT_S}s for the fleet to hold at 200"
 for i in $(seq 1 $((RAMP_WAIT_S / 20))); do
