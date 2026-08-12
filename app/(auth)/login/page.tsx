@@ -23,11 +23,20 @@ function LoginContent() {
   const [password, setPassword] = useState("")
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState<string | null>(
-    searchParams.get("error") === "no-account"
-      ? "No Central account exists for that Google email yet — create an account first."
-      : searchParams.get("error") === "recovery-failed"
+    searchParams.get("error") === "recovery-failed"
       ? "That password reset link is invalid or expired — request a new one."
       : null
+  )
+  // An OAuth identity with no Central account is NOT an error — the person did
+  // nothing wrong, they just haven't signed up yet. Held separately from `error`
+  // so it renders as a calm fork (explain + a way forward) instead of red alarm.
+  // Seeded from the URL: the WEB OAuth callback redirects with ?error=no-account
+  // and has no way to hand back a provider name (Google is the only provider
+  // that reaches this path on the web — Apple in the shell is native).
+  // Lazy-init, NOT an effect: the value is knowable at first render, and setting
+  // it in an effect cascades a render for nothing.
+  const [noAccountProvider, setNoAccountProvider] = useState<"Apple" | "Google" | null>(
+    searchParams.get("error") === "no-account" ? "Google" : null
   )
   const [loading, setLoading] = useState(false)
   // Mobile is a two-step flow (welcome → sign-in form). If we arrived with an
@@ -88,7 +97,7 @@ function LoginContent() {
       setError(null)
       const res = await signInWithGoogleNative("signin")
       if (!res.ok) {
-        if (res.error === "no-account") setError("No Central account exists for that Google email yet — create an account first.")
+        if (res.error === "no-account") { setNoAccountProvider("Google"); setMobileStep("form"); return }
         else if (res.error === "failed") setError("Google sign-in didn't complete — please try again.")
         else if (res.error === "unavailable") setError("Google sign-in needs the latest app version — update Central and try again.")
         else return // canceled — no error surface
@@ -112,9 +121,14 @@ function LoginContent() {
       setError(null)
       const res = await signInWithAppleNative("signin")
       if (!res.ok) {
-        if (res.error === "unavailable") { await webAppleOAuth(); return }
-        // TEMP DIAGNOSTIC: surface the raw reason (incl. canceled) so a
-        // real-device failure is legible without a debuggable build.
+        // `unavailable` = plugin missing from this binary; `not-entitled` =
+        // ASAuthorizationError 1000, the binary isn't entitled for Sign in with
+        // Apple. Neither is retryable natively and BOTH are fine over the web
+        // OAuth flow, which capacitor.config.ts allows in-webview via
+        // appleid.apple.com — so fall back instead of dead-ending on a raw
+        // NSError the user can do nothing about.
+        if (res.error === "unavailable" || res.error === "not-entitled") { await webAppleOAuth(); return }
+        if (res.error === "no-account") { setNoAccountProvider("Apple"); setMobileStep("form"); return }
         setError(nativeAuthDebugMessage(res))
         // The mobile welcome step has no error banner — surface it on the form step.
         setMobileStep("form")
@@ -208,6 +222,33 @@ function LoginContent() {
       <div style={{ margin: "22px 0" }}>
         <OrDivider />
       </div>
+
+      {noAccountProvider && (
+        <div style={{
+          borderRadius: 12, background: "var(--cream-panel)", border: "1px solid var(--line-2)",
+          padding: "16px 18px", marginBottom: 18,
+        }} role="status">
+          <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: "0 0 6px" }}>
+            No Central account yet
+          </p>
+          <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 14px", lineHeight: 1.5 }}>
+            That {noAccountProvider} account isn&apos;t linked to a Central account. Signing in
+            can&apos;t create one — create your account first and you&apos;ll be able to use
+            {" "}{noAccountProvider} from then on.
+          </p>
+          <Link
+            href={signupHref}
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              height: 42, padding: "0 20px", borderRadius: 999,
+              background: "var(--plum)", color: "var(--cream)",
+              fontSize: 13.5, fontWeight: 600, textDecoration: "none",
+            }}
+          >
+            Create an account
+          </Link>
+        </div>
+      )}
 
       {error && (
         <div style={{
@@ -320,6 +361,33 @@ function LoginContent() {
             <div style={mono}>Sign in</div>
             <h1 style={{ ...mH1, marginTop: 8 }}>Welcome back.</h1>
           </div>
+
+          {noAccountProvider && (
+            <div style={{
+              borderRadius: "var(--r-pocket)", background: "var(--ivory)",
+              padding: "16px 18px", marginTop: 22,
+            }} role="status">
+              <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", margin: "0 0 6px", letterSpacing: "-0.01em" }}>
+                No Central account yet
+              </p>
+              <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 14px", lineHeight: 1.5 }}>
+                That {noAccountProvider} account isn&apos;t linked to a Central account. Signing in
+                can&apos;t create one — create your account first and you&apos;ll be able to use
+                {" "}{noAccountProvider} from then on.
+              </p>
+              <Link
+                href={signupHref}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  minHeight: 42, borderRadius: 999,
+                  background: "var(--plum)", color: "var(--cream)",
+                  fontSize: 13.5, fontWeight: 600, textDecoration: "none",
+                }}
+              >
+                Create an account
+              </Link>
+            </div>
+          )}
 
           {error && (
             <div style={{
