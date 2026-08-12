@@ -2,10 +2,20 @@
 // rate limit, persisting {access_token, refresh_token, expires_at} per user to the
 // gitignored .tokens.json. Re-runs refresh only what's expired/missing.
 //
-//   node scripts/loadtest/warm-sessions.cjs [--count N] [--pace MS]
-//     --count N   only warm the first N fleet users (smoke: 10)
-//     --pace MS   delay between token calls (default 1200ms ≈ 50/min — raise the
-//                 dashboard rate limit before warming all 200 faster)
+//   node scripts/loadtest/warm-sessions.cjs [--count N] [--pace MS] [--signin-only]
+//     --count N       only warm the first N fleet users (smoke: 10)
+//     --pace MS       delay between token calls (default 1200ms ≈ 50/min)
+//     --signin-only   never refresh; always password sign-in
+//
+// PACE MUST RESPECT THE CONFIGURED PER-IP LIMITS — this is what actually blocked the
+// 2026-08-12 warm, misdiagnosed twice as "the dashboard limit isn't raised":
+//   sign-ups and sign-ins : 600 / 5min  = 2.0 req/s  -> pace >= 500ms
+//   token refreshes       : 150 / 5min  = 0.5 req/s  -> pace >= 2000ms
+// `--pace 350` is ~2.9 req/s = 857/5min, which exceeds the sign-in ceiling and blew
+// the (much lower) refresh ceiling by 8x. Measured clean: 60 sign-ins at 1/s, no 429.
+//
+// SIGN-IN IS THE CHEAP PATH: it allows 4x the rate of refresh, so for a full 200-user
+// warm prefer --signin-only. Refresh is only worth it when well under 150/5min.
 const { FLEET_EMAIL, FLEET_SIZE, loadEnv, readTokens, writeTokens, sleep, TOKENS_PATH, ensureThreadpool } = require("./lib.cjs")
 ensureThreadpool()
 const { createClient } = require("@supabase/supabase-js")
@@ -19,6 +29,7 @@ const flag = (name, dflt) => {
 }
 const COUNT = flag("--count", FLEET_SIZE)
 const PACE = flag("--pace", 1200)
+const SIGNIN_ONLY = args.includes("--signin-only")
 const PASS = process.env.E2E_PASSWORD
 
 ;(async () => {
@@ -38,7 +49,7 @@ const PASS = process.env.E2E_PASSWORD
     if (entry && entry.expires_at * 1000 - skew > Date.now()) { kept++; continue }
 
     let res
-    if (entry?.refresh_token) {
+    if (entry?.refresh_token && !SIGNIN_ONLY) {
       res = await auth.auth.refreshSession({ refresh_token: entry.refresh_token })
       if (!res.error) refreshed++
     }

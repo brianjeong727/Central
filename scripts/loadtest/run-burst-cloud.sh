@@ -45,6 +45,9 @@ HTTP_DURATION="${HTTP_DURATION:-600}"
 HTTP_NEXT_RPS="${HTTP_NEXT_RPS:-1}"
 HTTP_AUTH_BURST="${HTTP_AUTH_BURST:-50}"              # sign-ins/min — the campus-NAT shape
 MAC_WARM="${MAC_WARM:-20}"                            # local tokens for sender + http-burst
+# 1 req/s — measured clean (60 sign-ins, zero 429). The old 350ms was ~2.9/s = 857 per
+# 5min, over the 600/5min sign-in ceiling; refreshes (150/5min) blew up 8x faster.
+WARM_PACE="${WARM_PACE:-1100}"
 # -------------------------------------------------------------------------------
 
 cd "$ROOT"
@@ -72,15 +75,16 @@ say "PREFLIGHT"
 "${SSH[@]}" 'test -f /root/central/.env.local && test -f /root/central/scripts/loadtest/fleet.cjs' \
   || { echo "VM not bootstrapped — run: bash scripts/loadtest/vm-bootstrap.sh $VM"; exit 1; }
 
-VM_TOKENS=$("${SSH[@]}" 'node -e "try{const t=require(\"/root/central/scripts/loadtest/.tokens.json\");console.log(Object.keys(t).filter(k=>k.startsWith(\"fleet\")).length)}catch(e){console.log(0)}"' 2>/dev/null || echo 0)
-echo "VM warmed fleet tokens: $VM_TOKENS"
-if [ "${VM_TOKENS:-0}" -lt 200 ]; then
-  say "warming 200 sessions from the VM's IP (needs auth rate limit >= 600/5min)"
-  "${SSH[@]}" 'cd /root/central && ulimit -n 65535 && node scripts/loadtest/warm-sessions.cjs --count 200 --pace 350' || { echo "VM warm failed"; exit 1; }
+# Count only UNEXPIRED tokens — a stale store looks full but yields PGRST303 mid-run.
+VM_TOKENS=$("${SSH[@]}" 'node -e "try{const t=require(\"/root/central/scripts/loadtest/.tokens.json\");const n=Math.floor(Date.now()/1000);console.log(Object.entries(t).filter(([k,v])=>k.startsWith(\"fleet\")&&v.expires_at>n+120).length)}catch(e){console.log(0)}"' 2>/dev/null || echo 0)
+echo "VM fresh fleet tokens: $VM_TOKENS"
+if [ "${VM_TOKENS:-0}" -lt 198 ]; then
+  say "warming 200 sessions from the VM's IP"
+  "${SSH[@]}" "cd /root/central && ulimit -n 65535 && node scripts/loadtest/warm-sessions.cjs --count 200 --pace $WARM_PACE --signin-only" || { echo "VM warm failed"; exit 1; }
 fi
 
 say "warming $MAC_WARM local sessions (sender + http-burst identities)"
-node scripts/loadtest/warm-sessions.cjs --count "$MAC_WARM" --pace 350 || { echo "local warm failed"; exit 1; }
+node scripts/loadtest/warm-sessions.cjs --count "$MAC_WARM" --pace "$WARM_PACE" --signin-only || { echo "local warm failed"; exit 1; }
 
 # --- run -----------------------------------------------------------------------
 say "CANARY baseline — ${BASELINE_S}s alone (real-tenant, residential network)"
