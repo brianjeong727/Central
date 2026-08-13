@@ -39,10 +39,14 @@ const check = (label, value, ok) => console.log(`${ok === null ? "· " : ok ? "�
 console.log(`\n═══ Load-test summary — run ${RUN_ID} ═══\n`)
 
 // joins
+// Every join SEQUENCE starts at retry 0, so counting retry-0 events (successes +
+// failures) counts sequences. The old denominator was unique (client,topic) pairs,
+// which double-counts under --churn: the same pair legitimately rejoins many times,
+// and the ratio ran past 100% (observed 260%).
 const firstTryJoins = joins.filter((j) => (j.retry ?? 0) === 0).length
-const uniqueTopicsTried = new Set([...joins, ...joinFails].map((r) => `${r.c}|${r.topic}`)).size
+const joinSequences = firstTryJoins + joinFails.filter((f) => (f.retry ?? 0) === 0).length
 const joinMs = joins.map((j) => j.ms)
-check("channel joins (chat:*)", `${joins.length} joined, ${joinFails.length} fails, first-try ${uniqueTopicsTried ? Math.round((100 * firstTryJoins) / uniqueTopicsTried) : 0}%`, uniqueTopicsTried ? firstTryJoins / uniqueTopicsTried >= 0.995 : null)
+check("channel joins (chat:*)", `${joins.length} joined, ${joinFails.length} fails, first-try ${joinSequences ? Math.round((100 * firstTryJoins) / joinSequences) : 0}%`, joinSequences ? firstTryJoins / joinSequences >= 0.995 : null)
 check("join latency", `p50=${P(joinMs, 50)}ms p95=${P(joinMs, 95)}ms p99=${P(joinMs, 99)}ms`, joinMs.length ? pct(joinMs, 95) < 3000 : null)
 check("fallback engagements (trim gate = 0)", `${fallbacks.length} engaged, ${recoveries.length} recovered, ${fallbackRecvs.length} events via fallback`, fallbacks.length === 0)
 
@@ -73,6 +77,28 @@ check("delivery latency (ack→recv)", `p50=${P(latencies, 50)}ms p95=${P(latenc
 // last_read_at writes
 const lrMs = lr.filter((r) => r.ok).map((r) => r.ms)
 check("last_read_at writes", `${lr.length} (p95=${P(lrMs, 95)}ms, ${lr.filter((r) => !r.ok).length} errors)`, null)
+
+// churn (mobile background/resume shape) — only meaningful when --churn was on.
+const churnDrops = by("churn_drop")
+if (churnDrops.length) {
+  const rejoins = by("churn_rejoin")
+  const rejoinFails = by("churn_rejoin_fail")
+  const rms = rejoins.map((r) => r.ms)
+  // Drops still inside their offline window when the plan ended are IN FLIGHT, not
+  // failures — counting them as failures scored a clean 16/16 run as 80%.
+  const settled = rejoins.length + rejoinFails.length
+  const inFlight = churnDrops.length - settled
+  const rate = settled ? rejoins.length / settled : null
+  // Dropping is intentional; failing to COME BACK is the real mobile risk — a phone
+  // that resumes into a chat that never reconnects.
+  check("churn rejoin success",
+    `${rejoins.length}/${settled} settled rejoins (${rate === null ? "—" : (rate * 100).toFixed(1) + "%"}), ${rejoinFails.length} failed, ${inFlight} in flight at teardown`,
+    settled ? rejoinFails.length === 0 && rate >= 0.99 : null)
+  // ms is measured to the chat topic reaching SUBSCRIBED — the moment the phone can
+  // actually receive again — not to startClient() returning (that was ~2ms of setup).
+  check("churn rejoin latency (to SUBSCRIBED)", `p50=${P(rms, 50)}ms p95=${P(rms, 95)}ms p99=${P(rms, 99)}ms`,
+    rms.length ? pct(rms, 95) < 3000 : null)
+}
 
 // http
 for (const kind of [...new Set(http.map((h) => h.kind))]) {

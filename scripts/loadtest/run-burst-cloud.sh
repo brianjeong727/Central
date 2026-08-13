@@ -33,6 +33,10 @@ FLEET_PLAN="${FLEET_PLAN:-50x90,100x90,200x900}"      # reaches 200 at ~T+180s, 
 FLEET_WORKERS="${FLEET_WORKERS:-8}"
 FLEET_STAGGER="${FLEET_STAGGER:-55}"
 FLEET_OPEN_RATIO="${FLEET_OPEN_RATIO:-0.25}"
+# Mobile shape: % of the live fleet that backgrounds+resumes per minute. 15%/min at
+# 200 clients ≈ a phone cycling every ~7 min, which is what a service looks like.
+# Set CHURN=0 to reproduce the stable-connection shape of the 160-conn baseline.
+CHURN="${CHURN:-15}"
 RAMP_WAIT_S="${RAMP_WAIT_S:-200}"                     # fleet start -> 200 held (plan 180s + ramp slack)
 SEND_LADDER="${SEND_LADDER:-0.5x150,1x150,2x180,4x180,8x150}"   # 810s, fits inside the 900s hold
 SEND_SENDERS="${SEND_SENDERS:-10}"
@@ -41,6 +45,9 @@ HTTP_DURATION="${HTTP_DURATION:-600}"
 HTTP_NEXT_RPS="${HTTP_NEXT_RPS:-1}"
 HTTP_AUTH_BURST="${HTTP_AUTH_BURST:-50}"              # sign-ins/min — the campus-NAT shape
 MAC_WARM="${MAC_WARM:-20}"                            # local tokens for sender + http-burst
+# 1 req/s — measured clean (60 sign-ins, zero 429). The old 350ms was ~2.9/s = 857 per
+# 5min, over the 600/5min sign-in ceiling; refreshes (150/5min) blew up 8x faster.
+WARM_PACE="${WARM_PACE:-1100}"
 # -------------------------------------------------------------------------------
 
 cd "$ROOT"
@@ -68,15 +75,16 @@ say "PREFLIGHT"
 "${SSH[@]}" 'test -f /root/central/.env.local && test -f /root/central/scripts/loadtest/fleet.cjs' \
   || { echo "VM not bootstrapped — run: bash scripts/loadtest/vm-bootstrap.sh $VM"; exit 1; }
 
-VM_TOKENS=$("${SSH[@]}" 'node -e "try{const t=require(\"/root/central/scripts/loadtest/.tokens.json\");console.log(Object.keys(t).filter(k=>k.startsWith(\"fleet\")).length)}catch(e){console.log(0)}"' 2>/dev/null || echo 0)
-echo "VM warmed fleet tokens: $VM_TOKENS"
-if [ "${VM_TOKENS:-0}" -lt 200 ]; then
-  say "warming 200 sessions from the VM's IP (needs auth rate limit >= 600/5min)"
-  "${SSH[@]}" 'cd /root/central && ulimit -n 65535 && node scripts/loadtest/warm-sessions.cjs --count 200 --pace 350' || { echo "VM warm failed"; exit 1; }
+# Count only UNEXPIRED tokens — a stale store looks full but yields PGRST303 mid-run.
+VM_TOKENS=$("${SSH[@]}" 'node -e "try{const t=require(\"/root/central/scripts/loadtest/.tokens.json\");const n=Math.floor(Date.now()/1000);console.log(Object.entries(t).filter(([k,v])=>k.startsWith(\"fleet\")&&v.expires_at>n+120).length)}catch(e){console.log(0)}"' 2>/dev/null || echo 0)
+echo "VM fresh fleet tokens: $VM_TOKENS"
+if [ "${VM_TOKENS:-0}" -lt 198 ]; then
+  say "warming 200 sessions from the VM's IP"
+  "${SSH[@]}" "cd /root/central && ulimit -n 65535 && node scripts/loadtest/warm-sessions.cjs --count 200 --pace $WARM_PACE --signin-only" || { echo "VM warm failed"; exit 1; }
 fi
 
 say "warming $MAC_WARM local sessions (sender + http-burst identities)"
-node scripts/loadtest/warm-sessions.cjs --count "$MAC_WARM" --pace 350 || { echo "local warm failed"; exit 1; }
+node scripts/loadtest/warm-sessions.cjs --count "$MAC_WARM" --pace "$WARM_PACE" --signin-only || { echo "local warm failed"; exit 1; }
 
 # --- run -----------------------------------------------------------------------
 say "CANARY baseline — ${BASELINE_S}s alone (real-tenant, residential network)"
@@ -85,10 +93,41 @@ CANARY_PID=$!
 sleep "$BASELINE_S"
 
 say "FLEET on $VM — plan $FLEET_PLAN"
-"${SSH[@]}" "cd /root/central && ulimit -n 65535 && nohup node scripts/loadtest/fleet.cjs \
+FLEET_LAUNCH_T0=$(date +%s)
+# MUST fully detach, or ssh holds the channel open for the fleet's whole lifetime and
+# the sender/http-burst never start (this cost TWO windows on 2026-08-12: ssh blocked
+# ~18min, the fleet ran its entire plan alone, and recv=0 — no message-path data).
+#
+# THE BRACES ARE LOAD-BEARING. `cmd1 && cmd2 &` backgrounds the ENTIRE and-list as one
+# job, and that wrapping subshell inherits ssh's stdout. Redirecting only `node` leaves
+# the subshell holding the channel, so ssh waits for node to exit either way. The group
+# redirect detaches the subshell too. Measured on this exact box:
+#   cd /tmp && true && setsid nohup node parent.cjs >f 2>&1 &      -> ssh returns 42.8s
+#   { cd /tmp && true && setsid nohup node parent.cjs; } >f 2>&1 & -> ssh returns  3.3s
+# (setsid/nohup alone do NOT fix it — they target the wrong process.)
+#
+# UV_THREADPOOL_SIZE is set in the ENV so ensureThreadpool() does not re-exec here;
+# its spawnSync(stdio:"inherit") would be one more holder of the ssh fds.
+"${SSH[@]}" "{ cd /root/central && ulimit -n 65535 && \
+  UV_THREADPOOL_SIZE=64 setsid nohup node scripts/loadtest/fleet.cjs \
   --run-id '$RUN_ID' --plan '$FLEET_PLAN' --workers $FLEET_WORKERS \
-  --open-ratio $FLEET_OPEN_RATIO --stagger $FLEET_STAGGER \
-  > /root/central/fleet.out 2>&1 & echo started" || { teardown; exit 1; }
+  --open-ratio $FLEET_OPEN_RATIO --stagger $FLEET_STAGGER --churn $CHURN ; } \
+  </dev/null > /root/central/fleet.out 2>&1 & echo started" || { teardown; exit 1; }
+
+# Prove it actually detached. A LIVENESS check alone cannot catch a failed detach —
+# ssh blocks, so by the time we could probe, the fleet has already run its whole plan
+# and the check passes on a fleet that is about to exit. The TIMING is the signal:
+# a real detach returns in seconds. Fail loudly instead of silently burning a window.
+FLEET_LAUNCH_ELAPSED=$(( $(date +%s) - FLEET_LAUNCH_T0 ))
+if [ "$FLEET_LAUNCH_ELAPSED" -gt 30 ]; then
+  echo "ABORT: ssh took ${FLEET_LAUNCH_ELAPSED}s to return — the fleet did NOT detach."
+  echo "It ran (or is running) its whole plan with no sender/http-burst, so there is no"
+  echo "message-path data. Fix the detach (group-redirect braces) before re-running."
+  teardown; exit 1
+fi
+"${SSH[@]}" "pgrep -f 'loadtest/fleet.cjs' >/dev/null" \
+  || { echo "fleet did not start — see /root/central/fleet.out"; "${SSH[@]}" 'tail -20 /root/central/fleet.out'; teardown; exit 1; }
+echo "fleet detached in ${FLEET_LAUNCH_ELAPSED}s and is running"
 
 say "ramping — waiting ${RAMP_WAIT_S}s for the fleet to hold at 200"
 for i in $(seq 1 $((RAMP_WAIT_S / 20))); do
