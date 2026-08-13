@@ -114,6 +114,11 @@ function CompleteProfileContent() {
 
   const [userId, setUserId] = useState<string | null>(null)
   const [checking, setChecking] = useState(true)
+  // Name is collected ONLY when the stored one is an Apple private-relay prefix
+  // (see proxy.ts). `needsName` stays false for everyone else, so the form is
+  // unchanged for the gender+grad-year case it already served.
+  const [needsName, setNeedsName] = useState(false)
+  const [name, setName] = useState("")
   const [gender, setGender] = useState("")
   const [graduationYear, setGraduationYear] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -122,6 +127,7 @@ function CompleteProfileContent() {
   const currentYear = new Date().getFullYear()
   const gradYearNum = parseInt(graduationYear, 10)
   const gradYearValid = gradYearNum >= currentYear && gradYearNum <= currentYear + 6
+  const nameValid = !needsName || name.trim().length >= 2
 
   useEffect(() => {
     async function load() {
@@ -131,12 +137,23 @@ function CompleteProfileContent() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("gender, graduation_year")
+        .select("gender, graduation_year, name, email")
         .eq("id", user.id)
         .single()
 
+      // Mirrors proxy.ts's relayName test — a display name auto-derived from an
+      // Apple private-relay address is an opaque string, not a name.
+      const email = (profile?.email ?? "").toLowerCase()
+      const stored = (profile?.name ?? "").trim()
+      const relayName =
+        email.endsWith("@privaterelay.appleid.com") &&
+        (stored === "" || stored === email.split("@")[0])
+      setNeedsName(relayName)
+      // Never prefill the opaque prefix — that invites them to just accept it.
+      if (relayName) setName("")
+
       // Already complete (deep-link) — don't show the form, send them onward.
-      if (profile?.gender && profile?.graduation_year != null) {
+      if (profile?.gender && profile?.graduation_year != null && !relayName) {
         window.location.assign(next)
         return
       }
@@ -151,12 +168,12 @@ function CompleteProfileContent() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!userId || !gender || !gradYearValid) return
+    if (!userId || !gender || !gradYearValid || !nameValid) return
     setSaving(true); setError(null)
     const supabase = createClient()
     const { error: updateError } = await supabase
       .from("profiles")
-      .update({ gender, graduation_year: gradYearNum })
+      .update({ gender, graduation_year: gradYearNum, ...(needsName ? { name: name.trim() } : {}) })
       .eq("id", userId)
     if (updateError) {
       setError("Something went wrong saving your details. Please try again.")
@@ -180,7 +197,9 @@ function CompleteProfileContent() {
     )
   }
 
-  const submitHint = !gender
+  const submitHint = !nameValid
+    ? "Enter your name to continue."
+    : !gender
     ? "Select your gender to continue."
     : !gradYearValid
     ? "Enter a valid graduation year."
@@ -208,6 +227,16 @@ function CompleteProfileContent() {
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {error && <ErrorBanner msg={error}/>}
 
+          {needsName && (
+            <Field
+              label="YOUR NAME"
+              placeholder="First and last name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              helper="Signing in with Apple hid your email, so we couldn't read your name from it. This is what your ministry sees."
+            />
+          )}
+
           <div>
             <div style={mono}>GENDER</div>
             <div style={{ fontSize: 13, color: "var(--muted-text)", margin: "4px 0 10px" }}>Helps us place you in the right small group.</div>
@@ -227,7 +256,7 @@ function CompleteProfileContent() {
             helper={`Enter the year you graduate (e.g. ${currentYear + 1}, ${currentYear + 2}).`}
           />
 
-          <Primary disabled={!gender || !gradYearValid || saving} loading={saving}>
+          <Primary disabled={!gender || !gradYearValid || !nameValid || saving} loading={saving}>
             {saving ? "Saving…" : "Continue"}
           </Primary>
           {submitHint && !saving && (
@@ -249,6 +278,15 @@ function CompleteProfileContent() {
         <p style={{ ...pocketSub, marginTop: 14 }}>Just two things so we can place you in the right small group — then you&apos;re in.</p>
         {error && <PocketError msg={error}/>}
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 22 }}>
+          {needsName && (
+            <PocketField
+              label="Your name"
+              placeholder="First and last name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              hint="Signing in with Apple hid your email, so we couldn't read your name from it. This is what your ministry sees."
+            />
+          )}
           <div>
             <span style={pocketFieldLabel}>Gender</span>
             <div style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "-2px 0 8px", paddingLeft: 4 }}>Helps us place you in the right small group.</div>
@@ -260,7 +298,7 @@ function CompleteProfileContent() {
           </div>
           <PocketField label="Graduation year" type="number" placeholder={String(currentYear + 2)} value={graduationYear} onChange={(e) => setGraduationYear(e.target.value)}
             hint={`Enter the year you graduate (e.g. ${currentYear + 1}, ${currentYear + 2}).`}/>
-          <PocketSubmit loading={saving} disabled={!gender || !gradYearValid || saving}>
+          <PocketSubmit loading={saving} disabled={!gender || !gradYearValid || !nameValid || saving}>
             {saving ? "Saving…" : "Continue"}
           </PocketSubmit>
           {submitHint && !saving && (

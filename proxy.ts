@@ -238,7 +238,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!fromCache) {
-    type ProfileRow = { ministry_id: string | null; role: string | null; gender: string | null; graduation_year: number | null }
+    type ProfileRow = { ministry_id: string | null; role: string | null; gender: string | null; graduation_year: number | null; name: string | null; email: string | null }
     // Primary: ONE joined query. The embed MUST be FK-qualified — profiles↔ministries has
     // TWO relationships (profiles_ministry_id_fkey + ministries_archive_requested_by_fkey),
     // so the unqualified `ministries(status)` shorthand is ambiguous (PGRST201) and would
@@ -246,7 +246,7 @@ export async function proxy(request: NextRequest) {
     // join would drop them and falsely trip the no-account teardown below).
     const joined = await supabase
       .from('profiles')
-      .select('ministry_id, role, gender, graduation_year, ministries!profiles_ministry_id_fkey(status)')
+      .select('ministry_id, role, gender, graduation_year, name, email, ministries!profiles_ministry_id_fkey(status)')
       .eq('id', user.id)
       .maybeSingle()
 
@@ -266,7 +266,7 @@ export async function proxy(request: NextRequest) {
       // "no row", never on an error.
       const p = await supabase
         .from('profiles')
-        .select('ministry_id, role, gender, graduation_year')
+        .select('ministry_id, role, gender, graduation_year, name, email')
         .eq('id', user.id)
         .maybeSingle()
       profRow = p.data as ProfileRow | null
@@ -306,7 +306,24 @@ export async function proxy(request: NextRequest) {
     status = resolvedStatus ?? 'active'
     // "Complete" = the completeness gate would NOT fire (admin-tier is always complete;
     // member/visitor need gender + graduation_year).
-    profileComplete = !(isMemberTier(role) && (!profRow?.gender || profRow?.graduation_year == null))
+    // A name auto-derived from an Apple PRIVATE RELAY address is not a name.
+    // handle_new_user falls back to split_part(email,'@',1), and Apple only hands
+    // back a real name on the FIRST authorization — so a re-auth (or a user who
+    // declined to share it) lands with an opaque relay prefix as their display
+    // name ("ygcvnyy625"), shown to their whole ministry with no way to correct
+    // it: /complete-profile collected gender and graduation_year but never name.
+    //
+    // Deliberately scoped to relay addresses. The general rule (name === the email
+    // local part) would also re-gate long-standing users whose real name happens
+    // to match their email prefix, to fix a problem they do not have.
+    const relayName = (() => {
+      const email = profRow?.email ?? ""
+      if (!email.toLowerCase().endsWith("@privaterelay.appleid.com")) return false
+      const local = email.split("@")[0]
+      const nm = (profRow?.name ?? "").trim()
+      return nm === "" || nm === local
+    })()
+    profileComplete = !(isMemberTier(role) && (!profRow?.gender || profRow?.graduation_year == null || relayName))
 
     // Cache ONLY the settled steady state (active ministry + complete profile) AND only
     // when the read was clean (never cache a degraded/errored read — it re-queries next
