@@ -302,8 +302,14 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
         .update({ title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, event_end_date: isEvent && eventEndDate ? dateTimeInputToISO(eventEndDate, timeZone) : null, show_attendees: showAttendees, image_url: imageUrl, status })
         .eq("id", existing.id).eq("ministry_id", ministryId).select().maybeSingle()
       if (updateError) { setError(updateError.message); setSubmitting(false); return }
+      // RLS filters rows out WITHOUT raising: a denied UPDATE returns 200 with an
+      // empty body, so `updateError` is null and `data` is null. The old fallback
+      // fabricated the row from local state, which meant a denied edit reported
+      // success and the composer closed over changes that were never written.
+      // Trust the returned row or fail loudly — never invent it.
+      if (!data) { setError("You don't have permission to edit this announcement."); setSubmitting(false); return }
       announcementId = existing.id
-      resultAnn = (data ?? { ...existing, title: title.trim(), body: body.trim(), audience, is_event: isEvent, event_date: isEvent && eventDate ? dateTimeInputToISO(eventDate, timeZone) : null, event_end_date: isEvent && eventEndDate ? dateTimeInputToISO(eventEndDate, timeZone) : null, show_attendees: showAttendees, image_url: imageUrl }) as Announcement
+      resultAnn = data as Announcement
     } else {
       const { data, error: insertError } = await supabase
         .from("announcements")
@@ -1151,7 +1157,18 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
   async function handleDesktopDelete(ann: EnrichedAnnouncement) {
     mutateAnnouncements((prev) => (prev ?? []).filter((a) => a.id !== ann.id), { revalidate: false })
-    await createClient().from("announcements").delete().eq("id", ann.id).eq("ministry_id", ministryId)
+    // `.select("id")` so an RLS-DENIED delete is distinguishable from a real one.
+    // Postgres does not error when a policy filters the rows out — it reports
+    // success with zero rows affected — so this discarded its result and then
+    // wrote an audit entry claiming a deletion that never happened, while the row
+    // vanished from the UI until the next revalidate. Role gating means this is
+    // defense-in-depth, but an audit log that lies is worse than no audit log.
+    const { data: deleted } = await createClient()
+      .from("announcements").delete().eq("id", ann.id).eq("ministry_id", ministryId).select("id")
+    if (!deleted || deleted.length === 0) {
+      mutateAnnouncements()   // put the row back — the delete did not happen
+      return
+    }
     logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.delete", entityType: "announcement", entityId: ann.id, entityLabel: ann.title })
   }
 
@@ -1171,7 +1188,11 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       // Unpin any currently pinned announcement before pinning this one
       await client.from("announcements").update({ is_pinned: false }).eq("ministry_id", ministryId).eq("is_pinned", true)
     }
-    await client.from("announcements").update({ is_pinned: !currentlyPinned }).eq("id", annId).eq("ministry_id", ministryId)
+    // .select("id") for the same reason as the delete/edit paths: a policy-filtered
+    // UPDATE succeeds with zero rows, so without this the pill flips in the UI on a
+    // write that never landed and the audit log records it as done.
+    const { data: pinned } = await client.from("announcements").update({ is_pinned: !currentlyPinned }).eq("id", annId).eq("ministry_id", ministryId).select("id")
+    if (!pinned || pinned.length === 0) { mutateAnnouncements(); return }
     mutateAnnouncements(prev => (prev ?? []).map(a =>
       a.id === annId
         ? { ...a, is_pinned: !currentlyPinned }
@@ -1184,7 +1205,8 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   async function handleSubPinToggle(annId: string, currentlySubPinned: boolean) {
     const client = createClient()
     const target = announcements.find(a => a.id === annId)
-    await client.from("announcements").update({ is_sub_pinned: !currentlySubPinned }).eq("id", annId).eq("ministry_id", ministryId)
+    const { data: subPinned } = await client.from("announcements").update({ is_sub_pinned: !currentlySubPinned }).eq("id", annId).eq("ministry_id", ministryId).select("id")
+    if (!subPinned || subPinned.length === 0) { mutateAnnouncements(); return }
     mutateAnnouncements(prev => (prev ?? []).map(a =>
       a.id === annId ? { ...a, is_sub_pinned: !currentlySubPinned } : a
     ), { revalidate: false })
@@ -1578,7 +1600,11 @@ export function AnnouncementCard({ announcement, ministryId, userRole, isDraft =
 
   async function handleDelete() {
     setDeleting(true)
-    await supabase.from("announcements").delete().eq("id", announcement.id).eq("ministry_id", ministryId)
+    // See handleDesktopDelete: a policy-filtered delete succeeds with zero rows,
+    // so without .select("id") the card disappears whether or not anything died.
+    const { data: deleted } = await supabase
+      .from("announcements").delete().eq("id", announcement.id).eq("ministry_id", ministryId).select("id")
+    if (!deleted || deleted.length === 0) { setDeleting(false); return }
     onDelete(announcement.id)
   }
 

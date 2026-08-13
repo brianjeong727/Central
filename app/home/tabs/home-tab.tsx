@@ -10,7 +10,7 @@ import { PocketHeader } from "../components/pocket-header"
 import { PocketUpNext, type PocketCard as UpNextCard } from "../components/pocket-up-next"
 import { getInitials, previewBody } from "../utils"
 import { useMinistryTimezone } from "../ministry-timezone-context"
-import { formatInZone } from "@/lib/tz"
+import { formatInZone, startOfTodayInstantISO } from "@/lib/tz"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getSetupChecklist, setLeadersInvited, dismissSetupChecklist } from "@/app/actions/setup-checklist"
@@ -78,6 +78,18 @@ function slideEventDetail(s: HeroSlide): UpNextEventDetail | undefined {
   if (s.kind === "event") return s.eventDetail
   if (s.kind === "announcement") return s.eventDetail
   return undefined
+}
+
+// Has this announcement's event finished? Mirrors the rule plan-tab uses for
+// calendar_events: "upcoming" runs to the END of the event's last ministry-zone
+// day, so tonight's event stays up while it is happening (and a multi-day retreat
+// stays up throughout) instead of vanishing the moment it starts. Falls back to
+// the start for rows with no end — before event_end_date existed, every row was
+// that shape, and those keep today's behaviour of lingering for the day.
+function annEventIsOver(a: { event_date: string | null; event_end_date?: string | null }, timeZone: string): boolean {
+  const end = a.event_end_date ?? a.event_date
+  if (!end) return false
+  return new Date(end).getTime() < Date.parse(startOfTodayInstantISO(timeZone))
 }
 
 // Compact event eyebrow + meta line for a cream Pocket event card. Formatted in the
@@ -837,7 +849,7 @@ export function HomeTab({
       ),
     })
   }
-  for (const a of forYouItems.filter((it) => it.is_event && !slideAnnIdSet.has(it.id))) {
+  for (const a of forYouItems.filter((it) => it.is_event && !slideAnnIdSet.has(it.id) && !annEventIsOver(it, timeZone))) {
     const ed: UpNextEventDetail | undefined = a.event_date ? { startDate: a.event_date, endDate: a.event_end_date ?? a.event_date, allDay: false, location: null } : undefined
     const { eyebrow, meta } = ed ? fmtEvent(ed, timeZone) : { eyebrow: "Up next", meta: "" }
     pocketCards.push({
