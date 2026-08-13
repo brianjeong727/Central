@@ -52,7 +52,7 @@ async function sha256Hex(input: string): Promise<string> {
 
 export type NativeAppleResult =
   | { ok: true }
-  | { ok: false; error: "canceled" | "unavailable" | "no-account" | "failed"; detail?: string }
+  | { ok: false; error: "canceled" | "unavailable" | "no-account" | "not-entitled" | "failed"; detail?: string }
 
 // TEMP DIAGNOSTIC (Apple sign-in triage): the coarse error enum hides WHY the
 // native flow failed. This surfaces the raw reason to the sign-in UI (native
@@ -99,8 +99,14 @@ export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<
     if (/not implemented|unimplemented/i.test(msg)) return { ok: false, error: "unavailable", detail: msg }
     // ASAuthorizationError 1001 = user dismissed the sheet — genuinely silent.
     if (/1001|cancel/i.test(msg)) return { ok: false, error: "canceled", detail: msg }
-    // Everything else (1000 = no Apple ID signed in on the device, 1004 =
-    // request failed, entitlement problems) must SURFACE, not vanish.
+    // 1000 = ASAuthorizationError.unknown. In practice it means the RUNNING
+    // BINARY is not entitled for Sign in with Apple — the capability is missing
+    // from the App ID / provisioning profile it was signed with (the
+    // entitlements FILE alone is inert). It is not transient, so "please try
+    // again" is the wrong thing to say: retrying can never fix it. The web
+    // OAuth flow is still entitled, so fall back there rather than dead-end.
+    if (/error 1000|\b1000\b/.test(msg)) return { ok: false, error: "not-entitled", detail: msg }
+    // Everything else (1004 = request failed, network) is genuinely retryable.
     return { ok: false, error: "failed", detail: `authorize threw: ${msg}` }
   }
 
