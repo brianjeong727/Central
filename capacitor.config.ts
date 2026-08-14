@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli"
 import { KeyboardResize } from "@capacitor/keyboard"
 
-// Remote-URL shell: the native iOS app is a thin WebView that loads the deployed
+// Remote-URL shell: the native iOS and Android apps are thin WebViews that load the deployed
 // web app at https://www.joincentral.app (the CANONICAL origin — the apex 307s to www,
 // and Capacitor's bridge self-disables on origin mismatch, killing native detection). There is NO code fork — capacitor-shell/ holds
 // only a fallback index.html that the remote shell never serves. The shell owns just
@@ -26,6 +26,11 @@ const config: CapacitorConfig = {
     // Offline / failed-load fallback (App Store 2.1 stability): a cream "You're
     // offline" page with a retry back to the remote URL, instead of a blank error.
     errorPath: "offline.html",
+    // Scheme for the bundled fallback assets on Android (the remote server.url
+    // above supersedes it at runtime). https keeps the fallback page in a secure
+    // context, matching the remote origin, so nothing behaves differently in the
+    // one moment the app IS serving local assets.
+    androidScheme: "https",
   },
   ios: {
     // "never": the WKWebView scroll view adds NO native safe-area inset. Paired with
@@ -42,6 +47,19 @@ const config: CapacitorConfig = {
     // signed-out on /login, never the public marketing site. Appended (not overridden)
     // so the underlying Safari UA — and every heuristic that reads it — stays intact.
     // Takes effect only after the next `npx cap sync ios` + device build.
+    appendUserAgent: "CentralShell",
+  },
+  android: {
+    // Same cream as iOS — the WebView background behind the app while it paints.
+    backgroundColor: "#FBF8F2",
+    // LOAD-BEARING, and the single most breakable line in the Android shell.
+    // proxy.ts recognizes the shell by this UA substring and routes "/" to
+    // /home (signed in) or /login (signed out) instead of serving the public
+    // marketing page. lib/native-auth.ts's isNativeShell() and entry-splash.tsx
+    // probe the SAME string. Without it the Android app opens on the marketing
+    // site — a silent, non-crashing failure that looks like a routing bug.
+    // Appended (not overridden) so the underlying Chrome UA stays intact.
+    // Takes effect only after `npx cap sync android` + a new build.
     appendUserAgent: "CentralShell",
   },
   plugins: {

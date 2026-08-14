@@ -6,11 +6,13 @@ import {
   type SubscribeResult,
 } from "@/lib/push"
 
-// ── Native (Capacitor iOS shell) push bridge ─────────────────────────────────
+// ── Native (Capacitor iOS/Android shell) push bridge ─────────────────────────
 // This runs inside the DEPLOYED web app (https://joincentral.app). When that page is
-// loaded inside the Capacitor iOS shell, the browser Push API is unavailable — iOS
-// only delivers native pushes through APNs. So here we route the same subscribe /
-// state calls to Capacitor's PushNotifications plugin instead of the web PushManager.
+// loaded inside a Capacitor shell, the browser Push API is unavailable — iOS only
+// delivers native pushes through APNs, and the Android System WebView implements
+// Service Workers but NOT the Push API, so Android needs FCM. Either way we route
+// the same subscribe / state calls to Capacitor's PushNotifications plugin instead
+// of the web PushManager; the plugin abstracts APNs vs FCM behind one interface.
 //
 // Every Capacitor import is DYNAMIC (`await import(...)`) so the web bundle never
 // hard-depends on @capacitor/* at module top — on plain web the modules are simply
@@ -33,6 +35,20 @@ async function detectNative(): Promise<boolean> {
   return nativeIsShell
 }
 
+// Which native container, as the `platform` column value claim_native_push_token
+// expects. The RPC whitelists these two and derives the endpoint prefix itself
+// ('apns:' / 'fcm:') — the client never supplies one. Defaults to 'ios-native' so
+// an unexpected getPlatform() value can't mint an unroutable row; the RPC's own
+// default is the same value for the same reason.
+async function nativePlatform(): Promise<"ios-native" | "android-native"> {
+  try {
+    const { Capacitor } = await import("@capacitor/core")
+    return Capacitor.getPlatform() === "android" ? "android-native" : "ios-native"
+  } catch {
+    return "ios-native"
+  }
+}
+
 // Set up the native push listeners exactly once per page. Idempotent: the flag guards
 // against a second wiring when both the subscribe prompt and the settings section mount.
 let listenersReady = false
@@ -41,15 +57,19 @@ async function ensureNativeListeners(): Promise<void> {
   listenersReady = true
   const { PushNotifications } = await import("@capacitor/push-notifications")
 
-  // APNs device token → store as a subscription row. Mirrors claim_push_endpoint: the
-  // SECURITY DEFINER RPC stamps user_id/ministry_id and writes endpoint = 'apns:'||token,
-  // platform = 'ios-native'. The dispatch route skips these until the APNs sender ships.
+  // APNs (iOS) / FCM (Android) device token → store as a subscription row. Mirrors
+  // claim_push_endpoint: the SECURITY DEFINER RPC stamps user_id/ministry_id and
+  // writes endpoint = '<apns|fcm>:'||token with the matching platform. The prefix is
+  // derived SERVER-side from p_platform, which the RPC whitelists — the client never
+  // sends an endpoint, so it can't mint a row the dispatch route mistakes for web-push.
+  const platform = await nativePlatform()
   await PushNotifications.addListener("registration", async (token) => {
     try {
       const supabase = createClient()
       const { error } = await supabase.rpc("claim_native_push_token", {
         p_token: token.value,
         p_user_agent: navigator.userAgent,
+        p_platform: platform,
       })
       // Loud on failure (inspector-visible) — a silently swallowed claim error cost
       // a device-debugging session on 2026-07-12. Still never throws into the app.
@@ -83,11 +103,47 @@ async function ensureNativeListeners(): Promise<void> {
   })
 }
 
-// Native subscribe: request permission, wire listeners, register with APNs. The APNs
-// token arrives ASYNC via the 'registration' listener above, which performs the RPC —
-// so a resolved { ok: true } here means "registration kicked off", not "token stored".
+// Can this binary actually register for push? On iOS, always — APNs is part of the
+// OS. On Android it depends on whether the APK was built with google-services.json,
+// which ONLY the APK knows (Convention #28: the binary is the authority, not the
+// bundle — one web deploy lands in every installed binary at once).
+//
+// This is a CRASH GUARD, not a nicety. PushNotifications.register() on an Android
+// build without Firebase throws IllegalStateException on Capacitor's native plugin
+// thread — a FATAL EXCEPTION that kills the process and that no JS try/catch can
+// catch. Verified on an emulator: tapping "Turn on notifications" killed the app.
+// See android/.../FirebaseReadyPlugin.java.
+//
+// Fails CLOSED on Android: if the probe is missing or throws, we report "cannot
+// register" rather than calling register() and risking the crash. There are no
+// Android binaries predating this plugin, so that costs nothing today and stays
+// correct if an old one ever exists.
+async function canRegisterNatively(): Promise<boolean> {
+  try {
+    const { Capacitor } = await import("@capacitor/core")
+    if (Capacitor.getPlatform() !== "android") return true
+    const probe = (Capacitor as unknown as {
+      Plugins?: { FirebaseReady?: { check: () => Promise<{ available: boolean }> } }
+    }).Plugins?.FirebaseReady
+    if (!probe) return false
+    const { available } = await probe.check()
+    return !!available
+  } catch {
+    return false
+  }
+}
+
+// Native subscribe: request permission, wire listeners, register with APNs (iOS) or
+// FCM (Android). The device token arrives ASYNC via the 'registration' listener
+// above, which performs the RPC — so a resolved { ok: true } here means "registration
+// kicked off", not "token stored".
 async function subscribeToNativePush(): Promise<SubscribeResult> {
   try {
+    if (!(await canRegisterNatively())) {
+      // Android build without Firebase config. Report unsupported instead of
+      // registering — see canRegisterNatively().
+      return { ok: false, reason: "unsupported" }
+    }
     const { PushNotifications } = await import("@capacitor/push-notifications")
     const perm = await PushNotifications.requestPermissions()
     if (perm.receive !== "granted") {
@@ -108,6 +164,13 @@ async function subscribeToNativePush(): Promise<SubscribeResult> {
 // tapped while the app was backgrounded deep-links once the notifications UI mounts.
 async function getNativePushState(): Promise<PushState> {
   try {
+    // Same crash guard as subscribeToNativePush — this path calls register() too,
+    // and it runs on EVERY mount of the notifications UI, so an unguarded call here
+    // would crash the app merely by opening settings. Reported as unsupported so the
+    // UI offers no button rather than a dead one.
+    if (!(await canRegisterNatively())) {
+      return { supported: false, permission: "unsupported", subscribed: false }
+    }
     const { PushNotifications } = await import("@capacitor/push-notifications")
     await ensureNativeListeners()
     const perm = await PushNotifications.checkPermissions()

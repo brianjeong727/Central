@@ -11,6 +11,9 @@ importers:
       '@capacitor-community/apple-sign-in':
         specifier: ^7.1.0
         version: 7.1.0(@capacitor/core@8.4.1)
+      '@capacitor/android':
+        specifier: 8.4.2
+        version: 8.4.2(@capacitor/core@8.4.1)
       '@capacitor/app':
         specifier: ^8.1.0
         version: 8.1.0(@capacitor/core@8.4.1)
@@ -317,6 +320,11 @@ packages:
     resolution: {integrity: sha512-df7cA7vfvvvilTtpJKeVvxO31W+py5t3HK9233GBD5MvgAgtGvCqeQ3pI0noNkVsKPF9B1g/po8Mph6s4bVSmw==}
     peerDependencies:
       '@capacitor/core': '>=7.0.0'
+
+  '@capacitor/android@8.4.2':
+    resolution: {integrity: sha512-bzf8XZ9C+ePgOQ+e+T0fnhHGH4aCNY494vvSQIF5w4AY07RwEmkFqZs1678DDSMH0hLSQpxEwXGFNUVcXO6bBA==}
+    peerDependencies:
+      '@capacitor/core': ^8.4.0
 
   '@capacitor/app@8.1.0':
     resolution: {integrity: sha512-MlmttTOWHDedr/G4SrhNRxsXMqY+R75S4MM4eIgzsgCzOYhb/MpCkA5Q3nuOCfL1oHm26xjUzqZ5aupbOwdfYg==}
@@ -4838,6 +4846,10 @@ snapshots:
       '@capacitor/core': 8.4.1
       '@types/scriptjs': 0.0.2
       scriptjs: 2.5.9
+
+  '@capacitor/android@8.4.2(@capacitor/core@8.4.1)':
+    dependencies:
+      '@capacitor/core': 8.4.1
 
   '@capacitor/app@8.1.0(@capacitor/core@8.4.1)':
     dependencies:

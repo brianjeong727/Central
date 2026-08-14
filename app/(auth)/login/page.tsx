@@ -7,6 +7,7 @@ import { AlertCircle } from "lucide-react"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { SplitShell, GoogleButton, GoogleGlyph, AppleButton, AppleGlyph, OrDivider, EyeButton } from "@/app/(auth)/shared"
 import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn, nativeAuthDebugMessage } from "@/lib/native-auth"
+import { useBackIntent } from "@/lib/back-intent"
 import { RingCrossLogo } from "@/app/home/components/shared"
 import { EntrySplash } from "@/app/home/components/entry-splash"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
@@ -44,6 +45,12 @@ function LoginContent() {
   const [mobileStep, setMobileStep] = useState<"welcome" | "form">(
     searchParams.get("error") ? "form" : "welcome"
   )
+  // Android hardware/gesture back returns to the welcome step — the same action the
+  // "← Back" button above the form fires. Without this, back on the sign-in form
+  // would find nothing registered and minimize the app, losing a half-typed email.
+  // Registered only ON the form step, so back from `welcome` still backgrounds the
+  // app (there is genuinely nowhere above the entry screen to go).
+  useBackIntent(mobileStep === "form" ? () => setMobileStep("welcome") : undefined)
   // Google's web-OAuth flow can't run inside the WKWebView (Google blocks
   // embedded webviews), so the shell uses the NATIVE Google sheet instead —
   // shown only once the iOS OAuth client ID is configured. Until then the

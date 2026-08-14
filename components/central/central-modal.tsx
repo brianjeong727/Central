@@ -12,13 +12,14 @@
 //             32px ivory circular X top-right
 //   body      scrollable, 20px/24px padding
 //   footer    optional right-aligned action row above a hairline
-//   closes    X · backdrop click · Escape — all three, always
+//   closes    X · backdrop click · Escape · Android back — all four, always
 //
 // Modals remain for CREATION/CONFIG ONLY — never navigation (§4.17). Callers
 // conditionally render: `{open && <CentralModal …>}`.
 
 import { ReactNode, useEffect, useState } from "react"
 import { X } from "lucide-react"
+import { useBackIntent } from "@/lib/back-intent"
 
 export function CentralModal({
   onClose,
@@ -60,6 +61,12 @@ export function CentralModal({
   // Clean state can never keep a stale confirm open (e.g. after a save flips
   // dirty→false while the confirm was showing).
   useEffect(() => { if (!dirty) setConfirmingClose(false) }, [dirty])
+
+  // Android hardware/gesture back closes the modal, through the SAME dirty guard as
+  // the other three triggers — back must never be the one dismissal that discards
+  // unsaved work. Topmost-wins comes free from the LIFO stack, so a modal opened
+  // over a subpage closes before the subpage pops.
+  useBackIntent(requestClose)
 
   // Escape closes — standard across every modal (guarded when dirty).
   useEffect(() => {

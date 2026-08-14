@@ -35,6 +35,7 @@ import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
 import { isChatManageRole, isLeaderRole } from "@/lib/roles"
 import { subscribeKeyboard, useSwipeDownToDismissKeyboard } from "@/lib/keyboard-inset"
+import { useBackIntent } from "@/lib/back-intent"
 
 // Hydration-safe "are we mounted on the client yet?" flag with no set-state-in-
 // effect. useSyncExternalStore returns the server snapshot (false) during SSR
@@ -3242,6 +3243,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // Mobile: edge-swipe from the left closes the chat, mirroring the header back
   // chevron (§0.3). Disabled on the desktop inline render; coarse-pointer gated.
   const chatSwipeRef = useEdgeSwipeBack<HTMLDivElement>(inline ? undefined : onClose)
+  // Android hardware/gesture back closes the chat too — same handler, same gate as
+  // the swipe (Convention #22). ChatScreen is a shell-escaping overlay rather than a
+  // SubpageShell, so it registers its own, exactly as it wires its own edge-swipe.
+  useBackIntent(inline ? undefined : onClose)
 
   // Settings is now an in-content subpage (SubpageShell), not a portal sibling.
   // Early-return it so it REPLACES the chat in the same slot: on desktop it fills

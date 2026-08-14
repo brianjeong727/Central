@@ -4,6 +4,7 @@ import { Fragment, useEffect } from "react"
 import type { CSSProperties, ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react"
+import { useBackIntent } from "@/lib/back-intent"
 
 // ── Pocket primitives (mobile design system) ──────────────────────────────────
 // The shared building blocks of every phone-width (`md:hidden`) surface, per
@@ -350,6 +351,10 @@ export function PocketSheet({ title, onClose, children, zIndex = 200 }: {
   children: ReactNode
   zIndex?: number
 }) {
+  // Android hardware/gesture back dismisses the sheet, same as Escape and the
+  // backdrop. Topmost-wins comes free from the LIFO stack.
+  useBackIntent(onClose)
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
     window.addEventListener("keydown", onKey)

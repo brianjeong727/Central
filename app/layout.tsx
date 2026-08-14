@@ -4,6 +4,7 @@ import "./globals.css";
 import PWARegister from "@/components/pwa-register";
 import NativeSplashRelease from "@/components/native-splash-release";
 import KeyboardInsetBridge from "@/components/keyboard-inset-bridge";
+import NativeBackBridge from "@/components/native-back-bridge";
 
 const bricolageGrotesque = Bricolage_Grotesque({
   variable: "--font-bricolage-grotesque",
@@ -51,6 +52,10 @@ export default function RootLayout({
             Before {children} so the vars are live on the first frame a text field
             can be focused. */}
         <KeyboardInsetBridge />
+        {/* Routes Android's hardware/gesture back to the same handler the chrome
+            chevron fires (lib/back-intent.ts). Inert on web and iOS — `backButton`
+            is an Android-only Capacitor event. */}
+        <NativeBackBridge />
         {children}
         {/* After {children} so EntrySplash's effect (deeper in the tree, on /home and
             /login) runs first and can claim the splash handoff. */}
