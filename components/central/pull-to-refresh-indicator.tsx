@@ -35,6 +35,9 @@ export function PullToRefreshIndicator({
   return (
     <div
       aria-hidden
+      // Presence IS the contract the gesture spec asserts on (it must not appear
+      // mid-page); the ring is otherwise styled entirely by utility classes.
+      data-pull-refresh
       className="fixed left-1/2 z-40 md:hidden pointer-events-none"
       style={{
         // Travel is the pull itself, so the ring stays glued to the finger.

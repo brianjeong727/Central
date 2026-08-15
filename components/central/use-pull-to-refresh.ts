@@ -5,13 +5,15 @@
 // → the caller's async refresh runs → the spinner holds until it settles.
 //
 // Attach the returned ref to the SCROLL element itself (the shell's `.shell-scroll`),
-// not to a wrapper — the gesture has to read that element's own scrollTop.
+// not to a wrapper — the gesture reads that element's scroll position and listens
+// on it. Note that at phone width that element is not actually the scroller; see
+// `effectiveScrollTop` below, which is what keeps the top-anchored guard honest.
 //
 // Safety properties, same discipline as useEdgeSwipeBack (Convention #7 — never
 // fight another gesture):
 //   • coarse-pointer only; inert on desktop, so a trackpad can never trigger it
-//   • top-anchored — arms ONLY when the scroller is already at scrollTop 0, so it
-//     can never hijack a normal upward scroll through content
+//   • top-anchored — arms ONLY when the page is already scrolled to the very top,
+//     so it can never hijack a normal upward scroll through content
 //   • direction-locked — a horizontal-dominant drag releases immediately, so
 //     carousels and chip-rails keep their gesture
 //   • vertical-scroller guard — bails if the touch starts inside a NESTED vertical
@@ -32,6 +34,24 @@ const MAX_PULL = 96
 const ARM_PX = 6
 /** Horizontal movement beyond this before arming means the user meant sideways. */
 const H_SLOP = 12
+
+// How far the page is scrolled, from whichever element is ACTUALLY scrolling.
+//
+// The shell's scroll region is only a real scroller on desktop: at phone width
+// every one of its height/overflow constraints is `md:`-prefixed, so the div is
+// auto-height (`min-h-screen`) and its content can never overflow its own box —
+// the DOCUMENT scrolls instead. Measured on the announcements tab at 390px:
+// scrollHeight 1920 === clientHeight 1920, and after scrolling 600px the div's
+// own scrollTop was still 0 while window.scrollY was 600.
+//
+// So reading `node.scrollTop` alone reports a permanent 0 at exactly the width
+// this gesture runs at, which satisfies the top-anchored guard at EVERY scroll
+// position — the pull would arm halfway down a feed and preventDefault would
+// eat the scroll. Fall back to the document whenever the node isn't scrollable.
+function effectiveScrollTop(node: HTMLElement): number {
+  if (node.scrollHeight > node.clientHeight) return node.scrollTop
+  return window.scrollY || document.documentElement.scrollTop || 0
+}
 
 function inNestedVerticalScroller(target: EventTarget | null, root: HTMLElement): boolean {
   let n = target as HTMLElement | null
@@ -90,7 +110,7 @@ export function usePullToRefresh<T extends HTMLElement>({ onRefresh, enabled = t
       const node = ref.current
       if (!node) return
       // Only from the very top, and never from inside a nested scroller.
-      if (node.scrollTop > 0) { armed = false; return }
+      if (effectiveScrollTop(node) > 0) { armed = false; return }
       if (inNestedVerticalScroller(e.target, node)) { armed = false; return }
       startY = e.touches[0].clientY
       startX = e.touches[0].clientX
