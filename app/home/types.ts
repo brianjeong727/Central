@@ -1100,6 +1100,9 @@ export interface HomeAppProps {
    *  only if the boot fetch failed (resolver logs + falls back). */
   ministryTimezone?: string | null
   initialRecentChats?: ChatPreview[]
+  /** SSR-seeded chats-tab list (app/home/page.tsx). Removes the cold-load client
+   *  round trip AND the duplicate get_chat_list the panels' own SWR used to race. */
+  initialChatList?: ChatGroup[]
   initialUserTeams?: UserTeam[]
   initialActiveQuestion?: CongregationQuestion | null
   initialHasResponded?: boolean

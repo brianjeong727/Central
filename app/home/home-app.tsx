@@ -74,25 +74,62 @@ const NetworkTab = dynamic(() => import("./tabs/network-tab").then(m => m.Networ
 // once a profile is first opened.
 const GlobalMemberProfileOverlay = dynamic(() => import("./components/member-sheet").then(m => m.GlobalMemberProfileOverlay), { ssr: false })
 
-function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
+function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialChatList, initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const { mutate: globalMutate } = useSWRConfig()
   // Native Capacitor shell — Give is web-only there (App Store 3.2.2(iv)).
   const nativeShell = useIsNativeShell()
 
-  // Reliable chat-list fetch from the MAIN bundle. ChatListPanel/ChatsTab are
+  // Reliable chat-list state for the MAIN bundle. ChatListPanel/ChatsTab are
   // code-split (ssr:false) and their own useSWR for this key is unreliable on the
   // initial mount across the chunk boundary — SWR can leave `data` undefined even
-  // when the fetcher resolves. So we DON'T use SWR here: a plain promise + useState
-  // guarantees the resolved groups reach the render. This state is passed down as
-  // fallbackChats so the panels render it directly regardless of their own hook.
-  const [chatListData, setChatListData] = useState<ChatGroup[] | undefined>(undefined)
-  const loadChatList = useCallback(() => {
-    if (!userId || !ministryId) return
-    fetchChatList(["chat-list", userId, ministryId]).then(setChatListData).catch(() => {})
-  }, [userId, ministryId])
-  useEffect(() => { loadChatList() }, [loadChatList])
+  // when the fetcher resolves. So we DON'T use SWR here: plain state guarantees the
+  // groups reach the render. Passed down as fallbackChats (→ SWR `fallbackData`) so
+  // the panels render it directly regardless of their own hook.
+  //
+  // SEEDED FROM THE SERVER (app/home/page.tsx). It previously initialized to
+  // `undefined` and fetched on mount, which meant the request could not even START
+  // until the bundle had downloaded, parsed and hydrated — measured at +2.76s on a
+  // throttled mid-range phone, with the query itself taking single-digit ms. It also
+  // raced the panels' own SWR revalidation for the same key, so the RPC ran twice per
+  // cold load (observed at +2761ms and +3003ms). Seeding kills both: first paint has
+  // the list, and there is no mount fetch to duplicate.
+  const [chatListData, setChatListData] = useState<ChatGroup[] | undefined>(initialChatList)
+
+  // Warm the chats chunk once the boot is quiet.
+  //
+  // Chats is code-split with ssr:false, so tapping the tab starts a chunk download
+  // and shows a spinner until it lands — measured as the single largest cost on the
+  // cold chat path (the first API request could not even fire until +2.76s on a
+  // throttled mid-range phone, essentially all of it bundle download/parse/hydrate).
+  // Chats is the tab people open most, so paying for it during idle rather than on
+  // the tap turns the second-and-later opens instant.
+  //
+  // requestIdleCallback (not a timer) so this never competes with first paint or
+  // hydration; the fallback timeout covers Safari, which still lacks rIC. Fire and
+  // forget — a failed warm is a no-op, the tap just downloads it as before.
+  useEffect(() => {
+    let cancelled = false
+    const warm = () => {
+      if (cancelled) return
+      void import("./tabs/chats-tab").catch(() => {})
+    }
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
+      cancelIdleCallback?: (h: number) => void
+    }
+    if (typeof w.requestIdleCallback === "function") {
+      const h = w.requestIdleCallback(warm, { timeout: 3000 })
+      return () => { cancelled = true; w.cancelIdleCallback?.(h) }
+    }
+    const t = setTimeout(warm, 1200)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [])
+  // No mount fetch and no loader here on purpose — the server already provided the
+  // list. Refreshes go through refetchChatList (realtime paths), which updates BOTH
+  // the SWR cache and this state from one RPC, and through the panels' own SWR on
+  // focus/reconnect.
 
   // The current user's member group IDs — used to scope the global recent-chats
   // realtime channel so a session only wakes on inserts into ITS OWN groups

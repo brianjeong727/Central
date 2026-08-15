@@ -21,21 +21,20 @@ export type ChatListRow = {
   is_central: boolean | null
 }
 
-export async function fetchChatList([, userId, ministryId]: [string, string, string]): Promise<ChatGroup[]> {
-  const supabase = createClient()
-  const { data, error } = await supabase.rpc("get_chat_list", {
-    p_user_id: userId,
-    p_ministry_id: ministryId,
-  })
-  // Propagate transient RPC failures so SWR enters its error/retry state and
-  // keepPreviousData keeps the last good list — instead of swallowing the error
-  // and caching `[]`, which poisons every consumer until a manual refresh.
-  if (error) throw error
-
-  // get_chat_list now surfaces groups.is_central_chat directly (row.is_central),
-  // so the previously-required follow-up groups lookup is gone. Used only to flag
-  // the solid-plum monogram chip in the mobile Pocket list.
-  const groups = ((data ?? []) as ChatListRow[]).map((row) => ({
+// Pure row → ChatGroup mapping, shared by the CLIENT fetcher below and the SERVER
+// boot fetch in app/home/page.tsx. Extracted rather than duplicated because the two
+// must produce byte-identical shapes: the server result seeds the same SWR cache the
+// client fetcher later revalidates, and any drift between them would show up as the
+// list visibly rearranging itself a beat after first paint.
+//
+// Deliberately kept in this module (which has no module-level side effects — the
+// browser client is created lazily inside createClient()) so a SERVER component can
+// import it without pulling a browser client into the server graph.
+export function mapChatListRows(rows: ChatListRow[]): ChatGroup[] {
+  // get_chat_list surfaces groups.is_central_chat directly (row.is_central), so the
+  // previously-required follow-up groups lookup is gone. Used only to flag the
+  // solid-plum monogram chip in the mobile Pocket list.
+  const groups = (rows ?? []).map((row) => ({
     id: row.group_id,
     name: row.group_name,
     type: row.group_type,
@@ -59,4 +58,18 @@ export async function fetchChatList([, userId, ministryId]: [string, string, str
   })
 
   return groups
+}
+
+export async function fetchChatList([, userId, ministryId]: [string, string, string]): Promise<ChatGroup[]> {
+  const supabase = createClient()
+  const { data, error } = await supabase.rpc("get_chat_list", {
+    p_user_id: userId,
+    p_ministry_id: ministryId,
+  })
+  // Propagate transient RPC failures so SWR enters its error/retry state and
+  // keepPreviousData keeps the last good list — instead of swallowing the error
+  // and caching `[]`, which poisons every consumer until a manual refresh.
+  if (error) throw error
+
+  return mapChatListRows((data ?? []) as ChatListRow[])
 }
