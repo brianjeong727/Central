@@ -88,9 +88,15 @@ test.describe("B3 /login — mobile (390x844), signed out", () => {
     await page.goto("/login?error=no-account")
     const mobile = mobileTree(page)
     await expect(mobile.getByRole("heading", { name: "Welcome back." })).toBeVisible()
-    await expect(
-      mobile.getByText("No Central account exists for that Google email yet — create an account first."),
-    ).toBeVisible()
+    // Assert the STABLE parts of the no-account notice, not its full sentence. The
+    // body copy interpolates the provider ("That {Google} account isn't linked…")
+    // across three JSX lines, so a whole-string match is both brittle to copy edits
+    // and dependent on how the DOM segments the interpolation — which is how this
+    // assertion silently went stale against copy that no longer exists anywhere.
+    const notice = mobile.getByRole("status").filter({ hasText: "No Central account yet" })
+    await expect(notice).toBeVisible()
+    await expect(notice).toContainText("Google")
+    await expect(notice.getByRole("link", { name: "Create an account" })).toBeVisible()
   })
 })
 
