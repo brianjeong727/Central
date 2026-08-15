@@ -21,6 +21,15 @@ import { ApnsClient, Notification, ApnsError, Errors, Host, Priority, PushType }
 //
 // SECURITY: the decoded .p8 private key is passed straight into the ApnsClient and
 // is NEVER logged, stringified, or returned. Do not add debug output that touches it.
+//
+// SECURITY: never log an ApnsError object itself, and never log `notification`.
+// ApnsError carries `.notification` (apns2's errors.js), and a Notification holds
+// the DEVICE TOKEN — so the most natural debugging reflex, `console.error("apns
+// failed", err)`, would serialize a live device token into the Vercel logs. Tokens
+// are a capability here: claim_native_push_token() hands a device's notifications
+// to whoever presents its token. Log `err.reason` / `err.statusCode` ONLY (that is
+// what ApnsSendResult.reason carries, and why it carries a string rather than the
+// error).
 
 // ── Both hosts, not one ──────────────────────────────────────────────────────
 // ONE deployment serves BOTH kinds of token at once, so a single host is always

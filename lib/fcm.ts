@@ -36,7 +36,8 @@ let config: Config | null = null
 
 // Lazy singleton. Returns null when any required env var is absent (dev slots
 // without the credentials) so the route skips android-native rows instead of
-// crashing — identical degradation to getClient() in lib/apns.ts.
+// crashing — identical degradation to getClients() in lib/apns.ts (which builds
+// one client per APNs host, hence the plural).
 function getConfig(): Config | null {
   if (configInit) return config
   configInit = true
@@ -147,14 +148,25 @@ async function getAccessToken(cfg: Config): Promise<string | null> {
 //         Transient failures (500/503/429/network) → { ok:false, prune:false }.
 export type FcmSendResult = { ok: boolean; prune: boolean }
 
-// FCM v1 permanent-failure classification. UNREGISTERED means the app was
-// uninstalled or the token rotated; INVALID_ARGUMENT on a send means the token is
-// malformed; SENDER_ID_MISMATCH means it belongs to a different Firebase project.
-// All three are permanent for THIS row. Everything else (UNAVAILABLE, INTERNAL,
-// QUOTA_EXCEEDED, network) is retryable and must never prune a live device.
+// FCM v1 permanent-failure classification — the DEVICE's own verdict ONLY.
+// UNREGISTERED means the app was uninstalled or the token rotated; 404 is that
+// same verdict by status code; INVALID_ARGUMENT on a send means the token string
+// itself is malformed. Everything else (UNAVAILABLE, INTERNAL, QUOTA_EXCEEDED,
+// network) is retryable and must never prune a live device.
+//
+// SENDER_ID_MISMATCH is deliberately NOT here, for the same reason
+// Errors.badDeviceToken was removed from isPermanentFailure in lib/apns.ts: it
+// means "this token belongs to a different Firebase project", which is a
+// SERVER-side config error, not a dead device. Pruning on it deletes a
+// perfectly live registration — and because the shell re-registers on next
+// launch, that produces an endless register→prune→register loop whose only
+// symptom is `sent:0, failed:0`, i.e. silence with no error recorded anywhere.
+// That exact loop is what made the iOS outage undiagnosable across several
+// debugging attempts. Leaving the row costs one failed send per message;
+// deleting it costs every notification that user will ever get. So: log the
+// reason (below) and keep the row.
 function isPermanentFailure(status: number, errorStatus: string | undefined): boolean {
   if (status === 404) return true
-  if (status === 403 && errorStatus === "SENDER_ID_MISMATCH") return true
   if (status === 400 && errorStatus === "INVALID_ARGUMENT") return true
   return errorStatus === "UNREGISTERED"
 }
@@ -220,7 +232,17 @@ export async function sendFcmNotification(opts: {
     } catch {
       // Non-JSON error body — fall back to the status code alone.
     }
-    return { ok: false, prune: isPermanentFailure(res.status, errorStatus) }
+    const prune = isPermanentFailure(res.status, errorStatus)
+    // An FCM rejection used to vanish: the result carries only {ok, prune}, so
+    // the route could report nothing but a bare `failed:1`. Say why here — a
+    // config error (SENDER_ID_MISMATCH: wrong Firebase project for this token)
+    // now keeps the row rather than deleting it, so the log line is the ONLY
+    // trace it ever leaves. Status + error code only; the device token and the
+    // service-account PEM are never interpolated.
+    console.error(
+      `[push][fcm] send failed — status=${res.status} error=${errorStatus ?? "unknown"} prune=${prune}`,
+    )
+    return { ok: false, prune }
   } catch {
     // Network / unexpected error — transient, never prune.
     return { ok: false, prune: false }
