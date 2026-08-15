@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase-server"
 import { HomeApp } from "./home-app"
 import { rowsToChatPreviews, type ChatPreviewRow } from "./utils"
 import { mapChatListRows, type ChatListRow } from "./chat-list"
+import { resolveChatsSection } from "./tabs/chat-shared"
 import type { UserTeam, CongregationQuestion, GovernanceSettings, ChatGroup } from "./types"
 import type { ChatPreview } from "@/components/central/chat-strip"
 
@@ -17,8 +18,21 @@ type RawMembership = {
   team_roles: RawRoleRef | RawRoleRef[] | null
 }
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const supabase = await createClient()
+
+  // The chat list is SERVER-RENDERED, so the scope it opens on has to be decided
+  // here. It used to be read off `window.location.search` inside a useState
+  // initializer in BOTH list components — which the server cannot do, so the
+  // server would always have rendered "church" while a client arriving at
+  // ?chats=my rendered "my": a hydration mismatch that repaints the wrong
+  // segment first. `?chats` is still ordinary URL state written through
+  // nav-state's one atomic replace (Convention #12) — only the FIRST read moved.
+  const initialChatsSection = resolveChatsSection((await searchParams).chats)
 
   const {
     data: { user },
@@ -173,6 +187,7 @@ export default async function HomePage() {
       ministryTimezone={(ministryResult.data as { timezone?: string | null } | null)?.timezone ?? null}
       initialRecentChats={initialRecentChats}
       initialChatList={initialChatList}
+      initialChatsSection={initialChatsSection}
       initialUserTeams={initialUserTeams}
       initialActiveQuestion={initialActiveQuestion}
       initialHasResponded={initialHasResponded}

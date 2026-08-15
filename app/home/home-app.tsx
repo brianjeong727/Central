@@ -38,7 +38,7 @@ import { MinistryTimezoneProvider } from "./ministry-timezone-context"
 // the matching Item-2 skeleton where one exists, otherwise the shared Spinner.
 import { HomeTab } from "./tabs/home-tab"
 import { Spinner } from "./components/shared"
-import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ChatListSkeleton, ProfileTabSkeleton, CentralModal, SuperSwitcher, CentralButton, useScrollResetOn } from "@/components/central"
+import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ProfileTabSkeleton, CentralModal, SuperSwitcher, CentralButton, useScrollResetOn } from "@/components/central"
 import type { CalendarEvent } from "./types"
 import type { DirectoryMember } from "./types"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
@@ -49,9 +49,15 @@ import { useBackIntent } from "@/lib/back-intent"
 const AnnouncementsTab = dynamic(() => import("./tabs/announcements-tab").then(m => m.AnnouncementsTab), { loading: () => <AnnouncementsTabSkeleton />, ssr: false })
 const AnnouncementDetailView = dynamic(() => import("./tabs/announcements-tab").then(m => m.AnnouncementDetailView), { loading: () => <Spinner />, ssr: false })
 
-const ChatsTab = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatsTab), { loading: () => <Spinner />, ssr: false })
+// The chat LIST is a STATIC import, deliberately — it is the one tab surface that
+// must be HTML on first paint. Its data is already in the document (page.tsx
+// SSR-fetches get_chat_list and seeds it as fallbackChats), so code-splitting it
+// only meant the rows waited on a chunk to render data the browser already had.
+// The module is small and SSR-clean; the heavy half (thread/settings/composer)
+// stays behind the dynamics below. See app/home/tabs/chat-list-view.tsx.
+import { ChatsTab, ChatListPanel } from "./tabs/chat-list-view"
+
 const ChatScreen = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatScreen), { loading: () => <Spinner />, ssr: false })
-const ChatListPanel = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatListPanel), { loading: () => <ChatListSkeleton />, ssr: false })
 
 const PlanTab = dynamic(() => import("./tabs/plan-tab").then(m => m.PlanTab), { loading: () => <Spinner />, ssr: false })
 // Split separately from PlanTab: the volunteer who sees this is exactly the user
@@ -74,19 +80,20 @@ const NetworkTab = dynamic(() => import("./tabs/network-tab").then(m => m.Networ
 // once a profile is first opened.
 const GlobalMemberProfileOverlay = dynamic(() => import("./components/member-sheet").then(m => m.GlobalMemberProfileOverlay), { ssr: false })
 
-function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialChatList, initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
+function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialChatList, initialChatsSection = "church", initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const { mutate: globalMutate } = useSWRConfig()
   // Native Capacitor shell — Give is web-only there (App Store 3.2.2(iv)).
   const nativeShell = useIsNativeShell()
 
-  // Reliable chat-list state for the MAIN bundle. ChatListPanel/ChatsTab are
-  // code-split (ssr:false) and their own useSWR for this key is unreliable on the
-  // initial mount across the chunk boundary — SWR can leave `data` undefined even
-  // when the fetcher resolves. So we DON'T use SWR here: plain state guarantees the
-  // groups reach the render. Passed down as fallbackChats (→ SWR `fallbackData`) so
-  // the panels render it directly regardless of their own hook.
+  // Reliable chat-list state for the MAIN bundle. The list surfaces' own useSWR
+  // for this key is not trustworthy on the FIRST render — SWR can leave `data`
+  // undefined even when the fetcher resolves, and even with fallbackData it
+  // reports isLoading until a real request lands (fallback is not "loaded"
+  // data). So we DON'T use SWR here: plain state guarantees the groups reach the
+  // render. Passed down as fallbackChats (→ SWR `fallbackData`) so the panels
+  // render it directly regardless of their own hook.
   //
   // SEEDED FROM THE SERVER (app/home/page.tsx). It previously initialized to
   // `undefined` and fetched on mount, which meant the request could not even START
@@ -97,14 +104,17 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // the list, and there is no mount fetch to duplicate.
   const [chatListData, setChatListData] = useState<ChatGroup[] | undefined>(initialChatList)
 
-  // Warm the chats chunk once the boot is quiet.
+  // Warm the chats THREAD chunk once the boot is quiet.
   //
-  // Chats is code-split with ssr:false, so tapping the tab starts a chunk download
-  // and shows a spinner until it lands — measured as the single largest cost on the
-  // cold chat path (the first API request could not even fire until +2.76s on a
-  // throttled mid-range phone, essentially all of it bundle download/parse/hydrate).
-  // Chats is the tab people open most, so paying for it during idle rather than on
-  // the tap turns the second-and-later opens instant.
+  // The list no longer needs this — it is a static import and arrives as HTML.
+  // What is still code-split with ssr:false is ChatScreen (+ ChatSettings /
+  // CreateChatScreen, which live in the same module), so OPENING a conversation
+  // is what starts a chunk download and shows a spinner until it lands. That was
+  // measured as the single largest cost on the cold chat path (the first API
+  // request could not even fire until +2.76s on a throttled mid-range phone,
+  // essentially all of it bundle download/parse/hydrate). Chats is the tab people
+  // open most, so paying for it during idle rather than on the tap turns the
+  // first open instant too.
   //
   // requestIdleCallback (not a timer) so this never competes with first paint or
   // hydration; the fallback timeout covers Safari, which still lacks rIC. Fire and
@@ -1200,6 +1210,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             userProfile={initialProfile}
             userRole={initialProfile.role}
             fallbackChats={chatListData}
+            initialSection={initialChatsSection}
             onOpenDraftDm={openDraftDm}
           />
         }
@@ -1310,6 +1321,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                   activeGroupId={globalOpenChat?.id}
                   canCreateChurchChat={canCreateChurchChat}
                   fallbackChats={chatListData}
+                  initialSection={initialChatsSection}
                   onComposerOpenChange={setComposerOpen}
                   onOpenDraftDm={openDraftDm}
                 />
