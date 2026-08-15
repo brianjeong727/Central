@@ -404,8 +404,11 @@ test.describe("mobile Pocket sweep — Finance workspace hub (j)", () => {
     await expect(page).toHaveURL(/fsec=budget/)
     await shot(page, "finance-budget-drill")
 
-    // Single back ("← {team}") returns to the hub.
-    await page.getByRole("button", { name: TEAM_NAME }).filter({ visible: true }).first().click()
+    // Single back (chrome chevron) returns to the hub. The back control is the shared
+    // BackChevron (Convention #22), whose accessible name is "Back" — the parent name
+    // lives in the adjacent chrome TITLE, not on the button. This used to be a labeled
+    // "← {team}" row, which is why the old selector matched on TEAM_NAME.
+    await page.getByRole("button", { name: "Back" }).filter({ visible: true }).first().click()
     await expect(vis(page, "Reimbursements").first()).toBeVisible({ timeout: 10000 })
     assertNoErrors(errors)
   })
@@ -524,8 +527,9 @@ test.describe("mobile Pocket sweep — standard team hub (l)", () => {
     await expect(page.getByRole("button", { name: /Add event/ }).filter({ visible: true }).first()).toBeVisible({ timeout: 10000 })
     await shot(page, "standard-team-calendar-drill")
 
-    // Single back ("← {team}") returns to the hub.
-    await page.getByRole("button", { name: TEAM_NAME }).filter({ visible: true }).first().click()
+    // Single back (chrome chevron) returns to the hub — see the note on the Finance
+    // hub's back step above: the accessible name is "Back", not the team name.
+    await page.getByRole("button", { name: "Back" }).filter({ visible: true }).first().click()
     await expect(vis(page, "Calendar").first()).toBeVisible({ timeout: 10000 })
     assertNoErrors(errors)
   })
