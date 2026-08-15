@@ -332,6 +332,21 @@ html[data-kb-native] .kb-lift {
   }
 }
 
+/* Bottom-center toast (components/central/toast.tsx). At phone width it has to
+   clear the floating nav pill, so it rides the SAME --nav-clearance the shell
+   scroll region uses — derived from the pill's real geometry — instead of a
+   hand-typed offset that silently drifts the next time the pill changes height.
+   Desktop has no pill, so it returns to a plain inset. A CLASS, not an inline
+   style, for the same reason .shell-scroll is: inline would outrank the reset. */
+.toast-bottom {
+  bottom: var(--nav-clearance);
+}
+@variant md {
+  .toast-bottom {
+    bottom: 28px;
+  }
+}
+
 /* ── Dark mode ───────────────────────────────────────────────────────────── */
 /* NOTE: DESIGN_SYSTEM.md does not define a dark palette. These values are    */
 /* kept structurally intact from the shadcn default so dark-mode-aware        */

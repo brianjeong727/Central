@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore
 import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, Lock, BellOff, Paperclip, FileDown, LinkIcon, ImageIcon, Folder } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, PinOff, Lock, Bell, BellOff, Archive, ArchiveRestore, LogOut, Paperclip, FileDown, LinkIcon, ImageIcon, Folder } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -13,7 +13,7 @@ import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE } from "@/components/central"
+import { MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, POCKET_KICKER_STYLE, useScrollResetOn, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE, SwipeActionRow, ConfirmDialog, Toast } from "@/components/central"
 import { ChatSearchView } from "../components/chat-search"
 import { findExistingDm, getOrCreateDm } from "../dm"
 import { isMobileViewport } from "@/lib/breakpoints"
@@ -24,6 +24,9 @@ import { useNavState } from "../nav-state"
 import { useOpenMemberProfile } from "../member-profile-context"
 import { InsetHairline } from "@/components/central/hairline"
 import { fetchChatList } from "../chat-list"
+import { chatCapabilities } from "../chat-permissions"
+import { setChatPinned, setChatMuted, setChatArchived, leaveChat } from "../chat-actions"
+import type { SwipeAction, SwipeSide } from "@/components/central/swipe-actions"
 import { subscribeChatTopic } from "../chat-broadcast"
 import { PushSubscribeCard } from "../components/notifications"
 import { MessageRow, formatFileSize } from "./message-row"
@@ -534,27 +537,20 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const mounted = useMountedFlag()
 
   const isDM = groupType === "dm"
-  const isMy = groupType === "my"
   const isChurch = groupType === "church"
   // The ministry-wide central chat is identified by the groups.is_central_chat
   // flag (set by the DB auto-create trigger), NOT by a name match — so renaming it
   // can never break identification, auto-enroll, or the delete/archive guards.
   const isCentralChat = isChurch && isCentral
-  // Church-chat management is now "in-chat leader-or-above": a leader-tier role
+  // Church-chat management is "in-chat leader-or-above": a leader-tier role
   // (incl. pastor) AND membership of THIS chat — mirrors the groups/group_members
-  // /messages RLS. Non-church (my) chats force manage as before.
+  // /messages RLS. The gate itself lives in chat-permissions.ts, SHARED with the
+  // chat list's swipe actions so the two can never offer different things.
   const isMemberOfChat = members.some((m) => m.user_id === userId)
-  const churchManage = isChurch && isLeaderRole(userRole) && isMemberOfChat
-  const canManage = churchManage || isMy
-  // A DM is a PAIR, not a room you happen to be in — you cannot leave it, archive
-  // it, delete it, rename it, or change who is in it. Leaving in particular used
-  // to be offered here, and taking it deleted the leaver's group_members row:
-  // they stopped receiving DM pushes, the thread vanished on their side, and the
-  // other person's "does a DM exist?" lookup started minting duplicates.
-  const canLeave = isMy
-  const canArchive = churchManage && !groupArchived && !isCentralChat
-  const canUnarchive = churchManage && groupArchived
-  const canDelete = churchManage && !isCentralChat
+  const { canManage, canLeave, canArchive, canUnarchive, canDelete } = chatCapabilities(
+    { type: groupType, archived: groupArchived, isCentral, isMemberOfChat },
+    userRole,
+  )
   // The one other participant. A DM's roster is not a list — it is a person.
   const dmPartner = isDM ? members.find((m) => m.user_id !== userId) ?? null : null
   // Adding someone to a DM FORKS: the pair keeps its thread untouched and a new
@@ -730,7 +726,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
 
   // ── Chat prefs (mute/pin): stage locally, commit on Save. Member changes still
   //    persist immediately (optimistic + rollback); only prefs are staged. ──
-  const canReassignSection = churchManage && !isCentralChat
+  // Sections are a church-chat concept, so this is church-manage specifically —
+  // `canManage && isChurch` IS churchManage (a "my" chat is never church).
+  const canReassignSection = canManage && isChurch && !isCentralChat
   const prefsDirty = pendingMuted !== muted || pendingPinned !== pinned || pendingNotifyMode !== notifyMode || (canReassignSection && pendingCategory !== category)
 
   // Choosing a mode always writes an EXPLICIT per-chat value (never back to
@@ -3903,13 +3901,44 @@ function PocketChatRow({ group, isLast, onClick }: { group: ChatGroup; isLast: b
   )
 }
 
+// Swipe wiring for a card of chat rows. `openId`/`openSide` live in ChatsTab so
+// only ONE row across the whole list can be open at a time.
+export interface ChatSwipeConfig {
+  openId: string | null
+  openSide: SwipeSide | null
+  onOpenChange: (id: string, side: SwipeSide | null) => void
+  actionsFor: (g: ChatGroup) => { leading: SwipeAction[]; trailing: SwipeAction[] }
+}
+
+// PocketRowCard's own horizontal padding, cancelled by the swipe wrapper so the
+// action panel bleeds to the card's edge instead of stopping 18px short of it.
+const POCKET_CARD_PAD_X = 18
+
 // The single tonal grouped card holding a set of chat rows (mockup `.card`).
-function PocketChatCard({ groups, onOpen }: { groups: ChatGroup[]; onOpen: (id: string, name: string) => void }) {
+function PocketChatCard({ groups, onOpen, swipe }: {
+  groups: ChatGroup[]
+  onOpen: (id: string, name: string) => void
+  swipe?: ChatSwipeConfig
+}) {
   return (
     <PocketRowCard>
-      {groups.map((g, i) => (
-        <PocketChatRow key={g.id} group={g} isLast={i === groups.length - 1} onClick={() => onOpen(g.id, g.name)} />
-      ))}
+      {groups.map((g, i) => {
+        const row = <PocketChatRow group={g} isLast={i === groups.length - 1} onClick={() => onOpen(g.id, g.name)} />
+        if (!swipe) return <div key={g.id}>{row}</div>
+        const { leading, trailing } = swipe.actionsFor(g)
+        return (
+          <SwipeActionRow
+            key={g.id}
+            leading={leading}
+            trailing={trailing}
+            bleed={POCKET_CARD_PAD_X}
+            open={swipe.openId === g.id ? swipe.openSide : null}
+            onOpenChange={(side) => swipe.onOpenChange(g.id, side)}
+          >
+            {row}
+          </SwipeActionRow>
+        )
+      })}
     </PocketRowCard>
   )
 }
@@ -3918,11 +3947,12 @@ function PocketChatCard({ groups, onOpen }: { groups: ChatGroup[]; onOpen: (id: 
 // per-section tonal card). Each header carries its own compact plum + that opens
 // the create sheet pre-set to that section's category (leader/admin only). Empty
 // sections self-hide; a fully-empty church scope is handled by the caller.
-function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
+function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection, swipe }: {
   sections: Record<ChurchSection, ChatGroup[]>
   canCreate: boolean
   onOpen: (id: string, name: string) => void
   onAddInSection: (category: ChurchSection) => void
+  swipe?: ChatSwipeConfig
 }) {
   // The FIRST rendered section sits tight under the scope pills — the 20px
   // section gap is a between-sections rhythm, not a lead-in (empty sections
@@ -3948,7 +3978,7 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection }: {
                 </button>
               ) : undefined}
             />
-            <PocketChatCard groups={rooms} onOpen={onOpen} />
+            <PocketChatCard groups={rooms} onOpen={onOpen} swipe={swipe} />
           </div>
         )
       })}
@@ -4042,6 +4072,113 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   function handleOpenChat(groupId: string, groupName: string) {
     clearUnread(groupId)
     onOpenChat(groupId, groupName)
+  }
+
+  // ── Swipe row actions (phone width) ────────────────────────────────────────
+  // An ACCELERATOR for things chat Settings already does — pin/mute for everyone,
+  // plus the one reversible room action the user's role allows. Church-chat
+  // DELETE is deliberately absent: it destroys the room and every message for all
+  // members, and a thumb-flick is the wrong distance from that. Archive (which a
+  // leader can undo) stands in for it; Delete keeps its deliberate path through
+  // Settings' danger zone.
+  const [swipeOpen, setSwipeOpen] = useState<{ id: string; side: SwipeSide } | null>(null)
+  const [chatConfirm, setChatConfirm] = useState<{ kind: "archive" | "leave"; group: ChatGroup } | null>(null)
+  const [chatToast, setChatToast] = useState<{ message: string; undo?: () => void } | null>(null)
+
+  // Android hardware/gesture back closes an open row before it does anything
+  // else — the row is a transient state the user expects back to dismiss.
+  useBackIntent(swipeOpen ? () => setSwipeOpen(null) : undefined)
+  // A row left open while the list re-buckets would sit over the wrong chat.
+  useEffect(() => { setSwipeOpen(null) }, [subTab])
+
+  const chatCtx = useCallback(
+    (g: ChatGroup) => ({ groupId: g.id, userId, ministryId, userName: userProfile.name }),
+    [userId, ministryId, userProfile.name],
+  )
+
+  // The row updates optimistically, so the toast does too — waiting for the round
+  // trip to confirm what the list already shows reads as lag. A failed write
+  // rolls the row back and REPLACES the toast with the reason.
+  const runPin = useCallback(async (g: ChatGroup) => {
+    const next = !g.pinned
+    setChatToast({
+      message: next ? "Pinned" : "Unpinned",
+      undo: () => { setChatPinned(chatCtx(g), !next) },
+    })
+    const err = await setChatPinned(chatCtx(g), next)
+    if (err) setChatToast({ message: err })
+  }, [chatCtx])
+
+  const runMute = useCallback(async (g: ChatGroup) => {
+    const next = !g.muted
+    setChatToast({
+      message: next ? "Muted" : "Unmuted",
+      undo: () => { setChatMuted(chatCtx(g), !next) },
+    })
+    const err = await setChatMuted(chatCtx(g), next)
+    if (err) setChatToast({ message: err })
+  }, [chatCtx])
+
+  const actionsFor = useCallback((g: ChatGroup): { leading: SwipeAction[]; trailing: SwipeAction[] } => {
+    // Every row in this list came from get_chat_list, which only returns rooms
+    // the user belongs to — so membership is implied and the church gate reduces
+    // to the role check.
+    const caps = chatCapabilities(
+      { type: g.type, archived: g.archived, isCentral: g.is_central_chat, isMemberOfChat: true },
+      userRole,
+    )
+    const ico = { width: 16, height: 16 } as const
+    const leading: SwipeAction[] = [{
+      key: "pin",
+      label: g.pinned ? "Unpin" : "Pin",
+      icon: g.pinned ? <PinOff style={ico} /> : <Pin style={ico} />,
+      onSelect: () => { runPin(g) },
+    }]
+    const trailing: SwipeAction[] = [{
+      key: "mute",
+      label: g.muted ? "Unmute" : "Mute",
+      icon: g.muted ? <Bell style={ico} /> : <BellOff style={ico} />,
+      onSelect: () => { runMute(g) },
+    }]
+    if (caps.canArchive) trailing.push({
+      key: "archive", label: "Archive", tone: "strong", icon: <Archive style={ico} />,
+      onSelect: () => setChatConfirm({ kind: "archive", group: g }),
+    })
+    // Unarchive is reversible and low-stakes, so it fires straight from the swipe
+    // with an Undo rather than through a confirm.
+    else if (caps.canUnarchive) trailing.push({
+      key: "unarchive", label: "Unarchive", tone: "strong", icon: <ArchiveRestore style={ico} />,
+      onSelect: async () => {
+        setChatToast({ message: "Chat unarchived", undo: () => { setChatArchived(chatCtx(g), true) } })
+        const err = await setChatArchived(chatCtx(g), false)
+        if (err) setChatToast({ message: err })
+      },
+    })
+    if (caps.canLeave) trailing.push({
+      key: "leave", label: "Leave", tone: "strong", icon: <LogOut style={ico} />,
+      onSelect: () => setChatConfirm({ kind: "leave", group: g }),
+    })
+    return { leading, trailing }
+  }, [userRole, runPin, runMute, chatCtx])
+
+  const swipe: ChatSwipeConfig = {
+    openId: swipeOpen?.id ?? null,
+    openSide: swipeOpen?.side ?? null,
+    onOpenChange: (id, side) => setSwipeOpen(side ? { id, side } : null),
+    actionsFor,
+  }
+
+  async function confirmChatAction() {
+    if (!chatConfirm) return
+    const { kind, group } = chatConfirm
+    setChatConfirm(null)
+    if (kind === "archive") {
+      const err = await setChatArchived(chatCtx(group), true)
+      setChatToast(err ? { message: err } : { message: "Chat archived" })
+    } else {
+      const err = await leaveChat(chatCtx(group))
+      setChatToast(err ? { message: err } : { message: `You left ${group.name}` })
+    }
   }
 
   // Clear unread whenever activeGroupId changes (covers auto-open, HomeTab clicks, etc.)
@@ -4211,7 +4348,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             subtitle="Tap + to start a new chat."
           />
         ) : (
-          <PocketChatCard groups={partitionPinned(active)} onOpen={handleOpenChat} />
+          <PocketChatCard groups={partitionPinned(active)} onOpen={handleOpenChat} swipe={swipe} />
         )
       ) : active.length === 0 && archivedChurchChats.length === 0 ? (
         <EmptyState
@@ -4229,6 +4366,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
               canCreate={canCreateChurchChat}
               onOpen={handleOpenChat}
               onAddInSection={(category) => { setCreateChatCategory(category); setShowCreateChat("church") }}
+              swipe={swipe}
             />
           )}
 
@@ -4246,7 +4384,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
               </button>
               {showArchived && (
                 <div style={{ opacity: 0.6, marginTop: 8 }}>
-                  <PocketChatCard groups={archivedChurchChats} onOpen={handleOpenChat} />
+                  <PocketChatCard groups={archivedChurchChats} onOpen={handleOpenChat} swipe={swipe} />
                 </div>
               )}
             </div>
@@ -4281,6 +4419,29 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             setCreateChatCategory(undefined)
             onOpenChat(group.id, group.name)
           }}
+        />
+      )}
+
+      {/* Swipe-action confirms. Archive and Leave both change what a room IS for
+          someone, so they get the same deliberate step Settings gives them
+          (Hard-do-not #10). Pin/mute stay instant with an Undo toast. */}
+      <ConfirmDialog
+        open={!!chatConfirm}
+        danger={chatConfirm?.kind === "leave"}
+        title={chatConfirm?.kind === "archive" ? "Archive this chat?" : "Leave this chat?"}
+        message={chatConfirm?.kind === "archive"
+          ? "Members won't be able to send new messages. You can unarchive it later."
+          : "You'll stop receiving its messages."}
+        confirmLabel={chatConfirm?.kind === "archive" ? "Archive" : "Leave"}
+        onConfirm={confirmChatAction}
+        onClose={() => setChatConfirm(null)}
+      />
+      {chatToast && (
+        <Toast
+          message={chatToast.message}
+          actionLabel={chatToast.undo ? "Undo" : undefined}
+          onAction={chatToast.undo ? () => { chatToast.undo?.(); setChatToast(null) } : undefined}
+          onDismiss={() => setChatToast(null)}
         />
       )}
       </div>{/* end inner scroll div */}

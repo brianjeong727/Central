@@ -140,7 +140,11 @@ export function PocketCard({ children, padding = 18, onClick, style }: {
 // own 13px padding breathe against the card edge.
 export function PocketRowCard({ children, style }: { children: ReactNode; style?: CSSProperties }) {
   return (
-    <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "6px 18px", ...style }}>
+    // overflow:hidden so a child that bleeds to the card edge (a swiped row's
+    // action panel, SwipeActionRow) is clipped BY the radius instead of squaring
+    // off the corner. Menus are unaffected — ActionMenu portals to body precisely
+    // so an overflow-hidden ancestor can never clip it (Convention #20).
+    <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", overflow: "hidden", padding: "6px 18px", ...style }}>
       {children}
     </div>
   )

@@ -34,7 +34,10 @@ interface Options {
   enabled?: boolean
 }
 
-function inHorizontalScroller(target: EventTarget | null, root: HTMLElement): boolean {
+/** Exported so `swipe-actions.tsx` shares this ONE guard rather than keeping a
+ *  second copy that drifts — both gestures must skip carousels/chip-rails
+ *  identically (Convention #7). */
+export function inHorizontalScroller(target: EventTarget | null, root: HTMLElement): boolean {
   let n = target as HTMLElement | null
   while (n && n !== root) {
     const s = getComputedStyle(n)
