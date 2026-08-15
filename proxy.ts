@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isMemberTier } from '@/lib/roles'
+import { nameIsEmailDerived } from '@/lib/profile-name'
 
 const ADMIN_EMAIL = 'brianjeong13@gmail.com'
 
@@ -306,24 +307,23 @@ export async function proxy(request: NextRequest) {
     status = resolvedStatus ?? 'active'
     // "Complete" = the completeness gate would NOT fire (admin-tier is always complete;
     // member/visitor need gender + graduation_year).
-    // A name auto-derived from an Apple PRIVATE RELAY address is not a name.
-    // handle_new_user falls back to split_part(email,'@',1), and Apple only hands
-    // back a real name on the FIRST authorization — so a re-auth (or a user who
-    // declined to share it) lands with an opaque relay prefix as their display
-    // name ("ygcvnyy625"), shown to their whole ministry with no way to correct
-    // it: /complete-profile collected gender and graduation_year but never name.
+    // A name auto-derived from the email address is not a name. handle_new_user
+    // falls back to split_part(email,'@',1) whenever the mint carries no name
+    // metadata — always the case for Apple after the first authorization, and for
+    // any account whose first provider gave nothing — so the user lands with
+    // "captkidjr" (or the opaque relay "ygcvnyy625") as the display name their
+    // whole ministry sees, with no way to correct it: /complete-profile collected
+    // gender and graduation_year but never name.
     //
-    // Deliberately scoped to relay addresses. The general rule (name === the email
-    // local part) would also re-gate long-standing users whose real name happens
-    // to match their email prefix, to fix a problem they do not have.
-    const relayName = (() => {
-      const email = profRow?.email ?? ""
-      if (!email.toLowerCase().endsWith("@privaterelay.appleid.com")) return false
-      const local = email.split("@")[0]
-      const nm = (profRow?.name ?? "").trim()
-      return nm === "" || nm === local
-    })()
-    profileComplete = !(isMemberTier(role) && (!profRow?.gender || profRow?.graduation_year == null || relayName))
+    // The provider's real name is recovered server-side at every OAuth entry
+    // (lib/profile-name.ts, called from /auth/callback + verifyNativeOAuthSession);
+    // this gate is the fallback for when there was no real name to recover. The
+    // predicate is shared with that module and /complete-profile so the three can
+    // never disagree — and it requires a LONE token, which is what makes the
+    // general rule safe to apply beyond relay addresses (a real full name has a
+    // space, so no long-standing user is re-gated).
+    const placeholderName = nameIsEmailDerived(profRow?.name, profRow?.email)
+    profileComplete = !(isMemberTier(role) && (!profRow?.gender || profRow?.graduation_year == null || placeholderName))
 
     // Cache ONLY the settled steady state (active ministry + complete profile) AND only
     // when the read was clean (never cache a degraded/errored read — it re-queries next

@@ -136,17 +136,21 @@ export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<
   }
 
   // Apple only surfaces the user's name on the FIRST authorization, and it
-  // arrives in the plugin response — never in the token — so the
-  // handle_new_user trigger falls back to the email prefix (an opaque string
-  // for private-relay addresses). Backfill both metadata and the profile row.
+  // arrives in the plugin response — never in the token — so Supabase has no
+  // name to store and handle_new_user falls back to the email prefix (an opaque
+  // string for private-relay addresses). Stamp it into user_metadata so it is
+  // durable; the profiles row is then written by reconcileProfileName inside
+  // verifyNativeOAuthSession below, which is the SINGLE writer of that column on
+  // every OAuth path (web + native) and is the only one that knows not to stomp
+  // a name the user set themselves. Awaited, so the metadata is in place before
+  // the action reads it back.
   const fullName = [authorization.response?.givenName, authorization.response?.familyName]
     .filter(Boolean).join(" ").trim()
   if (fullName && !data.user.user_metadata?.name) {
     try {
       await supabase.auth.updateUser({ data: { name: fullName } })
-      await supabase.from("profiles").update({ name: fullName }).eq("id", data.user.id)
     } catch (err) {
-      console.error("[native-auth] name backfill failed:", err)
+      console.error("[native-auth] name metadata stamp failed:", err)
     }
   }
 

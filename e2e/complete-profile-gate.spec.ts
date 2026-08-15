@@ -72,9 +72,11 @@ test.describe("OAuth onboarding gate", () => {
     // Fill + submit.
     const genderPill = page.getByRole("button", { name: "Male", exact: true }).first()
     await genderPill.click()
-    const gradYearInput = page.locator('input[type="number"]').first()
+    // Graduation year is a <select> (a free-text year invited typos and offered
+    // values the form's own range check then rejected).
+    const gradYear = page.locator("select").filter({ visible: true }).first()
     const nextYear = new Date().getFullYear() + 3
-    await gradYearInput.fill(String(nextYear))
+    await gradYear.selectOption(String(nextYear))
     await page.getByRole("button", { name: "Continue" }).first().click()
 
     // Assert: returns to the ?next destination.

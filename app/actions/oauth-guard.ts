@@ -11,6 +11,7 @@
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
 import { enforceOAuthAccountPolicy } from "@/lib/oauth-account-guard"
+import { reconcileProfileName } from "@/lib/profile-name"
 
 export async function verifyNativeOAuthSession(
   flow: "signin" | "signup"
@@ -30,5 +31,11 @@ export async function verifyNativeOAuthSession(
     await supabase.auth.signOut()
     return { ok: false, reason: "guard-rejected" }
   }
+
+  // Same name repair the web callback runs (lib/profile-name.ts). The native
+  // Apple sheet stamps the name it got into user_metadata just before calling
+  // this action, so by here the metadata is the best we will ever have.
+  await reconcileProfileName(admin, user)
+
   return { ok: true }
 }

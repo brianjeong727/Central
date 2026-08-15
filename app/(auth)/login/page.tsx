@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { AlertCircle } from "lucide-react"
 import { createClient, siteOrigin } from "@/lib/supabase"
-import { SplitShell, GoogleButton, GoogleGlyph, AppleButton, AppleGlyph, OrDivider, EyeButton } from "@/app/(auth)/shared"
+import { SplitShell, GoogleButton, GoogleGlyph, AppleButton, AppleGlyph, OrDivider, EyeButton, AuthPendingVeil } from "@/app/(auth)/shared"
 import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn, nativeAuthDebugMessage } from "@/lib/native-auth"
 import { useBackIntent } from "@/lib/back-intent"
 import { RingCrossLogo } from "@/app/home/components/shared"
@@ -16,6 +16,9 @@ import { CentralButton } from "@/components/central"
 const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
 const serif: React.CSSProperties = { fontFamily: SERIF, fontWeight: 400, color: "var(--ink)", margin: 0 }
+
+// One label for every pending-veil moment on this page.
+const SIGNING_IN = "Signing you in…"
 
 function LoginContent() {
   const searchParams = useSearchParams()
@@ -40,6 +43,12 @@ function LoginContent() {
     searchParams.get("error") === "no-account" ? "Google" : null
   )
   const [loading, setLoading] = useState(false)
+  // Full-screen "something is happening" cover for the waits with no button to
+  // spin: the OAuth round trip (native sheet → signInWithIdToken → mint guard →
+  // routing queries), the web provider redirect, and the window.location.assign
+  // handoff — seconds of a completely inert screen otherwise. Cleared ONLY on
+  // failure; on success we are navigating and the form must not flash back.
+  const [pending, setPending] = useState<string | null>(null)
   // Mobile is a two-step flow (welcome → sign-in form). If we arrived with an
   // ?error=… (error state already set), jump straight to the form so it's visible.
   const [mobileStep, setMobileStep] = useState<"welcome" | "form">(
@@ -76,6 +85,10 @@ function LoginContent() {
       return
     }
 
+    // Password accepted — from here we only navigate. Cover the routing queries
+    // and the full page load that follows.
+    setPending(SIGNING_IN)
+
     if (intent === "register") { window.location.assign("/onboarding"); return }
     if (intent === "join") { window.location.assign("/ministries"); return }
 
@@ -101,9 +114,10 @@ function LoginContent() {
 
   async function handleGoogleLogin() {
     if (isNativeShell()) {
-      setError(null)
+      setError(null); setPending(SIGNING_IN)
       const res = await signInWithGoogleNative("signin")
       if (!res.ok) {
+        setPending(null)
         if (res.error === "no-account") { setNoAccountProvider("Google"); setMobileStep("form"); return }
         else if (res.error === "failed") setError("Google sign-in didn't complete — please try again.")
         else if (res.error === "unavailable") setError("Google sign-in needs the latest app version — update Central and try again.")
@@ -116,6 +130,7 @@ function LoginContent() {
       await routeAfterNativeSignIn(createClient())
       return
     }
+    setPending(SIGNING_IN)
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -125,7 +140,7 @@ function LoginContent() {
 
   async function handleAppleLogin() {
     if (isNativeShell()) {
-      setError(null)
+      setError(null); setPending(SIGNING_IN)
       const res = await signInWithAppleNative("signin")
       if (!res.ok) {
         // `unavailable` = plugin missing from this binary; `not-entitled` =
@@ -134,7 +149,9 @@ function LoginContent() {
         // OAuth flow, which capacitor.config.ts allows in-webview via
         // appleid.apple.com — so fall back instead of dead-ending on a raw
         // NSError the user can do nothing about.
+        // The fallback keeps the veil up — it goes straight into a redirect.
         if (res.error === "unavailable" || res.error === "not-entitled") { await webAppleOAuth(); return }
+        setPending(null)
         if (res.error === "no-account") { setNoAccountProvider("Apple"); setMobileStep("form"); return }
         setError(nativeAuthDebugMessage(res))
         // The mobile welcome step has no error banner — surface it on the form step.
@@ -150,6 +167,7 @@ function LoginContent() {
   }
 
   async function webAppleOAuth() {
+    setPending(SIGNING_IN)
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: "apple",
@@ -193,6 +211,7 @@ function LoginContent() {
   return (
     <>
     <EntrySplash />
+    {pending && <AuthPendingVeil label={pending} />}
 
     {/* ── Desktop (≥768px) — unchanged SplitShell ── */}
     <div className="hidden md:block">

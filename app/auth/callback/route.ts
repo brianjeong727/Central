@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
 import { enforceOAuthAccountPolicy } from "@/lib/oauth-account-guard"
+import { reconcileProfileName } from "@/lib/profile-name"
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
@@ -45,6 +46,11 @@ export async function GET(request: NextRequest) {
       await supabase.auth.signOut()
       return NextResponse.redirect(new URL("/login?error=no-account", base))
     }
+
+    // The mint is legitimate — make sure the display name is the provider's real
+    // one and not handle_new_user's email-prefix fallback (lib/profile-name.ts).
+    // Runs on sign-IN too, so accounts minted before this existed self-repair.
+    await reconcileProfileName(admin, data.user)
 
     if (intent === "register") return NextResponse.redirect(new URL("/onboarding", base))
     if (intent === "join") return NextResponse.redirect(new URL("/ministries?tab=code", base))
