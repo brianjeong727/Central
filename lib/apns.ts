@@ -22,58 +22,82 @@ import { ApnsClient, Notification, ApnsError, Errors, Host, Priority, PushType }
 // SECURITY: the decoded .p8 private key is passed straight into the ApnsClient and
 // is NEVER logged, stringified, or returned. Do not add debug output that touches it.
 
-let clientInit = false
-let client: ApnsClient | null = null
+// ── Both hosts, not one ──────────────────────────────────────────────────────
+// ONE deployment serves BOTH kinds of token at once, so a single host is always
+// wrong for somebody:
+//   • an Xcode/`/sim` dev install registers a SANDBOX token
+//   • a TestFlight/App Store install registers a PRODUCTION token
+// and both hit the same production backend. Whichever host APNS_ENV names, the
+// other population's tokens come back BadDeviceToken.
+//
+// That is not hypothetical — it is the bug this file was changed to fix. A DM to
+// a TestFlight user resolved the recipient correctly, failed the send, and the
+// route PRUNED the row, so the next message found no subscription at all and
+// reported `sent:0, failed:0` — silence with no error anywhere. Reopening the app
+// re-registered the token and the cycle repeated.
+//
+// So: try the host APNS_ENV names, and on BadDeviceToken try the other one. The
+// same .p8 key signs for both — only the host differs.
+type HostName = "production" | "development"
 
-// Lazy singleton. Returns null when any required env var is absent (dev slots
+let clientsInit = false
+let clients: Record<HostName, ApnsClient> | null = null
+
+function primaryHost(): HostName {
+  return process.env.APNS_ENV === "sandbox" ? "development" : "production"
+}
+
+// Lazy singletons. Returns null when any required env var is absent (dev slots
 // without the key) so the route falls back to skipping ios-native rows instead of
 // crashing. Init is attempted once; a null result is cached.
-function getClient(): ApnsClient | null {
-  if (clientInit) return client
-  clientInit = true
+function getClients(): Record<HostName, ApnsClient> | null {
+  if (clientsInit) return clients
+  clientsInit = true
 
   const keyId = process.env.APNS_KEY_ID
   const teamId = process.env.APNS_TEAM_ID
   const bundleId = process.env.APNS_BUNDLE_ID
   const keyB64 = process.env.APNS_PRIVATE_KEY_BASE64
   if (!keyId || !teamId || !bundleId || !keyB64) {
-    client = null
-    return client
+    clients = null
+    return clients
   }
 
   // Decode the .p8 PEM from base64 at use. Never log this value.
   const signingKey = Buffer.from(keyB64, "base64").toString("utf8")
-  client = new ApnsClient({
-    team: teamId,
-    keyId,
-    signingKey,
-    defaultTopic: bundleId,
-    host: process.env.APNS_ENV === "sandbox" ? Host.development : Host.production,
-    keepAlive: true,
-  })
-  return client
+  const base = { team: teamId, keyId, signingKey, defaultTopic: bundleId, keepAlive: true }
+  clients = {
+    production: new ApnsClient({ ...base, host: Host.production }),
+    development: new ApnsClient({ ...base, host: Host.development }),
+  }
+  return clients
 }
 
 // True when the APNs client is configured (env present). The route checks this
 // before routing native rows; when false it preserves the pre-APNs skip behavior.
 export function apnsReady(): boolean {
-  return getClient() !== null
+  return getClients() !== null
 }
 
-// ok    = APNs accepted the notification (HTTP 200).
-// prune = the token is permanently dead (Unregistered / BadDeviceToken / 410) and
-//         its subscription row should be deleted — parity with web-push 404/410.
-//         Transient failures (500/503/429/timeout/network) → { ok:false, prune:false }.
-export type ApnsSendResult = { ok: boolean; prune: boolean }
+// ok     = APNs accepted the notification (HTTP 200).
+// prune  = the token is genuinely dead and its row should be deleted.
+// reason = APNs `reason` (or a synthetic tag) for logging. NEVER contains the token.
+// host   = which host accepted/last rejected it, so a mismatch is visible in logs.
+export type ApnsSendResult = { ok: boolean; prune: boolean; reason?: string; host?: HostName }
 
-// Classify an APNs failure into permanent (prune the token) vs transient (retry-able,
-// no prune). Mirrors the web-push 404/410 prune rule.
+// Prune ONLY on a token the DEVICE has invalidated — Unregistered (app deleted) or
+// 410 (gone). Mirrors the web-push 404/410 rule.
+//
+// BadDeviceToken is deliberately NOT here. It means "this token is not valid for
+// the host/topic you asked", which is overwhelmingly a SERVER-side mismatch
+// (wrong APNs host for that build, or a bundle-id/topic mismatch) rather than a
+// dead device. Pruning on it deletes a perfectly live registration on a config
+// error, and — because the app re-registers on next launch — produces an endless
+// register→prune→register loop that reports `sent:0, failed:0` and looks like
+// "push just doesn't work". Leaving the row costs one failed send per message;
+// deleting it costs every notification the user will ever get.
 function isPermanentFailure(err: ApnsError): boolean {
-  return (
-    err.statusCode === 410 ||
-    err.reason === Errors.unregistered ||
-    err.reason === Errors.badDeviceToken
-  )
+  return err.statusCode === 410 || err.reason === Errors.unregistered
 }
 
 export async function sendApnsNotification(opts: {
@@ -83,8 +107,8 @@ export async function sendApnsNotification(opts: {
   url: string
   tag: string
 }): Promise<ApnsSendResult> {
-  const c = getClient()
-  if (!c) return { ok: false, prune: false } // caller should gate on apnsReady()
+  const cs = getClients()
+  if (!cs) return { ok: false, prune: false, reason: "not-configured" } // caller gates on apnsReady()
 
   // Payload: standard `aps` alert + sound; thread-id = tag for coalescing parity with
   // the web service worker's notification `tag`; custom top-level `url` key for
@@ -99,14 +123,43 @@ export async function sendApnsNotification(opts: {
     data: { url: opts.url },
   })
 
-  try {
-    await c.send(notification)
-    return { ok: true, prune: false }
-  } catch (err) {
-    if (err instanceof ApnsError) {
-      return { ok: false, prune: isPermanentFailure(err) }
+  const first = primaryHost()
+  const second: HostName = first === "production" ? "development" : "production"
+
+  const attempt = async (host: HostName): Promise<ApnsSendResult> => {
+    try {
+      await cs[host].send(notification)
+      return { ok: true, prune: false, host }
+    } catch (err) {
+      if (err instanceof ApnsError) {
+        return { ok: false, prune: isPermanentFailure(err), reason: err.reason, host }
+      }
+      // Network / unexpected error — transient, never prune.
+      return { ok: false, prune: false, reason: "network", host }
     }
-    // Network / unexpected error — transient, never prune.
-    return { ok: false, prune: false }
   }
+
+  const primary = await attempt(first)
+  if (primary.ok || !primary.reason) return primary
+
+  // Only a host mismatch is worth a second call. Unregistered/410 is the device's
+  // verdict and is the same on both hosts; a transient error should not be
+  // doubled into a second request.
+  const mismatch = primary.reason === Errors.badDeviceToken
+  if (!mismatch) return primary
+
+  const fallback = await attempt(second)
+  if (fallback.ok) {
+    // Worth surfacing: every token from this build population is paying two
+    // round-trips per notification, and APNS_ENV is pointed at the wrong host
+    // for them. No token or key material in this line.
+    console.warn(
+      `[push][apns] token accepted on '${second}' after '${first}' returned BadDeviceToken — ` +
+        `APNS_ENV names the wrong host for this build (sandbox = Xcode/dev install, production = TestFlight/App Store)`,
+    )
+    return fallback
+  }
+  // Rejected by BOTH hosts → not a host mismatch. Most likely an apns-topic /
+  // bundle-id mismatch, still a config problem, so still no prune.
+  return { ok: false, prune: false, reason: `badDeviceToken-both-hosts`, host: second }
 }
