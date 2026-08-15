@@ -504,6 +504,15 @@ export interface ChatsTabProps {
   activeGroupId?: string | null
   canCreateChurchChat: boolean
   fallbackChats?: ChatGroup[]
+  /**
+   * Which scope the list opens on (Church | My chats), resolved from `?chats`
+   * on the SERVER (app/home/page.tsx). It arrives as a prop rather than being
+   * read off `window` in a useState initializer, because the server has no
+   * window: that peek always rendered "church" server-side and could render
+   * "my" on the client, which is a hydration mismatch — and this list is now
+   * server-rendered. See app/home/tabs/chat-shared.ts.
+   */
+  initialSection: "church" | "my"
   // Reports whether the full-screen CreateChatScreen is up, so home-app can
   // suppress the floating pill nav (mobile design system §2.2).
   onComposerOpenChange?: (open: boolean) => void
@@ -1103,6 +1112,9 @@ export interface HomeAppProps {
   /** SSR-seeded chats-tab list (app/home/page.tsx). Removes the cold-load client
    *  round trip AND the duplicate get_chat_list the panels' own SWR used to race. */
   initialChatList?: ChatGroup[]
+  /** `?chats` scope resolved on the SERVER, so the server-rendered chat list and
+   *  the hydration render agree on which scope is showing. See chat-shared.ts. */
+  initialChatsSection?: "church" | "my"
   initialUserTeams?: UserTeam[]
   initialActiveQuestion?: CongregationQuestion | null
   initialHasResponded?: boolean
