@@ -106,17 +106,25 @@ test.describe.serial("APNs sender routing + prune classification", () => {
     await ctx.dispose()
   })
 
-  // ── Real dispatch: fake token fails BadDeviceToken -> attempted-failed + PRUNED ──
-  test("a real dispatch against the fake ios-native token fails and prunes the dead row", async () => {
+  // ── Real dispatch: fake token fails BadDeviceToken -> failed, and NOT pruned ──
+  //
+  // This assertion was INVERTED on 2026-08-15. It used to require `pruned:1`, which
+  // encoded the bug: BadDeviceToken was treated as "device is dead" and the row was
+  // deleted. In production that meant a real TestFlight user's live registration was
+  // destroyed the first time anyone messaged them, every later message reported
+  // `sent:0, failed:0` (no subscription left to try), and reopening the app just
+  // restarted the cycle. BadDeviceToken means the token is not valid for the host or
+  // topic we asked — a SERVER-side mismatch — so it must never delete a registration.
+  // Only Unregistered/410, the device's own verdict, prunes.
+  test("a real dispatch against the fake ios-native token fails WITHOUT pruning the row", async () => {
     const sb = sandbox()
     await sb.deletePushSubscriptionsForUser(memberId)
     const sub = await sb.insertPushSubscription({ userId: memberId, endpoint: APNS_ENDPOINT, platform: "ios-native" })
 
     const ctx = await request.newContext()
-    // Real (non-dry) dispatch. The APNs production host rejects the bogus token with
-    // 400 BadDeviceToken — a PERMANENT failure — so the send is counted as failed AND
-    // the subscription row is pruned (mirrors web-push 404/410 pruning). Verified against
-    // the real key: production host + fake token => statusCode 400, reason BadDeviceToken.
+    // Real (non-dry) dispatch. A bogus token is rejected as BadDeviceToken by BOTH
+    // hosts (the sender retries the other host precisely to tell a host mismatch
+    // apart from a genuinely bad token), so it counts as failed — and survives.
     const res = await ctx.post(dispatchUrl, {
       headers: { "x-push-secret": secret! },
       data: { table: "profiles", event: "role_change", record_id: memberId },
@@ -126,12 +134,12 @@ test.describe.serial("APNs sender routing + prune classification", () => {
     expect(body.recipients).toBe(1)
     expect(body.sent).toBe(0)
     expect(body.failed).toBe(1) // the one native attempt failed
-    expect(body.pruned).toBe(1) // BadDeviceToken is permanent -> row pruned
+    expect(body.pruned).toBe(0) // BadDeviceToken is a CONFIG signal -> row kept
 
-    // Confirm the row is actually gone from the DB.
+    // The row must still be there — this is the whole point of the change.
     const { data: after } = await sb.client
       .from("push_subscriptions").select("id").eq("id", sub.id)
-    expect(after ?? []).toHaveLength(0)
+    expect(after ?? []).toHaveLength(1)
 
     await sb.deletePushSubscriptionsForUser(memberId)
     await ctx.dispose()
