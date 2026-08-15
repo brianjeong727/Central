@@ -63,6 +63,14 @@ export function nativeAuthDebugMessage(res: Extract<NativeAppleResult, { ok: fal
 }
 
 export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<NativeAppleResult> {
+  // Android has no ASAuthorization sheet. The plugin's Android path falls back to
+  // Apple's WEB flow keyed on `clientId`, and the value below is the iOS BUNDLE ID
+  // — not a Services ID — so it would fail with an opaque invalid_client rather
+  // than doing anything useful. Report `unavailable` instead, which every call
+  // site already routes to webAppleOAuth(): the real Apple web flow, which
+  // completes in-WebView because appleid.apple.com is in allowNavigation.
+  if (isAndroidShell()) return { ok: false, error: "unavailable" }
+
   let SignInWithApple: typeof import("@capacitor-community/apple-sign-in").SignInWithApple
   try {
     ;({ SignInWithApple } = await import("@capacitor-community/apple-sign-in"))
@@ -164,19 +172,47 @@ export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<
 // ── Native Google sign-in ─────────────────────────────────────────────────────
 // Same architecture as Apple: native sheet (GoogleSignIn SDK via
 // @capgo/capacitor-social-login) → signInWithIdToken → the same mint guard.
-// Google's web OAuth flow cannot run in a WKWebView (disallowed_useragent), so
-// native is the ONLY way the shell gets a Google button. Gated on the iOS
-// OAuth client ID being configured — until then the shell hides Google.
+// Google's web OAuth flow cannot run in an app WebView (disallowed_useragent) on
+// EITHER platform, so native is the ONLY way the shell gets a Google button.
+//
+// The two platforms need DIFFERENT client IDs, and the Android rule is
+// counter-intuitive:
+//   • iOS     → the iOS OAuth client ID, passed as iOSClientId.
+//   • Android → the WEB OAuth client ID, passed as webClientId. The ANDROID
+//     OAuth client still has to exist in Google Cloud (keyed to the package name
+//     + signing-cert SHA-1) so Google will honor the request at all, but its ID
+//     is never named here — Android's Credential Manager mints an idToken whose
+//     `aud` is the WEB client, which is also what Supabase's Google provider
+//     validates against. Passing the Android client ID yields a token Supabase
+//     rejects with a confusing audience-mismatch error.
+//
+// Each platform is gated on ITS OWN id, so configuring one never half-enables the
+// other — the button hides on a platform whose id is absent.
+
+function googleClientIdForPlatform(): { iOSClientId?: string; webClientId?: string } | null {
+  const iOSClientId = process.env.NEXT_PUBLIC_GOOGLE_IOS_CLIENT_ID
+  const webClientId = process.env.NEXT_PUBLIC_GOOGLE_WEB_CLIENT_ID
+  if (isAndroidShell()) return webClientId ? { webClientId } : null
+  return iOSClientId ? { iOSClientId } : null
+}
+
+// Android's Chrome WebView UA contains "Android"; iOS's WKWebView never does.
+// Read from the UA rather than Capacitor.getPlatform() so this stays SYNCHRONOUS —
+// googleNativeConfigured() is called at render time to decide whether to show the
+// button, and an async probe there would flash a button that then disappears.
+function isAndroidShell(): boolean {
+  return isNativeShell() && typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent)
+}
 
 export function googleNativeConfigured(): boolean {
-  return !!process.env.NEXT_PUBLIC_GOOGLE_IOS_CLIENT_ID
+  return googleClientIdForPlatform() !== null
 }
 
 let googleInitialized = false
 
 export async function signInWithGoogleNative(flow: "signin" | "signup"): Promise<NativeAppleResult> {
-  const iOSClientId = process.env.NEXT_PUBLIC_GOOGLE_IOS_CLIENT_ID
-  if (!iOSClientId) return { ok: false, error: "unavailable" }
+  const googleConfig = googleClientIdForPlatform()
+  if (!googleConfig) return { ok: false, error: "unavailable" }
 
   let SocialLogin: typeof import("@capgo/capacitor-social-login").SocialLogin
   try {
@@ -188,7 +224,7 @@ export async function signInWithGoogleNative(flow: "signin" | "signup"): Promise
   let idToken: string | null | undefined
   try {
     if (!googleInitialized) {
-      await SocialLogin.initialize({ google: { iOSClientId } })
+      await SocialLogin.initialize({ google: googleConfig })
       googleInitialized = true
     }
     const { result } = await SocialLogin.login({

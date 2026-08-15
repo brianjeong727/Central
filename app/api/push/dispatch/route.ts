@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import webpush, { WebPushError } from "web-push"
 import { createAdminClient } from "@/lib/supabase-admin"
 import { apnsReady, sendApnsNotification } from "@/lib/apns"
+import { fcmReady, sendFcmNotification } from "@/lib/fcm"
 import { getMinistryTimezone } from "@/lib/ministry-timezone"
 import { formatInZone, resolveMinistryTimezone, todayInZone } from "@/lib/tz"
 import { isAdminRole } from "@/lib/roles"
@@ -48,7 +49,7 @@ interface SubRow {
   id: string
   user_id: string
   endpoint: string
-  p256dh: string | null // NULL on platform='ios-native' (APNs token rows — filtered out before web-push send)
+  p256dh: string | null // NULL on the native platforms (APNs/FCM token rows — filtered out before web-push send)
   auth: string | null
   platform: string
 }
@@ -58,10 +59,12 @@ const SMART_THRESHOLD = 30 // mirrors read-receipt large-room threshold (Convent
 // The subset of a recipient's subscriptions a given Resolved actually delivers to,
 // after Tier-3 platform gating. Shared by dryRun's routing breakdown and the real
 // fan-out so both agree exactly:
-//   • webOnly (Tier-3 desk-work) → platform='web' ONLY (excludes ios-pwa AND ios-native)
-//   • mobileOnly (Tier-3 digest) → platform!='web' (ios-pwa + ios-native, the mobile subs)
+//   • webOnly (Tier-3 desk-work) → platform='web' ONLY (excludes ios-pwa AND both natives)
+//   • mobileOnly (Tier-3 digest) → platform!='web' (ios-pwa + ios-native + android-native)
 //   • neither → all platforms
-// After gating, ios-native rows go to the APNs lane; web/ios-pwa go to web-push.
+// After gating: ios-native → the APNs lane, android-native → the FCM lane, and
+// web/ios-pwa → web-push. The two filters are platform-EXCLUSION based, so a new
+// native platform is classified correctly here without touching this function.
 function subsForRecipient(r: Resolved, all: SubRow[]): SubRow[] {
   if (r.webOnly) return all.filter((s) => s.platform === "web")
   if (r.mobileOnly) return all.filter((s) => s.platform !== "web")
@@ -1028,23 +1031,31 @@ export async function POST(req: NextRequest) {
     const mobileOnly: Record<string, boolean> = {}
     const counts: Record<string, { forms: number; receipts: number; members: number }> = {}
     // Per-recipient lane routing after platform gating: how many web-push subs
-    // (web + ios-pwa) vs how many APNs subs (ios-native) this recipient delivers to.
-    // Lets tests assert routing (native → apns lane on Tier-1, EXCLUDED on Tier-3
-    // webOnly) without sending a single notification.
+    // (web + ios-pwa) vs how many NATIVE subs (ios-native → APNs, android-native →
+    // FCM) this recipient delivers to. Lets tests assert routing (native → its own
+    // lane on Tier-1, EXCLUDED on Tier-3 webOnly) without sending a notification.
+    //
+    // `routing` deliberately keeps its two-key {web, native} shape — the APNs specs
+    // assert it with exact object equality, and the per-platform split it would
+    // need is available in `lanes` below. `native` means "not the web-push lane".
     const routing: Record<string, { web: number; native: number }> = {}
     let webLane = 0
     let apnsLane = 0
+    let fcmLane = 0
     for (const r of resolved) {
       reasons[r.userId] = r.reason
       if (r.webOnly) webOnly[r.userId] = true
       if (r.mobileOnly) mobileOnly[r.userId] = true
       if (r.counts) counts[r.userId] = r.counts
       const list = subsForRecipient(r, subsByUser.get(r.userId) ?? [])
-      const web = list.filter((s) => s.platform !== "ios-native").length
-      const native = list.filter((s) => s.platform === "ios-native").length
+      const apns = list.filter((s) => s.platform === "ios-native").length
+      const fcm = list.filter((s) => s.platform === "android-native").length
+      const native = apns + fcm
+      const web = list.length - native
       routing[r.userId] = { web, native }
       webLane += web
-      apnsLane += native
+      apnsLane += apns
+      fcmLane += fcm
     }
     return NextResponse.json({
       table: table ?? null,
@@ -1056,7 +1067,7 @@ export async function POST(req: NextRequest) {
       mobileOnly,
       counts,
       routing,
-      lanes: { web: webLane, apns: apnsLane },
+      lanes: { web: webLane, apns: apnsLane, fcm: fcmLane },
       count: resolved.length,
     })
   }
@@ -1069,10 +1080,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "vapid-not-configured" }, { status: 500 })
   }
   const apnsOk = apnsReady()
+  const fcmOk = fcmReady()
 
   // 4. Fan out. One notification per (recipient × their gated subscriptions).
-  //    ios-native rows go to APNs (sendApnsNotification); web + ios-pwa keep
-  //    web-push. Prune parity: APNs 410/Unregistered/BadDeviceToken prunes the row
+  //    ios-native rows go to APNs (sendApnsNotification), android-native rows to
+  //    FCM (sendFcmNotification); web + ios-pwa keep web-push. Prune parity: APNs
+  //    410/Unregistered/BadDeviceToken and FCM 404/UNREGISTERED prune the row
   //    exactly like web-push 404/410; transient errors are failed sends, no prune.
   type SendResult = { ok: boolean; prune?: string }
   const sends: Promise<SendResult>[] = []
@@ -1080,6 +1093,30 @@ export async function POST(req: NextRequest) {
     const list = subsForRecipient(r, subsByUser.get(r.userId) ?? [])
     const json = JSON.stringify(r.payload)
     for (const sub of list) {
+      if (sub.platform === "android-native") {
+        // Native FCM lane. endpoint is 'fcm:<token>' — strip the prefix.
+        const token = sub.endpoint.startsWith("fcm:") ? sub.endpoint.slice(4) : sub.endpoint
+        if (!fcmOk || !token) {
+          // No FCM env (dev slot without the service account) → skip, exactly as
+          // the APNs lane skips when unconfigured. Never a hard failure.
+          console.log(`[push] FCM client not configured — skipping android-native subscription for user ${r.userId} (${r.reason})`)
+          continue
+        }
+        sends.push(
+          sendFcmNotification({
+            token,
+            title: r.payload.title,
+            body: r.payload.body,
+            url: r.payload.url,
+            tag: r.payload.tag,
+          })
+            .then<SendResult>((res) =>
+              res.ok ? { ok: true } : { ok: false, prune: res.prune ? sub.id : undefined },
+            )
+            .catch<SendResult>(() => ({ ok: false })),
+        )
+        continue
+      }
       if (sub.platform === "ios-native") {
         // Native APNs lane. endpoint is 'apns:<token>' — strip the prefix.
         const token = sub.endpoint.startsWith("apns:") ? sub.endpoint.slice(5) : sub.endpoint

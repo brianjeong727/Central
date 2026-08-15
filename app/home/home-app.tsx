@@ -43,6 +43,7 @@ import type { DirectoryMember } from "./types"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { isAdminRole, isLeaderRole } from "@/lib/roles"
 import { useIsNativeShell } from "@/lib/native-auth"
+import { useBackIntent } from "@/lib/back-intent"
 
 const AnnouncementsTab = dynamic(() => import("./tabs/announcements-tab").then(m => m.AnnouncementsTab), { loading: () => <AnnouncementsTabSkeleton />, ssr: false })
 const AnnouncementDetailView = dynamic(() => import("./tabs/announcements-tab").then(m => m.AnnouncementDetailView), { loading: () => <Spinner />, ssr: false })
@@ -980,6 +981,17 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     setGlobalOpenChat((prev) => prev ? { ...prev, name } : prev)
     setChatRefreshKey((k) => k + 1)
   }
+
+  // BASE back-intent: the bottom of the stack, so it only runs once every subpage,
+  // overlay and modal above it has popped. From a non-home tab, Android back returns
+  // to Home — the same "up one level" the app's own hierarchy implies. On Home
+  // itself nothing is registered, so NativeBackBridge falls through to minimizeApp()
+  // and the app backgrounds like any other Android app.
+  //
+  // This lives HERE rather than in the bridge because the bridge is in the root
+  // layout and has no view of tab state; expressing it as just another registration
+  // keeps lib/back-intent.ts free of app-specific knowledge.
+  useBackIntent(activeTab === "home" ? undefined : () => handleNavClick("home"))
 
   // Unified, symmetric nav handler — wired to BOTH the desktop sidebar and the
   // mobile bottom nav (and the command palette). Re-clicking the active tab RESETS

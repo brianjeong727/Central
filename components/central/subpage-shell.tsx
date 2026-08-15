@@ -17,6 +17,7 @@ import { PageTitle } from "./page-title"
 import { POCKET_CHROME_PAD_Y, POCKET_CHROME_PAD_X, POCKET_CHROME_TITLE } from "./pocket"
 import { useScrollResetOn } from "./scroll-reset"
 import { useEdgeSwipeBack } from "./use-edge-swipe-back"
+import { useBackIntent } from "@/lib/back-intent"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ context hook); flagged Phase 2, refactor pending
 import { useSubpageCrumbs } from "@/app/home/breadcrumb-context"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ type import); flagged Phase 2, refactor pending
@@ -151,6 +152,10 @@ export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, titleScal
   // Mobile: edge-swipe from the left mirrors the chrome chevron (§0.3). Inert on
   // desktop (coarse-pointer gated inside the hook).
   const swipeRef = useEdgeSwipeBack<HTMLDivElement>(back?.onClick)
+  // Android hardware/gesture back is the THIRD input for that same one-level-up
+  // action (Convention #22) — same handler, so every SubpageShell spoke inherits it
+  // exactly as it inherits the swipe. Inert on web and iOS.
+  useBackIntent(back?.onClick)
   // Mobile chrome uses the override when supplied; desktop always uses `title`.
   //
   // Deliberately NOT derived from the terminal crumb. Tried that — it removes the
