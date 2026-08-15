@@ -1133,9 +1133,19 @@ export async function POST(req: NextRequest) {
             url: r.payload.url,
             tag: r.payload.tag,
           })
-            .then<SendResult>((res) =>
-              res.ok ? { ok: true } : { ok: false, prune: res.prune ? sub.id : undefined },
-            )
+            .then<SendResult>((res) => {
+              if (res.ok) return { ok: true }
+              // An APNs rejection used to vanish here: the result carried only
+              // {ok, prune}, so the response was a bare `failed:1` with no reason
+              // anywhere, and the row was deleted on the way out. That is what made
+              // "notifications don't arrive" undiagnosable across several attempts.
+              // Token and key material are never logged — only the reason code.
+              console.error(
+                `[push][apns] send failed for user ${r.userId} (${r.reason}) — ` +
+                  `reason=${res.reason ?? "unknown"} host=${res.host ?? "?"} prune=${res.prune}`,
+              )
+              return { ok: false, prune: res.prune ? sub.id : undefined }
+            })
             .catch<SendResult>(() => ({ ok: false })),
         )
         continue
