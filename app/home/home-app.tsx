@@ -315,7 +315,13 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   const pullToRefresh = usePullToRefresh<HTMLDivElement>({
     enabled: !composerOpen && globalOpenChat === null && openAnnouncementId === null,
     onRefresh: async () => {
-      await globalMutate(() => true, undefined, { revalidate: true })
+      // Hold the gap open for a beat even when the cache answers instantly — a
+      // spinner that flashes for 50ms reads as a glitch rather than a refresh,
+      // and the gesture needs to feel like it did something.
+      await Promise.all([
+        globalMutate(() => true, undefined, { revalidate: true }),
+        new Promise(resolve => setTimeout(resolve, 450)),
+      ])
     },
   })
 
@@ -1456,15 +1462,12 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         {/* Hidden while any full-screen mobile surface is up: an open chat
             overlay or a composer (§2.2 "nav hidden on full-screen composers").
             The nav must never paint over a fixed overlay. */}
-        {/* Rides the pull gesture. Fixed under the safe-area inset, NOT inside the
-            scroller — the scroller is the thing being pulled, so an indicator
-            within it would travel with the content instead of holding under the
-            chrome. Phone-width only (md:hidden lives on the component). */}
-        <PullToRefreshIndicator
-          pull={pullToRefresh.pull}
-          refreshing={pullToRefresh.refreshing}
-          armed={pullToRefresh.armed}
-        />
+        {/* The gap the pull opens above the content, with the spinner centred in
+            it. Fixed under the safe-area inset and OUTSIDE the scroller — the
+            scroller is the thing being translated, so a spinner within it would
+            ride down with the content instead of sitting in the opened space.
+            Phone-width only (md:hidden lives on the component). */}
+        <PullToRefreshIndicator indicatorRef={pullToRefresh.indicatorRef} />
 
         <BottomNav
           activeTab={activeTab}

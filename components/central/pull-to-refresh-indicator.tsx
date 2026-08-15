@@ -1,64 +1,45 @@
 "use client"
 
-// The spinner that rides a pull-to-refresh gesture. Pair with usePullToRefresh:
-// the hook owns the gesture and the async state, this owns the pixels.
+// The gap a pull-to-refresh gesture opens above the content, with the spinner
+// centred in it. Pair with usePullToRefresh: the hook owns the gesture and sizes
+// this element, and this owns the pixels.
 //
-// Positioned `fixed` under the safe-area inset rather than inside the scroller,
-// because the shell's scroll region is also the thing being pulled — an indicator
-// inside it would travel with the content and never sit still under the chrome.
+// This is the GAP, not a floating badge. The content translates down and this
+// element's height grows to match, so the ring is revealed in the space rather
+// than painted over the content — the iOS/Instagram grammar.
 //
-// Below the commit threshold the ring is a static arc that ROTATES with travel,
-// so the pull reads as winding it up; past the threshold and while refreshing it
-// spins on its own. Same 2px plum-on-tint ring as <Spinner> so it belongs to the
-// same family rather than being a second spinner grammar.
+// It sits `fixed` under the safe-area inset, OUTSIDE the translated content:
+// the content is the thing being pulled, so a spinner within it would travel
+// with the content instead of sitting still in the opened space.
+//
+// Height/opacity/rotation are written imperatively by the hook (a drag emits a
+// touchmove per frame; see the note in use-pull-to-refresh.ts), so this renders
+// once at rest and is not re-rendered during the gesture.
 
 const RING = "w-6 h-6 rounded-full border-2 border-[var(--plum)]/20 border-t-[var(--plum)]"
 
 export function PullToRefreshIndicator({
-  pull,
-  refreshing,
-  armed,
+  indicatorRef,
 }: {
-  /** Travel in px from usePullToRefresh. */
-  pull: number
-  /** Refresh in flight — spin continuously. */
-  refreshing: boolean
-  /** Past the commit point. */
-  armed: boolean
+  indicatorRef: React.RefObject<HTMLDivElement | null>
 }) {
-  const visible = pull > 0 || refreshing
-  if (!visible) return null
-
-  // Fade in over the first stretch so a tiny accidental drag shows almost nothing.
-  const opacity = refreshing ? 1 : Math.min(1, pull / 40)
-
   return (
     <div
+      ref={indicatorRef}
       aria-hidden
-      // Presence IS the contract the gesture spec asserts on (it must not appear
-      // mid-page); the ring is otherwise styled entirely by utility classes.
+      // The spec asserts on this element's measured height + opacity — presence
+      // alone means nothing now that it is always mounted (the hook needs a
+      // stable node to paint, and mounting per-drag would cost a frame).
       data-pull-refresh
-      className="fixed left-1/2 z-40 md:hidden pointer-events-none"
+      className="fixed left-0 right-0 z-40 md:hidden pointer-events-none overflow-hidden grid place-items-center"
       style={{
-        // Travel is the pull itself, so the ring stays glued to the finger.
-        top: `calc(env(safe-area-inset-top) + ${Math.round(pull * 0.6)}px)`,
-        transform: "translateX(-50%)",
-        opacity,
-        // No transition while dragging — direct manipulation must not lag. The
-        // release settle is handled by the hook zeroing `pull`, and a transition
-        // here would fight the finger on the way down.
-        transition: refreshing ? "opacity 150ms linear" : "none",
+        top: "env(safe-area-inset-top)",
+        // At rest the gap is closed. The hook grows it in step with the content.
+        height: 0,
+        opacity: 0,
       }}
     >
-      <div
-        className={`${RING} ${refreshing || armed ? "animate-spin" : ""}`}
-        style={
-          refreshing || armed
-            ? undefined
-            // Winds up with the drag: a full turn by the time it commits.
-            : { transform: `rotate(${Math.round((pull / 64) * 360)}deg)` }
-        }
-      />
+      <div className={RING} />
     </div>
   )
 }
