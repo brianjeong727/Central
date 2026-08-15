@@ -51,6 +51,8 @@ export { ReadOnlyMat, ReadOnlyPill } from "./read-only-mat"
 export { useEdgeSwipeBack } from "./use-edge-swipe-back"
 export { usePullToRefresh } from "./use-pull-to-refresh"
 export { PullToRefreshIndicator } from "./pull-to-refresh-indicator"
+export { SwipeActionRow } from "./swipe-actions"
+export type { SwipeAction, SwipeSide } from "./swipe-actions"
 export { BackChevron } from "./back-chevron"
 export { SuperSwitcher } from "./super-switcher"
 export {

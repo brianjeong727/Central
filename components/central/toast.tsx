@@ -30,10 +30,13 @@ export function Toast({
     <div
       role="status"
       aria-live="polite"
+      // `bottom` lives in .toast-bottom (globals.css), NOT here: at phone width it
+      // must clear the floating nav pill, and an inline value would outrank the
+      // desktop reset the same way an inline .shell-scroll pad would.
+      className="toast-bottom"
       style={{
         position: "fixed",
         left: "50%",
-        bottom: 28,
         transform: "translateX(-50%)",
         zIndex: 190,
         display: "flex",
