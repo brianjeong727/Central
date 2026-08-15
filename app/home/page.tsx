@@ -2,7 +2,8 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase-server"
 import { HomeApp } from "./home-app"
 import { rowsToChatPreviews, type ChatPreviewRow } from "./utils"
-import type { UserTeam, CongregationQuestion, GovernanceSettings } from "./types"
+import { mapChatListRows, type ChatListRow } from "./chat-list"
+import type { UserTeam, CongregationQuestion, GovernanceSettings, ChatGroup } from "./types"
 import type { ChatPreview } from "@/components/central/chat-strip"
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
@@ -39,12 +40,26 @@ export default async function HomePage() {
 
   if (!profile?.ministry_id) redirect("/ministries")
 
-  // Parallel fetch: ministry name + chat previews + user teams + active question
-  const [ministryResult, chatResult, teamResult, questionResult] = await Promise.all([
+  // Parallel fetch: ministry name + chat previews + chat LIST + user teams + active question
+  const [ministryResult, chatResult, chatListResult, teamResult, questionResult] = await Promise.all([
     // `timezone` rides this existing fetch (no extra round trip) — the shell
     // provides it to every event surface via MinistryTimezoneProvider.
     supabase.from("ministries").select("name, governance_settings, timezone").eq("id", profile.ministry_id).single(),
     supabase.rpc("get_chat_previews", { p_user_id: user.id, p_ministry_id: profile.ministry_id }),
+    // The CHATS TAB's list, fetched on the SERVER so it ships inside the HTML.
+    //
+    // This used to be a client fetch that could not start until the bundle had
+    // downloaded, parsed and hydrated — measured at +2.76s on a throttled mid-range
+    // phone BEFORE the first byte of any request left the device. The query itself
+    // is single-digit milliseconds, so essentially all of that wait was the client
+    // waiting to be able to ask. Riding this existing Promise.all costs no extra
+    // round trip (server→DB is same-region) and removes a whole client round trip
+    // from the critical path.
+    //
+    // The twin RPC above (get_chat_previews) feeds the HOME tab's recent-chats strip
+    // and is NOT interchangeable with this one — get_chat_list carries unread counts,
+    // muted/pinned prefs and the section category the chats tab groups by.
+    supabase.rpc("get_chat_list", { p_user_id: user.id, p_ministry_id: profile.ministry_id }),
     supabase
       .from("team_members")
       .select("team_id, role_id, teams(id, name, icon, description, team_type, allow_co_presidency, allow_admin_members), team_roles(id, name, permissions, is_president)")
@@ -60,6 +75,11 @@ export default async function HomePage() {
   // Shared with the client refetcher (home-app `loadRecentChats`) — see
   // rowsToChatPreviews. The two used to be hand-kept copies and had drifted.
   const initialRecentChats: ChatPreview[] = rowsToChatPreviews((chatResult.data ?? []) as ChatPreviewRow[])
+
+  // Same mapper the client fetcher uses (app/home/chat-list.ts), so the server seed
+  // and any later client revalidation produce identical shapes — otherwise the list
+  // would visibly rearrange a beat after first paint.
+  const initialChatList: ChatGroup[] = mapChatListRows((chatListResult.data ?? []) as ChatListRow[])
 
   // Build UserTeam[]
   const initialUserTeams: UserTeam[] = ((teamResult.data ?? []) as RawMembership[]).flatMap((m) => {
@@ -152,6 +172,7 @@ export default async function HomePage() {
       ministryName={ministryResult.data?.name ?? ""}
       ministryTimezone={(ministryResult.data as { timezone?: string | null } | null)?.timezone ?? null}
       initialRecentChats={initialRecentChats}
+      initialChatList={initialChatList}
       initialUserTeams={initialUserTeams}
       initialActiveQuestion={initialActiveQuestion}
       initialHasResponded={initialHasResponded}
