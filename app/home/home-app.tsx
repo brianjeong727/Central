@@ -13,6 +13,7 @@ import type { ChatPreview } from "@/components/central/chat-strip"
 // Types
 import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings, ChatGroup, Crumb } from "./types"
 import { formatChatListTime, getInitials, chatPreviewLabel, rowsToChatPreviews, type ChatPreviewRow } from "./utils"
+import { usePullToRefresh, PullToRefreshIndicator } from "@/components/central"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 import { classifyTeam } from "./team-type"
 import { useNavState, ALL_FOLDED_PARAMS } from "./nav-state"
@@ -193,6 +194,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   const [chatRefreshKey, setChatRefreshKey] = useState(0)
   const [recentChats, setRecentChats] = useState<ChatPreview[]>(initialRecentChats ?? [])
 
+
   // `time` on a ChatPreview is a RELATIVE label ("now", "15m", "3h") computed once
   // by rowsToChatPreviews. Data arriving is not the only thing that makes it wrong —
   // so does time passing, and nothing was re-running it, so a chat opened at 9:00
@@ -298,6 +300,31 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // up — reported by the owning tab via onComposerOpenChange. Suppresses the
   // floating pill nav + the floating super-switcher chip (mobile §2.2).
   const [composerOpen, setComposerOpen] = useState(false)
+
+  // ── Pull-to-refresh (mobile) ────────────────────────────────────────────────
+  // Revalidates every cached SWR key rather than only the active tab's. The
+  // alternative is a per-tab registry, which means threading a refresh handler
+  // through every tab component; this is one line and matches what the gesture
+  // says it does ("refresh the page"). The cost is that data for tabs the user
+  // visited earlier also refetches — mildly early rather than wasted, since they
+  // would revalidate on next visit anyway — and it only ever runs on a deliberate
+  // gesture, never on a timer.
+  //
+  // DISABLED while a full-screen surface is up: an open chat, the composer, or an
+  // announcement detail each own the screen and bring their own scroller, and the
+  // shell scroller behind them must not respond to a drag meant for those.
+  const pullToRefresh = usePullToRefresh<HTMLDivElement>({
+    enabled: !composerOpen && globalOpenChat === null && openAnnouncementId === null,
+    onRefresh: async () => {
+      // Hold the gap open for a beat even when the cache answers instantly — a
+      // spinner that flashes for 50ms reads as a glitch rather than a refresh,
+      // and the gesture needs to feel like it did something.
+      await Promise.all([
+        globalMutate(() => true, undefined, { revalidate: true }),
+        new Promise(resolve => setTimeout(resolve, 450)),
+      ])
+    },
+  })
 
   // Graduation prompt — show once per session if user's graduation year has passed
   const [showGradPrompt, setShowGradPrompt] = useState(false)
@@ -1172,7 +1199,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             what left ~260px of dead scroll below the last row when the pill
             needs ~74px. --nav-clearance derives from the pill's real geometry;
             see app/globals.css. Desktop drops it entirely (md:pb-0). */}
-        <div className="shell-scroll overflow-y-auto min-h-screen md:flex-1 md:min-h-0 md:overflow-hidden">
+        <div ref={pullToRefresh.ref} className="shell-scroll overflow-y-auto min-h-screen md:flex-1 md:min-h-0 md:overflow-hidden">
 
           {/* Shared on-load entrance — keyed by activeTab so this single element
               remounts and replays the fade+rise on every top-level tab switch
@@ -1447,6 +1474,13 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         {/* Hidden while any full-screen mobile surface is up: an open chat
             overlay or a composer (§2.2 "nav hidden on full-screen composers").
             The nav must never paint over a fixed overlay. */}
+        {/* The gap the pull opens above the content, with the spinner centred in
+            it. Fixed under the safe-area inset and OUTSIDE the scroller — the
+            scroller is the thing being translated, so a spinner within it would
+            ride down with the content instead of sitting in the opened space.
+            Phone-width only (md:hidden lives on the component). */}
+        <PullToRefreshIndicator indicatorRef={pullToRefresh.indicatorRef} />
+
         <BottomNav
           activeTab={activeTab}
           onTabChange={handleNavClick}
