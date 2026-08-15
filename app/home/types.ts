@@ -197,6 +197,10 @@ export interface GroupMember {
   role: string
   graduation_year: number | null
   avatar_url?: string | null
+  /** Deleted-account tombstone (profiles.deleted_at set). The row STAYS in the
+   *  roster — old messages depend on the name resolving — but it sorts last and
+   *  renders de-emphasised. See chats-tab's roster. */
+  deleted: boolean
 }
 
 export interface Message {
