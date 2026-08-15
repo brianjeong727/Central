@@ -15,7 +15,7 @@ import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { deleteMyAccount } from "@/app/actions/delete-account"
 import { unblockUser } from "@/app/actions/blocks"
 import { useBlocks } from "../use-blocks"
-import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, MonogramChip, PocketFilterChip, PocketCard, PocketButton, PocketTag, PocketRoundButton, PocketRow, PocketRowCard, PocketKicker, useScrollResetOn, useEdgeSwipeBack } from "@/components/central"
+import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, SerifInput, MonogramChip, PocketFilterChip, PocketCard, PocketButton, PocketTag, PocketRoundButton, PocketRow, PocketRowCard, PocketKicker, useScrollResetOn, useEdgeSwipeBack } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
@@ -767,7 +767,7 @@ export function JournalSection({
 
 // ── Profile field config ──────────────────────────────────────────────────────
 
-type ProfileDraftField = "phone" | "graduation_year" | "bio" | "testimony" | "favorite_verse" | "favorite_worship_song" | "favorite_book_of_bible" | "prayer_request"
+type ProfileDraftField = "name" | "phone" | "graduation_year" | "bio" | "testimony" | "favorite_verse" | "favorite_worship_song" | "favorite_book_of_bible" | "prayer_request"
 
 const PROFILE_SECTIONS: {
   id: string
@@ -1140,6 +1140,7 @@ export function ProfileTab({
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [draft, setDraft] = useState<Record<ProfileDraftField, string>>({
+    name: initialProfile.name ?? "",
     graduation_year: String(initialProfile.graduation_year ?? ""),
     phone: initialProfile.phone ?? "",
     bio: initialProfile.bio ?? "",
@@ -1165,6 +1166,7 @@ export function ProfileTab({
 
   const startEdit = () => {
     setDraft({
+      name: profile.name ?? "",
       graduation_year: String(profile.graduation_year ?? ""),
       phone: profile.phone ?? "",
       bio: profile.bio ?? "",
@@ -1179,11 +1181,19 @@ export function ProfileTab({
 
   const cancelEdit = () => setEditing(false)
 
+  // The display name is what the whole ministry sees, and unlike every other
+  // field on this screen it may never be blank — a nameless row renders as an
+  // empty monogram everywhere it appears. Save is gated on it rather than
+  // silently reverting, which would look like the edit simply didn't take.
+  const nameValid = draft.name.trim().length >= 2
+
   const saveEdit = useCallback(async () => {
+    if (draft.name.trim().length < 2) return
     setSaving(true)
     const { data, error } = await supabase
       .from("profiles")
       .update({
+        name: draft.name.trim(),
         graduation_year: draft.graduation_year ? parseInt(draft.graduation_year) : null,
         phone: draft.phone || null,
         bio: draft.bio || null,
@@ -1425,7 +1435,7 @@ export function ProfileTab({
           action={editing
             ? <PocketButton variant="quiet" compact surface="page" onClick={cancelEdit}>Cancel</PocketButton>
             : <PocketRoundButton ariaLabel="Settings" onClick={() => openSettings("hub")}><Settings size={16} /></PocketRoundButton>}
-          action2={editing ? <PocketButton variant="primary" compact onClick={saveEdit} disabled={saving}>{saving ? "Saving…" : "Save"}</PocketButton> : undefined}
+          action2={editing ? <PocketButton variant="primary" compact onClick={saveEdit} disabled={saving || !nameValid}>{saving ? "Saving…" : "Save"}</PocketButton> : undefined}
         />
 
         {/* ── Mobile: identity card (tonal ivory). Edit is a quiet plum action tucked
@@ -1445,7 +1455,20 @@ export function ProfileTab({
                 {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 40%, transparent)" }}><div className="animate-spin" style={{ width: 18, height: 18, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
               </label>
               <div style={{ flex: 1, minWidth: 0, paddingRight: !editing ? 40 : 0 }}>
-                <h1 style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: 0, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.name}</h1>
+                {editing ? (
+                  <SerifInput
+                    value={draft.name}
+                    onChange={(e) => setDraft(d => ({ ...d, name: e.target.value }))}
+                    fontSize={22}
+                    aria-label="Your name"
+                    placeholder="Your name"
+                    autoComplete="name"
+                    maxLength={80}
+                    style={{ letterSpacing: "-0.01em", lineHeight: 1.15 }}
+                  />
+                ) : (
+                  <h1 style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: 0, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.name}</h1>
+                )}
                 <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, minWidth: 0 }}>
                   <PocketTag label={roleLabel(profile.role, null)} variant="role" />
                   <span style={{ fontSize: 13, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.email}</span>
@@ -1547,7 +1570,27 @@ export function ProfileTab({
             </label>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ ...MONO_STYLE, margin: "0 0 6px" }}>{roleLabel(profile.role, null)}</p>
-              <h1 style={{ fontFamily: "var(--serif)", fontSize: 32, fontWeight: 400, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 8px", lineHeight: 1.05 }}>{profile.name}</h1>
+              {editing ? (
+                <div style={{ margin: "0 0 8px" }}>
+                  <SerifInput
+                    value={draft.name}
+                    onChange={(e) => setDraft(d => ({ ...d, name: e.target.value }))}
+                    fontSize={32}
+                    aria-label="Your name"
+                    placeholder="Your name"
+                    autoComplete="name"
+                    maxLength={80}
+                    style={{ fontWeight: 400, letterSpacing: "-0.01em", lineHeight: 1.05 }}
+                  />
+                  {!nameValid && (
+                    <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "6px 0 0" }}>
+                      Enter your name — this is what your ministry sees.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <h1 style={{ fontFamily: "var(--serif)", fontSize: 32, fontWeight: 400, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 8px", lineHeight: 1.05 }}>{profile.name}</h1>
+              )}
               <div style={{ display: "flex", gap: 20, fontSize: 14, color: "var(--body)", flexWrap: "wrap", alignItems: "center" }}>
                 {profile.graduation_year && <span>Class of {profile.graduation_year}</span>}
                 {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation && <span>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
@@ -1558,7 +1601,7 @@ export function ProfileTab({
             {editing ? (
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                 <CentralButton variant="secondary" onClick={cancelEdit}><X size={13} />Cancel</CentralButton>
-                <CentralButton onClick={saveEdit} disabled={saving}><Check size={13} />{saving ? "Saving…" : "Save"}</CentralButton>
+                <CentralButton onClick={saveEdit} disabled={saving || !nameValid}><Check size={13} />{saving ? "Saving…" : "Save"}</CentralButton>
               </div>
             ) : (
               <CentralButton variant="secondary" onClick={startEdit} style={{ flexShrink: 0 }}><Pencil size={13} />Edit profile</CentralButton>
