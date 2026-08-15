@@ -1084,9 +1084,14 @@ export async function POST(req: NextRequest) {
 
   // 4. Fan out. One notification per (recipient × their gated subscriptions).
   //    ios-native rows go to APNs (sendApnsNotification), android-native rows to
-  //    FCM (sendFcmNotification); web + ios-pwa keep web-push. Prune parity: APNs
-  //    410/Unregistered/BadDeviceToken and FCM 404/UNREGISTERED prune the row
-  //    exactly like web-push 404/410; transient errors are failed sends, no prune.
+  //    FCM (sendFcmNotification); web + ios-pwa keep web-push. Prune parity: a row
+  //    is deleted ONLY on the DEVICE's own verdict — APNs 410/Unregistered, FCM
+  //    404/UNREGISTERED — exactly like web-push 404/410. Server-side config
+  //    rejections (APNs BadDeviceToken, FCM SENDER_ID_MISMATCH) are logged and
+  //    NEVER pruned: deleting a live registration on a config error costs every
+  //    notification that user will ever get, and the app's re-register on next
+  //    launch hides it as `sent:0, failed:0`. Transient errors are failed sends,
+  //    no prune.
   type SendResult = { ok: boolean; prune?: string }
   const sends: Promise<SendResult>[] = []
   for (const r of resolved) {
@@ -1186,8 +1191,18 @@ export async function POST(req: NextRequest) {
   }
 
   // 5. Prune dead endpoints.
+  //    Scoped to `userIds` as well as the id list (Convention #8, defence in
+  //    depth): `admin` is the SERVICE-ROLE client, so RLS is bypassed entirely
+  //    and this WHERE clause is the only thing standing between a bad id and an
+  //    arbitrary row deletion on a security table. Every id in `toPrune` is the
+  //    PK of a row this request itself SELECTed for these recipients (step 3),
+  //    never a caller-supplied value — so the extra clause changes no behavior
+  //    today; it is here so a future refactor that lets an id reach `toPrune`
+  //    from somewhere else still cannot delete another user's subscription. A
+  //    per-ministry `.eq()` would be wrong: desk_digest fans out across
+  //    ministries, so the recipient set is the correct scope, not one tenant.
   if (toPrune.length > 0) {
-    await admin.from("push_subscriptions").delete().in("id", toPrune)
+    await admin.from("push_subscriptions").delete().in("id", toPrune).in("user_id", userIds)
   }
 
   return NextResponse.json({
