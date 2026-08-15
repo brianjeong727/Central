@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, ChevronDown } from "lucide-react"
 import { RingCrossLogo } from "@/app/home/components/shared"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 
@@ -151,6 +151,73 @@ export function AppleButton({ onClick }: { onClick: () => void }) {
   )
 }
 
+// ── Graduation-year options ────────────────────────────────────
+// Single source for the year window offered by the signup + complete-profile
+// pickers. It MUST match the `gradYearValid` range those pages check, or the
+// dropdown can offer a value its own form then rejects.
+export const GRAD_YEAR_SPAN = 6
+export function gradYearOptions(currentYear: number = new Date().getFullYear()): number[] {
+  return Array.from({ length: GRAD_YEAR_SPAN + 1 }, (_, i) => currentYear + i)
+}
+
+// ── AuthSelect (desktop) ───────────────────────────────────────
+// Native <select> in the same chrome the auth pages' text Fields use, so a
+// picker and a text input are visually the same control. `appearance:none` +
+// our own chevron — the platform arrow renders in the OS's own grey and breaks
+// the cream palette. Placeholder (value "") reads in --faint, the sanctioned
+// placeholder tone; a chosen value reads in --ink.
+export function AuthSelect({ label, helper, children, ...select }: {
+  label: string; helper?: string
+} & React.SelectHTMLAttributes<HTMLSelectElement>) {
+  const empty = !select.value
+  return (
+    <label style={{ display: "block" }}>
+      <div style={{ ...mono, marginBottom: 8 }}>{label}</div>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8,
+        background: "var(--cream-panel)", border: "1px solid var(--line-2)", borderRadius: 10, padding: "0 14px",
+      }}>
+        <select {...select} style={{
+          flex: 1, minWidth: 0, appearance: "none", WebkitAppearance: "none",
+          border: "none", outline: "none", background: "transparent", padding: "13px 0",
+          fontFamily: SANS, fontSize: 15, color: empty ? "var(--faint)" : "var(--ink)", cursor: "pointer",
+        }}>
+          {children}
+        </select>
+        <ChevronDown size={16} style={{ flexShrink: 0, color: "var(--faint)", pointerEvents: "none" }} aria-hidden />
+      </div>
+      {helper && <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 8 }}>{helper}</div>}
+    </label>
+  )
+}
+
+// ── AuthPendingVeil ────────────────────────────────────────────
+// Full-screen "something is happening" cover for the auth waits that have no
+// button to spin: the OAuth round trip (native sheet → signInWithIdToken → mint
+// guard → routing queries) and the window.location.assign handoff afterwards,
+// which together can run for seconds with a completely inert screen. Mounted
+// while pending and NEVER cleared on success — the page is navigating, and
+// clearing it would flash the form back for the last frame.
+export function AuthPendingVeil({ label }: { label: string }) {
+  return (
+    <div role="status" aria-live="polite" style={{
+      position: "fixed", inset: 0, zIndex: 300, background: "var(--cream)",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 28,
+    }}>
+      <RingCrossLogo size={48} color="var(--plum)" />
+      {/* Spinner and label read as ONE status line under the mark — stacked as
+          three evenly-spaced items they float apart. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="animate-spin" style={{
+          width: 15, height: 15, borderRadius: "50%", flexShrink: 0,
+          border: "2px solid var(--line-2)", borderTopColor: "var(--plum)",
+        }} />
+        <div style={{ fontFamily: SERIF, fontSize: 15, color: "var(--body)" }}>{label}</div>
+      </div>
+    </div>
+  )
+}
+
 // ── OrDivider ──────────────────────────────────────────────────
 // No built-in margin — callers control vertical spacing. `label` defaults to
 // "or"; signup passes "or sign up with email" so the email fields read as a
@@ -238,6 +305,30 @@ export function PocketField({ label, trailing, hint, ...input }: {
       <div style={pocketFieldBox}>
         <input {...input} style={pocketFieldInput} />
         {trailing}
+      </div>
+      {hint && <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 7, paddingLeft: 4 }}>{hint}</div>}
+    </label>
+  )
+}
+
+// Ivory pill SELECT — the PocketField grammar (ivory box, radius 16, serif 16,
+// ≥52px) with a native <select> inside. On a phone that opens the OS wheel
+// picker, the right control for a short fixed list like graduation years.
+export function PocketSelect({ label, hint, children, ...select }: {
+  label: string; hint?: React.ReactNode
+} & React.SelectHTMLAttributes<HTMLSelectElement>) {
+  const empty = !select.value
+  return (
+    <label style={{ display: "block" }}>
+      <span style={pocketFieldLabel}>{label}</span>
+      <div style={{ ...pocketFieldBox, gap: 8 }}>
+        <select {...select} style={{
+          ...pocketFieldInput, appearance: "none", WebkitAppearance: "none",
+          color: empty ? "var(--faint)" : "var(--ink)", cursor: "pointer",
+        }}>
+          {children}
+        </select>
+        <ChevronDown size={17} style={{ flexShrink: 0, color: "var(--faint)", pointerEvents: "none" }} aria-hidden />
       </div>
       {hint && <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 7, paddingLeft: 4 }}>{hint}</div>}
     </label>

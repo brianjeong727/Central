@@ -7,7 +7,8 @@ import { useSearchParams } from "next/navigation"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { Spinner } from "@/app/home/components/shared"
 import { SplitShell, GoogleButton, AppleButton, AppleGlyph, GoogleGlyph, OrDivider, EyeButton,
-  PocketAuthScreen, PocketBack, PocketField, PocketSubmit, PocketError,
+  PocketAuthScreen, PocketBack, PocketField, PocketSelect, PocketSubmit, PocketError,
+  AuthSelect, AuthPendingVeil, gradYearOptions,
   pocketPillCard, pocketFieldLabel, pocketFieldBox, pocketH1, pocketSub } from "@/app/(auth)/shared"
 import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn, nativeAuthDebugMessage } from "@/lib/native-auth"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
@@ -24,6 +25,9 @@ type View = "role-choice" | "admin" | "member" | "verify-code"
 // name the situation — the next step is already on screen.
 const EXISTING_ACCOUNT_MSG =
   "An account with this email already exists. Sign in instead — or reset your password if you've forgotten it."
+
+// One label for every pending-veil moment on this page.
+const SETTING_UP = "Setting up your account…"
 
 // ─── tiny icon helper ──────────────────────────────────────────
 function Icon({ d, size = 16, stroke = 1.8, style }: {
@@ -220,6 +224,13 @@ function SignupContent() {
   const nativeShell = useIsNativeShell()
   const googleInShell = googleNativeConfigured()
 
+  // Full-screen "something is happening" cover for the waits with no button to
+  // spin: the OAuth round trip (native sheet → signInWithIdToken → mint guard),
+  // the web provider redirect, and the window.location.assign handoff after a
+  // verified code. Holds a label, null when idle; cleared ONLY on failure —
+  // on success we are navigating and the form must not flash back.
+  const [pending, setPending] = useState<string | null>(null)
+
   // admin state
   const [adminName,     setAdminName]     = useState("")
   const [adminEmail,    setAdminEmail]    = useState("")
@@ -296,27 +307,30 @@ function SignupContent() {
 
   async function handleAdminGoogle() {
     if (isNativeShell()) {
-      setAdminError(null)
+      setAdminError(null); setPending(SETTING_UP)
       const res = await signInWithGoogleNative("signup")
       if (res.ok) { window.location.assign("/onboarding"); return }
+      setPending(null)
       if (res.error === "failed") setAdminError("Google sign-in didn't complete — please try again.")
       else if (res.error === "unavailable") setAdminError("Google sign-in needs the latest app version — update Central and try again.")
       return
     }
+    setPending(SETTING_UP)
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback?intent=register&flow=signup" } })
   }
 
   async function handleAdminApple() {
     if (isNativeShell()) {
-      setAdminError(null)
+      setAdminError(null); setPending(SETTING_UP)
       const res = await signInWithAppleNative("signup")
       if (res.ok) { window.location.assign("/onboarding"); return }
       // TEMP DIAGNOSTIC: show the raw reason for EVERY non-unavailable failure
       // (previously no-account/canceled returned silently — the "frozen" bug).
-      if (res.error !== "unavailable") { setAdminError(nativeAuthDebugMessage(res)); return }
-      // plugin missing from this binary — fall through to the web flow
+      if (res.error !== "unavailable") { setPending(null); setAdminError(nativeAuthDebugMessage(res)); return }
+      // plugin missing from this binary — fall through to the web flow (veil stays up)
     }
+    setPending(SETTING_UP)
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: siteOrigin() + "/auth/callback?intent=register&flow=signup" } })
   }
@@ -324,6 +338,12 @@ function SignupContent() {
   const currentYear = new Date().getFullYear()
   const gradYearNum = parseInt(graduationYear, 10)
   const gradYearValid = gradYearNum >= currentYear && gradYearNum <= currentYear + 6
+  const yearOptions = (
+    <>
+      <option value="">Select your graduation year</option>
+      {gradYearOptions(currentYear).map(y => <option key={y} value={String(y)}>{y}</option>)}
+    </>
+  )
 
   async function handleMemberSignup(e: React.FormEvent) {
     e.preventDefault()
@@ -350,29 +370,32 @@ function SignupContent() {
 
   async function handleMemberGoogle() {
     if (isNativeShell()) {
-      setMemberError(null)
+      setMemberError(null); setPending(SETTING_UP)
       const res = await signInWithGoogleNative("signup")
       if (res.ok) { window.location.assign("/ministries?tab=code"); return }
+      setPending(null)
       if (res.error === "failed") setMemberError("Google sign-in didn't complete — please try again.")
       else if (res.error === "unavailable") setMemberError("Google sign-in needs the latest app version — update Central and try again.")
       return
     }
+    setPending(SETTING_UP)
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback?flow=signup" } })
   }
 
   async function handleMemberApple() {
     if (isNativeShell()) {
-      setMemberError(null)
+      setMemberError(null); setPending(SETTING_UP)
       const res = await signInWithAppleNative("signup")
       // Mirrors the web callback's intent=join landing — a fresh member goes to
       // the join flow, never the marketing landing (hidden in the shell anyway).
       if (res.ok) { window.location.assign("/ministries?tab=code"); return }
       // TEMP DIAGNOSTIC: show the raw reason for EVERY non-unavailable failure
       // (previously no-account/canceled returned silently — the "frozen" bug).
-      if (res.error !== "unavailable") { setMemberError(nativeAuthDebugMessage(res)); return }
-      // plugin missing from this binary — fall through to the web flow
+      if (res.error !== "unavailable") { setPending(null); setMemberError(nativeAuthDebugMessage(res)); return }
+      // plugin missing from this binary — fall through to the web flow (veil stays up)
     }
+    setPending(SETTING_UP)
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: siteOrigin() + "/auth/callback?flow=signup" } })
   }
@@ -417,6 +440,8 @@ function SignupContent() {
     // Session established in-app. Route exactly as the post-signup path intends —
     // admin registrants set up the workspace; members go where login/callback send
     // a fresh sign-in (active ministries: 1→/home, >1→/pick-ministry, 0→/ministries).
+    // routeAfterNativeSignIn runs two queries before it navigates — cover them.
+    setPending(SETTING_UP)
     if (pendingView === "admin") { window.location.assign("/onboarding"); return }
     await routeAfterNativeSignIn(supabase)
   }
@@ -450,6 +475,7 @@ function SignupContent() {
     "aria-label": "6-digit confirmation code",
   }
   if (view === "verify-code") return (<>
+    {pending && <AuthPendingVeil label={pending} />}
     <div className="hidden md:block">
     <SplitShell topBar={<>{alreadyHaveAccount}</>}>
       <div style={mono}>VERIFY YOUR EMAIL · CENTRAL</div>
@@ -627,6 +653,7 @@ function SignupContent() {
 
   // ── ADMIN (register a church) ──────────────────────────────────
   if (view === "admin") return (<>
+    {pending && <AuthPendingVeil label={pending} />}
     <div className="hidden md:block">
     <SplitShell topBar={<>
       {intent !== "register" && (
@@ -763,6 +790,7 @@ function SignupContent() {
 
   // ── MEMBER (join a ministry) ────────────────────────────────────
   return (<>
+    {pending && <AuthPendingVeil label={pending} />}
     <div className="hidden md:block">
     <SplitShell topBar={<>
       <span style={{ marginRight: "auto" }}>
@@ -805,14 +833,14 @@ function SignupContent() {
           trailing={<EyeButton show={memberShowPw} onToggle={() => setMemberShowPw(v => !v)}/>}
           helper="At least 6 characters."/>
 
-        <Field
+        <AuthSelect
           label="GRADUATION YEAR"
-          placeholder={String(currentYear + 2)}
-          type="number"
           value={graduationYear}
           onChange={(e) => setGraduationYear(e.target.value)}
-          helper={`Enter the year you graduate (e.g. ${currentYear + 1}, ${currentYear + 2}).`}
-        />
+          helper="The year you graduate — it places you in the right class."
+        >
+          {yearOptions}
+        </AuthSelect>
 
         <Primary disabled={!gradYearValid || !gender || memberLoading} loading={memberLoading}>
           {memberLoading ? "Creating account…" : "Create account"}
@@ -871,8 +899,10 @@ function SignupContent() {
           <PocketField label="Email" type="email" placeholder="you@example.com" value={memberEmail} onChange={(e) => setMemberEmail(e.target.value)} required autoComplete="email"/>
           <PocketField label="Password" type={memberShowPw ? "text" : "password"} placeholder="••••••••" value={memberPassword} onChange={(e) => setMemberPassword(e.target.value)} required autoComplete="new-password"
             hint="At least 6 characters." trailing={<EyeButton show={memberShowPw} onToggle={() => setMemberShowPw(v => !v)}/>}/>
-          <PocketField label="Graduation year" type="number" placeholder={String(currentYear + 2)} value={graduationYear} onChange={(e) => setGraduationYear(e.target.value)}
-            hint={`Enter the year you graduate (e.g. ${currentYear + 1}, ${currentYear + 2}).`}/>
+          <PocketSelect label="Graduation year" value={graduationYear} onChange={(e) => setGraduationYear(e.target.value)}
+            hint="The year you graduate — it places you in the right class.">
+            {yearOptions}
+          </PocketSelect>
           <PocketSubmit loading={memberLoading} disabled={!gradYearValid || !gender || memberLoading}>
             {memberLoading ? "Creating account…" : "Create account"}
           </PocketSubmit>

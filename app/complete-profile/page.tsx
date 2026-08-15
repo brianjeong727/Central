@@ -9,12 +9,17 @@ import {
   SplitShell,
   PocketAuthScreen,
   PocketField,
+  PocketSelect,
   PocketSubmit,
   PocketError,
+  AuthSelect,
+  AuthPendingVeil,
+  gradYearOptions,
   pocketFieldLabel,
   pocketH1,
   pocketSub,
 } from "@/app/(auth)/shared"
+import { nameIsEmailDerived } from "@/lib/profile-name"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
 
@@ -114,15 +119,19 @@ function CompleteProfileContent() {
 
   const [userId, setUserId] = useState<string | null>(null)
   const [checking, setChecking] = useState(true)
-  // Name is collected ONLY when the stored one is an Apple private-relay prefix
-  // (see proxy.ts). `needsName` stays false for everyone else, so the form is
-  // unchanged for the gender+grad-year case it already served.
+  // Name is collected ONLY when the stored one is handle_new_user's email-prefix
+  // fallback rather than something a person typed — the same predicate proxy.ts
+  // gates on (lib/profile-name.ts). Everyone else sees the form unchanged.
   const [needsName, setNeedsName] = useState(false)
   const [name, setName] = useState("")
   const [gender, setGender] = useState("")
   const [graduationYear, setGraduationYear] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // Set once we hand off to window.location.assign — the full page load that
+  // follows is the longest wait on this screen and has nothing else to show for
+  // it. Never cleared: we are leaving.
+  const [navigating, setNavigating] = useState(false)
 
   const currentYear = new Date().getFullYear()
   const gradYearNum = parseInt(graduationYear, 10)
@@ -141,19 +150,16 @@ function CompleteProfileContent() {
         .eq("id", user.id)
         .single()
 
-      // Mirrors proxy.ts's relayName test — a display name auto-derived from an
-      // Apple private-relay address is an opaque string, not a name.
-      const email = (profile?.email ?? "").toLowerCase()
-      const stored = (profile?.name ?? "").trim()
-      const relayName =
-        email.endsWith("@privaterelay.appleid.com") &&
-        (stored === "" || stored === email.split("@")[0])
-      setNeedsName(relayName)
-      // Never prefill the opaque prefix — that invites them to just accept it.
-      if (relayName) setName("")
+      // The SAME predicate proxy.ts gates on — if the two ever disagreed, the
+      // gate would bounce a user to a page that then decides they're complete
+      // and sends them straight back into the gate.
+      const placeholderName = nameIsEmailDerived(profile?.name, profile?.email)
+      setNeedsName(placeholderName)
+      // Never prefill the derived prefix — that invites them to just accept it.
+      if (placeholderName) setName("")
 
       // Already complete (deep-link) — don't show the form, send them onward.
-      if (profile?.gender && profile?.graduation_year != null && !relayName) {
+      if (profile?.gender && profile?.graduation_year != null && !placeholderName) {
         window.location.assign(next)
         return
       }
@@ -180,6 +186,7 @@ function CompleteProfileContent() {
       setSaving(false)
       return
     }
+    setNavigating(true)
     window.location.assign(next)
   }
 
@@ -189,13 +196,7 @@ function CompleteProfileContent() {
     window.location.assign("/login")
   }
 
-  if (checking) {
-    return (
-      <div style={{ minHeight: "100svh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--cream-panel)" }}>
-        <Spinner />
-      </div>
-    )
-  }
+  if (checking) return <AuthPendingVeil label="One moment…" />
 
   const submitHint = !nameValid
     ? "Enter your name to continue."
@@ -205,7 +206,19 @@ function CompleteProfileContent() {
     ? "Enter a valid graduation year."
     : null
 
+  const years = gradYearOptions(currentYear)
+  const yearOptions = (
+    <>
+      <option value="">Select your graduation year</option>
+      {years.map(y => <option key={y} value={String(y)}>{y}</option>)}
+    </>
+  )
+  // Both providers can withhold a name (Apple always does after the first
+  // authorization), so the copy names neither.
+  const nameHelper = "We couldn't get your name from your sign-in. This is what your ministry sees."
+
   return (<>
+    {navigating && <AuthPendingVeil label="Taking you in…" />}
     {/* ── Desktop ── */}
     <div className="hidden md:block">
       <SplitShell topBar={
@@ -233,7 +246,7 @@ function CompleteProfileContent() {
               placeholder="First and last name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              helper="Signing in with Apple hid your email, so we couldn't read your name from it. This is what your ministry sees."
+              helper={nameHelper}
             />
           )}
 
@@ -247,14 +260,14 @@ function CompleteProfileContent() {
             </div>
           </div>
 
-          <Field
+          <AuthSelect
             label="GRADUATION YEAR"
-            placeholder={String(currentYear + 2)}
-            type="number"
             value={graduationYear}
             onChange={(e) => setGraduationYear(e.target.value)}
-            helper={`Enter the year you graduate (e.g. ${currentYear + 1}, ${currentYear + 2}).`}
-          />
+            helper="The year you graduate — it places you in the right class."
+          >
+            {yearOptions}
+          </AuthSelect>
 
           <Primary disabled={!gender || !gradYearValid || !nameValid || saving} loading={saving}>
             {saving ? "Saving…" : "Continue"}
@@ -284,7 +297,7 @@ function CompleteProfileContent() {
               placeholder="First and last name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              hint="Signing in with Apple hid your email, so we couldn't read your name from it. This is what your ministry sees."
+              hint={nameHelper}
             />
           )}
           <div>
@@ -296,8 +309,10 @@ function CompleteProfileContent() {
               ))}
             </div>
           </div>
-          <PocketField label="Graduation year" type="number" placeholder={String(currentYear + 2)} value={graduationYear} onChange={(e) => setGraduationYear(e.target.value)}
-            hint={`Enter the year you graduate (e.g. ${currentYear + 1}, ${currentYear + 2}).`}/>
+          <PocketSelect label="Graduation year" value={graduationYear} onChange={(e) => setGraduationYear(e.target.value)}
+            hint="The year you graduate — it places you in the right class.">
+            {yearOptions}
+          </PocketSelect>
           <PocketSubmit loading={saving} disabled={!gender || !gradYearValid || !nameValid || saving}>
             {saving ? "Saving…" : "Continue"}
           </PocketSubmit>
