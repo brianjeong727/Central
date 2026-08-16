@@ -153,12 +153,20 @@ export function PocketRowCard({ children, style }: { children: ReactNode; style?
 // The universal mobile list row: optional leading chip, 15/600 title (+ inline
 // accessory icons), 13px muted one-line sub, and a right column that is either
 // meta text, a time-over-unread-dot stack, or a drill-in chevron.
+//
+// `titleDim` de-emphasises the TITLE for a row that is still real and still
+// tappable but no longer live (today: a DM whose counterpart deleted their
+// account). It drops to `--muted-text`, the tertiary TEXT token — never opacity
+// (which crushes contrast below AA) and never `--faint` (a non-text token for
+// placeholders/arrows). Size, weight and every other part of the row are
+// unchanged: de-prioritised, not disabled.
 export function PocketRow({
-  leading, title, titleAccessory, sub, time, showDot = false, meta, chevron = false, isLast = false, onClick,
+  leading, title, titleAccessory, titleDim = false, sub, time, showDot = false, meta, chevron = false, isLast = false, onClick,
 }: {
   leading?: ReactNode
   title: string
   titleAccessory?: ReactNode
+  titleDim?: boolean
   sub?: string
   time?: string
   showDot?: boolean
@@ -185,7 +193,7 @@ export function PocketRow({
       {leading}
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: titleDim ? "var(--muted-text)" : "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
           {titleAccessory}
         </span>
         {sub && (

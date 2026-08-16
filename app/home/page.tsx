@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase-server"
 import { HomeApp } from "./home-app"
 import { rowsToChatPreviews, type ChatPreviewRow } from "./utils"
-import { mapChatListRows, type ChatListRow } from "./chat-list"
+import { mapChatListRows, toDeletedDmSet, DELETED_DM_RPC, type ChatListRow } from "./chat-list"
 import { resolveChatsSection } from "./tabs/chat-shared"
 import type { UserTeam, CongregationQuestion, GovernanceSettings, ChatGroup } from "./types"
 import type { ChatPreview } from "@/components/central/chat-strip"
@@ -55,7 +55,7 @@ export default async function HomePage({
   if (!profile?.ministry_id) redirect("/ministries")
 
   // Parallel fetch: ministry name + chat previews + chat LIST + user teams + active question
-  const [ministryResult, chatResult, chatListResult, teamResult, questionResult] = await Promise.all([
+  const [ministryResult, chatResult, chatListResult, teamResult, questionResult, deletedDmResult] = await Promise.all([
     // `timezone` rides this existing fetch (no extra round trip) — the shell
     // provides it to every event surface via MinistryTimezoneProvider.
     supabase.from("ministries").select("name, governance_settings, timezone").eq("id", profile.ministry_id).single(),
@@ -84,6 +84,13 @@ export default async function HomePage({
       .eq("ministry_id", profile.ministry_id)
       .eq("is_active", true)
       .maybeSingle(),
+    // Which of this user's DMs are dead threads (the counterpart deleted their
+    // account). Rides this existing Promise.all, so it costs no extra round trip
+    // on the critical path — and the client fetcher runs the SAME call in ITS
+    // Promise.all, so the SSR seed and the first revalidation agree on the order.
+    // The rejection handler is load-bearing: a cosmetic sort must never be able to
+    // reject this Promise.all and take the whole page down.
+    supabase.rpc(DELETED_DM_RPC).then((r) => r, () => null),
   ])
 
   // Shared with the client refetcher (home-app `loadRecentChats`) — see
@@ -93,7 +100,10 @@ export default async function HomePage({
   // Same mapper the client fetcher uses (app/home/chat-list.ts), so the server seed
   // and any later client revalidation produce identical shapes — otherwise the list
   // would visibly rearrange a beat after first paint.
-  const initialChatList: ChatGroup[] = mapChatListRows((chatListResult.data ?? []) as ChatListRow[])
+  const initialChatList: ChatGroup[] = mapChatListRows(
+    (chatListResult.data ?? []) as ChatListRow[],
+    toDeletedDmSet(deletedDmResult),
+  )
 
   // Build UserTeam[]
   const initialUserTeams: UserTeam[] = ((teamResult.data ?? []) as RawMembership[]).flatMap((m) => {

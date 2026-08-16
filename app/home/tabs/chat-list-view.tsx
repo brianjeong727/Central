@@ -83,6 +83,10 @@ function PocketChatRow({ group, isLast, onClick }: { group: ChatGroup; isLast: b
     <PocketRow
       leading={<PocketChip letter={group.name.charAt(0).toUpperCase()} solid={group.is_central_chat === true} />}
       title={group.name}
+      // Dead thread (the counterpart deleted their account): the title drops to
+      // the tertiary text token. The row is otherwise untouched and still opens
+      // the conversation — mapChatListRows has already sunk it to the bottom.
+      titleDim={group.counterpart_deleted === true}
       titleAccessory={
         <>
           {group.pinned && <Pin style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0 }} aria-label="Pinned" />}
@@ -667,6 +671,11 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
   // Muted silences the unread badge/dot regardless of unread_count.
   const showUnread = group.unread_count > 0 && !group.muted
   const time = useChatListTime(group.last_message_time)
+  // Dead thread (the DM's counterpart deleted their account): the NAME drops to
+  // the tertiary text token, matching the chat roster (Part A) and the phone-width
+  // list. Not opacity (below AA) and not --faint (a non-text token); nothing else
+  // on the row changes, and the row still opens. mapChatListRows already sank it.
+  const nameColor = group.counterpart_deleted ? "var(--muted-text)" : "var(--ink)"
 
   return (
     <button onClick={onClick} className="w-full text-left group">
@@ -681,7 +690,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1.5 min-w-0 pr-2">
-                <h3 className="text-[15px] font-medium text-[var(--ink)] truncate">{group.name}</h3>
+                <h3 className="text-[15px] font-medium truncate" style={{ color: nameColor }}>{group.name}</h3>
                 {group.pinned && <Pin className="w-3 h-3 flex-shrink-0" style={{ color: "var(--muted-text)" }} aria-label="Pinned" />}
                 {group.muted && <BellOff className="w-3 h-3 flex-shrink-0" style={{ color: "var(--muted-text)" }} aria-label="Muted" />}
                 {showLock && <Lock className="w-3 h-3 flex-shrink-0" style={{ color: "var(--muted-text)" }} aria-label="Members only" />}
@@ -721,7 +730,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 2 }}>
-            <p className="text-[13px] truncate leading-tight" style={{ color: "var(--ink)", fontWeight: group.unread_count ? 600 : 500, flex: 1, minWidth: 0 }}>
+            <p className="text-[13px] truncate leading-tight" style={{ color: nameColor, fontWeight: group.unread_count ? 600 : 500, flex: 1, minWidth: 0 }}>
               {group.name}
             </p>
             {group.pinned && <Pin style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0, alignSelf: "center" }} aria-label="Pinned" />}

@@ -21,16 +21,40 @@ export type ChatListRow = {
   is_central: boolean | null
 }
 
+// ── Dead-thread signal (deleted-account counterpart) ─────────────────────────
+// get_dm_groups_with_deleted_counterpart() returns the CALLER'S OWN dm group ids
+// whose counterpart(s) are ALL deleted-account tombstones. Zero arguments —
+// identity is auth.uid() and the ministry boundary comes from the `groups` SELECT
+// policy — and SECURITY INVOKER, so it is not a new privileged surface.
+//
+// It is a purely COSMETIC signal (sink + dim), so it is never allowed to fail the
+// list: toDeletedDmSet swallows an error/absent result into an empty set. A hiccup
+// in a display nicety must not be able to blank Messages for every consumer
+// (mobile ChatsTab, desktop ChatListPanel, the home-app realtime refetcher, ⌘K).
+export const DELETED_DM_RPC = "get_dm_groups_with_deleted_counterpart"
+type DeletedDmRow = { group_id: string }
+
+/** Never throws. Anything other than a clean row array degrades to "no dead DMs". */
+export function toDeletedDmSet(result: unknown): Set<string> {
+  const r = result as { data?: DeletedDmRow[] | null; error?: unknown } | null | undefined
+  if (!r || r.error || !Array.isArray(r.data)) return new Set()
+  return new Set(r.data.map((x) => x?.group_id).filter((id): id is string => typeof id === "string"))
+}
+
 // Pure row → ChatGroup mapping, shared by the CLIENT fetcher below and the SERVER
 // boot fetch in app/home/page.tsx. Extracted rather than duplicated because the two
 // must produce byte-identical shapes: the server result seeds the same SWR cache the
 // client fetcher later revalidates, and any drift between them would show up as the
 // list visibly rearranging itself a beat after first paint.
 //
+// That is also why the dead-DM ORDERING lives here and not in fetchChatList: the
+// fetcher is not the only producer. Sorting in the fetcher would leave the SSR seed
+// in plain recency order and the list would visibly reshuffle on hydration.
+//
 // Deliberately kept in this module (which has no module-level side effects — the
 // browser client is created lazily inside createClient()) so a SERVER component can
 // import it without pulling a browser client into the server graph.
-export function mapChatListRows(rows: ChatListRow[]): ChatGroup[] {
+export function mapChatListRows(rows: ChatListRow[], deletedDmIds?: ReadonlySet<string>): ChatGroup[] {
   // get_chat_list surfaces groups.is_central_chat directly (row.is_central), so the
   // previously-required follow-up groups lookup is gone. Used only to flag the
   // solid-plum monogram chip in the mobile Pocket list.
@@ -47,10 +71,17 @@ export function mapChatListRows(rows: ChatListRow[]): ChatGroup[] {
     muted: row.muted ?? false,
     pinned: row.pinned ?? false,
     is_central_chat: row.is_central ?? false,
+    counterpart_deleted: deletedDmIds?.has(row.group_id) ?? false,
   })) as ChatGroup[]
 
-  // Sort by most recent message first (nulls last)
+  // Dead threads (the other person deleted their account) sink BELOW every live
+  // conversation; recency orders each partition exactly as before. Pinning is
+  // deliberately NOT considered here — partitionPinned (chat-shared.ts) floats
+  // pinned rooms at render time, so an explicitly pinned dead DM still sits first.
+  // An explicit user act outranks an automatic de-prioritisation.
   groups.sort((a, b) => {
+    if (!!a.counterpart_deleted !== !!b.counterpart_deleted) return a.counterpart_deleted ? 1 : -1
+    // Then by most recent message first (nulls last)
     if (!a.last_message_time && !b.last_message_time) return 0
     if (!a.last_message_time) return 1
     if (!b.last_message_time) return -1
@@ -62,14 +93,19 @@ export function mapChatListRows(rows: ChatListRow[]): ChatGroup[] {
 
 export async function fetchChatList([, userId, ministryId]: [string, string, string]): Promise<ChatGroup[]> {
   const supabase = createClient()
-  const { data, error } = await supabase.rpc("get_chat_list", {
-    p_user_id: userId,
-    p_ministry_id: ministryId,
-  })
+  // PARALLEL, never sequential: awaiting the dead-DM set after the list would
+  // double list latency for a cosmetic sort. The second call also cannot reject
+  // into Promise.all — its rejection handler degrades it to null, which
+  // toDeletedDmSet reads as "no dead DMs".
+  const [listResult, deletedResult] = await Promise.all([
+    supabase.rpc("get_chat_list", { p_user_id: userId, p_ministry_id: ministryId }),
+    supabase.rpc(DELETED_DM_RPC).then((r) => r, () => null),
+  ])
   // Propagate transient RPC failures so SWR enters its error/retry state and
   // keepPreviousData keeps the last good list — instead of swallowing the error
   // and caching `[]`, which poisons every consumer until a manual refresh.
-  if (error) throw error
+  // (Only the LIST's own failure earns that; see above.)
+  if (listResult.error) throw listResult.error
 
-  return mapChatListRows((data ?? []) as ChatListRow[])
+  return mapChatListRows((listResult.data ?? []) as ChatListRow[], toDeletedDmSet(deletedResult))
 }

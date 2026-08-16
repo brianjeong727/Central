@@ -522,7 +522,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       const [{ data }, { data: prefData }, { data: groupRow }, { data: nicks }, { data: meProf }] = await Promise.all([
         supabase
           .from("group_members")
-          .select("user_id, profiles!user_id(name, role, graduation_year, avatar_url)")
+          // deleted_at rides along so a deleted account still RESOLVES here (the
+          // roster deliberately keeps tombstones so old messages stay attributed)
+          // while rendering de-prioritised — sorted last, name de-emphasised.
+          .select("user_id, profiles!user_id(name, role, graduation_year, avatar_url, deleted_at)")
           .eq("group_id", groupId),
         supabase
           .from("group_members")
@@ -549,9 +552,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       ])
       const nickById: Record<string, string> = {}
       for (const n of (nicks ?? []) as { target_user_id: string; nickname: string }[]) nickById[n.target_user_id] = n.nickname
+      type SettingsProfile = { name: string; role: string; graduation_year: number | null; avatar_url: string | null; deleted_at: string | null }
       const mapped: GroupMember[] = (data ?? []).map((m: {
         user_id: string
-        profiles: { name: string; role: string; graduation_year: number | null; avatar_url: string | null } | { name: string; role: string; graduation_year: number | null; avatar_url: string | null }[] | null
+        profiles: SettingsProfile | SettingsProfile[] | null
       }) => {
         const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
         return {
@@ -561,6 +565,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           role: p?.role ?? "",
           graduation_year: p?.graduation_year ?? null,
           avatar_url: p?.avatar_url ?? null,
+          deleted: !!p?.deleted_at,
         }
       })
       const cat = (groupRow as { category: string | null } | null)?.category
@@ -816,7 +821,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     if (selectedToAdd.length === 0) return
     const toAdd = allProfiles
       .filter((p) => selectedToAdd.includes(p.id))
-      .map((p) => ({ user_id: p.id, name: p.name, role: p.role, graduation_year: p.graduation_year ?? null, avatar_url: p.avatar_url ?? null }))
+      .map((p) => ({ user_id: p.id, name: p.name, role: p.role, graduation_year: p.graduation_year ?? null, avatar_url: p.avatar_url ?? null, deleted: false }))
     if (toAdd.length === 0) return
     setError(null)
     // Optimistic (Convention #4): reflect the new members + return to settings immediately.
@@ -888,8 +893,18 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             ? [{ label: displayGroupName, onClick: onBack }, { label: "Settings", onClick: () => setShowSectionPicker(false) }, { label: "Section" }]
             : [{ label: displayGroupName, onClick: onBack }, { label: "Settings" }]
 
+  // Former members (deleted accounts) stay in the roster — old messages depend on
+  // the name resolving — but they are dead weight in a member list, so they sink
+  // to the bottom. Array.prototype.sort is stable (ES2019), so the existing order
+  // among live members (whatever the group_members read returned, plus optimistic
+  // appends) is untouched. Both renders below consume this, not `members`.
+  const orderedMembers = useMemo(
+    () => [...members].sort((a, b) => Number(a.deleted) - Number(b.deleted)),
+    [members],
+  )
+
   // Members screen (mobile) — All | Leaders, then name/nickname search.
-  const visibleMembers = members.filter((m) => {
+  const visibleMembers = orderedMembers.filter((m) => {
     if (memberFilter === "leaders" && !isLeaderRole((m.role ?? "").toLowerCase())) return false
     const q = memberSearch.trim().toLowerCase()
     if (!q) return true
@@ -1359,7 +1374,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
               {/* In a DM the roster is the one other person — never a list that
                   includes you, and never removable. */}
-              {(isDM ? members.filter((m) => m.user_id !== userId) : members).map((member, i, list) => {
+              {(isDM ? orderedMembers.filter((m) => m.user_id !== userId) : orderedMembers).map((member, i, list) => {
                 const isConfirming = confirmRemoveMemberId === member.user_id
                 const isHovered = hoveredMemberId === member.user_id
                 return (
@@ -1374,7 +1389,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                     </span>
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <p onClick={() => openMemberProfile(member.user_id)} style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500, cursor: "pointer" }}>{member.nickname ?? member.name}</p>
+                        {/* A former member's name drops to the tertiary text token
+                            — de-emphasised but still AA-readable (never opacity,
+                            never --faint, which is a non-text token). */}
+                        <p onClick={() => openMemberProfile(member.user_id)} style={{ fontSize: 14, color: member.deleted ? "var(--muted-text)" : "var(--ink)", fontWeight: 500, cursor: "pointer" }}>{member.nickname ?? member.name}</p>
                         {member.user_id === userId && <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--cream)", color: "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" }}>You</span>}
                         {canNickname && (
                           <button
@@ -1614,7 +1632,9 @@ function MobileMemberRow({
       </span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <p onClick={(e) => { e.stopPropagation(); onOpenProfile(member.user_id) }} className="text-[15px] font-semibold truncate cursor-pointer" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>{member.nickname ?? member.name}</p>
+          {/* Former member: tertiary text token, same size/weight — the row reads
+              lower-priority without dropping below AA (no opacity, no --faint). */}
+          <p onClick={(e) => { e.stopPropagation(); onOpenProfile(member.user_id) }} className="text-[15px] font-semibold truncate cursor-pointer" style={{ color: member.deleted ? "var(--muted-text)" : "var(--ink)", letterSpacing: "-0.01em" }}>{member.nickname ?? member.name}</p>
           {isSelf && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
           {canNickname && (
             <button

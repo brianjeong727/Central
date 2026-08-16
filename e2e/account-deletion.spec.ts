@@ -245,5 +245,31 @@ test.describe("account deletion — full execution", () => {
       expect(row, `${fn} did not return the DM`).toBeTruthy()
       expect(row!.group_name, `${fn} DM title`).toBe("Former member")
     }
+
+    // ── Third producer: the dead-thread signal ────────────────────────────────
+    // get_dm_groups_with_deleted_counterpart sinks + dims this DM in the
+    // conversations list. It is SECURITY INVOKER and takes NO arguments, so it
+    // must be called with the surviving admin's own JWT — box.client is
+    // service-role, where auth.uid() is null AND EXECUTE is deliberately not
+    // granted. Raw fetch rather than a second supabase-js client so this also
+    // covers the PostgREST half (a missing schema-cache entry or a missing
+    // EXECUTE grant is invisible to an SQL-only check).
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    const tokenRes = await fetch(`${sbUrl}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: anonKey, "Content-Type": "application/json" },
+      body: JSON.stringify({ email: process.env.E2E_ADMIN_EMAIL, password: process.env.E2E_PASSWORD }),
+    })
+    expect(tokenRes.status, "admin sign-in for the dead-DM RPC").toBe(200)
+    const { access_token } = (await tokenRes.json()) as { access_token: string }
+    const deadRes = await fetch(`${sbUrl}/rest/v1/rpc/get_dm_groups_with_deleted_counterpart`, {
+      method: "POST",
+      headers: { apikey: anonKey, Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
+      body: "{}",
+    })
+    expect(deadRes.status, "get_dm_groups_with_deleted_counterpart (authenticated)").toBe(200)
+    const deadIds = ((await deadRes.json()) as { group_id: string }[]).map((r) => r.group_id)
+    expect(deadIds, "dead-DM set must contain the tombstoned DM").toContain(dmId)
   })
 })
