@@ -8,18 +8,26 @@
 // Delete is deliberately absent everywhere: it destroys the room for every
 // member and stays behind Settings' danger zone.
 import { test, expect, type Page, type Locator } from "@playwright/test"
-import { sandbox, E2E_PREFIX } from "./fixtures"
+import { sandbox, E2E_PREFIX, memberState } from "./fixtures"
 
 const CHURCH = `${E2E_PREFIX}Swipe Church`
 const MY = `${E2E_PREFIX}Swipe My`
+// A SECOND church chat, owned by the member-tier case. Deliberately separate
+// from CHURCH: the archive test moves that one into the collapsed Archived
+// accordion, and a permission assertion that quietly depends on a sibling
+// test's leftovers fails for reasons unrelated to permissions.
+const MEMBER_CHURCH = `${E2E_PREFIX}Swipe Member Church`
 
 let churchId = ""
 let myId = ""
+let memberChurchId = ""
 let adminId = ""
+let memberId = ""
 
 test.beforeAll(async () => {
   const sb = sandbox()
   adminId = await sb.adminUserId()
+  memberId = await sb.memberUserId()
 
   const { data: church, error } = await sb.client
     .from("groups")
@@ -32,11 +40,23 @@ test.beforeAll(async () => {
 
   const my = await sb.createGroup({ name: MY, memberIds: [adminId] })
   myId = my.id
+
+  const { data: memberChurch, error: mcErr } = await sb.client
+    .from("groups")
+    .insert({ ministry_id: sb.ministryId, name: MEMBER_CHURCH, type: "church", category: "general", created_by: adminId })
+    .select().single()
+  if (mcErr) throw mcErr
+  memberChurchId = memberChurch.id
+  // The member must BELONG to the room for it to appear in their list at all —
+  // get_chat_list only returns rooms the caller is in, which is the premise the
+  // list's `isMemberOfChat: true` rests on.
+  const { error: mcm } = await sb.client.from("group_members").insert({ group_id: memberChurchId, user_id: memberId })
+  if (mcm) throw mcm
 })
 
 test.afterAll(async () => {
   const sb = sandbox()
-  for (const id of [churchId, myId]) {
+  for (const id of [churchId, myId, memberChurchId]) {
     if (id) await sb.client.from("groups").delete().eq("id", id)
   }
 })
@@ -195,5 +215,29 @@ test.describe("chat list swipe actions", () => {
       const after = await scroller.evaluate((e) => e.scrollTop).catch(() => 0)
       expect(after).toBeGreaterThan(before)
     }
+  })
+})
+
+// The gate has to EXCLUDE something, or it isn't a gate. Every test above runs
+// as the sandbox admin, so they can only ever prove the permissive side; this
+// one runs the same swipe as a member-tier account and asserts the room actions
+// are absent. It is the assertion that would catch `isLeaderRole` slipping to a
+// wider predicate, or `isMemberOfChat: true` being passed from a list that stops
+// guaranteeing membership.
+test.describe("chat list swipe actions — member tier", () => {
+  test.use({ storageState: memberState })
+
+  test("church chat: a member gets mute only — no archive, no unarchive, no leave", async ({ page }) => {
+    await openChats(page, "church")
+    const row = rowFor(page, MEMBER_CHURCH)
+    await expect(row).toBeVisible({ timeout: 15000 })
+
+    await swipeRow(page, row, -150)
+    // The panel opened — without this, the three toHaveCount(0) below would pass
+    // on a row that never revealed anything.
+    await expect(page.getByRole("button", { name: "Mute", exact: true })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Archive", exact: true })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Unarchive", exact: true })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Leave", exact: true })).toHaveCount(0)
   })
 })

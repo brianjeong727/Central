@@ -15,6 +15,7 @@ import { selfLeaveMinistry } from "@/app/actions/ministry"
 import { deleteMyAccount } from "@/app/actions/delete-account"
 import { unblockUser } from "@/app/actions/blocks"
 import { useBlocks } from "../use-blocks"
+import { MODERATION_DEFAULTS, moderateText, type ModerationSettings } from "@/lib/moderation"
 import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, SerifInput, MonogramChip, PocketFilterChip, PocketCard, PocketButton, PocketTag, PocketRoundButton, PocketRow, PocketRowCard, PocketKicker, useScrollResetOn, useEdgeSwipeBack } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
@@ -1150,9 +1151,21 @@ export function ProfileTab({
     favorite_book_of_bible: initialProfile.favorite_book_of_bible ?? "",
     prayer_request: initialProfile.prayer_request ?? "",
   })
+  // Inline error under the name field — currently only the moderation refusal.
+  const [nameError, setNameError] = useState<string | null>(null)
   const { data: schoolData } = useSWR(
     initialProfile.ministry_id ? ["ministry-schools", initialProfile.ministry_id] : null,
     () => loadMinistrySchools(supabase, initialProfile.ministry_id!)
+  )
+  // Ministry moderation config — same SWR shape + key as the chat composer
+  // (chats-tab), so the two share one cache entry and can never disagree about
+  // the rules. Falls back to MODERATION_DEFAULTS until loaded.
+  const { data: modSettings, mutate: mutateModSettings } = useSWR(
+    initialProfile.ministry_id ? ["moderation-settings", initialProfile.ministry_id] : null,
+    async () => {
+      const { data } = await supabase.from("ministries").select("moderation_settings").eq("id", initialProfile.ministry_id!).maybeSingle()
+      return { ...MODERATION_DEFAULTS, ...(data?.moderation_settings ?? {}) } as ModerationSettings
+    }
   )
   const schoolOptions = useMemo(() => schoolData ?? [], [schoolData])
   const [currentSchoolId, setCurrentSchoolId] = useState<string | null>(initialProfile.school_id ?? null)
@@ -1176,10 +1189,11 @@ export function ProfileTab({
       favorite_book_of_bible: profile.favorite_book_of_bible ?? "",
       prayer_request: profile.prayer_request ?? "",
     })
+    setNameError(null)
     setEditing(true)
   }
 
-  const cancelEdit = () => setEditing(false)
+  const cancelEdit = () => { setNameError(null); setEditing(false) }
 
   // The display name is what the whole ministry sees, and unlike every other
   // field on this screen it may never be blank — a nameless row renders as an
@@ -1188,12 +1202,44 @@ export function ProfileTab({
   const nameValid = draft.name.trim().length >= 2
 
   const saveEdit = useCallback(async () => {
-    if (draft.name.trim().length < 2) return
+    const name = draft.name.trim()
+    if (name.length < 2) return
+    // Moderation — the display name is the most public label a user sets (every
+    // message, every roster row, the directory), so it runs the SAME filter the
+    // chat composer runs, with the same ministry settings. Two deliberate
+    // differences from the composer:
+    //   • Room SCOPE is not consulted. `scopeApplies` answers "does this ROOM
+    //     get filtered"; a name belongs to no room and renders inside every one
+    //     of them, so `enabled` is the only honest gate.
+    //   • A flagged name is REFUSED, never asterisked — silently starring
+    //     someone's own name is worse than telling them no (same call
+    //     `chat-nicknames.ts` makes for a nickname).
+    // This is a UX guardrail, not an enforcement boundary: `profiles` UPDATE RLS
+    // permits a user to write their own `name` directly through the API.
+    //   • It must not SKIP when the settings SWR hasn't resolved. `modSettings?.enabled`
+    //     silently no-ops on the realistic fast path — open Edit, type, Save — and a
+    //     filter that quietly doesn't run is WORSE than no filter, because it reads as
+    //     protection. The composer tolerates that (many sends, over a cache that warms
+    //     in milliseconds); a name is saved once, deliberately, and often immediately.
+    //     So resolve the settings HERE when they aren't loaded, falling back to
+    //     MODERATION_DEFAULTS (enabled: true) only if that read fails.
+    let settings = modSettings
+    if (!settings) {
+      settings = await mutateModSettings().catch(() => undefined) ?? MODERATION_DEFAULTS
+    }
+    if (settings.enabled) {
+      const { flaggedCount } = moderateText(name, { strictness: settings.strictness, behavior: settings.behavior })
+      if (flaggedCount > 0) {
+        setNameError("That name was blocked by the ministry's language filter. Try another.")
+        return
+      }
+    }
+    setNameError(null)
     setSaving(true)
     const { data, error } = await supabase
       .from("profiles")
       .update({
-        name: draft.name.trim(),
+        name,
         graduation_year: draft.graduation_year ? parseInt(draft.graduation_year) : null,
         phone: draft.phone || null,
         bio: draft.bio || null,
@@ -1211,7 +1257,7 @@ export function ProfileTab({
     setSaving(false)
     setEditing(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, initialProfile.ministry_id, userId])
+  }, [draft, initialProfile.ministry_id, userId, modSettings, mutateModSettings])
 
   async function handleToggleEntries(v: boolean) {
     await supabase.from("profiles").update({ show_journal_entries: v }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
@@ -1456,16 +1502,30 @@ export function ProfileTab({
               </label>
               <div style={{ flex: 1, minWidth: 0, paddingRight: !editing ? 40 : 0 }}>
                 {editing ? (
-                  <SerifInput
-                    value={draft.name}
-                    onChange={(e) => setDraft(d => ({ ...d, name: e.target.value }))}
-                    fontSize={22}
-                    aria-label="Your name"
-                    placeholder="Your name"
-                    autoComplete="name"
-                    maxLength={80}
-                    style={{ letterSpacing: "-0.01em", lineHeight: 1.15 }}
-                  />
+                  <>
+                    <SerifInput
+                      value={draft.name}
+                      onChange={(e) => { setDraft(d => ({ ...d, name: e.target.value })); if (nameError) setNameError(null) }}
+                      fontSize={22}
+                      aria-label="Your name"
+                      placeholder="Your name"
+                      autoComplete="name"
+                      maxLength={80}
+                      style={{ letterSpacing: "-0.01em", lineHeight: 1.15 }}
+                    />
+                    {/* Same copy as desktop — without it the disabled Save at the
+                        top of the chrome has no explanation at phone width. 12.5
+                        is the mobile ramp's off-ramp/hint size (PocketField), not
+                        desktop's 12. */}
+                    {!nameValid && (
+                      <p style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "6px 0 0" }}>
+                        Enter your name — this is what your ministry sees.
+                      </p>
+                    )}
+                    {nameError && (
+                      <p style={{ fontSize: 12.5, color: "var(--danger)", margin: "6px 0 0" }}>{nameError}</p>
+                    )}
+                  </>
                 ) : (
                   <h1 style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: 0, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.name}</h1>
                 )}
@@ -1574,7 +1634,7 @@ export function ProfileTab({
                 <div style={{ margin: "0 0 8px" }}>
                   <SerifInput
                     value={draft.name}
-                    onChange={(e) => setDraft(d => ({ ...d, name: e.target.value }))}
+                    onChange={(e) => { setDraft(d => ({ ...d, name: e.target.value })); if (nameError) setNameError(null) }}
                     fontSize={32}
                     aria-label="Your name"
                     placeholder="Your name"
@@ -1586,6 +1646,9 @@ export function ProfileTab({
                     <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "6px 0 0" }}>
                       Enter your name — this is what your ministry sees.
                     </p>
+                  )}
+                  {nameError && (
+                    <p style={{ fontSize: 12, color: "var(--danger)", margin: "6px 0 0" }}>{nameError}</p>
                   )}
                 </div>
               ) : (

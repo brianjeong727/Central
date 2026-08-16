@@ -65,5 +65,37 @@ test.describe("profile display name", () => {
     // Blank would render an empty monogram everywhere the person appears, so
     // Save is gated rather than silently reverting (which reads as "it didn't work").
     await expect(page.getByRole("button", { name: "Save", exact: true }).filter({ visible: true }).first()).toBeDisabled()
+
+    // …and the disabled Save is EXPLAINED at both widths. Both identity cards are
+    // in the DOM at any viewport (the Pocket one is `md:hidden`, i.e. hidden by
+    // CSS, not unmounted), so counting the hint proves the mobile branch renders
+    // it too — a dead button with no copy is only obvious to whoever wrote it.
+    await expect(page.getByText("Enter your name — this is what your ministry sees.")).toHaveCount(2)
+  })
+
+  test("a name the language filter flags is refused, with the reason in the card", async ({ page }) => {
+    const sb = sandbox()
+    await page.goto("/home?tab=profile")
+    await expect(page.getByRole("button", { name: /edit profile/i }).first()).toBeVisible({ timeout: 20000 })
+    await page.getByRole("button", { name: /edit profile/i }).first().click()
+
+    const field = page.getByLabel("Your name").filter({ visible: true }).first()
+    // The sandbox ministry stores no moderation_settings, so MODERATION_DEFAULTS
+    // apply: enabled, "moderate" strictness — which covers this token.
+    await field.fill(`${E2E_PREFIX}Shitty Name`)
+    await page.getByRole("button", { name: "Save", exact: true }).filter({ visible: true }).first().click()
+
+    // Both identity cards render the refusal; filter to the visible one or this
+    // latches onto the md:hidden Pocket copy and reports "hidden" at any width.
+    await expect(page.getByText(/blocked by the ministry's language filter/i).filter({ visible: true }).first())
+      .toBeVisible({ timeout: 10000 })
+    // Still in edit mode — the field is live and the refusal is recoverable.
+    await expect(field).toBeVisible()
+    // And nothing was written. Poll rather than read once, so a slow write that
+    // DID land can't slip past a single early check.
+    await expect.poll(async () => {
+      const { data } = await sb.client.from("profiles").select("name").eq("id", memberId).single()
+      return data?.name
+    }, { timeout: 5000 }).not.toContain("Shitty")
   })
 })
