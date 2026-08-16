@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, Suspense, type ComponentProps } from "react"
 import { SWRConfig, useSWRConfig } from "swr"
 import dynamic from "next/dynamic"
 import { MessageCircle } from "lucide-react"
@@ -18,6 +18,7 @@ import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "
 import { classifyTeam } from "./team-type"
 import { useNavState, ALL_FOLDED_PARAMS } from "./nav-state"
 import { fetchChatList } from "./chat-list"
+import { BootStreamProvider, useBootStream, useBootStreamPromise } from "./boot-stream"
 import { useMinistryPresence } from "./use-presence"
 import { subscribeChatTopic } from "./chat-broadcast"
 
@@ -38,7 +39,7 @@ import { MinistryTimezoneProvider } from "./ministry-timezone-context"
 // the matching Item-2 skeleton where one exists, otherwise the shared Spinner.
 import { HomeTab } from "./tabs/home-tab"
 import { Spinner } from "./components/shared"
-import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ProfileTabSkeleton, CentralModal, SuperSwitcher, CentralButton, useScrollResetOn } from "@/components/central"
+import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ProfileTabSkeleton, ChatListSkeleton, CentralModal, SuperSwitcher, CentralButton, useScrollResetOn } from "@/components/central"
 import type { CalendarEvent } from "./types"
 import type { DirectoryMember } from "./types"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
@@ -80,7 +81,7 @@ const NetworkTab = dynamic(() => import("./tabs/network-tab").then(m => m.Networ
 // once a profile is first opened.
 const GlobalMemberProfileOverlay = dynamic(() => import("./components/member-sheet").then(m => m.GlobalMemberProfileOverlay), { ssr: false })
 
-function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialChatList, initialChatsSection = "church", initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
+function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initialChatsSection = "church", initialUserTeams, initialGovernanceSettings }: HomeAppProps) {
   const supabase = createClient()
   const searchParams = useSearchParams()
   const { mutate: globalMutate } = useSWRConfig()
@@ -102,7 +103,14 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // raced the panels' own SWR revalidation for the same key, so the RPC ran twice per
   // cold load (observed at +2761ms and +3003ms). Seeding kills both: first paint has
   // the list, and there is no mount fetch to duplicate.
-  const [chatListData, setChatListData] = useState<ChatGroup[] | undefined>(initialChatList)
+  //
+  // The seed now arrives STREAMED (see ./boot-stream.tsx), so this state starts
+  // undefined and the chat surfaces read the streamed value through a Suspense
+  // boundary until the handoff effect below copies it in. The list is still
+  // server-rendered markup — it just lands in a later chunk of the same response
+  // instead of holding the whole document back.
+  const bootStream = useBootStreamPromise()
+  const [chatListData, setChatListData] = useState<ChatGroup[] | undefined>(undefined)
 
   // Warm the chats THREAD chunk once the boot is quiet.
   //
@@ -235,11 +243,14 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // top (mobile window scroll; the desktop shell locks window so scrollTo no-ops
   // and the inner md:overflow-y-auto container remounts per activeTab key).
   useScrollResetOn([activeTab, openAnnouncementId != null])
-  const [totalChatsUnread, setTotalChatsUnread] = useState(() =>
-    (initialRecentChats ?? []).reduce((sum, c) => sum + (c.muted ? 0 : c.unreadCount), 0)
-  )
+  // Both streamed (see ./boot-stream.tsx + the handoff effect below). The unread
+  // BADGE is the one thing that is no longer in the first HTML chunk: it starts
+  // at 0 and lands at the handoff. Suspending on it would mean suspending the
+  // whole nav chrome to place a two-digit dot — the wrong trade when the point
+  // of the change is to paint that chrome sooner.
+  const [totalChatsUnread, setTotalChatsUnread] = useState(0)
   const [chatRefreshKey, setChatRefreshKey] = useState(0)
-  const [recentChats, setRecentChats] = useState<ChatPreview[]>(initialRecentChats ?? [])
+  const [recentChats, setRecentChats] = useState<ChatPreview[] | null>(null)
 
 
   // `time` on a ChatPreview is a RELATIVE label ("now", "15m", "3h") computed once
@@ -253,6 +264,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   useEffect(() => {
     const id = setInterval(() => {
       setRecentChats(prev => {
+        if (!prev) return prev
         let changed = false
         const next = prev.map(c => {
           const fresh = c._ts ? formatChatListTime(c._ts) : ""
@@ -274,8 +286,11 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   const [allTeamsLoaded, setAllTeamsLoaded] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialProfile.avatar_url ?? null)
   const [isDesktop, setIsDesktop] = useState(false)
-  const [activeQuestion, setActiveQuestion] = useState<CongregationQuestion | null>(initialActiveQuestion ?? null)
-  const [hasResponded, setHasResponded] = useState(initialHasResponded ?? false)
+  // Streamed. The pulse card rides the home hero CAROUSEL, whose own slides are
+  // client-fetched (SWR) — so it was never in the first HTML chunk anyway, and
+  // the handoff below lands it at the same moment it always appeared.
+  const [activeQuestion, setActiveQuestion] = useState<CongregationQuestion | null>(null)
+  const [hasResponded, setHasResponded] = useState(false)
   const [showCreateTeam, setShowCreateTeam] = useState(false)
   const [activeTeamId, setActiveTeamId] = useState<string | null>(() => {
     const urlTeam = searchParams.get("team")
@@ -813,8 +828,48 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministryId, userId])
 
+  // ── Streamed-boot HANDOFF ────────────────────────────────────────────────
+  // The RENDER of the streamed values happens through Suspense (each consumer
+  // reads useBootStream()), which is what keeps them in the server HTML. This
+  // effect copies the same values into local state ONCE, after hydration, so
+  // every imperative update that already existed — realtime preview rewrites,
+  // unread recounts, refetch-on-chat-close, loadUserTeams — keeps operating on
+  // plain state exactly as it did when these arrived as props.
+  //
+  // Every setter is written as "keep what is already there", so a client update
+  // that beat the stream is never clobbered by the older server value, and a
+  // re-run cannot undo live state. It is intentionally NOT how the markup is
+  // produced: seeding only here would pull the chat list back out of the
+  // document (the regression PR #311 exists to prevent).
+  useEffect(() => {
+    let alive = true
+    // Promise.resolve() is load-bearing: a promise handed from a Server
+    // Component to a client one arrives as React's serialized THENABLE, not a
+    // real Promise — its .then() returns undefined, so chaining .catch() onto it
+    // throws "Cannot read properties of undefined (reading 'catch')" at runtime
+    // (it did; a browser console check is the only thing that catches it, since
+    // it type-checks fine as a PromiseLike). Wrapping adopts it into a real
+    // promise, which also gives us a rejection handler that actually attaches.
+    Promise.resolve(bootStream).then((boot) => {
+      if (!alive) return
+      setChatListData((prev) => prev ?? boot.chatList)
+      setRecentChats((prev) => prev ?? boot.recentChats)
+      setTotalChatsUnread((prev) => prev || boot.recentChats.reduce((sum, c) => sum + (c.muted ? 0 : c.unreadCount), 0))
+      setActiveQuestion((prev) => prev ?? boot.activeQuestion)
+      setHasResponded((prev) => prev || boot.hasResponded)
+      // Member counts only — a team whose count already arrived (loadUserTeams
+      // ran first) keeps it.
+      setUserTeams((prev) =>
+        prev.some((t) => t.memberCount == null)
+          ? prev.map((t) => (t.memberCount == null ? { ...t, memberCount: boot.teamMemberCounts[t.teamId] ?? 0 } : t))
+          : prev,
+      )
+    }).catch(() => {})
+    return () => { alive = false }
+  }, [bootStream])
+
   // Initial load + reload after closing a chat.
-  // recentChats is SSR-seeded from initialRecentChats, so skip the redundant
+  // recentChats is SSR-seeded (streamed) from the boot, so skip the redundant
   // refetch on the very first mount (chatRefreshKey === 0). After a chat closes
   // chatRefreshKey increments (>0) and this effect still refetches — the ref is
   // already true by then, so subsequent runs proceed normally.
@@ -837,7 +892,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     loadAllTeams()
   }, [loadAllTeams])
 
-  // activeQuestion/hasResponded are SSR-seeded → skip the mount refetch.
+  // activeQuestion/hasResponded are SSR-seeded (streamed) → skip the mount refetch.
   const didInitActiveQuestion = useRef(false)
   useEffect(() => {
     if (!didInitActiveQuestion.current) { didInitActiveQuestion.current = true; return }
@@ -924,6 +979,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       const isOwnMessage = msg.sender_id === userId
       const applyPreview = (senderName: string) => {
         setRecentChats((prev) => {
+          // null = the streamed boot has not been handed off yet. There is
+          // nothing to rewrite in place, and refetchChatList() above already
+          // covers the list; the next loadRecentChats picks the preview up.
+          if (!prev) return prev
           const existing = prev.find((c) => c.id === msg.group_id)
           if (!existing) return prev
           const updated = prev.map((c) =>
@@ -1000,7 +1059,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // owns ?chat via handleOpenChat; `!globalOpenChat` already prevents overriding a
   // URL-restored conversation (the lazy-init sets it before this effect runs).
   useEffect(() => {
-    if (isDesktop && activeTab === "chats" && !globalOpenChat && recentChats.length > 0) {
+    if (isDesktop && activeTab === "chats" && !globalOpenChat && recentChats && recentChats.length > 0) {
       const top = recentChats[0]
       setGlobalOpenChat({ id: top.id, name: top.groupName })
     }
@@ -1009,7 +1068,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
 
   // Backfill the header name for a URL-restored chat once recentChats loads.
   useEffect(() => {
-    if (!globalOpenChat || globalOpenChat.name !== "") return
+    if (!globalOpenChat || globalOpenChat.name !== "" || !recentChats) return
     const match = recentChats.find((c) => c.id === globalOpenChat.id)
     if (match) setGlobalOpenChat((prev) => prev && prev.name === "" ? { ...prev, name: match.groupName } : prev)
   }, [globalOpenChat, recentChats])
@@ -1174,7 +1233,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         showPlan={showPlanTab}
         userInitials={getInitials(initialProfile.name)}
         userAvatarUrl={avatarUrl}
-        recentChats={recentChats}
+        recentChats={recentChats ?? []}
         userTeams={userTeams}
         onOpenChat={handleOpenChat}
         activeGroupId={globalOpenChat?.id}
@@ -1199,20 +1258,22 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         directoryOnlineUserIds={onlineUserIds}
         onDirectoryMemberSelect={handleDirectoryMemberSelect}
         chatPanelContent={
-          <ChatListPanel
-            userId={userId}
-            ministryId={ministryId}
-            ministryName={ministryName}
-            activeGroupId={globalOpenChat?.id}
-            onOpenChat={handleOpenChat}
-            refreshKey={chatRefreshKey}
-            canCreateChurchChat={canCreateChurchChat}
-            userProfile={initialProfile}
-            userRole={initialProfile.role}
-            fallbackChats={chatListData}
-            initialSection={initialChatsSection}
-            onOpenDraftDm={openDraftDm}
-          />
+          <Suspense fallback={<ChatListSkeleton />}>
+            <StreamedChatListPanel
+              chatListOverride={chatListData}
+              userId={userId}
+              ministryId={ministryId}
+              ministryName={ministryName}
+              activeGroupId={globalOpenChat?.id}
+              onOpenChat={handleOpenChat}
+              refreshKey={chatRefreshKey}
+              canCreateChurchChat={canCreateChurchChat}
+              userProfile={initialProfile}
+              userRole={initialProfile.role}
+              initialSection={initialChatsSection}
+              onOpenDraftDm={openDraftDm}
+            />
+          </Suspense>
         }
         planContextContent={planContextContent}
         hideSidePanel={hideSidePanel}
@@ -1305,23 +1366,25 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             <div className="pb-2 md:pb-0 md:flex md:flex-col md:h-full md:overflow-hidden">
               {/* Mobile only: full ChatsTab list view */}
               <div className="md:hidden">
-                <ChatsTab
-                  userId={userId}
-                  userProfile={initialProfile}
-                  userRole={initialProfile.role}
-                  ministryId={ministryId}
-                  ministryName={ministryName}
-                  onOpenChat={handleOpenChat}
-                  onTotalUnreadChange={setTotalChatsUnread}
-                  refreshKey={chatRefreshKey}
-                  onOpenDirectory={() => handleNavClick("directory")}
-                  activeGroupId={globalOpenChat?.id}
-                  canCreateChurchChat={canCreateChurchChat}
-                  fallbackChats={chatListData}
-                  initialSection={initialChatsSection}
-                  onComposerOpenChange={setComposerOpen}
-                  onOpenDraftDm={openDraftDm}
-                />
+                <Suspense fallback={<ChatListSkeleton />}>
+                  <StreamedChatsTab
+                    chatListOverride={chatListData}
+                    userId={userId}
+                    userProfile={initialProfile}
+                    userRole={initialProfile.role}
+                    ministryId={ministryId}
+                    ministryName={ministryName}
+                    onOpenChat={handleOpenChat}
+                    onTotalUnreadChange={setTotalChatsUnread}
+                    refreshKey={chatRefreshKey}
+                    onOpenDirectory={() => handleNavClick("directory")}
+                    activeGroupId={globalOpenChat?.id}
+                    canCreateChurchChat={canCreateChurchChat}
+                    initialSection={initialChatsSection}
+                    onComposerOpenChange={setComposerOpen}
+                    onOpenDraftDm={openDraftDm}
+                  />
+                </Suspense>
               </div>
               {/* Desktop only: thread content area (list lives in DesktopSidebar panel) */}
               {/* Gate the ChatScreen MOUNT on isDesktop (not just the CSS `hidden md:flex`):
@@ -1650,13 +1713,46 @@ function ShellTopbar({ base, baseVisible }: { base: Crumb[]; baseVisible: boolea
   return <DesktopTopbar crumbs={base} />
 }
 
+// ── Streamed chat-list adapters ──────────────────────────────────────────────
+// The chats-tab list is fetched on the SERVER (it must be markup on first paint,
+// PR #311) but no longer BLOCKS the response — it rides the streamed boot. These
+// two thin wrappers are where that promise is read: each calls useBootStream(),
+// which suspends, so both must be rendered inside a <Suspense> with a real
+// skeleton. Once home-app's handoff has run, `chatListOverride` is the live
+// state and the streamed value is ignored — so realtime updates, refetches and
+// the open-chat unread adjustment all keep flowing exactly as before.
+//
+// Written as wrappers rather than by teaching ChatsTab/ChatListPanel about the
+// boot context on purpose: those two also render from the client SWR cache on
+// warm navigations, where there is no boot promise to read.
+function StreamedChatListPanel({
+  chatListOverride,
+  ...rest
+}: Omit<ComponentProps<typeof ChatListPanel>, "fallbackChats"> & { chatListOverride?: ChatGroup[] }) {
+  const boot = useBootStream()
+  return <ChatListPanel {...rest} fallbackChats={chatListOverride ?? boot.chatList} />
+}
+
+function StreamedChatsTab({
+  chatListOverride,
+  ...rest
+}: Omit<ComponentProps<typeof ChatsTab>, "fallbackChats"> & { chatListOverride?: ChatGroup[] }) {
+  const boot = useBootStream()
+  return <ChatsTab {...rest} fallbackChats={chatListOverride ?? boot.chatList} />
+}
+
 export function HomeApp(props: HomeAppProps) {
   return (
     <SWRConfig value={{ revalidateOnFocus: false, keepPreviousData: true, dedupingInterval: 5000 }}>
       {/* The ministry's IANA zone for every event surface below (read via
           useMinistryTimezone) — boot data, no client fetch, no storage. */}
       <MinistryTimezoneProvider timezone={props.ministryTimezone}>
-        <HomeAppInner {...props} />
+        {/* The non-blocking half of the boot. Nothing here awaits it: the
+            consumers that need it sit behind their own Suspense boundaries, so
+            the shell renders and flushes while those queries are still open. */}
+        <BootStreamProvider value={props.bootStream}>
+          <HomeAppInner {...props} />
+        </BootStreamProvider>
       </MinistryTimezoneProvider>
     </SWRConfig>
   )
