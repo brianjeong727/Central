@@ -49,13 +49,24 @@ export interface SwipeAction {
   key: string
   label: string
   icon: ReactNode
-  /** `strong` = the weightier action in the set (leave / archive). Both tones
-   *  come from the cream/tan family and get their weight from VALUE, not hue:
-   *  `default` is the lighter inset surface, `strong` a step darker. Plum is
-   *  deliberately absent — it is a surgical accent and the chat list already
-   *  spends it on the unread dot, the scope pill and the create +. Never a
-   *  danger fill either: the contract allows danger as text+border only, and the
-   *  one genuinely destructive chat action isn't offered here at all. */
+  /** `strong` = the weightier action in the set (leave / archive).
+   *
+   *  BOTH tones fill `--pocket-track`; the weight comes from TEXT, not fill —
+   *  `default` keeps `--body`, `strong` steps to `--ink`. One fill also means the
+   *  tiles need something to separate them, which is the `--line-3` hairline
+   *  between adjacent tiles below.
+   *
+   *  Why one fill: `--pocket-track` is THE mobile fill token (§2) — `--line-2` is
+   *  a border/stroke value and §6 forbids it as a fill outright, and `--cream-2`
+   *  is a DESKTOP token that is lighter than the `--ivory` row card the panel
+   *  sits behind, so it read as a hole punched through the card instead of a
+   *  layer recessed beneath it. `--pocket-track` is the family's own "behind the
+   *  card" value and reads correctly at both tones.
+   *
+   *  Plum is deliberately absent — it is a surgical accent and the chat list
+   *  already spends it on the unread dot, the scope pill and the create +. Never
+   *  a danger fill either: the contract allows danger as text+border only, and
+   *  the one genuinely destructive chat action isn't offered here at all. */
   tone?: "default" | "strong"
   onSelect: () => void
 }
@@ -229,7 +240,7 @@ function Panel({ actions, side, hidden, onDone }: {
         display: "flex", alignItems: "stretch",
       }}
     >
-      {actions.map((a) => (
+      {actions.map((a, i) => (
         <button
           key={a.key}
           type="button"
@@ -237,9 +248,20 @@ function Panel({ actions, side, hidden, onDone }: {
           onClick={(e) => { e.stopPropagation(); onDone(); a.onSelect() }}
           aria-label={a.label}
           style={{
-            width: ACTION_W, border: "none", cursor: "pointer",
+            // One fill across the panel means two adjacent tiles read as a single
+            // slab, so a hairline marks the seam — `--line-3`, the mobile system's
+            // ONE in-card divider (§2), the same rule that separates PocketRows.
+            // It is LIGHTER than `--pocket-track`, so it reads as an inset seam
+            // rather than a stroke; that is intentional. On the FIRST tile only
+            // (i === 0) it is omitted — a rule on the panel's outer edge would sit
+            // against the row/card edge and read as a border on the card itself.
+            // box-sizing must stay border-box or the 1px would push the panel past
+            // `actions.length * ACTION_W`, which is the offset the drag math uses.
+            width: ACTION_W, boxSizing: "border-box", cursor: "pointer",
+            border: "none",
+            borderLeft: i === 0 ? "none" : "1px solid var(--line-3)",
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5,
-            background: a.tone === "strong" ? "var(--line-2)" : "var(--cream-2)",
+            background: "var(--pocket-track)",
             color: a.tone === "strong" ? "var(--ink)" : "var(--body)",
             fontFamily: "var(--serif)", fontSize: 11, fontWeight: 600, letterSpacing: "-0.01em",
           }}
