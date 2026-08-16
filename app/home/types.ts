@@ -183,6 +183,11 @@ export interface ChatGroup {
   // Ministry-wide central chat (groups.is_central_chat) — drives the solid-plum
   // monogram chip in the mobile Pocket chat list.
   is_central_chat?: boolean
+  /** A DM whose only counterpart deleted their account (a dead thread). Set from
+   *  get_dm_groups_with_deleted_counterpart in mapChatListRows; sinks the row below
+   *  every live conversation and de-emphasises its title. Never a filter — the
+   *  thread and its messages stay reachable. */
+  counterpart_deleted?: boolean
 }
 
 /** Max length of a shared chat nickname (chat_nicknames). Lives here (not the
