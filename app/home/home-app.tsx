@@ -1346,10 +1346,8 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 onSeeChats={() => handleNavClick("chats")}
                 onSeeAnnouncements={() => handleNavClick("announcements")}
                 onOpenChat={handleOpenChat}
-                onGoToProfile={() => handleNavClick("profile")}
                 onOpenAnnouncement={handleOpenAnnouncement}
                 onGoToTab={(t) => handleNavClick(t)}
-                avatarUrl={avatarUrl}
                 activeQuestion={activeQuestion}
                 hasResponded={hasResponded}
                 onResponded={() => setHasResponded(true)}
@@ -1359,7 +1357,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
 
           {activeTab === "announcements" && (
             <div className="md:h-full md:overflow-y-auto">
-              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} avatarUrl={avatarUrl} onGoToProfile={() => handleNavClick("profile")} onOpenAnnouncement={handleOpenAnnouncement} onComposerOpenChange={setComposerOpen} />
+              <AnnouncementsTab userId={userId} userName={initialProfile.name} userRole={initialProfile.role} userGradYear={initialProfile.graduation_year} ministryId={ministryId} ministryName={ministryName} onOpenAnnouncement={handleOpenAnnouncement} onComposerOpenChange={setComposerOpen} />
             </div>
           )}
 
@@ -1380,7 +1378,6 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                     onTotalUnreadChange={setTotalChatsUnread}
                     refreshKey={chatRefreshKey}
                     onOpenDirectory={() => handleNavClick("directory")}
-                    onGoToProfile={() => handleNavClick("profile")}
                     activeGroupId={globalOpenChat?.id}
                     canCreateChurchChat={canCreateChurchChat}
                     initialSection={initialChatsSection}
@@ -1445,8 +1442,6 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 userName={initialProfile.name}
                 ministryId={ministryId}
                 ministryName={ministryName}
-                avatarUrl={avatarUrl}
-                onGoToProfile={() => handleNavClick("profile")}
                 userTeams={userTeams}
                 allTeams={allTeams}
                 isAdmin={isAdmin}
@@ -1528,7 +1523,6 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 onAvatarChange={(url) => setAvatarUrl(url)}
                 activeSection={profileSection}
                 onSectionChange={handleProfileSectionChange}
-                onBack={() => handleNavClick("home")}
               />
             </div>
           )}

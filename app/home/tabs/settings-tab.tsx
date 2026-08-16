@@ -1184,14 +1184,11 @@ export function SettingsTab({
       {/* Mobile: single chrome row — hub shows "Church Settings" + back; a drilled
           section shows that section's title + back one level to the hub (§1/§3). */}
       {mobileSection === null ? (
-        <PocketChrome title="Church Settings" back={onBack} hideAvatar userName="" onAvatarClick={() => {}} />
+        <PocketChrome title="Church Settings" back={onBack} />
       ) : (
         <PocketChrome
           title={TABS.find(t => t.key === mobileSection)?.label ?? "Settings"}
           back={closeMobileSection}
-          hideAvatar
-          userName=""
-          onAvatarClick={() => {}}
         />
       )}
 

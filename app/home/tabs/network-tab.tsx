@@ -12,7 +12,7 @@ export function NetworkTab({ onBack }: { onBack?: () => void }) {
   return (
     <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile: single chrome row (no two-header) */}
-      <PocketChrome title="Network" back={onBack} hideAvatar userName="" onAvatarClick={() => {}} />
+      <PocketChrome title="Network" back={onBack} />
 
       {/* Desktop header */}
       <TabPageHeader>

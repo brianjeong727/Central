@@ -321,10 +321,8 @@ export function HomeTab({
   onSeeChats,
   onSeeAnnouncements,
   onOpenChat,
-  onGoToProfile,
   onOpenAnnouncement,
   onGoToTab,
-  avatarUrl,
   activeQuestion,
   hasResponded,
   onResponded,
@@ -978,9 +976,6 @@ export function HomeTab({
       <div className="md:hidden px-5">
         <PocketHeader
           ministryName={ministryName}
-          userName={profile.name}
-          avatarUrl={avatarUrl}
-          onAvatarClick={onGoToProfile}
           action={isAdmin ? (
             <PocketRoundButton variant="ghost" ariaLabel="Church settings" onClick={() => onGoToTab?.("settings")}>
               <Settings style={{ width: 17, height: 17, color: "var(--plum)" }} strokeWidth={1.7} />
