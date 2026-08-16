@@ -12,11 +12,10 @@
 import type { ReactNode } from "react"
 import { Settings } from "lucide-react"
 import {
-  IconButton, MonogramChip, PocketHeroCard, PocketKicker, PocketRow, PocketRowCard, BackChevron,
+  IconButton, PocketHeroCard, PocketKicker, PocketRow, PocketRowCard, BackChevron,
   POCKET_CHROME_PAD_Y, POCKET_CHROME_TITLE, useChromeSlotRef,
 } from "@/components/central"
 import { PlanLineIcon } from "./shared"
-import { getInitials } from "../utils"
 
 export type HubRow = {
   iconKey?: string
@@ -27,17 +26,19 @@ export type HubRow = {
   onClick: () => void
 }
 
-export type HubAvatar = { userName: string; avatarUrl?: string | null; onClick: () => void }
-
 // Single chrome row (mobile_design_system §2.1): back chevron exits the
 // workspace to the picker; no separate "← All workspaces" pill, no PocketChrome
 // "Workspace" row above — this IS the workspace's one header. Also reused
 // standalone for drilled-in screens that carry a title + back in one row.
-export function PocketHubChrome({ title, onBack, onSettings, avatar, action }: {
+//
+// The trailing profile avatar was removed when Profile became a pill destination
+// (2026-08-16). It was doubly wrong here: a second door to a place the nav now
+// reaches from everywhere, on a screen that already carries a back chevron —
+// and §3 has always said sub-screens drop the avatar and show the chevron instead.
+export function PocketHubChrome({ title, onBack, onSettings, action }: {
   title: string
   onBack?: () => void
   onSettings?: () => void
-  avatar?: HubAvatar
   // Optional trailing action (a section-screen create — plum round "+" or a
   // primary pill). When present the title shrinks to 20 (§2, two-content row).
   action?: ReactNode
@@ -65,26 +66,20 @@ export function PocketHubChrome({ title, onBack, onSettings, avatar, action }: {
       {onSettings && (
         <IconButton dim={34} onClick={onSettings} title="Team settings"><Settings className="w-4 h-4" /></IconButton>
       )}
-      {avatar && (
-        <button onClick={avatar.onClick} aria-label="Your profile" style={{ flexShrink: 0, border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-          <MonogramChip initials={getInitials(avatar.userName)} avatarUrl={avatar.avatarUrl} style={{ width: 34, height: 34, fontFamily: "var(--sans)", fontWeight: 600, fontSize: 11 }} />
-        </button>
-      )}
     </div>
   )
 }
 
-export function MobilePocketHub({ teamName, onBack, onSettings, avatar, hero, groups }: {
+export function MobilePocketHub({ teamName, onBack, onSettings, hero, groups }: {
   teamName: string
   onBack?: () => void
   onSettings?: () => void
-  avatar?: HubAvatar
   hero?: { eyebrow: string; title: string; meta: string; progress?: { done: number; total: number } | null; onClick: () => void } | null
   groups: { label: string; rows: HubRow[] }[]
 }) {
   return (
     <div>
-      <PocketHubChrome title={teamName} onBack={onBack} onSettings={onSettings} avatar={avatar} />
+      <PocketHubChrome title={teamName} onBack={onBack} onSettings={onSettings} />
 
       {hero && (
         <PocketHeroCard

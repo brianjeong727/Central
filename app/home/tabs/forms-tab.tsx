@@ -669,7 +669,7 @@ export function FormResponsesView({ formId, title, onClose }: {
   return (
     <>
       {/* Mobile: single chrome row, back returns to the forms list */}
-      <PocketChrome title={title} back={onClose} hideAvatar userName="" onAvatarClick={() => {}} />
+      <PocketChrome title={title} back={onClose} />
 
       {/* Desktop header — back is the shell breadcrumb (§3.2 Zone A); no in-header
           back. Sub-tab strip below is the single terminating hairline (R1). */}
@@ -992,9 +992,6 @@ export function FormsTab({ ministryId, userId, onViewChange, onBack }: FormsTabP
       <PocketChrome
         title="Forms"
         back={onBack}
-        hideAvatar
-        userName=""
-        onAvatarClick={() => {}}
         action={
           <PocketRoundButton variant="plum" onClick={() => openBuilder(null)} ariaLabel="Create form">
             <Plus style={{ width: 16, height: 16 }} strokeWidth={1.8} />

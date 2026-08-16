@@ -735,8 +735,13 @@ export function JournalSection({
   return (
     <>
       {/* Mobile: PocketFilterChip filters + single column (hub-and-spoke — no
-          tab strip at phone width). Stats + verse cards render borderless tonal. */}
-      <div className="md:hidden" style={{ paddingTop: showStats ? 0 : 24, paddingBottom: 52 }}>
+          tab strip at phone width). Stats + verse cards render borderless tonal.
+          NO paddingTop — the chrome row owns the gap below the title
+          (POCKET_CHROME_PAD_Y, Convention #27). This carried `showStats ? 0 : 24`,
+          sized for the old hand-rolled header whose `pb-5` it was compensating for;
+          against PocketChrome the two stacked and the chips opened at 80px while
+          every sibling screen starts its body at 56. */}
+      <div className="md:hidden" style={{ paddingBottom: 52 }}>
         {statsBarNode(true)}
         <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
           {JOURNAL_TABS.map(t => (
@@ -1102,7 +1107,6 @@ export function ProfileTab({
   onAvatarChange,
   activeSection,
   onSectionChange,
-  onBack,
 }: {
   userId: string
   initialProfile: Profile
@@ -1113,7 +1117,6 @@ export function ProfileTab({
   onAvatarChange?: (url: string) => void
   activeSection: "spiritual-profile" | "journal"
   onSectionChange: (s: "spiritual-profile" | "journal") => void
-  onBack?: () => void
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -1138,6 +1141,12 @@ export function ProfileTab({
   // Edge-swipe-back mirrors the chrome chevron (Convention #22): from a section →
   // hub, from the hub → profile.
   const settingsSwipeRef = useEdgeSwipeBack<HTMLDivElement>(settingsView === "hub" ? closeSettings : () => openSettings("hub"))
+  // Journal is a PUSHED screen off the profile root on mobile (desktop keeps it as
+  // a sidebar section, where `back` is never rendered). Same handler as its chrome
+  // chevron, per Convention #22.
+  const backToProfileRoot = useCallback(() => onSectionChange("spiritual-profile"), [onSectionChange])
+  const journalSwipeRef = useEdgeSwipeBack<HTMLDivElement>(backToProfileRoot)
+  useScrollResetOn([activeSection])
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [draft, setDraft] = useState<Record<ProfileDraftField, string>>({
@@ -1435,14 +1444,17 @@ export function ProfileTab({
     <div className="pb-6 md:pb-0 md:flex md:flex-col md:min-h-full">
 
       {activeSection === "journal" && (
-        <div>
-          {/* Mobile header — compact, gear inline right.
-              NB: Tailwind flex CLASSES, not inline display:flex — an inline display
-              would override md:hidden and leak the mobile header onto desktop. */}
-          <div className="md:hidden flex items-center justify-between gap-3 px-5 pt-6 pb-5">
-            <h1 style={{ fontFamily: "var(--serif)", fontSize: 25, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.05, margin: 0 }}>Journal</h1>
-            <JournalSettingsMenu showEntries={profile.show_journal_entries ?? false} showStreak={profile.show_journal_streak ?? false} onToggleEntries={handleToggleEntries} onToggleStreak={handleToggleStreak} />
-          </div>
+        <div ref={journalSwipeRef}>
+          {/* Mobile chrome — Journal is a pushed screen off the profile root, so it
+              carries the one back chevron (Convention #22) and the shared chrome
+              rhythm/type (Convention #27). It used to be a hand-rolled row: serif 25
+              title, `pt-6 pb-5`, and no way back — the section was reachable only
+              from the desktop sidebar or a hand-typed ?section=journal. */}
+          <PocketChrome
+            title="Journal"
+            back={backToProfileRoot}
+            action={<JournalSettingsMenu showEntries={profile.show_journal_entries ?? false} showStreak={profile.show_journal_streak ?? false} onToggleEntries={handleToggleEntries} onToggleStreak={handleToggleStreak} />}
+          />
 
           {/* Desktop header — landing tier (R1), gear in the right slot; the
               Journal sub-tab strip below is the single terminating hairline. */}
@@ -1474,10 +1486,12 @@ export function ProfileTab({
         {settingsView === null && (<>
         <PocketChrome
           title={editing ? "Edit profile" : "Profile"}
-          back={editing ? cancelEdit : onBack}
-          hideAvatar
-          userName=""
-          onAvatarClick={() => {}}
+          // No chevron on the root: Profile is a pill TAB ROOT now, and a tab root
+          // has no level to go up to (§3 — sub-screens get the chevron, roots don't).
+          // It carried `onBack` → Home back when Profile was a subpage reached from
+          // the chrome avatar. While EDITING the chrome's own Cancel action exits the
+          // form, so a chevron there would just be a second cancel.
+          back={undefined}
           action={editing
             ? <PocketButton variant="quiet" compact surface="page" onClick={cancelEdit}>Cancel</PocketButton>
             : <PocketRoundButton ariaLabel="Settings" onClick={() => openSettings("hub")}><Settings size={16} /></PocketRoundButton>}
@@ -1549,6 +1563,31 @@ export function ProfileTab({
             {avatarError && <p style={{ fontSize: 11, color: "var(--danger)", margin: "10px 0 0" }}>{avatarError}</p>}
           </PocketCard>
         </div>
+
+        {/* ── Mobile: Journal — the ONE hub row on the profile root (§3 hub-and-spoke).
+            Journal's phone-width UI has existed since the Pocket build but had no
+            entry point at this width: `onSectionChange` was wired only in
+            desktop-nav.tsx, so on a phone it was reachable solely by hand-typing
+            ?section=journal. It stays a pushed screen rather than a pill tab —
+            it's private and low-frequency next to the four ministry surfaces —
+            and it sits above ABOUT/FAITH/PRAYER because it's a destination, not
+            a field. Hidden while editing (the root is a form then) and while the
+            settings drill is up (this whole block is inside that guard). ── */}
+        {!editing && (
+          <div className="md:hidden px-5" style={{ paddingTop: 10 }}>
+            <PocketKicker label="Personal" />
+            <PocketRowCard>
+              <PocketRow
+                leading={<SettingsIconChip icon={<BookOpen size={17} strokeWidth={2} />} />}
+                title="Journal"
+                sub="Devotionals, prayers & verses"
+                chevron
+                isLast
+                onClick={() => onSectionChange("journal")}
+              />
+            </PocketRowCard>
+          </div>
+        )}
         </>)}
 
         {/* ── Mobile: settings drill (gear → hub → section). md:hidden; desktop keeps
@@ -1558,9 +1597,6 @@ export function ProfileTab({
             <PocketChrome
               title={SETTINGS_LABELS[settingsView]}
               back={settingsView === "hub" ? closeSettings : () => openSettings("hub")}
-              hideAvatar
-              userName=""
-              onAvatarClick={() => {}}
             />
             {settingsView === "hub" ? (
               <div className="px-5 pt-2 pb-6">

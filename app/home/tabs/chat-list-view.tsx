@@ -189,7 +189,7 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection, swi
   )
 }
 
-export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, onGoToProfile, activeGroupId, canCreateChurchChat, fallbackChats, initialSection, onComposerOpenChange, onOpenDraftDm }: ChatsTabProps) {
+export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId, canCreateChurchChat, fallbackChats, initialSection, onComposerOpenChange, onOpenDraftDm }: ChatsTabProps) {
   const { setParam } = useNavState()
   // Server-resolved (app/home/page.tsx → resolveChatsSection), never read off
   // window here — see the note on resolveChatsSection in ./chat-shared.
@@ -450,9 +450,6 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           moved inline onto the scope-pills row below. */}
       <PocketChrome
         title="Chats"
-        userName={userProfile.name}
-        avatarUrl={userProfile.avatar_url}
-        onAvatarClick={onGoToProfile}
         action={
           <PocketRoundButton variant="ghost" onClick={onOpenDirectory} ariaLabel="Directory">
             <Users style={{ width: 17, height: 17 }} strokeWidth={1.6} />

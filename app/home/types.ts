@@ -361,13 +361,11 @@ export interface HomeTabProps {
   onSeeChats: () => void
   onSeeAnnouncements: () => void
   onOpenChat: (id: string, name: string, type?: string) => void
-  onGoToProfile: () => void
   onOpenAnnouncement: (id: string) => void
   // Getting-started checklist deep-links + Pocket quick-grid tiles (give / plan /
   // directory / announcements) + the mobile chrome Settings gear (settings).
   // Wired to the shell's handleNavClick so navigation stays one atomic param replace.
   onGoToTab?: (tab: "give" | "plan" | "directory" | "announcements" | "settings") => void
-  avatarUrl?: string | null
   activeQuestion?: CongregationQuestion | null
   hasResponded?: boolean
   onResponded?: () => void
@@ -390,8 +388,6 @@ export interface AnnouncementsTabProps {
   userGradYear: number | null
   ministryId: string
   ministryName: string
-  avatarUrl?: string | null
-  onGoToProfile: () => void
   onOpenAnnouncement: (id: string) => void
   // Reports whether the full-screen compose/edit surface is up, so home-app can
   // suppress the floating pill nav (mobile design system §2.2).
@@ -509,7 +505,6 @@ export interface ChatsTabProps {
   onTotalUnreadChange: (count: number) => void
   refreshKey: number
   onOpenDirectory: () => void
-  onGoToProfile: () => void
   activeGroupId?: string | null
   canCreateChurchChat: boolean
   fallbackChats?: ChatGroup[]
@@ -913,8 +908,6 @@ export interface PlanTabProps {
   userName: string
   ministryId: string
   ministryName: string
-  avatarUrl?: string | null
-  onGoToProfile: () => void
   userTeams: UserTeam[]
   allTeams: Team[]
   isAdmin: boolean

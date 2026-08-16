@@ -66,8 +66,11 @@ test.describe("mobile Home v2 (Pocket Daybreak) - Phase 2", () => {
     await expect(vis(page, await sandbox().ministryName()).first()).toBeVisible({ timeout: 15000 })
     const gear = page.getByRole("button", { name: "Church settings" }).filter({ visible: true })
     await expect(gear).toBeVisible({ timeout: 10000 })
-    const avatar = page.getByRole("button", { name: "Your profile" }).filter({ visible: true })
-    await expect(avatar).toBeVisible()
+    // Profile is a PILL destination, and the chrome row carries no avatar at all
+    // (mobile_design_system.md §3, ratified 2026-08-16). Asserting both directions
+    // so a reintroduced chrome avatar fails here rather than shipping two doors.
+    await expect(page.getByRole("button", { name: "Profile" }).filter({ visible: true })).toBeVisible()
+    await expect(page.getByRole("button", { name: "Your profile" })).toHaveCount(0)
 
     const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
     await expect(vis(page, dateLabel)).toBeVisible({ timeout: 10000 })
@@ -127,8 +130,9 @@ test.describe("mobile Home v2 (Pocket Daybreak) - Phase 2", () => {
     await expect(vis(page, "Church Settings").first()).toBeVisible({ timeout: 10000 })
 
     await page.goto("/home")
-    await expect(avatar).toBeVisible({ timeout: 15000 })
-    await avatar.click()
+    const profilePill = page.getByRole("button", { name: "Profile" }).filter({ visible: true })
+    await expect(profilePill).toBeVisible({ timeout: 15000 })
+    await profilePill.click()
     await expect(page).toHaveURL(/tab=profile/, { timeout: 10000 })
 
     await page.goto("/home?tab=announcements")
@@ -141,9 +145,11 @@ test.describe("mobile Home v2 (Pocket Daybreak) - Phase 2", () => {
 test.describe("mobile Home v2 - member has no Settings gear", () => {
   test.use({ storageState: memberState, ...MOBILE })
 
-  test("gear absent for member; avatar still present", async ({ page }) => {
+  test("gear absent for member; Profile pill still present", async ({ page }) => {
     await page.goto("/home")
-    await expect(page.getByRole("button", { name: "Your profile" }).filter({ visible: true })).toBeVisible({ timeout: 15000 })
+    // A plain member's pill is Home/Chats/Announcements/Profile — Workspace is
+    // role-gated (showPlan), Profile never is.
+    await expect(page.getByRole("button", { name: "Profile" }).filter({ visible: true })).toBeVisible({ timeout: 15000 })
     await expect(page.getByRole("button", { name: "Church settings" }).filter({ visible: true })).toHaveCount(0)
   })
 })
