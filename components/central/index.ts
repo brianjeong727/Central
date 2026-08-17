@@ -80,3 +80,4 @@ export {
   PocketTag,
   PocketFilterChipRow,
 } from "./pocket"
+export { ChatAvatar, chatAvatarLabel, type ChatAvatarMember } from "./chat-avatar"
