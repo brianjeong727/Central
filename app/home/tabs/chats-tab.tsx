@@ -33,7 +33,9 @@ import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
 import { isChatManageRole, isLeaderRole } from "@/lib/roles"
 import { subscribeKeyboard, useSwipeDownToDismissKeyboard } from "@/lib/keyboard-inset"
+import { storagePathFromPublicUrl, removeStorageObject } from "@/lib/storage-cleanup"
 import { useBackIntent } from "@/lib/back-intent"
+import { attachmentStillReferenced } from "@/app/actions/attachment-refs"
 // Hoisted out of this file so the server-rendered list module (./chat-list-view)
 // can reach them without importing this ~3,900-line thread chunk.
 import { CHURCH_SECTION_DEFS, type ChurchSection } from "./chat-shared"
@@ -2352,11 +2354,37 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const handleDeleteMessage = useCallback(async (msgId: string) => {
     setDeletingId(null)
     setContextMenuFor(null)
+    // Capture the attachment BEFORE anything nulls it — the optimistic write
+    // below and the row UPDATE both destroy the only copy of the path.
+    const doomed = messagesRef.current.find((m) => m.id === msgId)
+    const attachmentPath = storagePathFromPublicUrl(doomed?.attachment_url, "chat-attachments", groupId)
     setMessages((prev) => prev.map((m) => m.id === msgId ? { ...m, deleted: true, content: "", attachment_url: null, attachment_type: null, attachment_name: null, attachment_size: null } : m))
     setReactions((prev) => { const next = { ...prev }; delete next[msgId]; return next })
+
+    // Remove the file BEFORE nulling the pointer: a failed removal after the
+    // update leaves a live public URL nobody can ever find again, whereas a
+    // failed update after the removal is just a broken image the user can
+    // delete again. (lib/storage-cleanup.ts documents the full trade-off.)
+    if (attachmentPath && doomed?.attachment_url) {
+      // Forwarding copies attachment_url verbatim, so the object is SHARED —
+      // removing it would break every forwarded copy.
+      //
+      // This check MUST be server-side. A client query only sees chats this user
+      // belongs to, and a forward lives in the FORWARDER's chat — which the original
+      // sender usually is not in. Probed on real data: the client-side version of this
+      // guard saw 0 references when the truth was 2, removed the object, and the
+      // hidden forward started 404ing. It was not incomplete, it was wrong in the
+      // DEFAULT topology. attachmentStillReferenced() runs the count with the
+      // service-role client and fails CLOSED, so any error skips the removal.
+      const stillReferenced = await attachmentStillReferenced(doomed.attachment_url, msgId)
+      if (!stillReferenced) {
+        await removeStorageObject(supabase, "chat-attachments", attachmentPath, "message delete")
+      }
+    }
+
     await supabase.from("messages").update({ deleted: true, content: "", attachment_url: null, attachment_type: null, attachment_name: null, attachment_size: null }).eq("id", msgId).eq("sender_id", userId)
     await supabase.from("message_reactions").delete().eq("message_id", msgId)
-  }, [supabase, userId])
+  }, [supabase, userId, groupId])
 
   const handleDeletePoll = useCallback(async (msgId: string, pollId: string) => {
     setPollMenuFor(null)

@@ -16,6 +16,7 @@ import { deleteMyAccount } from "@/app/actions/delete-account"
 import { unblockUser } from "@/app/actions/blocks"
 import { useBlocks } from "../use-blocks"
 import { MODERATION_DEFAULTS, moderateText, type ModerationSettings } from "@/lib/moderation"
+import { storagePathFromPublicUrl, removeStorageObject } from "@/lib/storage-cleanup"
 import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, SerifInput, MonogramChip, PocketFilterChip, PocketCard, PocketButton, PocketTag, PocketRoundButton, PocketRow, PocketRowCard, PocketKicker, useScrollResetOn, useEdgeSwipeBack } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
@@ -118,6 +119,17 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange, mobil
     if (!draft.title.trim()) return
     setSaving(true)
     if (editingEntry) {
+      // Photo REPLACE: the upload is upsert:false with a timestamped key, so a
+      // new photo does not overwrite the old one — without this every edit
+      // accumulates another publicly-readable object. The PERSISTED url (not the
+      // draft) is the old one, and only if the entry is actually changing photo.
+      // Removed BEFORE the row update: a failed update then shows a broken image
+      // the user can fix, whereas removing after a successful update risks a live
+      // public file with no pointer left anywhere (lib/storage-cleanup.ts).
+      if (editingEntry.image_url && editingEntry.image_url !== draft.image_url) {
+        const oldPath = storagePathFromPublicUrl(editingEntry.image_url, "devotionals", userId)
+        await removeStorageObject(supabase, "devotionals", oldPath, "journal photo replace")
+      }
       const { data: row, error } = await supabase.from("devotionals").update({ title: draft.title, passage: draft.passage, content: draft.content, image_url: draft.image_url }).eq("id", editingEntry.id).eq("user_id", userId).eq("ministry_id", ministryId).select().single()
       if (!error && row) mutate(curr => (curr ?? []).map(e => e.id === editingEntry.id ? (row as Devotional) : e), { revalidate: false })
     } else {
@@ -128,6 +140,14 @@ export function JournalDevotionalsTab({ userId, ministryId, onCountChange, mobil
   }
 
   async function handleDelete(id: string) {
+    // Remove the photo BEFORE the row: the row is the only record of the path,
+    // and the bucket is public. The folder-scoped DELETE policy on `devotionals`
+    // matches the `${userId}/…` upload path, so the owner can do this directly.
+    const entry = entries.find(e => e.id === id)
+    if (entry?.image_url) {
+      const path = storagePathFromPublicUrl(entry.image_url, "devotionals", userId)
+      await removeStorageObject(supabase, "devotionals", path, "journal entry delete")
+    }
     const { error } = await supabase.from("devotionals").delete().eq("id", id).eq("user_id", userId).eq("ministry_id", ministryId)
     if (!error) mutate(curr => (curr ?? []).filter(e => e.id !== id), { revalidate: false })
   }
