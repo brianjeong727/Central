@@ -33,8 +33,8 @@ import useSWR from "swr"
 import { Search, ChevronDown, X, Plus, Users, Pin, PinOff, Lock, Bell, BellOff, Archive, ArchiveRestore, LogOut } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE } from "../components/shared"
-import { PocketChrome, PocketRoundButton, PocketChip } from "../components/pocket-header"
-import { MonogramChip, SegmentedControl, PocketFilterChip, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, POCKET_KICKER_STYLE, useScrollResetOn, SwipeActionRow, ConfirmDialog, Toast } from "@/components/central"
+import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
+import { MonogramChip, SegmentedControl, PocketFilterChip, PocketSearchField, PocketRow, PocketKicker, POCKET_KICKER_STYLE, useScrollResetOn, SwipeActionRow, ConfirmDialog, Toast } from "@/components/central"
 import { ChatSearchView } from "../components/chat-search"
 import { findExistingDm } from "../dm"
 import { formatChatListTime } from "../utils"
@@ -75,18 +75,33 @@ function useChatListTime(iso: string | null | undefined): string | undefined {
   return mounted && iso ? formatChatListTime(iso) : undefined
 }
 
-// One conversation row inside a Pocket grouped card: PocketRow fed from a
-// ChatGroup — squircle chip (`solid` = ministry-wide chat), "Sender: text"
-// preview, time + unread dot right column.
-function PocketChatRow({ group, isLast, onClick }: { group: ChatGroup; isLast: boolean; onClick: () => void }) {
+// One conversation row: PocketRow fed from a ChatGroup — plum circle monogram,
+// "Sender: text" preview, time + unread dot right column.
+//
+// The chip is a MonogramChip (plum + cream, CIRCLE — the one owner of avatar
+// colour and shape, per CLAUDE.md), matching the desktop chat list exactly. It
+// was a PocketChip: a `--r-callout` SQUIRCLE, tonal `--pocket-track` by default
+// and solid plum only for the ministry-wide room. Retired 2026-08-16 — a chat's
+// identity is a person or a group, and those are round everywhere else in the
+// app (directory, roster, member sheet). Every chat now takes the same plum
+// circle; `is_central_chat` no longer changes how a row LOOKS (it still drives
+// permissions and chat settings).
+//
+// The picture comes from `chatChipAvatar(group)` (app/home/chat-avatar.ts) — the
+// group's own photo, or for a DM the counterpart's profile photo. Always through
+// that resolver, never by reading a field directly; check-chat-avatar.sh enforces
+// it. Initials are the fallback when there's no photo.
+function PocketChatRow({ group, isFirst, onClick }: { group: ChatGroup; isFirst: boolean; onClick: () => void }) {
   const time = useChatListTime(group.last_message_time)
   return (
     <PocketRow
+      immersive
+      isFirst={isFirst}
       leading={
-        <PocketChip
-          letter={group.name.charAt(0).toUpperCase()}
+        <MonogramChip
+          initials={group.name.charAt(0).toUpperCase()}
           avatarUrl={chatChipAvatar(group)}
-          solid={group.is_central_chat === true}
+          style={{ width: 46, height: 46, flexShrink: 0, fontFamily: "var(--serif)", fontSize: 16, fontWeight: 600 }}
         />
       }
       title={group.name}
@@ -105,7 +120,6 @@ function PocketChatRow({ group, isLast, onClick }: { group: ChatGroup; isLast: b
         : "No messages yet"}
       time={time}
       showDot={group.unread_count > 0 && !group.muted}
-      isLast={isLast}
       onClick={onClick}
     />
   )
@@ -120,20 +134,23 @@ export interface ChatSwipeConfig {
   actionsFor: (g: ChatGroup) => { leading: SwipeAction[]; trailing: SwipeAction[] }
 }
 
-// PocketRowCard's own horizontal padding, cancelled by the swipe wrapper so the
-// action panel bleeds to the card's edge instead of stopping 18px short of it.
-const POCKET_CARD_PAD_X = 18
-
-// The single tonal grouped card holding a set of chat rows (mockup `.card`).
-function PocketChatCard({ groups, onOpen, swipe }: {
+// A full-bleed run of chat rows sitting directly on the page surface — no card.
+// Rows carry their own 20px gutter (PocketRow `immersive`) and separate with a
+// --line-3 top rule, so the list and the screen are one ground plane and the tap
+// target is the full screen width instead of width − 76px.
+//
+// `bleed` is 0 now: it existed solely to cancel PocketRowCard's 18px inset so the
+// swipe panel reached the card's edge. With no card the panel already spans the
+// screen, and a non-zero bleed would overhang it.
+function PocketChatRun({ groups, onOpen, swipe }: {
   groups: ChatGroup[]
   onOpen: (id: string, name: string) => void
   swipe?: ChatSwipeConfig
 }) {
   return (
-    <PocketRowCard>
+    <>
       {groups.map((g, i) => {
-        const row = <PocketChatRow group={g} isLast={i === groups.length - 1} onClick={() => onOpen(g.id, g.name)} />
+        const row = <PocketChatRow group={g} isFirst={i === 0} onClick={() => onOpen(g.id, g.name)} />
         if (!swipe) return <div key={g.id}>{row}</div>
         const { leading, trailing } = swipe.actionsFor(g)
         return (
@@ -141,7 +158,7 @@ function PocketChatCard({ groups, onOpen, swipe }: {
             key={g.id}
             leading={leading}
             trailing={trailing}
-            bleed={POCKET_CARD_PAD_X}
+            surface="var(--cream)"
             open={swipe.openId === g.id ? swipe.openSide : null}
             onOpenChange={(side) => swipe.onOpenChange(g.id, side)}
           >
@@ -149,7 +166,7 @@ function PocketChatCard({ groups, onOpen, swipe }: {
           </SwipeActionRow>
         )
       })}
-    </PocketRowCard>
+    </>
   )
 }
 
@@ -175,9 +192,16 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection, swi
         if (rooms.length === 0) return null
         return (
           <div key={key}>
+            {/* Full-bleed section eyebrow: it carries the rule that opens the run,
+                so the first row needs no top border and the last row leaves none
+                dangling under it. 20px inset matches the rows' own gutter. */}
             <PocketKicker
               label={label}
-              style={{ margin: `${key === visibleKeys[0] ? 2 : 20}px 4px 8px` }}
+              style={{
+                margin: 0,
+                padding: key === visibleKeys[0] ? "14px 20px 10px" : "24px 20px 10px",
+                borderTop: "1px solid var(--line-3)",
+              }}
               action={canCreate ? (
                 <button
                   onClick={() => onAddInSection(key)}
@@ -188,7 +212,7 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection, swi
                 </button>
               ) : undefined}
             />
-            <PocketChatCard groups={rooms} onOpen={onOpen} swipe={swipe} />
+            <PocketChatRun groups={rooms} onOpen={onOpen} swipe={swipe} />
           </div>
         )
       })}
@@ -496,12 +520,16 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         />
       </div>
 
-      <div className="px-5 pt-1 pb-2 md:pt-2 md:px-0 md:flex-1 md:overflow-y-auto">
+      {/* NO horizontal padding on this wrapper: the row list is FULL-BLEED and
+          carries its own 20px gutter per row (PocketRow `immersive`). Everything
+          that is not a row — chips, search, empty states — re-applies px-5 for
+          itself. Desktop was already px-0 here, so it is unaffected. */}
+      <div className="pt-1 pb-2 md:pt-2 md:flex-1 md:overflow-y-auto">
       {/* Mobile scope pills (B3 Pocket) — Church / My chats; the new-chat + sits
           right-aligned on the same row, My chats scope only. */}
       {/* Scope pills hide while searching — search spans BOTH scopes, so leaving a
           scope filter on screen would imply results are filtered by it. */}
-      <div className={`items-center gap-2 mb-4 md:hidden ${searchOpen ? "hidden" : "flex"}`}>
+      <div className={`items-center gap-2 mb-4 px-5 md:px-0 md:hidden ${searchOpen ? "hidden" : "flex"}`}>
         <PocketFilterChip label="Church" active={subTab === "church"} onClick={() => { setSubTab("church"); setSearch(""); setParam("chats", null) }} />
         <PocketFilterChip label="My chats" active={subTab === "my"} onClick={() => { setSubTab("my"); setSearch(""); setParam("chats", "my") }} />
         {canShowNewChat && (
@@ -517,7 +545,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           below to the search view IN PLACE, so the field stays pinned and the
           change reads as a transition rather than a navigation. Chats + people,
           so you can reach someone you have never messaged. */}
-      <div className="md:hidden mb-4">
+      <div className="md:hidden mb-4 px-5">
         <PocketSearchField
           value={mobileSearch}
           onChange={setMobileSearch}
@@ -536,7 +564,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       </div>
 
       {searchOpen ? (
-        <div className="md:hidden chat-search-enter">
+        <div className="md:hidden chat-search-enter px-5">
           <ChatSearchView
             query={mobileSearch}
             chats={data ?? []}
@@ -549,33 +577,38 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       ) : (
       <>
       {/* Push-notification prompt — self-hides unless permission is 'default' & unsubscribed & not dismissed */}
-      <div className="md:px-4">
+      <div className="px-5 md:px-4">
         <PushSubscribeCard userId={userId} ministryId={ministryId} notificationSettings={userProfile.notification_settings} variant="pocket" style={{ marginBottom: 16 }} />
       </div>
 
       {loading ? (
         <Spinner />
       ) : subTab === "my" ? (
-        /* My chats — one flat Pocket grouped card (mockup); pinned-first order. */
+        /* My chats — one full-bleed run of rows; pinned-first order. */
         active.length === 0 ? (
-          <EmptyState
-            icon={<Users className="w-7 h-7" />}
-            title="No personal chats"
-            subtitle="Tap + to start a new chat."
-          />
+          <div className="px-5">
+            <EmptyState
+              icon={<Users className="w-7 h-7" />}
+              title="No personal chats"
+              subtitle="Tap + to start a new chat."
+            />
+          </div>
         ) : (
-          <PocketChatCard groups={partitionPinned(active)} onOpen={handleOpenChat} swipe={swipe} />
+          <PocketChatRun groups={partitionPinned(active)} onOpen={handleOpenChat} swipe={swipe} />
         )
       ) : active.length === 0 && archivedChurchChats.length === 0 ? (
-        <EmptyState
-          icon={<Users className="w-7 h-7" />}
-          title="No church chats"
-          subtitle="You haven't been added to any church chats yet"
-        />
+        <div className="px-5">
+          <EmptyState
+            icon={<Users className="w-7 h-7" />}
+            title="No church chats"
+            subtitle="You haven't been added to any church chats yet"
+          />
+        </div>
       ) : (
         /* Church chats — sectioned into General / Groups / Teams (Daybreak ruling
-           #3), each its own tonal card with a per-section + create; archived self-hides. */
-        <div className="flex flex-col gap-4">
+           #3), each a full-bleed run under its own ruled eyebrow; archived self-hides.
+           No gap between sections: each eyebrow owns its lead-in padding + rule. */
+        <div className="flex flex-col">
           {active.length > 0 && (
             <PocketChurchSections
               sections={sectionChurchChats(active)}
@@ -591,7 +624,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             <div>
               <button
                 onClick={() => setShowArchived((s) => !s)}
-                className="w-full flex items-center justify-between py-2 px-1"
+                className="w-full flex items-center justify-between py-2 px-5"
               >
                 <span style={POCKET_KICKER_STYLE}>
                   Archived · {archivedChurchChats.length}
@@ -600,7 +633,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
               </button>
               {showArchived && (
                 <div style={{ opacity: 0.6, marginTop: 8 }}>
-                  <PocketChatCard groups={archivedChurchChats} onOpen={handleOpenChat} swipe={swipe} />
+                  <PocketChatRun groups={archivedChurchChats} onOpen={handleOpenChat} swipe={swipe} />
                 </div>
               )}
             </div>

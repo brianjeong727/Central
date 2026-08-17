@@ -72,7 +72,7 @@ export interface SwipeAction {
 }
 
 export function SwipeActionRow({
-  leading = [], trailing = [], open, onOpenChange, bleed = 0, children,
+  leading = [], trailing = [], open, onOpenChange, bleed = 0, surface = "var(--ivory)", children,
 }: {
   leading?: SwipeAction[]
   trailing?: SwipeAction[]
@@ -83,6 +83,10 @@ export function SwipeActionRow({
    *  bleeds to the card's edge instead of stopping short of it. The foreground
    *  re-applies the same value, so row content does not move. */
   bleed?: number
+  /** Opaque fill for the foreground layer — must match whatever the row sits on,
+   *  or the action panel's fill shows through. `--ivory` inside a card (default),
+   *  `--cream` for a full-bleed row on the page surface. */
+  surface?: string
   children: ReactNode
 }) {
   const fgRef = useRef<HTMLDivElement | null>(null)
@@ -213,7 +217,13 @@ export function SwipeActionRow({
         onClickCapture={swallow}
         style={{
           position: "relative",
-          background: "var(--ivory)",
+          // MUST be opaque — it is what hides the action panel until you swipe.
+          // Defaults to the card fill because that is where this shipped; a row
+          // sitting directly on the page (full-bleed list, §4) passes `--cream`
+          // instead. Getting this wrong doesn't hide the panel, it TINTS every
+          // row with the panel's fill, which reads as a styling bug rather than
+          // a layering one.
+          background: surface,
           padding: bleed ? `0 ${bleed}px` : undefined,
           // The browser keeps vertical panning; we only ever claim horizontal.
           touchAction: "pan-y",

@@ -161,8 +161,23 @@ export function PocketRowCard({ children, style }: { children: ReactNode; style?
 // (which crushes contrast below AA) and never `--faint` (a non-text token for
 // placeholders/arrows). Size, weight and every other part of the row are
 // unchanged: de-prioritised, not disabled.
+// `immersive` is the FULL-BLEED grammar for a tap-through list that sits directly
+// on the page surface with no card around it (cdesign "Full-bleed list immersion",
+// ratified 2026-08-16 — see mobile_design_system.md §4). It is opt-in rather than
+// the default because the default row lives INSIDE a PocketRowCard on ~18 other
+// screens, where 20px of row padding would double the card's own inset. The rule
+// that decides which you want: cards for things you READ, no cards for rows you
+// TAP THROUGH.
+//
+// Immersive rows separate with a TOP border rather than a bottom one, so the rule
+// above the first row is the section eyebrow's own border and the last row leaves
+// no dangling line above the next eyebrow. `isFirst` suppresses it (the prototype
+// computed this in JS; a `:first-child` rule can't reach an inline style, and on
+// the chat list the rows aren't even adjacent siblings — each is wrapped in a
+// SwipeActionRow).
 export function PocketRow({
-  leading, title, titleAccessory, titleDim = false, sub, time, showDot = false, meta, chevron = false, isLast = false, onClick,
+  leading, title, titleAccessory, titleDim = false, sub, time, showDot = false, meta, chevron = false,
+  isLast = false, immersive = false, isFirst = false, onClick,
 }: {
   leading?: ReactNode
   title: string
@@ -174,6 +189,8 @@ export function PocketRow({
   meta?: string
   chevron?: boolean
   isLast?: boolean
+  immersive?: boolean
+  isFirst?: boolean
   onClick: () => void
 }) {
   return (
@@ -186,24 +203,30 @@ export function PocketRow({
       // is covered by the margin rules the day it ships.
       data-pocket-row={title}
       style={{
-        display: "flex", alignItems: "center", gap: 12, width: "100%",
+        display: "flex", alignItems: "center", gap: immersive ? 14 : 12, width: "100%",
         background: "none", border: "none", textAlign: "left", cursor: "pointer",
-        padding: "13px 0", borderBottom: isLast ? "none" : "1px solid var(--line-3)",
+        // Immersive carries its own 20px gutter because the list escapes the
+        // screen's padded wrapper — the tap target is the full screen width,
+        // which is the entire point of the pattern.
+        padding: immersive ? "14px 20px" : "13px 0",
+        ...(immersive
+          ? { borderTop: isFirst ? "none" : "1px solid var(--line-3)" }
+          : { borderBottom: isLast ? "none" : "1px solid var(--line-3)" }),
       }}
     >
       {leading}
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: titleDim ? "var(--muted-text)" : "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
+          <span style={{ fontSize: immersive ? 16 : 15, fontWeight: 600, letterSpacing: "-0.01em", color: titleDim ? "var(--muted-text)" : "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{title}</span>
           {titleAccessory}
         </span>
         {sub && (
-          <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>
+          <span style={{ display: "block", fontSize: immersive ? 14 : 13, color: "var(--muted-text)", marginTop: immersive ? 3 : 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>
         )}
       </span>
       {(time || showDot) ? (
-        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
-          {time && <span style={{ fontSize: 11, color: "var(--muted-text)" }}>{time}</span>}
+        <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: immersive ? 7 : 5, flexShrink: 0 }}>
+          {time && <span style={{ fontSize: immersive ? 12 : 11, color: "var(--muted-text)" }}>{time}</span>}
           {showDot && <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--plum)" }} />}
         </span>
       ) : null}
@@ -297,17 +320,21 @@ export function PocketBackRow({ label, onBack, style }: { label: string; onBack:
 // chat). `icon` wins over `letter` when both are passed.
 //
 // `avatarUrl` is the same fall-back-to-initials affordance MonogramChip carries:
-// a photo fills the squircle when the chat has one, and the tonal/solid letter
-// treatment is what shows when it doesn't. The SHAPE stays the chat list's
-// squircle either way — this is the same chip, wearing a picture.
-export function PocketChip({ letter, icon, avatarUrl, solid = false, size = 40 }: { letter?: string; icon?: ReactNode; avatarUrl?: string | null; solid?: boolean; size?: number }) {
+// a photo fills the squircle when the row's subject has one, and the tonal/solid
+// letter treatment is what shows when it doesn't.
+//
+// The SQUIRCLE is now for OBJECT rows only — sections, resources, settings. Rows
+// whose subject is a PERSON OR A GROUP (chats, directory members) take the round
+// MonogramChip instead, because that identity is round everywhere else in the app
+// (ratified 2026-08-17). The chat list used to be this chip; it isn't any more.
+export function PocketChip({ letter, icon, avatarUrl, solid = false, size = 40, fontSize = 13 }: { letter?: string; icon?: ReactNode; avatarUrl?: string | null; solid?: boolean; size?: number; fontSize?: number }) {
   return (
     <span
       style={{
         position: "relative", overflow: "hidden",
         width: size, height: size, borderRadius: "var(--r-callout)", flexShrink: 0,
         display: "grid", placeItems: "center",
-        fontFamily: "var(--serif)", fontSize: 13, fontWeight: 600,
+        fontFamily: "var(--serif)", fontSize, fontWeight: 600,
         background: solid ? "var(--plum)" : "var(--pocket-track)",
         color: solid ? "var(--cream-on-dark)" : "var(--plum)",
       }}
