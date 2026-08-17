@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase-server"
+import { resolveUser } from "@/lib/auth-claims"
 import { HomeApp } from "./home-app"
 import { rowsToChatPreviews, type ChatPreviewRow } from "./utils"
 import { mapChatListRows, toDeletedDmSet, DELETED_DM_RPC, type ChatListRow } from "./chat-list"
@@ -34,9 +35,11 @@ export default async function HomePage({
   // nav-state's one atomic replace (Convention #12) — only the FIRST read moved.
   const initialChatsSection = resolveChatsSection((await searchParams).chats)
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Verify the JWT LOCALLY first — see lib/auth-claims.ts for why (getUser() is an
+  // HTTP call to GoTrue, measured at 250-330ms on every /home render) and for why the
+  // getUser fallback inside resolveUser is load-bearing rather than a nicety.
+  // Only `id` and `email` are read below, and both are verified JWT claims.
+  const user = await resolveUser(supabase)
 
   if (!user) redirect("/login")
   if (user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) redirect("/admin")
