@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isMemberTier } from '@/lib/roles'
+import { resolveUser } from '@/lib/auth-claims'
 import { nameIsEmailDerived } from '@/lib/profile-name'
 
 const ADMIN_EMAIL = 'brianjeong13@gmail.com'
@@ -14,9 +15,6 @@ const ADMIN_EMAIL = 'brianjeong13@gmail.com'
 // it is treated as absent (a cache miss → fresh query).
 const MW_COOKIE = 'central-mw'
 const MW_TTL_SECONDS = 5 * 60
-// Refresh the auth token (getUser round trip) once it's within this many seconds of
-// expiry, so a fast-path request never rides an about-to-expire JWT.
-const EXP_SKEW_SECONDS = 60
 
 type MwPayload = { uid: string; mid: string | null; role: string; status: string; pc: boolean; exp: number }
 
@@ -111,28 +109,11 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  // Auth — verify the JWT LOCALLY first (ES256 via JWKS, no network round trip).
-  // getClaims() decodes + signature-checks the access token against the cached JWKS;
-  // only when the token is missing / invalid / expired / near expiry do we fall back
-  // to the getUser() refresh path (which also keeps server-side token refresh working
-  // ~once/hour/user). email + id come from the verified claims (sub, email).
-  let user: { id: string; email?: string | null } | null = null
-  try {
-    const { data: claimsData } = await supabase.auth.getClaims()
-    const claims = claimsData?.claims as { sub?: string; email?: string; exp?: number } | undefined
-    const nowSec = Math.floor(Date.now() / 1000)
-    if (claims?.sub && typeof claims.exp === 'number' && claims.exp - nowSec > EXP_SKEW_SECONDS) {
-      user = { id: claims.sub, email: claims.email ?? null }
-    }
-  } catch {
-    // Any verification error → fall through to the getUser refresh path below.
-  }
-  if (!user) {
-    const {
-      data: { user: refreshed },
-    } = await supabase.auth.getUser()
-    user = refreshed ? { id: refreshed.id, email: refreshed.email } : null
-  }
+  // Auth — verify the JWT LOCALLY first (ES256 via JWKS, no network round trip), and
+  // fall back to the getUser() refresh path when the token is missing / invalid /
+  // expired / near expiry. Shared with app/home/page.tsx via lib/auth-claims.ts so the
+  // skew constant and the claim-shape assumption exist in exactly one place.
+  const user = await resolveUser(supabase)
 
   const { pathname } = request.nextUrl
 
