@@ -1,6 +1,7 @@
 "use client"
 
 import type { CSSProperties } from "react"
+import { Church } from "lucide-react"
 import { MonogramChip } from "./MonogramChip"
 
 // ── ChatAvatar — the one avatar a CHAT wears ─────────────────────────────────
@@ -97,6 +98,7 @@ export function ChatAvatar({
   members = [],
   otherCount = 0,
   nameIsGenerated = false,
+  isCentral = false,
   surface = "var(--cream)",
   className = "",
   style,
@@ -111,6 +113,12 @@ export function ChatAvatar({
   /** Total members excluding the viewer — drives the arrangement and the count. */
   otherCount?: number
   nameIsGenerated?: boolean
+  /** groups.is_central_chat — the ministry-wide room every member is auto-enrolled
+   *  in. It gets a church mark instead of a letter: it is the most important chat
+   *  in the app and the least well served by one, since its title is just the
+   *  ministry's name and "B" identifies nothing. A photo always wins over the mark
+   *  — the glyph is the DEFAULT, sized to be replaced. */
+  isCentral?: boolean
   /** The ring between overlapping circles is a gap in the ROW's own background,
    *  not a cream stroke — so a pressed or selected row must pass its own fill. */
   surface?: string
@@ -118,6 +126,24 @@ export function ChatAvatar({
   style?: CSSProperties
 }) {
   const solo = !nameIsGenerated || otherCount <= 1 || members.length === 0
+
+  // The ministry-wide room. Deliberately NOT a cluster: it holds everyone, so
+  // faces would be two people and "+200" — less identity than none. A photo
+  // replaces the mark the moment one is set.
+  if (isCentral && !avatarUrl) {
+    return (
+      <span
+        className={className}
+        style={{
+          width: size, height: size, flexShrink: 0, borderRadius: 999,
+          background: "var(--plum)", color: "var(--cream-on-dark)",
+          display: "grid", placeItems: "center", ...style,
+        }}
+      >
+        <Church style={{ width: Math.round(size * 0.46), height: Math.round(size * 0.46) }} strokeWidth={1.7} />
+      </span>
+    )
+  }
 
   if (solo) {
     // A named chat shows its title's letter; an unnamed one that has emptied out
