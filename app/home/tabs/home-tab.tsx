@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState } from "react"
 import dynamic from "next/dynamic"
 import useSWR, { useSWRConfig } from "swr"
 import { Bell, Calendar, Gift, Settings } from "lucide-react"
@@ -14,7 +14,7 @@ import { formatInZone, startOfTodayInstantISO } from "@/lib/tz"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getSetupChecklist, setLeadersInvited, dismissSetupChecklist } from "@/app/actions/setup-checklist"
-import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard, MonogramChip, PocketCard, PocketRowCard, PocketRow, PocketButton, PocketRoundButton, POCKET_KICKER_STYLE, SkeletonBlock } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard, MonogramChip, PocketCard, PocketRowCard, PocketRow, PocketButton, PocketRoundButton, POCKET_KICKER_STYLE } from "@/components/central"
 import { useIsNativeShell } from "@/lib/native-auth"
 import type { HeroSlide, SetupChecklistData, UpNextEventDetail } from "@/components/central"
 // Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
@@ -23,10 +23,9 @@ const HomeSlideManager = dynamic(
   () => import("../components/home-slide-manager").then((m) => m.HomeSlideManager),
   { ssr: false }
 )
-import type { HomeTabProps, Announcement, RsvpAttendee, ChatPreview } from "../types"
+import type { HomeTabProps, Announcement, RsvpAttendee } from "../types"
 import { isAdminRole, isLeaderRole } from "@/lib/roles"
 import { HomeDeadlines } from "./home-deadlines"
-import { useBootStream } from "../boot-stream"
 
 export { HomeTabProps }
 
@@ -176,112 +175,6 @@ function PocketSectionHeader({ title, onSeeAll }: { title: string; onSeeAll: () 
   )
 }
 
-// ── Recent chats — the two STREAMED sections of this tab ─────────────────────
-//
-// `recentChats` is the shell's LIVE state, or null until the streamed boot has
-// been handed off (app/home/boot-stream.tsx). These two components are the only
-// readers, and they read through useBootStream() — which SUSPENDS — so the rest
-// of the tab (greeting, Up Next, deadlines, verse) renders and flushes without
-// waiting on get_chat_previews, while these still arrive as server-rendered
-// markup in a later chunk of the same response.
-function useRecentChats(override: ChatPreview[] | null): ChatPreview[] {
-  const boot = useBootStream()
-  return override ?? boot.recentChats
-}
-
-function DesktopChatStrip({
-  recentChats,
-  onOpenChat,
-  onSeeAll,
-}: {
-  recentChats: ChatPreview[] | null
-  onOpenChat: HomeTabProps["onOpenChat"]
-  onSeeAll: () => void
-}) {
-  const chats = useRecentChats(recentChats)
-  const top3 = chats.slice(0, 3)
-  const totalUnread = top3.reduce((s, c) => s + (c.muted ? 0 : c.unreadCount), 0)
-  return (
-    <ChatStrip
-      chats={top3}
-      totalUnread={totalUnread}
-      onOpenChat={onOpenChat}
-      onSeeAll={onSeeAll}
-      style={{ marginTop: "var(--space-8)" }}
-    />
-  )
-}
-
-// Footprint matches the loaded strip (label row + one card) so the swap causes
-// no layout shift.
-function ChatStripSkeleton() {
-  return (
-    <div style={{ marginTop: "var(--space-8)" }}>
-      <SkeletonBlock width={84} height={11} radius="var(--r-pill)" style={{ marginBottom: "var(--space-6)" }} />
-      <div style={{ display: "flex", gap: "var(--space-5)" }}>
-        {[0, 1, 2].map((i) => (
-          <SkeletonBlock key={i} width="33%" height={62} radius="var(--r-card)" />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function PocketChats({
-  recentChats,
-  onSeeAll,
-  onOpenChat,
-}: {
-  recentChats: ChatPreview[] | null
-  onSeeAll: () => void
-  onOpenChat: HomeTabProps["onOpenChat"]
-}) {
-  const chats = useRecentChats(recentChats)
-  if (chats.length === 0) return null
-  return (
-    <section>
-      <PocketSectionHeader title="Chats" onSeeAll={onSeeAll} />
-      <PocketRowCard>
-        {chats.slice(0, 2).map((c, i) => (
-          <PocketRow
-            key={c.id}
-            leading={<MonogramChip initials={getInitials(c.groupName)} className="w-10 h-10 flex-shrink-0" style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600 }} />}
-            title={c.groupName}
-            sub={c.lastMessageSender ? `${c.lastMessageSender}: ${c.lastMessage}` : c.lastMessage || "No messages yet"}
-            time={c.time}
-            showDot={c.unreadCount > 0 && !c.muted}
-            isLast={i === Math.min(chats.length, 2) - 1}
-            onClick={() => onOpenChat(c.id, c.groupName, c.type)}
-          />
-        ))}
-      </PocketRowCard>
-    </section>
-  )
-}
-
-// Two rows in a PocketRowCard — the same footprint the loaded section has.
-function PocketChatsSkeleton() {
-  return (
-    <section>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
-        <SkeletonBlock width={64} height={17} radius="var(--r-pill)" />
-        <SkeletonBlock width={48} height={12} radius="var(--r-pill)" />
-      </div>
-      <PocketRowCard>
-        {[0, 1].map((i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 0" }}>
-            <SkeletonBlock width={40} height={40} radius={999} />
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-              <SkeletonBlock width="46%" height={13} radius="var(--r-pill)" />
-              <SkeletonBlock width="68%" height={11} radius="var(--r-pill)" />
-            </div>
-          </div>
-        ))}
-      </PocketRowCard>
-    </section>
-  )
-}
-
 // The Pocket quick-action tile (ivory borderless). Full-width since the workspace
 // tile that used to sit beside it was removed — a lone half-width tile floating
 // left reads as a broken 2-up grid, and every other Home card is full-bleed.
@@ -427,6 +320,8 @@ export function HomeTab({
   }
 
   const isLeaderOrAdmin = isLeaderRole(userRole)
+  const top3 = recentChats.slice(0, 3)
+  const totalUnread = top3.reduce((s, c) => s + (c.muted ? 0 : c.unreadCount), 0)
   const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
   const firstName = profile.name.split(" ")[0]
   const hour = new Date().getHours()
@@ -1125,16 +1020,14 @@ export function HomeTab({
           </HeroFrame>
         ))}
 
-        {/* Your chats — horizontal strip below hero. Suspends on the streamed
-            boot (see app/home/boot-stream.tsx) so the greeting + hero above it
-            flush without waiting on get_chat_previews. */}
-        <Suspense fallback={<ChatStripSkeleton />}>
-          <DesktopChatStrip
-            recentChats={recentChats}
-            onOpenChat={onOpenChat}
-            onSeeAll={onSeeChats}
-          />
-        </Suspense>
+        {/* Your chats — horizontal strip below hero */}
+        <ChatStrip
+          chats={top3}
+          totalUnread={totalUnread}
+          onOpenChat={onOpenChat}
+          onSeeAll={onSeeChats}
+          style={{ marginTop: "var(--space-8)" }}
+        />
 
         {/* ── My Deadlines — desktop (own SWR key; between chats and For You) ── */}
         <HomeDeadlines ministryId={ministryId} profileId={profile.id} variant="desktop" />
@@ -1359,17 +1252,26 @@ export function HomeTab({
             </section>
           )}
 
-          {/* ── Chats preview — mobile (top 2) ──
-              Suspends on the streamed boot so everything above it (chrome row,
-              greeting, Up Next, deadlines) paints without waiting on
-              get_chat_previews. See app/home/boot-stream.tsx. */}
-          <Suspense fallback={<PocketChatsSkeleton />}>
-            <PocketChats
-              recentChats={recentChats}
-              onSeeAll={onSeeChats}
-              onOpenChat={onOpenChat}
-            />
-          </Suspense>
+          {/* ── Chats preview — mobile (top 2) ── */}
+          {recentChats.length > 0 && (
+            <section>
+              <PocketSectionHeader title="Chats" onSeeAll={onSeeChats} />
+              <PocketRowCard>
+                {recentChats.slice(0, 2).map((c, i) => (
+                  <PocketRow
+                    key={c.id}
+                    leading={<MonogramChip initials={getInitials(c.groupName)} className="w-10 h-10 flex-shrink-0" style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600 }} />}
+                    title={c.groupName}
+                    sub={c.lastMessageSender ? `${c.lastMessageSender}: ${c.lastMessage}` : c.lastMessage || "No messages yet"}
+                    time={c.time}
+                    showDot={c.unreadCount > 0 && !c.muted}
+                    isLast={i === Math.min(recentChats.length, 2) - 1}
+                    onClick={() => onOpenChat(c.id, c.groupName, c.type)}
+                  />
+                ))}
+              </PocketRowCard>
+            </section>
+          )}
 
           {/* ── Quick tile — mobile. Give only; web-only (the native shell hides it).
               The "first workspace" tile that used to share this row is GONE (Brian,

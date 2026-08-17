@@ -357,10 +357,7 @@ export interface HomeTabProps {
   userRole: string
   ministryId: string
   ministryName: string
-  /** The shell's LIVE recent-chats state, or null while the streamed boot has
-   *  not been handed off yet — in which case the chats sections read the
-   *  streamed value themselves, behind Suspense. See app/home/boot-stream.tsx. */
-  recentChats: ChatPreview[] | null
+  recentChats: ChatPreview[]
   onSeeChats: () => void
   onSeeAnnouncements: () => void
   onOpenChat: (id: string, name: string, type?: string) => void
@@ -1104,21 +1101,6 @@ export interface DesktopSidebarProps {
   superSwitcherSlot?: ReactNode
 }
 
-/** The STREAMED half of the /home boot — see app/home/boot-stream.tsx.
- *  Declared HERE rather than in that module because page.tsx (a Server
- *  Component) needs the shape, and every export of a `"use client"` module
- *  reaching the server graph becomes a client reference, not a real value. */
-export interface BootStream {
-  /** get_chat_previews → the home tab's chats strip + the unread badge. */
-  recentChats: ChatPreview[]
-  /** get_chat_list (+ the dead-DM sort) → the chats tab list. */
-  chatList: ChatGroup[]
-  activeQuestion: CongregationQuestion | null
-  hasResponded: boolean
-  /** team_id → member count, for the workspace picker's "N members". */
-  teamMemberCounts: Record<string, number>
-}
-
 export interface HomeAppProps {
   userId: string
   initialProfile: Profile
@@ -1128,17 +1110,17 @@ export interface HomeAppProps {
    *  interpreted in. Provided to the tree via MinistryTimezoneProvider; null
    *  only if the boot fetch failed (resolver logs + falls back). */
   ministryTimezone?: string | null
+  initialRecentChats?: ChatPreview[]
+  /** SSR-seeded chats-tab list (app/home/page.tsx). Removes the cold-load client
+   *  round trip AND the duplicate get_chat_list the panels' own SWR used to race. */
+  initialChatList?: ChatGroup[]
   /** `?chats` scope resolved on the SERVER, so the server-rendered chat list and
    *  the hydration render agree on which scope is showing. See chat-shared.ts. */
   initialChatsSection?: "church" | "my"
-  /** BLOCKING boot data — home-app decides workspace auto-enter synchronously in
-   *  a useState initializer, so these two cannot be streamed. */
   initialUserTeams?: UserTeam[]
+  initialActiveQuestion?: CongregationQuestion | null
+  initialHasResponded?: boolean
   initialGovernanceSettings?: GovernanceSettings
-  /** The STREAMED half of the boot — chat previews, the chats-tab list, the
-   *  congregation question + response, team member counts. Unresolved when the
-   *  shell renders; see app/home/boot-stream.tsx for how it is consumed. */
-  bootStream?: Promise<BootStream>
 }
 
 export type { ChatPreview }
