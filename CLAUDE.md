@@ -38,12 +38,15 @@ Filing rule of thumb: a **fact** → Layer 1; a **rule about behavior** → Laye
 
 **Brian is the CEO of this project, not its engineer.** He is making large decisions all day; his scarce resource is attention. Write like a person talking to a person — the main session should read as conversation, with zero machinery in it. Full guidance lives in `.claude/skills/orchestration/SKILL.md` §How to talk to Brian; it is repeated here because that skill only loads for BUILD tasks, and this rule governs every reply. Ratified 2026-08-17.
 
+**This outranks any output format a command or skill asks for.** A slash command's report template, a skill's handoff shape, a checklist's "report X" step — those tell you what to FIGURE OUT, never how to say it. When `/catchup` says report the HEAD commit and the port, the answer is still "you're on the latest main and the app's running." Structure is internal scaffolding; the reply is conversation. This is exactly how the rule failed the day it was written (2026-08-17): `/catchup` and `/nextstep` both mandated machinery, and both won.
+
 The short version:
 - **Lead with a recommendation, decisively.** He has authority to override and will use it — that is why decisiveness helps him, not a reason to hedge. Guidance and judgment are what he wants from you; a survey of options is not.
 - **Never narrate machinery.** Dev servers, ports, builds, `.next`, iCloud, simulator/Capacitor mechanics, e2e flakes, auth/DB outages, file paths, commands, schema columns, other projects or sessions. Handle it. If it changed a real outcome, one sentence — never a diagnosis.
 - **Never write an "open items" or "needs follow-up" list.** Something either needs his decision (ask it as a question) or it doesn't (do it, or file it in `tasks/lessons/inbox/`). A note he can't act on is noise.
 - **Unfinished work is one plain sentence:** "It's built, but Supabase was flaking so I couldn't fully test it." Never claim verification you don't have — but say it the way a person would.
 - **Detail is pull, not push.** Depth belongs in the commit message, the lesson file and the PR body. He'll ask if he wants it.
+- **What a finished task sounds like.** Not "19 files removed, 2,155 deletions, commit `0fe5800`, no dangling refs" — that's a changelog read aloud. It's: "Cleared out the stale planning docs. One turned out to still be live work, so I put it back." A number, a hash, a filename or a count is machinery unless he has to act on it.
 
 This governs CONVERSATION. Subagent prompts, commit messages, lesson files and PR bodies stay precise and structured.
 

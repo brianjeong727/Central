@@ -30,23 +30,16 @@ Form a single thesis: **what is the ONE thing standing between Central and its n
 - **Sandbox illusion.** Rich seeded fixtures in Brian's Sandbox are not usage.
 - **Debt that is actually fine.** Frozen code that nobody touches costs nothing. Don't dress cleanup up as strategy.
 
-## Phase 3 — Answer (this is what Brian reads — keep it under ~300 words total)
+## Phase 3 — Answer (this is what Brian reads — under ~250 words, and it must read like a person talking)
 
-Exactly this shape, in this order. Prose, no tables. Hard ceilings — if it doesn't fit, your thesis isn't sharp enough yet.
+**The checklist below is what you must WORK OUT, not a template to render.** CLAUDE.md §How to talk to Brian outranks it: no section headers, no bolded field labels, no bullet dumps, no "Diagnosis / Direction A / The bet" scaffolding on the page. Write four or five short paragraphs the way a sharp colleague would say it out loud, then let `AskUserQuestion` carry the actual choice. If the answer reads like a report, you have failed the command even if every fact in it is right.
 
-**Diagnosis** — ≤4 bullets, ≤20 words each. Each bullet carries its evidence inline (a file, a table, a count, a commit). One of them must state the bottleneck outright.
+Cover these, invisibly:
 
-**Direction A / Direction B** — the two best bets. Each gets exactly four lines:
-- *Name* — a plain-English outcome, not a task title.
-- *Why now* — one sentence.
-- *First move* — one sentence, concrete enough to start today.
-- *The bet* — what you're wagering and what you give up by not doing the other.
-
-Rules on the two directions: they must be **genuinely mutually exclusive bets on where effort goes**, not two steps of one sequence (if B is "then do A," B is not a direction — find a real alternative). Different in KIND, not just in size. **Never offer three.** Kill the weaker third in your head and don't mention it.
-
-**Needs review** — ONE item, 2–3 sentences: something that could invalidate work or bite at launch (a permission/RLS assumption, a scaling cliff, a shipped-but-unverified surface, a cost/quota edge). It is a risk to look at, **not** a third direction. Include the rough cost to check it.
-
-**Recommendation** — one sentence: A or B, and why in a half-clause. Take the position; hedging here is a failure of the command.
+- **The bottleneck**, stated outright and early — one thing, not a list. Evidence rides along in the sentence ("all seven ministries are sandboxes") rather than as a citation; never a bare file path or commit hash unless he must act on it.
+- **Two directions.** Each needs a plain-English outcome, why it's now, a first move concrete enough to start today, and what he gives up by not taking the other — but say those as connected prose, not four labeled lines. They must be **genuinely mutually exclusive bets on where effort goes**, not two steps of one sequence (if B is "then do A," B is not a direction — find a real alternative). Different in KIND, not just size. **Never offer three** — kill the weaker third in your head and don't mention it.
+- **One thing to review** — a risk that could invalidate the work or bite at launch (a permission/RLS assumption, a scaling cliff, a shipped-but-unverified surface, a cost edge), plus roughly what it costs to check. It is a risk, **not** a third direction.
+- **Your call** — A or B, and the half-clause why. Take the position; hedging is a failure of the command.
 
 Then call `AskUserQuestion` so Brian picks in one tap: Direction A / Direction B / Review first. Nothing after that call — do not start building the winner in the same turn. When he picks, THAT becomes a normal build task and goes through the orchestration skill from the top.
 
