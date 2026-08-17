@@ -27,7 +27,17 @@ const MAX_TOP = 19
 
 async function titleTop(page: Page): Promise<{ top: number; text: string } | null> {
   return page.evaluate(() => {
-    for (const el of Array.from(document.querySelectorAll("span, div, h1, h2, p"))) {
+    // `button` is in the list because a chrome title MAY be an exclusive scope
+    // switch — one button per scope at the one title type, active `--ink` and the
+    // rest muted (mobile_design_system.md §0, `PocketChrome`'s `scope`; Chats uses
+    // it). Without buttons here the detector reported "no header title found" on a
+    // screen whose header was right there, which reads like a missing header rather
+    // than a blind selector. The contract has always been that a serif-22 leaf opens
+    // the row at the same height — never that the leaf is a single non-interactive
+    // word. Colour is deliberately NOT filtered: the FIRST matching option in DOM
+    // order is measured whether or not it is the active one, since every option
+    // shares the row's top edge and the rhythm is what is under test here.
+    for (const el of Array.from(document.querySelectorAll("span, div, h1, h2, p, button"))) {
       const r = el.getBoundingClientRect()
       if (r.top < 0 || r.top > 260 || r.height < 12 || r.width < 40) continue
       const s = getComputedStyle(el)

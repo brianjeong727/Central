@@ -34,7 +34,7 @@ import { Search, ChevronDown, X, Plus, Users, Pin, PinOff, Lock, Bell, BellOff, 
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
-import { ChatAvatar, chatAvatarLabel, SegmentedControl, PocketFilterChip, PocketSearchField, PocketRow, PocketKicker, POCKET_KICKER_STYLE, useScrollResetOn, SwipeActionRow, ConfirmDialog, Toast } from "@/components/central"
+import { ChatAvatar, chatAvatarLabel, SegmentedControl, PocketSearchField, PocketRow, PocketKicker, POCKET_KICKER_STYLE, useScrollResetOn, SwipeActionRow, ConfirmDialog, Toast } from "@/components/central"
 import { ChatSearchView } from "../components/chat-search"
 import { findExistingDm } from "../dm"
 import { formatChatListTime } from "../utils"
@@ -487,11 +487,28 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
 
   return (
     <div className="pb-2 md:pb-0 md:h-full md:flex md:flex-col">
-      {/* Mobile chrome (B3 Pocket) — "Chats" + directory ghost + avatar. New-chat
-          moved inline onto the scope-pills row below. */}
+      {/* Mobile chrome (B3 Pocket) — the scope switch IS the title. "Chats" as a
+          header earned nothing (the bottom nav already names the tab) while the
+          Church/My chips cost a second full-width band, so the two collapsed into
+          one row: scope at chrome-title type, then new-chat (My scope only) and
+          the directory ghost. Ratified with Brian 2026-08-17. */}
       <PocketChrome
         title="Chats"
-        action={
+        scope={{
+          options: [{ id: "church", label: "Church" }, { id: "my", label: "My chats" }],
+          value: subTab,
+          onChange: (t) => {
+            setSubTab(t as ChatsSection)
+            setSearch("")
+            setParam("chats", t === "church" ? null : t)
+          },
+        }}
+        action={canShowNewChat ? (
+          <PocketRoundButton variant="plum" onClick={openNewChat} ariaLabel="New chat">
+            <Plus style={{ width: 17, height: 17 }} strokeWidth={2} />
+          </PocketRoundButton>
+        ) : undefined}
+        action2={
           <PocketRoundButton variant="ghost" onClick={onOpenDirectory} ariaLabel="Directory">
             <Users style={{ width: 17, height: 17 }} strokeWidth={1.6} />
           </PocketRoundButton>
@@ -535,21 +552,9 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           that is not a row — chips, search, empty states — re-applies px-5 for
           itself. Desktop was already px-0 here, so it is unaffected. */}
       <div className="pt-1 pb-2 md:pt-2 md:flex-1 md:overflow-y-auto">
-      {/* Mobile scope pills (B3 Pocket) — Church / My chats; the new-chat + sits
-          right-aligned on the same row, My chats scope only. */}
-      {/* Scope pills hide while searching — search spans BOTH scopes, so leaving a
-          scope filter on screen would imply results are filtered by it. */}
-      <div className={`items-center gap-2 mb-4 px-5 md:px-0 md:hidden ${searchOpen ? "hidden" : "flex"}`}>
-        <PocketFilterChip label="Church" active={subTab === "church"} onClick={() => { setSubTab("church"); setSearch(""); setParam("chats", null) }} />
-        <PocketFilterChip label="My chats" active={subTab === "my"} onClick={() => { setSubTab("my"); setSearch(""); setParam("chats", "my") }} />
-        {canShowNewChat && (
-          <div className="ml-auto">
-            <PocketRoundButton variant="plum" onClick={openNewChat} ariaLabel="New chat">
-              <Plus style={{ width: 17, height: 17 }} strokeWidth={2} />
-            </PocketRoundButton>
-          </div>
-        )}
-      </div>
+      {/* The mobile scope pills + inline new-chat that used to sit here moved INTO
+          the chrome row above (scope = title). Nothing replaces this band — the
+          list now starts directly under the one chrome row. */}
 
       {/* Search (mobile) — the field is always present; focusing it swaps the body
           below to the search view IN PLACE, so the field stays pinned and the
