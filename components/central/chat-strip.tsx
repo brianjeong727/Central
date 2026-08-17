@@ -22,6 +22,12 @@ export interface ChatPreview {
   // is a recency feed and never reorders by pinned.
   muted?: boolean
   pinned?: boolean
+  /** The chat's chip image, ALREADY resolved by chatChipAvatar()
+   *  (app/home/chat-avatar.ts) — a group's own photo, or a DM partner's profile
+   *  photo. Null/absent falls back to the initials chip. This field is the
+   *  RESULT of that derivation, never a raw column: components/central is a LEAF
+   *  and must not import from app/, so the branch cannot live here. */
+  avatarUrl?: string | null
   /** Raw last-message instant. `time` above is a RELATIVE label derived from it,
    *  so it goes stale as time passes and not only as data changes — the app layer
    *  re-derives the label from this on a timer (home-app.tsx). Kept on the type
@@ -113,9 +119,10 @@ function StripCard({ chat, index, onOpen }: {
       onMouseEnter={e => (e.currentTarget.style.background = "var(--ivory)")}
       onMouseLeave={e => (e.currentTarget.style.background = "var(--cream-3)")}
     >
-      {/* Serif monogram */}
+      {/* Serif monogram — or the chat's photo, when it has one. */}
       <MonogramChip
         initials={chat.groupName.charAt(0)}
+        avatarUrl={chat.avatarUrl}
         style={{ width: 36, height: 36, fontSize: 16, fontWeight: 400, fontFamily: "var(--serif)" }}
       />
 

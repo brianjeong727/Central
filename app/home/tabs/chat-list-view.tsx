@@ -42,6 +42,7 @@ import type { ChatsTabProps, ChatGroup, Profile } from "../types"
 import { useNavState } from "../nav-state"
 import { fetchChatList } from "../chat-list"
 import { chatCapabilities } from "../chat-permissions"
+import { chatChipAvatar } from "../chat-avatar"
 import { setChatPinned, setChatMuted, setChatArchived, leaveChat } from "../chat-actions"
 import type { SwipeAction, SwipeSide } from "@/components/central/swipe-actions"
 import { PushSubscribeCard } from "../components/notifications"
@@ -81,7 +82,13 @@ function PocketChatRow({ group, isLast, onClick }: { group: ChatGroup; isLast: b
   const time = useChatListTime(group.last_message_time)
   return (
     <PocketRow
-      leading={<PocketChip letter={group.name.charAt(0).toUpperCase()} solid={group.is_central_chat === true} />}
+      leading={
+        <PocketChip
+          letter={group.name.charAt(0).toUpperCase()}
+          avatarUrl={chatChipAvatar(group)}
+          solid={group.is_central_chat === true}
+        />
+      }
       title={group.name}
       // Dead thread (the counterpart deleted their account): the title drops to
       // the tertiary text token. The row is otherwise untouched and still opens
@@ -661,6 +668,8 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
 
 export function ChatGroupCard({ group, onClick, isActive, locked }: { group: ChatGroup; onClick: () => void; isActive?: boolean; locked?: boolean }) {
   const firstInitial = group.name.charAt(0)
+  // Group photo, or a DM partner's face — one derivation, see chat-avatar.ts.
+  const chipAvatar = chatChipAvatar(group)
   // Glyph precedence: pinned + muted take the two available slots; lock drops when
   // both are set (a locked room is already implied by its section). With ≤1 of
   // pin/mute set, lock may render alongside. Order: pin, mute, lock.
@@ -681,6 +690,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
         <div className="flex items-center gap-3.5">
           <MonogramChip
             initials={firstInitial}
+            avatarUrl={chipAvatar}
             className="w-12 h-12 flex-shrink-0"
             style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400 }}
           />
@@ -722,6 +732,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
       >
         <MonogramChip
           initials={firstInitial}
+          avatarUrl={chipAvatar}
           className="flex-shrink-0"
           style={{ width: 38, height: 38, fontFamily: "var(--serif)", fontSize: "16px" }}
         />

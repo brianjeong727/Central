@@ -1,5 +1,6 @@
 import { instantToZoned } from "@/lib/tz"
 import type { ChatPreview } from "@/components/central/chat-strip"
+import { chatChipAvatar } from "./chat-avatar"
 
 export const REACTION_EMOJIS = ["👍", "❤️", "😂", "🙏", "🔥", "😮"]
 
@@ -250,6 +251,10 @@ export type ChatPreviewRow = {
   last_msg_type: string | null; unread_count: number
   last_msg_attachment_type: string | null; last_msg_has_poll: boolean | null
   muted: boolean | null; pinned: boolean | null
+  // Same pair get_chat_list carries — the chat's own photo and, for a DM, the
+  // other participant's. Resolved to ONE url below via chatChipAvatar().
+  group_avatar_url: string | null
+  partner_avatar_url: string | null
 }
 
 /** Map + sort `get_chat_previews` rows into the ChatPreview shape the Home strip
@@ -264,6 +269,13 @@ export function rowsToChatPreviews(rows: ChatPreviewRow[]): ChatPreview[] {
       lastMessageSender: row.last_msg_sender_name ?? "",
       unreadCount: Number(row.unread_count),
       initials: getInitials(row.group_name),
+      // ChatPreview crosses into components/central (a LEAF), so the DM branch
+      // is applied HERE and the strip only ever sees the resolved url.
+      avatarUrl: chatChipAvatar({
+        type: row.group_type,
+        group_avatar_url: row.group_avatar_url,
+        partner_avatar_url: row.partner_avatar_url,
+      }),
       time: row.last_msg_at ? formatChatListTime(row.last_msg_at) : "",
       muted: row.muted ?? false,
       pinned: row.pinned ?? false,

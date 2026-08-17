@@ -188,6 +188,18 @@ export interface ChatGroup {
    *  every live conversation and de-emphasises its title. Never a filter — the
    *  thread and its messages stay reachable. */
   counterpart_deleted?: boolean
+  /** groups.avatar_url — the chat's own uploaded photo (church + `my` chats).
+   *  NEVER read directly: resolve the chip image through `chatChipAvatar()`
+   *  (app/home/chat-avatar.ts), which ignores this for a DM.
+   *
+   *  Deliberately named for the RPC column rather than a plain `avatar_url`:
+   *  `group_avatar_url` is the token scripts/check-chat-avatar.sh greps for, so
+   *  ANY surface that reaches for this field instead of the resolver fails the
+   *  build gate. A plain name made the gate unfailable (review finding W1). */
+  group_avatar_url?: string | null
+  /** For a DM: the OTHER participant's profiles.avatar_url, resolved inside
+   *  get_chat_list. Null for every other chat type. */
+  partner_avatar_url?: string | null
 }
 
 /** Max length of a shared chat nickname (chat_nicknames). Lives here (not the

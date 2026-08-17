@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore
 import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, BellOff, Paperclip, FileDown, LinkIcon, ImageIcon, Folder } from "lucide-react"
+import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, BellOff, Paperclip, FileDown, LinkIcon, ImageIcon, Folder, Camera } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -12,7 +12,7 @@ import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames"
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
-import { MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE } from "@/components/central"
+import { MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE } from "@/components/central"
 import { getOrCreateDm } from "../dm"
 import { isMobileViewport } from "@/lib/breakpoints"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
@@ -21,6 +21,8 @@ import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatGro
 import { useOpenMemberProfile } from "../member-profile-context"
 import { InsetHairline } from "@/components/central/hairline"
 import { chatCapabilities } from "../chat-permissions"
+import { chatChipAvatarFromParts, chatAvatarStoragePath, chatGroupPhotoPatch } from "../chat-avatar"
+import { downscaleToJpeg } from "@/lib/downscale-image"
 import { subscribeChatTopic } from "../chat-broadcast"
 import { MessageRow, formatFileSize } from "./message-row"
 import { Composer } from "./composer"
@@ -463,6 +465,19 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const prefsSeeded = useRef(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // ── Chat photo ──────────────────────────────────────────────────────────────
+  // The saved value (mirrors groups.avatar_url) plus a local object-URL shown the
+  // instant a file is picked. Deliberately NOT part of the staged pending-prefs
+  // set: an upload is a conversational write like the profile photo, so it
+  // commits on pick and never waits behind the Save bar (Convention #21's
+  // carve-out — #4 optimistic applies, #21 does not).
+  const [chatAvatarUrl, setChatAvatarUrl] = useState<string | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
+  // Removal is instant + undoable rather than confirmed (Brian, 2026-08-16) —
+  // same shape the chat list's swipe pin/mute already use.
+  const [avatarToast, setAvatarToast] = useState<{ message: string; undo?: () => void } | null>(null)
   const [confirmAction, setConfirmAction] = useState<"archive" | "unarchive" | "delete" | "leave" | null>(null)
   const [confirmRemoveMemberId, setConfirmRemoveMemberId] = useState<string | null>(null)
   const [hoveredMemberId, setHoveredMemberId] = useState<string | null>(null)
@@ -535,7 +550,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           .maybeSingle(),
         supabase
           .from("groups")
-          .select("category")
+          .select("category, avatar_url")
           .eq("id", groupId)
           .maybeSingle(),
         supabase
@@ -568,14 +583,17 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           deleted: !!p?.deleted_at,
         }
       })
-      const cat = (groupRow as { category: string | null } | null)?.category
+      const groupRowTyped = groupRow as { category: string | null; avatar_url: string | null } | null
+      const cat = groupRowTyped?.category
       const category: ChurchSection = cat === "team" ? "team" : cat === "group" ? "group" : "general"
+      const avatarUrl = groupRowTyped?.avatar_url ?? null
       const globalMode = ((meProf as { notification_settings: NotificationSettings | null } | null)
         ?.notification_settings?.group_mode) ?? "smart"
       return {
         members: mapped,
         pref: (prefData as { muted: boolean | null; pinned: boolean | null; notify_mode: ChatNotifyMode | null } | null) ?? null,
         category,
+        avatarUrl,
         globalMode,
       }
     }
@@ -651,6 +669,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     setPinned(settingsData.pref?.pinned ?? false)
     setNotifyMode(settingsData.pref?.notify_mode ?? null)
     setCategory(settingsData.category)
+    setChatAvatarUrl(settingsData.avatarUrl)
     if (!prefsSeeded.current) {
       prefsSeeded.current = true
       setPendingMuted(settingsData.pref?.muted ?? false)
@@ -668,6 +687,146 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       .eq("ministry_id", ministryId)
       .order("name")
     setAllProfiles((data ?? []).filter((p: Profile) => !existingIds.has(p.id)))
+  }
+
+  // ── Chat photo upload ───────────────────────────────────────────────────────
+  // Gated on the SHARED capability predicate, not a new role array: a church
+  // chat needs leader-tier + membership, a `my` chat needs membership, and a DM
+  // is false — which is what keeps a DM's chip on the partner's face with no way
+  // to write a group photo from the UI (chat-avatar.ts, W1).
+  //
+  // Unlike rename / archive / delete this deliberately carries NO `&& !isCentralChat`.
+  // The ministry-wide chat can't be renamed or destroyed, but it CAN wear the
+  // church's logo — Brian, 2026-08-16.
+  const canSetChatPhoto = canManage
+
+  async function handleChatAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ""
+    if (!file || !canSetChatPhoto) return
+    setUploadingAvatar(true)
+    setAvatarError(null)
+    // Optimistic (Convention #4): paint the picked file immediately, then swap
+    // to the stored public URL. The object URL is revoked once the real one has
+    // taken over, and on failure the chip reverts to whatever was there before.
+    const localUrl = URL.createObjectURL(file)
+    setAvatarPreview(localUrl)
+
+    const raw = file.name.split(".").pop()?.toLowerCase()
+    const rawExt = raw && raw !== file.name.toLowerCase() ? raw : "png"
+    // Downscale to a 512px JPEG; on any decode failure keep the raw file. The
+    // stored contentType is what Supabase serves, so the path extension need not
+    // match the bytes (the profile-photo upload relies on the same thing).
+    let uploadBody: Blob | File = file
+    let uploadContentType = file.type || "image/png"
+    let ext = rawExt
+    try {
+      uploadBody = await downscaleToJpeg(file)
+      uploadContentType = "image/jpeg"
+      ext = "jpg"
+    } catch {
+      uploadBody = file
+      uploadContentType = file.type || "image/png"
+      ext = rawExt
+    }
+
+    const failUpload = (message: string) => {
+      setAvatarPreview(null)
+      URL.revokeObjectURL(localUrl)
+      setAvatarError(message)
+      setUploadingAvatar(false)
+    }
+
+    // UNIQUE name + upsert:false. `announcement-images` has no storage UPDATE
+    // policy, so the profile-photo pattern (stable name + upsert:true) would
+    // succeed once and be RLS-denied on every REPLACEMENT — see the note on
+    // chatAvatarStoragePath.
+    const path = chatAvatarStoragePath(ministryId, groupId, ext)
+    const { data: uploadData, error: upErr } = await supabase.storage
+      .from("announcement-images")
+      .upload(path, uploadBody, { upsert: false, contentType: uploadContentType })
+    if (upErr || !uploadData) { failUpload(upErr?.message ?? "Upload failed"); return }
+
+    const { data: { publicUrl } } = supabase.storage.from("announcement-images").getPublicUrl(uploadData.path)
+    const { error: dbErr } = await supabase
+      .from("groups")
+      .update({ avatar_url: publicUrl })
+      .eq("id", groupId)
+      .eq("ministry_id", ministryId)
+    if (dbErr) { failUpload(dbErr.message); return }
+
+    setAvatarPreview(null)
+    URL.revokeObjectURL(localUrl)
+    setUploadingAvatar(false)
+    // Local state + BOTH shared caches in one call, so the list row and the chat
+    // header change in the same frame instead of waiting for a revalidation.
+    applyChatAvatar(publicUrl)
+    mutateSettings()
+  }
+
+  // What the settings hero chip shows: the in-flight local preview if there is
+  // one, else the ONE derivation (a DM ignores the group column entirely).
+  const settingsChipAvatar = avatarPreview ?? chatChipAvatarFromParts({
+    type: groupType,
+    groupPhotoUrl: chatAvatarUrl,
+    partnerPhotoUrl: dmPartner?.avatar_url ?? null,
+  })
+
+  // The identity chip, shared by the mobile and desktop heroes so the upload
+  // affordance can never exist on one width and not the other. A plain function
+  // (not a nested component) — a component defined during render gets a new type
+  // each pass and would remount the file input mid-upload.
+  function renderChatPhotoChip(size: number, fontSize: number) {
+    const chip = (
+      <MonogramChip
+        initials={getInitials(displayGroupName)}
+        avatarUrl={settingsChipAvatar}
+        style={{ width: size, height: size, fontSize, fontWeight: 500 }}
+      />
+    )
+    if (!canSetChatPhoto) return chip
+    return (
+      <label
+        className="relative flex-shrink-0"
+        style={{ width: size, height: size, cursor: uploadingAvatar ? "wait" : "pointer", display: "inline-flex" }}
+        title="Change chat photo"
+      >
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleChatAvatarUpload}
+          disabled={uploadingAvatar}
+          style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }}
+        />
+        {chip}
+        {/* A persistent badge rather than a hover-only scrim: phone width has no
+            hover, and an editable photo that looks identical to a read-only one
+            is not an affordance. */}
+        <span
+          aria-hidden
+          style={{
+            position: "absolute", right: -2, bottom: -2,
+            width: 22, height: 22, borderRadius: 999,
+            display: "grid", placeItems: "center",
+            background: "var(--plum)", color: "var(--cream-on-dark)",
+            border: "2px solid var(--cream)",
+          }}
+        >
+          <Camera style={{ width: 11, height: 11 }} strokeWidth={2} />
+        </span>
+        {uploadingAvatar && (
+          <span
+            className="absolute inset-0 flex items-center justify-center"
+            style={{ borderRadius: 999, background: "color-mix(in srgb, var(--ink) 40%, transparent)" }}
+          >
+            <span
+              className="animate-spin"
+              style={{ width: 16, height: 16, border: "2px solid var(--cream)", borderTopColor: "transparent", borderRadius: "50%" }}
+            />
+          </span>
+        )}
+      </label>
+    )
   }
 
   async function handleRename() {
@@ -710,6 +869,118 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       { revalidate: false },
     )
   }
+
+  // The chat photo lives in THREE places at once: this screen's local state, the
+  // chat-list cache (every row's chip) and the group-meta cache (the chat
+  // header). Upload, remove and undo all move the same three together — a single
+  // writer, so a rollback can never restore two of them and forget the third.
+  function applyChatAvatar(url: string | null) {
+    setChatAvatarUrl(url)
+    // The ChatGroup patch is built in chat-avatar.ts on purpose — the field name
+    // is check-chat-avatar.sh's trigger token, which this file must not type.
+    patchChatListPref(chatGroupPhotoPatch(url))
+    mutateGlobal(
+      ["group-meta", groupId],
+      (cur: { avatar_url: string | null } | null | undefined) => (cur ? { ...cur, avatar_url: url } : cur),
+      { revalidate: false },
+    )
+  }
+
+  async function commitChatAvatar(url: string | null): Promise<boolean> {
+    const { error: dbErr } = await supabase
+      .from("groups")
+      .update({ avatar_url: url })
+      .eq("id", groupId)
+      .eq("ministry_id", ministryId)
+    return !dbErr
+  }
+
+  // Clearing the photo, not just replacing it. Without this a chat that gets the
+  // wrong picture is stuck with it — you can only overwrite, which is no help if
+  // what you wanted was the initials chip back. Messenger and iMessage both allow
+  // removal; the engineer flagged its absence and it is a gap, not a scope cut.
+  //
+  // ONE TAP, NO MODAL, BUT UNDOABLE (Brian, 2026-08-16). Re-uploading is easy, so
+  // a ConfirmDialog is heavier than the action deserves — but the change is
+  // immediate for everyone else in the room (the ministry-wide chat's logo
+  // included), so "nothing at all" is too light. The Undo toast is the same
+  // affordance the chat list's swipe pin/mute already use.
+  //
+  // The stored object is deliberately NOT deleted: `announcement-images` has no
+  // storage DELETE policy, and the bucket's other two writers (announcements,
+  // receipts) already orphan superseded objects the same way. Nulling the column
+  // is what makes it invisible; a storage sweep is a separate concern. It is also
+  // what makes Undo cheap — the bytes never left, so restoring is one UPDATE.
+  async function handleChatAvatarRemove() {
+    if (!canSetChatPhoto || !chatAvatarUrl || uploadingAvatar) return
+    const previous = chatAvatarUrl
+    setUploadingAvatar(true)
+    setAvatarError(null)
+    // Optimistic, and rolled back on failure exactly as the upload path is. The
+    // toast is optimistic too — waiting for the round trip to offer Undo reads as
+    // lag against a chip that already changed (chat-list-view's runPin/runMute).
+    applyChatAvatar(null)
+    setAvatarToast({ message: "Photo removed", undo: () => { void handleChatAvatarUndoRemove(previous) } })
+    const ok = await commitChatAvatar(null)
+    if (!ok) {
+      applyChatAvatar(previous)
+      setAvatarToast(null)
+      setAvatarError("Couldn't remove the photo. Please try again.")
+      setUploadingAvatar(false)
+      return
+    }
+    setUploadingAvatar(false)
+    mutateSettings()
+  }
+
+  async function handleChatAvatarUndoRemove(previous: string) {
+    if (!canSetChatPhoto) return
+    setAvatarError(null)
+    applyChatAvatar(previous)
+    const ok = await commitChatAvatar(previous)
+    if (!ok) {
+      applyChatAvatar(null)
+      setAvatarError("Couldn't restore the photo. Please try again.")
+      return
+    }
+    mutateSettings()
+  }
+
+  const canRemoveChatPhoto = Boolean(canSetChatPhoto && chatAvatarUrl && !uploadingAvatar)
+
+  // TWO idioms, one per width — deliberately not one node rendered twice.
+  //
+  // Desktop is governed by web_design_system.md, where a text control at weight
+  // 600 in serif at a fractional 12.5px breaks two named "do nots" — so it is the
+  // sanctioned ghost ContentActionButton (§3.2), matching the "Add members" ghost
+  // in this same hero. That also buys the 36px hit box the bare text run never
+  // had, and hands the row's plum budget back to the camera badge, which has no
+  // alternative.
+  //
+  // Mobile stays the plum text control: mobile_design_system.md §3's ramp carries
+  // 600 at row scale, and phone width is governed by that doc, never this one.
+  const removeChatPhotoDesktop = canRemoveChatPhoto ? (
+    <ContentActionButton variant="ghost" label="Remove photo" onClick={handleChatAvatarRemove} />
+  ) : null
+
+  const removeChatPhotoMobile = canRemoveChatPhoto ? (
+    <button
+      type="button"
+      onClick={handleChatAvatarRemove}
+      style={{
+        background: "none", border: "none", padding: 0, cursor: "pointer",
+        // Plum, NOT muted: sat in --muted-text directly under "Church chat · 2
+        // members" it read as a third line of METADATA rather than a control.
+        // Not --danger — removing a photo is undone by uploading another, and
+        // danger tone here would outrank the actual danger zone further down.
+        // 12.5 tracks the 13.5px meta line it sits under — the phone hero's own
+        // ramp; the integer-size rule is web_design_system's and desktop-only.
+        color: "var(--plum)", fontSize: 12.5, fontWeight: 600, fontFamily: "var(--serif)",
+      }}
+    >
+      Remove photo
+    </button>
+  ) : null
 
   function handleCancelPrefs() {
     setPendingMuted(muted)
@@ -1131,7 +1402,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           ) : (
           <>
           <div className="flex items-center gap-3.5 mb-7" style={{ paddingTop: 4 }}>
-            <MonogramChip initials={getInitials(displayGroupName)} className="w-14 h-14 font-medium text-[18px]" />
+            {renderChatPhotoChip(56, 18)}
             <div className="flex-1 min-w-0">
               {renaming ? (
                 <input
@@ -1153,6 +1424,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               <p className="text-[13.5px] mt-0.5" style={{ color: "var(--muted-text)" }}>
                 {isDM ? typeLabel : `${typeLabel} · ${members.length} member${members.length !== 1 ? "s" : ""}`}
               </p>
+              {removeChatPhotoMobile && <div className="mt-1">{removeChatPhotoMobile}</div>}
+              {avatarError && <p className="text-[12px] mt-1" style={{ color: "var(--danger)" }}>{avatarError}</p>}
             </div>
           </div>
 
@@ -1300,7 +1573,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             {/* Hero strip — chat identity + inline rename (page title "Settings" is
                 supplied by SubpageShell, so this name stays ≤ PageTitle scale). */}
             <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 32 }}>
-              <MonogramChip initials={getInitials(displayGroupName)} className="w-[52px] h-[52px] font-medium text-[16px]" />
+              {renderChatPhotoChip(52, 16)}
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted-text)", marginBottom: 4 }}>{typeLabel}</p>
                 {renaming ? (
@@ -1320,6 +1593,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                 )}
                 {/* A DM is always the two of you — the count says nothing. */}
                 {!isDM && <p style={{ color: "var(--body)", fontSize: 14, marginTop: 6 }}>{members.length} {members.length === 1 ? "member" : "members"}</p>}
+                {removeChatPhotoDesktop && <div style={{ marginTop: 12 }}>{removeChatPhotoDesktop}</div>}
+                {avatarError && <p style={{ color: "var(--danger)", fontSize: 12, marginTop: 6 }}>{avatarError}</p>}
               </div>
             </div>
 
@@ -1448,6 +1723,18 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           )}
         </div>
         </>
+      )}
+
+      {/* Photo-removal Undo. Portals itself to document.body and owns its own
+          bottom offset (.toast-bottom clears the phone nav pill), so it is mounted
+          once here rather than inside either width's hero. */}
+      {avatarToast && (
+        <Toast
+          message={avatarToast.message}
+          actionLabel={avatarToast.undo ? "Undo" : undefined}
+          onAction={avatarToast.undo ? () => { avatarToast.undo?.(); setAvatarToast(null) } : undefined}
+          onDismiss={() => setAvatarToast(null)}
+        />
       )}
 
       {/* Destructive-action confirm — top-layer portal (transform-safe), matching
@@ -1734,6 +2021,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // Central (ministry-wide) chat flag — sourced from groups.is_central_chat, not a
   // name match. Drives moderation scope + the ChatSettings central-chat gates.
   const [groupIsCentral, setGroupIsCentral] = useState(false)
+  // The GROUP's own uploaded photo (groups.avatar_url). Never rendered directly
+  // — it goes through chatChipAvatar(), which ignores it for a DM.
+  const [groupAvatarUrl, setGroupAvatarUrl] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
@@ -1821,6 +2111,19 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     return map
   }, [roster])
   const memberCount = roster.length
+  // The header chip's image. A DM shows the OTHER person's profile photo, which
+  // the roster already carries — so no extra query, and no read of the group's
+  // own column for a DM (chat-avatar.ts, finding W1). The `roster.length === 2`
+  // guard keeps a forked/degenerate "dm" row from picking an arbitrary face.
+  const dmPartnerAvatar = useMemo(() => {
+    if (groupType !== "dm" || roster.length !== 2) return null
+    return roster.find((m) => m.id !== userId)?.avatarUrl ?? null
+  }, [groupType, roster, userId])
+  const headerAvatar = chatChipAvatarFromParts({
+    type: groupType,
+    groupPhotoUrl: groupAvatarUrl,
+    partnerPhotoUrl: dmPartnerAvatar,
+  })
   // Threshold switch (Brian's product decision): rooms ≥30 members drop the live
   // per-member read-receipt fan-out (the O(members²) source) for an on-demand
   // "Seen by N" pill; <30 keep today's live per-member receipts exactly.
@@ -1881,10 +2184,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     async () => {
       const { data } = await supabase
         .from("groups")
-        .select("type, archived, pinned_message_id, is_central_chat")
+        .select("type, archived, pinned_message_id, is_central_chat, avatar_url")
         .eq("id", groupId)
         .single()
-      return (data as { type: string; archived: boolean | null; pinned_message_id: string | null; is_central_chat: boolean | null } | null) ?? null
+      return (data as { type: string; archived: boolean | null; pinned_message_id: string | null; is_central_chat: boolean | null; avatar_url: string | null } | null) ?? null
     }
   )
   // Chat moderation config — ministry-scoped, SWR-cached. Falls back to defaults
@@ -2299,6 +2602,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     setGroupType(groupMeta.type)
     setGroupArchived(groupMeta.archived ?? false)
     setGroupIsCentral(groupMeta.is_central_chat ?? false)
+    setGroupAvatarUrl(groupMeta.avatar_url ?? null)
     if (groupMeta.pinned_message_id) {
       setPinnedMessageId(groupMeta.pinned_message_id)
       supabase
@@ -3330,6 +3634,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 (md:w-8) is unchanged. */}
             <MonogramChip
               initials={getInitials(displayName)}
+              avatarUrl={headerAvatar}
               className="w-[34px] h-[34px] md:w-8 md:h-8"
               style={{ fontFamily: "var(--serif)", fontSize: 13 }}
             />

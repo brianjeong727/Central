@@ -1260,7 +1260,7 @@ export function HomeTab({
                 {recentChats.slice(0, 2).map((c, i) => (
                   <PocketRow
                     key={c.id}
-                    leading={<MonogramChip initials={getInitials(c.groupName)} className="w-10 h-10 flex-shrink-0" style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600 }} />}
+                    leading={<MonogramChip initials={getInitials(c.groupName)} avatarUrl={c.avatarUrl} className="w-10 h-10 flex-shrink-0" style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600 }} />}
                     title={c.groupName}
                     sub={c.lastMessageSender ? `${c.lastMessageSender}: ${c.lastMessage}` : c.lastMessage || "No messages yet"}
                     time={c.time}
