@@ -177,10 +177,14 @@ export function PocketRowCard({ children, style }: { children: ReactNode; style?
 // SwipeActionRow).
 export function PocketRow({
   leading, title, titleAccessory, titleDim = false, sub, time, showDot = false, meta, chevron = false,
-  isLast = false, immersive = false, isFirst = false, onClick,
+  isLast = false, immersive = false, isFirst = false, ariaLabel, onClick,
 }: {
   leading?: ReactNode
   title: string
+  /** Overrides the row's accessible name. Needed when the leading visual is
+   *  decorative (`aria-hidden`) but carries information the title doesn't — a
+   *  chat avatar cluster, whose members belong in the row's name instead. */
+  ariaLabel?: string
   titleAccessory?: ReactNode
   titleDim?: boolean
   sub?: string
@@ -202,6 +206,7 @@ export function PocketRow({
       // a hand-written list of screen names in sync with the app, and a NEW section
       // is covered by the margin rules the day it ships.
       data-pocket-row={title}
+      aria-label={ariaLabel}
       style={{
         display: "flex", alignItems: "center", gap: immersive ? 14 : 12, width: "100%",
         background: "none", border: "none", textAlign: "left", cursor: "pointer",

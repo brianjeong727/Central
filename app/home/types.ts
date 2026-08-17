@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import type { ChatPreview } from "@/components/central/chat-strip"
+import type { ChatAvatarMember } from "@/components/central/chat-avatar"
 
 export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "give" | "profile" | "settings" | "forms" | "congregation" | "network"
 
@@ -200,6 +201,16 @@ export interface ChatGroup {
   /** For a DM: the OTHER participant's profiles.avatar_url, resolved inside
    *  get_chat_list. Null for every other chat type. */
   partner_avatar_url?: string | null
+  /** groups.name_is_generated — the title was ASSEMBLED from member first names
+   *  ("Sarah, James, Grace"), not typed by anyone. A generated title gets its
+   *  members' faces instead of a first letter that belongs to nobody; see
+   *  components/central/chat-avatar.tsx. Never inferred from the string. */
+  name_is_generated?: boolean
+  /** Members excluding the viewer — you are never in your own cluster. */
+  other_member_count?: number
+  /** First three of those members, ordered by most recent message then join
+   *  date; `[]` unless a cluster can actually render (generated title, non-DM). */
+  cluster_members?: ChatAvatarMember[]
 }
 
 /** Max length of a shared chat nickname (chat_nicknames). Lives here (not the

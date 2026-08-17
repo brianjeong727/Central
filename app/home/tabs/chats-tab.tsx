@@ -112,6 +112,11 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
       type: groupType,
       memberIds: Array.from(selectedIds),
       createdBy: userId,
+      // Whether anyone TYPED this title. `effectiveName` falls back to
+      // `defaultName` (member first names) when the field is untouched, and once
+      // stored the two are indistinguishable — "Sarah, Grace" is a legal thing to
+      // type. Recording it here is the only moment the answer is known.
+      nameIsGenerated: !customName.trim(),
       ...(groupType === "church" ? { category } : {}),
     })
 
@@ -1076,6 +1081,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       type: "my",
       memberIds: [dmPartner.user_id, ...picked.map((p) => p.id)],
       createdBy: userId,
+      // Forking a DM into a group never asks for a title — it is always assembled.
+      nameIsGenerated: true,
     })
     setForking(false)
     if (err || !group) { setError(err ?? "Couldn't start the group chat. Please try again."); return }

@@ -17,6 +17,13 @@ interface CreateGroupInput {
   // Section for church chats only (my/dm ignore it → NULL). Defaults to
   // "general" when a church chat is created without an explicit category.
   category?: ChurchChatCategory
+  // True when `name` was ASSEMBLED by the composer from member first names
+  // ("Sarah, James, Grace") rather than typed. Recorded because it cannot be
+  // recovered later: "Sarah, Grace" is a perfectly legal thing to type, so no
+  // string test can tell the two apart. Drives the member-cluster avatar
+  // (components/central/chat-avatar.tsx). Defaults FALSE — an unmarked chat is
+  // treated as named, which is the safe direction: it keeps its letter.
+  nameIsGenerated?: boolean
 }
 
 interface CreateGroupResult {
@@ -52,7 +59,7 @@ export async function createGroup(input: CreateGroupInput): Promise<CreateGroupR
 
   const { data: group, error: groupErr } = await supabase
     .from("groups")
-    .insert({ name: input.name, type: input.type, created_by: user.id, ministry_id: profile.ministry_id, category })
+    .insert({ name: input.name, type: input.type, created_by: user.id, ministry_id: profile.ministry_id, category, name_is_generated: input.nameIsGenerated === true })
     .select("id, name")
     .single()
 
