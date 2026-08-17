@@ -41,10 +41,16 @@ export function PocketHeader({ ministryName, action }: PocketHeaderProps) {
 
 // ── B3 Pocket Daybreak chrome ────────────────────────────────────────────────
 // The single top row shared by the Announcements / Chats / Workspace mobile
-// screens (mockup `.chrome`): an optional back chevron, the page title (serif
-// 22/600, dropping to 20 when TWO actions share the row per v2 §2) and 0–2
+// screens (mockup `.chrome`): an optional back chevron, the page title and 0–2
 // action slots. Owns its own md:hidden + 12/20/10 padding so it drops in at the
 // tab root, outside any px-5 content wrapper.
+//
+// The title is ALWAYS `POCKET_CHROME_TITLE` (serif 22/600 `--ink`). It used to
+// drop to 20 whenever two actions shared the row — the same drift Convention #27
+// named and abolished for `PocketHubChrome`, left live here because the type-scale
+// line in mobile_design_system.md still documented the drop. Removed 2026-08-17;
+// only one caller passed two actions (Profile while editing), so it now reads 22
+// like every other chrome row.
 //
 // Daybreak-v2 extensions (all optional, existing callers untouched): `action2`
 // for a second action and `back` for the one-level-up chevron on drilled-in
@@ -53,26 +59,57 @@ export function PocketHeader({ ministryName, action }: PocketHeaderProps) {
 // The trailing MonogramChip avatar (and its `hideAvatar` opt-out, which by the
 // end every caller but three was passing) was removed when Profile became a pill
 // destination (2026-08-16). See mobile_design_system.md §3.
-export function PocketChrome({ title, action, action2, back }: {
+// 16px, wider than the row's own 10px gap: at 22/600 with -0.02em tracking a 12px
+// gap let the two options read as one phrase ("Church My chats") instead of two
+// controls — the active/muted contrast alone was not enough separation.
+const SCOPE_GAP = 16
+
+// `scope` turns the title slot INTO an exclusive switch: each option carries the
+// one chrome title type, the active one in `--ink` and the rest muted. A screen
+// whose header only repeated its own tab name AND carried a full-width scope-chip
+// band below it collapses to a single row this way — the chips were the second of
+// two stacked chrome bands, and the tab name was already on the bottom nav. The
+// Convention #27 rhythm is untouched: a serif-22 leaf still opens the row at the
+// same height as every other tab root, which is what the cross-tab contract
+// actually pins (Chats, 2026-08-17). `title` stays required — it labels the
+// switch for assistive tech, and it is the fallback for callers with no scope.
+export function PocketChrome({ title, scope, action, action2, back }: {
   title: string
+  scope?: {
+    options: readonly { id: string; label: string }[]
+    value: string
+    onChange: (id: string) => void
+  }
   action?: ReactNode
   action2?: ReactNode
   back?: () => void
 }) {
-  const twoActions = Boolean(action && action2)
   return (
     <div className="flex items-center md:hidden" style={{ gap: 10, ...POCKET_CHROME_PAD_Y, paddingLeft: POCKET_CHROME_PAD_X, paddingRight: POCKET_CHROME_PAD_X }}>
       {back && <BackChevron onClick={back} />}
-      <span
-        style={{
-          flex: 1, minWidth: 0,
-          fontFamily: "var(--serif)", fontSize: twoActions ? 20 : 22, fontWeight: 600,
-          letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1,
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-        }}
-      >
-        {title}
-      </span>
+      {scope ? (
+        <div className="flex items-center" style={{ flex: 1, minWidth: 0, gap: SCOPE_GAP }} role="tablist" aria-label={title}>
+          {scope.options.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="tab"
+              aria-selected={o.id === scope.value}
+              onClick={() => scope.onChange(o.id)}
+              style={{
+                ...POCKET_CHROME_TITLE,
+                color: o.id === scope.value ? "var(--ink)" : "var(--muted-text)",
+                background: "none", border: 0, padding: 0, minHeight: 34,
+                cursor: "pointer", flexShrink: 0,
+              }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <span style={{ ...POCKET_CHROME_TITLE, flex: 1, minWidth: 0 }}>{title}</span>
+      )}
       {action}
       {action2}
     </div>

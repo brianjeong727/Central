@@ -68,6 +68,12 @@ async function probe(page: Page): Promise<Probe> {
         // — it was being measured as the title. Skip it by marker, not by size:
         // sniffing dimensions is how this detector got fooled before.
         if (el.closest("[data-monogram]")) continue
+        // A chrome title MAY be an exclusive scope switch (mobile_design_system.md
+        // §0, `PocketChrome`'s `scope`). Only the ACTIVE option carries `--ink`; the
+        // rest are deliberately muted, so measuring an inactive one would report a
+        // colour violation against a healthy screen. Skip by the ARIA state rather
+        // than by colour — the colour is the thing under test.
+        if (el.getAttribute("aria-selected") === "false") continue
         const text = (el.textContent ?? "").trim()
         // Must be the LEAF that carries the type. The title sits inside a
         // flex wrapper span which INHERITS 16px; allowing one child picked that
@@ -80,11 +86,16 @@ async function probe(page: Page): Promise<Probe> {
       }
     }
     if (!title) {
-      for (const el of Array.from(document.querySelectorAll("span, div, h1, h2, p"))) {
+      // `button` here too — a tab root has no back chevron, so it lands in THIS
+      // fallback, and Chats' title is a scope switch built from buttons. Without it
+      // the sweep reported "Chats: no chrome title found" on a screen whose header
+      // was plainly there. Same aria-selected skip as above, for the same reason.
+      for (const el of Array.from(document.querySelectorAll("span, div, h1, h2, p, button"))) {
         const r = el.getBoundingClientRect()
         if (r.top < 0 || r.top > 260 || r.height < 12 || r.width < 40) continue
         if (!vis(el)) continue
         if (parseFloat(getComputedStyle(el).fontSize) < 19) continue
+        if (el.getAttribute("aria-selected") === "false") continue
         const text = (el.textContent ?? "").trim()
         if (!text || el.children.length > 1) continue
         const cs2 = getComputedStyle(el)
