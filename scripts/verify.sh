@@ -43,6 +43,22 @@ done
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "verify.sh: not a git repo" >&2; exit 2; }
 cd "$ROOT" || exit 2
 
+# Fingerprint of everything a `next build` reads: the commit plus the full
+# working diff (tracked changes AND untracked files, which can be new routes).
+# Shared with scripts/ship-can-skip-build.sh — both MUST compute it identically,
+# so it lives in one place and the other sources this definition by name.
+build_fingerprint() {
+  {
+    git rev-parse HEAD 2>/dev/null
+    # Exclude the /sim dev overlay: it is a Capacitor-only file, never part of
+    # the Next build graph, and it is dirty for the whole of any sim session —
+    # letting it move the fingerprint would disable this optimisation exactly
+    # when someone is iterating fastest.
+    git diff HEAD -- . ':(exclude)capacitor.config.ts' 2>/dev/null
+    git ls-files --others --exclude-standard 2>/dev/null
+  } | shasum | awk '{print $1}'
+}
+
 # Resolve the slot port from this worktree's directory name when --port was omitted.
 if [[ -z "$PORT" ]]; then
   PORT="$(
@@ -321,6 +337,20 @@ FAIL=0
 [[ "$E2E_STATUS" == "fail" ]] && FAIL=1
 
 if [[ $FAIL -eq 0 ]]; then
+  # ── Green-build stamp, so /ship doesn't rebuild a tree we just built ────────
+  # A full `next build` is ~35s and /ship ran one on EVERY ship, even seconds
+  # after this script had built the identical tree. Worse, `npm run dev` opens
+  # with `rm -rf .next`, so ship's build output was deleted immediately and the
+  # slot then paid another ~14s cold-starting dev — ~50s of the ~60s ship, all
+  # of it redundant.
+  #
+  # The stamp fingerprints exactly what a build consumes: HEAD plus the full
+  # working diff. Any source change moves it and ship rebuilds. Only a
+  # BUILD-clean run stamps — a --skip-build run must never mint one.
+  if [[ "$SKIP_BUILD" -eq 0 && "$BUILD_STATUS" == "pass" ]]; then
+    mkdir -p "$(git rev-parse --git-common-dir)/session-locks" 2>/dev/null
+    build_fingerprint > "$(git rev-parse --git-common-dir)/session-locks/${SLOT:-main}.built" 2>/dev/null || true
+  fi
   echo "════════ VERIFY RESULT: PASS ════════"
   exit 0
 else
