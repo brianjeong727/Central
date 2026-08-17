@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase"
 import { findExistingDm } from "../dm"
 import { useOpenDraftDm } from "../draft-dm-context"
 import { EmptyState } from "../components/shared"
-import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, PocketRow, PocketRowCard, PocketKicker, PocketSearchField, BackChevron, POCKET_CHROME_PAD_Y, POCKET_CHROME_TITLE } from "@/components/central"
+import { TabPageHeader, PageTitle, MonogramChip, DirectoryListSkeleton, PocketRow, PocketKicker, PocketSearchField, BackChevron, POCKET_CHROME_PAD_Y, POCKET_CHROME_TITLE } from "@/components/central"
 import { getInitials } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { DirectoryMember } from "../types"
@@ -266,27 +266,35 @@ export function DirectoryTab({
             />
           </div>
         ) : (
-          <div className="px-5 pb-4">
-            <PocketKicker label={`${mobileFiltered.length} ${mobileFiltered.length === 1 ? "member" : "members"}`} />
-            <PocketRowCard>
-              {mobileFiltered.map((member, i) => (
-                <PocketRow
-                  key={member.id}
-                  leading={<MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} className="w-10 h-10" style={{ fontFamily: "var(--serif)", fontSize: 13, fontWeight: 500 }} online={onlineUserIds?.has(member.id)} dotSize={10} dotRing="var(--ivory)" />}
-                  title={member.name}
-                  titleAccessory={
-                    <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                      {member.role && <MobileRoleTag role={member.role} userId={member.id} />}
-                      {member.id === currentUserId && <MobileYouTag />}
-                    </span>
-                  }
-                  sub={member.graduation_year ? `Class of ${member.graduation_year}` : undefined}
-                  chevron
-                  isLast={i === mobileFiltered.length - 1}
-                  onClick={() => setMobileSelected(member)}
-                />
-              ))}
-            </PocketRowCard>
+          /* Full-bleed member run — no card, rows on the page surface (§4). The
+             count eyebrow carries the rule that opens the list, so the first row
+             takes no top border. */
+          <div className="pb-4">
+            <PocketKicker
+              label={`${mobileFiltered.length} ${mobileFiltered.length === 1 ? "member" : "members"}`}
+              style={{ margin: 0, padding: "20px 20px 10px" }}
+            />
+            {mobileFiltered.map((member, i) => (
+              <PocketRow
+                key={member.id}
+                immersive
+                isFirst={i === 0}
+                // The presence dot's ring is a fake cut-out, so it must match
+                // whatever sits BEHIND the avatar. That was the card (--ivory);
+                // with the card gone it is the page surface.
+                leading={<MonogramChip initials={getInitials(member.name)} avatarUrl={member.avatar_url} style={{ width: 46, height: 46, fontFamily: "var(--serif)", fontSize: 16, fontWeight: 500 }} online={onlineUserIds?.has(member.id)} dotSize={11} dotRing="var(--cream)" />}
+                title={member.name}
+                titleAccessory={
+                  <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    {member.role && <MobileRoleTag role={member.role} userId={member.id} />}
+                    {member.id === currentUserId && <MobileYouTag />}
+                  </span>
+                }
+                sub={member.graduation_year ? `Class of ${member.graduation_year}` : undefined}
+                chevron
+                onClick={() => setMobileSelected(member)}
+              />
+            ))}
           </div>
         )}
       </div>
