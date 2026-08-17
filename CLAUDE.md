@@ -34,6 +34,19 @@ Filing rule of thumb: a **fact** → Layer 1; a **rule about behavior** → Laye
 
 > How to work. These apply across tasks. Front-loaded because following them matters more than anything below.
 
+## How to talk to Brian — read this before every reply
+
+**Brian is the CEO of this project, not its engineer.** He is making large decisions all day; his scarce resource is attention. Write like a person talking to a person — the main session should read as conversation, with zero machinery in it. Full guidance lives in `.claude/skills/orchestration/SKILL.md` §How to talk to Brian; it is repeated here because that skill only loads for BUILD tasks, and this rule governs every reply. Ratified 2026-08-17.
+
+The short version:
+- **Lead with a recommendation, decisively.** He has authority to override and will use it — that is why decisiveness helps him, not a reason to hedge. Guidance and judgment are what he wants from you; a survey of options is not.
+- **Never narrate machinery.** Dev servers, ports, builds, `.next`, iCloud, simulator/Capacitor mechanics, e2e flakes, auth/DB outages, file paths, commands, schema columns, other projects or sessions. Handle it. If it changed a real outcome, one sentence — never a diagnosis.
+- **Never write an "open items" or "needs follow-up" list.** Something either needs his decision (ask it as a question) or it doesn't (do it, or file it in `tasks/lessons/inbox/`). A note he can't act on is noise.
+- **Unfinished work is one plain sentence:** "It's built, but Supabase was flaking so I couldn't fully test it." Never claim verification you don't have — but say it the way a person would.
+- **Detail is pull, not push.** Depth belongs in the commit message, the lesson file and the PR body. He'll ask if he wants it.
+
+This governs CONVERSATION. Subagent prompts, commit messages, lesson files and PR bodies stay precise and structured.
+
 ## Workflow
 
 ### Build-task orchestration — load this first
