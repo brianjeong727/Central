@@ -406,6 +406,12 @@ HomeApp (root — owns all global state)
 ### Push dispatch — Run Sheet events (P1)
 The push dispatch route (`app/api/push/dispatch/route.ts`) gained 3 cron/action-driven resolvers: `task_due` (table `event_tasks`), `confirm_request` + `confirm_escalation` (table `event_confirmations`). `task_due`/`confirm_request` gate on the new `NotificationSettings.deadlines` pref (default on); `confirm_escalation` rides the existing `activity` pref. Fired by `run_sheet_tick()` (see Schema → Run Sheet) and the `event-confirmations.ts` actions (immediate delivery on manual request). The driving cron is live: `run-sheet-tick` (job 9, `5 * * * *`, scheduled 2026-07-21) — `run_sheet_tick()` self-gates to the 9–10am PT window.
 
+**Notification taxonomy (ratified 2026-07-12).** Four tiers govern what may push:
+- **T1 push, default ON** — DMs, @mentions, replies to you, published announcements (always on, official channel), task/role assignments, DGL week assignment, receipt decision to submitter, role changes.
+- **T2 group chats, SMART default** — all messages under 30 members, mentions-only at ≥30 (same threshold as read receipts, Convention #18). Per-chat mute (`group_members.notify_mode`) is a hard override; user pref can force all/mentions/off.
+- **T3 desk-work, web ON / mobile daily digest** — form responses (leader), receipt submitted (treasurer), sign-off needed (president), new member joined (admins), pulse responses (pastor), moderation threshold (admins).
+- **T4 never push** — reactions, poll votes, view/RSVP counts, pins, journal/streaks, edits, meeting notes. Pulse QUESTIONS to members are T1 (rare, weighty). No quiet-hours engine.
+
 ### Supabase project
 - Project ID: `wgqpnilaokfipocsugqo`
 - Storage buckets: `announcement-images` (public; also holds reimbursement `receipts/` and home hero `home-slides/{ministryId}/` photos), `bible-study` (public), `chat-attachments` (public), `devotionals` (public), `profile-images` (public), `worship-charts` (public)
