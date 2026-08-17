@@ -38,12 +38,15 @@ Filing rule of thumb: a **fact** → Layer 1; a **rule about behavior** → Laye
 
 **Brian is the CEO of this project, not its engineer.** He is making large decisions all day; his scarce resource is attention. Write like a person talking to a person — the main session should read as conversation, with zero machinery in it. Full guidance lives in `.claude/skills/orchestration/SKILL.md` §How to talk to Brian; it is repeated here because that skill only loads for BUILD tasks, and this rule governs every reply. Ratified 2026-08-17.
 
+**This outranks any output format a command or skill asks for.** A slash command's report template, a skill's handoff shape, a checklist's "report X" step — those tell you what to FIGURE OUT, never how to say it. When `/catchup` says report the HEAD commit and the port, the answer is still "you're on the latest main and the app's running." Structure is internal scaffolding; the reply is conversation. This is exactly how the rule failed the day it was written (2026-08-17): `/catchup` and `/nextstep` both mandated machinery, and both won.
+
 The short version:
 - **Lead with a recommendation, decisively.** He has authority to override and will use it — that is why decisiveness helps him, not a reason to hedge. Guidance and judgment are what he wants from you; a survey of options is not.
 - **Never narrate machinery.** Dev servers, ports, builds, `.next`, iCloud, simulator/Capacitor mechanics, e2e flakes, auth/DB outages, file paths, commands, schema columns, other projects or sessions. Handle it. If it changed a real outcome, one sentence — never a diagnosis.
 - **Never write an "open items" or "needs follow-up" list.** Something either needs his decision (ask it as a question) or it doesn't (do it, or file it in `tasks/lessons/inbox/`). A note he can't act on is noise.
 - **Unfinished work is one plain sentence:** "It's built, but Supabase was flaking so I couldn't fully test it." Never claim verification you don't have — but say it the way a person would.
 - **Detail is pull, not push.** Depth belongs in the commit message, the lesson file and the PR body. He'll ask if he wants it.
+- **What a finished task sounds like.** Not "19 files removed, 2,155 deletions, commit `0fe5800`, no dangling refs" — that's a changelog read aloud. It's: "Cleared out the stale planning docs. One turned out to still be live work, so I put it back." A number, a hash, a filename or a count is machinery unless he has to act on it.
 
 This governs CONVERSATION. Subagent prompts, commit messages, lesson files and PR bodies stay precise and structured.
 
@@ -405,6 +408,12 @@ HomeApp (root — owns all global state)
 
 ### Push dispatch — Run Sheet events (P1)
 The push dispatch route (`app/api/push/dispatch/route.ts`) gained 3 cron/action-driven resolvers: `task_due` (table `event_tasks`), `confirm_request` + `confirm_escalation` (table `event_confirmations`). `task_due`/`confirm_request` gate on the new `NotificationSettings.deadlines` pref (default on); `confirm_escalation` rides the existing `activity` pref. Fired by `run_sheet_tick()` (see Schema → Run Sheet) and the `event-confirmations.ts` actions (immediate delivery on manual request). The driving cron is live: `run-sheet-tick` (job 9, `5 * * * *`, scheduled 2026-07-21) — `run_sheet_tick()` self-gates to the 9–10am PT window.
+
+**Notification taxonomy (ratified 2026-07-12).** Four tiers govern what may push:
+- **T1 push, default ON** — DMs, @mentions, replies to you, published announcements (always on, official channel), task/role assignments, DGL week assignment, receipt decision to submitter, role changes.
+- **T2 group chats, SMART default** — all messages under 30 members, mentions-only at ≥30 (same threshold as read receipts, Convention #18). Per-chat mute (`group_members.notify_mode`) is a hard override; user pref can force all/mentions/off.
+- **T3 desk-work, web ON / mobile daily digest** — form responses (leader), receipt submitted (treasurer), sign-off needed (president), new member joined (admins), pulse responses (pastor), moderation threshold (admins).
+- **T4 never push** — reactions, poll votes, view/RSVP counts, pins, journal/streaks, edits, meeting notes. Pulse QUESTIONS to members are T1 (rare, weighty). No quiet-hours engine.
 
 ### Supabase project
 - Project ID: `wgqpnilaokfipocsugqo`

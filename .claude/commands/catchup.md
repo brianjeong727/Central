@@ -28,4 +28,4 @@ Steps:
 
 9. **Verify health BEFORE reporting:** poll until `curl -s -o /dev/null -w '%{http_code}' http://localhost:<port>/` returns `200`, and confirm a real app route (`/home`) returns `200` or a `3xx` auth redirect — NOT `500`. Don't hand back until a rendered route is healthy.
 
-10. **Report** in one or two plain sentences: the new HEAD (the `origin/main` commit it landed on), whether the old branch was already merged, and that dev is healthy on the slot's port. Mention the old merged branch can be deleted if Brian wants (don't delete it unless asked).
+10. **Report in ONE plain sentence** — "You're on the latest main and the app's running." That's it. Catchup is pure machinery, which CLAUDE.md §How to talk to Brian says never to narrate: no commit hash, no port number, no branch name, no HTTP status, no dep-install mention. You verify all of it (steps 1–9) and report none of it. The ONLY things that earn a second sentence are things he must decide or act on: work you refused to clobber (step 4), or a merged branch he may want deleted. If catchup was a no-op, say "already up to date."
