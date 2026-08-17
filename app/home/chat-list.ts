@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase"
 import { chatPreviewLabel } from "./utils"
 import type { ChatGroup } from "./types"
+import type { ChatAvatarMember } from "@/components/central/chat-avatar"
 
 // ── Shared chat-list SWR fetcher ─────────────────────────────────────────────
 // Single DB round-trip via get_chat_list RPC. The mobile ChatsTab, the desktop
@@ -24,6 +25,15 @@ export type ChatListRow = {
   // round trip. Never read either directly; go through chatChipAvatar().
   group_avatar_url: string | null
   partner_avatar_url: string | null
+  /** groups.name_is_generated — the title was assembled from member first names
+   *  rather than typed. Drives the member-cluster avatar; never inferred from
+   *  the string (see components/central/chat-avatar.tsx). */
+  name_is_generated: boolean | null
+  /** Members EXCLUDING the viewer. */
+  other_member_count: number | null
+  /** First three of them, recency-ordered. `[]` for named chats and DMs — the
+   *  SQL only pays for the cluster where one can actually render. */
+  cluster_members: ChatAvatarMember[] | null
 }
 
 // ── Dead-thread signal (deleted-account counterpart) ─────────────────────────
@@ -85,6 +95,9 @@ export function mapChatListRows(rows: ChatListRow[], deletedDmIds?: ReadonlySet<
     // reads the group photo without the resolver trips check-chat-avatar.sh.
     group_avatar_url: row.group_avatar_url ?? null,
     partner_avatar_url: row.partner_avatar_url ?? null,
+    name_is_generated: row.name_is_generated ?? false,
+    other_member_count: Number(row.other_member_count ?? 0),
+    cluster_members: row.cluster_members ?? [],
   })) as ChatGroup[]
 
   // Dead threads (the other person deleted their account) sink BELOW every live

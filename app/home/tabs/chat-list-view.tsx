@@ -34,7 +34,7 @@ import { Search, ChevronDown, X, Plus, Users, Pin, PinOff, Lock, Bell, BellOff, 
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
-import { MonogramChip, SegmentedControl, PocketFilterChip, PocketSearchField, PocketRow, PocketKicker, POCKET_KICKER_STYLE, useScrollResetOn, SwipeActionRow, ConfirmDialog, Toast } from "@/components/central"
+import { ChatAvatar, chatAvatarLabel, SegmentedControl, PocketFilterChip, PocketSearchField, PocketRow, PocketKicker, POCKET_KICKER_STYLE, useScrollResetOn, SwipeActionRow, ConfirmDialog, Toast } from "@/components/central"
 import { ChatSearchView } from "../components/chat-search"
 import { findExistingDm } from "../dm"
 import { formatChatListTime } from "../utils"
@@ -98,12 +98,22 @@ function PocketChatRow({ group, isFirst, onClick }: { group: ChatGroup; isFirst:
       immersive
       isFirst={isFirst}
       leading={
-        <MonogramChip
-          initials={group.name.charAt(0).toUpperCase()}
+        <ChatAvatar
+          size={46}
+          title={group.name}
           avatarUrl={chatChipAvatar(group)}
-          style={{ width: 46, height: 46, flexShrink: 0, fontFamily: "var(--serif)", fontSize: 16, fontWeight: 600 }}
+          members={group.cluster_members}
+          otherCount={group.other_member_count}
+          nameIsGenerated={group.name_is_generated}
+          isCentral={group.is_central_chat}
+          // Full-bleed rows sit on the page surface, so the ring between
+          // overlapping circles has to be cream, not the old card ivory.
+          surface="var(--cream)"
         />
       }
+      // The cluster is aria-hidden, so the row's own name is what carries the
+      // members to a screen reader.
+      ariaLabel={chatAvatarLabel(group.name, group.cluster_members ?? [], group.other_member_count ?? 0, group.name_is_generated === true)}
       title={group.name}
       // Dead thread (the counterpart deleted their account): the title drops to
       // the tertiary text token. The row is otherwise untouched and still opens
@@ -700,7 +710,6 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
 }
 
 export function ChatGroupCard({ group, onClick, isActive, locked }: { group: ChatGroup; onClick: () => void; isActive?: boolean; locked?: boolean }) {
-  const firstInitial = group.name.charAt(0)
   // Group photo, or a DM partner's face — one derivation, see chat-avatar.ts.
   const chipAvatar = chatChipAvatar(group)
   // Glyph precedence: pinned + muted take the two available slots; lock drops when
@@ -721,11 +730,16 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
       {/* Mobile style */}
       <div className="md:hidden bg-[var(--cream-panel)] border border-[var(--line)] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors">
         <div className="flex items-center gap-3.5">
-          <MonogramChip
-            initials={firstInitial}
+          <ChatAvatar
+            size={48}
+            title={group.name}
             avatarUrl={chipAvatar}
-            className="w-12 h-12 flex-shrink-0"
-            style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400 }}
+            members={group.cluster_members}
+            otherCount={group.other_member_count}
+            nameIsGenerated={group.name_is_generated}
+            isCentral={group.is_central_chat}
+            surface="var(--cream-panel)"
+            className="flex-shrink-0"
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
@@ -763,11 +777,18 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
         onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "var(--cream-3)" }}
         onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "" }}
       >
-        <MonogramChip
-          initials={firstInitial}
+        <ChatAvatar
+          size={38}
+          title={group.name}
           avatarUrl={chipAvatar}
+          members={group.cluster_members}
+          otherCount={group.other_member_count}
+          nameIsGenerated={group.name_is_generated}
+          isCentral={group.is_central_chat}
+          // Desktop panel rows sit on the panel fill, and the active row tints —
+          // the ring follows whichever is behind it.
+          surface={isActive ? "var(--plum-tint)" : "var(--cream)"}
           className="flex-shrink-0"
-          style={{ width: 38, height: 38, fontFamily: "var(--serif)", fontSize: "16px" }}
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 2 }}>
