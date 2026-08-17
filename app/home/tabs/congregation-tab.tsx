@@ -258,9 +258,6 @@ export function CongregationTab({ userId, ministryId, onViewChange, onBack }: Co
         <PocketChrome
           title="Congregation"
           back={onBack}
-          hideAvatar
-          userName=""
-          onAvatarClick={() => {}}
           action={
             <PocketRoundButton variant="plum" onClick={() => goTo("create")} ariaLabel="New question">
               <Plus style={{ width: 16, height: 16 }} strokeWidth={1.8} />

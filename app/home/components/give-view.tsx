@@ -119,7 +119,7 @@ export function GiveView({
   return (
     <div className="md:flex md:flex-col md:h-full md:overflow-hidden">
       {/* Mobile: single chrome row (no two-header) */}
-      <PocketChrome title="Give" back={onBack} hideAvatar userName="" onAvatarClick={() => {}} />
+      <PocketChrome title="Give" back={onBack} />
 
       {/* Desktop header — landing tier (R1) */}
       <TabPageHeader>

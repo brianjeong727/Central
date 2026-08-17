@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, MessageCircle, ClipboardList, Bell } from "lucide-react"
+import { Home, MessageCircle, ClipboardList, Bell, User } from "lucide-react"
 import { sectionForTab } from "@/components/central/nav-sections"
 
 // "network" is included so activeTab can carry it (admin-only, desktop-nav-only);
@@ -23,10 +23,17 @@ interface BottomNavProps {
   announcementOpen?: boolean
 }
 
-// Floating "Pocket" pill nav (ratified B3 mobile). Home / Announcements / Chats /
-// Workspace only — Profile ("You") is NOT here; it's the chrome avatar (top-right of
-// each Pocket screen). Workspace stays role-gated via showPlan (→ 3-icon pill for
-// non-team members). Active item = cream circle + plum-2 icon.
+// Floating "Pocket" pill nav (ratified B3 mobile; Profile added 2026-08-16).
+// Home / Chats / Announcements / Workspace / Profile. Workspace stays role-gated
+// via showPlan (→ 4-icon pill for non-team members). Active = cream circle + plum-2 icon.
+//
+// Profile is a pill DESTINATION, not a chrome avatar. The avatar that used to sit
+// top-right of every tab root (and every workspace hub) was a second door to the
+// place this item already reaches from everywhere — the same redundancy that retired
+// the Workspace quick-tile. One door, and it's here. The icon is the generic User
+// glyph rather than the user's photo: the pill is a monochrome cream-on-plum icon
+// set, and a full-colour avatar in it breaks that rhythm and has no coherent active
+// state (a cream circle behind a photo). See mobile_design_system.md §3.
 const TABS_BASE = [
   { id: "home" as Tab,          label: "Home",          icon: Home },
   { id: "chats" as Tab,         label: "Chats",         icon: MessageCircle },
@@ -34,10 +41,13 @@ const TABS_BASE = [
 ]
 
 const PLAN_TAB = { id: "plan" as Tab, label: "Workspace", icon: ClipboardList }
+// Always last — Workspace slots in ahead of it when the user has one.
+const PROFILE_TAB = { id: "profile" as Tab, label: "Profile", icon: User }
 
 export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = false, hidden = false, announcementOpen = false }: BottomNavProps) {
-  // Plain member: Home/Chats/Announcements (3). Team member/leader/gov admin: +Workspace (4).
-  const tabs = showPlan ? [...TABS_BASE, PLAN_TAB] : TABS_BASE
+  // Plain member: Home/Chats/Announcements/Profile (4).
+  // Team member/leader/gov admin: +Workspace before Profile (5).
+  const tabs = showPlan ? [...TABS_BASE, PLAN_TAB, PROFILE_TAB] : [...TABS_BASE, PROFILE_TAB]
   if (hidden) return null
   return (
     <div
@@ -58,8 +68,8 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = 
           // Highlight derives from the single nav-section config (R7). Mobile-only
           // exception: Announcements is a first-class item here even though nav-sections
           // folds it under Home — so on the announcements tab light ONLY that item;
-          // otherwise resolve normally (Home wins for give/forms/settings/etc.). On the
-          // profile tab nothing lights (Profile isn't in the pill — it's the avatar).
+          // otherwise resolve normally (Home wins for give/forms/settings/etc.; the
+          // "profile" section lights Profile, including on its pushed Journal screen).
           const isActive =
             activeTab === "announcements" || announcementOpen
               ? tab.id === "announcements"

@@ -934,7 +934,7 @@ function DesktopActionMenu({
   )
 }
 
-export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, avatarUrl, onGoToProfile, onOpenAnnouncement, onComposerOpenChange }: AnnouncementsTabProps) {
+export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, onOpenAnnouncement, onComposerOpenChange }: AnnouncementsTabProps) {
   const supabase = createClient()
   const openMemberProfile = useOpenMemberProfile()
   // Compose/edit is ephemeral plain state — never in the URL. A reload mid-compose
@@ -1251,9 +1251,6 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
           create (leader/admin) + avatar. */}
       <PocketChrome
         title="Announcements"
-        userName={userName}
-        avatarUrl={avatarUrl}
-        onAvatarClick={onGoToProfile}
         action={isLeaderOrAdmin ? (
           <PocketRoundButton variant="plum" onClick={openCreate} ariaLabel="New announcement">
             <Plus style={{ width: 16, height: 16 }} strokeWidth={1.8} />

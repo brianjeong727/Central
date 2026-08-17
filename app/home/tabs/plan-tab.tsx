@@ -1195,7 +1195,7 @@ export function StudentOrgTeamHome({
   teamId, teamName, teamIcon, ministryId, userId, userName, userRole, canEdit, canEditBudget, onTeamSettings,
   planningEvent, onPlanningEventChange, onOpenChat,
   desktopSection, isDesktopView, onCalEventsChange,
-  avatarUrl, onGoToProfile, onExitTeam,
+  onExitTeam,
 }: {
   teamId: string | null
   teamName: string
@@ -1214,8 +1214,6 @@ export function StudentOrgTeamHome({
   isDesktopView?: boolean
   onCalEventsChange?: (events: CalendarEvent[]) => void
   // Mobile hub chrome (§2.1): avatar → profile, back chevron → picker.
-  avatarUrl?: string | null
-  onGoToProfile?: () => void
   onExitTeam?: () => void
 }) {
   const supabase = createClient()
@@ -1660,7 +1658,6 @@ export function StudentOrgTeamHome({
             teamName={teamName}
             onBack={onExitTeam}
             onSettings={onTeamSettings}
-            avatar={onGoToProfile ? { userName, avatarUrl, onClick: onGoToProfile } : undefined}
             hero={nextEvent ? {
               eyebrow: "Up next",
               title: nextEvent.title,
@@ -2701,7 +2698,7 @@ function MobileWsRow({ letter, iconKey, name, sub, progress, onEnter, onManage }
 }
 
 export function PlanTab({
-  userId, userName, ministryId, ministryName, avatarUrl, onGoToProfile, userTeams, allTeams, isAdmin, isGovernanceAdmin, governanceSettings, isDGL, isPastor,
+  userId, userName, ministryId, ministryName, userTeams, allTeams, isAdmin, isGovernanceAdmin, governanceSettings, isDGL, isPastor,
   onTeamsChange, showCreateTeam, onShowCreateTeam, activeTeamId, onOpenChat,
   onTeamSelect, onExitTeam,
   studentOrgSection, onStudentOrgSectionChange, studentOrgPlanningEvent, onStudentOrgPlanningEventChange, onStudentOrgCalEventsChange,
@@ -3074,9 +3071,6 @@ export function PlanTab({
       ) && (
         <PocketChrome
           title={activeTeamId === "receipts" ? "Receipts" : activeTeamId ? activeTeamName : "Workspace"}
-          userName={userName}
-          avatarUrl={avatarUrl}
-          onAvatarClick={onGoToProfile}
         />
       )}
 
@@ -3240,7 +3234,6 @@ export function PlanTab({
           <ReceiptsWorkspace
             ministryId={ministryId}
             userId={userId}
-            userName={userName}
             teams={receiptsTeams}
             activeReceiptsTeamId={activeReceiptsTeamId ?? null}
             onReceiptsTeamChange={(id) => onReceiptsTeamChange?.(id)}
@@ -3449,14 +3442,11 @@ export function PlanTab({
           <ReceiptsWorkspace
             ministryId={ministryId}
             userId={userId}
-            userName={userName}
             teams={receiptsTeams}
             activeReceiptsTeamId={activeReceiptsTeamId ?? null}
             onReceiptsTeamChange={(id) => onReceiptsTeamChange?.(id)}
             onOpenTeamSettings={canManageReceiptsTeam ? openActiveReceiptsTeamSettings : undefined}
             onExitTeam={(userTeams.length >= 2 || govTeams.length > 0) ? onExitTeam : undefined}
-            avatarUrl={avatarUrl}
-            onGoToProfile={onGoToProfile}
           />
         </div>
       ) : teamKind === "finance" && activeTeamId && financeCanAccess ? (
@@ -3477,7 +3467,6 @@ export function PlanTab({
                 teamName={activeTeamName}
                 onBack={(userTeams.length >= 2 || govTeams.length > 0) ? onExitTeam : undefined}
                 onSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
-                avatar={{ userName, avatarUrl, onClick: onGoToProfile }}
                 groups={[{
                   label: "Sections",
                   rows: [
@@ -3580,8 +3569,6 @@ export function PlanTab({
             planningEvent={studentOrgPlanningEvent ?? null}
             onPlanningEventChange={ev => onStudentOrgPlanningEventChange?.(ev)}
             onOpenChat={onOpenChat}
-            avatarUrl={avatarUrl}
-            onGoToProfile={onGoToProfile}
             onExitTeam={(userTeams.length >= 2 || govTeams.length > 0) ? onExitTeam : undefined}
           />
         ) : teamKind === "dgl" && activeTeamId && activeTeamAllowed ? (
@@ -3590,13 +3577,10 @@ export function PlanTab({
             teamName={activeTeamName}
             ministryId={ministryId}
             userId={userId}
-            userName={userName}
             isPresident={isDGLPresident}
             isPastor={isPastor}
             onOpenChat={onOpenChat}
             onTeamSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
-            avatarUrl={avatarUrl}
-            onGoToProfile={onGoToProfile}
             onExitTeam={(userTeams.length >= 2 || govTeams.length > 0) ? onExitTeam : undefined}
             praiseTeamId={
               allTeams.find(t =>
@@ -3636,7 +3620,6 @@ export function PlanTab({
                 teamName={activeTeamName}
                 onBack={(userTeams.length >= 2 || govTeams.length > 0) ? onExitTeam : undefined}
                 onSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
-                avatar={{ userName, avatarUrl, onClick: onGoToProfile }}
                 groups={calendarAllowed ? [{
                   label: "Sections",
                   rows: [
@@ -14101,7 +14084,7 @@ function SmallGroupLeadersTab({
   onTeamSettings,
   isDesktopView,
   desktopSection,
-  userName, avatarUrl, onGoToProfile, onExitTeam,
+  onExitTeam,
 }: {
   teamId: string
   teamName?: string
@@ -14115,9 +14098,6 @@ function SmallGroupLeadersTab({
   isDesktopView?: boolean
   desktopSection?: string
   // Mobile hub chrome (§2.1): avatar → profile, back chevron → picker.
-  userName?: string
-  avatarUrl?: string | null
-  onGoToProfile?: () => void
   onExitTeam?: () => void
 }) {
   const supabase = createClient()
@@ -14701,7 +14681,6 @@ function SmallGroupLeadersTab({
           teamName={teamName}
           onBack={onExitTeam}
           onSettings={onTeamSettings}
-          avatar={onGoToProfile ? { userName: userName ?? "", avatarUrl, onClick: onGoToProfile } : undefined}
           groups={[{
             label: "Sections",
             rows: validTabs.map(k => ({

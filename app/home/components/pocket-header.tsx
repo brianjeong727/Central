@@ -2,25 +2,24 @@
 
 import type { ReactNode } from "react"
 import { RingCrossLogo } from "./shared"
-import { MonogramChip, BackChevron, POCKET_CHROME_PAD_Y, POCKET_CHROME_PAD_X, POCKET_CHROME_TITLE } from "@/components/central"
-import { getInitials } from "../utils"
+import { BackChevron, POCKET_CHROME_PAD_Y, POCKET_CHROME_PAD_X, POCKET_CHROME_TITLE } from "@/components/central"
 
 interface PocketHeaderProps {
   ministryName: string
-  userName: string
-  avatarUrl?: string | null
-  // Optional chrome action rendered between the ministry name and the avatar
-  // (Home's admin-tier Settings gear). A single object-level action only — creates
-  // never live here (mobile carve-out from Convention #15 is the plum "+" per screen).
+  // Optional trailing chrome action (Home's admin-tier Settings gear). A single
+  // object-level action only — creates never live here (mobile carve-out from
+  // Convention #15 is the plum "+" per screen).
   action?: ReactNode
-  onAvatarClick: () => void
 }
 
 // Shared mobile chrome row for the "Pocket" screens: brand mark + ministry name
-// (serif) on the LEFT, an optional action (gear) + the user's MonogramChip avatar
-// on the RIGHT (taps through to the profile tab). Home wires it in this pass;
-// news/chats/workspace adopt it later.
-export function PocketHeader({ ministryName, userName, avatarUrl, action, onAvatarClick }: PocketHeaderProps) {
+// (serif) on the LEFT, an optional action (gear) on the RIGHT.
+//
+// The user's MonogramChip avatar used to sit at the far right and tap through to
+// Profile. It was removed when Profile became a pill destination (2026-08-16) —
+// it was a second door to a place the nav now reaches from every screen. See
+// mobile_design_system.md §3.
+export function PocketHeader({ ministryName, action }: PocketHeaderProps) {
   return (
     <div
       className="flex items-center"
@@ -36,18 +35,6 @@ export function PocketHeader({ ministryName, userName, avatarUrl, action, onAvat
         {ministryName}
       </span>
       {action}
-      <button
-        onClick={onAvatarClick}
-        aria-label="Your profile"
-        style={{ flexShrink: 0, border: "none", background: "none", padding: 0, cursor: "pointer" }}
-      >
-        <MonogramChip
-          initials={getInitials(userName)}
-          avatarUrl={avatarUrl}
-          className="w-9 h-9"
-          style={{ fontFamily: "var(--sans)", fontWeight: 600, fontSize: 12 }}
-        />
-      </button>
     </div>
   )
 }
@@ -55,25 +42,22 @@ export function PocketHeader({ ministryName, userName, avatarUrl, action, onAvat
 // ── B3 Pocket Daybreak chrome ────────────────────────────────────────────────
 // The single top row shared by the Announcements / Chats / Workspace mobile
 // screens (mockup `.chrome`): an optional back chevron, the page title (serif
-// 22/600, dropping to 20 when TWO actions share the row per v2 §2), 0–2 action
-// slots, then the user's MonogramChip avatar (taps to the profile tab) far
-// RIGHT. Owns its own md:hidden + 12/20/10 padding so it drops in at the tab
-// root, outside any px-5 content wrapper.
+// 22/600, dropping to 20 when TWO actions share the row per v2 §2) and 0–2
+// action slots. Owns its own md:hidden + 12/20/10 padding so it drops in at the
+// tab root, outside any px-5 content wrapper.
 //
 // Daybreak-v2 extensions (all optional, existing callers untouched): `action2`
-// for a second action, `back` for the one-level-up chevron on drilled-in
-// subpages, and `hideAvatar` since subpages drop the avatar (v2 §3).
-export function PocketChrome({
-  title, action, action2, back, hideAvatar = false, userName, avatarUrl, onAvatarClick,
-}: {
+// for a second action and `back` for the one-level-up chevron on drilled-in
+// subpages.
+//
+// The trailing MonogramChip avatar (and its `hideAvatar` opt-out, which by the
+// end every caller but three was passing) was removed when Profile became a pill
+// destination (2026-08-16). See mobile_design_system.md §3.
+export function PocketChrome({ title, action, action2, back }: {
   title: string
   action?: ReactNode
   action2?: ReactNode
   back?: () => void
-  hideAvatar?: boolean
-  userName: string
-  avatarUrl?: string | null
-  onAvatarClick: () => void
 }) {
   const twoActions = Boolean(action && action2)
   return (
@@ -91,19 +75,6 @@ export function PocketChrome({
       </span>
       {action}
       {action2}
-      {!hideAvatar && (
-        <button
-          onClick={onAvatarClick}
-          aria-label="Your profile"
-          style={{ flexShrink: 0, border: "none", background: "none", padding: 0, cursor: "pointer" }}
-        >
-          <MonogramChip
-            initials={getInitials(userName)}
-            avatarUrl={avatarUrl}
-            style={{ width: 34, height: 34, fontFamily: "var(--sans)", fontWeight: 600, fontSize: 11 }}
-          />
-        </button>
-      )}
     </div>
   )
 }

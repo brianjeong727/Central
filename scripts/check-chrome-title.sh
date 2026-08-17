@@ -29,9 +29,15 @@ for f in $builders; do
   # The constant's own home defines both — skip it.
   [ "$f" = "components/central/pocket.tsx" ] && continue
   # A file that only NAMES the constant in prose (a comment pointing at the rule)
-  # is not building a row. Strip comment lines FIRST — a block-comment
-  # continuation (" * …") has no slash on it and slipped through a naive filter.
-  grep -E 'POCKET_CHROME_PAD_Y' "$f" | grep -qvE '^\s*(\*|//|/\*)' || continue
+  # is not building a row. Strip comments SYNTACTICALLY rather than by line prefix.
+  # Prefix-matching was tried twice and leaks both times: " * …" has no slash on it,
+  # and a JSX `{/* … */}` continuation line carries no marker at ALL, so prose
+  # wrapped onto a second line read as code and failed a BLOCKING gate on a comment
+  # (profile-tab.tsx, 2026-08-16). Perl slurps the file and removes /* … */ blocks
+  # (which covers `{/* … */}`) and // tails, then we grep what's actually left.
+  if ! perl -0777 -ne 's{/\*.*?\*/}{}gs; s{//[^\n]*}{}g; exit(/POCKET_CHROME_PAD_Y/ ? 0 : 1)' "$f"; then
+    continue
+  fi
   if ! grep -q 'POCKET_CHROME_TITLE' "$f"; then
     bad="$bad$f\n"
   fi

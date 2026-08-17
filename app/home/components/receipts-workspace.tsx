@@ -25,7 +25,6 @@ export interface ReceiptsTeamRef {
 interface ReceiptsWorkspaceProps {
   ministryId: string
   userId: string
-  userName: string
   teams: ReceiptsTeamRef[]
   activeReceiptsTeamId: string | null
   // null clears the selection back to the mobile Receipts hub (?rteam removed).
@@ -34,11 +33,9 @@ interface ReceiptsWorkspaceProps {
   // current user may manage that team (its president or a governance admin); the
   // gear is hidden otherwise.
   onOpenTeamSettings?: () => void
-  // Mobile hub chrome (§2.1): back chevron exits Receipts to the workspace picker;
-  // avatar taps through to the profile tab. Desktop ignores all three.
+  // Mobile hub chrome (§2.1): back chevron exits Receipts to the workspace picker.
+  // Desktop ignores it.
   onExitTeam?: () => void
-  avatarUrl?: string | null
-  onGoToProfile?: () => void
 }
 
 const FUND_OPTIONS = [
@@ -49,14 +46,11 @@ const FUND_OPTIONS = [
 export function ReceiptsWorkspace({
   ministryId,
   userId,
-  userName,
   teams,
   activeReceiptsTeamId,
   onReceiptsTeamChange,
   onOpenTeamSettings,
   onExitTeam,
-  avatarUrl,
-  onGoToProfile,
 }: ReceiptsWorkspaceProps) {
   const isMobile = useIsMobile()
 
@@ -190,7 +184,6 @@ export function ReceiptsWorkspace({
           <MobilePocketHub
             teamName="Receipts"
             onBack={onExitTeam}
-            avatar={onGoToProfile ? { userName, avatarUrl, onClick: onGoToProfile } : undefined}
             groups={[{
               label: "Your teams",
               rows: teams.map(t => {
