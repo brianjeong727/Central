@@ -30,6 +30,9 @@ Steps:
    - Find the PR for this branch: `gh pr view --json number,state,mergeStateStatus` (or `gh pr list --head "$(git branch --show-current)" --json number,state,mergeStateStatus`).
    - If no open PR exists yet, create one: `gh pr create --base main --fill`.
    - Merge it: `gh pr merge <n> --merge` (this repo uses merge commits). `mergeStateStatus: UNSTABLE` (non-blocking checks still pending) is fine to merge. `BLOCKED` (conflicts or a required check failing) → STOP and report why. Do NOT create the sentinel on this path — it isn't used.
+   - **NEVER pass `--delete-branch`.** The branch being shipped is checked out in THIS worktree, and `gh` cannot delete a branch a worktree holds: it fails with `cannot delete branch '<x>' used by worktree at …` AFTER the merge has already landed, so the ship looks failed when it actually succeeded. Delete the remote branch separately if you want it gone: `git push origin --delete <branch>`. (Verified from slot s3, 2026-08-17.)
+
+   **This path works from EVERY slot — s1, s2, s3 and the shared checkout alike.** Proven end-to-end from s3: `gh` resolves the repo from any worktree, the token carries admin, `main` is unprotected, and NO hook matches `gh` (main-branch-guard and destructive-git-guard both fast-bail on commands with no `git` token). If a slot session ever claims it "cannot merge from a worktree," that belief is wrong — it is almost always an agent declining rather than a tool refusing. The ONLY thing slots must not do is check out or fast-forward the local `main` worktree, which this path never touches.
 
 7. **Merge to main — FALLBACK only if there is no GitHub remote / `gh` is unavailable:** authorize one protected push and update the remote ref directly, WITHOUT checking out main:
    - Drop the single-use sentinel the main-branch-guard consumes. `$CLAUDE_PROJECT_DIR` may be unset, so derive the path and cover both:

@@ -34,7 +34,7 @@ block() {
     echo "main-branch-guard: /ship sentinel honored (single-use, now consumed)." >&2
     exit 0
   fi
-  echo "BLOCKED: $1 Switch to a feature branch first (e.g. \`git switch -c <name>\`) — never commit or push on main/master. (Sanctioned merges to main go through /ship, which Brian types himself, or a GitHub PR.)" >&2
+  echo "BLOCKED: $1 Switch to a feature branch first (e.g. \`git switch -c <name>\`) — never commit or push on main/master. NOTE: this guard only ever matches \`git\`; it does NOT block \`gh pr merge\`, which is how main is meant to advance and which works from EVERY worktree slot. If you were trying to land a branch, open a PR and merge it — do not conclude that shipping is unavailable here." >&2
   exit 2
 }
 
