@@ -228,6 +228,24 @@ else
   exit 1
 fi
 
+# A chat's chip image must resolve through chatChipAvatar() alone. A DM's
+# groups.avatar_url is writable by either participant through the API (RLS is
+# wider than the app gate there) and is inert ONLY because no render path reads
+# it — a property currently resting on six separate surfaces continuing to behave.
+echo "▶ scripts/check-chat-avatar.sh"
+AVATAR_LOG="$(mktemp)"
+if bash scripts/check-chat-avatar.sh >"$AVATAR_LOG" 2>&1; then
+  AVATAR_STATUS="pass"
+  tail -n 1 "$AVATAR_LOG"
+else
+  AVATAR_STATUS="fail"
+  echo "── chat-avatar FAILED (BLOCKING) ────────────────────"
+  cat "$AVATAR_LOG"
+  echo "─────────────────────────────────────────────────────"
+  echo "════════ VERIFY RESULT: FAIL (chat-avatar) ════════"
+  exit 1
+fi
+
 # ── (d) restart dev server ───────────────────────────────────────────────────
 case "$PORT" in
   3000) SLOT="main" ;;
@@ -288,6 +306,7 @@ printf '  %-8s %s\n' "hex"    "$HEX_STATUS"
 printf '  %-8s %s\n' "dedup"  "$DEDUP_STATUS"
 printf '  %-8s %s\n' "copies" "$COPIES_STATUS"
 printf '  %-8s %s\n' "chrome" "$CHROME_STATUS"
+printf '  %-8s %s\n' "avatar" "$AVATAR_STATUS"
 printf '  %-8s %s (:%s)\n' "server" "$SERVER_STATUS" "$PORT"
 printf '  %-8s %s\n' "e2e"    "$E2E_STATUS"
 echo "════════════════════════════════════════"

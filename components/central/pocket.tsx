@@ -3,6 +3,7 @@
 import { Fragment, useEffect } from "react"
 import type { CSSProperties, ReactNode } from "react"
 import { createPortal } from "react-dom"
+import Image from "next/image"
 import { ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react"
 import { useBackIntent } from "@/lib/back-intent"
 
@@ -294,10 +295,16 @@ export function PocketBackRow({ label, onBack, style }: { label: string; onBack:
 // letter OR a plum stroked icon (§4 Row contract — "plum stroke icon or
 // initial"); `solid` inverts to a plum fill with cream content (ministry-wide
 // chat). `icon` wins over `letter` when both are passed.
-export function PocketChip({ letter, icon, solid = false, size = 40 }: { letter?: string; icon?: ReactNode; solid?: boolean; size?: number }) {
+//
+// `avatarUrl` is the same fall-back-to-initials affordance MonogramChip carries:
+// a photo fills the squircle when the chat has one, and the tonal/solid letter
+// treatment is what shows when it doesn't. The SHAPE stays the chat list's
+// squircle either way — this is the same chip, wearing a picture.
+export function PocketChip({ letter, icon, avatarUrl, solid = false, size = 40 }: { letter?: string; icon?: ReactNode; avatarUrl?: string | null; solid?: boolean; size?: number }) {
   return (
     <span
       style={{
+        position: "relative", overflow: "hidden",
         width: size, height: size, borderRadius: "var(--r-callout)", flexShrink: 0,
         display: "grid", placeItems: "center",
         fontFamily: "var(--serif)", fontSize: 13, fontWeight: 600,
@@ -305,7 +312,9 @@ export function PocketChip({ letter, icon, solid = false, size = 40 }: { letter?
         color: solid ? "var(--cream-on-dark)" : "var(--plum)",
       }}
     >
-      {icon ?? letter}
+      {avatarUrl
+        ? <Image src={avatarUrl} alt={letter ?? ""} fill sizes="80px" className="object-cover" />
+        : (icon ?? letter)}
     </span>
   )
 }

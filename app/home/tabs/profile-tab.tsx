@@ -20,31 +20,8 @@ import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, J
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
+import { downscaleToJpeg } from "@/lib/downscale-image"
 import type { Profile, Devotional, Prayer, Verse, NotificationSettings } from "../types"
-
-// Client-side avatar downscale before upload: cap the longest edge at 512px and
-// re-encode JPEG q0.85 so phone-camera multi-MB originals never hit storage/egress.
-// Best-effort — on any decode failure (e.g. HEIC the browser can't paint) the
-// caller falls back to uploading the original file untouched.
-async function downscaleToJpeg(file: File, maxEdge = 512, quality = 0.85): Promise<Blob> {
-  const bitmap = await createImageBitmap(file)
-  try {
-    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height))
-    const w = Math.max(1, Math.round(bitmap.width * scale))
-    const h = Math.max(1, Math.round(bitmap.height * scale))
-    const canvas = document.createElement("canvas")
-    canvas.width = w
-    canvas.height = h
-    const ctx = canvas.getContext("2d")
-    if (!ctx) throw new Error("no 2d context")
-    ctx.drawImage(bitmap, 0, 0, w, h)
-    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", quality))
-    if (!blob) throw new Error("toBlob failed")
-    return blob
-  } finally {
-    bitmap.close?.()
-  }
-}
 
 // Lazy — RoleDescriptionEditor pulls in @tiptap + yjs; keep that bundle off the
 // Profile tab's chunk until the user actually opens a journal editor.

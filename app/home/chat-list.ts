@@ -19,6 +19,11 @@ export type ChatListRow = {
   group_category: string | null
   muted: boolean | null; pinned: boolean | null
   is_central: boolean | null
+  // The chat's own uploaded photo, and — for a DM — the other participant's
+  // profile photo, both resolved inside get_chat_list so the list stays ONE
+  // round trip. Never read either directly; go through chatChipAvatar().
+  group_avatar_url: string | null
+  partner_avatar_url: string | null
 }
 
 // ── Dead-thread signal (deleted-account counterpart) ─────────────────────────
@@ -72,6 +77,14 @@ export function mapChatListRows(rows: ChatListRow[], deletedDmIds?: ReadonlySet<
     pinned: row.pinned ?? false,
     is_central_chat: row.is_central ?? false,
     counterpart_deleted: deletedDmIds?.has(row.group_id) ?? false,
+    // Carried RAW onto the ChatGroup — the DM-vs-group choice is made once, at
+    // render, by chatChipAvatar() (app/home/chat-avatar.ts). Collapsing them to
+    // a single field here would put a second derivation point in the codebase,
+    // which is exactly what the W1 policy gap makes unsafe. The RPC spelling is
+    // kept verbatim (NOT renamed to a plain `avatar_url`) so any consumer that
+    // reads the group photo without the resolver trips check-chat-avatar.sh.
+    group_avatar_url: row.group_avatar_url ?? null,
+    partner_avatar_url: row.partner_avatar_url ?? null,
   })) as ChatGroup[]
 
   // Dead threads (the other person deleted their account) sink BELOW every live

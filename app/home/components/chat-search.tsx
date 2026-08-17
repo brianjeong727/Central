@@ -6,6 +6,7 @@ import { MonogramChip, PocketKicker, PocketRow, PocketRowCard } from "@/componen
 import { createClient } from "@/lib/supabase"
 import { EmptyState } from "./shared"
 import { getInitials } from "../utils"
+import { chatChipAvatar } from "../chat-avatar"
 import type { ChatGroup } from "../types"
 
 // ── ChatSearchView ───────────────────────────────────────────────────────────
@@ -104,7 +105,7 @@ export function ChatSearchView({
     return (
       <PocketRow
         key={c.id}
-        leading={<MonogramChip initials={getInitials(c.name)} className="w-9 h-9 font-medium text-[10px]" />}
+        leading={<MonogramChip initials={getInitials(c.name)} avatarUrl={chatChipAvatar(c)} className="w-9 h-9 font-medium text-[10px]" />}
         title={c.name}
         meta={c.type === "dm" ? undefined : c.type === "church" ? "Church" : "Group"}
         showDot={c.unread_count > 0 && !c.muted}
