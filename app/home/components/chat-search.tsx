@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Search, Users } from "lucide-react"
-import { MonogramChip, PocketKicker, PocketRow, PocketRowCard } from "@/components/central"
+import { ChatAvatar, MonogramChip, PocketKicker, PocketRow, PocketRowCard } from "@/components/central"
 import { createClient } from "@/lib/supabase"
 import { EmptyState } from "./shared"
 import { getInitials } from "../utils"
@@ -38,6 +38,7 @@ export function ChatSearchView({
   ministryId,
   onOpenChat,
   onOpenPerson,
+  variant = "pocket",
 }: {
   query: string
   /** The already-cached chat list — Recent/Suggested/chat matches all read this. */
@@ -47,7 +48,21 @@ export function ChatSearchView({
   onOpenChat: (id: string, name: string) => void
   /** A person row — the caller opens the existing DM or a draft (app/home/dm.ts). */
   onOpenPerson: (person: ChatSearchPerson) => void
+  /**
+   * Which list grammar to render in.
+   *
+   * `pocket` (default) is the phone-width Pocket family — an ivory `PocketRowCard`
+   * holding 40px-chip rows. `desktop` is the CHAT SIDEBAR's own grammar: flat rows
+   * on the panel fill, 38px avatar, 13px name, 11.5px sub, no card.
+   *
+   * This exists because one shared body rendered in Pocket primitives put a big
+   * tonal mobile card inside the desktop sidebar the moment you typed — the panel
+   * changed design languages mid-interaction. Sharing the LOGIC is right; sharing
+   * the CHROME across two design systems is not.
+   */
+  variant?: "pocket" | "desktop"
 }) {
+  const isDesktop = variant === "desktop"
   const supabase = useMemo(() => createClient(), [])
   const [people, setPeople] = useState<ChatSearchPerson[]>([])
   const [searching, setSearching] = useState(false)
@@ -101,7 +116,41 @@ export function ChatSearchView({
     [live, q],
   )
 
+  // Mirrors ChatGroupCard's desktop row (chat-list-view.tsx) so a search result and
+  // the row it becomes are visibly the same object.
+  function deskRow(key: string, avatar: React.ReactNode, title: string, sub: string | null, onClick: () => void, dot = false) {
+    return (
+      <button
+        key={key}
+        onClick={onClick}
+        className="w-full text-left flex items-center gap-2.5 px-2.5 py-2 transition-colors duration-100"
+        style={{ borderLeft: "3px solid transparent", margin: "0 4px" }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--cream-3)" }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "" }}
+      >
+        {avatar}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p className="text-[13px] truncate leading-tight" style={{ color: "var(--ink)", fontWeight: 500 }}>{title}</p>
+          {sub && <p className="text-[11.5px] truncate leading-tight" style={{ color: "var(--muted-text)", marginTop: 2 }}>{sub}</p>}
+        </div>
+        {dot && <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--plum)", flexShrink: 0 }} />}
+      </button>
+    )
+  }
+
   function chatRow(c: ChatGroup, isLast: boolean) {
+    if (isDesktop) {
+      return deskRow(
+        c.id,
+        <ChatAvatar size={38} title={c.name} avatarUrl={chatChipAvatar(c)} members={c.cluster_members}
+          otherCount={c.other_member_count} nameIsGenerated={c.name_is_generated} isCentral={c.is_central_chat}
+          surface="var(--cream)" className="flex-shrink-0" />,
+        c.name,
+        c.type === "dm" ? null : c.type === "church" ? "Church" : "Group",
+        () => onOpenChat(c.id, c.name),
+        c.unread_count > 0 && !c.muted,
+      )
+    }
     return (
       <PocketRow
         key={c.id}
@@ -116,6 +165,15 @@ export function ChatSearchView({
   }
 
   function personRow(p: ChatSearchPerson, isLast: boolean) {
+    if (isDesktop) {
+      return deskRow(
+        p.id,
+        <MonogramChip initials={getInitials(p.name)} avatarUrl={p.avatar_url} className="font-medium text-[11px]" style={{ width: 38, height: 38 }} />,
+        p.name,
+        p.graduation_year ? `Class of ${p.graduation_year}` : null,
+        () => onOpenPerson(p),
+      )
+    }
     return (
       <PocketRow
         key={p.id}
@@ -125,6 +183,17 @@ export function ChatSearchView({
         isLast={isLast}
         onClick={() => onOpenPerson(p)}
       />
+    )
+  }
+
+  // The card is a PHONE affordance. On desktop the rows sit directly on the panel
+  // fill, exactly like the chat list they are replacing.
+  function section(label: string, rows: React.ReactNode) {
+    return (
+      <div>
+        <PocketKicker label={label} style={{ margin: isDesktop ? "0 0 4px 10px" : "0 4px 8px" }} />
+        {isDesktop ? rows : <PocketRowCard>{rows}</PocketRowCard>}
+      </div>
     )
   }
 
@@ -143,20 +212,10 @@ export function ChatSearchView({
     return (
       <div className="flex flex-col gap-4 pb-4">
         {chatMatches.length > 0 && (
-          <div>
-            <PocketKicker label="Chats" style={{ margin: "0 4px 8px" }} />
-            <PocketRowCard>
-              {chatMatches.map((c, i) => chatRow(c, i === chatMatches.length - 1))}
-            </PocketRowCard>
-          </div>
+          section("Chats", chatMatches.map((c, i) => chatRow(c, i === chatMatches.length - 1)))
         )}
         {shownPeople.length > 0 && (
-          <div>
-            <PocketKicker label="People" style={{ margin: "0 4px 8px" }} />
-            <PocketRowCard>
-              {shownPeople.map((p, i) => personRow(p, i === shownPeople.length - 1))}
-            </PocketRowCard>
-          </div>
+          section("People", shownPeople.map((p, i) => personRow(p, i === shownPeople.length - 1)))
         )}
       </div>
     )
@@ -176,20 +235,10 @@ export function ChatSearchView({
   return (
     <div className="flex flex-col gap-4 pb-4">
       {suggested.length > 0 && (
-        <div>
-          <PocketKicker label="Unread" style={{ margin: "0 4px 8px" }} />
-          <PocketRowCard>
-            {suggested.map((c, i) => chatRow(c, i === suggested.length - 1))}
-          </PocketRowCard>
-        </div>
+        section("Unread", suggested.map((c, i) => chatRow(c, i === suggested.length - 1)))
       )}
       {recent.length > 0 && (
-        <div>
-          <PocketKicker label="Recent" style={{ margin: "0 4px 8px" }} />
-          <PocketRowCard>
-            {recent.map((c, i) => chatRow(c, i === recent.length - 1))}
-          </PocketRowCard>
-        </div>
+        section("Recent", recent.map((c, i) => chatRow(c, i === recent.length - 1)))
       )}
     </div>
   )
