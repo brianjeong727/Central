@@ -1163,7 +1163,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
           const { error } = await supabase.from("rsvps").delete().eq("announcement_id", announcementId).eq("user_id", userId)
           if (error) throw error
         } else {
-          const { error } = await supabase.from("rsvps").upsert({ announcement_id: announcementId, user_id: userId }, { onConflict: "announcement_id,user_id" })
+          const { error } = await supabase.from("rsvps").upsert({ announcement_id: announcementId, user_id: userId }, { onConflict: "announcement_id,user_id", ignoreDuplicates: true })
           if (error) throw error
           // An RSVP is a strictly stronger signal than "I saw this", so it
           // SATISFIES acknowledgment — making someone tap twice for one
@@ -1906,7 +1906,7 @@ export function AnnouncementDetailView({
       ])
 
       supabase.from("announcement_views")
-        .upsert({ announcement_id: announcementId, user_id: userId }, { onConflict: "announcement_id,user_id" })
+        .upsert({ announcement_id: announcementId, user_id: userId }, { onConflict: "announcement_id,user_id", ignoreDuplicates: true })
         .then()
 
       const rsvpUserIds = (rsvpRows ?? []).map((r: { user_id: string }) => r.user_id)
@@ -1969,7 +1969,7 @@ export function AnnouncementDetailView({
       await supabase.from("rsvps").delete().eq("announcement_id", ann.id).eq("user_id", userId)
       setAnn((prev) => prev ? { ...prev, user_has_rsvped: false, rsvp_count: Math.max(0, prev.rsvp_count - 1), rsvp_attendees: prev.rsvp_attendees.filter((a) => a.user_id !== userId) } : prev)
     } else {
-      await supabase.from("rsvps").upsert({ announcement_id: ann.id, user_id: userId }, { onConflict: "announcement_id,user_id" })
+      await supabase.from("rsvps").upsert({ announcement_id: ann.id, user_id: userId }, { onConflict: "announcement_id,user_id", ignoreDuplicates: true })
       setAnn((prev) => prev ? { ...prev, user_has_rsvped: true, rsvp_count: prev.rsvp_count + 1, rsvp_attendees: [...prev.rsvp_attendees, { user_id: userId, name: userName }] } : prev)
       // RSVP satisfies acknowledgment (the SECOND of the two RSVP writers — the
       // feed's handleRsvpToggle is the other). Insert-only: the un-RSVP branch

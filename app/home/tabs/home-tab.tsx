@@ -680,7 +680,7 @@ export function HomeTab({
         } else {
           await supabase.from("rsvps").upsert(
             { announcement_id: hero.id, user_id: profile.id },
-            { onConflict: "announcement_id,user_id" }
+            { onConflict: "announcement_id,user_id", ignoreDuplicates: true }
           )
           // An RSVP satisfies acknowledgment (spec §3) — one of FIVE RSVP write
           // paths in the app, all of which must write it, or someone who RSVPs
@@ -709,7 +709,7 @@ export function HomeTab({
         } else {
           await supabase.from("rsvps").upsert(
             { announcement_id: annId, user_id: profile.id },
-            { onConflict: "announcement_id,user_id" }
+            { onConflict: "announcement_id,user_id", ignoreDuplicates: true }
           )
           await acknowledgeAnnouncement(supabase, annId, profile.id) // RSVP satisfies acknowledgment
         }
@@ -743,7 +743,7 @@ export function HomeTab({
         if (has) {
           await supabase.from("rsvps").delete().eq("announcement_id", annId).eq("user_id", profile.id)
         } else {
-          await supabase.from("rsvps").upsert({ announcement_id: annId, user_id: profile.id }, { onConflict: "announcement_id,user_id" })
+          await supabase.from("rsvps").upsert({ announcement_id: annId, user_id: profile.id }, { onConflict: "announcement_id,user_id", ignoreDuplicates: true })
           await acknowledgeAnnouncement(supabase, annId, profile.id) // RSVP satisfies acknowledgment
         }
         return optimistic
