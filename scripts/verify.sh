@@ -101,6 +101,7 @@ HEX_STATUS="n/a"
 DEDUP_STATUS="n/a"
 COPIES_STATUS="n/a"
 CHROME_STATUS="n/a"
+ROLE_STATUS="n/a"
 SERVER_STATUS="fail"
 E2E_STATUS="n/a"
 
@@ -262,6 +263,32 @@ else
   exit 1
 fi
 
+# ── (c6) role domain: DB CHECK constraints == lib/roles.ts (BLOCKING) ────────
+# profiles_role_check allowed only 5 of the 7 roles lib/roles.ts had encoded for
+# months, so deacon/elder were unreachable platform-wide and nothing surfaced it
+# until a user reported "only pastor works on admin signup". The live half probes
+# the real constraints on profiles.role + user_ministries.role (a PK-colliding
+# INSERT: the CHECK is evaluated first, the unique index aborts the statement —
+# nothing is ever written). It SKIPS loudly without a service key; the static
+# code-to-code half always runs.
+echo "▶ scripts/check-role-domain.mjs"
+ROLE_LOG="$(mktemp)"
+if node scripts/check-role-domain.mjs >"$ROLE_LOG" 2>&1; then
+  if grep -q '\[live\]: SKIPPED' "$ROLE_LOG"; then
+    ROLE_STATUS="pass (static only — live probe skipped)"
+  else
+    ROLE_STATUS="pass"
+  fi
+  cat "$ROLE_LOG"
+else
+  ROLE_STATUS="fail"
+  echo "── role-domain FAILED (BLOCKING) ────────────────────"
+  cat "$ROLE_LOG"
+  echo "─────────────────────────────────────────────────────"
+  echo "════════ VERIFY RESULT: FAIL (role-domain) ════════"
+  exit 1
+fi
+
 # ── (d) restart dev server ───────────────────────────────────────────────────
 case "$PORT" in
   3000) SLOT="main" ;;
@@ -323,6 +350,7 @@ printf '  %-8s %s\n' "dedup"  "$DEDUP_STATUS"
 printf '  %-8s %s\n' "copies" "$COPIES_STATUS"
 printf '  %-8s %s\n' "chrome" "$CHROME_STATUS"
 printf '  %-8s %s\n' "avatar" "$AVATAR_STATUS"
+printf '  %-8s %s\n' "roles"  "$ROLE_STATUS"
 printf '  %-8s %s (:%s)\n' "server" "$SERVER_STATUS" "$PORT"
 printf '  %-8s %s\n' "e2e"    "$E2E_STATUS"
 echo "════════════════════════════════════════"
@@ -333,6 +361,7 @@ FAIL=0
 [[ "$LINT_STATUS" == "fail" ]] && FAIL=1
 [[ "$HEX_STATUS" == "fail" ]] && FAIL=1
 [[ "$DEDUP_STATUS" == "fail" ]] && FAIL=1
+[[ "$ROLE_STATUS" == "fail" ]] && FAIL=1
 [[ "$SERVER_STATUS" != "pass" ]] && FAIL=1
 [[ "$E2E_STATUS" == "fail" ]] && FAIL=1
 

@@ -331,6 +331,16 @@ export async function submitMinistryApplication(data: {
   // Duplicate-registration guard — a re-fire (double-submit, back-button, retry)
   // must not create a second pending ministry that orphans the first. If this
   // user already has a pending registration, surface it instead of inserting.
+  //
+  // …UNLESS that pending row is STRANDED. The ministry is inserted before the
+  // founder is attached to it, so a failure between those two writes (the
+  // deacon/elder role-CHECK rejection was one; a crash between them is another,
+  // and the cleanup below cannot cover that) leaves a ministry with NO founder —
+  // and this guard then permanently blocks the retry. "Stranded" is precisely
+  // "neither link exists": the profile does not point at it AND it has no
+  // user_ministries row. A legitimately-pending registration always has at
+  // least one (a founder who later joined another ministry by code keeps the
+  // membership row), so the test can't eat a real application.
   const { data: existingPending } = await admin
     .from("ministries")
     .select("id")
@@ -338,7 +348,36 @@ export async function submitMinistryApplication(data: {
     .eq("status", "pending")
     .maybeSingle()
   if (existingPending) {
-    return { error: "You already have a pending registration — it's waiting for approval." }
+    const profileLinked = callerProfile?.ministry_id === existingPending.id
+    const { data: existingMembership } = await admin
+      .from("user_ministries")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("ministry_id", existingPending.id)
+      .maybeSingle()
+
+    if (profileLinked || existingMembership) {
+      // Real pending registration. Repair the half-link if the membership row is
+      // the missing one — otherwise the founder is silently demoted to the
+      // user_ministries default on their next ministry switch.
+      if (profileLinked && !existingMembership) {
+        await admin.from("user_ministries").upsert(
+          { user_id: user.id, ministry_id: existingPending.id, role: callerProfile?.role ?? "pastor" },
+          { onConflict: "user_id,ministry_id" }
+        )
+      }
+      return { error: "You already have a pending registration — it's waiting for approval." }
+    }
+
+    // Stranded: no founder was ever attached, so nothing references this row
+    // (chats/workspaces are only created after the link succeeds). Drop it and
+    // let this submission proceed.
+    await admin
+      .from("ministries")
+      .delete()
+      .eq("id", existingPending.id)
+      .eq("created_by", user.id)
+      .eq("status", "pending")
   }
 
   const inviteCode = await uniqueInviteCode(admin)
@@ -382,6 +421,17 @@ export async function submitMinistryApplication(data: {
 
   if (createErr || !ministry) return { error: createErr?.message ?? "Failed to create application." }
 
+  // The ministry row now exists but has no founder attached. Every failure from
+  // here until BOTH link writes land must unwind it — otherwise the applicant is
+  // left with a pending ministry they are not in, and the duplicate guard above
+  // blocks their retry. (That is exactly how the deacon/elder role-CHECK
+  // rejection stranded people: the insert succeeded, the role write did not.)
+  const unwindMinistry = async () => {
+    await admin.from("ministries").delete().eq("id", ministry.id).eq("status", "pending")
+  }
+  const priorMinistryId = callerProfile?.ministry_id ?? null
+  const priorRole = callerProfile?.role ?? "member"
+
   // Link user to ministry with their specific founder role
   const { data: updatedRows, error: profileErr } = await admin
     .from("profiles")
@@ -389,15 +439,29 @@ export async function submitMinistryApplication(data: {
     .eq("id", user.id)
     .select("id")
 
-  if (profileErr) return { error: profileErr.message }
+  if (profileErr) {
+    await unwindMinistry()
+    return { error: profileErr.message }
+  }
   if (!updatedRows || updatedRows.length === 0) {
+    await unwindMinistry()
     return { error: "Profile not found. Please sign out and sign back in, then try again." }
   }
 
-  await admin.from("user_ministries").upsert(
+  const { error: membershipErr } = await admin.from("user_ministries").upsert(
     { user_id: user.id, ministry_id: ministry.id, role: founderRole },
     { onConflict: "user_id,ministry_id" }
   )
+  if (membershipErr) {
+    // Put the profile back where it was FIRST — profiles.ministry_id references
+    // the row we're about to delete.
+    await admin
+      .from("profiles")
+      .update({ ministry_id: priorMinistryId, role: priorRole })
+      .eq("id", user.id)
+    await unwindMinistry()
+    return { error: membershipErr.message }
+  }
 
   // Create standard grade + central chats for the new ministry
   await ensureMinistryChats(ministry.id, data.name.trim(), user.id)
@@ -943,8 +1007,31 @@ export async function updateMemberRole(targetUserId: string, newRole: "visitor" 
     if (blockErr) return { error: blockErr }
   }
 
+  // The role lives in TWO places and they must move together: profiles.role is
+  // what every gate reads, user_ministries.role is what setCurrentMinistry /
+  // a return-join restores it FROM. Writing only profiles silently demotes the
+  // member back on their next ministry switch (joinMinistryByCode already keeps
+  // both in step — this path did not).
+  const { data: priorRows } = await admin
+    .from("profiles").select("role").eq("id", targetUserId).eq("ministry_id", profile.ministry_id).maybeSingle()
+  const priorRole = priorRows?.role ?? null
+
   const { error } = await admin.from("profiles").update({ role: newRole }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
   if (error) return { error: error.message }
+
+  // Upsert (not update): a member whose profile points at this ministry IS a
+  // member, even if a legacy path never wrote them a membership row.
+  const { error: membershipErr } = await admin.from("user_ministries").upsert(
+    { user_id: targetUserId, ministry_id: profile.ministry_id, role: newRole },
+    { onConflict: "user_id,ministry_id" }
+  )
+  if (membershipErr) {
+    // Leave the two in lockstep rather than half-applied.
+    if (priorRole) {
+      await admin.from("profiles").update({ role: priorRole }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
+    }
+    return { error: membershipErr.message }
+  }
 
   // Keep the Leaders chat roster in step with the new role (fire-and-forget —
   // never fails the role change).
@@ -1310,13 +1397,27 @@ export async function elevateToLeader(userIds: string[], ministryId: string): Pr
         .some(r => r.team_roles?.is_president || (r.team_roles?.permissions ?? []).includes("can_manage_team"))
       if (!isTeamManager) return { error: "Not authorized." }
     }
-    const { error } = await admin
+    const { data: elevated, error } = await admin
       .from("profiles")
       .update({ role: "leader" })
       .in("id", userIds)
       .eq("ministry_id", ministryId)
       .in("role", [...MEMBER_TIER])
-    return { error: error?.message ?? null }
+      .select("id")
+    if (error) return { error: error.message }
+
+    // Mirror into user_ministries — the role lives in two places and
+    // setCurrentMinistry restores from THAT one, so a profiles-only elevation
+    // is undone the next time they switch ministries. Only the rows actually
+    // elevated (the .in("role", MEMBER_TIER) filter skips existing leaders).
+    const elevatedIds = (elevated ?? []).map((r: { id: string }) => r.id)
+    if (elevatedIds.length > 0) {
+      await admin.from("user_ministries").upsert(
+        elevatedIds.map((id) => ({ user_id: id, ministry_id: ministryId, role: "leader" })),
+        { onConflict: "user_id,ministry_id" }
+      )
+    }
+    return { error: null }
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed to elevate role." }
   }

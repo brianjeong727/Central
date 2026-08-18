@@ -45,6 +45,17 @@ export async function switchMinistryRole(role: string): Promise<{ error: string 
       .eq("id", SUPER_UUID)
     if (updateErr) return { error: updateErr.message }
 
+    // Mirror into the membership row for the SAME (sandbox) ministry. The role
+    // lives in two places and setCurrentMinistry restores it from this one, so
+    // without the mirror a ministry switch silently drops the acted-as POV.
+    // UPDATE, never upsert — this must not invent a membership the super
+    // doesn't have. resetToSuper puts both back.
+    await admin
+      .from("user_ministries")
+      .update({ role })
+      .eq("user_id", SUPER_UUID)
+      .eq("ministry_id", profile.ministry_id)
+
     return { error: null }
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed to switch role." }
@@ -168,6 +179,14 @@ export async function resetToSuper(): Promise<{ error: string | null }> {
       .update({ role: HOME_ROLE, ministry_id: CENTRAL_MINISTRY_ID })
       .eq("id", SUPER_UUID)
     if (updateErr) return { error: updateErr.message }
+
+    // Reset the membership row too (switchMinistryRole mirrors into it), so the
+    // home state survives a ministry switch. UPDATE, never upsert.
+    await admin
+      .from("user_ministries")
+      .update({ role: HOME_ROLE })
+      .eq("user_id", SUPER_UUID)
+      .eq("ministry_id", CENTRAL_MINISTRY_ID)
 
     const { error: delErr } = await admin
       .from("team_members")
