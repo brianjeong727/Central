@@ -14,7 +14,7 @@ import { formatInZone, startOfTodayInstantISO } from "@/lib/tz"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getSetupChecklist, setLeadersInvited, dismissSetupChecklist } from "@/app/actions/setup-checklist"
-import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard, MonogramChip, PocketCard, PocketRowCard, PocketRow, PocketButton, PocketRoundButton, POCKET_KICKER_STYLE } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard, FindYourPeopleCard, MonogramChip, PocketCard, PocketRowCard, PocketRow, PocketButton, PocketRoundButton, POCKET_KICKER_STYLE } from "@/components/central"
 import { useIsNativeShell } from "@/lib/native-auth"
 import type { HeroSlide, SetupChecklistData, UpNextEventDetail } from "@/components/central"
 // Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
@@ -26,6 +26,7 @@ const HomeSlideManager = dynamic(
 import type { HomeTabProps, Announcement, RsvpAttendee } from "../types"
 import { isAdminRole, isLeaderRole } from "@/lib/roles"
 import { HomeDeadlines } from "./home-deadlines"
+import { fetchOpenGroups, joinOpenGroup, openGroupsKey, type OpenGroup } from "../open-groups"
 
 export { HomeTabProps }
 
@@ -255,6 +256,23 @@ export function HomeTab({
   )
   // Card shows only while eligible AND at least one item is open (all done → hidden).
   const checklistData = checklist?.eligible && checklist.items.some((i) => !i.done) ? checklist : null
+
+  // ── "Find your people" — open groups this member could join ────────────────
+  // Same SWR key as the browse list and the chat list's entry row, so all three
+  // share one fetch and a join anywhere updates them together.
+  const { data: openGroupsAll, mutate: mutateOpenGroups } = useSWR(openGroupsKey(ministryId), fetchOpenGroups)
+  const [openCardDismissed, setOpenCardDismissed] = useState<boolean>(!!profile.open_groups_card_dismissed)
+  const joinableGroups = (openGroupsAll ?? []).filter((g: OpenGroup) => !g.isMember)
+
+  async function handleJoinOpenGroup(id: string) {
+    await joinOpenGroup(id, profile.id)
+    void mutateOpenGroups()
+  }
+
+  async function handleDismissOpenCard() {
+    setOpenCardDismissed(true)   // optimistic — the card should vanish on tap
+    await supabase.from("profiles").update({ open_groups_card_dismissed: true }).eq("id", profile.id)
+  }
 
   async function handleChecklistToggle(done: boolean) {
     if (!checklist?.eligible) return
@@ -1198,6 +1216,16 @@ export function HomeTab({
               onToggleLeadersInvited={handleChecklistToggle}
               onDismiss={handleChecklistDismiss}
               onNavigate={handleChecklistNavigate}
+            />
+          )}
+
+          {/* ── Find your people — the open-group picker (mobile) ── */}
+          {!openCardDismissed && (
+            <FindYourPeopleCard
+              groups={joinableGroups.map((g: OpenGroup) => ({ id: g.id, name: g.name, memberCount: g.memberCount }))}
+              onJoin={handleJoinOpenGroup}
+              onDismiss={handleDismissOpenCard}
+              onSeeAll={onSeeChats}
             />
           )}
 

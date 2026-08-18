@@ -51,7 +51,7 @@ const PREFETCH_TTL_MS = 5 * 60 * 1000
 // select ChatScreen has always used.
 export const MESSAGE_SELECT =
   "id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, deleted, " +
-  "attachment_url, attachment_type, attachment_name, attachment_size, poll_id, " +
+  "attachment_url, attachment_type, attachment_name, attachment_size, poll_id, invite_group_id, " +
   "profiles!sender_id(name, avatar_url), " +
   "reply_to:reply_to_id(id, content, attachment_type, attachment_name, profiles!sender_id(name)), " +
   "message_reactions(id, message_id, user_id, emoji)"
@@ -215,6 +215,10 @@ export function enrichMessageRows(rows: unknown[]): Message[] {
       attachment_name: m.attachment_name ?? null,
       attachment_size: m.attachment_size ?? null,
       poll_id: m.poll_id ?? null,
+      // This mapper builds an EXPLICIT object, so a column added to MESSAGE_SELECT
+      // is fetched and then silently dropped unless it is also listed here. That is
+      // how the invite card first rendered as a plain bubble.
+      invite_group_id: m.invite_group_id ?? null,
     }
   })
 }

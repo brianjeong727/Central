@@ -5,6 +5,8 @@ import type { ChatAvatarMember } from "@/components/central/chat-avatar"
 export type Tab = "home" | "announcements" | "chats" | "plan" | "directory" | "give" | "profile" | "settings" | "forms" | "congregation" | "network"
 
 export interface Profile {
+  /** Per-user dismissal of the Home "find your people" card. */
+  open_groups_card_dismissed?: boolean
   id: string
   name: string
   email: string
@@ -251,6 +253,10 @@ export interface Message {
   attachment_name?: string | null
   attachment_size?: number | null
   poll_id?: string | null
+  /** Target of an `invite` message — the open group the card offers to join.
+   *  Attacker-supplied: always resolve it through `open_group_card`, never a
+   *  `groups` read (see app/home/tabs/invite-card.tsx). */
+  invite_group_id?: string | null
 }
 
 
@@ -290,6 +296,10 @@ export type ProcessedMessage = Message & { _voteGroup?: string[] }
 
 export interface MessageRowProps {
   msg: ProcessedMessage
+  /** Ministry scope — needed by the invite card to revalidate the open-groups list. */
+  ministryId: string
+  /** Opens a chat from an invite card the reader has already joined. */
+  onOpenChat?: (groupId: string, groupName: string) => void
   isOwn: boolean
   /** True only for the very first message in the list — popovers open downward instead of upward. */
   isFirstMessage: boolean
@@ -499,6 +509,9 @@ export interface ChatScreenProps {
 // churn (inputText, @mention autocomplete, GIF search) re-renders only the composer.
 // ChatScreen keeps messages + optimistic send behind the callbacks below.
 export interface ComposerProps {
+  /** Opens the open-group picker. Absent when there is nothing to invite to, and
+   *  the menu item is then not rendered at all. */
+  onOpenInvitePicker?: () => void
   groupArchived: boolean
   displayName: string
   // Roster (self already excluded) for @mention autocomplete. Structural type — the

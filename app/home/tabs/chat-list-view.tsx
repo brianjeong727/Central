@@ -300,7 +300,11 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   // its own cadence. The row counts only rooms you could actually join.
   const [browseOpen, setBrowseOpen] = useState(false)
   const { data: openGroups } = useSWR(openGroupsKey(ministryId), fetchOpenGroups)
-  const openGroupCount = (openGroups ?? []).filter((g) => !g.isMember).length
+  // The row appears whenever the ministry HAS open groups, not only when one is
+  // joinable. Gating on joinable-count hid the entry from the very people who set
+  // the groups up, since a creator belongs to all of them and the count was 0.
+  const openGroupTotal = (openGroups ?? []).length
+  const openGroupJoinable = (openGroups ?? []).filter((g) => !g.isMember).length
   const closeMobileSearch = useCallback(() => { setSearchOpen(false); setMobileSearch("") }, [])
 
   // Escape leaves search, mirroring the X.
@@ -657,7 +661,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       {/* Discovery, deliberately understated: ONE row, and only when there is
           actually something to browse. An always-present row for an empty list is
           the clutter this feature exists to avoid. */}
-      {openGroupCount > 0 && (
+      {openGroupTotal > 0 && (
         <PocketRow
           immersive
           isFirst
@@ -670,7 +674,9 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
             </div>
           }
           title="Open groups"
-          sub={`${openGroupCount} group${openGroupCount === 1 ? "" : "s"} you can join`}
+          sub={openGroupJoinable > 0
+            ? `${openGroupJoinable} group${openGroupJoinable === 1 ? "" : "s"} you can join`
+            : `${openGroupTotal} group${openGroupTotal === 1 ? "" : "s"}, you're in all of them`}
           chevron
           ariaLabel="Browse open groups"
           onClick={() => setBrowseOpen(true)}
@@ -931,7 +937,8 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
   // Same SWR key as the mobile list — one fetch serves both, and a join in either
   // place updates the other.
   const { data: panelOpenGroups } = useSWR(openGroupsKey(ministryId), fetchOpenGroups)
-  const panelOpenGroupCount = (panelOpenGroups ?? []).filter((g) => !g.isMember).length
+  // Same rule as the mobile list: present whenever open groups exist at all.
+  const panelOpenGroupCount = (panelOpenGroups ?? []).length
   const { setParam } = useNavState()
   // Server-resolved — same single source as ChatsTab (./chat-shared).
   const [subTab, setSubTab] = useState<ChatsSection>(initialSection)

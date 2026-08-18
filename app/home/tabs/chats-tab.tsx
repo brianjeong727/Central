@@ -12,7 +12,7 @@ import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames"
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
-import { ConfirmDialog, MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE } from "@/components/central"
+import { ConfirmDialog, MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, PocketSheet, ChatAvatar, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE } from "@/components/central"
 import { getOrCreateDm } from "../dm"
 import { isMobileViewport } from "@/lib/breakpoints"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
@@ -36,6 +36,7 @@ import { MODERATION_DEFAULTS, moderateText, scopeApplies, reverentCapitalize } f
 import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
 import { isChatManageRole, isLeaderRole } from "@/lib/roles"
+import { fetchOpenGroups, openGroupsKey } from "@/app/home/open-groups"
 import { subscribeKeyboard, useSwipeDownToDismissKeyboard } from "@/lib/keyboard-inset"
 import { storagePathFromPublicUrl, removeStorageObject } from "@/lib/storage-cleanup"
 import { useBackIntent } from "@/lib/back-intent"
@@ -366,13 +367,18 @@ function PrefToggleRow({ label, sub, on, onToggle, divider = false }: {
   )
 }
 
-function ChatPrefsCard({ pendingMuted, pendingPinned, onToggleMuted, onTogglePinned }: {
+function ChatPrefsCard({ pendingMuted, pendingPinned, onToggleMuted, onTogglePinned, canSetOpen = false, pendingIsOpen = false, onToggleOpen }: {
   pendingMuted: boolean; pendingPinned: boolean; onToggleMuted: () => void; onTogglePinned: () => void
+  /** Only the chat's creator or a leader may publish it — mirrors the DB trigger. */
+  canSetOpen?: boolean; pendingIsOpen?: boolean; onToggleOpen?: () => void
 }) {
   return (
     <div className="max-md:!border-0 max-md:!bg-[var(--ivory)] max-md:!rounded-[var(--r-pocket)]" style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
       <PrefToggleRow label="Mute notifications" sub="Stay in the chat. Just stop the buzz." on={pendingMuted} onToggle={onToggleMuted} divider />
-      <PrefToggleRow label="Pin to top of chats" sub="Keeps it above the fold." on={pendingPinned} onToggle={onTogglePinned} />
+      <PrefToggleRow label="Pin to top of chats" sub="Keeps it above the fold." on={pendingPinned} onToggle={onTogglePinned} divider={canSetOpen} />
+      {canSetOpen && onToggleOpen && (
+        <PrefToggleRow label="Open to everyone" sub="Anyone in the ministry can find and join this chat." on={pendingIsOpen} onToggle={onToggleOpen} />
+      )}
     </div>
   )
 }
@@ -1087,8 +1093,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         group_id: groupId,
         sender_id: userId,
         content: pendingIsOpen
-          ? `${userName} opened this chat — anyone in the ministry can now join`
-          : `${userName} closed this chat — it's invite-only again`,
+          ? `${userName} opened this chat to the ministry`
+          : `${userName} made this chat invite-only`,
         message_type: "system",
       })
     }
@@ -1715,7 +1721,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   now routes through chooseNotifyMode so muted and notify_mode stay
                   in lockstep — the DB CHECK requires muted = (notify_mode='off'),
                   so a bare setPendingMuted would fail the write. */}
-              <ChatPrefsCard pendingMuted={pendingMuted} pendingPinned={pendingPinned} onToggleMuted={() => chooseNotifyMode(pendingMuted ? "all" : "off")} onTogglePinned={() => setPendingPinned((v) => !v)} />
+              <ChatPrefsCard pendingMuted={pendingMuted} pendingPinned={pendingPinned} onToggleMuted={() => chooseNotifyMode(pendingMuted ? "all" : "off")} onTogglePinned={() => setPendingPinned((v) => !v)} canSetOpen={canSetOpen} pendingIsOpen={pendingIsOpen} onToggleOpen={() => (pendingIsOpen ? setPendingIsOpen(false) : setConfirmOpenChat(true))} />
             </div>
 
             {/* Staged-save affordance — settings commit on Save, never on toggle */}
@@ -2355,6 +2361,17 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const canPin = !groupArchived && (groupType !== "church" ? true : (isLeaderRole(userRole) && isMemberOfChat))
 
   // @mention member list is loaded via useSWR above (see rosterData/mentionMembers).
+  // ── Invite-to-a-group picker ──────────────────────────────────────────────
+  // Shares the browse list's SWR key, so opening a chat costs no extra fetch when
+  // that list is already warm. A group is invitable if it is open — including ones
+  // the sender is not in; they are public by definition, so there is nothing to
+  // leak. The CURRENT chat is excluded: inviting people to the room they are in
+  // is noise.
+  const [invitePickerOpen, setInvitePickerOpen] = useState(false)
+  const [invitingId, setInvitingId] = useState<string | null>(null)
+  const { data: openGroupsForInvite } = useSWR(openGroupsKey(ministryId), fetchOpenGroups)
+  const invitableGroups = (openGroupsForInvite ?? []).filter((g) => g.id !== groupId)
+
   // The @mention dropdown, GIF picker, and input state now live in <Composer>.
 
   // Fetch link previews for URLs found in messages
@@ -2362,7 +2379,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     const urlRe = /https?:\/\/[^\s<>"']+/gi
     const toFetch: string[] = []
     for (const msg of messages) {
-      if (!msg.content || msg.message_type === "system" || msg.message_type === "poll") continue
+      if (!msg.content || msg.message_type === "system" || msg.message_type === "poll" || msg.message_type === "invite") continue
       const found = msg.content.match(urlRe)
       if (!found) continue
       for (const url of found) {
@@ -2727,6 +2744,22 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
   // GIF send — optimistic insert stays in ChatScreen (owns messages); <Composer>
   // closes the picker itself after calling this. Stable for the memoized child.
+  // Post an invite card. `content` carries a plain-language fallback so the
+  // chat-list preview, search, and the push body all have something readable —
+  // the CARD is the rendering, not the message's only meaning.
+  async function sendInvite(g: { id: string; name: string }) {
+    setInvitingId(g.id)
+    const { error } = await supabase.from("messages").insert({
+      group_id: groupId,
+      sender_id: userId,
+      content: `Invitation to join ${g.name}`,
+      message_type: "invite",
+      invite_group_id: g.id,
+    })
+    setInvitingId(null)
+    if (!error) setInvitePickerOpen(false)
+  }
+
   const handleSendGif = useCallback((fullUrl: string) => {
     if (!fullUrl) return
     const optimisticId = `optimistic-gif-${Date.now()}`
@@ -3643,7 +3676,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const previewByMsgId = useMemo(() => {
     const map: Record<string, LinkPreviewData | undefined> = {}
     for (const msg of processedMessages) {
-      if (!msg.content || msg.message_type === "system" || msg.message_type === "poll") continue
+      if (!msg.content || msg.message_type === "system" || msg.message_type === "poll" || msg.message_type === "invite") continue
       const urls = msg.content.match(/https?:\/\/[^\s<>"']+/gi) ?? []
       const preview = urls.map((u) => linkPreviews[u]).find((p) => p && p.title)
       if (preview) map[msg.id] = preview
@@ -3888,6 +3921,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 <MessageRow
                   key={msg.id}
                   msg={msg}
+                  ministryId={ministryId}
+                  onOpenChat={onOpenChat}
                   isOwn={isOwn}
                   isFirstMessage={i === 0}
                   isFirstInGroup={isFirstInGroup}
@@ -3975,6 +4010,33 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         </div>
       )}
 
+      {invitePickerOpen && (
+        <PocketSheet title="Invite to a group" onClose={() => setInvitePickerOpen(false)} zIndex={210}>
+          <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.55, margin: "0 0 14px" }}>
+            Posts a card anyone here can tap to join.
+          </p>
+          {invitableGroups.length === 0 ? (
+            <p style={{ fontSize: 13.5, color: "var(--muted-text)", margin: 0 }}>
+              No open groups yet. Open a group chat to the ministry from its settings first.
+            </p>
+          ) : (
+            invitableGroups.map((g, i) => (
+              <PocketRow
+                key={g.id}
+                isFirst={i === 0}
+                leading={<ChatAvatar size={40} title={g.name} avatarUrl={g.avatarUrl} />}
+                title={g.name}
+                sub={`${g.memberCount} member${g.memberCount === 1 ? "" : "s"}`}
+                meta={invitingId === g.id ? "Posting…" : undefined}
+                isLast={i === invitableGroups.length - 1}
+                ariaLabel={`Invite to ${g.name}`}
+                onClick={() => { if (!invitingId) void sendInvite(g) }}
+              />
+            ))
+          )}
+        </PocketSheet>
+      )}
+
       <Composer
         groupArchived={groupArchived}
         displayName={displayName}
@@ -3988,6 +4050,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         onTyping={onTyping}
         onClearReply={onClearReply}
         onSetPollOpen={onSetPollOpen}
+        onOpenInvitePicker={invitableGroups.length > 0 ? () => setInvitePickerOpen(true) : undefined}
       />
 
       {/* Overlay to dismiss message-row emoji / context menu / poll menu. The
