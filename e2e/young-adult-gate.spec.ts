@@ -63,6 +63,34 @@ test.describe("profile completeness gate — young adults", () => {
       .not.toContain("/complete-profile")
   })
 
+  test("completing as a young adult sets the cohort AND joins the chat", async ({ page }) => {
+    // The form's write is what gets you past the gate; the chat move is what makes
+    // the label true. Setting one without the other is the split that made the
+    // graduation flow look like it worked for months.
+    const email = await makeUser({ gender: "male" })
+    const path = await landingPathFor(page, email)
+    expect(path).toContain("/complete-profile")
+
+    // The form never prefills gender, even when the profile already has one.
+    await page.getByRole("button", { name: "Male", exact: true }).filter({ visible: true }).first().click()
+    await page.getByRole("button", { name: /young adult/i }).filter({ visible: true }).first().click()
+    await page.getByRole("button", { name: /continue/i }).filter({ visible: true }).first().click()
+    await page.waitForTimeout(9000)
+
+    const id = made[made.length - 1]
+    const { data: prof } = await admin.from("profiles")
+      .select("grade, graduation_year").eq("id", id).single()
+    console.log("### after completing as YA:", JSON.stringify(prof))
+    expect(prof?.grade).toBe("young_adult")
+    expect(prof?.graduation_year).toBeNull()
+
+    const { data: rows } = await admin.from("group_members")
+      .select("groups!group_id(name)").eq("user_id", id)
+    const names = (rows ?? []).map((r) => (r as { groups?: { name?: string } }).groups?.name).filter(Boolean)
+    console.log("### chats after completing:", JSON.stringify(names))
+    expect(names, "the label and the chat must move together").toContain("Young Adults")
+  })
+
   test("someone genuinely missing a cohort IS still diverted", async ({ page }) => {
     // The gate must still do its job — this is the OAuth case it exists for.
     const email = await makeUser({ gender: "male" })

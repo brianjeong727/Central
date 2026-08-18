@@ -21,6 +21,11 @@ import {
 } from "@/app/(auth)/shared"
 import { nameIsEmailDerived, memberProfileIncomplete } from "@/lib/profile-name"
 import { YOUNG_ADULT, isYoungAdult } from "@/lib/cohort"
+// Aliased: the local `setYoungAdult` useState setter would otherwise SHADOW this
+// import, and `setYoungAdult(true)` type-checks perfectly against
+// Dispatch<SetStateAction<boolean>> — so the call silently became a state write
+// and the chat move never ran.
+import { setYoungAdult as persistYoungAdult } from "@/app/actions/auto-chats"
 import { YoungAdultCheck } from "@/app/(auth)/shared"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
@@ -110,6 +115,10 @@ function sanitizeNext(raw: string | null): string {
   if (!raw || typeof window === "undefined") return "/ministries"
   try {
     const u = new URL(raw, window.location.origin)
+    // Never hand this page back to itself: `?next=/complete-profile` makes an
+    // already-complete user reload it forever, since the "already complete" branch
+    // assigns `next` and lands right back here.
+    if (u.pathname.startsWith("/complete-profile")) return "/ministries"
     if (u.origin === window.location.origin) return u.pathname + u.search
   } catch {}
   return "/ministries"
@@ -193,13 +202,17 @@ function CompleteProfileContent() {
     const supabase = createClient()
     const { error: updateError } = await supabase
       .from("profiles")
-      // Exactly one of the two is written — a young adult stores the cohort
-      // sentinel and no year, everyone else the reverse (lib/cohort.ts).
+      // Exactly one of the two is written, and the OTHER is explicitly cleared.
+      // Clearing matters: the tick is seeded from an existing `grade`, so someone
+      // already young_adult who unticks and picks a class year would otherwise keep
+      // the sentinel — and cohortChatName/cohortLabel PREFER it over a year, so they
+      // would read "Young Adult" forever with a graduation year sitting unused
+      // beside it. The completeness predicate passes either way, so it fails silently.
       .update({
         gender,
         ...(youngAdult
           ? { grade: YOUNG_ADULT, graduation_year: null }
-          : { graduation_year: gradYearNum }),
+          : { graduation_year: gradYearNum, grade: null }),
         ...(needsName ? { name: name.trim() } : {}),
       })
       .eq("id", userId)
@@ -208,6 +221,17 @@ function CompleteProfileContent() {
       setSaving(false)
       return
     }
+
+    // The cohort label and the CHAT have to move together — setting `grade` alone
+    // is the exact split that made the graduation flow look like it worked for
+    // months (see moveToCohortChat). The write above is what gets the user past the
+    // gate; this is what puts them in the right room. Best-effort: a user with no
+    // ministry yet has no chats to move, and autoAddUserToChats will place them
+    // correctly when they join, so its "not a member" refusal is expected here.
+    if (youngAdult) {
+      try { await persistYoungAdult(true) } catch { /* no ministry yet — placed at join */ }
+    }
+
     setNavigating(true)
     window.location.assign(next)
   }
