@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
 import { getUserMinistries, setCurrentMinistry } from "@/app/actions/ministry"
-import { RingCrossLogo } from "@/app/home/components/shared"
+import { RingCrossLogo } from "@/components/central/ring-cross-logo"
+import { PendingVeil } from "@/components/central/pending-veil"
 
 type Ministry = { id: string; name: string; university: string; role: string }
 
@@ -20,6 +21,8 @@ export default function PickMinistryPage() {
   const [loading, setLoading] = useState(true)
   const [selecting, setSelecting] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Set on click and never cleared — sign-out ends in a full document navigation.
+  const [signingOut, setSigningOut] = useState(false)
 
   useEffect(() => {
     getUserMinistries().then(({ data, error: err }) => {
@@ -37,13 +40,26 @@ export default function PickMinistryPage() {
   }
 
   async function handleSignOut() {
+    setSigningOut(true)
     const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.assign("/login")
+    // Always navigate, even if signOut() rejects. Network errors are RETURNED by
+    // auth-js, but a lock-acquire timeout REJECTS — and the veil is never cleared
+    // by design, so without this the user is stranded on an inert cream screen
+    // with no escape but a manual refresh. That is strictly worse than the static
+    // wait this replaced. Tradeoff on the failure path: if the session genuinely
+    // survived, proxy.ts bounces /login back to /home. Confusing, but recoverable
+    // in one more tap (the storage lock is free after a document navigation),
+    // whereas an inert veil is not recoverable at all.
+    try {
+      await supabase.auth.signOut()
+    } finally {
+      window.location.assign("/login")
+    }
   }
 
   return (
     <div style={{ minHeight: "100svh", background: "var(--cream-panel)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 24px", fontFamily: "var(--font-inter)" }}>
+      {signingOut && <PendingVeil label="Signing you out…" />}
 
       {/* Logo */}
       <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ display: "inline-flex", alignItems: "center", gap: 9, marginBottom: 8, textDecoration: "none", color: "inherit" }}>

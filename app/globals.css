@@ -687,6 +687,86 @@ html[data-kb-native] .kb-lift {
 /* Destructive icon affordance (remove responsibility / delete link) → danger on hover */
 .central-icon-btn.resource-remove-btn:not(:disabled):hover { background: color-mix(in srgb, var(--danger) 8%, transparent); color: var(--danger); }
 
+/* ── Press feedback for controls that aren't CentralButton ──────────────────
+   Same grammar as .central-btn above — --dur-fast/--ease-out, nothing new. It
+   lives here rather than inline because a touch device has no hover, so the
+   press IS the only acknowledgement a tap ever gets, and because both the
+   reduced-motion fallback and the pointer gate are media queries.
+
+   Buttons SCALE, rows TINT — two grammars keyed to two control shapes.
+
+   .press-scale — button-SHAPED controls (PocketButton, the You-panel rail rows).
+                  The :active rule sets `transform` and NOTHING else, which is
+                  what lets it ride a control that styles everything else
+                  inline: inline style only wins for the properties it sets, and
+                  no caller sets transform. The transform is deliberately NOT in
+                  the transition list — `.central-btn` above doesn't transition
+                  it either, so every press in the app snaps in and out
+                  identically. Easing it here would be a new motion.
+   .press-row   — full-width tappable ROWS (settings list rows). A row tints
+                  instead of scaling: scaling a full-bleed row reads as the
+                  whole card flinching, and inside an overflow-hidden card it
+                  drags the --line-3 dividers off-grid. The class owns
+                  `background` so its :active can win — a row must NOT set
+                  background inline.
+
+   The row tints walk one step DOWN the warm cream ramp per ground, using only
+   already-ratified tokens (no press-specific colour exists, and an ink mix
+   greys out on cream: 6% ink over --cream computes #EFEEEB, an R/B spread of 4
+   in a palette whose every other wash spreads 14+):
+     ground --cream (desktop card)  hover --cream-2  →  press --ivory
+     ground --ivory (mobile card)   no hover (touch) →  press --pocket-track
+   --pocket-track is the mobile family's "behind the card" fill, already used by
+   SwipeActionRow precisely because it reads as a layer RECESSED beneath an
+   --ivory row — which is what a press is. */
+.press-scale { transition: background var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
+.press-scale:not(:disabled):active { transform: scale(0.98); }
+
+.press-row { background: transparent; transition: background var(--dur-fast) var(--ease-out); }
+
+/* Hover is the pointer half of the same affordance — a desktop row that reacts
+   to a click but not to the cursor is backwards. This is the ratified §8.3 row
+   hover (.central-list-row above), same token. Gated on a real pointer so a tap
+   on a touch device can't leave a row stuck in the hover tint after the press
+   releases; the ivory variant is phone-width-only and so takes none.
+   It is declared BEFORE the :active rules ON PURPOSE — a pressed row matches
+   :hover and :active simultaneously and the two selectors tie on specificity,
+   so source order is the only thing deciding which wins. Hover last would mean
+   a desktop press showed the HOVER tint and never the press one. */
+@media (hover: hover) and (pointer: fine) {
+  .press-row:not(:disabled):hover { background: var(--cream-2); }
+}
+
+.press-row:not(:disabled):active { background: var(--ivory); }
+/* Ivory-ground variant (the mobile tonal card): --cream-2 and --ivory are both
+   LIGHTER than --ivory and would read as a lift, not a press. */
+.press-row-ivory:not(:disabled):active { background: var(--pocket-track); }
+
+/* Reduced motion: suppress the MOTION, never the FEEDBACK. A press that does
+   nothing is the exact defect these rules exist to fix, and .central-btn DID
+   acknowledge presses for this cohort before, so dropping the transform without
+   a replacement would be a regression — on touch there is no hover to fall back
+   on. The replacement is `filter`, not a background tint, for the same reason
+   the press is a transform in the first place: every one of these controls
+   paints its own `background` INLINE (CentralButton's variant styles,
+   PocketButton's variantStyle), so a class-level background could never win.
+   `filter` is unclaimed inline, is already in .central-btn's transition list,
+   and is already the ratified hover knob there (brightness 1.1–1.15) — this
+   darkens instead of lightening so it reads as "pushed".
+   The [data-variant] / :not(:disabled) selectors are written to TIE with the
+   hover rules above on specificity and win on source order; without that, a
+   hovered primary would keep brightness(1.12) and swallow the press entirely.
+   .press-row needs nothing here — a tint is a colour change, not motion. */
+@media (prefers-reduced-motion: reduce) {
+  .press-scale:not(:disabled):active,
+  .central-btn:not(:disabled):active,
+  .central-icon-btn:not(:disabled):active { transform: none; }
+
+  .press-scale:not(:disabled):active,
+  .central-btn[data-variant]:not(:disabled):active,
+  .central-icon-btn:not(:disabled):active { filter: brightness(0.94); }
+}
+
 /* ── CollapsibleRail (components/central/collapsible-rail.tsx) ─────────────
    The fold animates `grid-template-columns` so both columns move as one; the
    rail body only cross-fades (its pixel width is fixed, so it never re-wraps

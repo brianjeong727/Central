@@ -5,7 +5,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Menu, X, Lock, Plus, MessageCircle } from "lucide-react"
 import { getUserMinistries } from "@/app/actions/ministry"
-import { RingCrossLogo } from "@/app/home/components/shared"
+import { RingCrossLogo } from "@/components/central/ring-cross-logo"
+import { PendingVeil } from "@/components/central/pending-veil"
 import { createClient } from "@/lib/supabase"
 import { isNativeShell, isLikelyNativeShell } from "@/lib/native-push"
 
@@ -165,6 +166,10 @@ export default function LandingPage() {
   // (no delay). On the server there's no window → false, so SSR/web is byte-for-byte
   // unchanged and only the in-shell client hydration diverges (it redirects away at once).
   const [shellPending, setShellPending]   = useState<boolean>(isLikelyNativeShell)
+  // Pending label for the two exits off this page (sign out, open app). Set on
+  // click and NEVER cleared — both end in a navigation, and clearing would flash
+  // the marketing page back for the last frame.
+  const [pending, setPending]             = useState<string | null>(null)
 
   // ── Scroll (nav border). Closing the mobile menu on scroll happens HERE, in
   // the scroll handler, rather than in a separate scrolled→setMenuOpen effect
@@ -234,12 +239,25 @@ export default function LandingPage() {
 
 
   async function handleSignOut() {
+    setPending("Signing you out…")
     const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.assign("/")
+    // Always navigate, even if signOut() rejects. Network errors are RETURNED by
+    // auth-js, but a lock-acquire timeout REJECTS — and the veil is never cleared
+    // by design, so without this the user is stranded on an inert cream screen
+    // with no escape but a manual refresh. That is strictly worse than the static
+    // wait this replaced. Tradeoff on the failure path: if the session genuinely
+    // survived, proxy.ts bounces / back to /home. Confusing, but recoverable
+    // in one more tap (the storage lock is free after a document navigation),
+    // whereas an inert veil is not recoverable at all.
+    try {
+      await supabase.auth.signOut()
+    } finally {
+      window.location.assign("/")
+    }
   }
 
   function handleOpenApp() {
+    setPending("One moment…")
     if (ministryCount === 0) router.push("/ministries")
     else if (ministryCount !== null && ministryCount > 1) router.push("/pick-ministry")
     else router.push("/home")
@@ -254,6 +272,7 @@ export default function LandingPage() {
 
   return (
     <main style={{ minHeight: "100vh", background: CREAM, color: INK, fontFamily: SANS }}>
+      {pending && <PendingVeil label={pending} />}
 
       {/* ── NAV ── */}
       <nav className="cl-nav" style={{
