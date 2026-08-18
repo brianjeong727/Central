@@ -2,7 +2,7 @@
 
 import { memo, useState, useEffect, useRef, useMemo } from "react"
 import type { ChangeEvent, KeyboardEvent } from "react"
-import { X, Send, CornerUpLeft, Smile, Paperclip, FileDown, BarChart2, Plus } from "lucide-react"
+import { BarChart2, Compass, CornerUpLeft, FileDown, Paperclip, Plus, Send, Smile, X } from "lucide-react"
 import { MonogramChip, ActionMenu } from "@/components/central"
 import { LazyEmojiPicker, formatFileSize } from "./message-row"
 import { replyPreviewLabel } from "../utils"
@@ -29,6 +29,7 @@ function ComposerImpl({
   onTyping,
   onClearReply,
   onSetPollOpen,
+  onOpenInvitePicker,
 }: ComposerProps) {
   const [inputText, setInputText] = useState("")
   const [mentionQuery, setMentionQuery] = useState<string | null>(null)
@@ -307,6 +308,10 @@ function ComposerImpl({
                   { key: "file", label: "Photo or file", icon: <Paperclip className="w-4 h-4" />, onSelect: () => fileInputRef.current?.click() },
                   { key: "gif", label: "GIF", icon: <span className="w-4 text-[9px] font-bold tracking-tight text-center">GIF</span>, onSelect: () => { onSetPollOpen(false); setShowGifPicker(true) } },
                   { key: "poll", label: "Poll", icon: <BarChart2 className="w-4 h-4" />, onSelect: () => { setShowGifPicker(false); onSetPollOpen(true) } },
+                  // Only offered when there is an open group to invite to.
+                  ...(onOpenInvitePicker
+                    ? [{ key: "invite", label: "Invite to a group", icon: <Compass className="w-4 h-4" />, onSelect: () => { setShowGifPicker(false); onSetPollOpen(false); onOpenInvitePicker() } }]
+                    : []),
                 ]}
                 renderTrigger={({ toggle }) => (
                   <button

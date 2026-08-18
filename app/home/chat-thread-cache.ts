@@ -51,7 +51,7 @@ const PREFETCH_TTL_MS = 5 * 60 * 1000
 // select ChatScreen has always used.
 export const MESSAGE_SELECT =
   "id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, deleted, " +
-  "attachment_url, attachment_type, attachment_name, attachment_size, poll_id, " +
+  "attachment_url, attachment_type, attachment_name, attachment_size, poll_id, invite_group_id, " +
   "profiles!sender_id(name, avatar_url), " +
   "reply_to:reply_to_id(id, content, attachment_type, attachment_name, profiles!sender_id(name)), " +
   "message_reactions(id, message_id, user_id, emoji)"

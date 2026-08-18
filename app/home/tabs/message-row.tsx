@@ -7,6 +7,7 @@ import { MonogramChip, ConfirmDialog } from "@/components/central"
 import { formatMessageTime, REACTION_EMOJIS } from "../utils"
 import { useOpenMemberProfile } from "../member-profile-context"
 import type { MessageRowProps } from "../types"
+import { InviteCard } from "./invite-card"
 
 // emoji-mart is ~2MB (almost entirely the @emoji-mart/data JSON). Load both the
 // Picker component and its data lazily — only when a picker actually opens — so
@@ -113,6 +114,8 @@ function MessageRowBase({
   showGroupGap,
   senderDeparted,
   userId,
+  ministryId,
+  onOpenChat,
   canPin,
   isAdminOrLeader,
   isEmojiPickerOpen,
@@ -359,6 +362,30 @@ function MessageRowBase({
   }
 
   // System message — centered event note, no bubble
+  // Invite card — an invitation to an open group. Rendered as a card in the stream
+  // (not a bubble): it is an object you act on, not something someone said.
+  if (msg.message_type === "invite" && msg.invite_group_id) {
+    return (
+      <div ref={(el) => { registerMessageRef(msg.id, el) }}>
+        {showDateSep && (
+          <div className={dateSepClass}>
+            <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
+              {formatDateLabel(msg.created_at)}
+            </span>
+          </div>
+        )}
+        <div className={`flex ${isOwn ? "justify-end" : "justify-start"} ${groupGap}`}>
+          <InviteCard
+            inviteGroupId={msg.invite_group_id}
+            userId={userId}
+            ministryId={ministryId}
+            onOpenChat={onOpenChat ?? (() => {})}
+          />
+        </div>
+      </div>
+    )
+  }
+
   if (msg.message_type === "system") {
     const voteGroup = msg._voteGroup
     let displayContent = msg.content

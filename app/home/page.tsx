@@ -51,7 +51,7 @@ export default async function HomePage({
   // never refetches. Other fat fields (testimony/bio/favorite_*) were never in this select.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, name, email, graduation_year, grade, needs_grad_check, role, prayer_request, ministry_id, avatar_url, school_id, seen_workspace_nav_hint, grad_prompt_dismissed, compact_sidebar, notification_settings")
+    .select("id, name, email, graduation_year, grade, needs_grad_check, role, prayer_request, ministry_id, avatar_url, school_id, seen_workspace_nav_hint, grad_prompt_dismissed, compact_sidebar, open_groups_card_dismissed, notification_settings")
     .eq("id", user.id)
     .single()
 
@@ -189,6 +189,7 @@ export default async function HomePage({
         school_id: null,
         grad_prompt_dismissed: false,
         compact_sidebar: false,
+        open_groups_card_dismissed: false,
       }
 
   return (
