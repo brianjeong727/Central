@@ -56,6 +56,7 @@ const AnnouncementDetailView = dynamic(() => import("./tabs/announcements-tab").
 // The module is small and SSR-clean; the heavy half (thread/settings/composer)
 // stays behind the dynamics below. See app/home/tabs/chat-list-view.tsx.
 import { ChatsTab, ChatListPanel } from "./tabs/chat-list-view"
+import { OpenGroupsBrowse } from "./tabs/open-groups-view"
 
 const ChatScreen = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatScreen), { loading: () => <Spinner />, ssr: false })
 
@@ -201,6 +202,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // `id: ""` + `draftUserId` == a DRAFT direct message: the conversation has no
   // group row yet, and won't until the first message is actually sent. Drafts are
   // deliberately NOT restored from ?chat — there is nothing to restore.
+  // Desktop browse-open-groups occupies the CHAT CONTENT AREA, the same slot a
+  // thread uses — it is a page you navigate to, not a modal (design contract hard
+  // do-not #1). Opening any chat clears it.
+  const [browseOpenGroups, setBrowseOpenGroups] = useState(false)
   const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string; draftUserId?: string } | null>(() => {
     const chatId = searchParams.get("chat")
     return chatId && initialTab === "chats" ? { id: chatId, name: "" } : null
@@ -1220,6 +1225,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         onDirectoryMemberSelect={handleDirectoryMemberSelect}
         chatPanelContent={
           <ChatListPanel
+            onBrowseOpenGroups={() => setBrowseOpenGroups(true)}
             userId={userId}
             ministryId={ministryId}
             ministryName={ministryName}
@@ -1350,7 +1356,14 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                   overlay below mount for the same group → duplicate realtime channel topic
                   ("cannot add postgres_changes callbacks after subscribe()"). */}
               <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
-                {isDesktop && globalOpenChat ? (
+                {isDesktop && browseOpenGroups ? (
+                  <OpenGroupsBrowse
+                    userId={userId}
+                    ministryId={ministryId}
+                    onBack={() => setBrowseOpenGroups(false)}
+                    onOpenChat={(id, name) => { setBrowseOpenGroups(false); handleOpenChat(id, name) }}
+                  />
+                ) : isDesktop && globalOpenChat ? (
                   <ChatScreen
                     key={globalOpenChat.draftUserId ?? globalOpenChat.id}
                     groupId={globalOpenChat.id}

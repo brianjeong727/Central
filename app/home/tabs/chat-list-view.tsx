@@ -873,6 +873,8 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
 // Mirrors DirectoryMemberListPanel: own state + data fetching, minimal props.
 
 export interface ChatListPanelProps {
+  /** Opens the browse-open-groups page in the desktop content area. */
+  onBrowseOpenGroups?: () => void
   userId: string
   ministryId: string
   ministryName: string
@@ -889,7 +891,11 @@ export interface ChatListPanelProps {
   onOpenDraftDm?: (person: { id: string; name: string }) => void
 }
 
-export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole, fallbackChats, initialSection, onOpenDraftDm }: ChatListPanelProps) {
+export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole, fallbackChats, initialSection, onOpenDraftDm, onBrowseOpenGroups }: ChatListPanelProps) {
+  // Same SWR key as the mobile list — one fetch serves both, and a join in either
+  // place updates the other.
+  const { data: panelOpenGroups } = useSWR(openGroupsKey(ministryId), fetchOpenGroups)
+  const panelOpenGroupCount = (panelOpenGroups ?? []).filter((g) => !g.isMember).length
   const { setParam } = useNavState()
   // Server-resolved — same single source as ChatsTab (./chat-shared).
   const [subTab, setSubTab] = useState<ChatsSection>(initialSection)
@@ -1018,6 +1024,21 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
       )}
       {!searchOpen && (
       <>
+
+      {/* Discovery — the desktop twin of the mobile chat list's row. One line, only
+          when there is something to browse; it opens the browse PAGE in the content
+          area (never a modal — design contract hard do-not #1). */}
+      {panelOpenGroupCount > 0 && onBrowseOpenGroups && (
+        <button
+          onClick={onBrowseOpenGroups}
+          className="w-full flex items-center gap-2.5 px-3 py-2 mb-1 flex-shrink-0 text-left transition-colors hover:bg-[var(--ivory)]"
+          style={{ background: "none", border: "none", cursor: "pointer" }}
+        >
+          <Compass style={{ width: 15, height: 15, color: "var(--plum)", flexShrink: 0 }} strokeWidth={1.8} />
+          <span className="flex-1 min-w-0 text-[13.5px]" style={{ color: "var(--ink)" }}>Open groups</span>
+          <span className="text-[12px]" style={{ color: "var(--muted-text)" }}>{panelOpenGroupCount}</span>
+        </button>
+      )}
 
       {/* Church / My mode switcher — exclusive filter, SegmentedControl (R4/R12) */}
       <div className="px-3 flex-shrink-0">

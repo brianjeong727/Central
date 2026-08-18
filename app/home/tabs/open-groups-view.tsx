@@ -23,9 +23,8 @@
 import { useState } from "react"
 import useSWR from "swr"
 import { Users } from "lucide-react"
-import { SubpageShell, PocketRow, PocketKicker, MonogramChip, Toast } from "@/components/central"
+import { SubpageShell, PocketRow, PocketKicker, ChatAvatar, Toast } from "@/components/central"
 import { EmptyState } from "@/app/home/components/shared"
-import { getInitials } from "@/app/home/utils"
 import {
   fetchOpenGroups,
   joinOpenGroup,
@@ -91,7 +90,7 @@ export function OpenGroupsBrowse({
       width="full"
     >
       <p
-        className="px-5 md:px-14 text-[14.5px]"
+        className="px-5 md:px-0 text-[14.5px]"
         style={{ color: "var(--body)", lineHeight: 1.6, margin: "0 0 18px" }}
       >
         Chats anyone in the ministry can join. Tap one to join — it then shows up with your other
@@ -99,13 +98,13 @@ export function OpenGroupsBrowse({
       </p>
 
       {error && (
-        <p className="px-5 md:px-14 text-[13px]" style={{ color: "var(--danger)", margin: "0 0 14px" }} role="alert">
+        <p className="px-5 md:px-0 text-[13px]" style={{ color: "var(--danger)", margin: "0 0 14px" }} role="alert">
           {error}
         </p>
       )}
 
       {isLoading ? null : groups.length === 0 ? (
-        <div className="px-5 md:px-14">
+        <div className="px-5 md:px-0">
           <EmptyState
             icon={<Users style={{ width: 21, height: 21 }} strokeWidth={1.7} />}
             title="No open groups yet"
@@ -123,10 +122,14 @@ export function OpenGroupsBrowse({
               key={g.id}
               immersive
               isFirst={i === 0}
-              leading={<MonogramChip initials={getInitials(g.name)} avatarUrl={g.avatarUrl ?? undefined} />}
+              // Same primitive and size the chat list itself uses, so a row here
+              // and the row it becomes after joining are the same object.
+              // MonogramChip has no intrinsic size and would collapse to its
+              // content — a one-letter name rendered visibly narrower.
+              leading={<ChatAvatar size={46} title={g.name} avatarUrl={g.avatarUrl} />}
               title={g.name}
               sub={`${g.memberCount} member${g.memberCount === 1 ? "" : "s"}`}
-              meta={g.isMember ? "Joined" : busyId === g.id ? "Joining…" : undefined}
+              meta={g.isMember ? "Joined" : busyId === g.id ? "Joining…" : "Join"}
               chevron={g.isMember}
               ariaLabel={g.isMember ? `Open ${g.name}` : `Join ${g.name}`}
               onClick={() => {
