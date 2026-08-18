@@ -1284,8 +1284,13 @@ export function ProfileTab({
     if (!error && data) setProfile(data as Profile)
     setSaving(false)
     setEditing(false)
+    // draftYoungAdult + profile.grade are REQUIRED here. Without them this
+    // callback closes over the value they had when Edit was opened, so ticking
+    // "I'm a young adult" set aria-pressed, showed no error, and saved nothing —
+    // the comparison below ran against a stale `false` every time. The
+    // exhaustive-deps disable was hiding exactly that.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, initialProfile.ministry_id, userId, modSettings, mutateModSettings])
+  }, [draft, draftYoungAdult, profile.grade, initialProfile.ministry_id, userId, modSettings, mutateModSettings])
 
   async function handleToggleEntries(v: boolean) {
     await supabase.from("profiles").update({ show_journal_entries: v }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
