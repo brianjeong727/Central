@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { isMemberTier } from '@/lib/roles'
 import { resolveUser } from '@/lib/auth-claims'
-import { nameIsEmailDerived } from '@/lib/profile-name'
+import { memberProfileIncomplete } from '@/lib/profile-name'
 
 const ADMIN_EMAIL = 'brianjeong13@gmail.com'
 
@@ -226,7 +226,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!fromCache) {
-    type ProfileRow = { ministry_id: string | null; role: string | null; gender: string | null; graduation_year: number | null; name: string | null; email: string | null }
+    type ProfileRow = { ministry_id: string | null; role: string | null; gender: string | null; graduation_year: number | null; grade: string | null; name: string | null; email: string | null }
     // Primary: ONE joined query. The embed MUST be FK-qualified — profiles↔ministries has
     // TWO relationships (profiles_ministry_id_fkey + ministries_archive_requested_by_fkey),
     // so the unqualified `ministries(status)` shorthand is ambiguous (PGRST201) and would
@@ -234,7 +234,7 @@ export async function proxy(request: NextRequest) {
     // join would drop them and falsely trip the no-account teardown below).
     const joined = await supabase
       .from('profiles')
-      .select('ministry_id, role, gender, graduation_year, name, email, ministries!profiles_ministry_id_fkey(status)')
+      .select('ministry_id, role, gender, graduation_year, grade, name, email, ministries!profiles_ministry_id_fkey(status)')
       .eq('id', user.id)
       .maybeSingle()
 
@@ -254,7 +254,7 @@ export async function proxy(request: NextRequest) {
       // "no row", never on an error.
       const p = await supabase
         .from('profiles')
-        .select('ministry_id, role, gender, graduation_year, name, email')
+        .select('ministry_id, role, gender, graduation_year, grade, name, email')
         .eq('id', user.id)
         .maybeSingle()
       profRow = p.data as ProfileRow | null
@@ -309,8 +309,16 @@ export async function proxy(request: NextRequest) {
     // never disagree — and it requires a LONE token, which is what makes the
     // general rule safe to apply beyond relay addresses (a real full name has a
     // space, so no long-standing user is re-gated).
-    const placeholderName = nameIsEmailDerived(profRow?.name, profRow?.email)
-    profileComplete = !(isMemberTier(role) && (!profRow?.gender || profRow?.graduation_year == null || placeholderName))
+    // Shared with /complete-profile via memberProfileIncomplete — inlining the
+    // rule here is what let the gate demand a graduation year the form could not
+    // supply, stranding young adults (who have none by design).
+    profileComplete = !(isMemberTier(role) && memberProfileIncomplete({
+      gender: profRow?.gender,
+      graduation_year: profRow?.graduation_year,
+      grade: profRow?.grade,
+      name: profRow?.name,
+      email: profRow?.email,
+    }))
 
     // Cache ONLY the settled steady state (active ministry + complete profile) AND only
     // when the read was clean (never cache a degraded/errored read — it re-queries next

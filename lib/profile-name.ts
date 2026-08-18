@@ -21,6 +21,7 @@
 // proxy.ts (middleware) can import the predicate.
 
 import type { SupabaseClient, User } from "@supabase/supabase-js"
+import { isYoungAdult } from "./cohort"
 
 type Meta = Record<string, unknown> | null | undefined
 
@@ -92,4 +93,35 @@ export async function reconcileProfileName(admin: SupabaseClient, user: User): P
 
   const { error: updErr } = await admin.from("profiles").update({ name: candidate }).eq("id", user.id)
   if (updErr) console.error("[profile-name] failed to backfill name for", user.id, updErr)
+}
+
+// ── Profile completeness ─────────────────────────────────────────────────────
+//
+// THE one predicate for "does this member still owe us signup details". Three
+// places must agree on it — the proxy gate that diverts people to
+// /complete-profile, the page itself (which bounces back out if it decides the
+// profile is already complete), and anything that caches the answer. When they
+// disagree the result is not a wrong pixel, it is a REDIRECT LOOP or a dead end.
+//
+// The young-adult clause is why this is shared rather than inlined. A young adult
+// has NO graduation year by design (lib/cohort.ts), so a gate that demands one
+// traps them on a form that cannot be satisfied: the year is the only thing
+// missing, the form's only year control is a class-year picker, and the submit
+// button stays disabled forever. That shipped — it is what sent a manually
+// signed-up young adult to /complete-profile with "Enter a valid graduation
+// year." and no way past.
+//
+// Admin-tier is exempt elsewhere (the caller checks tier); this answers only the
+// member/visitor question.
+export function memberProfileIncomplete(p: {
+  gender: string | null | undefined
+  graduation_year: number | null | undefined
+  grade: string | null | undefined
+  name: string | null | undefined
+  email: string | null | undefined
+}): boolean {
+  if (!p.gender) return true
+  // A cohort is required, but a young adult satisfies it WITHOUT a year.
+  if (p.graduation_year == null && !isYoungAdult(p.grade)) return true
+  return nameIsEmailDerived(p.name, p.email)
 }
