@@ -246,7 +246,12 @@ export function DirectoryTab({
             Vertical rhythm is the shared constant (Convention #27) — this shipped
             `pt-14` (56px), by far the deepest header in the app, so Directory sat
             a full title-height lower than every other tab root. */}
-        <div className="px-5 pb-5" style={{ paddingTop: POCKET_CHROME_PAD_Y.paddingTop }}>
+        {/* NO bottom padding: the count eyebrow below owns the whitespace that
+            separates it from the search field (mobile spec §4 — Directory's is the
+            one kicker with no opening rule, so that gap IS the separator). Adding
+            `pb-5` here paid for it twice: 20 + the eyebrow's own 20 put the first
+            visible mark 40px under the field, where every other list sits at ~16. */}
+        <div className="px-5" style={{ paddingTop: POCKET_CHROME_PAD_Y.paddingTop }}>
           <div className="flex items-center gap-2" style={{ marginBottom: POCKET_CHROME_PAD_Y.paddingBottom + 6 }}>
             {onBack && <BackChevron onClick={onBack} />}
             <span style={{ flex: 1, minWidth: 0, ...POCKET_CHROME_TITLE }}>Directory</span>
@@ -255,10 +260,12 @@ export function DirectoryTab({
           <PocketSearchField value={mobileSearch} onChange={setMobileSearch} placeholder="Search members…" />
         </div>
 
+        {/* The two non-list branches have no eyebrow to carry the gap, so they
+            re-apply it themselves rather than pushing it back onto the wrapper. */}
         {mobileLoading ? (
-          <div className="px-2"><DirectoryListSkeleton /></div>
+          <div className="px-2 pt-5"><DirectoryListSkeleton /></div>
         ) : mobileFiltered.length === 0 ? (
-          <div className="px-5">
+          <div className="px-5 pt-5">
             <EmptyState
               icon={<Users className="w-7 h-7" />}
               title="No members found"
