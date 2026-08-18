@@ -122,6 +122,10 @@ export interface Announcement {
   created_by: string | null
   show_attendees: boolean
   status?: string
+  /** Does this announcement ask for a "Got it"? Defaults TRUE for new rows
+   *  (ratified 2026-08-19); every pre-existing announcement was backfilled to
+   *  false so 156 historical posts did not retroactively demand a tap. */
+  requires_ack?: boolean
 }
 
 export interface RsvpAttendee {

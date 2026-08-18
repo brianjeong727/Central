@@ -66,6 +66,10 @@ const PROFILE_SCRUB: Record<string, unknown> = {
 const USER_ID_TABLES = [
   "rsvps",
   "announcement_views",
+  // The FK's `on delete cascade` is a NO-OP for account deletion: the profiles
+  // row is TOMBSTONED, not deleted (only auth.users is hard-deleted), so this
+  // list is the only thing that stops acknowledgments outliving the account.
+  "announcement_acknowledgements",
   "message_reactions",
   "poll_votes",
   "devotionals",

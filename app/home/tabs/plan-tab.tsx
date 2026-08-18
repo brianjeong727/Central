@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
+import { fetchRsvpCounts } from "@/lib/announcement-counts"
 import { useNavState } from "../nav-state"
 import { useOpenMemberProfile } from "../member-profile-context"
 import { useMinistryTimezone } from "../ministry-timezone-context"
@@ -24,7 +25,7 @@ import { runAlgorithm, runSmallGroupAlgorithm, type PoolPerson, type GeneratedGr
 import {
   generateDGLRotationAction, saveDGLRotationAction, publishDGLRotationAction,
 } from "@/app/actions/generate-dgl-rotation"
-import { confirmSmallGroupsAction, deleteSmallGroupAssignmentsAction } from "@/app/actions/generate-groups"
+import { confirmSmallGroupsAction, deleteSmallGroupAssignmentsAction, announcementRsvpPoolAction } from "@/app/actions/generate-groups"
 import { SLOTS, type DGLSlot, type ProposedAssignment } from "@/app/actions/dgl-constants"
 import { getSemesterLabel, getSemesterWeeks, getSemesterDates, getSemesterOptions, type DGLAvailSlot } from "@/app/actions/dgl-utils"
 import { createPraiseTeamChatAction, updateSmallGroupMembersAction, createTeamChatAction, createEventPlanningChatAction, syncEventPlanningChat, syncTeamChat } from "@/app/actions/auto-chats"
@@ -8378,11 +8379,12 @@ export function EventPlanWorkspace({
 
       // Fetch RSVP count if linked to an announcement
       if ((calendarEvent as { linked_announcement_id?: string | null }).linked_announcement_id) {
-        const { count } = await supabase
-          .from("rsvps")
-          .select("*", { count: "exact", head: true })
-          .eq("announcement_id", (calendarEvent as { linked_announcement_id: string }).linked_announcement_id)
-        setRsvpCount(count ?? 0)
+        // Through the SECURITY DEFINER count (lib/announcement-counts.ts): `rsvps`
+        // rows are no longer ministry-wide readable, so a head-count here would
+        // report 0-or-1 for a planner who is not leader-tier.
+        const annId = (calendarEvent as { linked_announcement_id: string }).linked_announcement_id
+        const counts = await fetchRsvpCounts(supabase, [annId])
+        setRsvpCount(counts[annId] ?? 0)
       }
 
       setLoading(false)
@@ -11785,15 +11787,9 @@ function GroupGeneratorWizard({
 
       if (anns && anns.length > 0) {
         const annIds = anns.map((a: Record<string, unknown>) => a.id as string)
-        const { data: rsvpCounts } = await supabase
-          .from("rsvps")
-          .select("announcement_id")
-          .in("announcement_id", annIds)
-        const countMap: Record<string, number> = {}
-        ;(rsvpCounts ?? []).forEach((r: Record<string, unknown>) => {
-          const aid = r.announcement_id as string
-          countMap[aid] = (countMap[aid] ?? 0) + 1
-        })
+        // Batch definer count — one RPC for the page, and it does not collapse
+        // to 0-or-1 the way counting scoped rows now would.
+        const countMap = await fetchRsvpCounts(supabase, annIds)
         setAnnouncements(
           anns
             .map((a: Record<string, unknown>) => ({ id: a.id as string, title: a.title as string, rsvp_count: countMap[a.id as string] ?? 0 }))
@@ -11846,11 +11842,8 @@ function GroupGeneratorWizard({
           .eq("ministry_id", ministryId)
         setPoolCount(count ?? 0)
       } else if (sourceType === "announcement" && sourceId) {
-        const { count } = await supabase
-          .from("rsvps")
-          .select("user_id", { count: "exact", head: true })
-          .eq("announcement_id", sourceId)
-        setPoolCount(count ?? 0)
+        const counts = await fetchRsvpCounts(supabase, [sourceId])
+        setPoolCount(counts[sourceId] ?? 0)
       } else if (sourceType === "form" && sourceId) {
         // Mirror the generate path: dedup respondents by user_id, then keep
         // only those with a profile in this ministry.
@@ -11951,17 +11944,15 @@ function GroupGeneratorWizard({
         if (error) throw new Error("Failed to fetch members.")
         pool = (data ?? []) as PoolPerson[]
       } else if (sourceType === "announcement" && sourceId) {
-        const { data, error } = await supabase
-          .from("rsvps")
-          .select("user_id, profiles(id, name, graduation_year, role, gender)")
-          .eq("announcement_id", sourceId)
-        if (error) throw new Error("Failed to fetch RSVP list.")
-        pool = ((data ?? []) as Record<string, unknown>[])
-          .map((r) => {
-            const p = r.profiles
-            return Array.isArray(p) ? p[0] : p
-          })
-          .filter(Boolean) as PoolPerson[]
+        // WHO RSVPed is identity data, and `rsvps` is no longer readable
+        // ministry-wide (own row / show_attendees / leader). The wizard is gated
+        // on TEAM write access, not leader-tier, so reading it from the browser
+        // would silently hand a DGL an empty pool. It goes through the server
+        // action instead, which carries the same team-membership gate the group
+        // generator already uses for exactly this data.
+        const res = await announcementRsvpPoolAction({ ministryId, announcementId: sourceId })
+        if (res.error) throw new Error(res.error)
+        pool = res.pool
       } else if (sourceType === "form" && sourceId) {
         const { data: respData, error: respErr } = await supabase
           .from("form_responses")

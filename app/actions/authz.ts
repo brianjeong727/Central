@@ -57,6 +57,17 @@ export async function requireMinistryAdmin(ministryId: string): Promise<AuthzRes
   return ctx
 }
 
+// Caller must belong to the given ministry AND be leader-tier (leader + admin,
+// deacon, elder, pastor). Exactly the DB's auth_is_admin_or_leader() and exactly
+// lib/roles.ts's isLeaderRole — the three must stay in lockstep, since a gate the
+// action allows but RLS refuses (or vice versa) is the failure mode that matters.
+export async function requireMinistryLeader(ministryId: string): Promise<AuthzResult> {
+  const ctx = await requireSameMinistry(ministryId)
+  if (ctx.error !== null) return ctx
+  if (!isLeaderRole(ctx.role)) return deny("Not authorized.")
+  return ctx
+}
+
 // Caller must belong to the team's ministry AND be admin-tier OR a member of
 // the team. (Governance admins are a subset of admin-tier, so gov-view/write
 // callers pass via the admin-tier arm.)

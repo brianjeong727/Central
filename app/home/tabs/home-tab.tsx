@@ -25,6 +25,9 @@ const HomeSlideManager = dynamic(
 )
 import type { HomeTabProps, Announcement, RsvpAttendee } from "../types"
 import { isAdminRole, isLeaderRole } from "@/lib/roles"
+import { audienceOrFilter } from "@/lib/announcement-audience"
+import { fetchRsvpCounts } from "@/lib/announcement-counts"
+import { acknowledgeAnnouncement } from "@/lib/announcement-ack"
 import { HomeDeadlines } from "./home-deadlines"
 
 export { HomeTabProps }
@@ -370,10 +373,7 @@ export function HomeTab({
         // surfaced on Home — in the hero, the digest, and the Featured fallback.
         // Same expression as announcements-tab.tsx so the two cannot drift.
         if (!isLeaderOrAdmin) {
-          const gradYear = profile.graduation_year
-          q = q.or(gradYear
-            ? `audience.is.null,audience.eq.all,audience.eq.${gradYear},audience.eq.group`
-            : `audience.is.null,audience.eq.all,audience.eq.group`)
+          q = q.or(audienceOrFilter(profile.graduation_year))
         }
         return q
           .order("is_pinned", { ascending: false })
@@ -407,7 +407,6 @@ export function HomeTab({
     // leaders who can see it. Curated slides are unaffected: a leader who
     // deliberately features something has already made that call.
     const churchWide = list.filter((a) => a.audience == null || a.audience === "all")
-    const hero = churchWide.find((a) => a.is_pinned) ?? churchWide[0] ?? null
     const eventCount = list.filter((a) => a.is_event).length
     // Latest 2 by recency (list is pinned-first, so re-sort by created_at for "latest").
     const recentAnns = [...list]
@@ -422,7 +421,7 @@ export function HomeTab({
     // announcement/event resolution (need home_slides rows) — all from RT1, parallel. ──
     const [
       { data: myRsvps },
-      { data: heroRsvpRows },
+      { data: myAcks },
       { data: slideAnns },
       { data: slideEvents },
       { data: slideForms },
@@ -434,9 +433,16 @@ export function HomeTab({
             .eq("user_id", profile.id)
             .in("announcement_id", list.map((a) => a.id))
         : Promise.resolve({ data: [] as { announcement_id: string }[], error: null }),
-      hero
-        ? supabase.from("rsvps").select("user_id").eq("announcement_id", hero.id)
-        : Promise.resolve({ data: [] as { user_id: string }[], error: null }),
+      // My acknowledgments across this window. Own rows only (RLS) — this is
+      // what lets an announcement that still asks for a "Got it" HOLD the Up
+      // Next slot instead of scrolling away (ratified 2026-08-19).
+      list.length > 0
+        ? supabase
+            .from("announcement_acknowledgements")
+            .select("announcement_id")
+            .eq("user_id", profile.id)
+            .in("announcement_id", list.map((a) => a.id))
+        : Promise.resolve({ data: [] as { announcement_id: string }[], error: null }),
       slideAnnIds.length
         ? supabase.from("announcements").select("id, title, body, is_event, image_url, event_date, event_end_date, created_at").in("id", slideAnnIds).eq("ministry_id", ministryId)
         : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean; image_url: string | null; event_date: string | null; event_end_date: string | null; created_at: string }[] }),
@@ -453,17 +459,29 @@ export function HomeTab({
     ])
 
     const userRsvpIds = new Set((myRsvps ?? []).map((r) => r.announcement_id))
+    const ackedIds = new Set((myAcks ?? []).map((r) => r.announcement_id))
 
-    // Hero RSVP scalar state (attendee NAMES are resolved in the combined RT4 below).
-    let featuredShowAttendees = false
-    let userHasRsvped = false
-    let rsvpCount = 0
+    // Up Next occupant. An announcement that still asks for a "Got it" HOLDS the
+    // slot until this viewer acknowledges it, rather than scrolling away as newer
+    // posts arrive (ratified 2026-08-19) — persistent but quiet: no badge, no
+    // interstitial, nothing that can be swiped past. `churchWide` is already
+    // pinned-first then newest-first, so the held occupant is the newest
+    // un-acknowledged ask, and acknowledging it hands the slot to the next one.
+    // Once nothing is outstanding the original pinned-or-latest rule resumes.
+    //
+    // Scope, deliberately: this holds within Home's own ~10-announcement window.
+    // An ask that has fallen out of that window is no longer on Home in ANY form,
+    // so there is nothing left to hold; a backlog older than ten newer posts
+    // would need a queue, which is not what was ratified.
+    const heldByAck = churchWide.filter((a) => a.requires_ack && !ackedIds.has(a.id))
+    const hero =
+      heldByAck.find((a) => a.is_pinned) ?? heldByAck[0] ??
+      churchWide.find((a) => a.is_pinned) ?? churchWide[0] ?? null
+
+    // Hero RSVP scalar state (the count + attendee NAMES land after RT3/RT4).
+    const featuredShowAttendees = hero?.show_attendees ?? false
+    const userHasRsvped = hero ? userRsvpIds.has(hero.id) : false
     let rsvpAttendees: RsvpAttendee[] = []
-    if (hero) {
-      featuredShowAttendees = hero.show_attendees ?? false
-      userHasRsvped = userRsvpIds.has(hero.id)
-      rsvpCount = (heroRsvpRows ?? []).length
-    }
 
     const heroId = hero?.id
     const forYouItems = list
@@ -530,23 +548,40 @@ export function HomeTab({
     let slideByAnnUserIds: Record<string, string[]> = {}
     let slideUserIds: string[] = []
 
-    // ── RT3: slide RSVP state (needs the slide announcement IDs from RT2). ──
-    if (rsvpIdArr.length > 0) {
-      const [{ data: myR }, { data: allR }, { data: annMeta }] = await Promise.all([
-        supabase.from("rsvps").select("announcement_id").eq("user_id", profile.id).in("announcement_id", rsvpIdArr),
-        supabase.from("rsvps").select("announcement_id, user_id").in("announcement_id", rsvpIdArr),
-        supabase.from("announcements").select("id, show_attendees").in("id", rsvpIdArr).eq("ministry_id", ministryId),
-      ])
+    // ── RT3: hero RSVP rows/count (the hero is only known after RT2 now — the
+    // acknowledgment hold decides it) + slide RSVP state (needs the slide
+    // announcement IDs from RT2). One batch, so this stayed 4 round trips. ──
+    const [{ data: heroRsvpRows }, heroRsvpCounts, { data: myR }, { data: allR }, { data: annMeta }, slideCounts] = await Promise.all([
+      hero
+        ? supabase.from("rsvps").select("user_id").eq("announcement_id", hero.id)
+        : Promise.resolve({ data: [] as { user_id: string }[], error: null }),
+      fetchRsvpCounts(supabase, hero ? [hero.id] : []),
+      rsvpIdArr.length > 0
+        ? supabase.from("rsvps").select("announcement_id").eq("user_id", profile.id).in("announcement_id", rsvpIdArr)
+        : Promise.resolve({ data: [] as { announcement_id: string }[] }),
+      rsvpIdArr.length > 0
+        ? supabase.from("rsvps").select("announcement_id, user_id").in("announcement_id", rsvpIdArr)
+        : Promise.resolve({ data: [] as { announcement_id: string; user_id: string }[] }),
+      rsvpIdArr.length > 0
+        ? supabase.from("announcements").select("id, show_attendees").in("id", rsvpIdArr).eq("ministry_id", ministryId)
+        : Promise.resolve({ data: [] as { id: string; show_attendees: boolean }[] }),
+      fetchRsvpCounts(supabase, rsvpIdArr),
+    ])
 
-      const counts: Record<string, number> = {}
+    // COUNT comes from the SECURITY DEFINER function, not from counting rows:
+    // `rsvps` is no longer ministry-wide readable (own row / show_attendees /
+    // leader), so `heroRsvpRows.length` would read 0-or-1 for most members. The
+    // ROWS still feed the attendee chips, wherever the author turned them on.
+    const rsvpCount = hero ? (heroRsvpCounts[hero.id] ?? 0) : 0
+
+    if (rsvpIdArr.length > 0) {
       const byAnnUserIds: Record<string, string[]> = {}
       for (const row of allR ?? []) {
-        counts[row.announcement_id] = (counts[row.announcement_id] ?? 0) + 1
         ;(byAnnUserIds[row.announcement_id] ??= []).push(row.user_id)
       }
 
       slideRsvpedIds = new Set((myR ?? []).map((r) => r.announcement_id))
-      slideRsvpCounts = counts
+      slideRsvpCounts = slideCounts
       slideByAnnUserIds = byAnnUserIds
       slideShowAttendeesIds = new Set((annMeta ?? []).filter((a) => a.show_attendees).map((a) => a.id))
       slideUserIds = (allR ?? []).map((r) => r.user_id)
@@ -647,6 +682,11 @@ export function HomeTab({
             { announcement_id: hero.id, user_id: profile.id },
             { onConflict: "announcement_id,user_id" }
           )
+          // An RSVP satisfies acknowledgment (spec §3) — one of FIVE RSVP write
+          // paths in the app, all of which must write it, or someone who RSVPs
+          // from Home still reads as un-acknowledged. Insert-only: un-RSVPing
+          // above must never take it back.
+          await acknowledgeAnnouncement(supabase, hero.id, profile.id)
         }
         return optimistic
       },
@@ -671,6 +711,7 @@ export function HomeTab({
             { announcement_id: annId, user_id: profile.id },
             { onConflict: "announcement_id,user_id" }
           )
+          await acknowledgeAnnouncement(supabase, annId, profile.id) // RSVP satisfies acknowledgment
         }
         return optimistic
       },
@@ -703,6 +744,7 @@ export function HomeTab({
           await supabase.from("rsvps").delete().eq("announcement_id", annId).eq("user_id", profile.id)
         } else {
           await supabase.from("rsvps").upsert({ announcement_id: annId, user_id: profile.id }, { onConflict: "announcement_id,user_id" })
+          await acknowledgeAnnouncement(supabase, annId, profile.id) // RSVP satisfies acknowledgment
         }
         return optimistic
       },
