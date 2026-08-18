@@ -177,7 +177,7 @@ export function PocketRowCard({ children, style }: { children: ReactNode; style?
 // SwipeActionRow).
 export function PocketRow({
   leading, title, titleAccessory, titleDim = false, sub, time, showDot = false, meta, chevron = false,
-  isLast = false, immersive = false, isFirst = false, ariaLabel, onClick,
+  isLast = false, immersive = false, isFirst = false, ariaLabel, onClick, onPointerDown,
 }: {
   leading?: ReactNode
   title: string
@@ -196,10 +196,17 @@ export function PocketRow({
   immersive?: boolean
   isFirst?: boolean
   onClick: () => void
+  /** Fires on press, BEFORE the click resolves — the seam for warming whatever the
+   *  row is about to open. Purely a head-start hook: it must never be where the
+   *  row's actual behavior lives, because a press that ends in a scroll or a swipe
+   *  never becomes a click, so the caller is responsible for deciding whether a
+   *  given press has settled into a tap. */
+  onPointerDown?: () => void
 }) {
   return (
     <button
       onClick={onClick}
+      onPointerDown={onPointerDown}
       // `data-pocket-row` is how e2e/mobile-screen-sweep DISCOVERS screens. This is
       // the one drill-in primitive on phone width, so walking every row reachable
       // from a hub reaches every hub-and-spoke screen — the sweep never has to keep
