@@ -14,6 +14,7 @@ import type { DirectoryMember } from "../types"
 // Member-profile UI lives in the shared member-sheet module so it can also open
 // as a global overlay from anywhere (not only inside this tab).
 import { MemberSheet, MemberActionsMenu, MobileRoleTag, MobileYouTag, loadMemberDetail } from "../components/member-sheet"
+import { cohortLabel, cohortShortLabel } from "@/lib/cohort"
 
 // Shared directory fetcher — both the desktop panel and the mobile list key on
 // ["directory-members", ministryId], so they dedupe to a single request and
@@ -25,7 +26,7 @@ async function loadDirectoryMembers(
 ): Promise<DirectoryMember[]> {
   const { data } = await supabase
     .from("profiles")
-    .select("id, name, graduation_year, role, avatar_url")
+    .select("id, name, graduation_year, grade, role, avatar_url")
     .eq("ministry_id", ministryId)
     .is("deleted_at", null) // hide deleted-account tombstones ("Former member")
     .order("name")
@@ -135,8 +136,8 @@ export function DirectoryMemberListPanel({
                     {member.id === currentUserId && <span className="ml-1.5 text-[10px] font-normal" style={{ color: "var(--muted-text)" }}>you</span>}
                   </p>
                   <p className="text-[11px] truncate leading-tight mt-0.5" style={{ color: "var(--muted-text)" }}>
-                    {member.graduation_year ? `'${String(member.graduation_year).slice(2)}` : ""}
-                    {member.graduation_year && member.role ? " · " : ""}
+                    {cohortShortLabel(member.grade, member.graduation_year)}
+                    {cohortShortLabel(member.grade, member.graduation_year) && member.role ? " · " : ""}
                     {roleLabel(member.role, member.id)}
                   </p>
                 </div>
@@ -297,7 +298,7 @@ export function DirectoryTab({
                     {member.id === currentUserId && <MobileYouTag />}
                   </span>
                 }
-                sub={member.graduation_year ? `Class of ${member.graduation_year}` : undefined}
+                sub={cohortLabel(member.grade, member.graduation_year) ?? undefined}
                 chevron
                 onClick={() => setMobileSelected(member)}
               />
@@ -369,7 +370,7 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
     { label: "EMAIL", value: detail?.email || null },
     { label: "PHONE", value: detail?.phone || null },
     { label: "ROLE", value: roleLabel(member.role, member.id) || null },
-    { label: "CLASS", value: member.graduation_year ? `Class of ${member.graduation_year}` : null },
+    { label: "CLASS", value: cohortLabel(member.grade, member.graduation_year) },
   ].filter(r => r.value)
 
   return (
@@ -393,7 +394,7 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
       {/* Subtitle */}
       <p style={{ fontSize: 13.5, color: "var(--muted-text)", margin: "0 0 28px", textAlign: "center" }}>
         {[
-          member.graduation_year ? `Class of ${member.graduation_year}` : null,
+          cohortLabel(member.grade, member.graduation_year),
           roleLabel(member.role, member.id) || null,
         ].filter(Boolean).join(" · ")}
       </p>

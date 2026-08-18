@@ -360,3 +360,49 @@ export function EyeButton({ show, onToggle }: { show: boolean; onToggle: () => v
     </button>
   )
 }
+
+// ─── young-adult check-off ─────────────────────────────────────
+// A tick, not a pill pair: this is one optional statement about yourself, not a
+// choice between two peers (which is what the gender pills are). Ticking it
+// REPLACES the graduation-year field rather than disabling it — a dead control
+// left on screen reads as something you failed to fill in.
+export function YoungAdultCheck({ on, onToggle, compact = false }: { on: boolean; onToggle: () => void; compact?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={on}
+      style={{
+        display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
+        padding: compact ? "12px 14px" : "11px 13px", minHeight: 44,
+        borderRadius: compact ? 14 : 12,
+        border: compact ? "none" : "1px solid " + (on ? "var(--plum)" : "var(--line-2)"),
+        background: compact ? "var(--ivory)" : (on ? "var(--plum-2)" : "var(--cream-panel)"),
+        cursor: "pointer", fontFamily: compact ? SERIF : SANS, transition: "all .12s",
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 20, height: 20, flexShrink: 0, borderRadius: 6,
+          border: "1px solid " + (on ? "var(--plum)" : "var(--line-2)"),
+          background: on ? "var(--plum)" : "transparent",
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          color: "var(--cream)", fontSize: 12, lineHeight: 1,
+        }}
+      >{on ? "✓" : ""}</span>
+      <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+        <span style={{
+          fontSize: compact ? 14.5 : 14,
+          fontWeight: 600,
+          color: (!compact && on) ? "var(--cream-panel)" : "var(--ink)",
+        }}>I&apos;m a young adult</span>
+        <span style={{
+          fontSize: 12.5,
+          color: (!compact && on) ? "var(--cream-panel)" : "var(--muted-text)",
+          opacity: (!compact && on) ? 0.85 : 1,
+        }}>No graduation year &mdash; you&rsquo;ll join the Young Adults chat.</span>
+      </span>
+    </button>
+  )
+}

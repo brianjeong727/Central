@@ -14,6 +14,8 @@ import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogl
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
 import { inviteReturnPath, codeFromReturnPath } from "@/lib/invite-code"
+import { YOUNG_ADULT } from "@/lib/cohort"
+import { YoungAdultCheck } from "../shared"
 
 const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
@@ -258,6 +260,7 @@ function SignupContent() {
   const [memberPassword,   setMemberPassword]   = useState("")
   const [memberShowPw,     setMemberShowPw]     = useState(false)
   const [graduationYear,   setGraduationYear]   = useState("")
+  const [isYoungAdult,     setIsYoungAdult]     = useState(false)
   const [gender,           setGender]           = useState("")
   const [memberError,      setMemberError]      = useState<string|null>(null)
   const [memberLoading,    setMemberLoading]    = useState(false)
@@ -349,7 +352,10 @@ function SignupContent() {
 
   const currentYear = new Date().getFullYear()
   const gradYearNum = parseInt(graduationYear, 10)
-  const gradYearValid = gradYearNum >= currentYear && gradYearNum <= currentYear + 6
+  // A young adult has no graduating class to give, so the year requirement is
+  // lifted rather than faked — see lib/cohort.ts for why that distinction has to
+  // be explicit rather than inferred from a missing year.
+  const gradYearValid = isYoungAdult || (gradYearNum >= currentYear && gradYearNum <= currentYear + 6)
   const yearOptions = (
     <>
       <option value="">Select your graduation year</option>
@@ -366,7 +372,19 @@ function SignupContent() {
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: memberEmail,
       password: memberPassword,
-      options: { data: { name: memberName, graduation_year: String(gradYearNum), gender, central_signup: true }, emailRedirectTo: redirect },
+      options: {
+        data: {
+          name: memberName,
+          // Exactly one of these is ever sent. A young adult carries the grade
+          // sentinel and NO graduation year — the join flow reads it off this
+          // metadata onto the profile (resolveSignupGrade in actions/ministry.ts),
+          // because the handle_new_user trigger only copies name/email/grad year.
+          ...(isYoungAdult ? { grade: YOUNG_ADULT } : { graduation_year: String(gradYearNum) }),
+          gender,
+          central_signup: true,
+        },
+        emailRedirectTo: redirect,
+      },
     })
     if (signUpError) {
       setMemberError(rateLimitCopy(signUpError.message))
@@ -848,21 +866,25 @@ function SignupContent() {
           trailing={<EyeButton show={memberShowPw} onToggle={() => setMemberShowPw(v => !v)}/>}
           helper="At least 6 characters."/>
 
-        <AuthSelect
-          label="GRADUATION YEAR"
-          value={graduationYear}
-          onChange={(e) => setGraduationYear(e.target.value)}
-          helper="The year you graduate — it places you in the right class."
-        >
-          {yearOptions}
-        </AuthSelect>
+        {!isYoungAdult && (
+          <AuthSelect
+            label="GRADUATION YEAR"
+            value={graduationYear}
+            onChange={(e) => setGraduationYear(e.target.value)}
+            helper="The year you graduate — it places you in the right class."
+          >
+            {yearOptions}
+          </AuthSelect>
+        )}
+
+        <YoungAdultCheck on={isYoungAdult} onToggle={() => setIsYoungAdult(v => !v)}/>
 
         <Primary disabled={!gradYearValid || !gender || memberLoading} loading={memberLoading}>
           {memberLoading ? "Creating account…" : "Create account"}
         </Primary>
         {(!gradYearValid || !gender) && !memberLoading && (
           <div style={{ fontSize: 13, color: "var(--muted-text)", textAlign: "center", marginTop: -6 }}>
-            {!gender ? "Select your gender to continue." : "Enter a valid graduation year."}
+            {!gender ? "Select your gender to continue." : "Select your graduation year, or tick \u201cI\u2019m a young adult\u201d."}
           </div>
         )}
         <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5, textAlign: "center", margin: "-4px 0 0" }}>
@@ -914,16 +936,20 @@ function SignupContent() {
           <PocketField label="Email" type="email" placeholder="you@example.com" value={memberEmail} onChange={(e) => setMemberEmail(e.target.value)} required autoComplete="email"/>
           <PocketField label="Password" type={memberShowPw ? "text" : "password"} placeholder="••••••••" value={memberPassword} onChange={(e) => setMemberPassword(e.target.value)} required autoComplete="new-password"
             hint="At least 6 characters." trailing={<EyeButton show={memberShowPw} onToggle={() => setMemberShowPw(v => !v)}/>}/>
-          <PocketSelect label="Graduation year" value={graduationYear} onChange={(e) => setGraduationYear(e.target.value)}
-            hint="The year you graduate — it places you in the right class.">
-            {yearOptions}
-          </PocketSelect>
+          {!isYoungAdult && (
+            <PocketSelect label="Graduation year" value={graduationYear} onChange={(e) => setGraduationYear(e.target.value)}
+              hint="The year you graduate — it places you in the right class.">
+              {yearOptions}
+            </PocketSelect>
+          )}
+
+          <YoungAdultCheck on={isYoungAdult} onToggle={() => setIsYoungAdult(v => !v)} compact/>
           <PocketSubmit loading={memberLoading} disabled={!gradYearValid || !gender || memberLoading}>
             {memberLoading ? "Creating account…" : "Create account"}
           </PocketSubmit>
           {(!gradYearValid || !gender) && !memberLoading && (
             <div style={{ fontSize: 13, color: "var(--muted-text)", textAlign: "center", marginTop: -8 }}>
-              {!gender ? "Select your gender to continue." : "Enter a valid graduation year."}
+              {!gender ? "Select your gender to continue." : "Select your graduation year, or tick \u201cI\u2019m a young adult\u201d."}
             </div>
           )}
           <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5, textAlign: "center", margin: "-4px 0 0" }}>

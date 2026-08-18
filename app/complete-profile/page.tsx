@@ -19,7 +19,14 @@ import {
   pocketH1,
   pocketSub,
 } from "@/app/(auth)/shared"
-import { nameIsEmailDerived } from "@/lib/profile-name"
+import { nameIsEmailDerived, memberProfileIncomplete } from "@/lib/profile-name"
+import { YOUNG_ADULT, isYoungAdult } from "@/lib/cohort"
+// Aliased: the local `setYoungAdult` useState setter would otherwise SHADOW this
+// import, and `setYoungAdult(true)` type-checks perfectly against
+// Dispatch<SetStateAction<boolean>> — so the call silently became a state write
+// and the chat move never ran.
+import { setYoungAdult as persistYoungAdult } from "@/app/actions/auto-chats"
+import { YoungAdultCheck } from "@/app/(auth)/shared"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
 
@@ -108,6 +115,10 @@ function sanitizeNext(raw: string | null): string {
   if (!raw || typeof window === "undefined") return "/ministries"
   try {
     const u = new URL(raw, window.location.origin)
+    // Never hand this page back to itself: `?next=/complete-profile` makes an
+    // already-complete user reload it forever, since the "already complete" branch
+    // assigns `next` and lands right back here.
+    if (u.pathname.startsWith("/complete-profile")) return "/ministries"
     if (u.origin === window.location.origin) return u.pathname + u.search
   } catch {}
   return "/ministries"
@@ -126,6 +137,7 @@ function CompleteProfileContent() {
   const [name, setName] = useState("")
   const [gender, setGender] = useState("")
   const [graduationYear, setGraduationYear] = useState("")
+  const [youngAdult, setYoungAdult] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   // Set once we hand off to window.location.assign — the full page load that
@@ -136,7 +148,9 @@ function CompleteProfileContent() {
 
   const currentYear = new Date().getFullYear()
   const gradYearNum = parseInt(graduationYear, 10)
-  const gradYearValid = gradYearNum >= currentYear && gradYearNum <= currentYear + 6
+  // A young adult has no graduating class, so the year requirement lifts for them
+  // — this form is the only way an OAuth young adult can ever get past the gate.
+  const gradYearValid = youngAdult || (gradYearNum >= currentYear && gradYearNum <= currentYear + 6)
   const nameValid = !needsName || name.trim().length >= 2
 
   useEffect(() => {
@@ -147,7 +161,7 @@ function CompleteProfileContent() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("gender, graduation_year, name, email")
+        .select("gender, graduation_year, grade, name, email")
         .eq("id", user.id)
         .single()
 
@@ -156,11 +170,19 @@ function CompleteProfileContent() {
       // and sends them straight back into the gate.
       const placeholderName = nameIsEmailDerived(profile?.name, profile?.email)
       setNeedsName(placeholderName)
+      // Seed the tick from what they already are, so someone the graduation flow
+      // has already moved isn't asked to re-declare it.
+      if (isYoungAdult(profile?.grade)) setYoungAdult(true)
       // Never prefill the derived prefix — that invites them to just accept it.
       if (placeholderName) setName("")
 
       // Already complete (deep-link) — don't show the form, send them onward.
-      if (profile?.gender && profile?.graduation_year != null && !placeholderName) {
+      // memberProfileIncomplete is the SAME predicate proxy.ts gates on; a private
+      // copy here is what produces a redirect loop when the two drift.
+      if (!memberProfileIncomplete({
+        gender: profile?.gender, graduation_year: profile?.graduation_year,
+        grade: profile?.grade, name: profile?.name, email: profile?.email,
+      })) {
         window.location.assign(next)
         return
       }
@@ -180,13 +202,36 @@ function CompleteProfileContent() {
     const supabase = createClient()
     const { error: updateError } = await supabase
       .from("profiles")
-      .update({ gender, graduation_year: gradYearNum, ...(needsName ? { name: name.trim() } : {}) })
+      // Exactly one of the two is written, and the OTHER is explicitly cleared.
+      // Clearing matters: the tick is seeded from an existing `grade`, so someone
+      // already young_adult who unticks and picks a class year would otherwise keep
+      // the sentinel — and cohortChatName/cohortLabel PREFER it over a year, so they
+      // would read "Young Adult" forever with a graduation year sitting unused
+      // beside it. The completeness predicate passes either way, so it fails silently.
+      .update({
+        gender,
+        ...(youngAdult
+          ? { grade: YOUNG_ADULT, graduation_year: null }
+          : { graduation_year: gradYearNum, grade: null }),
+        ...(needsName ? { name: name.trim() } : {}),
+      })
       .eq("id", userId)
     if (updateError) {
       setError("Something went wrong saving your details. Please try again.")
       setSaving(false)
       return
     }
+
+    // The cohort label and the CHAT have to move together — setting `grade` alone
+    // is the exact split that made the graduation flow look like it worked for
+    // months (see moveToCohortChat). The write above is what gets the user past the
+    // gate; this is what puts them in the right room. Best-effort: a user with no
+    // ministry yet has no chats to move, and autoAddUserToChats will place them
+    // correctly when they join, so its "not a member" refusal is expected here.
+    if (youngAdult) {
+      try { await persistYoungAdult(true) } catch { /* no ministry yet — placed at join */ }
+    }
+
     setNavigating(true)
     window.location.assign(next)
   }
@@ -277,6 +322,7 @@ function CompleteProfileContent() {
             </div>
           </div>
 
+          {!youngAdult && (
           <AuthSelect
             label="GRADUATION YEAR"
             value={graduationYear}
@@ -285,6 +331,9 @@ function CompleteProfileContent() {
           >
             {yearOptions}
           </AuthSelect>
+          )}
+
+          <YoungAdultCheck on={youngAdult} onToggle={() => setYoungAdult(v => !v)}/>
 
           <Primary disabled={!gender || !gradYearValid || !nameValid || saving} loading={saving}>
             {saving ? "Saving…" : "Continue"}
@@ -326,10 +375,14 @@ function CompleteProfileContent() {
               ))}
             </div>
           </div>
-          <PocketSelect label="Graduation year" value={graduationYear} onChange={(e) => setGraduationYear(e.target.value)}
-            hint="The year you graduate — it places you in the right class.">
-            {yearOptions}
-          </PocketSelect>
+          {!youngAdult && (
+            <PocketSelect label="Graduation year" value={graduationYear} onChange={(e) => setGraduationYear(e.target.value)}
+              hint="The year you graduate — it places you in the right class.">
+              {yearOptions}
+            </PocketSelect>
+          )}
+
+          <YoungAdultCheck on={youngAdult} onToggle={() => setYoungAdult(v => !v)} compact/>
           <PocketSubmit loading={saving} disabled={!gender || !gradYearValid || !nameValid || saving}>
             {saving ? "Saving…" : "Continue"}
           </PocketSubmit>

@@ -21,6 +21,7 @@ import { ReportModal } from "./report-modal"
 import { useBlocks } from "../use-blocks"
 import { blockUser, unblockUser } from "@/app/actions/blocks"
 import type { DirectoryMember, DirectoryMemberDetail } from "../types"
+import { cohortLabel, isYoungAdult } from "@/lib/cohort"
 
 // Borderless tonal role tag for phone-width surfaces (mobile spec §3.7): elevated
 // roles carry the plum fill; member/visitor get a --line-2 tonal pill. No borders.
@@ -115,7 +116,7 @@ export async function loadMemberDetail(
 ): Promise<DirectoryMemberDetail | null> {
   const { data } = await supabase
     .from("profiles")
-    .select("id, name, graduation_year, role, avatar_url, email, phone, about_me, bio, bible_verse, favorite_verse, prayer_request, pray_for_me, testimony, favorite_worship_song, favorite_book_of_bible")
+    .select("id, name, graduation_year, grade, role, avatar_url, email, phone, about_me, bio, bible_verse, favorite_verse, prayer_request, pray_for_me, testimony, favorite_worship_song, favorite_book_of_bible")
     .eq("id", memberId)
     .eq("ministry_id", ministryId)
     .single()
@@ -195,8 +196,8 @@ export function MemberSheet({
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
                   {member.role && <MobileRoleTag role={member.role} userId={member.id} />}
                   {isOwnProfile && <MobileYouTag />}
-                  {member.graduation_year && (
-                    <span style={{ fontSize: 12.5, color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>
+                  {cohortLabel(member.grade, member.graduation_year) && (
+                    <span style={{ fontSize: 12.5, color: "var(--muted-text)" }}>{cohortLabel(member.grade, member.graduation_year)}</span>
                   )}
                 </div>
               </div>
@@ -237,7 +238,9 @@ export function MemberSheet({
               {
                 id: "contact", label: "Contact",
                 fields: [
-                  member.graduation_year ? { label: "Graduation year", value: String(member.graduation_year) } : null,
+                  cohortLabel(member.grade, member.graduation_year)
+                    ? { label: isYoungAdult(member.grade) ? "Stage" : "Graduation year", value: cohortLabel(member.grade, member.graduation_year)! }
+                    : null,
                   detail?.phone ? { label: "Phone", value: detail.phone } : null,
                 ].filter(Boolean) as { label: string; value: string }[]
               },
