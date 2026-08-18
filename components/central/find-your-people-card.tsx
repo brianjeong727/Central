@@ -76,7 +76,7 @@ export function FindYourPeopleCard({
 
       <span style={{ ...EYEBROW_STYLE, display: "block", marginBottom: 6 }}>Find your people</span>
       <p style={{ fontSize: 14.5, color: "var(--body)", lineHeight: 1.55, margin: "0 0 14px", paddingRight: 28 }}>
-        Groups anyone can join — pick the ones you&apos;re into.
+        Groups anyone can join. Pick the ones you&apos;re into.
       </p>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>

@@ -404,7 +404,10 @@ function MessageRowBase({
         )}
         <div className="flex items-center gap-3 my-2 px-1">
           <div className="flex-1 h-px bg-[var(--line)]/70" />
-          <span style={{ fontSize: "12px", color: "var(--muted-text)", fontStyle: "italic", whiteSpace: "nowrap", maxWidth: "72%" }} className="text-center select-none">
+          {/* WRAPS. `nowrap` here let any system line longer than the viewport push
+              the whole transcript wider, making the chat scroll sideways — the
+              maxWidth capped the box, not the text inside it. */}
+          <span style={{ fontSize: "12px", color: "var(--muted-text)", fontStyle: "italic", maxWidth: "72%", overflowWrap: "anywhere" }} className="text-center select-none">
             {displayContent}
           </span>
           <div className="flex-1 h-px bg-[var(--line)]/70" />

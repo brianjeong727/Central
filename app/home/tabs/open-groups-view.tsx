@@ -93,7 +93,7 @@ export function OpenGroupsBrowse({
         className="px-5 md:px-0 text-[14.5px]"
         style={{ color: "var(--body)", lineHeight: 1.6, margin: "0 0 18px" }}
       >
-        Chats anyone in the ministry can join. Tap one to join — it then shows up with your other
+        Chats anyone in the ministry can join. Tap one to join, and it shows up with your other
         chats.
       </p>
 

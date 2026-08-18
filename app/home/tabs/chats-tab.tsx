@@ -367,13 +367,18 @@ function PrefToggleRow({ label, sub, on, onToggle, divider = false }: {
   )
 }
 
-function ChatPrefsCard({ pendingMuted, pendingPinned, onToggleMuted, onTogglePinned }: {
+function ChatPrefsCard({ pendingMuted, pendingPinned, onToggleMuted, onTogglePinned, canSetOpen = false, pendingIsOpen = false, onToggleOpen }: {
   pendingMuted: boolean; pendingPinned: boolean; onToggleMuted: () => void; onTogglePinned: () => void
+  /** Only the chat's creator or a leader may publish it — mirrors the DB trigger. */
+  canSetOpen?: boolean; pendingIsOpen?: boolean; onToggleOpen?: () => void
 }) {
   return (
     <div className="max-md:!border-0 max-md:!bg-[var(--ivory)] max-md:!rounded-[var(--r-pocket)]" style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
       <PrefToggleRow label="Mute notifications" sub="Stay in the chat. Just stop the buzz." on={pendingMuted} onToggle={onToggleMuted} divider />
-      <PrefToggleRow label="Pin to top of chats" sub="Keeps it above the fold." on={pendingPinned} onToggle={onTogglePinned} />
+      <PrefToggleRow label="Pin to top of chats" sub="Keeps it above the fold." on={pendingPinned} onToggle={onTogglePinned} divider={canSetOpen} />
+      {canSetOpen && onToggleOpen && (
+        <PrefToggleRow label="Open to everyone" sub="Anyone in the ministry can find and join this chat." on={pendingIsOpen} onToggle={onToggleOpen} />
+      )}
     </div>
   )
 }
@@ -1088,8 +1093,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         group_id: groupId,
         sender_id: userId,
         content: pendingIsOpen
-          ? `${userName} opened this chat — anyone in the ministry can now join`
-          : `${userName} closed this chat — it's invite-only again`,
+          ? `${userName} opened this chat to the ministry`
+          : `${userName} made this chat invite-only`,
         message_type: "system",
       })
     }
@@ -1716,7 +1721,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   now routes through chooseNotifyMode so muted and notify_mode stay
                   in lockstep — the DB CHECK requires muted = (notify_mode='off'),
                   so a bare setPendingMuted would fail the write. */}
-              <ChatPrefsCard pendingMuted={pendingMuted} pendingPinned={pendingPinned} onToggleMuted={() => chooseNotifyMode(pendingMuted ? "all" : "off")} onTogglePinned={() => setPendingPinned((v) => !v)} />
+              <ChatPrefsCard pendingMuted={pendingMuted} pendingPinned={pendingPinned} onToggleMuted={() => chooseNotifyMode(pendingMuted ? "all" : "off")} onTogglePinned={() => setPendingPinned((v) => !v)} canSetOpen={canSetOpen} pendingIsOpen={pendingIsOpen} onToggleOpen={() => (pendingIsOpen ? setPendingIsOpen(false) : setConfirmOpenChat(true))} />
             </div>
 
             {/* Staged-save affordance — settings commit on Save, never on toggle */}
