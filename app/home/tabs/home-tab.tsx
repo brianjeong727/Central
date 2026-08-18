@@ -25,7 +25,7 @@ const HomeSlideManager = dynamic(
 )
 import type { HomeTabProps, Announcement, RsvpAttendee } from "../types"
 import { isAdminRole, isLeaderRole } from "@/lib/roles"
-import { audienceOrFilter } from "@/lib/announcement-audience"
+import { announcementAsksAck, audienceOrFilter } from "@/lib/announcement-audience"
 import { fetchRsvpCounts } from "@/lib/announcement-counts"
 import { acknowledgeAnnouncement } from "@/lib/announcement-ack"
 import { HomeDeadlines } from "./home-deadlines"
@@ -56,6 +56,16 @@ type HomeData = {
   slideRsvpCounts: Record<string, number>
   slideRsvpAttendees: Record<string, RsvpAttendee[]>
   slideShowAttendeesIds: Set<string>
+  // Announcement ids that ask THIS viewer for an acknowledgment
+  // (lib/announcement-audience.ts — the same predicate as the denominator, the
+  // feed card and the detail view). Computed once at load and consumed by both
+  // the Up Next hold and every RSVP path that writes an acknowledgment, so Home
+  // can never ask — or silently record — an acknowledgment from someone the
+  // announcement does not count. The author is the case that made this real:
+  // they are excluded from the denominator, so an ack from them reads as
+  // "17 of 16", and their own post would otherwise hold their Home forever
+  // because they can never acknowledge it.
+  asksAckIds: Set<string>
   homeVerse: { reference: string; text: string } | null
 }
 
@@ -444,8 +454,8 @@ export function HomeTab({
             .in("announcement_id", list.map((a) => a.id))
         : Promise.resolve({ data: [] as { announcement_id: string }[], error: null }),
       slideAnnIds.length
-        ? supabase.from("announcements").select("id, title, body, is_event, image_url, event_date, event_end_date, created_at").in("id", slideAnnIds).eq("ministry_id", ministryId)
-        : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean; image_url: string | null; event_date: string | null; event_end_date: string | null; created_at: string }[] }),
+        ? supabase.from("announcements").select("id, title, body, is_event, image_url, event_date, event_end_date, created_at, audience, created_by, requires_ack").in("id", slideAnnIds).eq("ministry_id", ministryId)
+        : Promise.resolve({ data: [] as { id: string; title: string; body: string; is_event: boolean; image_url: string | null; event_date: string | null; event_end_date: string | null; created_at: string; audience: string | null; created_by: string | null; requires_ack: boolean }[] }),
       slideEvIds.length
         ? supabase
             .from("calendar_events")
@@ -473,7 +483,13 @@ export function HomeTab({
     // An ask that has fallen out of that window is no longer on Home in ANY form,
     // so there is nothing left to hold; a backlog older than ten newer posts
     // would need a queue, which is not what was ratified.
-    const heldByAck = churchWide.filter((a) => a.requires_ack && !ackedIds.has(a.id))
+    // Only an announcement that asks YOU can hold your Home. The author's own
+    // post is the case that forced this: they are outside the recipient set, so
+    // they can never acknowledge it — an unfiltered hold would pin their own
+    // announcement to their Home permanently, with no control anywhere that
+    // could release it.
+    const me = { id: profile.id, graduation_year: profile.graduation_year }
+    const heldByAck = churchWide.filter((a) => announcementAsksAck(a, me) && !ackedIds.has(a.id))
     const hero =
       heldByAck.find((a) => a.is_pinned) ?? heldByAck[0] ??
       churchWide.find((a) => a.is_pinned) ?? churchWide[0] ?? null
@@ -492,6 +508,15 @@ export function HomeTab({
         return bScore - aScore
       })
       .slice(0, 3)
+
+    // Every announcement Home can RSVP to or feature, reduced to "does it ask
+    // me?" — one evaluation of the shared predicate, consumed by all three RSVP
+    // paths below (an RSVP writes an acknowledgment, so it must obey the same
+    // rule as the "Got it" itself).
+    const asksAckIds = new Set<string>()
+    for (const a of [...list, ...(slideAnns ?? [])]) {
+      if (announcementAsksAck(a, me)) asksAckIds.add(a.id)
+    }
 
     // ── Build curated hero slides from the resolved announcement/event data (RT2). ──
     const annMap = new Map((slideAnns ?? []).map((a) => [a.id, a]))
@@ -631,6 +656,7 @@ export function HomeTab({
       slideRsvpCounts,
       slideRsvpAttendees,
       slideShowAttendeesIds,
+      asksAckIds,
       homeVerse,
     }
   }
@@ -685,8 +711,10 @@ export function HomeTab({
           // An RSVP satisfies acknowledgment (spec §3) — one of FIVE RSVP write
           // paths in the app, all of which must write it, or someone who RSVPs
           // from Home still reads as un-acknowledged. Insert-only: un-RSVPing
-          // above must never take it back.
-          await acknowledgeAnnouncement(supabase, hero.id, profile.id)
+          // above must never take it back. Gated on the SAME ask predicate as
+          // the "Got it" itself: an author RSVPing their own event must not be
+          // silently written into a numerator that excludes them.
+          if (data.asksAckIds.has(hero.id)) await acknowledgeAnnouncement(supabase, hero.id, profile.id)
         }
         return optimistic
       },
@@ -711,7 +739,8 @@ export function HomeTab({
             { announcement_id: annId, user_id: profile.id },
             { onConflict: "announcement_id,user_id", ignoreDuplicates: true }
           )
-          await acknowledgeAnnouncement(supabase, annId, profile.id) // RSVP satisfies acknowledgment
+          // Same ask predicate as the "Got it" (see handleHomeRsvp).
+          if (data.asksAckIds.has(annId)) await acknowledgeAnnouncement(supabase, annId, profile.id)
         }
         return optimistic
       },
@@ -744,7 +773,8 @@ export function HomeTab({
           await supabase.from("rsvps").delete().eq("announcement_id", annId).eq("user_id", profile.id)
         } else {
           await supabase.from("rsvps").upsert({ announcement_id: annId, user_id: profile.id }, { onConflict: "announcement_id,user_id", ignoreDuplicates: true })
-          await acknowledgeAnnouncement(supabase, annId, profile.id) // RSVP satisfies acknowledgment
+          // Same ask predicate as the "Got it" (see handleHomeRsvp).
+          if (data.asksAckIds.has(annId)) await acknowledgeAnnouncement(supabase, annId, profile.id)
         }
         return optimistic
       },

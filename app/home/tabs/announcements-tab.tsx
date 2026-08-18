@@ -17,7 +17,7 @@ import { useOpenMemberProfile } from "../member-profile-context"
 import { FormFillView } from "./forms-tab"
 import type { AnnouncementsTabProps, AnnouncementCardProps, CreateAnnouncementModalProps, Announcement, EnrichedAnnouncement, RsvpAttendee } from "../types"
 import { isLeaderRole } from "@/lib/roles"
-import { audienceOrFilter, isAnnouncementRecipient } from "@/lib/announcement-audience"
+import { announcementAsksAck, audienceOrFilter, isAnnouncementRecipient } from "@/lib/announcement-audience"
 import { fetchAckCounts, fetchRsvpCounts, fetchViewCounts } from "@/lib/announcement-counts"
 import { acknowledgeAnnouncement } from "@/lib/announcement-ack"
 import { remindUnacknowledgedAction } from "@/app/actions/announcement-ack"
@@ -969,6 +969,157 @@ function DesktopActionMenu({
   )
 }
 
+// ── Inline acknowledgment on a feed card ─────────────────────────────────────
+//
+// Acknowledging should not require opening the announcement — for the tier this
+// is aimed at ("no food at Bible study") that is more friction than the notice
+// is worth, and a loop nobody closes is worth nothing.
+//
+// The qualifier is the whole point: a feed card CLAMPS its body, and confirming
+// you have read text that is visibly cut off is exactly the reflexive tap that
+// makes the number meaningless (spec §7, "dead signal"). So the inline "Got it"
+// is offered ONLY when the entire body is on screen; when it is clipped the same
+// slot invites you to open it instead. That is why the clamp is MEASURED rather
+// than guessed from a character count — a count guesses wrong across two
+// viewports and two font sizes, and wrong here means either suppressing an
+// honest tap or offering a dishonest one.
+
+// A body preview that reports whether the clamp cut it off.
+//
+// `scrollHeight > clientHeight` is the browser's own answer, so it needs no
+// knowledge of the clamp line count or the font. It is re-asked on every reflow
+// (ResizeObserver: column width, orientation, sidebar collapse) AND after the
+// webfont swap — a font change alters the text's natural height without
+// changing the clamped box, so the observer alone would sleep through it.
+function ClampedText({ text, className, style, onClampChange }: {
+  text: string
+  className?: string
+  style?: React.CSSProperties
+  onClampChange: (clipped: boolean) => void
+}) {
+  const ref = useRef<HTMLParagraphElement>(null)
+  // The callback is a fresh closure every render; keeping it in a ref keeps it
+  // out of the effect's deps, so the observer is attached once per text change
+  // rather than torn down and rebuilt on every parent render.
+  const report = useRef(onClampChange)
+  // Kept fresh in an effect, never during render (a render-phase ref write is
+  // unsafe under concurrent rendering — react-hooks/refs).
+  useEffect(() => { report.current = onClampChange })
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    let cancelled = false
+    let last: boolean | null = null
+    const measure = () => {
+      if (cancelled || !ref.current) return
+      // 1px tolerance: sub-pixel line-height rounding makes an unclipped
+      // paragraph report a fractional overflow on some zoom levels.
+      const clipped = ref.current.scrollHeight - ref.current.clientHeight > 1
+      if (clipped !== last) { last = clipped; report.current(clipped) }
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    document.fonts?.ready.then(measure).catch(() => {})
+    return () => { cancelled = true; ro.disconnect() }
+  }, [text])
+
+  return <p ref={ref} className={className} style={style}>{text}</p>
+}
+
+// The three states of the card control. ONE implementation of the LOGIC (which
+// state applies) with two skins, because the desktop contract and the mobile
+// contract genuinely differ on button grammar — what must never fork is the
+// rule about when a tap is honest.
+//
+// Never a re-ask, never an undo: the table has no DELETE policy, so an undo
+// affordance would fail at the database anyway.
+// The viewer, in the only two fields the ask predicate reads.
+export type AckViewer = { id: string; graduation_year?: number | null }
+
+// Does this card show anything in its acknowledgment slot? Shared with the
+// mobile card so its wrapper row is not rendered (and 14px of dead space left
+// under every card) for an announcement that never asks.
+//
+// "Asked" is NOT re-derived here — it is `announcementAsksAck`, the same
+// predicate the denominator, the detail view and Home's hold use, so a person
+// can never be asked without being counted. An ALREADY-acknowledged row still
+// shows its quiet confirmed state even for someone the announcement no longer
+// asks (e.g. a legacy row from before the rule tightened): reporting a fact is
+// not the same as making a request.
+function cardShowsAck(ann: EnrichedAnnouncement, viewer: AckViewer): boolean {
+  return ann.user_has_acked || announcementAsksAck(ann, viewer)
+}
+
+function AckCardAction({ ann, clipped, viewport, viewer, onAcknowledge, onOpen }: {
+  ann: EnrichedAnnouncement
+  clipped: boolean
+  viewport: "desktop" | "mobile"
+  viewer: AckViewer
+  onAcknowledge: (id: string) => void
+  onOpen: (id: string) => void
+}) {
+  if (!cardShowsAck(ann, viewer)) return null
+
+  if (ann.user_has_acked) {
+    return (
+      <span style={{
+        display: "inline-flex", alignItems: "center", gap: 4, whiteSpace: "nowrap",
+        fontSize: viewport === "mobile" ? 13 : 12, color: "var(--muted-text)",
+      }}>
+        <Check style={{ width: viewport === "mobile" ? 13 : 12, height: viewport === "mobile" ? 13 : 12 }} />Acknowledged
+      </span>
+    )
+  }
+
+  if (clipped) {
+    // Names the ask that the neutral "See announcement →" beside it cannot: an
+    // acknowledgment is expected of you, and reading comes first.
+    return viewport === "mobile" ? (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onOpen(ann.id) }}
+        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "var(--serif)", color: "var(--plum)" }}
+      >
+        Read &amp; confirm →
+      </button>
+    ) : (
+      <button
+        type="button"
+        onClick={() => onOpen(ann.id)}
+        className="hover:text-[var(--plum)] transition-colors"
+        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap" }}
+      >
+        Read &amp; confirm →
+      </button>
+    )
+  }
+
+  // Body fully visible → the tap is honest.
+  return viewport === "mobile" ? (
+    // Quiet (cream on the ivory card, plum text) at the sibling RSVP pill's
+    // geometry — not a second plum fill. A feed is many cards, and a plum pill
+    // per card would spend the one accent ten times down a screen.
+    <PocketButton
+      variant="quiet"
+      surface="card"
+      onClick={() => onAcknowledge(ann.id)}
+      style={{ minHeight: 38, padding: "0 20px" }}
+    >
+      Got it
+    </PocketButton>
+  ) : (
+    <CentralButton
+      variant="plum-outline"
+      onClick={() => onAcknowledge(ann.id)}
+      style={{ padding: "8px 16px", borderRadius: 999, fontSize: 12, whiteSpace: "nowrap" }}
+    >
+      Got it
+    </CentralButton>
+  )
+}
+
 export function AnnouncementsTab({ userId, userName, userRole, userGradYear, ministryId, onOpenAnnouncement, onComposerOpenChange }: AnnouncementsTabProps) {
   const supabase = createClient()
   const openMemberProfile = useOpenMemberProfile()
@@ -1019,6 +1170,11 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
   }
 
   const isLeaderOrAdmin = isLeaderRole(userRole)
+  // Who the acknowledgment ask is evaluated against. Grad year is load-bearing:
+  // a LEADER's feed carries every audience, including a class-only announcement
+  // they are not in — and being asked for an acknowledgment that no denominator
+  // counts is the same "17 of 16" bug as the author case.
+  const ackViewer: AckViewer = { id: userId, graduation_year: userGradYear }
 
   const loadAnnouncements = useCallback(async (): Promise<EnrichedAnnouncement[]> => {
     let annQuery = supabase
@@ -1051,11 +1207,16 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     // so counting rows client-side would silently collapse to 0-or-1 for members.
     // The rsvps ROW select stays — it is what still answers "did I RSVP" and
     // populates the attendee chips wherever the author chose to show them.
-    const [viewMap, rsvpCountMap, { data: rsvpRows }, { data: formRows }] = await Promise.all([
+    const [viewMap, rsvpCountMap, { data: rsvpRows }, { data: formRows }, { data: ackRows }] = await Promise.all([
       fetchViewCounts(supabase, ids),
       fetchRsvpCounts(supabase, ids),
       supabase.from("rsvps").select("announcement_id, user_id").in("announcement_id", ids),
       supabase.from("announcement_forms").select("id, announcement_id").in("announcement_id", ids),
+      // MY acknowledgments only — own-row read under RLS, which is also exactly
+      // what the card needs. No ack COUNT is fetched here on purpose: the card
+      // shows no count, and the leader view of who has/hasn't belongs to the
+      // announcement's own screen, not to a feed row.
+      supabase.from("announcement_acknowledgements").select("announcement_id").eq("user_id", userId).in("announcement_id", ids),
     ])
 
     // A "view" means the user OPENED the announcement — recorded on detail open
@@ -1097,6 +1258,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
     const rsvpAttendeesMap: Record<string, RsvpAttendee[]> = {}
     const userRsvpSet = new Set<string>()
+    const userAckSet = new Set((ackRows ?? []).map((r) => r.announcement_id))
     for (const r of rsvpRows ?? []) {
       if (!rsvpAttendeesMap[r.announcement_id]) rsvpAttendeesMap[r.announcement_id] = []
       rsvpAttendeesMap[r.announcement_id].push({ user_id: r.user_id, name: profileNameMap[r.user_id] ?? "Unknown" })
@@ -1113,6 +1275,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
       has_form: !!formByAnn[ann.id],
       form_id: formByAnn[ann.id] ?? null,
       user_has_responded: formByAnn[ann.id] ? respondedFormIds.has(formByAnn[ann.id]) : false,
+      user_has_acked: userAckSet.has(ann.id),
     }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, ministryId, isLeaderOrAdmin, userGradYear, feedLimit])
@@ -1142,6 +1305,11 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     const current = (announcements ?? []).find((a) => a.id === announcementId)
     if (!current) return
     const wasRsvped = current.user_has_rsvped
+    // Does the RSVP also satisfy an acknowledgment for THIS viewer? Same
+    // predicate as the "Got it" — an author RSVPing their own event is not
+    // acknowledging anything, and writing the row would push the count past its
+    // own total (the author is excluded from the denominator).
+    const rsvpSatisfiesAck = announcementAsksAck(current, ackViewer)
 
     const applyToggle = (list: EnrichedAnnouncement[] | undefined): EnrichedAnnouncement[] =>
       (list ?? []).map((ann) => {
@@ -1154,6 +1322,10 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
           user_has_rsvped: !wasRsvped,
           rsvp_count: wasRsvped ? Math.max(0, ann.rsvp_count - 1) : ann.rsvp_count + 1,
           rsvp_attendees: newAttendees,
+          // RSVP satisfies acknowledgment, so the card's ack slot must settle in
+          // the same frame as the RSVP pill. Un-RSVPing never takes it back
+          // (insert-only) — hence the one-way OR rather than a toggle.
+          user_has_acked: ann.user_has_acked || (!wasRsvped && rsvpSatisfiesAck),
         }
       })
 
@@ -1169,7 +1341,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
           // SATISFIES acknowledgment — making someone tap twice for one
           // announcement teaches them the tap is bureaucracy. Insert-only, so
           // un-RSVPing above deliberately does NOT take it back.
-          await acknowledgeAnnouncement(supabase, announcementId, userId)
+          if (rsvpSatisfiesAck) await acknowledgeAnnouncement(supabase, announcementId, userId)
         }
         return applyToggle(prev)
       },
@@ -1177,8 +1349,44 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
     ).then(() => refreshHome())
   }
 
+  // Which cards had their body cut off by the clamp, reported by ClampedText and
+  // keyed by announcement id. State lives HERE rather than in a per-card hook
+  // because the desktop cards are inline JSX inside a .map() — a hook per
+  // iteration is not available, and extracting a card component to get one would
+  // move ~70 lines of shipped markup for no behavioural gain.
+  // Unmeasured defaults to CLIPPED at every read site (`?? true`): during the
+  // first paint, before ClampedText has measured, the honest assumption is that
+  // the body is cut off — a card must never offer an inline confirm it has not
+  // yet earned.
+  const [clippedIds, setClippedIds] = useState<Record<string, boolean>>({})
+  const reportClipped = useCallback((id: string, clipped: boolean) => {
+    setClippedIds((prev) => (prev[id] === clipped ? prev : { ...prev, [id]: clipped }))
+  }, [])
+
+  // Inline "Got it" from a card. Same write path as the detail view — optimistic
+  // (Convention #4), ON CONFLICT DO NOTHING, an empty result is SUCCESS. There is
+  // deliberately no second writer: acknowledgeAnnouncement() is the only one.
+  function handleAcknowledge(announcementId: string) {
+    const current = (announcements ?? []).find((a) => a.id === announcementId)
+    // The control only renders when asked; the guard keeps that invariant local
+    // to the write, so no future caller can route around it.
+    if (!current || current.user_has_acked || !announcementAsksAck(current, ackViewer)) return
+
+    const applyAck = (list: EnrichedAnnouncement[] | undefined): EnrichedAnnouncement[] =>
+      (list ?? []).map((ann) => (ann.id === announcementId ? { ...ann, user_has_acked: true } : ann))
+
+    mutateAnnouncements(
+      async (prev) => {
+        const { error } = await acknowledgeAnnouncement(supabase, announcementId, userId)
+        if (error) throw new Error(error)
+        return applyAck(prev)
+      },
+      { optimisticData: applyAck, rollbackOnError: true, revalidate: false, populateCache: true }
+    ).then(() => refreshHome())
+  }
+
   function handleNewAnnouncement(newAnn: Announcement, formMeta: { has_form: boolean; form_id: string | null }) {
-    mutateAnnouncements((prev) => [{ ...newAnn, show_attendees: newAnn.show_attendees ?? false, view_count: 0, rsvp_count: 0, user_has_rsvped: false, rsvp_attendees: [], has_form: formMeta.has_form, form_id: formMeta.form_id, user_has_responded: false }, ...(prev ?? [])], { revalidate: false })
+    mutateAnnouncements((prev) => [{ ...newAnn, show_attendees: newAnn.show_attendees ?? false, view_count: 0, rsvp_count: 0, user_has_rsvped: false, rsvp_attendees: [], has_form: formMeta.has_form, form_id: formMeta.form_id, user_has_responded: false, user_has_acked: false }, ...(prev ?? [])], { revalidate: false })
     logAudit({ ministryId, actorId: userId, actorName: userName, action: "announcement.create", entityType: "announcement", entityId: newAnn.id, entityLabel: newAnn.title })
   }
 
@@ -1365,6 +1573,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                             isPinned={ann.is_pinned}
                             isDraft
                             userId={userId}
+                            userGradYear={userGradYear}
                             ministryId={ministryId}
                             userRole={userRole}
                             onRsvpToggle={handleRsvpToggle}
@@ -1374,6 +1583,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                             onSubPinToggle={handleSubPinToggle}
                             onOpenForm={(formId, annId, title) => setFormFillState({ formId, announcementId: annId, title })}
                             onOpenDetail={onOpenAnnouncement}
+                            onAcknowledge={handleAcknowledge}
                           />
                         ))}
                       </div>
@@ -1396,6 +1606,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         announcement={ann}
                         isPinned={ann.is_pinned}
                         userId={userId}
+                        userGradYear={userGradYear}
                         ministryId={ministryId}
                         userRole={userRole}
                         onRsvpToggle={handleRsvpToggle}
@@ -1405,6 +1616,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         onSubPinToggle={handleSubPinToggle}
                         onOpenForm={(formId, annId, title) => setFormFillState({ formId, announcementId: annId, title })}
                         onOpenDetail={onOpenAnnouncement}
+                        onAcknowledge={handleAcknowledge}
                       />
                     ))}
                   </div>
@@ -1433,7 +1645,12 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                       <span style={{ ...EYEBROW_STYLE, color: "var(--plum)" }}>Pinned</span>
                     </p>
                     <h2 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--serif)", fontWeight: 400, fontSize: "40px", lineHeight: 1.05, letterSpacing: "-0.01em", color: "var(--ink)" }}>{pinnedAnn.title}</h2>
-                    <p style={{ margin: 0, fontSize: "13px", color: "var(--body)", lineHeight: 1.55 }} className="line-clamp-2">{previewBody(pinnedAnn.body)}</p>
+                    <ClampedText
+                      text={previewBody(pinnedAnn.body)}
+                      className="line-clamp-2"
+                      style={{ margin: 0, fontSize: "13px", color: "var(--body)", lineHeight: 1.55 }}
+                      onClampChange={(c) => reportClipped(pinnedAnn.id, c)}
+                    />
                     {/* Actions row */}
                     <div className="flex items-center gap-2.5 flex-wrap">
                       <CentralButton variant="secondary" onClick={() => onOpenAnnouncement(pinnedAnn.id)} style={{ padding: "9px 20px", borderRadius: "9px", fontSize: "13px" }}>
@@ -1444,6 +1661,14 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                           {pinnedAnn.user_has_rsvped ? "Going ✓" : "RSVP"}
                         </CentralButton>
                       )}
+                      <AckCardAction
+                        ann={pinnedAnn}
+                        clipped={clippedIds[pinnedAnn.id] ?? true}
+                        viewport="desktop"
+                        viewer={ackViewer}
+                        onAcknowledge={handleAcknowledge}
+                        onOpen={onOpenAnnouncement}
+                      />
                       {pinnedAnn.rsvp_count > 0 && (
                         <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{pinnedAnn.rsvp_count} going</span>
                       )}
@@ -1531,12 +1756,25 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                         </div>
                       </div>
                       <h3 className="line-clamp-2" style={{ margin: 0, fontFamily: "var(--serif)", fontWeight: 400, fontSize: "28px", lineHeight: 1.1, letterSpacing: "-0.01em", color: "var(--ink)" }}>{ann.title}</h3>
-                      <p style={{ marginTop: "14px", fontSize: "14px", color: "var(--body)", lineHeight: 1.55 }} className="line-clamp-3">{previewBody(ann.body)}</p>
+                      <ClampedText
+                        text={previewBody(ann.body)}
+                        className="line-clamp-3"
+                        style={{ marginTop: "14px", fontSize: "14px", color: "var(--body)", lineHeight: 1.55 }}
+                        onClampChange={(c) => reportClipped(ann.id, c)}
+                      />
                       <button onClick={() => onOpenAnnouncement(ann.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "var(--muted-text)", marginTop: 10, textAlign: "left" }} className="hover:text-[var(--plum)] transition-colors">See announcement →</button>
                       <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid var(--line-3)" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                           <span style={{ fontSize: "12px", color: "var(--muted-text)" }}>{ann.rsvp_count} going · {ann.view_count} views</span>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                            <AckCardAction
+                              ann={ann}
+                              clipped={clippedIds[ann.id] ?? true}
+                              viewport="desktop"
+                              viewer={ackViewer}
+                              onAcknowledge={handleAcknowledge}
+                              onOpen={onOpenAnnouncement}
+                            />
                             {ann.has_form && (
                               ann.user_has_responded
                                 ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}><FileText style={{ width: 12, height: 12 }} />Form submitted</span>
@@ -1624,10 +1862,17 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
 
 // ── Announcement Card (mobile) ───────────────────────────────────────────────
 
-export function AnnouncementCard({ announcement, ministryId, userRole, isDraft = false, onRsvpToggle, onEdit, onDelete, onPinToggle, onOpenForm, onOpenDetail }: AnnouncementCardProps) {
+export function AnnouncementCard({ announcement, userId, userGradYear, ministryId, userRole, isDraft = false, onRsvpToggle, onEdit, onDelete, onPinToggle, onOpenForm, onOpenDetail, onAcknowledge }: AnnouncementCardProps) {
   const supabase = createClient()
+  const ackViewer: AckViewer = { id: userId, graduation_year: userGradYear }
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // This card IS a component, so it owns its own measurement (the desktop cards
+  // are inline JSX in a .map() and report up to the tab instead). Defaults to
+  // CLIPPED until measured — never offer a confirm the card has not earned.
+  // (An announcement with no body at all has nothing to clip — and nothing to
+  // read — so it starts honest rather than permanently deferring to the detail.)
+  const [bodyClipped, setBodyClipped] = useState(!!announcement.body)
 
   const isAdminOrLeader = isLeaderRole(userRole)
 
@@ -1717,7 +1962,12 @@ export function AnnouncementCard({ announcement, ministryId, userRole, isDraft =
 
           <h3 className="line-clamp-2" style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 600, lineHeight: 1.15, letterSpacing: "-0.01em", color: "var(--ink)", margin: "8px 0 0" }}>{announcement.title}</h3>
           {announcement.body && (
-            <p className="line-clamp-3" style={{ fontSize: 13, lineHeight: 1.5, color: "var(--body)", margin: "6px 0 0" }}>{previewBody(announcement.body)}</p>
+            <ClampedText
+              text={previewBody(announcement.body)}
+              className="line-clamp-3"
+              style={{ fontSize: 13, lineHeight: 1.5, color: "var(--body)", margin: "6px 0 0" }}
+              onClampChange={setBodyClipped}
+            />
           )}
 
           {!isDraft && announcement.is_event && (
@@ -1742,6 +1992,21 @@ export function AnnouncementCard({ announcement, ministryId, userRole, isDraft =
                 ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
                 : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
               }
+            </div>
+          )}
+          {/* Acknowledge inline — a draft is not published, so it never asks.
+              The card itself is a tap-through, so this is a stopPropagation
+              island like the RSVP pill and the form button above it. */}
+          {!isDraft && cardShowsAck(announcement, ackViewer) && (
+            <div style={{ marginTop: 14 }} onClick={(e) => e.stopPropagation()}>
+              <AckCardAction
+                ann={announcement}
+                clipped={bodyClipped}
+                viewport="mobile"
+                viewer={ackViewer}
+                onAcknowledge={onAcknowledge}
+                onOpen={onOpenDetail}
+              />
             </div>
           )}
         </div>
@@ -1837,6 +2102,11 @@ interface DetailAnnouncement {
   ack_count: number
   ack_total: number
   user_has_acked: boolean
+  /** Does it ask THIS viewer? Not the same as `requires_ack`: the author (and
+   *  anyone outside the audience) is excluded from the denominator, so asking
+   *  them would let the count exceed its own total — "17 of 16". Same predicate
+   *  as the feed card and Home's hold. */
+  asks_ack: boolean
 }
 
 export function AnnouncementDetailView({
@@ -1873,11 +2143,15 @@ export function AnnouncementDetailView({
   const [nudging, setNudging] = useState(false)
   const [nudgeNote, setNudgeNote] = useState<string | null>(null)
   // Acknowledging here changes what Home shows (an un-acknowledged announcement
-  // HOLDS the Up Next slot), and Home is a sibling SWR cache — invalidate it by
-  // key prefix, the same way the list tab does after a pin or an RSVP.
+  // HOLDS the Up Next slot) AND what the feed card shows (the inline "Got it"
+  // must not still be offering itself on a card you just acknowledged). Both are
+  // sibling SWR caches — invalidate by key prefix, the same way the list tab
+  // does after a pin or an RSVP.
   const { mutate: globalMutate } = useSWRConfig()
-  const refreshHome = () =>
+  const refreshHome = () => {
     globalMutate((key) => Array.isArray(key) && key[0] === "home-tab", undefined, { revalidate: true })
+    globalMutate((key) => Array.isArray(key) && key[0] === "announcements", undefined, { revalidate: true })
+  }
 
   useEffect(() => {
     async function load() {
@@ -1932,6 +2206,7 @@ export function AnnouncementDetailView({
       // shown can never disagree with the set that was actually notified. Only
       // fetched when the announcement actually asks.
       let ackTotal = 0
+      let asksAck = false
       if (annData.requires_ack) {
         const { data: audienceRows } = await supabase
           .from("profiles")
@@ -1941,12 +2216,19 @@ export function AnnouncementDetailView({
         ackTotal = (audienceRows ?? []).filter((p: { id: string; graduation_year: number | null; deleted_at: string | null }) =>
           isAnnouncementRecipient(p, annData)
         ).length
+        // Whether I am ASKED is read off the very rows that make the TOTAL, so
+        // the two cannot disagree — asked if and only if counted. (The author
+        // was previously asked while being excluded from the total, which let
+        // one tap push a 16-person audience to "17 of 16".)
+        const me = (audienceRows ?? []).find((p: { id: string }) => p.id === userId)
+        asksAck = !!me && announcementAsksAck(annData, me)
       }
 
       setAnn({
         ...annData,
         ack_count: ackCounts[announcementId] ?? 0,
         ack_total: ackTotal,
+        asks_ack: asksAck,
         user_has_acked: (ackRows ?? []).some((r: { user_id: string }) => r.user_id === userId),
         view_count: viewCounts[announcementId] ?? 0,
         rsvp_count: rsvpCounts[announcementId] ?? 0,
@@ -1983,7 +2265,9 @@ export function AnnouncementDetailView({
   // Optimistic (Convention #4) and rolled back on failure; an already-acked row
   // comes back as an empty success, never an error (see lib/announcement-ack.ts).
   async function acknowledgeAck() {
-    if (!ann || ann.user_has_acked) return
+    // Also the guard for the RSVP path below — RSVPing your own event must not
+    // write you into a numerator that excludes you.
+    if (!ann || ann.user_has_acked || !ann.asks_ack) return
     const revert = ann
     setAnn((prev) => prev ? { ...prev, user_has_acked: true, ack_count: prev.ack_count + 1 } : prev)
     const { error } = await acknowledgeAnnouncement(supabase, revert.id, userId)
@@ -2131,11 +2415,15 @@ export function AnnouncementDetailView({
             <div className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "var(--muted-text)", marginTop: 14 }}>
               <Check className="w-3.5 h-3.5" />Acknowledged
             </div>
-          ) : (
+          ) : ann.asks_ack ? (
             <CentralButton variant="primary" onClick={acknowledgeAck} style={{ width: "100%", marginTop: 18 }}>
               Got it
             </CentralButton>
-          )}
+          ) : null}
+          {/* Someone the announcement does not ask — its AUTHOR, or a leader
+              outside the class it went to — still sees the progress and (if
+              leader-tier) the roster below. They just are not asked to confirm
+              receipt of a notice that does not count them. */}
           <AckProgress pct={ackPct} />
           {isLeaderOrAdmin ? (
             <button
@@ -2218,11 +2506,11 @@ export function AnnouncementDetailView({
             <div className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: "var(--muted-text)", marginTop: 14 }}>
               <Check className="w-3.5 h-3.5" />Acknowledged
             </div>
-          ) : (
+          ) : ann.asks_ack ? (
             <CentralButton variant="primary" onClick={acknowledgeAck} style={{ width: "100%", marginTop: 16 }}>
               Got it
             </CentralButton>
-          )}
+          ) : null}
           <AckProgress pct={ackPct} />
           {isLeaderOrAdmin ? (
             <button

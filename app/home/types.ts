@@ -141,6 +141,9 @@ export interface EnrichedAnnouncement extends Announcement {
   has_form: boolean
   form_id: string | null
   user_has_responded: boolean
+  /** Has THIS viewer acknowledged? Own-row read (RLS), so it is never a leak.
+   *  Drives the inline card control as well as the detail view. */
+  user_has_acked: boolean
 }
 
 export type FieldType = 'text' | 'multiple_choice' | 'checkbox' | 'dropdown'
@@ -429,6 +432,9 @@ export interface AnnouncementCardProps {
   // editor (resume), and suppresses RSVP/form/pin (a draft isn't interactive yet).
   isDraft?: boolean
   userId: string
+  /** Viewer's graduation year — half of the acknowledgment-ask predicate
+   *  (a class-only announcement asks only its own class). */
+  userGradYear: number | null
   ministryId: string
   userRole: string
   onRsvpToggle: (id: string) => void
@@ -438,6 +444,8 @@ export interface AnnouncementCardProps {
   onSubPinToggle?: (id: string, isSubPinned: boolean) => void
   onOpenForm: (formId: string, announcementId: string, title: string) => void
   onOpenDetail: (id: string) => void
+  /** Inline "Got it" from the card. Same optimistic write path as the detail view. */
+  onAcknowledge: (id: string) => void
 }
 
 export interface CreateChatScreenProps {

@@ -68,3 +68,31 @@ export function isAnnouncementRecipient(
   if (ann.created_by && person.id === ann.created_by) return false
   return audienceIncludesGradYear(ann.audience, person.graduation_year)
 }
+
+/**
+ * Does this announcement ask THIS person for an acknowledgment?
+ *
+ * The invariant it exists to hold: **you are asked if and only if you are
+ * counted.** The denominator of "142 of 180" is `isAnnouncementRecipient` over
+ * the ministry, so the ask has to be the same predicate — otherwise someone
+ * lands in the numerator while absent from the denominator and the count reads
+ * past its own total.
+ *
+ * That is not hypothetical: the author was excluded from the denominator (right)
+ * but still shown a "Got it" on their own announcement's detail view (wrong), so
+ * a 16-person audience could be pushed to "17 of 16" by the one person who
+ * cannot sensibly confirm receipt of their own notice. The same hole is open one
+ * step further out — a leader sees every audience in their feed, including a
+ * class-only announcement they are not in, and would otherwise be asked to
+ * acknowledge a notice that does not count them either.
+ *
+ * So: ONE encoding, consumed by the feed card, both detail-view modules, and
+ * Home's un-acknowledged hold. Never re-derive "should this person be asked" at
+ * a call site.
+ */
+export function announcementAsksAck(
+  ann: { requires_ack?: boolean | null; audience: string | null | undefined; created_by?: string | null },
+  person: { id: string; graduation_year?: number | null; deleted_at?: string | null },
+): boolean {
+  return !!ann.requires_ack && isAnnouncementRecipient(person, ann)
+}
