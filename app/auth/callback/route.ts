@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { inviteReturnPath } from "@/lib/invite-code"
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
 import { enforceOAuthAccountPolicy } from "@/lib/oauth-account-guard"
@@ -9,6 +10,10 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code")
   const intent = searchParams.get("intent")
   const flow = searchParams.get("flow")
+  // Landing HINT only — never a credential. inviteReturnPath returns null for
+  // anything that is not a well-formed code, so a caller-supplied value can never be
+  // concatenated into a redirect path (no //evil.com, no ../, no CRLF).
+  const invite = searchParams.get("invite")
   const base = origin
 
   console.log("[auth/callback] invoked", { code: !!code, intent, flow, url: request.url })
@@ -53,6 +58,11 @@ export async function GET(request: NextRequest) {
     await reconcileProfileName(admin, data.user)
 
     if (intent === "register") return NextResponse.redirect(new URL("/onboarding", base))
+    // A valid invite is honoured on its own — not every path that carries one also
+    // carries intent=join, and the email-OTP landing already returns on the invite
+    // alone. Gating on intent here would make the two disagree.
+    const invitePath = inviteReturnPath(invite)
+    if (invitePath) return NextResponse.redirect(new URL(invitePath, base))
     if (intent === "join") return NextResponse.redirect(new URL("/ministries?tab=code", base))
 
     // Only ACTIVE ministries count toward the picker — a pending registration

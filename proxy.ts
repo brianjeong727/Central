@@ -153,8 +153,14 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse
   }
 
+  // isInvitePath — /j/<CODE> is the one-scan invite landing. Exact-or-slash, never a
+  // bare startsWith('/j'), which would also swallow /join (handled above) and any
+  // future /journal or /jobs.
+  const isInvitePath = pathname === '/j' || pathname.startsWith('/j/')
+
   const isPublicPath =
     pathname === '/' ||
+    isInvitePath ||
     pathname.startsWith('/landing') ||
     pathname.startsWith('/ministries') ||
     pathname.startsWith('/login') ||
@@ -421,7 +427,7 @@ export async function proxy(request: NextRequest) {
 
     // /ministries stays open — a pending registrant may want to join an existing
     // ministry instead of waiting (previously they had to sign out first).
-    if (!pathname.startsWith('/pending') && !pathname.startsWith('/landing') && !pathname.startsWith('/ministries') && pathname !== '/') {
+    if (!pathname.startsWith('/pending') && !pathname.startsWith('/landing') && !pathname.startsWith('/ministries') && !isInvitePath && pathname !== '/') {
       return NextResponse.redirect(new URL('/pending', request.url))
     }
     return supabaseResponse
@@ -432,7 +438,7 @@ export async function proxy(request: NextRequest) {
   if (status === 'rejected') {
     // /register-ministry must stay reachable — /pending's "Register again" CTA
     // points there (its page then routes admin-tier founders to /onboarding).
-    const allowedForRejected = pathname.startsWith('/pending') || pathname.startsWith('/landing') || pathname.startsWith('/ministries') || pathname.startsWith('/onboarding') || pathname.startsWith('/register-ministry') || pathname === '/'
+    const allowedForRejected = pathname.startsWith('/pending') || pathname.startsWith('/landing') || pathname.startsWith('/ministries') || pathname.startsWith('/onboarding') || pathname.startsWith('/register-ministry') || isInvitePath || pathname === '/'
     if (!allowedForRejected) {
       return NextResponse.redirect(new URL('/pending', request.url))
     }
@@ -443,7 +449,7 @@ export async function proxy(request: NextRequest) {
   // /home — treat exactly like 'rejected' (only pending/rejected have their own
   // branches above; everything else that isn't 'active' lands here).
   if (status !== 'active') {
-    const allowedForInactive = pathname.startsWith('/pending') || pathname.startsWith('/landing') || pathname.startsWith('/ministries') || pathname.startsWith('/onboarding') || pathname.startsWith('/register-ministry') || pathname === '/'
+    const allowedForInactive = pathname.startsWith('/pending') || pathname.startsWith('/landing') || pathname.startsWith('/ministries') || pathname.startsWith('/onboarding') || pathname.startsWith('/register-ministry') || isInvitePath || pathname === '/'
     if (!allowedForInactive) {
       return NextResponse.redirect(new URL('/pending', request.url))
     }
