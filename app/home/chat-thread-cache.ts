@@ -215,6 +215,10 @@ export function enrichMessageRows(rows: unknown[]): Message[] {
       attachment_name: m.attachment_name ?? null,
       attachment_size: m.attachment_size ?? null,
       poll_id: m.poll_id ?? null,
+      // This mapper builds an EXPLICIT object, so a column added to MESSAGE_SELECT
+      // is fetched and then silently dropped unless it is also listed here. That is
+      // how the invite card first rendered as a plain bubble.
+      invite_group_id: m.invite_group_id ?? null,
     }
   })
 }
