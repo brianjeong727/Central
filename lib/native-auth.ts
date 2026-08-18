@@ -50,9 +50,16 @@ async function sha256Hex(input: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("")
 }
 
+// `destination` is computed SERVER-side by verifyNativeOAuthSession and is the
+// only routing input the client needs — the phone no longer asks Supabase where
+// to go (see routeAfterNativeSignIn).
 export type NativeAppleResult =
-  | { ok: true }
+  | { ok: true; destination?: string }
   | { ok: false; error: "canceled" | "unavailable" | "no-account" | "not-entitled" | "failed"; detail?: string }
+
+// `intent` rides through to the guard action, which owns the destination
+// decision for every case (register / join / ministry count / profile fallback).
+export type NativeSignInOpts = { intent?: string | null }
 
 // TEMP DIAGNOSTIC (Apple sign-in triage): the coarse error enum hides WHY the
 // native flow failed. This surfaces the raw reason to the sign-in UI (native
@@ -62,7 +69,7 @@ export function nativeAuthDebugMessage(res: Extract<NativeAppleResult, { ok: fal
   return `Sign-in failed (${res.error})${res.detail ? `: ${res.detail}` : ""}`
 }
 
-export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<NativeAppleResult> {
+export async function signInWithAppleNative(flow: "signin" | "signup", opts?: NativeSignInOpts): Promise<NativeAppleResult> {
   // Android has no ASAuthorization sheet. The plugin's Android path falls back to
   // Apple's WEB flow keyed on `clientId`, and the value below is the iOS BUNDLE ID
   // — not a Services ID — so it would fail with an opaque invalid_client rather
@@ -138,25 +145,23 @@ export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<
   // Apple only surfaces the user's name on the FIRST authorization, and it
   // arrives in the plugin response — never in the token — so Supabase has no
   // name to store and handle_new_user falls back to the email prefix (an opaque
-  // string for private-relay addresses). Stamp it into user_metadata so it is
-  // durable; the profiles row is then written by reconcileProfileName inside
-  // verifyNativeOAuthSession below, which is the SINGLE writer of that column on
-  // every OAuth path (web + native) and is the only one that knows not to stomp
-  // a name the user set themselves. Awaited, so the metadata is in place before
-  // the action reads it back.
+  // string for private-relay addresses). It still gets stamped into
+  // user_metadata so it is durable, and the profiles row is still written by
+  // reconcileProfileName inside verifyNativeOAuthSession — the SINGLE writer of
+  // that column on every OAuth path (web + native), and the only one that knows
+  // not to stomp a name the user set themselves.
+  //
+  // What changed: the stamp used to be an AWAITED supabase.auth.updateUser()
+  // from the PHONE, purely so the action could read the name back a moment
+  // later. It now rides along as `appleName` and is stamped server-side with the
+  // admin client, in the same order, one Vercel→Supabase hop instead of a
+  // ~0.6s-median phone→Supabase one.
   const fullName = [authorization.response?.givenName, authorization.response?.familyName]
     .filter(Boolean).join(" ").trim()
-  if (fullName && !data.user.user_metadata?.name) {
-    try {
-      await supabase.auth.updateUser({ data: { name: fullName } })
-    } catch (err) {
-      console.error("[native-auth] name metadata stamp failed:", err)
-    }
-  }
 
-  let verified: { ok: boolean; reason?: string }
+  let verified: { ok: boolean; reason?: string; destination?: string }
   try {
-    verified = await verifyNativeOAuthSession(flow)
+    verified = await verifyNativeOAuthSession(flow, { intent: opts?.intent, appleName: fullName || null })
   } catch (err) {
     // The guard runs as a Server Action POST to the current page. If anything
     // redirects/breaks that request (see proxy.ts's Server-Action bypass), the
@@ -170,7 +175,7 @@ export async function signInWithAppleNative(flow: "signin" | "signup"): Promise<
     await supabase.auth.signOut()
     return { ok: false, error: "no-account", detail: verified.reason }
   }
-  return { ok: true }
+  return { ok: true, destination: verified.destination }
 }
 
 // ── Native Google sign-in ─────────────────────────────────────────────────────
@@ -214,7 +219,7 @@ export function googleNativeConfigured(): boolean {
 
 let googleInitialized = false
 
-export async function signInWithGoogleNative(flow: "signin" | "signup"): Promise<NativeAppleResult> {
+export async function signInWithGoogleNative(flow: "signin" | "signup", opts?: NativeSignInOpts): Promise<NativeAppleResult> {
   const googleConfig = googleClientIdForPlatform()
   if (!googleConfig) return { ok: false, error: "unavailable" }
 
@@ -263,9 +268,10 @@ export async function signInWithGoogleNative(flow: "signin" | "signup"): Promise
     return { ok: false, error: "failed" }
   }
 
-  let verified: { ok: boolean; reason?: string }
+  let verified: { ok: boolean; reason?: string; destination?: string }
   try {
-    verified = await verifyNativeOAuthSession(flow)
+    // Google's own metadata already carries the name — no appleName to hand over.
+    verified = await verifyNativeOAuthSession(flow, { intent: opts?.intent })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     await supabase.auth.signOut()
@@ -275,13 +281,42 @@ export async function signInWithGoogleNative(flow: "signin" | "signup"): Promise
     await supabase.auth.signOut()
     return { ok: false, error: "no-account", detail: verified.reason }
   }
-  return { ok: true }
+  return { ok: true, destination: verified.destination }
 }
 
-// Post-sign-in routing for the native path — mirrors the email login flow in
-// app/(auth)/login/page.tsx (only ACTIVE ministries count toward the picker;
-// a pending registration application isn't openable).
-export async function routeAfterNativeSignIn(supabase: SupabaseClient): Promise<void> {
+// A destination is only navigable if it is a SAME-ORIGIN RELATIVE PATH: it must
+// start with exactly one "/". The server only ever returns hardcoded literals
+// today, but this value now crosses a trust boundary (a Server Action response),
+// and in a WKWebView both failure modes are live navigation risks rather than
+// theoretical ones: "//evil.host" is a protocol-relative ABSOLUTE url, and
+// location.assign("javascript:…") actually EXECUTES. The backslash case is
+// checked too because browsers normalize "/\\host" to "//host". A rejected
+// value is IGNORED, not navigated to — the caller falls through to the query
+// fallback, which can only produce literals of its own.
+function isSafeDestination(dest: string | null | undefined): dest is string {
+  if (!dest) return false
+  if (!dest.startsWith("/")) return false
+  return dest[1] !== "/" && dest[1] !== "\\"
+}
+
+// Post-sign-in navigation for the native path.
+//
+// On the OAuth path `destination` is ALWAYS supplied — verifyNativeOAuthSession
+// computed it server-side — so this makes ZERO Supabase round trips and is a
+// plain navigation. The query path below is the defensive fallback: it covers a
+// missing or non-navigable destination, and it is the LIVE path for the one
+// caller that has no guard action to ride on — the in-app email-OTP verification
+// in app/(auth)/signup/page.tsx, which mints its session with verifyOtp and
+// never touches the OAuth guard.
+//
+// The query fallback mirrors the email login flow in app/(auth)/login/page.tsx
+// (only ACTIVE ministries count toward the picker; a pending registration
+// application isn't openable) — the same logic nativeDestination now runs
+// server-side.
+export async function routeAfterNativeSignIn(supabase: SupabaseClient, destination?: string | null): Promise<void> {
+  if (isSafeDestination(destination)) { window.location.assign(destination); return }
+  if (destination) console.error("[native-auth] refusing non-relative destination; falling back")
+
   const { data: { user: me } } = await supabase.auth.getUser()
   if (me) {
     const { data: memberships } = await supabase

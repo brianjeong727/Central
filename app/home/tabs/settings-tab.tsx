@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Copy, Check, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen, Building2, Zap, MessageSquare, Flag, LayoutGrid, ScrollText } from "lucide-react"
+import { Copy, Check, QrCode, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen, Building2, Zap, MessageSquare, Flag, LayoutGrid, ScrollText } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EYEBROW_STYLE, PlanLineIcon, EmptyState } from "../components/shared"
@@ -35,7 +35,8 @@ import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@
 import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
-import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, PocketKicker, PocketRowCard, PocketRow, PocketFilterChip, PocketSwitch, useScrollResetOn } from "@/components/central"
+import { isValidInviteCode } from "@/lib/invite-code"
+import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, InviteShareModal, PocketKicker, PocketRowCard, PocketRow, PocketFilterChip, PocketSwitch, useScrollResetOn } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
 import { useOpenMemberProfile } from "../member-profile-context"
@@ -332,6 +333,9 @@ export function SettingsTab({
 
   // Staff invite code
   const [staffCode, setStaffCode] = useState<string | null>(null)
+  // Share sheet for the MEMBER code only — never the staff code (a link is the wrong
+  // container for a credential that grants pastor/deacon/elder).
+  const [shareOpen, setShareOpen] = useState(false)
   const [staffCopied, setStaffCopied] = useState(false)
   const [showStaffRegenerateConfirm, setShowStaffRegenerateConfirm] = useState(false)
   const [regeneratingStaff, setRegeneratingStaff] = useState(false)
@@ -2048,6 +2052,19 @@ export function SettingsTab({
                         {copied ? "Copied" : "Copy"}
                       </button>
                     </div>
+                    {/* A share LINK is only offered for a code /j/ will actually accept.
+                        Pre-rotation codes predate the current format, and offering a link
+                        for one would print a QR that the invite route refuses — the leader
+                        would find out from a room full of students, not from us. */}
+                    {isValidInviteCode(inviteCode) ? (
+                      <button onClick={() => setShareOpen(true)} style={{ marginTop: 12, padding: 0, background: "none", border: "none", color: "var(--plum)", fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <QrCode style={{ width: 13, height: 13 }} /> Share link or QR
+                      </button>
+                    ) : inviteCode ? (
+                      <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5 }}>
+                        {isAdmin ? "Regenerate this code to get a shareable link and QR." : "Ask an admin to regenerate this code to get a shareable link."}
+                      </div>
+                    ) : null}
                     {isAdmin && (showRegenerateConfirm ? (
                       <div style={{ marginTop: 14, borderRadius: 10, border: "1px solid var(--line)", background: "#F7F4EF", padding: "12px 14px" }}>
                         <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old code will stop working immediately.</p>
@@ -2314,6 +2331,14 @@ export function SettingsTab({
         )}
         </div>
       </div>
+      {shareOpen && inviteCode && (
+        <InviteShareModal
+          onClose={() => setShareOpen(false)}
+          inviteCode={inviteCode}
+          ministryName={ministryInfo?.name ?? ministryName}
+        />
+      )}
+
       <ConfirmDialog
         open={!!confirmDeleteSchool}
         title="Remove school?"

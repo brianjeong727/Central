@@ -17,7 +17,7 @@ import { unblockUser } from "@/app/actions/blocks"
 import { useBlocks } from "../use-blocks"
 import { MODERATION_DEFAULTS, moderateText, type ModerationSettings } from "@/lib/moderation"
 import { storagePathFromPublicUrl, removeStorageObject } from "@/lib/storage-cleanup"
-import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, SerifInput, MonogramChip, PocketFilterChip, PocketCard, PocketButton, PocketTag, PocketRoundButton, PocketRow, PocketRowCard, PocketKicker, useScrollResetOn, useEdgeSwipeBack } from "@/components/central"
+import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, SerifInput, MonogramChip, PocketFilterChip, PocketCard, PocketButton, PocketTag, PocketRoundButton, PocketRow, PocketRowCard, PocketKicker, useScrollResetOn, useEdgeSwipeBack, PendingVeil } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
@@ -818,6 +818,11 @@ const PROFILE_SECTIONS: {
 function AccountLinksSection({ userId, mobile = false }: { userId: string; mobile?: boolean }) {
   const { blocked, mutate } = useBlocks(userId)
   const [showBlocked, setShowBlocked] = useState(false)
+  // Switching ministry is a FULL document navigation, so the tap used to land on
+  // a screen that then sat inert for the whole round trip. Set on click and
+  // NEVER cleared — the page is navigating, and clearing it would flash the
+  // settings list back for the last frame.
+  const [switching, setSwitching] = useState(false)
 
   // Mobile → borderless tonal --ivory card + --line-3 row dividers (spec §1.1);
   // desktop keeps the hairline cream card language.
@@ -825,7 +830,14 @@ function AccountLinksSection({ userId, mobile = false }: { userId: string; mobil
     ? { borderRadius: "var(--r-pocket)", overflow: "hidden", background: "var(--ivory)" }
     : { border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", background: "var(--cream)" }
   const hair = mobile ? "var(--line-3)" : "var(--line)"
-  const rowBase: React.CSSProperties = { display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer", color: "var(--ink)" }
+  // Press ground: this card is --ivory on mobile and --cream on desktop, and the
+  // press tint has to step DOWN from whichever it is (see .press-row in
+  // app/globals.css). Desktop additionally gets the ratified §8.3 row hover.
+  const pressRow = mobile ? "press-row press-row-ivory" : "press-row"
+  // No `background` here on purpose: `.press-row` (app/globals.css) supplies the
+  // transparent default so its :active press tint can win — an inline background
+  // would beat any stylesheet rule and the row would never acknowledge a tap.
+  const rowBase: React.CSSProperties = { display: "flex", alignItems: "center", gap: 12, padding: "14px 18px", width: "100%", textAlign: "left", border: "none", cursor: "pointer", color: "var(--ink)" }
   const label: React.CSSProperties = { flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, color: "var(--ink)" }
   const right: React.CSSProperties = { fontSize: 13, color: "var(--muted-text)", flexShrink: 0 }
 
@@ -837,10 +849,11 @@ function AccountLinksSection({ userId, mobile = false }: { userId: string; mobil
 
   return (
     <div>
+      {switching && <PendingVeil label="One moment…" />}
       <p style={{ ...MONO_STYLE, marginBottom: 10, marginTop: 0 }}>Account &amp; support</p>
       <div style={cardBorder}>
         {/* Blocked users */}
-        <button type="button" onClick={() => setShowBlocked((v) => !v)} style={rowBase}>
+        <button type="button" className={pressRow} onClick={() => setShowBlocked((v) => !v)} style={rowBase}>
           <span style={label}>Blocked users</span>
           <span style={right}>{blocked.length}</span>
           {showBlocked ? <ChevronDown size={16} style={{ color: "var(--muted-text)" }} /> : <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />}
@@ -861,26 +874,38 @@ function AccountLinksSection({ userId, mobile = false }: { userId: string; mobil
           </div>
         )}
 
-        {/* Switch ministry */}
-        <a href="/ministries" style={{ ...rowBase, borderTop: `1px solid ${hair}`, textDecoration: "none" }}>
+        {/* Switch ministry — stays an <a> (real href: middle-click / open-in-new-tab
+            still work, and it is the fallback if JS hasn't hydrated), but the click
+            is intercepted to raise the veil BEFORE the same navigation runs. */}
+        <a
+          href="/ministries"
+          className={pressRow}
+          onClick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+            e.preventDefault()
+            setSwitching(true)
+            window.location.assign("/ministries")
+          }}
+          style={{ ...rowBase, borderTop: `1px solid ${hair}`, textDecoration: "none" }}
+        >
           <span style={label}>Switch ministry</span>
           <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />
         </a>
 
         {/* Contact & support */}
-        <a href="mailto:team@joincentral.app" style={{ ...rowBase, borderTop: `1px solid ${hair}`, textDecoration: "none" }}>
+        <a href="mailto:team@joincentral.app" className={pressRow} style={{ ...rowBase, borderTop: `1px solid ${hair}`, textDecoration: "none" }}>
           <span style={label}>Contact &amp; support</span>
           <span style={right}>team@joincentral.app</span>
         </a>
 
         {/* Privacy policy */}
-        <a href="/privacy" style={{ ...rowBase, borderTop: `1px solid ${hair}`, textDecoration: "none" }}>
+        <a href="/privacy" className={pressRow} style={{ ...rowBase, borderTop: `1px solid ${hair}`, textDecoration: "none" }}>
           <span style={label}>Privacy policy</span>
           <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />
         </a>
 
         {/* Terms of service */}
-        <a href="/terms" style={{ ...rowBase, borderTop: `1px solid ${hair}`, textDecoration: "none" }}>
+        <a href="/terms" className={pressRow} style={{ ...rowBase, borderTop: `1px solid ${hair}`, textDecoration: "none" }}>
           <span style={label}>Terms of service</span>
           <ChevronRight size={16} style={{ color: "var(--muted-text)" }} />
         </a>

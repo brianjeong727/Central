@@ -24,14 +24,20 @@ interface BlockRow {
 
 export function useBlocks(userId: string | null) {
   const supabase = createClient()
-  const { data, mutate, isLoading } = useSWR(
+  const { data, error, mutate, isLoading } = useSWR(
     userId ? ["user-blocks", userId] : null,
     async (): Promise<BlockedUser[]> => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("user_blocks")
         .select("blocked_id, created_at, profiles!blocked_id(name, avatar_url)")
         .eq("blocker_id", userId as string)
         .order("created_at", { ascending: false })
+      // THROW rather than degrade to an empty list. Swallowing the error made a
+      // failed query indistinguishable from "you have blocked nobody", so SWR
+      // never entered its error state and consumers could not tell the difference
+      // — including ChatScreen, which holds its first paint until this settles
+      // precisely so a blocked sender's messages cannot paint first.
+      if (error) throw error
       return ((data ?? []) as BlockRow[]).map((b) => {
         const p = Array.isArray(b.profiles) ? b.profiles[0] : b.profiles
         return {
@@ -47,5 +53,12 @@ export function useBlocks(userId: string | null) {
   const blocked = useMemo(() => data ?? [], [data])
   const blockedIds = useMemo(() => new Set(blocked.map((b) => b.blocked_id)), [blocked])
 
-  return { blocked, blockedIds, mutate, isLoading }
+  // Has this query RESOLVED at least once, either way? Distinct from `isLoading`,
+  // which SWR flips back to true on every error retry — so a consumer that holds
+  // UI back on `isLoading` alone waits forever against a failing query, not just
+  // until the first answer. ChatScreen holds its first paint on exactly this, so
+  // that a blocked sender's messages can't paint before the block list is known.
+  const settled = data !== undefined || error !== undefined
+
+  return { blocked, blockedIds, mutate, isLoading, settled }
 }

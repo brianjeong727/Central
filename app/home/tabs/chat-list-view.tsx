@@ -34,7 +34,7 @@ import { Search, ChevronDown, X, Plus, Users, Pin, PinOff, Lock, Bell, BellOff, 
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
-import { MonogramChip, SegmentedControl, PocketFilterChip, PocketSearchField, PocketRow, PocketKicker, POCKET_KICKER_STYLE, useScrollResetOn, SwipeActionRow, ConfirmDialog, Toast } from "@/components/central"
+import { ChatAvatar, chatAvatarLabel, SegmentedControl, PocketSearchField, PocketRow, PocketKicker, POCKET_KICKER_STYLE, useScrollResetOn, SwipeActionRow, ConfirmDialog, Toast } from "@/components/central"
 import { ChatSearchView } from "../components/chat-search"
 import { findExistingDm } from "../dm"
 import { formatChatListTime } from "../utils"
@@ -43,6 +43,36 @@ import { useNavState } from "../nav-state"
 import { fetchChatList } from "../chat-list"
 import { chatCapabilities } from "../chat-permissions"
 import { chatChipAvatar } from "../chat-avatar"
+import { prefetchThread } from "../chat-thread-cache"
+
+// Warm a chat's transcript only for a press that behaves like a TAP — one that
+// doesn't move. A press that turns into a scroll or a horizontal swipe never
+// becomes an open, so it must not pay for one. Deliberately tiny and local: the
+// press either settles (warm) or moves (cancel), and prefetchThread itself is
+// idempotent, TTL'd and failure-silent, so a double fire costs nothing.
+const WARM_SETTLE_MS = 90
+const WARM_MOVE_TOLERANCE_PX = 8
+function warmOnSettledPress(groupId: string) {
+  if (typeof window === "undefined") return
+  let startX = 0, startY = 0, moved = false
+  const onMove = (e: PointerEvent) => {
+    if (!startX && !startY) { startX = e.clientX; startY = e.clientY; return }
+    if (Math.abs(e.clientX - startX) > WARM_MOVE_TOLERANCE_PX || Math.abs(e.clientY - startY) > WARM_MOVE_TOLERANCE_PX) moved = true
+  }
+  const cleanup = () => {
+    window.removeEventListener("pointermove", onMove)
+    window.removeEventListener("pointerup", cleanup)
+    window.removeEventListener("pointercancel", cleanup)
+    clearTimeout(timer)
+  }
+  const timer = setTimeout(() => {
+    if (!moved) prefetchThread(groupId)
+    cleanup()
+  }, WARM_SETTLE_MS)
+  window.addEventListener("pointermove", onMove)
+  window.addEventListener("pointerup", cleanup)
+  window.addEventListener("pointercancel", cleanup)
+}
 import { setChatPinned, setChatMuted, setChatArchived, leaveChat } from "../chat-actions"
 import type { SwipeAction, SwipeSide } from "@/components/central/swipe-actions"
 import { PushSubscribeCard } from "../components/notifications"
@@ -98,12 +128,22 @@ function PocketChatRow({ group, isFirst, onClick }: { group: ChatGroup; isFirst:
       immersive
       isFirst={isFirst}
       leading={
-        <MonogramChip
-          initials={group.name.charAt(0).toUpperCase()}
+        <ChatAvatar
+          size={46}
+          title={group.name}
           avatarUrl={chatChipAvatar(group)}
-          style={{ width: 46, height: 46, flexShrink: 0, fontFamily: "var(--serif)", fontSize: 16, fontWeight: 600 }}
+          members={group.cluster_members}
+          otherCount={group.other_member_count}
+          nameIsGenerated={group.name_is_generated}
+          isCentral={group.is_central_chat}
+          // Full-bleed rows sit on the page surface, so the ring between
+          // overlapping circles has to be cream, not the old card ivory.
+          surface="var(--cream)"
         />
       }
+      // The cluster is aria-hidden, so the row's own name is what carries the
+      // members to a screen reader.
+      ariaLabel={chatAvatarLabel(group.name, group.cluster_members ?? [], group.other_member_count ?? 0, group.name_is_generated === true)}
       title={group.name}
       // Dead thread (the counterpart deleted their account): the title drops to
       // the tertiary text token. The row is otherwise untouched and still opens
@@ -121,6 +161,12 @@ function PocketChatRow({ group, isFirst, onClick }: { group: ChatGroup; isFirst:
       time={time}
       showDot={group.unread_count > 0 && !group.muted}
       onClick={onClick}
+      // Warm the thread on PRESS, so the fetch is in flight before the tap
+      // resolves and ChatScreen mounts. Gated on the press STAYING STILL: this row
+      // is wrapped in SwipeActionRow and sits in a scroller, so a bare pointerdown
+      // also fires for every flick-scroll and swipe-to-reveal — flicking down a
+      // 20-room list would have fired ~20 fifty-message queries on cellular.
+      onPointerDown={() => warmOnSettledPress(group.id)}
     />
   )
 }
@@ -477,11 +523,28 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
 
   return (
     <div className="pb-2 md:pb-0 md:h-full md:flex md:flex-col">
-      {/* Mobile chrome (B3 Pocket) — "Chats" + directory ghost + avatar. New-chat
-          moved inline onto the scope-pills row below. */}
+      {/* Mobile chrome (B3 Pocket) — the scope switch IS the title. "Chats" as a
+          header earned nothing (the bottom nav already names the tab) while the
+          Church/My chips cost a second full-width band, so the two collapsed into
+          one row: scope at chrome-title type, then new-chat (My scope only) and
+          the directory ghost. Ratified with Brian 2026-08-17. */}
       <PocketChrome
         title="Chats"
-        action={
+        scope={{
+          options: [{ id: "church", label: "Church" }, { id: "my", label: "My chats" }],
+          value: subTab,
+          onChange: (t) => {
+            setSubTab(t as ChatsSection)
+            setSearch("")
+            setParam("chats", t === "church" ? null : t)
+          },
+        }}
+        action={canShowNewChat ? (
+          <PocketRoundButton variant="plum" onClick={openNewChat} ariaLabel="New chat">
+            <Plus style={{ width: 17, height: 17 }} strokeWidth={2} />
+          </PocketRoundButton>
+        ) : undefined}
+        action2={
           <PocketRoundButton variant="ghost" onClick={onOpenDirectory} ariaLabel="Directory">
             <Users style={{ width: 17, height: 17 }} strokeWidth={1.6} />
           </PocketRoundButton>
@@ -525,21 +588,9 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           that is not a row — chips, search, empty states — re-applies px-5 for
           itself. Desktop was already px-0 here, so it is unaffected. */}
       <div className="pt-1 pb-2 md:pt-2 md:flex-1 md:overflow-y-auto">
-      {/* Mobile scope pills (B3 Pocket) — Church / My chats; the new-chat + sits
-          right-aligned on the same row, My chats scope only. */}
-      {/* Scope pills hide while searching — search spans BOTH scopes, so leaving a
-          scope filter on screen would imply results are filtered by it. */}
-      <div className={`items-center gap-2 mb-4 px-5 md:px-0 md:hidden ${searchOpen ? "hidden" : "flex"}`}>
-        <PocketFilterChip label="Church" active={subTab === "church"} onClick={() => { setSubTab("church"); setSearch(""); setParam("chats", null) }} />
-        <PocketFilterChip label="My chats" active={subTab === "my"} onClick={() => { setSubTab("my"); setSearch(""); setParam("chats", "my") }} />
-        {canShowNewChat && (
-          <div className="ml-auto">
-            <PocketRoundButton variant="plum" onClick={openNewChat} ariaLabel="New chat">
-              <Plus style={{ width: 17, height: 17 }} strokeWidth={2} />
-            </PocketRoundButton>
-          </div>
-        )}
-      </div>
+      {/* The mobile scope pills + inline new-chat that used to sit here moved INTO
+          the chrome row above (scope = title). Nothing replaces this band — the
+          list now starts directly under the one chrome row. */}
 
       {/* Search (mobile) — the field is always present; focusing it swaps the body
           below to the search view IN PLACE, so the field stays pinned and the
@@ -700,7 +751,6 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
 }
 
 export function ChatGroupCard({ group, onClick, isActive, locked }: { group: ChatGroup; onClick: () => void; isActive?: boolean; locked?: boolean }) {
-  const firstInitial = group.name.charAt(0)
   // Group photo, or a DM partner's face — one derivation, see chat-avatar.ts.
   const chipAvatar = chatChipAvatar(group)
   // Glyph precedence: pinned + muted take the two available slots; lock drops when
@@ -717,15 +767,20 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
   const nameColor = group.counterpart_deleted ? "var(--muted-text)" : "var(--ink)"
 
   return (
-    <button onClick={onClick} className="w-full text-left group">
+    <button onClick={onClick} onPointerDown={() => prefetchThread(group.id)} className="w-full text-left group">
       {/* Mobile style */}
       <div className="md:hidden bg-[var(--cream-panel)] border border-[var(--line)] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors">
         <div className="flex items-center gap-3.5">
-          <MonogramChip
-            initials={firstInitial}
+          <ChatAvatar
+            size={48}
+            title={group.name}
             avatarUrl={chipAvatar}
-            className="w-12 h-12 flex-shrink-0"
-            style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "22px", fontWeight: 400 }}
+            members={group.cluster_members}
+            otherCount={group.other_member_count}
+            nameIsGenerated={group.name_is_generated}
+            isCentral={group.is_central_chat}
+            surface="var(--cream-panel)"
+            className="flex-shrink-0"
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
@@ -763,11 +818,18 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
         onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "var(--cream-3)" }}
         onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "" }}
       >
-        <MonogramChip
-          initials={firstInitial}
+        <ChatAvatar
+          size={38}
+          title={group.name}
           avatarUrl={chipAvatar}
+          members={group.cluster_members}
+          otherCount={group.other_member_count}
+          nameIsGenerated={group.name_is_generated}
+          isCentral={group.is_central_chat}
+          // Desktop panel rows sit on the panel fill, and the active row tints —
+          // the ring follows whichever is behind it.
+          surface={isActive ? "var(--plum-tint)" : "var(--cream)"}
           className="flex-shrink-0"
-          style={{ width: 38, height: 38, fontFamily: "var(--serif)", fontSize: "16px" }}
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 2 }}>

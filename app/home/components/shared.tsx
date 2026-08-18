@@ -8,15 +8,10 @@ import { useState, useEffect, useRef } from "react"
 export { EYEBROW_STYLE, MONO_STYLE } from "@/components/central/typography"
 
 // ── Shared brand mark ─────────────────────────────────────────────────────────
-
-export function RingCrossLogo({ size = 32, color = "var(--plum)" }: { size?: number; color?: string }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" aria-hidden>
-      <path d="M70 28 A32 32 0 1 0 70 72" stroke={color} strokeWidth="8" strokeLinecap="round" />
-      <circle cx="50" cy="50" r="6" fill={color} />
-    </svg>
-  )
-}
+// RingCrossLogo is canonically defined in components/central/ring-cross-logo.tsx
+// (the leaf layer — PendingVeil needs it and components/central must not import
+// from app/) and re-exported here so existing app-layer importers keep working.
+export { RingCrossLogo } from "@/components/central/ring-cross-logo"
 
 // ── UI atoms ──────────────────────────────────────────────────────────────────
 

@@ -35,6 +35,12 @@ export async function enforceOAuthAccountPolicy(
   if (flow === "signup") {
     // OAuth signups can't set metadata pre-mint, so stamp server-side here.
     // Email signups already carry the marker via signUp options.data.
+    // NOTE this writes the marker to the DB but deliberately does NOT assign it
+    // back onto the in-memory `user` — any caller that reads user.user_metadata
+    // after this function still sees PRE-stamp metadata and must re-read before
+    // relying on it. (Harmless for the marker itself: GoTrue merges top-level
+    // user_metadata keys, so a later write that omits central_signup does not
+    // drop it — verified by live probe 2026-08-18.)
     const existingMeta = user.user_metadata ?? {}
     if (existingMeta.central_signup !== true) {
       const { error: stampErr } = await admin.auth.admin.updateUserById(user.id, {

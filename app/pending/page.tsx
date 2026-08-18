@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase"
-import { RingCrossLogo } from "@/app/home/components/shared"
+import { RingCrossLogo } from "@/components/central/ring-cross-logo"
+import { PendingVeil } from "@/components/central/pending-veil"
 import { getMinistryCodes } from "@/app/actions/ministry"
 
 export default function PendingPage() {
@@ -16,6 +17,8 @@ export default function PendingPage() {
   const [staffCode, setStaffCode] = useState<string | null>(null)
   const [copied, setCopied] = useState<"member" | "staff" | null>(null)
   const [checking, setChecking] = useState(false)
+  // Set on click and never cleared — signOut ends in a full document navigation.
+  const [signingOut, setSigningOut] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -73,13 +76,26 @@ export default function PendingPage() {
   }
 
   async function signOut() {
+    setSigningOut(true)
     const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.href = "/landing"
+    // Always navigate, even if signOut() rejects. Network errors are RETURNED by
+    // auth-js, but a lock-acquire timeout REJECTS — and the veil is never cleared
+    // by design, so without this the user is stranded on an inert cream screen
+    // with no escape but a manual refresh. That is strictly worse than the static
+    // wait this replaced. Tradeoff on the failure path: if the session genuinely
+    // survived, proxy.ts bounces /landing back to /home. Confusing, but recoverable
+    // in one more tap (the storage lock is free after a document navigation),
+    // whereas an inert veil is not recoverable at all.
+    try {
+      await supabase.auth.signOut()
+    } finally {
+      window.location.href = "/landing"
+    }
   }
 
   return (
     <div className="min-h-screen bg-[var(--cream-panel)] flex items-center justify-center px-6 py-12">
+      {signingOut && <PendingVeil label="Signing you out…" />}
       <div className="w-full max-w-[390px] flex flex-col items-center text-center">
 
         {/* Logo */}

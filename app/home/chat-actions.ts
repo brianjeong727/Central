@@ -14,6 +14,7 @@
 import { mutate as mutateGlobal } from "swr"
 import { createClient } from "@/lib/supabase"
 import type { ChatGroup } from "./types"
+import { forgetThread } from "./chat-thread-cache"
 
 /** The one chat-list SWR key. ChatsTab, ChatListPanel and home-app all read it,
  *  so patching here updates every consumer at once. */
@@ -107,5 +108,9 @@ export async function leaveChat(ctx: ChatActionCtx): Promise<string | null> {
   // Only drop the row once the delete succeeded — an optimistic removal here
   // would vanish a chat the user is still in if the write failed.
   await dropRow(ctx)
+  // The cached transcript outlives the component, so it has to be dropped
+  // explicitly — otherwise re-joining this room later would flash the messages
+  // from before you left while the fresh page loads.
+  forgetThread(ctx.groupId)
   return null
 }

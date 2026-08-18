@@ -236,6 +236,12 @@ export function DesktopSidebar({
           {items.map((s, i) => (
             <button
               key={i}
+              // `press-scale` = the same scale(0.98) .central-btn has always used.
+              // It rides sidebarItemStyle's inline styles because the :active rule
+              // sets ONLY `transform`, which that function never sets. Applied to
+              // all three rows, not just Sign out: one row reacting to a click
+              // while its two neighbours sit dead reads as a bug, not a nicety.
+              className="press-scale"
               style={subItemStyle(
                 s.tab ? activeTab === s.tab
                   : s.section ? (activeTab === "profile" && profileSection === s.section)

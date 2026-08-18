@@ -132,6 +132,7 @@ function CompleteProfileContent() {
   // follows is the longest wait on this screen and has nothing else to show for
   // it. Never cleared: we are leaving.
   const [navigating, setNavigating] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
 
   const currentYear = new Date().getFullYear()
   const gradYearNum = parseInt(graduationYear, 10)
@@ -191,9 +192,24 @@ function CompleteProfileContent() {
   }
 
   async function signOut() {
+    // Same veil the save path uses, its own label. The wait is identical (round
+    // trip + full document navigation) and this was the one exit on the page
+    // with no feedback at all. Never cleared — the page is navigating.
+    setSigningOut(true)
     const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.assign("/login")
+    // Always navigate, even if signOut() rejects. Network errors are RETURNED by
+    // auth-js, but a lock-acquire timeout REJECTS — and the veil is never cleared
+    // by design, so without this the user is stranded on an inert cream screen
+    // with no escape but a manual refresh. That is strictly worse than the static
+    // wait this replaced. Tradeoff on the failure path: if the session genuinely
+    // survived, proxy.ts bounces /login back to /home. Confusing, but recoverable
+    // in one more tap (the storage lock is free after a document navigation),
+    // whereas an inert veil is not recoverable at all.
+    try {
+      await supabase.auth.signOut()
+    } finally {
+      window.location.assign("/login")
+    }
   }
 
   if (checking) return <AuthPendingVeil label="One moment…" />
@@ -219,6 +235,7 @@ function CompleteProfileContent() {
 
   return (<>
     {navigating && <AuthPendingVeil label="Taking you in…" />}
+    {signingOut && <AuthPendingVeil label="Signing you out…" />}
     {/* ── Desktop ── */}
     <div className="hidden md:block">
       <SplitShell topBar={

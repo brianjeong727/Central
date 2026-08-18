@@ -1,24 +1,27 @@
 # Central — App Store Submission & Compliance (context)
 
-> Living record of the iOS App Store submission for Central. Captures the demo
-> account, the build config, every App Store Connect field value, the compliance
-> work already shipped, and the exact status/blockers as of the last update.
-> **Last updated: 2026-07-16.**
+> Reference record for Central's iOS App Store presence. Captures the demo account,
+> the build config, every App Store Connect field value, and the compliance work
+> shipped — the things you need again for each resubmission.
+>
+> **Submission is DONE** (confirmed by Brian 2026-08-17). Everything below is kept as
+> the durable reference, NOT as an open checklist. The original submission walkthrough
+> lived in a throwaway checklist that has been deleted.
 
 ---
 
 ## 0. TL;DR status
 
-- **Code side: DONE and merged to `main`** (PR #188, commit `22cfa42`, 2026-07-16).
-- **Build uploaded:** Build `1`, version `1.0`, attached to the ASC version page.
-- **Demo tenant:** live in prod, seeded and screenshot-ready.
-- **Remaining before hitting "Add for Review"** (all in App Store Connect UI, Brian's side):
-  1. ⚠️ **App Review → Sign-In credentials are EMPTY** — must fill (most common fast-rejection cause).
-  2. **App Information → Category** = Lifestyle (was unset).
-  3. **App Information → Content Rights** = "does not use third-party content."
-  4. **App Privacy** — edits made, must be **Published**.
-  5. (optional) Pricing → uncheck Apple Silicon Mac + Apple Vision Pro availability.
-- **DSA** trader declaration: done → **"not a trader"** (EU excluded; 175 countries available).
+- **Submitted — the first release went out.** The step-by-step "before you hit Add for
+  Review" checklist that used to live here is complete and has been removed; treat the
+  sections below as the field-value reference for the NEXT submission.
+- **Code side:** merged to `main` (PR #188, commit `22cfa42`, 2026-07-16).
+- **Demo tenant:** live in prod, seeded and screenshot-ready — reuse it for App Review
+  sign-in credentials on every resubmission (empty credentials is the most common
+  fast-rejection cause).
+- **DSA** trader declaration: **"not a trader"** (EU excluded; 175 countries available).
+- **Settled ASC values:** Category = Lifestyle · Content Rights = does not use
+  third-party content · App Privacy published.
 
 Review timeline expectation: earliest same-day/overnight, typically **24–48h**.
 
@@ -242,7 +245,8 @@ fixes + iPhone-only/encryption + demo section seed).
 ## 7. Apple Developer portal / Supabase config (SIWA)
 
 Reference — the portal + Supabase steps that back the native/web Sign in with Apple flow.
-Full detail in the throwaway `APPSTORE_SUBMISSION_STEPS 2.md` on Brian's Desktop.
+These are configured and working; the values below are what to re-check if SIWA ever
+breaks (note the 6-month client-secret expiry in the Supabase bullet).
 
 - **App ID** `app.joincentral` → enable **Sign In with Apple** capability.
 - **Services ID** `app.joincentral.web` (web flow client) → SIWA configured:

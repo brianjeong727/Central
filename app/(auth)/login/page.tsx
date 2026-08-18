@@ -12,6 +12,7 @@ import { RingCrossLogo } from "@/app/home/components/shared"
 import { EntrySplash } from "@/app/home/components/entry-splash"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
+import { inviteReturnPath, codeFromReturnPath } from "@/lib/invite-code"
 
 const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
@@ -23,6 +24,10 @@ const SIGNING_IN = "Signing you in…"
 function LoginContent() {
   const searchParams = useSearchParams()
   const intent = searchParams.get("intent")
+  // An invite ride-along: auth's only job is to return the user to /j/<CODE>, where
+  // the join happens. `invitePath` is null unless the param is a well-formed code.
+  const invite = searchParams.get("invite")
+  const invitePath = inviteReturnPath(invite)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPw, setShowPw] = useState(false)
@@ -90,7 +95,7 @@ function LoginContent() {
     setPending(SIGNING_IN)
 
     if (intent === "register") { window.location.assign("/onboarding"); return }
-    if (intent === "join") { window.location.assign("/ministries"); return }
+    if (intent === "join") { window.location.assign(invitePath ?? "/ministries"); return }
 
     const { data: { user: me } } = await supabase.auth.getUser()
     if (me) {
@@ -115,7 +120,7 @@ function LoginContent() {
   async function handleGoogleLogin() {
     if (isNativeShell()) {
       setError(null); setPending(SIGNING_IN)
-      const res = await signInWithGoogleNative("signin")
+      const res = await signInWithGoogleNative("signin", { intent })
       if (!res.ok) {
         setPending(null)
         if (res.error === "no-account") { setNoAccountProvider("Google"); setMobileStep("form"); return }
@@ -125,23 +130,28 @@ function LoginContent() {
         setMobileStep("form")
         return
       }
-      if (intent === "register") { window.location.assign("/onboarding"); return }
-      if (intent === "join") { window.location.assign("/ministries"); return }
-      await routeAfterNativeSignIn(createClient())
+      // A scanned invite outranks the server-decided destination: the guard action
+      // resolves where this account normally lands, but it cannot know the user
+      // arrived from an invite link. invitePath is already validated.
+      if (invitePath) { window.location.assign(invitePath); return }
+      // The intent short-circuits and the routing queries that used to live here
+      // all moved into the guard action, which already had the authenticated
+      // user — one decision, made once, with no phone→Supabase round trip.
+      await routeAfterNativeSignIn(createClient(), res.destination)
       return
     }
     setPending(SIGNING_IN)
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: siteOrigin() + "/auth/callback?flow=signin" + (intent ? `&intent=${intent}` : "") },
+      options: { redirectTo: oauthRedirect("signin", intent, invite) },
     })
   }
 
   async function handleAppleLogin() {
     if (isNativeShell()) {
       setError(null); setPending(SIGNING_IN)
-      const res = await signInWithAppleNative("signin")
+      const res = await signInWithAppleNative("signin", { intent })
       if (!res.ok) {
         // `unavailable` = plugin missing from this binary; `not-entitled` =
         // ASAuthorizationError 1000, the binary isn't entitled for Sign in with
@@ -158,9 +168,10 @@ function LoginContent() {
         setMobileStep("form")
         return
       }
-      if (intent === "register") { window.location.assign("/onboarding"); return }
-      if (intent === "join") { window.location.assign("/ministries"); return }
-      await routeAfterNativeSignIn(createClient())
+      // Invite wins over the server-decided destination — see handleGoogleLogin.
+      if (invitePath) { window.location.assign(invitePath); return }
+      // Destination decided server-side by the guard action (see handleGoogleLogin).
+      await routeAfterNativeSignIn(createClient(), res.destination)
       return
     }
     await webAppleOAuth()
@@ -171,11 +182,17 @@ function LoginContent() {
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: "apple",
-      options: { redirectTo: siteOrigin() + "/auth/callback?flow=signin" + (intent ? `&intent=${intent}` : "") },
+      options: { redirectTo: oauthRedirect("signin", intent, invite) },
     })
   }
 
-  const signupHref = intent ? `/signup?intent=${intent}` : "/signup"
+  const signupHref = (() => {
+    const q = new URLSearchParams()
+    if (intent) q.set("intent", intent)
+    if (invitePath) q.set("invite", codeFromReturnPath(invitePath))
+    const qs = q.toString()
+    return qs ? `/signup?${qs}` : "/signup"
+  })()
 
   // ── Mobile-only styles (Pocket idiom — KEEP per ratified reconciliation) ──
   const pillBase: React.CSSProperties = {
@@ -469,6 +486,20 @@ function LoginContent() {
     </div>
     </>
   )
+}
+
+// Build the OAuth redirect with URLSearchParams and an ALLOWLIST, never string
+// concatenation. `intent` was previously concatenated raw from useSearchParams, so a
+// crafted ?intent=join%26x%3Dy injected arbitrary params into redirectTo; adding a
+// second caller-influenced param (invite) to that pattern is how the containment
+// eventually breaks. Both values are validated before they go anywhere near the URL.
+function oauthRedirect(flow: "signin" | "signup", intent: string | null, invite: string | null): string {
+  const url = new URL("/auth/callback", siteOrigin())
+  url.searchParams.set("flow", flow)
+  if (intent === "join" || intent === "register") url.searchParams.set("intent", intent)
+  const code = inviteReturnPath(invite)
+  if (code) url.searchParams.set("invite", codeFromReturnPath(code))
+  return url.toString()
 }
 
 export default function LoginPage() {

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { AlertCircle, ChevronDown } from "lucide-react"
-import { RingCrossLogo } from "@/app/home/components/shared"
+import { RingCrossLogo } from "@/components/central/ring-cross-logo"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 
 const SERIF = "var(--font-instrument-serif)"
@@ -192,31 +192,12 @@ export function AuthSelect({ label, helper, children, ...select }: {
 }
 
 // ── AuthPendingVeil ────────────────────────────────────────────
-// Full-screen "something is happening" cover for the auth waits that have no
-// button to spin: the OAuth round trip (native sheet → signInWithIdToken → mint
-// guard → routing queries) and the window.location.assign handoff afterwards,
-// which together can run for seconds with a completely inert screen. Mounted
-// while pending and NEVER cleared on success — the page is navigating, and
-// clearing it would flash the form back for the last frame.
-export function AuthPendingVeil({ label }: { label: string }) {
-  return (
-    <div role="status" aria-live="polite" style={{
-      position: "fixed", inset: 0, zIndex: 300, background: "var(--cream)",
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 28,
-    }}>
-      <RingCrossLogo size={48} color="var(--plum)" />
-      {/* Spinner and label read as ONE status line under the mark — stacked as
-          three evenly-spaced items they float apart. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div className="animate-spin" style={{
-          width: 15, height: 15, borderRadius: "50%", flexShrink: 0,
-          border: "2px solid var(--line-2)", borderTopColor: "var(--plum)",
-        }} />
-        <div style={{ fontFamily: SERIF, fontSize: 15, color: "var(--body)" }}>{label}</div>
-      </div>
-    </div>
-  )
-}
+// Canonically defined as `PendingVeil` in components/central/pending-veil.tsx —
+// it started here for the auth waits that have no button to spin, but sign-out
+// and switch-ministry are the same situation, so it was promoted to the leaf
+// layer. Re-exported under the old name: login / signup / complete-profile are
+// untouched. Still NEVER cleared on success (see the component's own comment).
+export { PendingVeil as AuthPendingVeil } from "@/components/central/pending-veil"
 
 // ── OrDivider ──────────────────────────────────────────────────
 // No built-in margin — callers control vertical spacing. `label` defaults to

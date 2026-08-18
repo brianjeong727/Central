@@ -13,6 +13,7 @@ import { SplitShell, GoogleButton, AppleButton, AppleGlyph, GoogleGlyph, OrDivid
 import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn, nativeAuthDebugMessage } from "@/lib/native-auth"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
+import { inviteReturnPath, codeFromReturnPath } from "@/lib/invite-code"
 
 const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"
@@ -217,6 +218,17 @@ function MGenderPill({ label, on, onClick }: { label: string; on: boolean; onCli
 function SignupContent() {
   const searchParams = useSearchParams()
   const intent = searchParams.get("intent")
+  // Invite ride-along — see lib/invite-code.ts. `invitePath` is null unless the param
+  // is a well-formed code, so every landing below falls back safely.
+  const invite = searchParams.get("invite")
+  const invitePath = inviteReturnPath(invite)
+  const loginHref = (() => {
+    const q = new URLSearchParams()
+    if (intent) q.set("intent", intent)
+    if (invitePath) q.set("invite", codeFromReturnPath(invitePath))
+    const qs = q.toString()
+    return qs ? `/login?${qs}` : "/login"
+  })()
   const [view, setView] = useState<View>(intent === "register" ? "admin" : "role-choice")
   // Google web-OAuth can't run inside the WKWebView — the shell uses the native
   // Google sheet instead, shown only once the iOS client ID is configured
@@ -350,7 +362,7 @@ function SignupContent() {
     if (!gradYearValid) { setMemberError("Please enter a valid graduation year."); return }
     setMemberLoading(true); setMemberError(null)
     const supabase = createClient()
-    const redirect = siteOrigin() + "/auth/callback?flow=signup"
+    const redirect = memberOauthRedirect(intent, invite)
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: memberEmail,
       password: memberPassword,
@@ -372,7 +384,7 @@ function SignupContent() {
     if (isNativeShell()) {
       setMemberError(null); setPending(SETTING_UP)
       const res = await signInWithGoogleNative("signup")
-      if (res.ok) { window.location.assign("/ministries?tab=code"); return }
+      if (res.ok) { window.location.assign(invitePath ?? "/ministries?tab=code"); return }
       setPending(null)
       if (res.error === "failed") setMemberError("Google sign-in didn't complete — please try again.")
       else if (res.error === "unavailable") setMemberError("Google sign-in needs the latest app version — update Central and try again.")
@@ -380,7 +392,7 @@ function SignupContent() {
     }
     setPending(SETTING_UP)
     const supabase = createClient()
-    await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback?flow=signup" } })
+    await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: memberOauthRedirect(intent, invite) } })
   }
 
   async function handleMemberApple() {
@@ -389,7 +401,7 @@ function SignupContent() {
       const res = await signInWithAppleNative("signup")
       // Mirrors the web callback's intent=join landing — a fresh member goes to
       // the join flow, never the marketing landing (hidden in the shell anyway).
-      if (res.ok) { window.location.assign("/ministries?tab=code"); return }
+      if (res.ok) { window.location.assign(invitePath ?? "/ministries?tab=code"); return }
       // TEMP DIAGNOSTIC: show the raw reason for EVERY non-unavailable failure
       // (previously no-account/canceled returned silently — the "frozen" bug).
       if (res.error !== "unavailable") { setPending(null); setMemberError(nativeAuthDebugMessage(res)); return }
@@ -397,7 +409,7 @@ function SignupContent() {
     }
     setPending(SETTING_UP)
     const supabase = createClient()
-    await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: siteOrigin() + "/auth/callback?flow=signup" } })
+    await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: memberOauthRedirect(intent, invite) } })
   }
 
   async function handleResend() {
@@ -443,6 +455,9 @@ function SignupContent() {
     // routeAfterNativeSignIn runs two queries before it navigates — cover them.
     setPending(SETTING_UP)
     if (pendingView === "admin") { window.location.assign("/onboarding"); return }
+    // This path self-routes and never reaches /auth/callback, so the invite has to be
+    // honoured here explicitly or a scanned link silently lands on /ministries.
+    if (invitePath) { window.location.assign(invitePath); return }
     await routeAfterNativeSignIn(supabase)
   }
 
@@ -455,7 +470,7 @@ function SignupContent() {
   const alreadyHaveAccount = (
     <span>
       Already have an account?{" "}
-      <Link href="/login" style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
+      <Link href={loginHref} style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">
         Sign in
       </Link>
     </span>
@@ -921,6 +936,17 @@ function SignupContent() {
       </PocketAuthScreen>
     </div>
   </>)
+}
+
+// URLSearchParams + allowlist, never concatenation (see the twin in login/page.tsx).
+function memberOauthRedirect(intent: string | null, invite: string | null): string {
+  const url = new URL("/auth/callback", siteOrigin())
+  url.searchParams.set("flow", "signup")
+  // Member paths only ever carry join; admin registration builds its own redirect.
+  if (intent === "join") url.searchParams.set("intent", intent)
+  const path = inviteReturnPath(invite)
+  if (path) url.searchParams.set("invite", codeFromReturnPath(path))
+  return url.toString()
 }
 
 export default function SignupPage() {

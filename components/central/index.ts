@@ -54,6 +54,8 @@ export { PullToRefreshIndicator } from "./pull-to-refresh-indicator"
 export { SwipeActionRow } from "./swipe-actions"
 export type { SwipeAction, SwipeSide } from "./swipe-actions"
 export { BackChevron } from "./back-chevron"
+export { RingCrossLogo } from "./ring-cross-logo"
+export { PendingVeil } from "./pending-veil"
 export { SuperSwitcher } from "./super-switcher"
 export {
   POCKET_KICKER_STYLE,
@@ -80,3 +82,5 @@ export {
   PocketTag,
   PocketFilterChipRow,
 } from "./pocket"
+export { ChatAvatar, chatAvatarLabel, type ChatAvatarMember } from "./chat-avatar"
+export { InviteShareModal } from "./invite-share-modal"

@@ -5,7 +5,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Menu, X, Lock, Plus, MessageCircle } from "lucide-react"
 import { getUserMinistries } from "@/app/actions/ministry"
-import { RingCrossLogo } from "@/app/home/components/shared"
+import { RingCrossLogo } from "@/components/central/ring-cross-logo"
+import { PendingVeil } from "@/components/central/pending-veil"
 import { createClient } from "@/lib/supabase"
 import { isNativeShell, isLikelyNativeShell } from "@/lib/native-push"
 
@@ -165,6 +166,10 @@ export default function LandingPage() {
   // (no delay). On the server there's no window → false, so SSR/web is byte-for-byte
   // unchanged and only the in-shell client hydration diverges (it redirects away at once).
   const [shellPending, setShellPending]   = useState<boolean>(isLikelyNativeShell)
+  // Pending label for the two exits off this page (sign out, open app). Set on
+  // click and NEVER cleared — both end in a navigation, and clearing would flash
+  // the marketing page back for the last frame.
+  const [pending, setPending]             = useState<string | null>(null)
 
   // ── Scroll (nav border). Closing the mobile menu on scroll happens HERE, in
   // the scroll handler, rather than in a separate scrolled→setMenuOpen effect
@@ -234,12 +239,25 @@ export default function LandingPage() {
 
 
   async function handleSignOut() {
+    setPending("Signing you out…")
     const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.assign("/")
+    // Always navigate, even if signOut() rejects. Network errors are RETURNED by
+    // auth-js, but a lock-acquire timeout REJECTS — and the veil is never cleared
+    // by design, so without this the user is stranded on an inert cream screen
+    // with no escape but a manual refresh. That is strictly worse than the static
+    // wait this replaced. Tradeoff on the failure path: if the session genuinely
+    // survived, proxy.ts bounces / back to /home. Confusing, but recoverable
+    // in one more tap (the storage lock is free after a document navigation),
+    // whereas an inert veil is not recoverable at all.
+    try {
+      await supabase.auth.signOut()
+    } finally {
+      window.location.assign("/")
+    }
   }
 
   function handleOpenApp() {
+    setPending("One moment…")
     if (ministryCount === 0) router.push("/ministries")
     else if (ministryCount !== null && ministryCount > 1) router.push("/pick-ministry")
     else router.push("/home")
@@ -254,6 +272,7 @@ export default function LandingPage() {
 
   return (
     <main style={{ minHeight: "100vh", background: CREAM, color: INK, fontFamily: SANS }}>
+      {pending && <PendingVeil label={pending} />}
 
       {/* ── NAV ── */}
       <nav className="cl-nav" style={{
@@ -351,7 +370,7 @@ export default function LandingPage() {
             &ldquo;To equip the saints for the work of ministry.&rdquo;
           </h1>
           <p style={{ fontSize: 18, color: BODY, lineHeight: 1.7, maxWidth: 620, margin: "26px auto 0" }}>
-            That&rsquo;s the whole job description. Central is the church OS for college ministry — messaging, planning, and roles built so that nothing administrative gets between your people and the work God gave them.
+            Central is the church OS for college ministry. Messaging, planning, and roles in one place, so the admin work stays out of the way of the people doing the ministry.
           </p>
           <div style={{ display: "flex", justifyContent: "center", gap: 18, marginTop: 34, flexWrap: "wrap" }}>
             <button onClick={() => router.push("/register-ministry")} className="cl-btn-primary" style={btnPrimary}>
@@ -372,7 +391,7 @@ export default function LandingPage() {
             fontFamily: SERIF, fontSize: "clamp(24px, 2.6vw, 32px)", fontWeight: 500,
             letterSpacing: "-0.01em", lineHeight: 1.4, color: INK, margin: "22px 0 0",
           }}>
-            None of this is the point. The roster isn&rsquo;t the point. The RSVP count isn&rsquo;t the point. They&rsquo;re scaffolding — so that the freshman who walked in three Sundays ago gets known, gets fed on Friday, and gets kept. We build software so the admin never becomes the ministry.
+            Most of a leader&rsquo;s week goes to admin. Rosters, sign-ups, reminders, three group chats and a spreadsheet. Central exists to take that work off their plate so they can spend their time on the students in front of them.
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 28 }}>
             <span style={{ width: 34, height: 1, background: PLUM }}/>
@@ -402,7 +421,7 @@ export default function LandingPage() {
                 Every room they need. Not one more.
               </h3>
               <p style={{ fontSize: 16, color: BODY, lineHeight: 1.7, margin: "14px 0 0" }}>
-                A student&rsquo;s chats are grouped by relationship — the whole church, their groups, their teams. Rooms appear when a leader adds you; there&rsquo;s nothing to join, mute, or browse. Team rooms stay locked to the people serving in them.
+                A student&rsquo;s chats are grouped by relationship: the whole church, their groups, their teams. Rooms appear when a leader adds you; there&rsquo;s nothing to join, mute, or browse. Team rooms stay locked to the people serving in them.
               </p>
             </div>
             <div className="cl-week-mock">
@@ -439,7 +458,7 @@ export default function LandingPage() {
                       <span style={ey({ size: 10 })}>Pinned</span>
                     </div>
                     <div style={{ fontFamily: SERIF, fontSize: 19, fontWeight: 600, marginTop: 8 }}>Welcome Week schedule</div>
-                    <div style={{ fontSize: 13, color: BODY, marginTop: 3 }}>Everything from move-in to Sunday lunch — share with your freshmen.</div>
+                    <div style={{ fontSize: 13, color: BODY, marginTop: 3 }}>Everything from move-in to Sunday lunch. Share with your freshmen.</div>
                   </div>
                   {/* event */}
                   <div style={{ border: `1px solid ${LINE2}`, borderRadius: 12, padding: "14px 18px" }}>
@@ -447,7 +466,7 @@ export default function LandingPage() {
                       <span style={ey({ size: 10 })}>Fri, Aug 21</span>
                       <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 10, letterSpacing: "1.4px", textTransform: "uppercase", background: IVORY, border: `1px solid ${LINE2}`, borderRadius: 999, padding: "3px 9px", color: PLUM }}>Event</span>
                     </div>
-                    <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 400, marginTop: 7 }}>Fall Retreat 2026 — registration open</div>
+                    <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 400, marginTop: 7 }}>Fall Retreat 2026: registration open</div>
                     <div style={{ display: "flex", alignItems: "center", marginTop: 10, paddingTop: 10, borderTop: `1px solid ${LINE3}` }}>
                       <span style={{ fontSize: 12, color: MUTED }}>61 going · 148 views</span>
                       <span style={{ marginLeft: "auto", background: PLUM, color: COD, borderRadius: 999, padding: "6px 16px", fontSize: 12, fontWeight: 600 }}>RSVP</span>
@@ -462,7 +481,7 @@ export default function LandingPage() {
                 Posted once. Actually seen.
               </h3>
               <p style={{ fontSize: 16, color: BODY, lineHeight: 1.7, margin: "14px 0 0" }}>
-                Announcements are a page, not a scroll — pinned posts stay pinned, events carry their own RSVP, and leaders can see who&rsquo;s coming and who hasn&rsquo;t looked. No re-posting across three apps.
+                Announcements are a page, not a scroll. Pinned posts stay pinned, events carry their own RSVP, and leaders can see who&rsquo;s coming and who hasn&rsquo;t looked. No re-posting across three apps.
               </p>
             </div>
           </div>
@@ -475,7 +494,7 @@ export default function LandingPage() {
                 Give a team exactly the keys it needs.
               </h3>
               <p style={{ fontSize: 16, color: BODY, lineHeight: 1.7, margin: "14px 0 0" }}>
-                Every team is a workspace with its own permissions — the finance team sees finances, the welcome team tracks visitors, nobody carries keys they don&rsquo;t need. And every team is <b style={{ color: INK, fontWeight: 600 }}>one click from its own group chat.</b>
+                Every team is a workspace with its own permissions. The finance team sees finances, the welcome team tracks visitors, nobody carries keys they don&rsquo;t need. And every team is <b style={{ color: INK, fontWeight: 600 }}>one click from its own group chat.</b>
               </p>
             </div>
             <div className="cl-week-mock">
@@ -558,7 +577,7 @@ export default function LandingPage() {
                 Every role in its place.
               </h3>
               <p style={{ fontSize: 16, color: BODY, lineHeight: 1.7, margin: "14px 0 0" }}>
-                Members, leaders, admins — one roster, one place to grant a role, and everything else follows: which chats appear, which teams unlock, who can announce. Students see a simple week; leaders see their people; staff see the whole flock.
+                Members, leaders, admins. One roster, one place to grant a role, and everything else follows: which chats appear, which teams unlock, who can announce. Students see a simple week; leaders see their people; staff see the whole flock.
               </p>
             </div>
           </div>
@@ -586,23 +605,6 @@ export default function LandingPage() {
               <div style={{ fontFamily: SERIF, fontSize: "clamp(28px, 3vw, 38px)", fontWeight: 600, color: COD, marginTop: 2 }}>Aug 23</div>
               <div style={{ fontSize: 13, color: cod(60), marginTop: 6 }}>10:00 AM</div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── §7 QUOTE BEAT ── */}
-      <section className="cl-quote" style={{ borderTop: `1px solid ${LINE}`, padding: "100px 0" }}>
-        <div className="cl-wrap" style={{ maxWidth: 760 }}>
-          <p style={{ ...ey(), margin: 0 }}>What we&rsquo;re building toward</p>
-          <p style={{
-            fontFamily: SERIF, fontSize: "clamp(22px, 2.4vw, 29px)", fontWeight: 500,
-            lineHeight: 1.45, letterSpacing: "-0.01em", color: INK, margin: "18px 0 0",
-          }}>
-            We&rsquo;re building Central so no leader spends Saturday night chasing sign-ups across four apps — and so the time that frees up gets spent praying over the names that matter: the ones we haven&rsquo;t seen in a while. That&rsquo;s the trade we&rsquo;re after.
-          </p>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 24 }}>
-            <span style={{ width: 34, height: 1, background: PLUM }}/>
-            <span style={{ fontSize: 14, color: BODY }}>The Central team</span>
           </div>
         </div>
       </section>
@@ -687,7 +689,6 @@ export default function LandingPage() {
           .cl-why { padding: 64px 0 !important; }
           .cl-week { padding: 64px 0 !important; }
           .cl-upnext-sec { padding: 64px 0 !important; }
-          .cl-quote { padding: 64px 0 !important; }
           .cl-sendoff { padding: 80px 0 !important; }
 
           .cl-week-row { grid-template-columns: 1fr !important; gap: 28px !important; padding: 40px 0 !important; }

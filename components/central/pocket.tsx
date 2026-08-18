@@ -177,10 +177,14 @@ export function PocketRowCard({ children, style }: { children: ReactNode; style?
 // SwipeActionRow).
 export function PocketRow({
   leading, title, titleAccessory, titleDim = false, sub, time, showDot = false, meta, chevron = false,
-  isLast = false, immersive = false, isFirst = false, onClick,
+  isLast = false, immersive = false, isFirst = false, ariaLabel, onClick, onPointerDown,
 }: {
   leading?: ReactNode
   title: string
+  /** Overrides the row's accessible name. Needed when the leading visual is
+   *  decorative (`aria-hidden`) but carries information the title doesn't — a
+   *  chat avatar cluster, whose members belong in the row's name instead. */
+  ariaLabel?: string
   titleAccessory?: ReactNode
   titleDim?: boolean
   sub?: string
@@ -192,16 +196,24 @@ export function PocketRow({
   immersive?: boolean
   isFirst?: boolean
   onClick: () => void
+  /** Fires on press, BEFORE the click resolves — the seam for warming whatever the
+   *  row is about to open. Purely a head-start hook: it must never be where the
+   *  row's actual behavior lives, because a press that ends in a scroll or a swipe
+   *  never becomes a click, so the caller is responsible for deciding whether a
+   *  given press has settled into a tap. */
+  onPointerDown?: () => void
 }) {
   return (
     <button
       onClick={onClick}
+      onPointerDown={onPointerDown}
       // `data-pocket-row` is how e2e/mobile-screen-sweep DISCOVERS screens. This is
       // the one drill-in primitive on phone width, so walking every row reachable
       // from a hub reaches every hub-and-spoke screen — the sweep never has to keep
       // a hand-written list of screen names in sync with the app, and a NEW section
       // is covered by the margin rules the day it ships.
       data-pocket-row={title}
+      aria-label={ariaLabel}
       style={{
         display: "flex", alignItems: "center", gap: immersive ? 14 : 12, width: "100%",
         background: "none", border: "none", textAlign: "left", cursor: "pointer",
@@ -484,7 +496,11 @@ export function PocketButton({
     borderRadius: 999, minHeight: compact ? 36 : 42, padding: "0 18px",
     fontFamily: "var(--serif)", fontSize: 13.5, fontWeight: 600,
     cursor: disabled ? "not-allowed" : "pointer", border: "none",
-    transition: "background var(--dur-fast), opacity var(--dur-fast)",
+    // No inline `transition` — `.press-scale` (app/globals.css) owns both the
+    // timing and the press, and it restates the exact background/opacity
+    // transition that used to live here. One owner keeps the reduced-motion
+    // guard (a media query, impossible inline) in force. The press transform
+    // itself is intentionally untransitioned, matching `.central-btn`.
   }
   let variantStyle: CSSProperties
   if (variant === "quiet") {
@@ -495,7 +511,10 @@ export function PocketButton({
     variantStyle = { background: "var(--plum)", color: "var(--cream-on-dark)", opacity: disabled ? 0.45 : 1 }
   }
   return (
-    <button type={type} onClick={onClick} disabled={disabled} style={{ ...base, ...variantStyle, ...style }}>
+    // `press-scale`: a phone has no hover, so without a :active state a tap on
+    // this button changes nothing at all until the action lands (Brian, on Sign
+    // out). Same scale(0.98) the .central-btn press has always used.
+    <button className="press-scale" type={type} onClick={onClick} disabled={disabled} style={{ ...base, ...variantStyle, ...style }}>
       {children}
     </button>
   )
