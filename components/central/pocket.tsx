@@ -489,7 +489,11 @@ export function PocketButton({
     borderRadius: 999, minHeight: compact ? 36 : 42, padding: "0 18px",
     fontFamily: "var(--serif)", fontSize: 13.5, fontWeight: 600,
     cursor: disabled ? "not-allowed" : "pointer", border: "none",
-    transition: "background var(--dur-fast), opacity var(--dur-fast)",
+    // No inline `transition` — `.press-scale` (app/globals.css) owns both the
+    // timing and the press, and it restates the exact background/opacity
+    // transition that used to live here. One owner keeps the reduced-motion
+    // guard (a media query, impossible inline) in force. The press transform
+    // itself is intentionally untransitioned, matching `.central-btn`.
   }
   let variantStyle: CSSProperties
   if (variant === "quiet") {
@@ -500,7 +504,10 @@ export function PocketButton({
     variantStyle = { background: "var(--plum)", color: "var(--cream-on-dark)", opacity: disabled ? 0.45 : 1 }
   }
   return (
-    <button type={type} onClick={onClick} disabled={disabled} style={{ ...base, ...variantStyle, ...style }}>
+    // `press-scale`: a phone has no hover, so without a :active state a tap on
+    // this button changes nothing at all until the action lands (Brian, on Sign
+    // out). Same scale(0.98) the .central-btn press has always used.
+    <button className="press-scale" type={type} onClick={onClick} disabled={disabled} style={{ ...base, ...variantStyle, ...style }}>
       {children}
     </button>
   )

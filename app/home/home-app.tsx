@@ -38,7 +38,7 @@ import { MinistryTimezoneProvider } from "./ministry-timezone-context"
 // the matching Item-2 skeleton where one exists, otherwise the shared Spinner.
 import { HomeTab } from "./tabs/home-tab"
 import { Spinner } from "./components/shared"
-import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ProfileTabSkeleton, CentralModal, SuperSwitcher, CentralButton, useScrollResetOn } from "@/components/central"
+import { AnnouncementsTabSkeleton, DirectoryTabSkeleton, ProfileTabSkeleton, CentralModal, SuperSwitcher, CentralButton, useScrollResetOn, PendingVeil } from "@/components/central"
 import type { CalendarEvent } from "./types"
 import type { DirectoryMember } from "./types"
 import { selfLeaveMinistry } from "@/app/actions/ministry"
@@ -1131,9 +1131,29 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     }
   }
 
+  const [signingOut, setSigningOut] = useState(false)
+
+  // Sign-out is a network round trip followed by a full document navigation, and
+  // until the veil it left the app sitting there looking like the tap missed.
+  // The veil goes up FIRST (before the await) and is never cleared: the page is
+  // navigating, and clearing it would flash the app back for the last frame.
+  // One owner for both viewports — the desktop rail item and the mobile Sign out
+  // PocketButton both call this.
   async function handleLogout() {
-    await supabase.auth.signOut()
-    window.location.assign("/login")
+    setSigningOut(true)
+    // Always navigate, even if signOut() rejects. Network errors are RETURNED by
+    // auth-js, but a lock-acquire timeout REJECTS — and the veil is never cleared
+    // by design, so without this the user is stranded on an inert cream screen
+    // with no escape but a manual refresh. That is strictly worse than the static
+    // wait this replaced. Tradeoff on the failure path: if the session genuinely
+    // survived, proxy.ts bounces /login back to /home. Confusing, but recoverable
+    // in one more tap (the storage lock is free after a document navigation),
+    // whereas an inert veil is not recoverable at all.
+    try {
+      await supabase.auth.signOut()
+    } finally {
+      window.location.assign("/login")
+    }
   }
 
   // Leaders reach Plan even with no team membership so the Receipts workspace stays
@@ -1630,6 +1650,12 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       <div className={composerOpen ? "contents max-md:hidden" : "contents"}>
         <SuperSwitcher variant="floating" profile={{ id: initialProfile.id, role: initialProfile.role }} />
       </div>
+
+      {/* Signing out — the shared pending veil (z 300, above every overlay in the
+          Z-Index table) so the wait is never a dead screen. Mounted here, at the
+          shell root, so it covers the desktop rail item and the mobile settings
+          button alike. */}
+      {signingOut && <PendingVeil label="Signing you out…" />}
 
       {/* Native cold-launch splash (self-gated: no-ops on web/desktop/warm nav, and
           releases the native launch splash even when it skips rendering). */}
