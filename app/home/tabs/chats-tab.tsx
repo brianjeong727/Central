@@ -3686,6 +3686,14 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
   // Header member summary — derived from the roster SWR (not memberReadMap, which is
   // empty in large rooms). Self first, then everyone else, to match prior ordering.
+  // A DM is a PAIR, not a room. The desktop header's roster cluster and
+  // "N members · names" line are group-chat furniture: for a two-person thread they
+  // restate the name you are already looking at. Mobile dropped them when DMs were
+  // separated from group chats; desktop renders its own header and never got the
+  // same treatment. A DRAFT DM counts too — its roster is empty, so it would have
+  // read "0 members".
+  const isDmThread = groupType === "dm" || !!draftRecipient
+
   const memberFirstNames = useMemo(() => {
     const self = roster.filter(m => m.id === userId).map(m => m.displayName.split(" ")[0])
     const others = roster.filter(m => m.id !== userId).map(m => m.displayName.split(" ")[0])
@@ -3828,7 +3836,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                     desktop keeps its 16/normal panel heading. */}
                 <h2 className="md:hidden truncate" style={{ ...POCKET_CHROME_TITLE }}>{displayName}</h2>
                 <h2 className="hidden md:block truncate leading-none text-[16px] font-normal" style={{ fontFamily: "var(--serif)", color: "var(--ink)", letterSpacing: "-0.01em" }}>{displayName}</h2>
-                <div className="hidden md:flex items-center flex-shrink-0">
+                <div className={`${isDmThread ? "hidden" : "hidden md:flex"} items-center flex-shrink-0`}>
                   {memberFirstNames.slice(0, 4).map((name, i) => (
                     <span
                       key={i}
@@ -3844,9 +3852,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                     >{name.charAt(0).toUpperCase()}</span>
                   ))}
                 </div>
-                <p className="hidden md:block text-[12px] text-[var(--muted-text)] truncate">
-                  {memberCount} member{memberCount !== 1 ? "s" : ""} · {memberFirstNames.slice(0, 8).join(", ")}
-                </p>
+                {!isDmThread && (
+                  <p className="hidden md:block text-[12px] text-[var(--muted-text)] truncate">
+                    {memberCount} member{memberCount !== 1 ? "s" : ""} · {memberFirstNames.slice(0, 8).join(", ")}
+                  </p>
+                )}
               </div>
             </div>
             {/* Desktop action buttons — Search + User only */}
