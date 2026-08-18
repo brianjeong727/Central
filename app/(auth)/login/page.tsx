@@ -120,7 +120,7 @@ function LoginContent() {
   async function handleGoogleLogin() {
     if (isNativeShell()) {
       setError(null); setPending(SIGNING_IN)
-      const res = await signInWithGoogleNative("signin")
+      const res = await signInWithGoogleNative("signin", { intent })
       if (!res.ok) {
         setPending(null)
         if (res.error === "no-account") { setNoAccountProvider("Google"); setMobileStep("form"); return }
@@ -130,9 +130,14 @@ function LoginContent() {
         setMobileStep("form")
         return
       }
-      if (intent === "register") { window.location.assign("/onboarding"); return }
-      if (intent === "join") { window.location.assign(invitePath ?? "/ministries"); return }
-      await routeAfterNativeSignIn(createClient())
+      // A scanned invite outranks the server-decided destination: the guard action
+      // resolves where this account normally lands, but it cannot know the user
+      // arrived from an invite link. invitePath is already validated.
+      if (invitePath) { window.location.assign(invitePath); return }
+      // The intent short-circuits and the routing queries that used to live here
+      // all moved into the guard action, which already had the authenticated
+      // user — one decision, made once, with no phone→Supabase round trip.
+      await routeAfterNativeSignIn(createClient(), res.destination)
       return
     }
     setPending(SIGNING_IN)
@@ -146,7 +151,7 @@ function LoginContent() {
   async function handleAppleLogin() {
     if (isNativeShell()) {
       setError(null); setPending(SIGNING_IN)
-      const res = await signInWithAppleNative("signin")
+      const res = await signInWithAppleNative("signin", { intent })
       if (!res.ok) {
         // `unavailable` = plugin missing from this binary; `not-entitled` =
         // ASAuthorizationError 1000, the binary isn't entitled for Sign in with
@@ -163,9 +168,10 @@ function LoginContent() {
         setMobileStep("form")
         return
       }
-      if (intent === "register") { window.location.assign("/onboarding"); return }
-      if (intent === "join") { window.location.assign(invitePath ?? "/ministries"); return }
-      await routeAfterNativeSignIn(createClient())
+      // Invite wins over the server-decided destination — see handleGoogleLogin.
+      if (invitePath) { window.location.assign(invitePath); return }
+      // Destination decided server-side by the guard action (see handleGoogleLogin).
+      await routeAfterNativeSignIn(createClient(), res.destination)
       return
     }
     await webAppleOAuth()
