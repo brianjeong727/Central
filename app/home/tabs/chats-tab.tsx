@@ -24,6 +24,10 @@ import { chatCapabilities } from "../chat-permissions"
 import { chatChipAvatarFromParts, chatAvatarStoragePath, chatGroupPhotoPatch } from "../chat-avatar"
 import { downscaleToJpeg } from "@/lib/downscale-image"
 import { subscribeChatTopic } from "../chat-broadcast"
+import {
+  MESSAGE_SELECT, THREAD_PAGE, readThread, fetchThread, forgetThread, threadEpoch,
+  writeThreadIfCurrent, enrichMessageRows, reactionsFromRows, mergeThread, replaceOptimistic,
+} from "../chat-thread-cache"
 import { MessageRow, formatFileSize } from "./message-row"
 import { Composer } from "./composer"
 import { ReportModal } from "../components/report-modal"
@@ -33,7 +37,9 @@ import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
 import { isChatManageRole, isLeaderRole } from "@/lib/roles"
 import { subscribeKeyboard, useSwipeDownToDismissKeyboard } from "@/lib/keyboard-inset"
+import { storagePathFromPublicUrl, removeStorageObject } from "@/lib/storage-cleanup"
 import { useBackIntent } from "@/lib/back-intent"
+import { attachmentStillReferenced } from "@/app/actions/attachment-refs"
 // Hoisted out of this file so the server-rendered list module (./chat-list-view)
 // can reach them without importing this ~3,900-line thread chunk.
 import { CHURCH_SECTION_DEFS, type ChurchSection } from "./chat-shared"
@@ -1164,6 +1170,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   async function handleLeave() {
     await supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `${userName.split(" ")[0]} left`, message_type: "system" })
     await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", userId)
+    // Same action, same consequence as the swipe-to-leave path in chat-actions.ts,
+    // so it must drop the cached transcript too — chat-permissions.ts exists
+    // precisely so these two can never diverge on what leaving means.
+    forgetThread(groupId)
     onClose()
   }
 
@@ -1186,6 +1196,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     if (isCentralChat) { setError("The ministry chat can't be deleted."); return }
     const { error: err } = await deleteGroup(groupId)
     if (err) { setError(err); return }
+    forgetThread(groupId)
     onClose()
   }
 
@@ -2042,9 +2053,10 @@ function MobileMemberRow({
   )
 }
 
-// Shared message select — used by the initial newest-50 load and the load-older
-// keyset page so both build identical enriched Message rows.
-const MESSAGE_SELECT = "id, group_id, sender_id, content, created_at, reply_to_id, message_type, is_edited, deleted, attachment_url, attachment_type, attachment_name, attachment_size, poll_id, profiles!sender_id(name, avatar_url), reply_to:reply_to_id(id, content, attachment_type, attachment_name, profiles!sender_id(name))"
+// MESSAGE_SELECT / THREAD_PAGE now live in chat-thread-cache.ts — the initial
+// load, the load-older page, and the background prefetch must all ask for the
+// SAME shape (reactions embedded included), and only one of the three has a
+// component around it.
 
 // Two adjacent messages render as one visual group when they're from the same
 // sender within a minute (never for system/poll rows).
@@ -2090,8 +2102,19 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       { revalidate: false },
     )
   }, [mutateGlobal, userId, ministryId, groupId, userName])
-  const [messages, setMessages] = useState<Message[]>([])
-  const [loading, setLoading] = useState(true)
+  // Instant paint from the thread cache (app/home/chat-thread-cache.ts). Read
+  // ONCE, in a lazy initializer, so a re-opened room renders its messages in the
+  // very first frame — no spinner, no round trip — and the mount fetch below
+  // revalidates behind them. `loading` is therefore only true for a room we have
+  // genuinely never seen; that is the whole "second open is instant" mechanism.
+  const [cachedThread] = useState(() => readThread(groupId))
+  // Whether THIS mount's thread fetch succeeded. The write-through must not cache
+  // a failed fetch's empty state as though it were a real, empty room.
+  const threadFetchOkRef = useRef(Boolean(cachedThread))
+  // The room's eviction epoch as of this mount — see writeThreadIfCurrent.
+  const threadEpochRef = useRef(0)
+  const [messages, setMessages] = useState<Message[]>(() => cachedThread?.messages ?? [])
+  const [threadLoading, setLoading] = useState(!cachedThread)
   const [sending, setSending] = useState(false)
   const [displayName, setDisplayName] = useState(groupName)
   // Re-seed the header name whenever the groupName prop changes (chat switch through
@@ -2108,7 +2131,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const [groupAvatarUrl, setGroupAvatarUrl] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
-  const [reactions, setReactions] = useState<Record<string, Reaction[]>>({})
+  const [reactions, setReactions] = useState<Record<string, Reaction[]>>(() => cachedThread?.reactions ?? {})
   const [emojiPickerFor, setEmojiPickerFor] = useState<string | null>(null)
   const [fullReactionPickerFor, setFullReactionPickerFor] = useState<string | null>(null)
   const [contextMenuFor, setContextMenuFor] = useState<string | null>(null)
@@ -2118,7 +2141,27 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const [editOriginalText, setEditOriginalText] = useState("")
   const [reportingMsg, setReportingMsg] = useState<Message | null>(null)
   // Own block list — hide blocked senders' messages (initial render + realtime).
-  const { blockedIds, mutate: mutateBlocks } = useBlocks(userId)
+  const { blockedIds, mutate: mutateBlocks, settled: blocksSettled } = useBlocks(userId)
+  // Blocked senders are filtered at RENDER time from `blockedIds`. Painting the
+  // transcript in the first frame made that a race the spinner used to hide: on
+  // the first chat opened in a session the block SWR is still cold, so a blocked
+  // person's messages would render until it resolved. Hold the paint until the
+  // block list is known — cold only ONCE per session (the key is shared with the
+  // create-chat flow and Profile → Blocked users, and the shell warms it at boot),
+  // so in practice it is already resolved. A user-safety filter must not be the
+  // thing that loses a race to a performance win.
+  //
+  // Gated on SETTLED, not on `isLoading`: SWR flips isLoading back to true for
+  // every error retry, so a failing user_blocks query would have held the whole
+  // transcript behind a spinner indefinitely rather than for one round trip.
+  //
+  // That means a persistently FAILING block query fails OPEN — the transcript
+  // paints with an empty block list. Deliberate: the alternative is a chat the
+  // user can never read at all, and this matches the behaviour before the cache
+  // existed (the filter has always degraded to "no blocks" when the lookup fails).
+  // What changed is only that the failure is now visible to SWR rather than
+  // swallowed inside the fetcher.
+  const loading = threadLoading || !blocksSettled
   const [forwardingMsg, setForwardingMsg] = useState<Message | null>(null)
   const [forwardGroups, setForwardGroups] = useState<{ id: string; name: string }[]>([])
   const [forwardSentTo, setForwardSentTo] = useState<string | null>(null)
@@ -2238,7 +2281,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const suppressScrollRef = useRef(false)
   // Upward (older-message) pagination — keyset cursor is the oldest loaded message.
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const [hasMore, setHasMore] = useState(true)
+  const [hasMore, setHasMore] = useState(cachedThread?.hasMore ?? true)
   const loadingOlderRef = useRef(false)
   const lastTypingSentRef = useRef(0)
   // On-demand "Seen by N" (large rooms only): point-in-time, never live.
@@ -2434,11 +2477,37 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const handleDeleteMessage = useCallback(async (msgId: string) => {
     setDeletingId(null)
     setContextMenuFor(null)
+    // Capture the attachment BEFORE anything nulls it — the optimistic write
+    // below and the row UPDATE both destroy the only copy of the path.
+    const doomed = messagesRef.current.find((m) => m.id === msgId)
+    const attachmentPath = storagePathFromPublicUrl(doomed?.attachment_url, "chat-attachments", groupId)
     setMessages((prev) => prev.map((m) => m.id === msgId ? { ...m, deleted: true, content: "", attachment_url: null, attachment_type: null, attachment_name: null, attachment_size: null } : m))
     setReactions((prev) => { const next = { ...prev }; delete next[msgId]; return next })
+
+    // Remove the file BEFORE nulling the pointer: a failed removal after the
+    // update leaves a live public URL nobody can ever find again, whereas a
+    // failed update after the removal is just a broken image the user can
+    // delete again. (lib/storage-cleanup.ts documents the full trade-off.)
+    if (attachmentPath && doomed?.attachment_url) {
+      // Forwarding copies attachment_url verbatim, so the object is SHARED —
+      // removing it would break every forwarded copy.
+      //
+      // This check MUST be server-side. A client query only sees chats this user
+      // belongs to, and a forward lives in the FORWARDER's chat — which the original
+      // sender usually is not in. Probed on real data: the client-side version of this
+      // guard saw 0 references when the truth was 2, removed the object, and the
+      // hidden forward started 404ing. It was not incomplete, it was wrong in the
+      // DEFAULT topology. attachmentStillReferenced() runs the count with the
+      // service-role client and fails CLOSED, so any error skips the removal.
+      const stillReferenced = await attachmentStillReferenced(doomed.attachment_url, msgId)
+      if (!stillReferenced) {
+        await removeStorageObject(supabase, "chat-attachments", attachmentPath, "message delete")
+      }
+    }
+
     await supabase.from("messages").update({ deleted: true, content: "", attachment_url: null, attachment_type: null, attachment_name: null, attachment_size: null }).eq("id", msgId).eq("sender_id", userId)
     await supabase.from("message_reactions").delete().eq("message_id", msgId)
-  }, [supabase, userId])
+  }, [supabase, userId, groupId])
 
   const handleDeletePoll = useCallback(async (msgId: string, pollId: string) => {
     setPollMenuFor(null)
@@ -2600,7 +2669,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     setPollCounts(prev => ({ ...prev, [pollRow.id]: opts.map(() => 0) }))
 
     const { data } = await supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: "", message_type: "poll", poll_id: pollRow.id }).select("id").single()
-    if (data) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m))
+    if (data) setMessages(prev => replaceOptimistic(prev, optimisticId, data.id))
 
     setPollQuestion("")
     setPollOptions(["", ""])
@@ -2670,7 +2739,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     }
     setMessages(prev => [...prev, optimisticMsg])
     supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: "", attachment_url: fullUrl, attachment_type: "image/gif" }).select("id").single()
-      .then(({ data }) => { if (data) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m)) })
+      .then(({ data }) => { if (data) setMessages(prev => replaceOptimistic(prev, optimisticId, data.id)) })
   }, [supabase, groupId, userId, userName])
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -2871,106 +2940,92 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     }
   }, [messages])
 
-  // Shared row→Message enrichment (initial load AND load-older). Side effect:
-  // populates profilesCache/avatarCache. Otherwise a pure transform.
-  const enrichRows = useCallback((rows: unknown[]): Message[] => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (rows as any[]).map((m: any) => {
-      const isSystem = m.message_type === "system"
-      const p = isSystem ? null : (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles)
-      const name = p?.name ?? (isSystem ? "" : "Unknown")
-      const avatarUrl = p?.avatar_url ?? null
-      if (m.sender_id) {
-        profilesCache.current[m.sender_id] = name
-        avatarCache.current[m.sender_id] = avatarUrl
-      }
+  // Row→Message enrichment is the pure `enrichMessageRows` in chat-thread-cache.ts
+  // (shared with the prefetch path, which has no component to hang a callback on).
+  // The profilesCache/avatarCache population it used to do as a side effect now
+  // rides on the `messages` effect above.
 
-      const replyRaw = m.reply_to ?? null
-      const replyProfile = replyRaw?.profiles
-        ? (Array.isArray(replyRaw.profiles) ? replyRaw.profiles[0] : replyRaw.profiles)
-        : null
-
-      return {
-        id: m.id, group_id: m.group_id, sender_id: m.sender_id,
-        content: m.content, created_at: m.created_at, sender_name: name,
-        sender_avatar_url: avatarUrl,
-        reply_to_id: m.reply_to_id ?? null,
-        reply_to_content: replyPreviewLabel(replyRaw?.content, replyRaw?.attachment_type, replyRaw?.attachment_name),
-        reply_to_sender: (replyProfile as { name: string } | null)?.name ?? null,
-        message_type: m.message_type ?? "user",
-        is_edited: (m as { is_edited?: boolean }).is_edited ?? false,
-        deleted: (m as { deleted?: boolean }).deleted ?? false,
-        attachment_url: (m as { attachment_url?: string | null }).attachment_url ?? null,
-        attachment_type: (m as { attachment_type?: string | null }).attachment_type ?? null,
-        attachment_name: (m as { attachment_name?: string | null }).attachment_name ?? null,
-        attachment_size: (m as { attachment_size?: number | null }).attachment_size ?? null,
-        poll_id: (m as { poll_id?: string | null }).poll_id ?? null,
-      }
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Merge a batch of reactions into the existing map (used by load-older).
-  const mergeReactionsFor = useCallback(async (messageIds: string[]) => {
-    if (messageIds.length === 0) return
-    const { data: rxData } = await supabase
-      .from("message_reactions")
-      .select("id, message_id, user_id, emoji")
-      .in("message_id", messageIds)
-    setReactions((prev) => {
-      const rxMap: Record<string, Reaction[]> = { ...prev }
-      for (const rx of ((rxData ?? []) as Reaction[])) {
-        const list = rxMap[rx.message_id] ? [...rxMap[rx.message_id]] : []
-        if (!list.find((r) => r.id === rx.id)) list.push(rx)
-        rxMap[rx.message_id] = list
-      }
-      return rxMap
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Initial load = NEWEST 50 (fetched desc, reversed to ascending for render).
+  // Initial load = NEWEST 50, in ONE round trip (reactions ride along embedded —
+  // see chat-thread-cache.ts). When the room was cached or prefetched its messages
+  // are ALREADY on screen by the time this runs, so this is a silent revalidation
+  // behind them rather than something the user waits on.
   useEffect(() => {
-    async function loadMessages() {
-      const { data } = await supabase
-        .from("messages")
-        .select(MESSAGE_SELECT)
-        .eq("group_id", groupId)
-        .order("created_at", { ascending: false })
-        .limit(50)
-
-      if (data) {
-        const enriched = enrichRows([...data].reverse())
-        setMessages(enriched)
-        setHasMore(data.length === 50)
-
-        // Load polls for any poll messages
-        const pollIds = enriched.filter(m => m.poll_id).map(m => m.poll_id!)
-        if (pollIds.length > 0) loadPollsData(pollIds)
-
-        // Load all reactions for these messages in one query
-        const messageIds = enriched.map((m) => m.id)
-        if (messageIds.length > 0) {
-          const { data: rxData } = await supabase
-            .from("message_reactions")
-            .select("id, message_id, user_id, emoji")
-            .in("message_id", messageIds)
-          const rxMap: Record<string, Reaction[]> = {}
-          for (const rx of ((rxData ?? []) as Reaction[])) {
-            if (!rxMap[rx.message_id]) rxMap[rx.message_id] = []
-            rxMap[rx.message_id].push(rx)
-          }
-          setReactions(rxMap)
-        }
-      }
-      setLoading(false)
-    }
     // Draft DM: there is no group yet, so there is nothing to load. Land in the
     // empty state immediately rather than firing a query against an empty id.
     if (!groupId) { setMessages([]); setLoading(false); return }
-    loadMessages()
+
+    // Captured BEFORE the fetch is issued. Sourced from the cached snapshot rather
+    // than live state on purpose: at this point the room's messages ARE the cache
+    // (realtime isn't subscribed yet and nothing else has written), so every id in
+    // here provably predates the request — which is exactly the guarantee the merge
+    // relies on. A brand-new DM has no snapshot, so its in-flight first message is
+    // correctly treated as having appeared after the request.
+    const knownBeforeFetch = new Set((readThread(groupId)?.messages ?? []).map((m) => m.id))
+    threadEpochRef.current = threadEpoch(groupId)
+    let cancelled = false
+    fetchThread(groupId)
+      .then((snap) => {
+        if (cancelled) return
+        threadFetchOkRef.current = true
+        // The server wins for the range it reports on; scrollback, live arrivals
+        // and an unsent send survive (mergeThread). `knownBeforeFetch` is what the
+        // room already had when the query went out, so anything outside it arrived
+        // afterwards and must be kept rather than read as a deletion.
+        setMessages((prev) => mergeThread(prev, snap.messages, knownBeforeFetch))
+        setReactions((prev) => {
+          // The window is authoritative for the messages it carries (a reaction
+          // removed elsewhere must disappear); rows outside it keep what they had.
+          const next = { ...prev }
+          for (const m of snap.messages) {
+            const rx = snap.reactions[m.id]
+            if (rx) next[m.id] = rx
+            else delete next[m.id]
+          }
+          return next
+        })
+        // Only the FIRST page's exhaustion is knowable here — once the user has
+        // paged upward, `hasMore` belongs to loadOlder and must not be reset.
+        if (messagesRef.current.length <= snap.messages.length) setHasMore(snap.hasMore)
+
+        const pollIds = snap.messages.filter(m => m.poll_id).map(m => m.poll_id!)
+        if (pollIds.length > 0) loadPollsData(pollIds)
+      })
+      .catch(() => { /* keep whatever is painted; realtime still delivers new rows */ })
+      .finally(() => { if (!cancelled) setLoading(false) })
+
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId])
+
+  // Write-through: keep the out-of-React snapshot current so the NEXT open of this
+  // room paints from it. Covers every route a thread changes by — initial load,
+  // realtime insert, optimistic send, edit, delete, reaction, load-older — because
+  // it watches the rendered state rather than each individual writer.
+  //
+  // Gated on the fetch having SUCCEEDED. A thrown fetch still releases `loading`
+  // (the user must not be left under a spinner forever), and without this guard
+  // that empty state was written to the cache as if it were a real, empty room —
+  // so the next open started with `loading` false and told the user the
+  // conversation was empty when the network had merely failed.
+  useEffect(() => {
+    if (!groupId || loading || !threadFetchOkRef.current) return
+    // Guarded, not a bare writeThread: if the user is REMOVED from a room they
+    // currently have open, nothing closes this screen, so the eviction lands and
+    // then the next reaction/arrival/send would put the transcript straight back.
+    writeThreadIfCurrent(groupId, { messages, reactions, hasMore, fetchedAt: Date.now() }, threadEpochRef.current)
+  }, [groupId, loading, messages, reactions, hasMore])
+
+  // Sender name/avatar caches, populated from whatever is on screen. This used to
+  // be a side effect inside the row-enrichment transform; it lives here now so the
+  // transform can stay pure (and run in a prefetch with no component around it).
+  // Realtime INSERTs still read these to avoid a per-message profile query.
+  useEffect(() => {
+    for (const m of messages) {
+      if (!m.sender_id) continue
+      profilesCache.current[m.sender_id] = m.sender_name
+      avatarCache.current[m.sender_id] = m.sender_avatar_url ?? null
+    }
+  }, [messages])
 
   // Load-older: keyset page on scroll-up. Cursor = oldest loaded message's
   // created_at (.lt). Prepends, preserves scroll position, and pulls the new
@@ -2991,10 +3046,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       .eq("group_id", groupId)
       .lt("created_at", oldest.created_at)
       .order("created_at", { ascending: false })
-      .limit(50)
+      .limit(THREAD_PAGE)
 
     if (data && data.length > 0) {
-      const enriched = enrichRows([...data].reverse())
+      const rows = [...data].reverse()
+      const enriched = enrichMessageRows(rows)
       // Suppress the auto-scroll-to-bottom effect: prepending grows the list but
       // the view must stay put (scroll position is restored below).
       suppressScrollRef.current = true
@@ -3006,9 +3062,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
       const pollIds = enriched.filter(m => m.poll_id).map(m => m.poll_id!)
       if (pollIds.length > 0) loadPollsData(pollIds)
-      mergeReactionsFor(enriched.map((m) => m.id))
+      // Reactions arrive embedded on the same rows — the older page costs one
+      // round trip now, not two (it used to chase the ids it had just fetched).
+      const pageReactions = reactionsFromRows(rows)
+      setReactions((prev) => ({ ...prev, ...pageReactions }))
 
-      if (data.length < 50) setHasMore(false)
+      if (data.length < THREAD_PAGE) setHasMore(false)
 
       // Restore scroll position after the prepended rows lay out.
       requestAnimationFrame(() => {
@@ -3020,7 +3079,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     }
     loadingOlderRef.current = false
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId, hasMore, enrichRows, mergeReactionsFor])
+  }, [groupId, hasMore])
 
   // Trigger load-older when the thread is scrolled near the top.
   const handleMessagesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -3181,7 +3240,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           // The messagesRef guard stays as defense-in-depth: ignore reactions for
           // messages not currently loaded in THIS chat (e.g. scroll-up messages not
           // yet paged in) — otherwise the map grows entries for unloaded messages.
-          // Reactions for later-loaded messages are fetched fresh by mergeReactionsFor.
+          // Reactions for later-loaded messages ride in embedded on their own page.
           if (!messagesRef.current.some((m) => m.id === rx.message_id)) return
           setReactions((prev) => {
             const list = prev[rx.message_id] ?? []
@@ -3366,7 +3425,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           attachment_url: publicUrl, attachment_type: attachment.type,
           attachment_name: attachment.name, attachment_size: attachment.size,
         }).select("id").single()
-        if (data) setMessages(prev => prev.map(m => m.id === optimisticId ? { ...m, id: data.id } : m))
+        if (data) setMessages(prev => replaceOptimistic(prev, optimisticId, data.id))
 
         // Send caption as a separate plain text message immediately after
         if (captionText) {
@@ -3382,7 +3441,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           const { data: capData } = await supabase.from("messages").insert({
             group_id: gid, sender_id: userId, content: captionText,
           }).select("id").single()
-          if (capData) setMessages(prev => prev.map(m => m.id === captionOptimisticId ? { ...m, id: capData.id } : m))
+          if (capData) setMessages(prev => replaceOptimistic(prev, captionOptimisticId, capData.id))
         }
       }
       setUploading(false)
@@ -3414,7 +3473,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     if (error) {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
     } else if (data) {
-      setMessages((prev) => prev.map((m) => m.id === optimisticId ? { ...m, id: data.id } : m))
+      setMessages((prev) => replaceOptimistic(prev, optimisticId, data.id))
     }
     setSending(false)
   }, [supabase, groupId, userId, userName, bumpChatListForOwnSend, modSettings, modIsChurch, modIsPersonal, modIsMinistryDefault, draftRecipient, onDmCreated])

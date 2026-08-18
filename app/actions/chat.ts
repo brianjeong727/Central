@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
+import { removeStorageFolder } from "@/lib/storage-cleanup"
 import { isChatManageRole, isLeaderRole } from "@/lib/roles"
 
 export async function deleteGroup(groupId: string): Promise<{ error: string | null }> {
@@ -45,6 +46,20 @@ export async function deleteGroup(groupId: string): Promise<{ error: string | nu
   // The ministry-wide central chat can never be deleted. Surface a friendly
   // message before hitting the DB (a BEFORE DELETE trigger is the hard backstop).
   if (group.is_central_chat) return { error: "The ministry chat can't be deleted." }
+
+  // Sweep the chat's attachments BEFORE the messages go: the rows are the only
+  // record of the object keys, and `chat-attachments` is a PUBLIC bucket, so
+  // anything left here keeps serving its URL forever. Uploads are keyed
+  // `${groupId}/…`, so the whole folder belongs to this chat. `.remove()` matches
+  // exact names, not prefixes — hence the list-then-remove sweep. Service-role
+  // client, so no DELETE policy is involved. Best-effort: a storage failure must
+  // not block the chat deletion the caller is authorised for.
+  //
+  // Known gap: a message FORWARDED out of this chat still points at these keys,
+  // so its image breaks. Accepted — the alternative is keeping every object of a
+  // deleted chat alive forever, and a forward pointing into a chat that no longer
+  // exists cannot be repaired from here anyway.
+  await removeStorageFolder(admin, "chat-attachments", groupId, "chat delete sweep")
 
   // Delete in FK-safe order
   const { data: msgs } = await admin.from("messages").select("id").eq("group_id", groupId)

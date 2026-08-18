@@ -18,6 +18,7 @@
 //     execution path with TODO(migration) for exactly this reason.
 
 import { createAdminClient } from "@/lib/supabase-admin"
+import { storagePathFromPublicUrl, removeStorageObject } from "@/lib/storage-cleanup"
 import { requireMinistryMember } from "./authz"
 import { ADMIN_ROLES, isAdminRole } from "@/lib/roles"
 
@@ -171,6 +172,36 @@ export async function deleteMyAccount(emailConfirmation: string): Promise<Delete
   //    scrub + row deletes are individual writes, then a separate auth API call.
   //    Every step is idempotent/retriable, so a partial failure surfaces an
   //    error and the caller can safely re-run (see build-report.md §Atomicity).
+
+  // (4a) Capture the avatar's storage path BEFORE the scrub — PROFILE_SCRUB
+  //      nulls avatar_url, and that column is the ONLY record of the object's
+  //      key (the extension varies: .png and .svg both exist in the bucket), so
+  //      after the scrub the file is unreachable forever in a PUBLIC bucket.
+  //      An OAuth avatar is an external URL and parses to null — nothing to do.
+  let avatarPath: string | null = null
+  {
+    const { data: me } = await admin
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", userId)
+      .maybeSingle()
+    const parsed = storagePathFromPublicUrl(me?.avatar_url, "profile-images")
+    // Uploads land at the bucket ROOT as `${userId}.${ext}` — assert exactly
+    // that shape rather than trusting a string that came out of a URL.
+    if (parsed && !parsed.includes("/") && parsed.startsWith(`${userId}.`)) avatarPath = parsed
+  }
+
+  // (4b) Remove the avatar file BEFORE the scrub nulls its pointer. Service-role
+  //      client, so no storage policy is involved (profile-images has no DELETE
+  //      policy at all). Best-effort: a storage failure must never strand a
+  //      deletion the user asked for — it logs the orphan and carries on.
+  //      Chat attachments are deliberately NOT removed here: the product promise
+  //      is that messages you sent stay in their chats as "Former member", and
+  //      removing their images would leave broken pictures in conversations that
+  //      are being kept on purpose.
+  if (avatarPath) {
+    await removeStorageObject(admin, "profile-images", avatarPath, "account deletion avatar")
+  }
 
   // (4) Scrub the profile into a tombstone (KEEP ministry_id so chat joins still
   //     resolve "Former member"; set deleted_at so member lists hide it).
