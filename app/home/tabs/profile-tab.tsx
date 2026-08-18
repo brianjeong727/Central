@@ -22,6 +22,8 @@ import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
 import { downscaleToJpeg } from "@/lib/downscale-image"
 import type { Profile, Devotional, Prayer, Verse, NotificationSettings } from "../types"
+import { cohortLabel, isYoungAdult } from "@/lib/cohort"
+import { setYoungAdult } from "@/app/actions/auto-chats"
 
 // Lazy — RoleDescriptionEditor pulls in @tiptap + yjs; keep that bundle off the
 // Profile tab's chunk until the user actually opens a journal editor.
@@ -1188,7 +1190,10 @@ export function ProfileTab({
     setProfile(p => ({ ...p, school_id: newId }))
   }
 
+  const [draftYoungAdult, setDraftYoungAdult] = useState(false)
+
   const startEdit = () => {
+    setDraftYoungAdult(isYoungAdult(profile.grade))
     setDraft({
       name: profile.name ?? "",
       graduation_year: String(profile.graduation_year ?? ""),
@@ -1247,6 +1252,18 @@ export function ProfileTab({
     }
     setNameError(null)
     setSaving(true)
+    // Cohort change is its own server action, not a column on this update: moving
+    // between "Class of X" and Young Adults also moves CHAT MEMBERSHIP, and a bare
+    // profiles write would leave someone labelled a young adult while still sitting
+    // in their class chat — the exact split that made the graduation flow look like
+    // it worked for months. Staged behind Save like every other field here
+    // (Convention #21), applied only when it actually changed.
+    const wasYoungAdult = isYoungAdult(profile.grade)
+    if (draftYoungAdult !== wasYoungAdult) {
+      const res = await setYoungAdult(draftYoungAdult)
+      if (res?.error) { setNameError(res.error); setSaving(false); return }
+      setProfile(prev => ({ ...prev, grade: draftYoungAdult ? "young_adult" : null }))
+    }
     const { data, error } = await supabase
       .from("profiles")
       .update({
@@ -1352,9 +1369,14 @@ export function ProfileTab({
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {PROFILE_SECTIONS.map(section => {
-          const filledFields = section.fields.filter(f => !!getFieldValue(f.key).trim())
-          if (!editing && filledFields.length === 0) return null
-          const fieldsToRender = editing ? section.fields : filledFields
+          // A young adult has no graduating class, so the year field is removed
+          // rather than left blank for them to wonder about.
+          const applicable = draftYoungAdult
+            ? section.fields.filter(f => f.key !== "graduation_year")
+            : section.fields
+          const filledFields = applicable.filter(f => !!getFieldValue(f.key).trim())
+          if (!editing && filledFields.length === 0 && !(section.id === "contact" && isYoungAdult(profile.grade))) return null
+          const fieldsToRender = editing ? applicable : filledFields
           return (
             <div key={section.id}>
               <p style={{ ...MONO_STYLE, marginBottom: 10, marginTop: 0 }}>{section.label}</p>
@@ -1394,6 +1416,35 @@ export function ProfileTab({
                     )}
                   </div>
                 ))}
+                {section.id === "contact" && (editing || isYoungAdult(profile.grade)) && (
+                  <div style={{ padding: "14px 18px", borderTop: `1px solid ${fieldDivider}` }}>
+                    <p style={monoFieldLabel}>Stage</p>
+                    {editing ? (
+                      <button
+                        type="button"
+                        onClick={() => setDraftYoungAdult(v => !v)}
+                        aria-pressed={draftYoungAdult}
+                        style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", minHeight: 32 }}
+                      >
+                        <span aria-hidden style={{
+                          width: 18, height: 18, flexShrink: 0, borderRadius: 5,
+                          border: `1px solid ${draftYoungAdult ? "var(--plum)" : "var(--line-2)"}`,
+                          background: draftYoungAdult ? "var(--plum)" : "transparent",
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          color: "var(--cream)", fontSize: 11, lineHeight: 1,
+                        }}>{draftYoungAdult ? "\u2713" : ""}</span>
+                        <span style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+                          <span style={{ fontSize: 14, color: "var(--ink)" }}>I&rsquo;m a young adult</span>
+                          <span style={{ fontSize: 12, color: "var(--muted-text)" }}>
+                            Moves you to the Young Adults chat.
+                          </span>
+                        </span>
+                      </button>
+                    ) : (
+                      <p style={{ fontSize: 14, color: "var(--ink)", margin: 0 }}>Young Adult</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )
@@ -1549,9 +1600,9 @@ export function ProfileTab({
                   <PocketTag label={roleLabel(profile.role, null)} variant="role" />
                   <span style={{ fontSize: 13, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.email}</span>
                 </div>
-                {(profile.graduation_year || (currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation)) && (
+                {(cohortLabel(profile.grade, profile.graduation_year) || (currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation)) && (
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 5 }}>
-                    {profile.graduation_year && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>Class of {profile.graduation_year}</span>}
+                    {cohortLabel(profile.grade, profile.graduation_year) && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{cohortLabel(profile.grade, profile.graduation_year)}</span>}
                     {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
                   </div>
                 )}
@@ -1693,7 +1744,7 @@ export function ProfileTab({
                 <h1 style={{ fontFamily: "var(--serif)", fontSize: 32, fontWeight: 400, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 8px", lineHeight: 1.05 }}>{profile.name}</h1>
               )}
               <div style={{ display: "flex", gap: 20, fontSize: 14, color: "var(--body)", flexWrap: "wrap", alignItems: "center" }}>
-                {profile.graduation_year && <span>Class of {profile.graduation_year}</span>}
+                {cohortLabel(profile.grade, profile.graduation_year) && <span>{cohortLabel(profile.grade, profile.graduation_year)}</span>}
                 {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation && <span>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
                 <span style={{ color: "var(--muted-text)" }}>{profile.email}</span>
               </div>

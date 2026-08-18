@@ -557,6 +557,9 @@ export interface DirectoryMember {
   id: string
   name: string
   graduation_year: number | null
+  /** `profiles.grade`. Only ever null or the young_adult sentinel today — always
+   *  read it through lib/cohort.ts, never compare the string at a call site. */
+  grade: string | null
   role: string
   avatar_url: string | null
 }

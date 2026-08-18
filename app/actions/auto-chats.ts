@@ -11,6 +11,7 @@ import {
   isAdminTier,
 } from "@/app/actions/authz"
 import { STAFF_ROLES, isStaffRole } from "@/lib/roles"
+import { YOUNG_ADULT, YOUNG_ADULTS_CHAT, cohortChatName, classChatName } from "@/lib/cohort"
 
 // Archived chats are STASH — replaced, never resurrected (a recurring room like
 // "Welcome Week Leads" gets a fresh chat each cycle; the old one keeps history).
@@ -77,6 +78,7 @@ export async function autoAddUserToChats(
   ministryId: string,
   graduationYear: number | null,
   userRole?: string | null,
+  grade?: string | null,
 ): Promise<void> {
   // Caller must belong to the ministry, and may only auto-add THEMSELVES
   // unless admin-tier (the join flows always pass the caller's own id).
@@ -101,7 +103,10 @@ export async function autoAddUserToChats(
   // DB, then resolve central (by flag) + those names in ONE read.
   const wantCentral = settings.auto_central_chat !== false
   const namesWanted: string[] = []
-  const className = settings.auto_grade_chats === true && graduationYear ? `Class of ${graduationYear}` : null
+  // Class of {year} OR Young Adults — cohortChatName owns that choice (lib/cohort.ts)
+  // so the join path, the graduation flow and the UI can never disagree about which
+  // chat a person belongs to or what it is called.
+  const className = settings.auto_grade_chats === true ? cohortChatName(grade, graduationYear) : null
   const staffChatName = settings.auto_staff_chat === true && isStaffRole(userRole) ? `${ministry.name} Staff` : null
   if (className) namesWanted.push(className)
   if (staffChatName) namesWanted.push(staffChatName)
@@ -602,6 +607,68 @@ export async function confirmSmallGroupChatsAction(
   }
 }
 
+
+// ── moveToCohortChat ──────────────────────────────────────────────────────────
+// Put a user in the church chat their cohort maps to, and take them out of the
+// other one. Used whenever the cohort CHANGES — graduating, or switching to /
+// from young adult by hand — so the two directions can never drift apart.
+//
+// This replaced a lookup for chats named "Senior Chat" and "Young Adult Chat".
+// Nothing has ever created either (class chats are "Class of {year}"), so the
+// graduation swap found nothing, skipped both branches, and left every graduating
+// senior in their old class chat with a profile that said young_adult. Names come
+// from lib/cohort.ts now — one source, so a second spelling cannot appear.
+//
+async function moveToCohortChat(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  ministryId: string,
+  grade: string | null,
+  graduationYear: number | null,
+): Promise<void> {
+  const joinName = cohortChatName(grade, graduationYear)
+  // The chat they should NO LONGER be in is the other side of the same choice.
+  const leaveName = joinName === YOUNG_ADULTS_CHAT
+    ? (graduationYear ? classChatName(graduationYear) : null)
+    : YOUNG_ADULTS_CHAT
+  if (!joinName && !leaveName) return
+
+  const wanted = [joinName, leaveName].filter((n): n is string => !!n)
+  const { data: chats } = await admin
+    .from("groups")
+    .select("id, name")
+    .eq("ministry_id", ministryId)
+    .eq("type", "church")
+    .in("name", wanted)
+    .or(NOT_ARCHIVED)
+  const rows = (chats ?? []) as { id: string; name: string }[]
+
+  const leaving = leaveName ? rows.find((g) => g.name === leaveName) : null
+  if (leaving) {
+    await admin.from("group_members").delete().eq("group_id", leaving.id).eq("user_id", userId)
+  }
+
+  if (!joinName) return
+  let joining = rows.find((g) => g.name === joinName)
+  // The destination must exist for the move to mean anything — whoever gets there
+  // first creates it, owned by the ministry founder like every other auto chat.
+  if (!joining) {
+    const { data: min } = await admin.from("ministries").select("created_by").eq("id", ministryId).single()
+    const { data: created } = await admin
+      .from("groups")
+      .insert({ name: joinName, type: "church", category: "general", ministry_id: ministryId, created_by: min?.created_by ?? null })
+      .select("id, name")
+      .single()
+    if (created) joining = created as { id: string; name: string }
+  }
+  if (joining) {
+    await admin.from("group_members").upsert(
+      [{ group_id: joining.id, user_id: userId }],
+      { onConflict: "group_id,user_id", ignoreDuplicates: true },
+    )
+  }
+}
+
 // ── respondToGradCheck ────────────────────────────────────────────────────────
 // Handles the senior graduation banner response.
 // graduated=true → moves to Young Adult Chat; graduated=false → clears flag only.
@@ -631,39 +698,17 @@ export async function respondToGradCheck(
     // Fetch user's ministry_id
     const { data: profile } = await admin
       .from("profiles")
-      .select("ministry_id")
+      .select("ministry_id, graduation_year")
       .eq("id", userId)
       .single()
 
     if (profile?.ministry_id) {
-      // Swap group_members: Senior Chat → Young Adult Chat
-      const { data: chats } = await admin
-        .from("groups")
-        .select("id, name")
-        .eq("ministry_id", profile.ministry_id)
-        .eq("type", "church")
-        .in("name", ["Senior Chat", "Young Adult Chat"])
-        .or(NOT_ARCHIVED)
-
-      const seniorChat = (chats ?? []).find((g: { name: string }) => g.name === "Senior Chat")
-      const youngAdultChat = (chats ?? []).find((g: { name: string }) => g.name === "Young Adult Chat")
-
-      if (seniorChat) {
-        await admin.from("group_members").delete()
-          .eq("group_id", seniorChat.id)
-          .eq("user_id", userId)
-      }
-      if (youngAdultChat) {
-        await admin.from("group_members").upsert(
-          [{ group_id: youngAdultChat.id, user_id: userId }],
-          { onConflict: "group_id,user_id", ignoreDuplicates: true }
-        )
-      }
+      await moveToCohortChat(admin, userId, profile.ministry_id, YOUNG_ADULT, profile.graduation_year ?? null)
     }
 
     const { error } = await admin
       .from("profiles")
-      .update({ grade: "young_adult", needs_grad_check: false, grade_updated_at: new Date().toISOString() })
+      .update({ grade: YOUNG_ADULT, needs_grad_check: false, grade_updated_at: new Date().toISOString() })
       .eq("id", userId)
 
     return { error: error?.message }
@@ -1277,4 +1322,43 @@ export async function backfillTeamChats(ministryId: string): Promise<{ created: 
     if (res.created) created++
   }
   return { created }
+}
+
+// ── setYoungAdult ─────────────────────────────────────────────────────────────
+// The by-hand counterpart to respondToGradCheck: a member declaring (or undoing)
+// young-adult status from their own profile. Two-way on purpose — a one-way flag
+// makes a mis-tap unfixable, and someone who ticks it by accident has no other
+// route back.
+//
+// Chat membership moves with the flag. Setting `grade` alone would leave the
+// person labelled a young adult while still sitting in "Class of 2027", which is
+// the exact split that made the graduation flow look like it worked.
+
+export async function setYoungAdult(isYoungAdultNow: boolean): Promise<{ error?: string }> {
+  const authz = await requireMinistryMember()
+  if (authz.error !== null) return { error: authz.error }
+
+  const admin = createAdminClient()
+  const userId = authz.userId
+
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("ministry_id, graduation_year")
+    .eq("id", userId)
+    .maybeSingle()
+  if (!profile?.ministry_id) return { error: "Profile not found." }
+
+  const grade = isYoungAdultNow ? YOUNG_ADULT : null
+
+  const { error } = await admin
+    .from("profiles")
+    // needs_grad_check is cleared either way — the person has just answered the
+    // question the banner asks, by hand.
+    .update({ grade, needs_grad_check: false, grade_updated_at: new Date().toISOString() })
+    .eq("id", userId)
+    .eq("ministry_id", profile.ministry_id)
+  if (error) return { error: error.message }
+
+  await moveToCohortChat(admin, userId, profile.ministry_id, grade, profile.graduation_year ?? null)
+  return {}
 }

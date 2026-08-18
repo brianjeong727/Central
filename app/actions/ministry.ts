@@ -4,6 +4,27 @@ import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
 import { requireSameMinistry, requireMinistryAdmin, isAdminTier } from "./authz"
 import { autoAddUserToChats, ensureMinistryChats } from "./auto-chats"
+import { YOUNG_ADULT } from "@/lib/cohort"
+
+/**
+ * The grade to write when a user joins a ministry, or null to leave it alone.
+ *
+ * Young-adult status is chosen on the SIGNUP form, but the profile row is created
+ * by the handle_new_user trigger, which copies only name / email / graduation_year
+ * — so the choice sits in auth metadata until the first join picks it up. An
+ * existing grade on the profile always wins: a returning member who has since been
+ * graduated (or who set it by hand) must not be reset by stale signup metadata.
+ *
+ * Only ever produces the young_adult sentinel; arbitrary metadata is never
+ * written through to the column.
+ */
+function resolveSignupGrade(
+  currentGrade: string | null | undefined,
+  metadata: Record<string, unknown> | undefined,
+): string | null {
+  if (currentGrade) return null
+  return metadata?.grade === YOUNG_ADULT ? YOUNG_ADULT : null
+}
 import { presetById } from "@/app/home/workspace-presets"
 import { ADMIN_ROLES, LEADER_ROLES, MEMBER_TIER, isAdminRole, isStaffRole } from "@/lib/roles"
 import { SUPER_UUID } from "./super-constants"
@@ -107,7 +128,7 @@ export async function joinMinistryByCode(
   // escalation) — so we resolve the role explicitly rather than leaving it untouched.
   const { data: currentProfile } = await admin
     .from("profiles")
-    .select("ministry_id, role, graduation_year")
+    .select("ministry_id, role, graduation_year, grade")
     .eq("id", user.id)
     .maybeSingle()
 
@@ -137,9 +158,16 @@ export async function joinMinistryByCode(
     role = existingUm ? (existingUm.role ?? "member") : "member"
   }
 
+  // Adopt the young-adult choice made at signup. It rides in auth metadata (the
+  // profile row is created by the handle_new_user trigger, which only copies name
+  // / email / graduation_year), so this is where it first reaches the profile —
+  // and it must land BEFORE autoAddUserToChats runs, since that is what decides
+  // between a class chat and Young Adults.
+  const grade = resolveSignupGrade(currentProfile.grade, user.user_metadata)
+
   const { data: updatedRows, error: updateErr } = await admin
     .from("profiles")
-    .update({ ministry_id: ministry.id, role })
+    .update({ ministry_id: ministry.id, role, ...(grade ? { grade } : {}) })
     .eq("id", user.id)
     .select("id")
 
@@ -153,7 +181,7 @@ export async function joinMinistryByCode(
     { onConflict: "user_id,ministry_id" }
   )
 
-  await autoAddUserToChats(user.id, ministry.id, currentProfile.graduation_year ?? null, role)
+  await autoAddUserToChats(user.id, ministry.id, currentProfile.graduation_year ?? null, role, grade)
 
   return { ministryName: ministry.name, error: null }
 }
@@ -227,7 +255,7 @@ export async function joinMinistryById(ministryId: string): Promise<{ error: str
   // never carry a previous ministry's admin role into this one.
   const { data: currentProfile } = await admin
     .from("profiles")
-    .select("ministry_id, role, graduation_year")
+    .select("ministry_id, role, graduation_year, grade")
     .eq("id", user.id)
     .maybeSingle()
 
@@ -239,6 +267,10 @@ export async function joinMinistryById(ministryId: string): Promise<{ error: str
   if (currentProfile.ministry_id === ministryId) {
     return { error: null }
   }
+
+  // Same as the code-join path: the young-adult choice made at signup lives in
+  // auth metadata until a join writes it onto the profile.
+  const publicJoinGrade = resolveSignupGrade(currentProfile.grade, user.user_metadata)
 
   // Restore the role from an existing membership row if this is a return;
   // otherwise it's a fresh join → "member".
@@ -252,7 +284,7 @@ export async function joinMinistryById(ministryId: string): Promise<{ error: str
 
   const { error: updateErr } = await admin
     .from("profiles")
-    .update({ ministry_id: ministryId, role })
+    .update({ ministry_id: ministryId, role, ...(publicJoinGrade ? { grade: publicJoinGrade } : {}) })
     .eq("id", user.id)
 
   if (updateErr) return { error: updateErr.message }
@@ -262,7 +294,7 @@ export async function joinMinistryById(ministryId: string): Promise<{ error: str
     { onConflict: "user_id,ministry_id" }
   )
 
-  await autoAddUserToChats(user.id, ministryId, currentProfile.graduation_year ?? null, role)
+  await autoAddUserToChats(user.id, ministryId, currentProfile.graduation_year ?? null, role, publicJoinGrade)
 
   return { error: null }
 }
@@ -402,8 +434,8 @@ export async function submitMinistryApplication(data: {
   // Create standard grade + central chats for the new ministry
   await ensureMinistryChats(ministry.id, data.name.trim(), user.id)
 
-  const { data: founderProfile } = await admin.from("profiles").select("graduation_year").eq("id", user.id).single()
-  await autoAddUserToChats(user.id, ministry.id, founderProfile?.graduation_year ?? null, founderRole)
+  const { data: founderProfile } = await admin.from("profiles").select("graduation_year, grade").eq("id", user.id).single()
+  await autoAddUserToChats(user.id, ministry.id, founderProfile?.graduation_year ?? null, founderRole, founderProfile?.grade ?? null)
 
   // Workspaces are NOT created here. The selected presets are stored on the
   // ministry (onboarding_workspaces) and created as empty workspaces only once
