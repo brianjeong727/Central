@@ -9,10 +9,14 @@ import { Spinner, RingCrossLogo } from "@/app/home/components/shared"
 import { MonogramChip } from "@/components/central/MonogramChip"
 import { PlanSubTabStrip } from "@/components/central/plan-sub-tab-strip"
 import { CentralButton } from "@/components/central/button"
-import { CentralModal } from "@/components/central"
+import { CentralModal, InviteShareModal } from "@/components/central"
 import { usePostJoinPickers, PostJoinPickerModals, SIZE_LABELS, ModalAction } from "./post-join-pickers"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { BackChevron } from "@/components/central/back-chevron"
+// maxLength on both code inputs is BOUND to the generator's length. A longer code with
+// a stale maxLength truncates on entry, and every manual join then fails with
+// "No ministry found with that invite code" — a bug with no visible cause.
+import { INVITE_CODE_LEN, isValidInviteCode } from "@/lib/invite-code"
 
 const SANS  = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
@@ -90,6 +94,8 @@ function MinistriesContent() {
   // Member invite codes per my-ministry (member-visible by rule change 2026-07-04),
   // so members can share their ministry's code without asking an admin.
   const [memberCodes, setMemberCodes] = useState<Record<string, string>>({})
+  // Share sheet for a ministry I belong to — member code only.
+  const [shareFor, setShareFor] = useState<{ code: string; name: string } | null>(null)
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null)
 
   // Gender + school pickers — every join path enforces the same
@@ -257,6 +263,13 @@ function MinistriesContent() {
     <>
 
       {/* ── Gender + school picker modals (shared across viewports; portaled) ── */}
+      {shareFor && (
+        <InviteShareModal
+          onClose={() => setShareFor(null)}
+          inviteCode={shareFor.code}
+          ministryName={shareFor.name}
+        />
+      )}
       <PostJoinPickerModals pickers={pickers} />
 
       {/* ── Staff role picker modal (CentralModal shell, §4.17) ── */}
@@ -421,6 +434,21 @@ function MinistriesContent() {
                           </span>
                         </button>
                       )}
+                      {/* Only for codes /j/ accepts — see the twin note in settings-tab. */}
+                      {isValidInviteCode(memberCodes[m.id]) && (
+                        <button
+                          type="button"
+                          onClick={() => setShareFor({ code: memberCodes[m.id], name: m.name })}
+                          style={{
+                            display: "inline-flex", alignItems: "center", marginTop: 4,
+                            padding: 0, background: "transparent", border: "none",
+                            cursor: "pointer", fontFamily: SANS,
+                            fontSize: 12, color: "var(--muted-text)",
+                          }}
+                        >
+                          Share link or QR
+                        </button>
+                      )}
                     </div>
                     <div style={{ marginLeft: "auto", flexShrink: 0 }}>
                       <button onClick={() => handleGoToMinistry(m.id)} disabled={switchingId === m.id} style={{
@@ -525,7 +553,7 @@ function MinistriesContent() {
                 value={inviteCode}
                 onChange={e => setInviteCode(e.target.value.toUpperCase())}
                 placeholder="MERCY24"
-                autoComplete="off" autoCapitalize="characters" maxLength={10}
+                autoComplete="off" autoCapitalize="characters" maxLength={INVITE_CODE_LEN}
                 style={{
                   width: "100%", padding: "16px 18px",
                   border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream)",
@@ -672,7 +700,7 @@ function MinistriesContent() {
                 <label style={{ display: "block", fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", color: "var(--muted-text)", textTransform: "uppercase", marginBottom: 7, paddingLeft: 4 }}>Invite code</label>
                 <input
                   value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
-                  placeholder="MERCY24" autoComplete="off" autoCapitalize="characters" maxLength={10}
+                  placeholder="MERCY24" autoComplete="off" autoCapitalize="characters" maxLength={INVITE_CODE_LEN}
                   style={{ width: "100%", minHeight: 52, border: "none", borderRadius: 16, background: "var(--ivory)", padding: "0 18px", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 20, letterSpacing: "3px", textTransform: "uppercase", color: "var(--ink)", outline: "none", boxSizing: "border-box" }}
                 />
                 <button type="submit" disabled={joiningCode || inviteCode.trim().length < 4} style={{

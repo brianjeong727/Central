@@ -7,12 +7,9 @@ import { autoAddUserToChats, ensureMinistryChats } from "./auto-chats"
 import { presetById } from "@/app/home/workspace-presets"
 import { ADMIN_ROLES, LEADER_ROLES, MEMBER_TIER, isAdminRole, isStaffRole } from "@/lib/roles"
 import { SUPER_UUID } from "./super-constants"
+import { generateInviteCode, normalizeCode, legacyLookupVariant } from "@/lib/invite-code"
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
-
-function generateInviteCode(): string {
-  return Math.random().toString(36).substring(2, 8).toUpperCase()
-}
 
 async function uniqueInviteCode(supabase: ReturnType<typeof createAdminClient>): Promise<string> {
   let code = generateInviteCode()
@@ -44,21 +41,37 @@ export async function joinMinistryByCode(
   if (authErr || !user) return { ministryName: null, error: "Not authenticated." }
 
   const admin = createAdminClient()
-  const code = inviteCode.trim().toUpperCase()
+  // Crockford input folding (I/L→1, O→0) so a code read off a poster or heard
+  // aloud still resolves. lib/invite-code.ts is the one definition of that rule.
+  const code = normalizeCode(inviteCode)
+
+  // LEGACY BRIDGE — remove once every stored code is rotated to the 10-char format.
+  // Pre-rotation codes are base36, which uses ALL 26 letters, so a stored code holding
+  // an I, L or O does not survive Crockford folding (~40.7% of six-char base36 codes
+  // contain one). Without this retry those ministries silently lose their invite code
+  // on the one path that still works for them — typing it.
+  const legacy = legacyLookupVariant(inviteCode)
+
+  const findBy = async (column: "invite_code" | "staff_invite_code") => {
+    const { data } = await admin
+      .from("ministries")
+      .select("id, name, status")
+      .eq(column, code)
+      .maybeSingle()
+    if (data || !legacy) return data
+    const { data: legacyHit } = await admin
+      .from("ministries")
+      .select("id, name, status")
+      .eq(column, legacy)
+      .maybeSingle()
+    return legacyHit
+  }
 
   // Check member code first
-  const { data: byMember } = await admin
-    .from("ministries")
-    .select("id, name, status")
-    .eq("invite_code", code)
-    .maybeSingle()
+  const byMember = await findBy("invite_code")
 
   // Check staff code if member code didn't match
-  const { data: byStaff } = !byMember ? await admin
-    .from("ministries")
-    .select("id, name, status")
-    .eq("staff_invite_code", code)
-    .maybeSingle() : { data: null }
+  const byStaff = !byMember ? await findBy("staff_invite_code") : null
 
   const ministry = byMember ?? byStaff
   const isStaff = !byMember && !!byStaff
