@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore
 import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Search, ChevronDown, ChevronUp, X, Check, Trash2, Plus, Users, Pencil, User, Forward, Pin, BellOff, Paperclip, FileDown, LinkIcon, ImageIcon, Folder, Camera } from "lucide-react"
+import { BellOff, Camera, Check, ChevronDown, ChevronUp, FileDown, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Pin, Plus, Search, Trash2, User, Users, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -12,7 +12,7 @@ import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames"
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
-import { MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE } from "@/components/central"
+import { ConfirmDialog, MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE } from "@/components/central"
 import { getOrCreateDm } from "../dm"
 import { isMobileViewport } from "@/lib/breakpoints"
 import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
@@ -461,6 +461,14 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   const [pendingNotifyMode, setPendingNotifyMode] = useState<ChatNotifyMode | null>(null)
   const [pendingMuted, setPendingMuted] = useState(false)
   const [pendingPinned, setPendingPinned] = useState(false)
+  // "Open to everyone in the ministry" — a chat property, not a per-user pref, so
+  // it lives on `groups`. Staged like every other settings control (Convention #21)
+  // and additionally confirmed, because publishing hands the chat's whole history
+  // to the ministry and there is no undoing that for the people who wrote it.
+  const [isOpen, setIsOpen] = useState(false)
+  const [pendingIsOpen, setPendingIsOpen] = useState(false)
+  const [groupCreatedBy, setGroupCreatedBy] = useState<string | null>(null)
+  const [confirmOpenChat, setConfirmOpenChat] = useState(false)
   // Church-chat SECTION ("Presets + reassign"): baseline mirrors groups.category,
   // pendingCategory is staged like mute/pin and committed on the same Save bar.
   const [category, setCategory] = useState<ChurchSection>("general")
@@ -555,7 +563,10 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           .maybeSingle(),
         supabase
           .from("groups")
-          .select("category, avatar_url")
+          // is_open/created_by drive the "open to the ministry" control: only the
+          // creator or a leader may flip it (a BEFORE UPDATE trigger enforces the
+          // same rule server-side — the UI must agree or it offers a 42501).
+          .select("category, avatar_url, is_open, created_by")
           .eq("id", groupId)
           .maybeSingle(),
         supabase
@@ -588,7 +599,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
           deleted: !!p?.deleted_at,
         }
       })
-      const groupRowTyped = groupRow as { category: string | null; avatar_url: string | null } | null
+      const groupRowTyped = groupRow as { category: string | null; avatar_url: string | null; is_open: boolean | null; created_by: string | null } | null
       const cat = groupRowTyped?.category
       const category: ChurchSection = cat === "team" ? "team" : cat === "group" ? "group" : "general"
       const avatarUrl = groupRowTyped?.avatar_url ?? null
@@ -600,6 +611,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         category,
         avatarUrl,
         globalMode,
+        isOpen: groupRowTyped?.is_open ?? false,
+        createdBy: groupRowTyped?.created_by ?? null,
       }
     }
   )
@@ -675,12 +688,15 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     setNotifyMode(settingsData.pref?.notify_mode ?? null)
     setCategory(settingsData.category)
     setChatAvatarUrl(settingsData.avatarUrl)
+    setIsOpen(settingsData.isOpen)
+    setGroupCreatedBy(settingsData.createdBy)
     if (!prefsSeeded.current) {
       prefsSeeded.current = true
       setPendingMuted(settingsData.pref?.muted ?? false)
       setPendingPinned(settingsData.pref?.pinned ?? false)
       setPendingNotifyMode(settingsData.pref?.notify_mode ?? null)
       setPendingCategory(settingsData.category)
+      setPendingIsOpen(settingsData.isOpen)
     }
   }, [settingsData])
 
@@ -854,7 +870,12 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // Sections are a church-chat concept, so this is church-manage specifically —
   // `canManage && isChurch` IS churchManage (a "my" chat is never church).
   const canReassignSection = canManage && isChurch && !isCentralChat
-  const prefsDirty = pendingMuted !== muted || pendingPinned !== pinned || pendingNotifyMode !== notifyMode || (canReassignSection && pendingCategory !== category)
+  // Publishing a chat exposes its whole history to the ministry, so it is NOT the
+  // same gate as canManage (which any member of a 'my' chat has). This mirrors the
+  // groups_guard_is_open BEFORE UPDATE trigger exactly — creator or leader-tier —
+  // because a UI that offered it more widely would just surface a raw 42501.
+  const canSetOpen = groupType === "my" && (userId === groupCreatedBy || isLeaderRole(userRole))
+  const prefsDirty = pendingMuted !== muted || pendingPinned !== pinned || pendingNotifyMode !== notifyMode || (canReassignSection && pendingCategory !== category) || (canSetOpen && pendingIsOpen !== isOpen)
 
   // Choosing a mode always writes an EXPLICIT per-chat value (never back to
   // NULL/inherit) and keeps `muted` in lockstep — the DB has a CHECK constraint
@@ -1000,7 +1021,8 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     const notifyChanged = pendingNotifyMode !== notifyMode
     const pinnedChanged = pendingPinned !== pinned
     const categoryChanged = canReassignSection && pendingCategory !== category
-    if (!mutedChanged && !notifyChanged && !pinnedChanged && !categoryChanged) return
+    const openChanged = canSetOpen && pendingIsOpen !== isOpen
+    if (!mutedChanged && !notifyChanged && !pinnedChanged && !categoryChanged && !openChanged) return
     setSavingPrefs(true)
     setPrefError(null)
     // Per-user prefs live on group_members; the SECTION lives on groups. Patch the
@@ -1030,6 +1052,13 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       const res = await supabase.from("groups").update({ category: pendingCategory }).eq("id", groupId).eq("ministry_id", ministryId)
       err = res.error
     }
+    if (!err && openChanged) {
+      // The DB trigger allows this only for the creator or a leader; canSetOpen
+      // mirrors it, so a 42501 here means the two drifted, not that the user
+      // did something wrong.
+      const res = await supabase.from("groups").update({ is_open: pendingIsOpen }).eq("id", groupId).eq("ministry_id", ministryId)
+      err = res.error
+    }
     if (err) {
       // Roll the cache + pending back to the saved baseline.
       patchChatListPref({ muted, pinned, category })
@@ -1037,6 +1066,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       setPendingPinned(pinned)
       setPendingNotifyMode(notifyMode)
       setPendingCategory(category)
+      setPendingIsOpen(isOpen)
       setPrefError("Couldn't save. Please try again.")
       setSavingPrefs(false)
       return
@@ -1046,11 +1076,22 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
       const label = CHURCH_SECTION_DEFS.find((s) => s.key === pendingCategory)?.label ?? "General"
       await supabase.from("messages").insert({ group_id: groupId, sender_id: userId, content: `Chat moved to ${label}`, message_type: "system" })
     }
+    if (openChanged) {
+      await supabase.from("messages").insert({
+        group_id: groupId,
+        sender_id: userId,
+        content: pendingIsOpen
+          ? `${userName} opened this chat — anyone in the ministry can now join`
+          : `${userName} closed this chat — it's invite-only again`,
+        message_type: "system",
+      })
+    }
     setMuted(pendingMuted)
     setPinned(pendingPinned)
     setNotifyMode(pendingNotifyMode)
     setCategory(pendingCategory)
-    mutateSettings((cur) => cur ? { ...cur, pref: { muted: pendingMuted, pinned: pendingPinned, notify_mode: pendingNotifyMode }, category: pendingCategory } : cur, { revalidate: false })
+    setIsOpen(pendingIsOpen)
+    mutateSettings((cur) => cur ? { ...cur, pref: { muted: pendingMuted, pinned: pendingPinned, notify_mode: pendingNotifyMode }, category: pendingCategory, isOpen: pendingIsOpen } : cur, { revalidate: false })
     setSavingPrefs(false)
   }
 
@@ -1218,6 +1259,21 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   }
 
   return (
+    <>
+      {/* Publishing is the one settings change that cannot be undone FOR OTHER
+          PEOPLE — the history they wrote becomes ministry-visible. So it names
+          that consequence before it happens (web_design_system §14). NOT `danger`:
+          consequential, not destructive. Closing a chat again needs no confirm —
+          it takes nothing away from anyone. */}
+      <ConfirmDialog
+        open={confirmOpenChat}
+        title="Open this chat to everyone?"
+        message={<>Anyone in the ministry will be able to find this chat, join it, and read everything already said in it. You can close it again later, but what people have already seen can&apos;t be unseen.</>}
+        confirmLabel="Open it"
+        danger={false}
+        onConfirm={() => { setPendingIsOpen(true); setConfirmOpenChat(false) }}
+        onClose={() => setConfirmOpenChat(false)}
+      />
     <SubpageShell
       title={showAddMembers ? addScreenTitle : "Settings"}
       crumbs={crumbs}
@@ -1547,6 +1603,24 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   <p className="flex-1 min-w-0 text-[15px] font-semibold" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>Pin chat</p>
                   <PocketSwitch checked={pendingPinned} onChange={() => setPendingPinned((v) => !v)} ariaLabel="Pin chat" />
                 </div>
+                {/* Turning this ON is confirmed; turning it OFF is not — closing a
+                    chat takes nothing away from anyone. */}
+                {canSetOpen && (
+                  <div className="flex items-start gap-3" style={{ padding: "13px 0" }}>
+                    <SettingsRowIcon><Globe style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[15px] font-semibold" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>Open to everyone</p>
+                      <p className="text-[13px] mt-0.5" style={{ color: "var(--muted-text)", lineHeight: 1.45 }}>
+                        Anyone in the ministry can find and join this chat.
+                      </p>
+                    </div>
+                    <PocketSwitch
+                      checked={pendingIsOpen}
+                      onChange={() => (pendingIsOpen ? setPendingIsOpen(false) : setConfirmOpenChat(true))}
+                      ariaLabel="Open to everyone in the ministry"
+                    />
+                  </div>
+                )}
               </PocketRowCard>
               {prefsDirty && (
                 <div className="flex items-center gap-2 mt-3">
@@ -1824,6 +1898,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         document.body
       )}
     </SubpageShell>
+    </>
   )
 }
 

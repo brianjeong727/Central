@@ -35,6 +35,9 @@ import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
 import { ChatAvatar, chatAvatarLabel, SegmentedControl, PocketSearchField, PocketRow, PocketKicker, POCKET_KICKER_STYLE, useScrollResetOn, SwipeActionRow, ConfirmDialog, Toast } from "@/components/central"
+import { Compass } from "lucide-react"
+import { fetchOpenGroups, openGroupsKey } from "@/app/home/open-groups"
+import { OpenGroupsBrowse } from "./open-groups-view"
 import { ChatSearchView } from "../components/chat-search"
 import { findExistingDm } from "../dm"
 import { formatChatListTime } from "../utils"
@@ -256,6 +259,12 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   // filter) so the two surfaces never share a stale query.
   const [mobileSearch, setMobileSearch] = useState("")
   const [searchOpen, setSearchOpen] = useState(false)
+  // Open-group discovery. Its OWN SWR key, not the chat-list key — this is the
+  // ministry's open rooms, most of which the user is not in, so it revalidates on
+  // its own cadence. The row counts only rooms you could actually join.
+  const [browseOpen, setBrowseOpen] = useState(false)
+  const { data: openGroups } = useSWR(openGroupsKey(ministryId), fetchOpenGroups)
+  const openGroupCount = (openGroups ?? []).filter((g) => !g.isMember).length
   const closeMobileSearch = useCallback(() => { setSearchOpen(false); setMobileSearch("") }, [])
 
   // Escape leaves search, mirroring the X.
@@ -485,6 +494,19 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
     setShowCreateChat("my")
   }
 
+  // Browse replaces the list entirely — it is a full-bleed push surface, so it
+  // gets edge-swipe-back for free from SubpageShell (Convention #22).
+  if (browseOpen) {
+    return (
+      <OpenGroupsBrowse
+        userId={userId}
+        ministryId={ministryId}
+        onBack={() => setBrowseOpen(false)}
+        onOpenChat={(id, name) => { setBrowseOpen(false); handleOpenChat(id, name) }}
+      />
+    )
+  }
+
   return (
     <div className="pb-2 md:pb-0 md:h-full md:flex md:flex-col">
       {/* Mobile chrome (B3 Pocket) — the scope switch IS the title. "Chats" as a
@@ -595,6 +617,29 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       <div className="px-5 md:px-4">
         <PushSubscribeCard userId={userId} ministryId={ministryId} notificationSettings={userProfile.notification_settings} variant="pocket" style={{ marginBottom: 16 }} />
       </div>
+
+      {/* Discovery, deliberately understated: ONE row, and only when there is
+          actually something to browse. An always-present row for an empty list is
+          the clutter this feature exists to avoid. */}
+      {openGroupCount > 0 && (
+        <PocketRow
+          immersive
+          isFirst
+          leading={
+            <div style={{
+              width: 46, height: 46, borderRadius: "var(--r-callout)", flexShrink: 0,
+              background: "var(--pocket-track)", display: "grid", placeItems: "center",
+            }}>
+              <Compass style={{ width: 20, height: 20, color: "var(--plum)" }} strokeWidth={1.7} />
+            </div>
+          }
+          title="Open groups"
+          sub={`${openGroupCount} group${openGroupCount === 1 ? "" : "s"} you can join`}
+          chevron
+          ariaLabel="Browse open groups"
+          onClick={() => setBrowseOpen(true)}
+        />
+      )}
 
       {loading ? (
         <Spinner />
