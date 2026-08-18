@@ -56,6 +56,8 @@ const AnnouncementDetailView = dynamic(() => import("./tabs/announcements-tab").
 // The module is small and SSR-clean; the heavy half (thread/settings/composer)
 // stays behind the dynamics below. See app/home/tabs/chat-list-view.tsx.
 import { ChatsTab, ChatListPanel } from "./tabs/chat-list-view"
+import { retainThreads, prefetchThread } from "./chat-thread-cache"
+import { useBlocks } from "./use-blocks"
 
 const ChatScreen = dynamic(() => import("./tabs/chats-tab").then(m => m.ChatScreen), { loading: () => <Spinner />, ssr: false })
 
@@ -104,6 +106,13 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // the list, and there is no mount fetch to duplicate.
   const [chatListData, setChatListData] = useState<ChatGroup[] | undefined>(initialChatList)
 
+  // Warm the shared ["user-blocks", userId] SWR from boot. ChatScreen filters
+  // blocked senders at render time and now holds its first paint until this
+  // resolves (see `loading` in chats-tab), so warming it here is what keeps that
+  // guard from costing a visible spinner. Mounted at the SHELL rather than on the
+  // chat list because a deep link straight to ?chat=<id> never renders the list.
+  useBlocks(userId)
+
   // Warm the chats THREAD chunk once the boot is quiet.
   //
   // The list no longer needs this — it is a static import and arrives as HTML.
@@ -119,11 +128,28 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // requestIdleCallback (not a timer) so this never competes with first paint or
   // hydration; the fallback timeout covers Safari, which still lacks rIC. Fire and
   // forget — a failed warm is a no-op, the tap just downloads it as before.
+  // The chunk warm above made the JS ready; it did not make the DATA ready, so a
+  // first open still paid two sequential round trips (~700ms of pure latency) into
+  // a spinner. The rooms a person actually opens are overwhelmingly the ones at the
+  // top of their own list, so warm those threads in the same idle window. After
+  // this, the FIRST open of a recent conversation paints from memory exactly like
+  // the second one does. Kept small (top rooms only) and TTL'd + deduped inside
+  // chat-thread-cache.ts, so this is a handful of indexed reads once per boot.
+  const PREFETCH_TOP_N = 5
+  const prefetchTopChatsRef = useRef<ChatGroup[] | undefined>(initialChatList)
+  useEffect(() => { prefetchTopChatsRef.current = chatListData ?? initialChatList }, [chatListData, initialChatList])
+
   useEffect(() => {
     let cancelled = false
     const warm = () => {
       if (cancelled) return
       void import("./tabs/chats-tab").catch(() => {})
+      // chat-thread-cache is already in the boot bundle (chat-list-view imports
+      // prefetchThread statically for its press-warm), so this is a plain call —
+      // a dynamic import here would only have implied a split that doesn't exist.
+      for (const g of (prefetchTopChatsRef.current ?? []).slice(0, PREFETCH_TOP_N)) {
+        prefetchThread(g.id)
+      }
     }
     const w = window as Window & {
       requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
@@ -153,6 +179,12 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       .select("group_id")
       .eq("user_id", userId)
     const ids = (data ?? []).map((r: { group_id: string }) => r.group_id).sort()
+    // Any room the user is no longer in loses its cached transcript here. This is
+    // the ONLY signal that covers being removed by an admin or a group deleted by
+    // someone else — neither of which the losing client can announce for itself,
+    // and neither of which the realtime DELETE payload can identify (see
+    // retainThreads). Without it a cached transcript outlives access to its room.
+    retainThreads(new Set(ids))
     setMemberGroupKey(ids.join(","))
   }, [userId])
   useEffect(() => { refreshMemberGroups() }, [refreshMemberGroups])

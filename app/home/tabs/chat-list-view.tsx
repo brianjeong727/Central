@@ -43,6 +43,36 @@ import { useNavState } from "../nav-state"
 import { fetchChatList } from "../chat-list"
 import { chatCapabilities } from "../chat-permissions"
 import { chatChipAvatar } from "../chat-avatar"
+import { prefetchThread } from "../chat-thread-cache"
+
+// Warm a chat's transcript only for a press that behaves like a TAP — one that
+// doesn't move. A press that turns into a scroll or a horizontal swipe never
+// becomes an open, so it must not pay for one. Deliberately tiny and local: the
+// press either settles (warm) or moves (cancel), and prefetchThread itself is
+// idempotent, TTL'd and failure-silent, so a double fire costs nothing.
+const WARM_SETTLE_MS = 90
+const WARM_MOVE_TOLERANCE_PX = 8
+function warmOnSettledPress(groupId: string) {
+  if (typeof window === "undefined") return
+  let startX = 0, startY = 0, moved = false
+  const onMove = (e: PointerEvent) => {
+    if (!startX && !startY) { startX = e.clientX; startY = e.clientY; return }
+    if (Math.abs(e.clientX - startX) > WARM_MOVE_TOLERANCE_PX || Math.abs(e.clientY - startY) > WARM_MOVE_TOLERANCE_PX) moved = true
+  }
+  const cleanup = () => {
+    window.removeEventListener("pointermove", onMove)
+    window.removeEventListener("pointerup", cleanup)
+    window.removeEventListener("pointercancel", cleanup)
+    clearTimeout(timer)
+  }
+  const timer = setTimeout(() => {
+    if (!moved) prefetchThread(groupId)
+    cleanup()
+  }, WARM_SETTLE_MS)
+  window.addEventListener("pointermove", onMove)
+  window.addEventListener("pointerup", cleanup)
+  window.addEventListener("pointercancel", cleanup)
+}
 import { setChatPinned, setChatMuted, setChatArchived, leaveChat } from "../chat-actions"
 import type { SwipeAction, SwipeSide } from "@/components/central/swipe-actions"
 import { PushSubscribeCard } from "../components/notifications"
@@ -131,6 +161,12 @@ function PocketChatRow({ group, isFirst, onClick }: { group: ChatGroup; isFirst:
       time={time}
       showDot={group.unread_count > 0 && !group.muted}
       onClick={onClick}
+      // Warm the thread on PRESS, so the fetch is in flight before the tap
+      // resolves and ChatScreen mounts. Gated on the press STAYING STILL: this row
+      // is wrapped in SwipeActionRow and sits in a scroller, so a bare pointerdown
+      // also fires for every flick-scroll and swipe-to-reveal — flicking down a
+      // 20-room list would have fired ~20 fifty-message queries on cellular.
+      onPointerDown={() => warmOnSettledPress(group.id)}
     />
   )
 }
@@ -731,7 +767,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
   const nameColor = group.counterpart_deleted ? "var(--muted-text)" : "var(--ink)"
 
   return (
-    <button onClick={onClick} className="w-full text-left group">
+    <button onClick={onClick} onPointerDown={() => prefetchThread(group.id)} className="w-full text-left group">
       {/* Mobile style */}
       <div className="md:hidden bg-[var(--cream-panel)] border border-[var(--line)] rounded-[18px] p-4 hover:bg-[#F5F0E8] transition-colors">
         <div className="flex items-center gap-3.5">
