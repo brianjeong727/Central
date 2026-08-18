@@ -1,0 +1,32 @@
+-- ═══ VERIFY (run all of these; do not assume) ════════════════════════════════
+-- select column_name, data_type, column_default, is_nullable from information_schema.columns
+--   where table_schema='public' and table_name='announcements' and column_name='requires_ack';
+--   -- expect: boolean, default true, NOT NULL
+-- select count(*) filter (where requires_ack) as asking, count(*) as total from public.announcements;
+--   -- expect asking = 0 immediately after apply (156 total)
+--
+-- select tablename, policyname, cmd, roles, qual, with_check from pg_policies
+--   where schemaname='public' and tablename in
+--     ('announcement_acknowledgements','announcement_views','rsvps') order by tablename, cmd;
+--   -- expect ack: exactly one INSERT + one SELECT, both to {authenticated}, no UPDATE/DELETE
+--
+-- select grantee, privilege_type from information_schema.role_table_grants
+--   where table_schema='public' and table_name='announcement_acknowledgements'
+--     and grantee in ('anon','authenticated');
+--   -- expect EXACTLY authenticated/SELECT and authenticated/INSERT
+--
+-- select proname, prosecdef, proconfig::text, proacl::text from pg_proc p
+--   join pg_namespace n on n.oid = p.pronamespace where n.nspname='public'
+--   and proname in ('announcement_ack_counts','announcement_view_counts','announcement_rsvp_counts',
+--                   'auth_ministry_id','auth_is_admin_or_leader');
+--   -- expect prosecdef=true and proconfig={"search_path=public, pg_temp"} on ALL FIVE
+--   -- (the repo's on-disk SQL for auth_is_admin_or_leader is STALE — trust this, not the file)
+--
+-- select indexname from pg_indexes where tablename='announcement_acknowledgements';
+--   -- expect the PK + announcement_acknowledgements_user_id_idx
+--
+-- Then the API-level probes from rls-review-design.md §"What the AFTER pass will
+-- probe" — in particular: member acks as another user → 42501; member reads
+-- another member's ack row → 0 rows; a SECOND "Got it" → OK [] not 42501;
+-- member/leader UPDATE or DELETE on an ack row → 42501 permission denied for
+-- table (i.e. the revokes landed), NOT "OK n=0".

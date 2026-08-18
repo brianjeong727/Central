@@ -21,26 +21,8 @@ export async function generateGroupsAction(
     return { groups: [], error: "Server configuration error." }
   }
 
-  // Group generation reads ministry-wide profile data — restrict to admin-tier
-  // or members of at least one team in the ministry (every legitimate generator
-  // — Student Org board, DGL president — is a team member).
-  if (!isAdminTier(authz.role)) {
-    const { data: ministryTeams } = await admin
-      .from("teams")
-      .select("id")
-      .eq("ministry_id", params.ministryId)
-    const teamIds = (ministryTeams ?? []).map((t: { id: string }) => t.id)
-    let onATeam = false
-    if (teamIds.length > 0) {
-      const { data: membership } = await admin
-        .from("team_members")
-        .select("id")
-        .in("team_id", teamIds)
-        .eq("user_id", authz.userId)
-        .limit(1)
-      onATeam = !!membership && membership.length > 0
-    }
-    if (!onATeam) return { groups: [], error: "Not authorized." }
+  if (!(await canGenerateGroups(admin, params.ministryId, authz.role, authz.userId))) {
+    return { groups: [], error: "Not authorized." }
   }
 
   // The announcement pool path joins profiles without a ministry filter —
@@ -111,6 +93,84 @@ export async function generateGroupsAction(
   } catch {
     return { groups: [], error: "Failed to generate groups." }
   }
+}
+
+// Group generation reads ministry-wide profile data — restrict to admin-tier or
+// members of at least one team in the ministry (every legitimate generator —
+// Student Org board, DGL president — is a team member).
+//
+// Extracted so generateGroupsAction and announcementRsvpPoolAction share ONE
+// predicate: they hand out the same data, and a gate that exists twice is a gate
+// that gets tightened in one place only.
+async function canGenerateGroups(
+  admin: ReturnType<typeof createAdminClient>,
+  ministryId: string,
+  role: string,
+  userId: string,
+): Promise<boolean> {
+  if (isAdminTier(role)) return true
+  const { data: ministryTeams } = await admin
+    .from("teams")
+    .select("id")
+    .eq("ministry_id", ministryId)
+  const teamIds = (ministryTeams ?? []).map((t: { id: string }) => t.id)
+  if (teamIds.length === 0) return false
+  const { data: membership } = await admin
+    .from("team_members")
+    .select("id")
+    .in("team_id", teamIds)
+    .eq("user_id", userId)
+    .limit(1)
+  return !!membership && membership.length > 0
+}
+
+// The RSVP pool for one announcement, for the group-generator wizard.
+//
+// WHY a server action: `rsvps` SELECT is now scoped (own row / show_attendees /
+// leader) so that "who ignored this" stops being one API call away for any
+// member. The wizard is gated on TEAM write access, not leader-tier, so reading
+// the pool from the browser would silently hand a legitimate DGL an empty list.
+// This is the same data, behind the same gate, that generateGroupsAction already
+// serves — the wizard just runs the algorithm client-side.
+export async function announcementRsvpPoolAction(params: {
+  ministryId: string
+  announcementId: string
+}): Promise<{ pool: PoolPerson[]; error?: string }> {
+  const authz = await requireSameMinistry(params.ministryId)
+  if (authz.error !== null) return { pool: [], error: authz.error }
+
+  let admin: ReturnType<typeof createAdminClient>
+  try {
+    admin = createAdminClient()
+  } catch {
+    return { pool: [], error: "Server configuration error." }
+  }
+
+  if (!(await canGenerateGroups(admin, params.ministryId, authz.role, authz.userId))) {
+    return { pool: [], error: "Not authorized." }
+  }
+
+  // The announcement must belong to THIS ministry — the join below reaches
+  // profiles without a ministry filter of its own.
+  const { data: ann } = await admin
+    .from("announcements")
+    .select("id")
+    .eq("id", params.announcementId)
+    .eq("ministry_id", params.ministryId)
+    .maybeSingle()
+  if (!ann) return { pool: [], error: "Announcement not found." }
+
+  const { data } = await admin
+    .from("rsvps")
+    .select("user_id, profiles(id, name, graduation_year, role, gender)")
+    .eq("announcement_id", params.announcementId)
+  const pool = ((data ?? []) as Record<string, unknown>[])
+    .map((r) => {
+      const p = r.profiles
+      return Array.isArray(p) ? p[0] : p
+    })
+    .filter(Boolean) as PoolPerson[]
+  return { pool }
 }
 
 // Writes SG mode results to small_groups + small_group_members, then triggers chat creation.

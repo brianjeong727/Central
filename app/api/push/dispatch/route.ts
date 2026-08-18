@@ -6,6 +6,7 @@ import { fcmReady, sendFcmNotification } from "@/lib/fcm"
 import { getMinistryTimezone } from "@/lib/ministry-timezone"
 import { formatInZone, resolveMinistryTimezone, todayInZone } from "@/lib/tz"
 import { isAdminRole } from "@/lib/roles"
+import { audienceScope } from "@/lib/announcement-audience"
 import type { NotificationSettings, ChatNotifyMode } from "@/app/home/types"
 
 export const runtime = "nodejs"
@@ -224,6 +225,25 @@ async function resolveMessage(
 }
 
 // ── Announcement recipients ──────────────────────────────────────────────────
+// The audience rule itself lives in lib/announcement-audience.ts (ONE copy,
+// shared with both feeds and the acknowledgment denominator); this is only its
+// PostgREST expression. Tombstoned profiles are excluded here — a deleted
+// account keeps its `profiles` row (name "Former member") and must never be
+// pushed to, counted in a denominator, or listed in a non-acknowledger roster.
+function announcementAudienceQuery(
+  admin: ReturnType<typeof createAdminClient>,
+  ann: { ministry_id: string; audience: string | null },
+) {
+  let query = admin
+    .from("profiles")
+    .select("id, notification_settings")
+    .eq("ministry_id", ann.ministry_id)
+    .is("deleted_at", null)
+  const scope = audienceScope(ann.audience)
+  if (scope.kind === "grad_year") query = query.eq("graduation_year", scope.gradYear)
+  return query
+}
+
 async function resolveAnnouncement(
   admin: ReturnType<typeof createAdminClient>,
   recordId: string,
@@ -235,16 +255,7 @@ async function resolveAnnouncement(
     .single()
   if (!ann || ann.status !== "published") return []
 
-  // Audience semantics mirror announcements-tab's read filter: null / "all" /
-  // "group" → whole ministry; a 4-digit year → only that graduating class.
-  let query = admin
-    .from("profiles")
-    .select("id, notification_settings")
-    .eq("ministry_id", ann.ministry_id)
-  if (ann.audience && /^\d{4}$/.test(ann.audience)) {
-    query = query.eq("graduation_year", parseInt(ann.audience, 10))
-  }
-  const { data: profs } = await query
+  const { data: profs } = await announcementAudienceQuery(admin, ann)
   if (!profs) return []
 
   const title = ann.title || "New announcement"
@@ -261,6 +272,59 @@ async function resolveAnnouncement(
         title,
         body,
         url: `/home?tab=announcements&ann=${ann.id}`,
+        tag: `announcement-${ann.id}`,
+      },
+    })
+  }
+  return results
+}
+
+// ── Announcement nudge ───────────────────────────────────────────────────────
+// "Remind the N who haven't acknowledged." Same audience filter and the same
+// author exclusion as the original publish — a nudge is a RE-SEND of a T1
+// announcement, not a new tier, so it rides the existing `announcements` pref
+// and needs no new one (taxonomy ratified 2026-07-12).
+//
+// Fired only by remindUnacknowledgedAction, which hard-caps it at 2 per
+// announcement ≥24h apart via the notification_ledger claim. The cap is
+// server-side because without one this becomes harassment and people mute the
+// announcements channel permanently.
+async function resolveAnnouncementNudge(
+  admin: AdminClient,
+  recordId: string,
+): Promise<Resolved[]> {
+  const { data: ann } = await admin
+    .from("announcements")
+    .select("id, ministry_id, title, body, audience, status, created_by")
+    .eq("id", recordId)
+    .single()
+  if (!ann || ann.status !== "published") return []
+
+  const [{ data: profs }, { data: ackRows }] = await Promise.all([
+    announcementAudienceQuery(admin, ann),
+    admin.from("announcement_acknowledgements").select("user_id").eq("announcement_id", ann.id),
+  ])
+  if (!profs) return []
+  const acked = new Set((ackRows ?? []).map((r: { user_id: string }) => r.user_id))
+
+  const title = ann.title || "Announcement"
+  // A reminder, never a reprimand — it is the same announcement, again.
+  const body = `Still waiting on you · ${firstLine(ann.body)}`
+  const results: Resolved[] = []
+  for (const p of profs) {
+    if (p.id === ann.created_by) continue
+    if (acked.has(p.id)) continue
+    const settings = (p.notification_settings as NotificationSettings) ?? {}
+    if (settings.announcements === false) continue
+    results.push({
+      userId: p.id,
+      reason: "announcement_nudge",
+      payload: {
+        title,
+        body,
+        url: `/home?tab=announcements&ann=${ann.id}`,
+        // Same tag as the publish push: a reminder REPLACES the original notice
+        // in the tray rather than stacking a second copy of the same thing.
         tag: `announcement-${ann.id}`,
       },
     })
@@ -987,6 +1051,7 @@ export async function POST(req: NextRequest) {
     if (event === "desk_digest") resolved = await resolveDeskDigest(admin)
     else if (table === "messages") resolved = await resolveMessage(admin, recordId)
     else if (table === "announcements" && event === "event_reminder") resolved = await resolveEventReminder(admin, recordId)
+    else if (table === "announcements" && event === "announcement_nudge") resolved = await resolveAnnouncementNudge(admin, recordId)
     else if (table === "announcements") resolved = await resolveAnnouncement(admin, recordId)
     else if (table === "receipts" && event === "receipt_decision") resolved = await resolveReceiptDecision(admin, recordId)
     else if (table === "receipts" && event === "receipt_submitted") resolved = await resolveReceiptSubmitted(admin, recordId)
