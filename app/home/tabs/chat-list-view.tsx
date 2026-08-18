@@ -1054,8 +1054,11 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
       </div>
 
       {searchOpen && (
-        <div className="flex-1 overflow-y-auto px-3 pb-3">
+        <div className="flex-1 overflow-y-auto pb-3">
+          {/* The sidebar keeps its own list grammar while searching — without this
+              the panel swapped into the phone-width Pocket card mid-interaction. */}
           <ChatSearchView
+            variant="desktop"
             query={search}
             chats={data ?? []}
             userId={userId}
