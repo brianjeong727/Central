@@ -156,16 +156,18 @@ export function OpenGroupsBrowse({
           subtitle slot, so it leads the body. Phone width keeps its shipped
           14.5/1.6 and its own gutter — the desktop body is what this redesign
           replaces. */}
+      {/* NO horizontal padding of its own: SubpageShell's body wrapper is
+          `w-full px-5 md:px-14`, so a `px-5` here stacked to 40px at phone width
+          (Convention #26 — a subpage owns exactly ONE 20px gutter). */}
       <p
-        className="px-5 md:px-0 md:pt-6 text-[14.5px] md:text-[15px] leading-[1.6] md:leading-[1.55] md:max-w-[56ch] md:text-pretty"
+        className="md:pt-6 text-[14.5px] md:text-[15px] leading-[1.6] md:leading-[1.55] md:max-w-[56ch] md:text-pretty"
         style={{ color: "var(--body)", margin: "0 0 18px" }}
       >
-        Chats anyone in the ministry can join. Tap one to join, and it shows up with your other
-        chats.
+        Chats anyone in the ministry can join.
       </p>
 
       {error && (
-        <p className="px-5 md:px-0 text-[13px]" style={{ color: "var(--danger)", margin: "0 0 14px" }} role="alert">
+        <p className="text-[13px]" style={{ color: "var(--danger)", margin: "0 0 14px" }} role="alert">
           {error}
         </p>
       )}
@@ -189,7 +191,7 @@ export function OpenGroupsBrowse({
           ))}
         </div>
       ) : groups.length === 0 ? (
-        <div className="px-5 md:px-0">
+        <div>
           <EmptyState
             icon={<Users style={{ width: 21, height: 21 }} strokeWidth={1.7} />}
             title="No open groups yet"
@@ -199,7 +201,13 @@ export function OpenGroupsBrowse({
       ) : (
         <>
           {/* ── Phone width — the shipped full-bleed immersive run ──────────── */}
-          <div className="md:hidden">
+          {/* FULL-BLEED: an `immersive` PocketRow owns the 20px screen gutter
+              itself, so its host must not also apply one. SubpageShell's body is
+              `px-5` at phone width, which inset the run to 350px and pushed row
+              content to 40px. `-mx-5` cancels exactly that; the kicker's own
+              `0 20px` margin then lands it back at the 20px gutter. Desktop is
+              untouched (`md:mx-0`, and this whole branch is md:hidden). */}
+          <div className="md:hidden -mx-5 md:mx-0">
             <PocketKicker label={countLabel} style={{ margin: "0 20px 8px" }} />
             {groups.map((g, i) => (
               <PocketRow
