@@ -329,8 +329,6 @@ export interface MessageRowProps {
   /** Present only on the row currently being edited. */
   editText?: string
   /** Present only when this row is a search match while search is active. */
-  highlightQuery?: string
-  isActiveSearchMatch: boolean
   // Per-row data slices (stable references for unchanged rows)
   reactions?: Reaction[]
   linkPreview?: LinkPreviewData

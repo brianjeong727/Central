@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore
 import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { BellOff, Camera, Check, ChevronDown, ChevronUp, FileDown, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Pin, Plus, Search, Trash2, User, Users, X } from "lucide-react"
+import { BellOff, Camera, Check, FileDown, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Pin, Plus, Search, Trash2, User, Users, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -2184,10 +2184,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const typingTimeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const myTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [searchMode, setSearchMode] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [searchMatchIndex, setSearchMatchIndex] = useState(0)
-  const searchInputRef = useRef<HTMLInputElement>(null)
   const [pinnedMessageId, setPinnedMessageId] = useState<string | null>(null)
   const [pinnedMessage, setPinnedMessage] = useState<{ id: string; content: string; sender_name: string; attachment_url?: string | null; attachment_type?: string | null; attachment_name?: string | null } | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
@@ -2345,13 +2341,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // Link previews
   const [linkPreviews, setLinkPreviews] = useState<Record<string, LinkPreviewData>>({})
 
-  const searchMatches = useMemo(() => {
-    if (!searchQuery.trim()) return []
-    const q = searchQuery.toLowerCase().trim()
-    return messages
-      .filter(m => !m.deleted && m.content.toLowerCase().includes(q))
-      .map(m => m.id)
-  }, [messages, searchQuery])
 
   // Church-chat moderation (delete others' messages/polls, pin) is now "in-chat
   // leader-or-above": a leader-tier role (incl. pastor) AND membership of THIS chat,
@@ -3150,7 +3139,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   // keyboard state through a hook instead would re-render this whole component on every
   // step of the keyboard's slide — stutter in the exact frames that must stay smooth.
   useEffect(() => {
-    if (loading || searchMode) return
+    if (loading) return
     let frame = 0
     let settled = 0
     const stop = subscribeKeyboard(({ open }) => {
@@ -3163,7 +3152,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       settled = window.setTimeout(() => scrollToBottom(false), 320)
     })
     return () => { stop(); cancelAnimationFrame(frame); window.clearTimeout(settled) }
-  }, [loading, searchMode, scrollToBottom])
+  }, [loading, scrollToBottom])
 
   // Realtime — all chat events for this thread flow through the shared private-broadcast
   // hub (chat:{groupId}): new messages (INSERT), edits + unsends/soft-deletes (UPDATE),
@@ -3326,17 +3315,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
   // Auto-scroll only when messages are added, not on deletions/edits
   useEffect(() => {
-    if (!searchMode && !suppressScrollRef.current && messages.length > prevMsgCountRef.current) scrollToBottom()
+    if (!suppressScrollRef.current && messages.length > prevMsgCountRef.current) scrollToBottom()
     suppressScrollRef.current = false
     prevMsgCountRef.current = messages.length
-  }, [messages, scrollToBottom, searchMode])
-
-  // Scroll to the current search match
-  useEffect(() => {
-    if (searchMatches.length === 0) return
-    const matchId = searchMatches[searchMatchIndex]
-    if (matchId) messageRefs.current[matchId]?.scrollIntoView({ behavior: "smooth", block: "center" })
-  }, [searchMatchIndex, searchMatches])
+  }, [messages, scrollToBottom])
 
   // Throttled typing broadcast — the realtime channel lives here in ChatScreen;
   // <Composer> calls this on every input change. Stable for the memoized child.
@@ -3601,29 +3583,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     }
   }, [latestOwnMsg, seenByOpen, seenByList, supabase, groupId, userId, displayNameById])
 
-  function openSearch() {
-    setSearchMode(true)
-    setSearchQuery("")
-    setSearchMatchIndex(0)
-    setTimeout(() => searchInputRef.current?.focus(), 50)
-  }
-
-  function closeSearch() {
-    setSearchMode(false)
-    setSearchQuery("")
-    setSearchMatchIndex(0)
-  }
-
-  function goToNextMatch() {
-    if (searchMatches.length === 0) return
-    setSearchMatchIndex(i => (i + 1) % searchMatches.length)
-  }
-
-  function goToPrevMatch() {
-    if (searchMatches.length === 0) return
-    setSearchMatchIndex(i => (i - 1 + searchMatches.length) % searchMatches.length)
-  }
-
   const handleReact = useCallback(async (messageId: string, emoji: string) => {
     setEmojiPickerFor(null)
     // Read reactions through the ref (synced above) so this callback stays
@@ -3668,7 +3627,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   }, [supabase, userId])
 
   // O(1) per-row search-match lookup for the memoized rows.
-  const searchMatchSet = useMemo(() => new Set(searchMatches), [searchMatches])
 
   // Per-message resolved link preview — each row receives ONE object (or
   // undefined) instead of the whole linkPreviews map, so an unrelated preview
@@ -3765,45 +3723,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
       {/* ── Top bar ── */}
       <div className={`flex-shrink-0 flex items-center gap-3 px-5 md:px-6 ${inline ? "py-3 md:pt-5 md:pb-3" : "pt-[calc(env(safe-area-inset-top)+12px)] pb-3 md:py-3.5 md:border-b md:border-[var(--line)]"} bg-[var(--cream)]`}>
-        {searchMode ? (
-          <>
-            {/* Search bar mode */}
-            <button
-              onClick={closeSearch}
-              style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "grid", placeItems: "center", flexShrink: 0 }}
-            >
-              <X size={14} />
-            </button>
-            <input
-              ref={searchInputRef}
-              value={searchQuery}
-              onChange={e => { setSearchQuery(e.target.value); setSearchMatchIndex(0) }}
-              onKeyDown={e => {
-                if (e.key === "Escape") closeSearch()
-                else if (e.key === "Enter") { e.preventDefault(); goToNextMatch() }
-                else if (e.key === "ArrowDown") { e.preventDefault(); goToNextMatch() }
-                else if (e.key === "ArrowUp") { e.preventDefault(); goToPrevMatch() }
-              }}
-              placeholder="Search messages…"
-              className="flex-1 bg-transparent outline-none text-[14px] text-[var(--ink)] placeholder:text-[var(--faint)] min-w-0"
-            />
-            {searchQuery.trim() && (
-              <span style={{ fontSize: "12px", color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>
-                {searchMatches.length === 0 ? "No results" : `${searchMatchIndex + 1} / ${searchMatches.length}`}
-              </span>
-            )}
-            {searchMatches.length > 0 && (
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <button onClick={goToPrevMatch} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "grid", placeItems: "center" }}>
-                  <ChevronUp size={12} />
-                </button>
-                <button onClick={goToNextMatch} style={{ width: 28, height: 28, borderRadius: 6, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "grid", placeItems: "center" }}>
-                  <ChevronDown size={12} />
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
+        {(
           <>
             {!inline && <BackChevron onClick={onClose} className="md:hidden" />}
             {/* Group avatar — 40px on mobile (Pocket chat header), 32px on the
@@ -3861,9 +3781,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             </div>
             {/* Desktop action buttons — Search + User only */}
             <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
-              <button onClick={openSearch} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "grid", placeItems: "center" }}>
-                <Search size={14} />
-              </button>
               <button onClick={() => setShowSettings(true)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "grid", placeItems: "center" }}>
                 <User size={14} />
               </button>
@@ -3951,8 +3868,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   isPollMenuOpen={pollMenuFor === msg.id}
                   isPinned={pinnedMessageId === msg.id}
                   editText={editingId === msg.id ? editText : undefined}
-                  highlightQuery={searchMode && searchQuery.trim() && searchMatchSet.has(msg.id) ? searchQuery : undefined}
-                  isActiveSearchMatch={searchMatches[searchMatchIndex] === msg.id}
                   reactions={reactions[msg.id]}
                   linkPreview={previewByMsgId[msg.id]}
                   readReceipts={readReceiptMap[msg.id]}
