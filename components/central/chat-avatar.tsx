@@ -97,7 +97,6 @@ export function ChatAvatar({
   avatarUrl,
   members = [],
   otherCount = 0,
-  nameIsGenerated = false,
   isCentral = false,
   surface = "var(--cream)",
   className = "",
@@ -112,6 +111,8 @@ export function ChatAvatar({
   members?: ChatAvatarMember[]
   /** Total members excluding the viewer — drives the arrangement and the count. */
   otherCount?: number
+  /** No longer read: a group chat's avatar is its people regardless of how the
+   *  title was produced. Kept so existing callers still type-check. */
   nameIsGenerated?: boolean
   /** groups.is_central_chat — the ministry-wide room every member is auto-enrolled
    *  in. It gets a church mark instead of a letter: it is the most important chat
@@ -125,12 +126,38 @@ export function ChatAvatar({
   className?: string
   style?: CSSProperties
 }) {
-  const solo = !nameIsGenerated || otherCount <= 1 || members.length === 0
+  // A group chat's avatar is its PEOPLE. It used to be the cluster only when the
+  // title had been auto-assembled from member names; a typed name fell back to that
+  // name's first letter, which spends the whole chip repeating the label printed
+  // beside it. Faces are the one thing the row does not already say.
+  //
+  // `nameIsGenerated` no longer decides anything here — it stays in the props
+  // because callers pass it and the chat list still uses it elsewhere.
+  //
+  // Solo remains for the two cases with nothing to show: a chat whose only other
+  // member is one person (show THAT person, not a one-face "cluster"), and one with
+  // no other members at all (nothing to draw, so fall back to the title letter).
+  const solo = otherCount <= 1 || members.length === 0
+
+  // A chat's OWN photo wins over everything — the cluster, the single face, the
+  // letter and the church mark. It is the most deliberate identity the chat has,
+  // because somebody chose it. (For a DM this is the partner's profile photo,
+  // resolved upstream by chatChipAvatar.)
+  if (avatarUrl) {
+    return (
+      <MonogramChip
+        initials={title.charAt(0).toUpperCase()}
+        avatarUrl={avatarUrl}
+        className={className}
+        style={{ width: size, height: size, flexShrink: 0, fontFamily: "var(--serif)", fontSize: Math.round(size * 0.35), fontWeight: 600, ...style }}
+      />
+    )
+  }
 
   // The ministry-wide room. Deliberately NOT a cluster: it holds everyone, so
   // faces would be two people and "+200" — less identity than none. A photo
   // replaces the mark the moment one is set.
-  if (isCentral && !avatarUrl) {
+  if (isCentral) {
     return (
       <span
         className={className}
@@ -146,13 +173,13 @@ export function ChatAvatar({
   }
 
   if (solo) {
-    // A named chat shows its title's letter; an unnamed one that has emptied out
-    // to a single other person shows THAT person.
-    const one = !nameIsGenerated ? null : members[0]
+    // One other person → show them. Nobody → the title's letter, which is all
+    // that is left. A group photo (avatarUrl) still wins over both.
+    const one = members[0] ?? null
     return (
       <MonogramChip
         initials={one ? initialsOf(one.name) : title.charAt(0).toUpperCase()}
-        avatarUrl={one ? one.avatar_url : avatarUrl}
+        avatarUrl={one?.avatar_url ?? null}
         className={className}
         style={{ width: size, height: size, flexShrink: 0, fontFamily: "var(--serif)", fontSize: Math.round(size * 0.35), fontWeight: 600, ...style }}
       />
