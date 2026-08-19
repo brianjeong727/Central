@@ -21,9 +21,19 @@ import { YOUNG_ADULT } from "@/lib/cohort"
 function resolveSignupGrade(
   currentGrade: string | null | undefined,
   metadata: Record<string, unknown> | undefined,
-): string | null {
-  if (currentGrade) return null
-  return metadata?.grade === YOUNG_ADULT ? YOUNG_ADULT : null
+): { write: string | null; effective: string | null } {
+  // TWO DIFFERENT ANSWERS, and conflating them is a shipped bug: `write` is what
+  // the join should persist (null = leave the column alone), `effective` is what
+  // the person actually IS. They differ in the common case — the handle_new_user
+  // trigger already copies `grade` from signup metadata, so a young adult arrives
+  // here with the column ALREADY set, `write` is correctly null… and passing that
+  // null on as the cohort gave autoAddUserToChats nothing to work with. Result: a
+  // young adult joined, got the central chat, and was silently left out of Young
+  // Adults. Returning one value made that mistake easy; returning both makes it
+  // hard.
+  if (currentGrade) return { write: null, effective: currentGrade }
+  const fromMeta = metadata?.grade === YOUNG_ADULT ? YOUNG_ADULT : null
+  return { write: fromMeta, effective: fromMeta }
 }
 import { presetById } from "@/app/home/workspace-presets"
 import { ADMIN_ROLES, LEADER_ROLES, MEMBER_TIER, isAdminRole, isStaffRole } from "@/lib/roles"
@@ -163,11 +173,11 @@ export async function joinMinistryByCode(
   // / email / graduation_year), so this is where it first reaches the profile —
   // and it must land BEFORE autoAddUserToChats runs, since that is what decides
   // between a class chat and Young Adults.
-  const grade = resolveSignupGrade(currentProfile.grade, user.user_metadata)
+  const signupGrade = resolveSignupGrade(currentProfile.grade, user.user_metadata)
 
   const { data: updatedRows, error: updateErr } = await admin
     .from("profiles")
-    .update({ ministry_id: ministry.id, role, ...(grade ? { grade } : {}) })
+    .update({ ministry_id: ministry.id, role, ...(signupGrade.write ? { grade: signupGrade.write } : {}) })
     .eq("id", user.id)
     .select("id")
 
@@ -181,7 +191,7 @@ export async function joinMinistryByCode(
     { onConflict: "user_id,ministry_id" }
   )
 
-  await autoAddUserToChats(user.id, ministry.id, currentProfile.graduation_year ?? null, role, grade)
+  await autoAddUserToChats(user.id, ministry.id, currentProfile.graduation_year ?? null, role, signupGrade.effective)
 
   return { ministryName: ministry.name, error: null }
 }
@@ -284,7 +294,7 @@ export async function joinMinistryById(ministryId: string): Promise<{ error: str
 
   const { error: updateErr } = await admin
     .from("profiles")
-    .update({ ministry_id: ministryId, role, ...(publicJoinGrade ? { grade: publicJoinGrade } : {}) })
+    .update({ ministry_id: ministryId, role, ...(publicJoinGrade.write ? { grade: publicJoinGrade.write } : {}) })
     .eq("id", user.id)
 
   if (updateErr) return { error: updateErr.message }
@@ -294,7 +304,7 @@ export async function joinMinistryById(ministryId: string): Promise<{ error: str
     { onConflict: "user_id,ministry_id" }
   )
 
-  await autoAddUserToChats(user.id, ministryId, currentProfile.graduation_year ?? null, role, publicJoinGrade)
+  await autoAddUserToChats(user.id, ministryId, currentProfile.graduation_year ?? null, role, publicJoinGrade.effective)
 
   return { error: null }
 }
