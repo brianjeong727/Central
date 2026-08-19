@@ -1344,8 +1344,15 @@ export function ProfileTab({
     if (!file) return
     setUploadingAvatar(true)
     setAvatarError(null)
+    // The extension lands inside the STORAGE KEY, and the key is what the RLS
+    // policy matches on — so it cannot be whatever the user's filename happened to
+    // end with. `photo.tar.gz` gave `gz`; a name ending in a 40-character token
+    // gave a 40-character extension. Clamp to a known image set, defaulting to the
+    // format the bytes are actually converted to below.
     const raw = file.name.split(".").pop()?.toLowerCase()
-    const ext = raw && raw !== file.name.toLowerCase() ? raw : "png"
+    const candidate = raw && raw !== file.name.toLowerCase() ? raw : ""
+    const ALLOWED_EXT = ["jpg", "jpeg", "png", "webp", "gif", "heic", "heif", "avif"]
+    const ext = ALLOWED_EXT.includes(candidate) ? candidate : "jpg"
     const fileName = `${userId}.${ext}`
     // Downscale to a 512px JPEG before upload; on decode failure keep the raw file.
     // Path stays identical — Supabase serves the stored contentType, so a .png path
@@ -1372,6 +1379,17 @@ export function ProfileTab({
       // cached one. The upload worked and the user saw their old photo, which is
       // indistinguishable from "you can't change it". A version stamp makes each
       // upload a distinct URL, which is what actually forces the update.
+      // If the extension changed, the OLD object is now unreferenced — publicly
+      // live with nothing pointing at it, which is the invisible leak
+      // lib/storage-cleanup.ts rule 2 exists to prevent. Reachable without the
+      // user changing file type at all, since an extensionless pick now defaults
+      // to `jpg` where it used to default to `png`. Best-effort: the new photo is
+      // already stored, so a failed sweep must not fail the upload.
+      const previous = storagePathFromPublicUrl(profile.avatar_url, "profile-images")
+      if (previous && previous !== uploadData.path && !previous.includes("/") && previous.startsWith(`${userId}.`)) {
+        await removeStorageObject(supabase, "profile-images", previous, "avatar extension change")
+      }
+
       const versioned = `${publicUrl}?v=${Date.now()}`
       // Checked, not fire-and-forget: if this write fails the object HAS been
       // replaced but the column still holds the old `?v=`, so the user sees their
