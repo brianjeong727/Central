@@ -1138,7 +1138,9 @@ export function ProfileTab({
   isAdmin?: boolean
   ministryIsPublic?: boolean
   onLogout: () => void
-  onAvatarChange?: (url: string) => void
+  /** null when the photo is REMOVED — the shell avatar must fall back to
+   *  initials, not keep rendering a deleted image. */
+  onAvatarChange?: (url: string | null) => void
   activeSection: "spiritual-profile" | "journal"
   onSectionChange: (s: "spiritual-profile" | "journal") => void
 }) {
@@ -1363,12 +1365,71 @@ export function ProfileTab({
     if (error) { setAvatarError(error.message); setUploadingAvatar(false); e.target.value = ""; return }
     if (uploadData) {
       const { data: { publicUrl } } = supabase.storage.from("profile-images").getPublicUrl(uploadData.path)
-      await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
-      setProfile(p => ({ ...p, avatar_url: publicUrl }))
-      onAvatarChange?.(publicUrl)
+      // The stored path is `{userId}.{ext}`, so every upload overwrites the SAME
+      // object at the SAME URL. The bytes changed; the URL did not — and every
+      // consumer is keyed on the URL. React sees an identical string and skips the
+      // re-render, next/image serves its optimized copy, the browser serves its
+      // cached one. The upload worked and the user saw their old photo, which is
+      // indistinguishable from "you can't change it". A version stamp makes each
+      // upload a distinct URL, which is what actually forces the update.
+      const versioned = `${publicUrl}?v=${Date.now()}`
+      await supabase.from("profiles").update({ avatar_url: versioned }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
+      setProfile(p => ({ ...p, avatar_url: versioned }))
+      onAvatarChange?.(versioned)
     }
     setUploadingAvatar(false)
     e.target.value = ""
+  }
+
+  // Storage path for the current photo, recovered from the stored URL — the
+  // extension varies (.jpg/.jpeg/.png/.svg) and older rows predate any convention,
+  // so deriving it from `{userId}.{ext}` would miss files. The URL is the record of
+  // what was actually written; the `?v=` stamp is stripped back off.
+  function avatarStoragePath(url: string | null | undefined): string | null {
+    if (!url) return null
+    const marker = "/profile-images/"
+    const i = url.indexOf(marker)
+    if (i === -1) return null
+    return decodeURIComponent(url.slice(i + marker.length).split("?")[0]) || null
+  }
+
+  async function handleAvatarRemove() {
+    if (!profile.avatar_url || uploadingAvatar) return
+    setUploadingAvatar(true)
+    setAvatarError(null)
+    const path = avatarStoragePath(profile.avatar_url)
+    // Clear the profile FIRST: that is the half the user can see, and it is the
+    // half that must not be left behind if storage misbehaves. An orphaned object
+    // is invisible; a photo that survives "remove" is the bug being fixed.
+    const { error } = await supabase.from("profiles")
+      .update({ avatar_url: null }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
+    if (error) { setAvatarError("Couldn't remove your photo. Please try again."); setUploadingAvatar(false); return }
+    setProfile(p => ({ ...p, avatar_url: null }))
+    onAvatarChange?.(null)
+    if (path) await supabase.storage.from("profile-images").remove([path])
+    setUploadingAvatar(false)
+  }
+
+  // One tap, no modal — matches the chat photo-removal precedent (CLAUDE.md:
+  // re-uploading is easy, so a confirm dialog costs more than the mistake does).
+  // Rendered only when there IS a photo, so it never sits dead next to initials.
+  function removePhotoButton(compact: boolean) {
+    if (!profile.avatar_url || editing) return null
+    return (
+      <button
+        type="button"
+        onClick={handleAvatarRemove}
+        disabled={uploadingAvatar}
+        style={{
+          background: "none", border: "none", padding: 0, marginTop: 6,
+          color: "var(--muted-text)", fontSize: compact ? 12 : 12.5,
+          cursor: uploadingAvatar ? "not-allowed" : "pointer",
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
+        Remove photo
+      </button>
+    )
   }
 
   function getFieldValue(key: ProfileDraftField): string {
@@ -1592,6 +1653,8 @@ export function ProfileTab({
                 </div>
                 {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 40%, transparent)" }}><div className="animate-spin" style={{ width: 18, height: 18, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
               </label>
+              {/* Sibling of the avatar, never inside the <label> — nesting it there
+                  makes every tap open the file picker instead of removing. */}
               <div style={{ flex: 1, minWidth: 0, paddingRight: !editing ? 40 : 0 }}>
                 {editing ? (
                   <>
@@ -1625,6 +1688,7 @@ export function ProfileTab({
                   <PocketTag label={roleLabel(profile.role, null)} variant="role" />
                   <span style={{ fontSize: 13, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.email}</span>
                 </div>
+                {removePhotoButton(true)}
                 {(cohortLabel(profile.grade, profile.graduation_year) || (currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation)) && (
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 5 }}>
                     {cohortLabel(profile.grade, profile.graduation_year) && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{cohortLabel(profile.grade, profile.graduation_year)}</span>}
@@ -1773,6 +1837,7 @@ export function ProfileTab({
                 {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation && <span>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
                 <span style={{ color: "var(--muted-text)" }}>{profile.email}</span>
               </div>
+              {removePhotoButton(false)}
               {avatarError && <p style={{ fontSize: 11, color: "var(--danger)", margin: "6px 0 0" }}>{avatarError}</p>}
             </div>
             {editing ? (
