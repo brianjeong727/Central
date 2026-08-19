@@ -529,6 +529,22 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   useEffect(() => {
     const gradYear = initialProfile.graduation_year
     if (!gradYear) return
+    // TWO graduation questions exist and they must not arrive together.
+    //
+    //   "Have you graduated?"            — Home banner, driven by needs_grad_check
+    //                                      (home-tab). Sets the COHORT: answering
+    //                                      yes makes you a young adult and moves
+    //                                      you into the Young Adults chat.
+    //   "Stay in the ministry, or leave?" — this modal, driven by class year.
+    //
+    // They land on the same people in the same session, and this one is BLOCKING.
+    // The cohort question goes first because its answer is what makes this one
+    // meaningful — asking someone whether to leave the ministry before they have
+    // told us they graduated is out of order, and stacking a modal on top of a
+    // banner asking almost the same words reads as a bug. Answering the banner
+    // clears needs_grad_check, so this appears on a later visit instead of being
+    // lost.
+    if (initialProfile.needs_grad_check) return
     const now = new Date()
     const month = now.getMonth() + 1 // 1-indexed
     const year = now.getFullYear()
@@ -536,7 +552,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     if (gradYear <= year && month >= 5 && !initialProfile.grad_prompt_dismissed) {
       setShowGradPrompt(true)
     }
-  }, [initialProfile.graduation_year, initialProfile.grad_prompt_dismissed])
+  }, [initialProfile.graduation_year, initialProfile.grad_prompt_dismissed, initialProfile.needs_grad_check])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
