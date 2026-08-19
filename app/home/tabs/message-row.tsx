@@ -8,6 +8,7 @@ import { formatMessageTime, REACTION_EMOJIS } from "../utils"
 import { useOpenMemberProfile } from "../member-profile-context"
 import type { MessageRowProps } from "../types"
 import { InviteCard } from "./invite-card"
+import { jumboEmojiCount, jumboFontSize } from "@/lib/jumbo-emoji"
 
 // emoji-mart is ~2MB (almost entirely the @emoji-mart/data JSON). Load both the
 // Picker component and its data lazily — only when a picker actually opens — so
@@ -210,6 +211,14 @@ function MessageRowBase({
       : isLastInGroup
         ? "rounded-[14px] rounded-tr-[6px]"
         : "rounded-[14px] rounded-r-[6px]"
+
+  // Jumbo emoji (iMessage-style): one or two emoji ALONE render large and bare.
+  // Only for a plain text message — a reply, an attachment or a link preview all
+  // need the bubble to hold their own chrome, and a deleted row is a tombstone.
+  const jumboCount = (!msg.deleted && !msg.reply_to_id && !msg.attachment_url && !linkPreview)
+    ? jumboEmojiCount(msg.content)
+    : null
+  const isJumbo = jumboCount !== null
 
   // Grouped reactions — derived from this row's reactions slice only
   const rxMap: Record<string, { count: number; userReacted: boolean }> = {}
@@ -588,14 +597,19 @@ function MessageRowBase({
             onPointerLeave={onPointerCancel}
             onPointerCancel={onPointerCancel}
             className={`max-w-[75%] text-[14px] leading-[1.4] select-none overflow-hidden ${
-              msg.deleted
-                ? isOwn
-                  ? `bg-[var(--plum-2)]/30 text-[color-mix(in_srgb,var(--cream-on-dark)_50%,transparent)] ${outgoingRadius} px-4 py-2`
-                  : `bg-[var(--ivory)] text-[var(--muted-text)] ${incomingRadius} px-4 py-2`
-                : isOwn
-                  ? `bg-[var(--plum-2)] text-[var(--cream-on-dark)] ${outgoingRadius}`
-                  : `bg-[var(--ivory)] text-[var(--ink)] ${incomingRadius}`
-            } ${!msg.deleted && !msg.reply_to_id && !(msg.attachment_url && msg.attachment_type?.startsWith("image/")) ? "px-4 py-2.5" : ""}`}
+              isJumbo
+                // No surface, no padding, no radius — the emoji IS the message.
+                // Same element and same handlers, so Convention #7's tap/long-press
+                // timing is untouched; only the skin comes off.
+                ? "bg-transparent px-0 py-0.5"
+                : msg.deleted
+                  ? isOwn
+                    ? `bg-[var(--plum-2)]/30 text-[color-mix(in_srgb,var(--cream-on-dark)_50%,transparent)] ${outgoingRadius} px-4 py-2`
+                    : `bg-[var(--ivory)] text-[var(--muted-text)] ${incomingRadius} px-4 py-2`
+                  : isOwn
+                    ? `bg-[var(--plum-2)] text-[var(--cream-on-dark)] ${outgoingRadius}`
+                    : `bg-[var(--ivory)] text-[var(--ink)] ${incomingRadius}`
+            } ${!isJumbo && !msg.deleted && !msg.reply_to_id && !(msg.attachment_url && msg.attachment_type?.startsWith("image/")) ? "px-4 py-2.5" : ""}`}
           >
             {msg.deleted ? (
               <span className="italic text-[13px]">Message deleted</span>
@@ -697,7 +711,12 @@ function MessageRowBase({
                       <>
                         <div
                           className={(msg.reply_to_id || msg.attachment_url) ? "px-4 pt-1.5 pb-2.5" : ""}
-                          style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "break-word" }}
+                          style={{
+                            whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "break-word",
+                            // lineHeight 1.15 keeps a 44px glyph from stacking the
+                            // row's height on a 1.4 body ratio meant for 14px text.
+                            ...(isJumbo ? { fontSize: jumboFontSize(jumboCount!), lineHeight: 1.15 } : null),
+                          }}
                         >
                           {renderMentions(msg.content, isOwn)}
                         </div>
