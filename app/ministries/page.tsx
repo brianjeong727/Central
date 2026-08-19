@@ -9,7 +9,7 @@ import { Spinner, RingCrossLogo } from "@/app/home/components/shared"
 import { MonogramChip } from "@/components/central/MonogramChip"
 import { PlanSubTabStrip } from "@/components/central/plan-sub-tab-strip"
 import { CentralButton } from "@/components/central/button"
-import { CentralModal, InviteShareModal } from "@/components/central"
+import { CentralModal, InviteShareModal, PendingVeil } from "@/components/central"
 import { usePostJoinPickers, PostJoinPickerModals, SIZE_LABELS, ModalAction } from "./post-join-pickers"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { BackChevron } from "@/components/central/back-chevron"
@@ -65,6 +65,14 @@ function MinistriesContent() {
   })
   const [authChecked, setAuthChecked] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  // Whether /home will actually open, i.e. profiles.ministry_id — the SAME column
+  // proxy.ts routes on. Deliberately NOT derived from myMinistries: that comes from
+  // getUserMinistries(), which reads `user_ministries` only, so a user holding a
+  // ministry_id with no membership row reads as zero there while /home works fine
+  // for them. Gating the back link on the list hid it from exactly those users.
+  const [hasMinistry, setHasMinistry] = useState(false)
+  // Set on click and never cleared — signOut ends in a full document navigation.
+  const [signingOut, setSigningOut] = useState(false)
 
   const [myMinistries, setMyMinistries]   = useState<MyMinistry[]>([])
   const [myIds, setMyIds]                 = useState<Set<string>>(new Set())
@@ -107,6 +115,8 @@ function MinistriesContent() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         setIsLoggedIn(true)
+        supabase.from("profiles").select("ministry_id").eq("id", user.id).maybeSingle()
+          .then(({ data }) => setHasMinistry(Boolean(data?.ministry_id)))
         setLoadingMine(true)
         getUserMinistries().then(({ data }) => {
           if (data && data.length > 0) {
@@ -126,6 +136,25 @@ function MinistriesContent() {
       setAuthChecked(true)
     })
   }, [])
+
+  // The ONLY escape from this page for a signed-in user who has no ministry yet.
+  // proxy.ts sends every non-public path to /ministries while ministry_id is null,
+  // and it bounces a logged-in user off /login|/signup to /home — which lands right
+  // back here. So "Back to home" is a loop for these users and clearing cookies was
+  // the only real exit. Sign out is what breaks it; it must never be gated on having
+  // a ministry, because having none is exactly the trapped case.
+  async function handleSignOut() {
+    setSigningOut(true)
+    const supabase = createClient()
+    // Always navigate, even if signOut() rejects — a lock-acquire timeout REJECTS
+    // and the veil is never cleared by design, so without this the user trades one
+    // dead end for an inert cream screen. Same tradeoff as /pick-ministry.
+    try {
+      await supabase.auth.signOut()
+    } finally {
+      window.location.assign("/login")
+    }
+  }
 
   async function copyMemberCode(id: string, code: string) {
     try {
@@ -156,6 +185,10 @@ function MinistriesContent() {
   }, [tab, search, fetchPublic])
 
   const browseable = publicMinistries.filter((m) => !myIds.has(m.id))
+  // "Back to home" only earns its place when /home won't bounce the user right back
+  // here. Resolved from the loaded profile, so it appears a beat late rather than
+  // showing a dead link first — a trapped user must never see an exit flash and vanish.
+  const canGoHome = isLoggedIn && hasMinistry
 
   async function handleGoToMinistry(id: string) {
     setSwitchingId(id)
@@ -261,6 +294,7 @@ function MinistriesContent() {
 
   return (
     <>
+      {signingOut && <PendingVeil label="Signing you out…" />}
 
       {/* ── Gender + school picker modals (shared across viewports; portaled) ── */}
       {shareFor && (
@@ -335,15 +369,31 @@ function MinistriesContent() {
           </span>
           <span style={{ fontFamily: SERIF, fontSize: 20, letterSpacing: "-0.01em" }}>Central</span>
         </Link>
-        <a href="/home" style={{
-          display: "inline-flex", alignItems: "center", gap: 8,
-          fontSize: 14, color: "var(--muted-text)", textDecoration: "none",
-        }}>
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
-          Back to home
-        </a>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 22 }}>
+          {/* "Back to home" is shown only when there IS a home to go back to. With no
+              ministry, /home bounces straight back here, so the link was a loop — the
+              desktop half of the same trap the mobile screen had. Held while the
+              memberships load so an existing link never flashes out and back in. */}
+          {canGoHome && (
+            <a href="/home" style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              fontSize: 14, color: "var(--muted-text)", textDecoration: "none",
+            }}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+              </svg>
+              Back to home
+            </a>
+          )}
+          {isLoggedIn && (
+            <button type="button" onClick={handleSignOut} className="transition-colors hover:text-[var(--plum)]" style={{
+              background: "none", border: "none", padding: 0, cursor: "pointer",
+              fontFamily: SANS, fontSize: 14, color: "var(--muted-text)",
+            }}>
+              Sign out
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Content ── */}
@@ -596,19 +646,30 @@ function MinistriesContent() {
       <div className="md:hidden" style={{ minHeight: "100svh", background: "var(--cream)", fontFamily: SANS, color: "var(--ink)" }}>
         <div className="max-w-[390px] mx-auto w-full" style={{ padding: "calc(env(safe-area-inset-top) + 22px) 24px calc(env(safe-area-inset-bottom) + 40px)" }}>
 
-          {/* Quick exit for anyone who opened "Switch ministry" by mistake — only shown
-              when they have a ministry to return to. Uses the shared BackChevron
-              (Convention #22): muted-ink chrome, never a plum arrow, and it carries the
-              44×44 tap target the raw glyph doesn't. */}
-          {isLoggedIn && myMinistries.length > 0 && (
-            <BackChevron
-              label="Back to home"
-              onClick={() => {
-                if (typeof window !== "undefined" && window.history.length > 1) window.history.back()
-                else window.location.assign("/home")
-              }}
-              style={{ marginBottom: 6 }}
-            />
+          {/* Chrome row — back on the left (only when there IS a home to return to),
+              Sign out on the right. Sign out is NOT gated on having a ministry: a
+              signed-in user with none is exactly the person with nowhere else to go,
+              and before this the screen had no exit at all. Back uses the shared
+              BackChevron (Convention #22): muted-ink chrome, never a plum arrow, and
+              it carries the 44×44 tap target the raw glyph doesn't. */}
+          {isLoggedIn && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, minHeight: 34, marginBottom: 6 }}>
+              {canGoHome ? (
+                <BackChevron
+                  label="Back to home"
+                  onClick={() => {
+                    if (typeof window !== "undefined" && window.history.length > 1) window.history.back()
+                    else window.location.assign("/home")
+                  }}
+                />
+              ) : <span/>}
+              <button type="button" onClick={handleSignOut} style={{
+                background: "none", border: "none", padding: "0 2px", cursor: "pointer",
+                fontFamily: SANS, fontSize: 13.5, color: "var(--muted-text)", whiteSpace: "nowrap",
+              }}>
+                Sign out
+              </button>
+            </div>
           )}
 
           <div style={mono}>{isLoggedIn && myMinistries.length === 0 ? "Almost there" : "Ministries"}</div>
