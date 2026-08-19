@@ -22,8 +22,12 @@
 -- ministry is affected.
 
 -- ── The definition being retired, preserved verbatim ─────────────────────────
--- It existed ONLY in the database — no migration file defined it — so dropping it
--- without recording it would erase the only copy of how the ladder worked.
+-- Not in THIS folder — no file here defined it — so without this block the repo
+-- would keep no record of how the ladder worked. It is recorded in Supabase's own
+-- migration history (20260522175403_grade_bump_and_archive_cron_jobs, later
+-- hardened by 20260806160318); the copy below was taken from the LIVE function, so
+-- it carries that hardening and is the state actually being dropped. Verified
+-- statement-for-statement against the history copy.
 --
 -- CREATE OR REPLACE FUNCTION public.grade_bump_all_ministries()
 --  RETURNS void LANGUAGE plpgsql SECURITY DEFINER
