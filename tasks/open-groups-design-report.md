@@ -10,7 +10,7 @@ Built 2026-08-19. Not committed.
 | `app/home/tabs/open-groups-view.tsx` | Body split into `md:hidden` (shipped Pocket path, untouched) + `hidden md:block` (new desktop card/row/Join grammar). One SWR/state/data layer feeds both. Header comment rewritten (K2). |
 | `components/central/list-row.tsx` | `ListRowProps` now extends `HTMLAttributes<HTMLDivElement>` so a row can carry `role`/`tabIndex`/`aria-label`/`onKeyDown` (SNAP 10). Backwards compatible — every existing call site is a strict subset. |
 | `app/globals.css` | New `.row-chevron` rule beside `.central-list-row`: 2px `translateX` on parent-row hover, `--dur-fast`/`--ease-out`, pointer-gated + reduced-motion guarded (K4). |
-| `components/central/subpage-shell.tsx` | `width="centered"` now puts the DESKTOP header in the same centered `maxWidth` column as the body (title, meta, action, both hairlines). `width="full"` renders the identical element tree it always did. |
+| `components/central/subpage-shell.tsx` | `width="centered"` now puts the DESKTOP header in the same centered `maxWidth` column as the body (title, meta, action, both hairlines). `width="full"` renders the identical element tree it always did. **This surface no longer uses `centered`** — the fix stands for the one legitimate consumer, `plan-tab`'s "New workspace". |
 | `app/home/open-groups.ts` | **Untouched** — not forked, as instructed. |
 
 ## Manifest items applied
@@ -60,70 +60,79 @@ Built 2026-08-19. Not committed.
 4. **Join and Joined are the same slot but not the same height** — Join is 37.5px (§4.3 `sm`, SNAP 13), Joined is ~22px (4×10 / 12px, SNAP 14). Both numbers are pinned by the manifest, so I took "one control changing state" to mean the same slot and the same pill shape, not identical boxes. Neither affects row height (the 46px avatar dominates).
 5. **`width="centered"` means the body inset is `px-5`, not `md:px-14`.** K1 names the implementation and SNAP 20 names `md:px-14`; they cannot both hold. K1 is the more specific instruction, so the column carries the shell's centered `px-5` and the header keeps `md:px-14`.
 
-## The alignment fix — escalated, ratified, implemented
+## Width & alignment — the capped column was drift, and it is gone
 
-The first build shipped the manifest literally and the header did not share a left edge with the
-body: title at x=392 (the shell's `md:px-14` inset), column at x=548, and a hairline spanning the
-whole content area above a card that started a third of the way in. I flagged it rather than
-papering over it; Brian ratified the shell fix (option 2 of the three I offered).
+**Final state: FULL WIDTH, LEFT-ALIGNED at the standard `md:px-14` content inset.** Title,
+description, count eyebrow and card all start at x=392 at 1440, the header rules span the content
+width (992), and the card fills it. `width="full"`, no `maxWidth`.
 
-**What I did.** `SubpageShell` now applies the SAME centered column to its desktop HEADER as to its
-body whenever `width="centered"`. The header's title, `titleMeta`, `titleAction` and BOTH
-`InsetHairline`s are wrapped in the identical `mx-auto w-full px-5` + `maxWidth` wrapper the body
-already used — deliberately the same wrapper, so the two can never drift apart again. The hairlines
-sit INSIDE it, which is what makes them span the column instead of the content area (§4.11: a rule
-is sized to what it separates).
+**Why the 720px centred column was wrong.** `web_design_system.md` §7.0 splits by CONTENT TYPE, and
+the manifest's K1 leaned on the wrong half of it:
 
-**Result on this surface** (measured at 1440, not eyeballed):
+- *Reading-/form-measure content* (prose, a single-column form, an editorial body) → cap and CENTER.
+- *Collection / data content* — "lists of cards, tables, stat grids… **no** reading-measure
+  constraint — let them fill the content area out to the page padding (`px-14` / `0 40px`)… **Do not
+  trap a list or grid in a fixed narrow column.**"
 
-| | before | after |
+A list of joinable groups is collection content, full stop. So K1 was never a legitimate KEEP — it
+was **drift that should have been a SNAP**. Recorded here so the next cdesign handoff proposing a
+capped column for a list gets snapped rather than kept: the test is what the content IS, not whether
+the mock looks tidier narrow.
+
+**The `SubpageShell` header-centering fix is KEPT** — it is independently correct (a genuinely
+centred column should have a centred header) and it is what straightens `plan-tab`'s "New workspace"
+(820), which is a creation FORM and therefore legitimately reading-measure content. It simply no
+longer applies to this surface. Re-verified after the revert: "New workspace" title x=366 with rules
+366/780, byte-identical to the capture taken right after the shell fix (**diff bbox `None`**).
+
+**Everything else built earlier is unchanged** — card, rows, 46px avatar, `46px 1fr auto` grid,
+Join/Joined pill sharing one slot, chevron on joined rows only, hover, chevron nudge, skeleton,
+empty state. Only width and alignment moved.
+
+### The wide-row sanity check (measured, not eyeballed)
+
+Gap between the end of the group NAME text and the left edge of the Join/Joined cluster:
+
+| viewport | row width | name→cluster gap (3 rows) |
 |---|---|---|
-| title x | 392 | **548** |
-| description x | 548 | 548 |
-| count eyebrow x | 548 | 548 |
-| card x / width | 548 / 680 | 548 / 680 |
-| header hairlines | x 392, w 992 | **x 548, w 680** |
+| 1440 | 990 | 661 / 732 / 730 |
+| 1920 | 1470 | 1141 / 1212 / 1210 |
 
-One left edge for all five, and the rules are now exactly the card's width.
+**At 1440 it reads correctly** — the divider, the card edge and the `--cream-2` hover fill bind the
+row, and the right cluster reads as the row's right-hand column exactly as it does in Directory and
+the announcements list. I looked at it; nothing is stranded.
 
-**`width="full"` is untouched — proven, not assumed.** The `full` branch renders the identical
-element tree it always did (same `px-14`, same `InsetHairline` default `mx-14`); the new wrapper is
-inside a `width === "centered"` branch. Captured a titled `width="full"` subpage (Workspace → Student
-Org Board → Settings — it exercises the header code path, which a titleless subpage would not) plus
-the team home and the announcements root at 1440 before and after: **all three diff to zero pixels**,
-and the settings header's four hairlines measure byte-identically (392/992, 392/992, 415/946,
-392/992).
-
-**`plan-tab.tsx`'s "New workspace" (maxWidth 820) changed as intended, and looks better.** It had the
-same defect worse: title at x=128 under a 1256px rule, with its body starting at x=368 — a 240px
-orphan. It now sits at x=366, directly above its own description and preset card, with the rules
-spanning the 780px column. I looked at it; it reads as one page now instead of a header belonging to
-a different one. So the fix is right at 820 as well as at 720 — this was a latent shell flaw the
-open-groups design surfaced, not a special case.
-
-**What it cost.** The header JSX is duplicated across the two branches (~14 lines) rather than
-extracted, because hoisting it into a variable would have changed the `width="full"` render path and
-I needed that path provably byte-identical. If a third width ever appears, extract it then. The
-breadcrumb still sits at the content inset on centered pages — correct, and left alone: it is shell
-topbar chrome above the header rule, not page content.
-
-Consequential doc-comment updates: the `width` prop now documents that the header rides the column,
-and the stale comment in `open-groups-view.tsx` (which asserted the rule "still spans the content
-inset") was rewritten rather than left contradicting the code — the same discipline K2 demanded.
+**At 1920 it starts to strain** — a ~1.2k px run of empty cream between a short name like
+"Building A" and its pill. Flagging it with the numbers rather than quietly re-capping, because
+re-capping is the thing that was just ruled out and it is Brian's call, not mine. If he ever wants it
+addressed, the fix that stays inside §7.0 is to let the collection use the extra width (a second
+column of cards past some breakpoint), not to narrow the row.
 
 ## Verification
 
 - Type gate: `npx tsc --noEmit` clean. `npx eslint` clean on both touched TS files.
 - Guards: `check-hex.sh` (93 < baseline 146 — no new hex), `check-chrome-title.sh`, `check-chat-avatar.sh` all pass.
-- **Desktop @1440**: rendered live and inspected, plus computed-style measurement of every token, size, radius, padding, grid, role/tabindex/aria, and the hover + chevron transform. All match the table above.
+- **Desktop @1440**: rendered live and inspected, plus computed-style measurement of every token, size, radius, padding, grid, role/tabindex/aria, and the hover + chevron transform — all matching the SNAP table above. Final alignment measured: title / description / count eyebrow / card all at x=392, header rules x=392 w=992, card width 992.
 - **Phone @390: pixel-identical to what ships today**, re-verified after the shell change too. Baseline captured before touching anything; final diff `bbox = None` — zero differing pixels. (The shell edit is structurally desktop-only — it lives entirely inside `{title && (<div className="hidden md:flex …">`.) (One real regression was caught this way: `text-wrap: pretty` had been applied unconditionally and rewrapped the phone description. Now `md:text-pretty`.)
 - `npm run build`: **passes** (compiled successfully).
-- `width="full"` regression: team settings (titled subpage, exercises the header path), team home and announcements root all diff to **zero pixels** at 1440, before vs after.
-- `plan-tab` "New workspace" at 1440 captured before and after and inspected — changed deliberately, and better.
+- `width="full"` regression at 1440, before vs after: **team settings** (a TITLED subpage — it exercises the header code path a titleless one would not) and the **announcements root** both diff to **zero pixels**; its four header hairlines measure byte-identically (392/992, 392/992, 415/946, 392/992). The team-home capture shows one 11×11px diff, which is the `eventUpNextRing` pulse animation caught at a different phase — not my change.
+- `plan-tab` "New workspace" at 1440 captured, inspected, and re-diffed after the revert: title x=128 (orphaned under a 1256px rule) → x=366 above its own card, rules spanning its 780px column. **Zero-pixel diff** between the post-shell-fix capture and the final one, so the revert did not disturb it.
 - Throwaway capture specs were deleted; nothing was added to `e2e/`.
 
 **Sandbox note for whoever tests this:** the E2E sandbox (`fcbe3a1f-…`) now has 3 open groups with varied member counts — Board games night (3), Building A (4), Basketball (5) — and E2E Admin was removed from **Basketball** so the not-joined/Join state is reachable. Fixtures left in place. Path: Messages → "Open groups" row at the top of the chat panel.
 
 ## Trap worth knowing (dev only)
 
-The slot's dev server serves a STALE `globals.css` until the next page request forces Turbopack's lazy CSS recompile — a `touch` alone does not do it. A new CSS rule silently does not exist in the browser, which reads as "my selector is wrong" and sent me hunting the wrong thing. Confirm a new rule by grepping `.next/dev/static/chunks/app_globals_css_*.single.css` after hitting a page, not by re-reading the source.
+The slot's dev server serves STALE compiled output while reporting healthy, and it bit twice — once
+on CSS (a new `globals.css` rule simply did not exist in the browser) and once, worse, on a **TSX
+module**: the `width="centered"` → `width="full"` change was correct on disk, `tsc` was clean, and
+the app kept rendering the old centred column through two full Playwright runs. `touch` did not fix
+it and neither did requesting the page; the compiled chunk's mtime never moved. Only restarting the
+dev server on the slot's own port did.
+
+Two consequences worth carrying:
+- **Never conclude "my change had no effect" from a render alone.** Grep the compiled chunk
+  (`.next/dev/static/chunks/…`) for a distinctive string from the edit. That is the difference
+  between five wasted minutes and hunting a bug that does not exist.
+- A visual verification pass is only evidence if you have confirmed the bundle under test is the
+  code you wrote.

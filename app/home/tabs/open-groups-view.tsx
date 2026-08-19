@@ -141,14 +141,16 @@ export function OpenGroupsBrowse({
       crumbs={[{ label: "Chats", onClick: onBack }, { label: "Open groups" }]}
       title="Open groups"
       mobileTitle="Open groups"
-      // §7.0 — a capped column must be CENTERED, never left-aligned against dead
-      // space. The shell puts its own header in this same column (title, meta and
-      // both hairlines share the column's left edge), so the description, the
-      // count eyebrow and the card below all line up under the title. Never
-      // hand-roll a header inside the body to get that alignment — that ships two
-      // titles (§4.18).
-      width="centered"
-      maxWidth={720}
+      // FULL WIDTH, LEFT-ALIGNED — §7.0 splits by CONTENT TYPE, and this is a
+      // COLLECTION: "lists of cards, tables, stat grids… no reading-measure
+      // constraint — let them fill the content area out to the page padding. Do
+      // not trap a list or grid in a fixed narrow column." The capped/centred
+      // clause governs reading- and form-measure content (prose, a single-column
+      // form), which a list of joinable groups is not. The handoff proposed a
+      // 720px centred column and it was drift, not a variant — do not reintroduce
+      // one here. Title, description, count eyebrow and card all sit at the same
+      // md:px-14 inset, and the header rules span the content width.
+      width="full"
     >
       {/* The 15px sentence §3 puts in the title block; SubpageShell has no
           subtitle slot, so it leads the body. Phone width keeps its shipped
