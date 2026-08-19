@@ -1373,7 +1373,18 @@ export function ProfileTab({
       // indistinguishable from "you can't change it". A version stamp makes each
       // upload a distinct URL, which is what actually forces the update.
       const versioned = `${publicUrl}?v=${Date.now()}`
-      await supabase.from("profiles").update({ avatar_url: versioned }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
+      // Checked, not fire-and-forget: if this write fails the object HAS been
+      // replaced but the column still holds the old `?v=`, so the user sees their
+      // previous photo after a successful-looking upload — verbatim the symptom
+      // this whole change exists to fix.
+      const { error: pointerErr } = await supabase.from("profiles")
+        .update({ avatar_url: versioned }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
+      if (pointerErr) {
+        setAvatarError("Couldn't save your new photo. Please try again.")
+        setUploadingAvatar(false)
+        e.target.value = ""
+        return
+      }
       setProfile(p => ({ ...p, avatar_url: versioned }))
       onAvatarChange?.(versioned)
     }
@@ -1381,32 +1392,42 @@ export function ProfileTab({
     e.target.value = ""
   }
 
-  // Storage path for the current photo, recovered from the stored URL — the
-  // extension varies (.jpg/.jpeg/.png/.svg) and older rows predate any convention,
-  // so deriving it from `{userId}.{ext}` would miss files. The URL is the record of
-  // what was actually written; the `?v=` stamp is stripped back off.
-  function avatarStoragePath(url: string | null | undefined): string | null {
-    if (!url) return null
-    const marker = "/profile-images/"
-    const i = url.indexOf(marker)
-    if (i === -1) return null
-    return decodeURIComponent(url.slice(i + marker.length).split("?")[0]) || null
-  }
-
   async function handleAvatarRemove() {
     if (!profile.avatar_url || uploadingAvatar) return
     setUploadingAvatar(true)
     setAvatarError(null)
-    const path = avatarStoragePath(profile.avatar_url)
-    // Clear the profile FIRST: that is the half the user can see, and it is the
-    // half that must not be left behind if storage misbehaves. An orphaned object
-    // is invisible; a photo that survives "remove" is the bug being fixed.
+
+    // Assert the shape rather than trusting a string that came out of a URL:
+    // root-level, own uid. Same guard delete-account.ts uses for this bucket. A
+    // profile can legitimately point at a URL that is NOT its own object (an
+    // OAuth photo, or a sandbox fixture aliasing someone else's file) — those
+    // parse to null or fail the guard, and the column is simply cleared.
+    const parsed = storagePathFromPublicUrl(profile.avatar_url, "profile-images")
+    const ownPath = parsed && !parsed.includes("/") && parsed.startsWith(`${userId}.`) ? parsed : null
+
+    // REMOVE FIRST, then drop the pointer (lib/storage-cleanup.ts rule 2). This
+    // bucket is PUBLIC: clearing the column first and failing the delete leaves a
+    // live public face photo with nothing pointing at it — invisible, permanent,
+    // unretryable. Failing this way round leaves the photo AND the button, so the
+    // user can just try again.
+    if (ownPath) {
+      // Judged on rows removed, NEVER on `error` — an RLS-denied remove returns
+      // `{ error: null, data: [] }`, HTTP 200, file untouched (rule 1). The first
+      // cut of this handler discarded the result entirely and would have reported
+      // success while the photo survived — the very bug being fixed here.
+      const removed = await removeStorageObject(supabase, "profile-images", ownPath, "profile avatar remove")
+      if (!removed) {
+        setAvatarError("Couldn't remove your photo. Please try again.")
+        setUploadingAvatar(false)
+        return
+      }
+    }
+
     const { error } = await supabase.from("profiles")
       .update({ avatar_url: null }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
     if (error) { setAvatarError("Couldn't remove your photo. Please try again."); setUploadingAvatar(false); return }
     setProfile(p => ({ ...p, avatar_url: null }))
     onAvatarChange?.(null)
-    if (path) await supabase.storage.from("profile-images").remove([path])
     setUploadingAvatar(false)
   }
 
