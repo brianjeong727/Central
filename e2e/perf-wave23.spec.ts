@@ -1,6 +1,12 @@
 import { test, expect, type Page } from "@playwright/test"
 import { sandbox } from "./fixtures"
 
+// 1x1 transparent PNG — the smallest thing that still exercises the image pipeline.
+const PNG_1PX_FIXTURE = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+)
+
 // Wave2+3 perf-diff verification (feat/perf-wave1, commit 1ce5d84):
 //   - proxy.ts: middleware JWT local-verify + signed central-mw routing cache
 //   - chat-broadcast.ts / chats-tab.tsx / home-app.tsx: chat:{groupId} private
@@ -275,7 +281,16 @@ test.describe("Wave2+3 — chat broadcast + bounded fetch + images + regression 
 
   test("images: avatars + announcement images render through /_next/image, directory + announcements + profile regression", async ({ page }) => {
     const adminId = await sb.adminUserId()
-    const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/profile-images/a98d3716-f60d-4cb7-99db-1faf4ec3fd20.png`
+    // Upload our OWN fixture rather than pointing at a pre-existing object. This
+    // used to hardcode `a98d3716-….png`, an orphan left behind by a deleted
+    // account — nothing in the repo said it was load-bearing, so any storage
+    // cleanup would have silently broken this test. A spec must not depend on
+    // stray data it did not create.
+    const fixtureKey = `e2e-wave23/${adminId}.png`
+    const { error: fixErr } = await sb.client.storage.from("profile-images")
+      .upload(fixtureKey, PNG_1PX_FIXTURE, { contentType: "image/png", upsert: true })
+    if (fixErr) throw fixErr
+    const publicUrl = sb.client.storage.from("profile-images").getPublicUrl(fixtureKey).data.publicUrl
     await sb.client.from("profiles").update({ avatar_url: publicUrl }).eq("id", adminId)
     await sb.createAnnouncement({ title: "wave23-image-test", body: "image pipeline check" })
     await sb.client.from("announcements").update({ image_url: publicUrl }).eq("ministry_id", sb.ministryId).like("title", "E2E::wave23-image-test%")
