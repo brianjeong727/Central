@@ -84,11 +84,16 @@ test.describe("profile completeness gate — young adults", () => {
     expect(prof?.grade).toBe("young_adult")
     expect(prof?.graduation_year).toBeNull()
 
-    const { data: rows } = await admin.from("group_members")
-      .select("groups!group_id(name)").eq("user_id", id)
-    const names = (rows ?? []).map((r) => (r as { groups?: { name?: string } }).groups?.name).filter(Boolean)
-    console.log("### chats after completing:", JSON.stringify(names))
-    expect(names, "the label and the chat must move together").toContain("Young Adults")
+    // Poll: the chat move runs after the profile write, so a single read races it.
+    const chatNames = async () => {
+      const { data: rows } = await admin.from("group_members")
+        .select("groups!group_id(name)").eq("user_id", id)
+      return (rows ?? []).map((r) => (r as { groups?: { name?: string } }).groups?.name).filter(Boolean)
+    }
+    await expect.poll(chatNames, {
+      message: "the label and the chat must move together", timeout: 30000,
+    }).toContain("Young Adults")
+    console.log("### chats after completing:", JSON.stringify(await chatNames()))
   })
 
   test("someone genuinely missing a cohort IS still diverted", async ({ page }) => {
