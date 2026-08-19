@@ -69,6 +69,33 @@ export function nativeAuthDebugMessage(res: Extract<NativeAppleResult, { ok: fal
   return `Sign-in failed (${res.error})${res.detail ? `: ${res.detail}` : ""}`
 }
 
+/**
+ * Copy for a FAILED native Google attempt. Callers must not call this for
+ * `canceled` — a deliberate dismissal is the one outcome that should stay silent.
+ *
+ * Every other outcome has to say something. Both signup Google handlers used to
+ * message only `failed` and `unavailable` and return silently otherwise, which
+ * left the user staring at the same page after a tap that appeared to do nothing
+ * (reported from the field 2026-08-19). `no-account` is reachable on a SIGNUP
+ * flow even though the guard never rejects a signup, because signInWithGoogleNative
+ * maps EVERY failed verification onto it — including `no-server-session`, a session
+ * that had not propagated yet. That case is retryable, so it gets retry copy rather
+ * than the misleading "you have no account".
+ *
+ * Unlike Apple there is deliberately NO web fallback for `unavailable`: Google
+ * refuses OAuth in an embedded WebView (disallowed_useragent), so falling through
+ * would trade a clear message for an opaque Google error page.
+ */
+export function googleNativeFailureMessage(res: Extract<NativeAppleResult, { ok: false }>): string {
+  if (res.error === "unavailable" || res.error === "not-entitled") {
+    return "Google sign-in needs the latest app version — update Central and try again."
+  }
+  if (res.error === "no-account") {
+    return `We couldn't finish setting up your account — please try again.${res.detail ? ` (${res.detail})` : ""}`
+  }
+  return `Google sign-in didn't complete — please try again.${res.detail ? ` (${res.detail})` : ""}`
+}
+
 export async function signInWithAppleNative(flow: "signin" | "signup", opts?: NativeSignInOpts): Promise<NativeAppleResult> {
   // Android has no ASAuthorization sheet. The plugin's Android path falls back to
   // Apple's WEB flow keyed on `clientId`, and the value below is the iOS BUNDLE ID

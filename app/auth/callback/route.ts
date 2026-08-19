@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { inviteReturnPath } from "@/lib/invite-code"
+import { inviteReturnPath, codeFromReturnPath } from "@/lib/invite-code"
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
 import { enforceOAuthAccountPolicy } from "@/lib/oauth-account-guard"
@@ -49,7 +49,23 @@ export async function GET(request: NextRequest) {
     const { allowed } = await enforceOAuthAccountPolicy(admin, data.user, flow)
     if (!allowed) {
       await supabase.auth.signOut()
-      return NextResponse.redirect(new URL("/login?error=no-account", base))
+      // Carry the invite context through the rejection. This used to redirect to a
+      // BARE /login?error=no-account, which threw away the very thing the user was
+      // in the middle of: the banner's "Create your account" CTA rebuilds its href
+      // from THIS url, so a scanned-invite user was dropped on a context-free
+      // signup page — the role-choice screen, with no code attached — and every
+      // retry returned them to what looked like the start. Reported from the field
+      // 2026-08-19 as "an endless loop back to the create an account page".
+      //
+      // `intent` is untrusted, so it is COMPARED against the two literals rather
+      // than reflected; `invite` goes through inviteReturnPath, which returns null
+      // for anything malformed, so neither can smuggle a path in.
+      const rejected = new URL("/login", base)
+      rejected.searchParams.set("error", "no-account")
+      if (intent === "join" || intent === "register") rejected.searchParams.set("intent", intent)
+      const rejectedInvite = inviteReturnPath(invite)
+      if (rejectedInvite) rejected.searchParams.set("invite", codeFromReturnPath(rejectedInvite))
+      return NextResponse.redirect(rejected)
     }
 
     // The mint is legitimate — make sure the display name is the provider's real
