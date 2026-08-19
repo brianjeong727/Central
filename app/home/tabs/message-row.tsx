@@ -78,27 +78,6 @@ function renderMentions(content: string, isOwn: boolean): React.ReactNode {
   )}</>
 }
 
-function highlightText(text: string, query: string, isCurrent: boolean): React.ReactNode {
-  const q = query.toLowerCase().trim()
-  if (!q) return text
-  const lower = text.toLowerCase()
-  const parts: React.ReactNode[] = []
-  let i = 0
-  let key = 0
-  while (i < text.length) {
-    const idx = lower.indexOf(q, i)
-    if (idx === -1) { parts.push(text.slice(i)); break }
-    if (idx > i) parts.push(text.slice(i, idx))
-    parts.push(
-      <mark key={key++} style={{ background: isCurrent ? "var(--gold)" : "rgba(212,164,92,0.45)", color: "var(--ink)", borderRadius: 2, padding: "0 1px" }}>
-        {text.slice(idx, idx + q.length)}
-      </mark>
-    )
-    i = idx + q.length
-  }
-  return <>{parts}</>
-}
-
 // Memoized per-message row. ChatScreen re-renders on every composer keystroke,
 // typing broadcast, and realtime event — this memo boundary keeps rows whose
 // props didn't change from re-rendering. All callbacks passed in are stable
@@ -126,8 +105,6 @@ function MessageRowBase({
   isPollMenuOpen,
   isPinned,
   editText,
-  highlightQuery,
-  isActiveSearchMatch,
   reactions,
   linkPreview,
   readReceipts,
@@ -722,9 +699,7 @@ function MessageRowBase({
                           className={(msg.reply_to_id || msg.attachment_url) ? "px-4 pt-1.5 pb-2.5" : ""}
                           style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "break-word" }}
                         >
-                          {highlightQuery
-                            ? highlightText(msg.content, highlightQuery, isActiveSearchMatch)
-                            : renderMentions(msg.content, isOwn)}
+                          {renderMentions(msg.content, isOwn)}
                         </div>
                         {linkPreview && (
                           <a

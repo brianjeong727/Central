@@ -1056,6 +1056,11 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // chat — all in one replace.
   function handleOpenChat(id: string, name: string, type?: string) {
     setActiveTabState("chats")
+    // Browse occupies the same desktop content slot as a thread and wins the
+    // render, so opening a chat from ANYWHERE — the sidebar, search, the command
+    // palette — has to close it or the click looks ignored. Clearing it here
+    // instead of at each call site is what makes that true for every entry point.
+    setBrowseOpenGroups(false)
     setGlobalOpenChat({ id, name })
     const sub = type ? (type === "church" ? "church" : "my") : null
     setParams({ tab: "chats", chat: id, ...(sub ? { chats: sub } : {}) })
@@ -1393,7 +1398,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                     userId={userId}
                     ministryId={ministryId}
                     onBack={() => setBrowseOpenGroups(false)}
-                    onOpenChat={(id, name) => { setBrowseOpenGroups(false); handleOpenChat(id, name) }}
+                    onOpenChat={handleOpenChat}
                   />
                 ) : isDesktop && globalOpenChat ? (
                   <ChatScreen

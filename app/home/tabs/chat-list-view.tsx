@@ -1077,6 +1077,7 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
       {panelOpenGroupCount > 0 && onBrowseOpenGroups && (
         <button
           onClick={onBrowseOpenGroups}
+          aria-label="Browse open groups"
           className="w-full flex items-center gap-2.5 px-3 py-2 mb-1 flex-shrink-0 text-left transition-colors hover:bg-[var(--ivory)]"
           style={{ background: "none", border: "none", cursor: "pointer" }}
         >
