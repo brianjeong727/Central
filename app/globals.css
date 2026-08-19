@@ -681,6 +681,21 @@ html[data-kb-native] .kb-lift {
 .central-list-row { transition: background var(--dur-fast) var(--ease-out); }
 .central-list-row:hover { background: var(--cream-2); }
 
+/* Row drill-in chevron — nudges 2px toward its destination on row hover (cdesign
+   "Open groups body", K4). Transform-only, so it composites; it lives here rather
+   than inline because a parent :hover can't reach a child's inline style, and
+   because the reduced-motion guard and the pointer gate are media queries.
+   The chevron does NOT dim at rest: --faint is already the 3.48:1 UI floor, and
+   halving it lands under the 3:1 threshold. Motion is the whole affordance. */
+.row-chevron { transition: transform var(--dur-fast) var(--ease-out); }
+@media (hover: hover) and (pointer: fine) {
+  .central-list-row:hover .row-chevron { transform: translateX(2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .row-chevron { transition: none; }
+  .central-list-row:hover .row-chevron { transform: none; }
+}
+
 .central-icon-btn { transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
 .central-icon-btn:not(:disabled):hover { background: var(--ivory); color: var(--ink); }
 .central-icon-btn:not(:disabled):active { transform: scale(0.94); }
