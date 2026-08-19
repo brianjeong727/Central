@@ -1,12 +1,15 @@
-import { CSSProperties, MouseEventHandler, ReactNode } from "react"
+import { HTMLAttributes, ReactNode } from "react"
 
-interface ListRowProps {
+// Extends the plain div attributes so a row that must be KEYBOARD-REACHABLE can
+// carry `role="button"` / `tabIndex` / `aria-label` / `onKeyDown` without being an
+// actual <button>. That distinction is load-bearing wherever a row holds its own
+// nested action (the open-groups Join button): a <button> may not contain another
+// <button>, so the row is a div wearing the button role and the nested control
+// stays a real focusable button.
+interface ListRowProps extends Omit<HTMLAttributes<HTMLDivElement>, "children"> {
   last?: boolean
   hover?: boolean
-  onClick?: MouseEventHandler<HTMLDivElement>
   children: ReactNode
-  style?: CSSProperties
-  className?: string
 }
 
 // §8.3 table-row pattern: a bottom hairline divider (--line-3), chip-radius
@@ -19,9 +22,11 @@ export function ListRow({
   children,
   style,
   className,
+  ...rest
 }: ListRowProps) {
   return (
     <div
+      {...rest}
       onClick={onClick}
       className={[hover ? "central-list-row" : "", className].filter(Boolean).join(" ")}
       style={{

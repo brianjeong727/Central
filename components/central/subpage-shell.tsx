@@ -134,6 +134,14 @@ export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, titleScal
    * rule holds.
    */
   mobileMeta?: string
+  /**
+   * `full` (default) — body spans the content area at the standard `md:px-14`
+   * inset. `centered` — body is a `maxWidth` column centred in the content area
+   * (§7.0: cap a measure only if you then CENTER it). On `centered` the desktop
+   * HEADER rides that same column: title, meta, action and both hairlines share
+   * the body's left edge, so the header can never be stranded at the page inset
+   * above a column that starts hundreds of pixels further in.
+   */
   width?: "full" | "centered"
   maxWidth?: number
   children: ReactNode
@@ -221,20 +229,54 @@ export function SubpageShell({ crumbs, title, mobileTitle, mobileMeta, titleScal
       {/* Canonical page header — identical rhythm to TabPageHeader, butting the
           breadcrumb (desktop-only, like every page header). Body below starts at
           paddingTop 0 so the first child (a strip's own 12px, or a body's own
-          paddingTop) defines the next gap. */}
+          paddingTop) defines the next gap.
+
+          THE HEADER RIDES THE BODY'S COLUMN. On `width="centered"` the body is a
+          capped, centred column, so the header must sit in that SAME column —
+          title, meta, action and both hairlines share the body's left edge. It
+          did not, and the result was a title stranded at the page inset with its
+          own content starting 156px (720 col) / 240px (820 col) further in, under
+          a rule that spanned the whole content area: the header read as belonging
+          to a different page than the card beneath it. Both centered consumers
+          (open groups 720, "New workspace" 820) had it, so this is the shell's
+          flaw, not a surface's. §4.11 decides the hairline width too — a rule is
+          sized to what it separates, and here that is the column, not the page.
+          `width="full"` is untouched: same elements, same `px-14`, same
+          `InsetHairline` default `mx-14`. */}
       {title && (
         <div className="hidden md:flex md:flex-col flex-shrink-0">
-          <InsetHairline />
-          <div className="px-14" style={{ paddingTop: "var(--space-8)", paddingBottom: "var(--space-8)" }}>
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 24 }}>
-              <div style={{ minWidth: 0 }}>
-                <PageTitle title={title} compact={titleScale === "compact"} />
-                {titleMeta}
+          {width === "centered" ? (
+            // Same wrapper the body uses (mx-auto + px-5 + maxWidth), so the two
+            // can never drift apart. The hairlines go INSIDE it, which is what
+            // makes them span the column rather than the content area.
+            <div className="mx-auto w-full px-5" style={{ maxWidth }}>
+              <InsetHairline className="" />
+              <div style={{ paddingTop: "var(--space-8)", paddingBottom: "var(--space-8)" }}>
+                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 24 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <PageTitle title={title} compact={titleScale === "compact"} />
+                    {titleMeta}
+                  </div>
+                  {titleAction && <div style={{ flexShrink: 0 }}>{titleAction}</div>}
+                </div>
               </div>
-              {titleAction && <div style={{ flexShrink: 0 }}>{titleAction}</div>}
+              <InsetHairline className="" />
             </div>
-          </div>
-          <InsetHairline />
+          ) : (
+            <>
+              <InsetHairline />
+              <div className="px-14" style={{ paddingTop: "var(--space-8)", paddingBottom: "var(--space-8)" }}>
+                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 24 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <PageTitle title={title} compact={titleScale === "compact"} />
+                    {titleMeta}
+                  </div>
+                  {titleAction && <div style={{ flexShrink: 0 }}>{titleAction}</div>}
+                </div>
+              </div>
+              <InsetHairline />
+            </>
+          )}
         </div>
       )}
       {/* Mobile bottom pad clears the floating pill nav (§2.1: ~110px + safe
