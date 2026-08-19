@@ -1379,6 +1379,17 @@ export function ProfileTab({
       // cached one. The upload worked and the user saw their old photo, which is
       // indistinguishable from "you can't change it". A version stamp makes each
       // upload a distinct URL, which is what actually forces the update.
+      // If the extension changed, the OLD object is now unreferenced — publicly
+      // live with nothing pointing at it, which is the invisible leak
+      // lib/storage-cleanup.ts rule 2 exists to prevent. Reachable without the
+      // user changing file type at all, since an extensionless pick now defaults
+      // to `jpg` where it used to default to `png`. Best-effort: the new photo is
+      // already stored, so a failed sweep must not fail the upload.
+      const previous = storagePathFromPublicUrl(profile.avatar_url, "profile-images")
+      if (previous && previous !== uploadData.path && !previous.includes("/") && previous.startsWith(`${userId}.`)) {
+        await removeStorageObject(supabase, "profile-images", previous, "avatar extension change")
+      }
+
       const versioned = `${publicUrl}?v=${Date.now()}`
       // Checked, not fire-and-forget: if this write fails the object HAS been
       // replaced but the column still holds the old `?v=`, so the user sees their
