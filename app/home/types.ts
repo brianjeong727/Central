@@ -477,7 +477,11 @@ export interface CreateChatScreenProps {
   // interactive). Ignored for "my" chats. Defaults to "general".
   initialCategory?: "general" | "group" | "team"
   onClose: () => void
-  onCreated: (group: { id: string; name: string; category?: "general" | "group" | "team" | null }) => void
+  // `type` is what was ACTUALLY created, which is not always `groupType`:
+  // selecting exactly one other person produces a real DM whichever "+" opened
+  // this screen. The list's optimistic row must use this, not the composer's
+  // mode, or a DM lands in the church/my list under the wrong tab.
+  onCreated: (group: { id: string; name: string; category?: "general" | "group" | "team" | null; type?: "my" | "church" | "dm" }) => void
 }
 
 export interface ChatSettingsProps {

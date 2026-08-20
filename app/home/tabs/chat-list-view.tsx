@@ -756,8 +756,11 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           onCreated={(group) => {
             const newGroup: ChatGroup = {
               id: group.id,
+              // What was actually created, NOT the composer's mode: one recipient
+              // yields a real DM from either "+", and typing it as church/my would
+              // file the row under the wrong tab until the next revalidate.
+              type: group.type ?? showCreateChat!,
               name: group.name,
-              type: showCreateChat!,
               category: group.category ?? null,
               last_message: null,
               last_sender: null,
@@ -765,7 +768,13 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
               unread_count: 0,
               archived: false,
             }
-            mutate((current) => [newGroup, ...(current ?? [])], { revalidate: false })
+            // get_or_create_dm is idempotent, so this id may ALREADY be in the
+            // list (you picked someone you have a thread with). Prepending blind
+            // would show the same conversation twice until SWR caught up.
+            mutate(
+              (current) => [newGroup, ...(current ?? []).filter((g) => g.id !== newGroup.id)],
+              { revalidate: false },
+            )
             setShowCreateChat(null)
             setCreateChatCategory(undefined)
             onOpenChat(group.id, group.name)
@@ -1219,8 +1228,11 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
           onCreated={(group) => {
             const newGroup: ChatGroup = {
               id: group.id,
+              // What was actually created, NOT the composer's mode: one recipient
+              // yields a real DM from either "+", and typing it as church/my would
+              // file the row under the wrong tab until the next revalidate.
+              type: group.type ?? showCreateChat!,
               name: group.name,
-              type: showCreateChat!,
               category: group.category ?? null,
               last_message: null,
               last_sender: null,
@@ -1228,7 +1240,13 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
               unread_count: 0,
               archived: false,
             }
-            mutate((current) => [newGroup, ...(current ?? [])], { revalidate: false })
+            // get_or_create_dm is idempotent, so this id may ALREADY be in the
+            // list (you picked someone you have a thread with). Prepending blind
+            // would show the same conversation twice until SWR caught up.
+            mutate(
+              (current) => [newGroup, ...(current ?? []).filter((g) => g.id !== newGroup.id)],
+              { revalidate: false },
+            )
             setShowCreateChat(null)
             onOpenChat(group.id, group.name)
           }}
