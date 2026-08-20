@@ -12,12 +12,20 @@ Re-running the identical check after driving a dozen requests at the route (givi
 rebuild) produced the expected failure — `a dm row should exist for the admin/member pair` — proving
 the guard real.
 
-**The rule:** a negative check against a running dev server is only valid once the server has
-actually served the changed code. After toggling source, either
+**The rule:** an e2e result against a running dev server is only valid once the server has actually
+served the changed code. **RESTART the dev server** (`npm run dev` opens with `rm -rf .next`, so it
+is a clean slate) and re-run.
 
-- hit the route repeatedly until it has demonstrably rebuilt, then run; or
-- restart the dev server; or
-- assert on something that proves which bundle is live before trusting the result.
+Do NOT rely on warming the route with requests. It bit again the same day, in the other direction —
+a genuinely correct fix in `app/home/tabs/profile-tab.tsx` reported as broken across three runs, and
+a dozen `curl /home` calls in between changed nothing. Two reasons that warm-up is worthless here:
+`/home` 307s for an unauthenticated request so nothing under it compiles at all, and the tab files
+are `next/dynamic` chunks that are only built when a signed-in page actually asks for them. A clean
+restart fixed it on the first attempt and the debug line appeared immediately.
+
+The generalisation: **when an e2e result disagrees with a careful reading of the code, suspect the
+bundle before you suspect the code.** Both times, the instinct was to go rewrite something that was
+already right — once a spec, once a feature.
 
 The failure mode is silent and it points the WRONG WAY — a false PASS on a negative check reads as
 "weak test", and the natural response is to weaken or rewrite a spec that was already doing its job.
