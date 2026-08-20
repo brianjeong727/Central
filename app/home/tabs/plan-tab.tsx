@@ -666,9 +666,33 @@ function eventTimeLabel(iso: string, timeZone: string): string {
 // `daysUntil` / `countdownLabel` moved to app/home/utils.ts (imported above) now
 // that the shared L1 event meta line consumes the countdown too. Both still take
 // the ministry `timeZone` explicitly — see the note there.
+// An event is OVER once its last ministry-zone calendar day has passed — never
+// when it merely STARTED. `eventEndYMD` already resolves an all-day row to its
+// INCLUSIVE `end_day` and a timed row to its zoned day, and comparing two
+// "YYYY-MM-DD" strings is zone-immune, so this needs no instant arithmetic at all.
+//
+// This is the in-memory twin of the SQL rule the two query sites use
+// (`.gte("end_date", startOfTodayInstantISO(timeZone))` — the hub hero at
+// ~L1256 and the picker's workspace progress at ~L2960). Those two were fixed
+// when the same bug hit them; the events LIST kept splitting on `start_date` and
+// so filed a multi-day event under "Past events" the day after it began — Central's
+// Aug 18–29 Welcome Week went to the archive on Aug 19, mid-week. If you change
+// the rule, change it in all three.
+//
+// `now` is a PARAMETER rather than a `todayInZone()` call inside: the callers are
+// `useMemo`s keyed on the parent's ticking clock, and a helper that reads the wall
+// clock itself would make those memos silently impure — recomputing only when
+// something else happened to change, and telling eslint the `now` dependency was
+// unnecessary when it is the whole point.
+function isEventOver(ev: CalendarEvent, now: Date, timeZone: string): boolean {
+  return eventEndYMD(ev, timeZone) < instantToZoned(now, timeZone).ymd
+}
+
 // Humanised "Ended · …" label for a past event (day/week/month granularity).
-function endedAgoLabel(start: Date, now: Date, timeZone: string): string {
-  const days = -daysUntil(start, now, timeZone) // positive = days in the past
+// Measured from the event's LAST day, not its first: a 12-day Welcome Week that
+// wrapped yesterday had been reading "Ended · 13 days ago".
+function endedAgoLabel(endYMD: string, now: Date, timeZone: string): string {
+  const days = daysBetweenYMD(endYMD, instantToZoned(now, timeZone).ymd) // positive = days in the past
   if (days <= 0) return "Ended · today"
   if (days === 1) return "Ended · yesterday"
   if (days < 7) return `Ended · ${days} days ago`
@@ -794,9 +818,12 @@ function EventsAgendaList({
     () => [...events].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()),
     [events],
   )
-  // Split by the same "today" cutoff countdownLabel uses: on/after today = upcoming.
-  const upcoming = useMemo(() => sorted.filter(e => daysUntil(new Date(e.start_date), now, timeZone) >= 0), [sorted, now, timeZone])
-  const past = useMemo(() => sorted.filter(e => daysUntil(new Date(e.start_date), now, timeZone) < 0), [sorted, now, timeZone])
+  // Split on whether the event is OVER, not on when it started — an event that is
+  // happening right now belongs at the top of the list, not in the archive
+  // (see isEventOver). `now` stays in the deps so the split still re-derives on
+  // the parent's clock tick.
+  const upcoming = useMemo(() => sorted.filter(e => !isEventOver(e, now, timeZone)), [sorted, now, timeZone])
+  const past = useMemo(() => sorted.filter(e => isEventOver(e, now, timeZone)), [sorted, now, timeZone])
   const upNextId = upcoming[0]?.id ?? null
   const showPast = showPastOverride ?? (upcoming.length === 0)
   const childrenByParent = useMemo(() => {
@@ -1105,7 +1132,6 @@ function EventsAgendaList({
   const archiveView = upcoming.length === 0 && past.length > 0
   const pastDesc = archiveView ? [...past] : [...past].reverse()
   const pastNodes: ReactNode[] = pastDesc.map((ev, i) => {
-    const d = new Date(ev.start_date)
     const isFirst = i === 0
     const isLast = i === pastDesc.length - 1
     const isConfirmDelete = deleteConfirmId === ev.id
@@ -1131,7 +1157,7 @@ function EventsAgendaList({
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.08em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>{endedAgoLabel(d, now, timeZone)}</span>
+          <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.08em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>{endedAgoLabel(eventEndYMD(ev, timeZone), now, timeZone)}</span>
           {renderPlannedCheck(isPlanned)}
           {renderDeleteBtn(ev.id, isHovered)}
         </div>
