@@ -120,6 +120,14 @@ export async function autoAddUserToChats(
     .eq("ministry_id", ministryId)
     .eq("type", "church")
     .or(NOT_ARCHIVED)
+    // OLDEST FIRST, and it is load-bearing: `.find()` below picks whichever row
+    // comes back first, and a ministry can genuinely hold two chats with the same
+    // name (Central had two "Class of 2028" and two "Class of 2029" — a leader
+    // hand-made a second set not knowing the automation had already created
+    // them). Unordered, new members land in an arbitrary one and a class is
+    // silently split across two rooms. Oldest wins = the established room, the
+    // one with the people and the history in it.
+    .order("created_at", { ascending: true })
   const groupRows = (churchGroups ?? []) as { id: string; name: string; is_central_chat: boolean }[]
 
   // Central chat — always enrolled unless the automation is off. Guaranteed to
@@ -641,6 +649,9 @@ async function moveToCohortChat(
     .eq("type", "church")
     .in("name", wanted)
     .or(NOT_ARCHIVED)
+    // Oldest first — same reason as addUserToAutoChats: duplicate names exist in
+    // the wild and `.find()` must not pick between them at random.
+    .order("created_at", { ascending: true })
   const rows = (chats ?? []) as { id: string; name: string }[]
 
   const leaving = leaveName ? rows.find((g) => g.name === leaveName) : null
@@ -667,6 +678,122 @@ async function moveToCohortChat(
       { onConflict: "group_id,user_id", ignoreDuplicates: true },
     )
   }
+}
+
+// ── changeClassChat ───────────────────────────────────────────────────────────
+// A member edited their GRADUATION YEAR in their own profile. Move their class
+// chat to match, with their consent.
+//
+// The year field used to be a plain column write — it changed the label on the
+// directory row and nothing else. Meanwhile the young-adult switch DIRECTLY BESIDE
+// IT on the same screen went through moveToCohortChat and did move you, so the
+// two halves of "which cohort am I in" behaved differently depending on which
+// control you touched. A student who joined as 2027 and corrected herself to 2029
+// stayed in the Class of 2027 chat indefinitely, and nothing anywhere said so
+// (Allyson Choi, Central, 2026-08-19 — found by Brian, not by the app).
+//
+// SELF ONLY, and deliberately takes no user id: identity is auth.uid() via
+// requireMinistryMember, so there is no parameter here that could be pointed at
+// somebody else. The destination is derived from the profile ALREADY SAVED, not
+// from anything the caller sends — the client cannot ask to be placed in an
+// arbitrary class chat. `previousYear` is the one caller-supplied value, and it
+// can only cause a LEAVE of a "Class of {year}" room the caller is already in —
+// and `group_members` DELETE RLS already permits `user_id = auth.uid()`, so this
+// grants no reach the caller did not have.
+export async function changeClassChat(input: {
+  previousYear: number | null
+  keepPrevious: boolean
+}): Promise<{ error?: string; joined?: string | null; left?: string | null }> {
+  const authz = await requireMinistryMember()
+  if (authz.error !== null) return { error: authz.error }
+
+  // previousYear is the ONE caller-supplied value and it is interpolated into a
+  // chat name that goes into a PostgREST `in.()` filter. A string like
+  // `2029","Class of 2028` really does widen that filter (probed). Nothing
+  // escalates today because the exact-string `.find()` below neutralises it, but
+  // the filter should never have been widenable in the first place.
+  const previousYear =
+    Number.isInteger(input.previousYear) && (input.previousYear as number) > 1900 && (input.previousYear as number) < 2200
+      ? (input.previousYear as number)
+      : null
+
+  const admin = createAdminClient()
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("ministry_id, graduation_year, grade")
+    .eq("id", authz.userId)
+    .maybeSingle()
+  if (!profile?.ministry_id) return { error: "Couldn't find your profile." }
+
+  const ministryId = profile.ministry_id as string
+  // Derived from the SAVED profile — see the note above.
+  const joinName = cohortChatName(profile.grade as string | null, profile.graduation_year as number | null)
+  const leaveName = input.keepPrevious || previousYear == null
+    ? null
+    : classChatName(previousYear)
+  // Changing 2027 → 2027 is not a move. Nor is leaving the room you just joined.
+  if (leaveName && leaveName === joinName) return { joined: null, left: null }
+  if (!joinName && !leaveName) return { joined: null, left: null }
+
+  const { data: chats, error: readErr } = await admin
+    .from("groups")
+    .select("id, name")
+    .eq("ministry_id", ministryId)
+    .eq("type", "church")
+    .in("name", [joinName, leaveName].filter((n): n is string => !!n))
+    .or(NOT_ARCHIVED)
+    // Oldest first — a duplicate class chat must never be chosen at random.
+    .order("created_at", { ascending: true })
+  // A FAILED read is not "no chat exists". Swallowing it drops through to the
+  // create branch below and mints a SECOND "Class of {year}" — the very duplicate
+  // this function now has to defend against, manufactured by a transient error.
+  // There is no unique index on (ministry_id, name) to catch it either.
+  if (readErr) return { error: "Couldn't reach your class chats. Try again." }
+  const rows = (chats ?? []) as { id: string; name: string }[]
+
+  let left: string | null = null
+  if (leaveName) {
+    // EVERY room with that name, not just the oldest. Joining picks one; leaving
+    // must clear them all, or someone sitting in the newer duplicate is taken out
+    // of a room they were not in and left in the one they were. `select()` so the
+    // reported result reflects rows actually removed rather than a clean error.
+    const leavingIds = rows.filter((g) => g.name === leaveName).map((g) => g.id)
+    if (leavingIds.length > 0) {
+      const { data: removed } = await admin
+        .from("group_members").delete()
+        .in("group_id", leavingIds).eq("user_id", authz.userId)
+        .select("group_id")
+      if ((removed ?? []).length > 0) left = leaveName
+    }
+  }
+
+  if (!joinName) return { joined: null, left }
+
+  let joining = rows.find((g) => g.name === joinName)
+  if (!joining) {
+    // Only CREATE where the ministry has asked for class chats. Somewhere that
+    // turned the automation off should not have rooms conjured into its church
+    // list by one person editing their profile — but joining an existing one is
+    // always fine, which is why this gate sits on creation alone.
+    const { data: ministry } = await admin
+      .from("ministries").select("created_by, automation_settings")
+      .eq("id", ministryId).maybeSingle()
+    const settings = (ministry?.automation_settings ?? {}) as Record<string, unknown>
+    if (settings.auto_grade_chats !== true) return { joined: null, left }
+    const { data: created } = await admin
+      .from("groups")
+      .insert({ name: joinName, type: "church", category: "general", ministry_id: ministryId, created_by: ministry?.created_by ?? null })
+      .select("id, name")
+      .single()
+    if (created) joining = created as { id: string; name: string }
+  }
+  if (!joining) return { joined: null, left }
+
+  await admin.from("group_members").upsert(
+    [{ group_id: joining.id, user_id: authz.userId }],
+    { onConflict: "group_id,user_id", ignoreDuplicates: true },
+  )
+  return { joined: joinName, left }
 }
 
 // ── respondToGradCheck ────────────────────────────────────────────────────────

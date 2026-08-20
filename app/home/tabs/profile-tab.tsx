@@ -24,7 +24,7 @@ import { NotificationsSection } from "../components/notifications"
 import { downscaleToJpeg } from "@/lib/downscale-image"
 import type { Profile, Devotional, Prayer, Verse, NotificationSettings } from "../types"
 import { cohortLabel, isYoungAdult } from "@/lib/cohort"
-import { setYoungAdult } from "@/app/actions/auto-chats"
+import { setYoungAdult, changeClassChat } from "@/app/actions/auto-chats"
 
 // Lazy — RoleDescriptionEditor pulls in @tiptap + yjs; keep that bundle off the
 // Profile tab's chunk until the user actually opens a journal editor.
@@ -1151,6 +1151,11 @@ export function ProfileTab({
   const [saving, setSaving] = useState(false)
   const [leaveConfirm, setLeaveConfirm] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  // Class-chat move, offered after a graduation-year edit. `from` may be null
+  // (they never had a year); `to` is the year they just saved.
+  const [classPrompt, setClassPrompt] = useState<{ from: number | null; to: number } | null>(null)
+  const [keepOldClass, setKeepOldClass] = useState(false)
+  const [movingClass, setMovingClass] = useState(false)
   const [leaveError, setLeaveError] = useState<string | null>(null)
   // Mobile settings hub (gear → sections → subpage). null = on the profile;
   // "hub" = the section list; a key = one drilled section. URL-synced (?pset,
@@ -1280,6 +1285,9 @@ export function ProfileTab({
     // in their class chat — the exact split that made the graduation flow look like
     // it worked for months. Staged behind Save like every other field here
     // (Convention #21), applied only when it actually changed.
+    // Read BEFORE the write below — afterwards the old year is gone, and it is
+    // the only thing that says which class chat to take them out of.
+    const previousYear = profile.graduation_year ?? null
     const wasYoungAdult = isYoungAdult(profile.grade)
     if (draftYoungAdult !== wasYoungAdult) {
       const res = await setYoungAdult(draftYoungAdult)
@@ -1306,13 +1314,25 @@ export function ProfileTab({
     if (!error && data) setProfile(data as Profile)
     setSaving(false)
     setEditing(false)
+    // The class chat does not follow the year on its own — ASK, then move.
+    // A bare `graduation_year` write used to be the whole story, which is how a
+    // student who corrected 2027 → 2029 stayed in the Class of 2027 chat with
+    // nothing anywhere saying so. Prompted rather than automatic because it
+    // changes which room other people see you in, and because the reason for the
+    // edit varies: a correction wants a clean move, a genuine year change might
+    // want to keep the old friends too.
+    const newYear = draft.graduation_year ? parseInt(draft.graduation_year) : null
+    if (!error && newYear && newYear !== previousYear && !draftYoungAdult) {
+      setClassPrompt({ from: previousYear, to: newYear })
+      setKeepOldClass(false)
+    }
     // draftYoungAdult + profile.grade are REQUIRED here. Without them this
     // callback closes over the value they had when Edit was opened, so ticking
     // "I'm a young adult" set aria-pressed, showed no error, and saved nothing —
     // the comparison below ran against a stale `false` every time. The
     // exhaustive-deps disable was hiding exactly that.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, draftYoungAdult, profile.grade, initialProfile.ministry_id, userId, modSettings, mutateModSettings])
+  }, [draft, draftYoungAdult, profile.grade, profile.graduation_year, initialProfile.ministry_id, userId, modSettings, mutateModSettings])
 
   async function handleToggleEntries(v: boolean) {
     await supabase.from("profiles").update({ show_journal_entries: v }).eq("id", userId).eq("ministry_id", initialProfile.ministry_id ?? "")
@@ -1928,6 +1948,50 @@ export function ProfileTab({
           {renderProfileSections(true)}
         </div>
         )}
+
+      {/* Class-chat move, offered after a graduation-year edit (see handleSave).
+          ConfirmDialog rather than a bespoke panel — Convention #20 / hard-do-not
+          #11: dialogs are the shared component, and this one is a confirm with one
+          extra choice, not a new kind of surface. `danger={false}` gives it the
+          "Confirm" eyebrow and a plum primary instead of the delete styling. */}
+      <ConfirmDialog
+        open={!!classPrompt}
+        danger={false}
+        title={classPrompt ? `You're now Class of ${classPrompt.to}` : ""}
+        confirmLabel={movingClass ? "Moving…" : "Join chat"}
+        cancelLabel="Not now"
+        loading={movingClass}
+        message={classPrompt ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>
+              You&rsquo;ll be added to the <strong style={{ color: "var(--ink)" }}>Class of {classPrompt.to}</strong> chat
+              {classPrompt.from ? <> and taken out of <strong style={{ color: "var(--ink)" }}>Class of {classPrompt.from}</strong></> : null}.
+            </p>
+            {classPrompt.from && (
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 14, color: "var(--body)" }}>
+                <input
+                  type="checkbox"
+                  checked={keepOldClass}
+                  onChange={(e) => setKeepOldClass(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: "var(--plum)", cursor: "pointer" }}
+                />
+                Stay in Class of {classPrompt.from} too
+              </label>
+            )}
+          </div>
+        ) : undefined}
+        onConfirm={async () => {
+          if (!classPrompt) return
+          setMovingClass(true)
+          // Failure is deliberately quiet: the profile itself already saved, and
+          // the chat move is the optional half. Blocking the dialog open on an
+          // error would strand someone in an edit they already completed.
+          await changeClassChat({ previousYear: classPrompt.from, keepPrevious: keepOldClass }).catch(() => null)
+          setMovingClass(false)
+          setClassPrompt(null)
+        }}
+        onClose={() => setClassPrompt(null)}
+      />
       </div>}
     </div>
   )
