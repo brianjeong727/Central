@@ -77,7 +77,7 @@ test.describe("tap-to-open-profile — global overlay + message-row regression",
 
     test("quick tap → emoji picker; long-press → reply menu; sender name/avatar → profile only; reaction round-trips", async ({ page }) => {
       await page.goto(`/home?tab=chats&chat=${groupId}`)
-      const bubble = page.locator('div[title="Long-press for reply and reactions"]').filter({ hasText: MSG })
+      const bubble = page.locator('div[data-message-bubble]').filter({ hasText: MSG })
       await expect(bubble).toBeVisible({ timeout: 20000 })
 
       // (a) quick tap (<400ms) → emoji reaction bar opens
@@ -204,7 +204,7 @@ test.describe("tap-to-open-profile — global overlay + message-row regression",
 
     test("profile modal opens ABOVE the inline chat (z-order)", async ({ page }) => {
       await page.goto(`/home?tab=chats&chat=${groupId}`)
-      const bubble = page.locator('div[title="Long-press for reply and reactions"]').filter({ hasText: MSG })
+      const bubble = page.locator('div[data-message-bubble]').filter({ hasText: MSG })
       await expect(bubble).toBeVisible({ timeout: 20000 })
       const senderName = page.locator("span.cursor-pointer", { hasText: memberName }).filter({ visible: true }).first()
       await senderName.click()

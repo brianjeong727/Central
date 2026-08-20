@@ -30,11 +30,14 @@ test.describe("jumbo emoji", () => {
   })
   test.afterAll(async () => { await sandbox().deleteGroupsByPrefix(ROOM) })
 
-  // The bubble is the nearest ancestor carrying the press contract (its title is
-  // the long-press hint) — anchoring there rather than on a class keeps this
-  // honest if the styling changes shape.
+  // The bubble is the element carrying the press contract. This used to anchor on
+  // its `title` (the long-press hint), which broke the day swipe-to-reply shipped
+  // and the hint gained a clause — a copy edit silently unhooking four assertions
+  // is exactly what the "anchor on structure, not styling" note was trying to
+  // avoid. `data-message-bubble` is the stable marker for that element now, the
+  // same role `data-pocket-row` plays for the mobile list.
   const bubbleOf = (page: import("@playwright/test").Page, text: string) =>
-    page.locator("[data-bottom-anchored] [title='Long-press for reply and reactions']")
+    page.locator("[data-bottom-anchored] [data-message-bubble]")
       .filter({ hasText: text }).first()
 
   async function bubbleStyle(page: import("@playwright/test").Page, text: string) {

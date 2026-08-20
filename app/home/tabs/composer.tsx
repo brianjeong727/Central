@@ -192,7 +192,10 @@ function ComposerImpl({
     <>
       {/* ── Reply preview bar ── */}
       {replyingTo && (
-        <div className="flex-shrink-0 bg-[var(--cream)] px-4 py-2 flex items-start gap-3">
+        // `data-reply-preview` is the e2e anchor for "a reply is staged", and it
+        // carries WHO it is staged against — the sender name also appears in the
+        // transcript, so text alone can't tell the strip from the message.
+        <div data-reply-preview={replyingTo.sender_name} className="flex-shrink-0 bg-[var(--cream)] px-4 py-2 flex items-start gap-3">
           <div className="flex-1 border-l-2 border-[var(--plum)] pl-2.5 min-w-0">
             <p className="text-[11px] font-medium text-[var(--plum)] flex items-center gap-1 mb-0.5">
               <CornerUpLeft className="w-3 h-3 flex-shrink-0" />
