@@ -114,6 +114,36 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
     setCreating(true)
     setError(null)
 
+    // ONE other person is a DIRECT MESSAGE, whichever "+" opened this screen.
+    //
+    // This screen used to create whatever `groupType` it was opened with, even
+    // for a single recipient — while the button said "Message Eric" and the
+    // subtitle said "Starting a conversation with Eric". A leader who tapped the
+    // Church Chats "+" and picked one person therefore got a CHURCH chat named
+    // after that person, in the church list, with the other member's face as its
+    // icon. It happened twice to one leader inside 35 minutes (2026-08-19), and
+    // both of his real 1:1 conversations ended up living there.
+    //
+    // A 1:1 "church chat" is not a thing the product has — church chats are
+    // ministry rooms. Routing to get_or_create_dm also makes this IDEMPOTENT:
+    // the DM is keyed on the participant pair, so picking someone you already
+    // have a thread with reopens it instead of forking a second one (the exact
+    // failure groups.dm_key exists to prevent).
+    if (selectedIds.size === 1) {
+      const other = selectedMembers[0]
+      const { groupId: dmId, error: dmErr } = await getOrCreateDm(supabase, Array.from(selectedIds)[0])
+      if (dmErr || !dmId) {
+        setError(dmErr ?? "Couldn't start that conversation.")
+        setCreating(false)
+        return
+      }
+      // No "X created this chat" system line: a DM is a conversation between two
+      // people, not a room someone opened — and this call may well have RE-opened
+      // an existing thread, where announcing a creation would be a lie.
+      onCreated({ id: dmId, name: other?.name ?? name, category: null, type: "dm" })
+      return
+    }
+
     const { group, error: createErr } = await createGroup({
       name,
       type: groupType,
@@ -173,8 +203,11 @@ export function CreateChatScreen({ userId, userName, ministryId, groupType, init
             </div>
           )}
 
-          {/* Section — church chats only. General / Groups / Teams. */}
-          {groupType === "church" && (
+          {/* Section — church chats only. General / Groups / Teams.
+              Hidden once exactly one person is selected: that now creates a DM,
+              and a DM has no section. Leaving the picker up would ask for a
+              choice that is then silently discarded. */}
+          {groupType === "church" && !isDM && (
             <div className="flex flex-col gap-2.5">
               <label style={{ fontSize: "10px", fontWeight: 400, letterSpacing: "1.2px", textTransform: "uppercase", color: "var(--muted-text)" }}>Section</label>
               <div className="flex flex-wrap gap-2">
