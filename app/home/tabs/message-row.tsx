@@ -4,7 +4,7 @@ import { memo, useId, useState, useEffect, useRef, useLayoutEffect } from "react
 import { createPortal } from "react-dom"
 import dynamic from "next/dynamic"
 import { Check, MoreHorizontal, Trash2, CornerUpLeft, Plus, Pencil, Forward, Pin, FileDown, Flag } from "lucide-react"
-import { MonogramChip, ConfirmDialog } from "@/components/central"
+import { MonogramChip, ConfirmDialog, useSwipeToReply } from "@/components/central"
 import { formatMessageTime, REACTION_EMOJIS } from "../utils"
 import { useOpenMemberProfile } from "../member-profile-context"
 import type { MessageRowProps } from "../types"
@@ -172,6 +172,27 @@ function MessageRowBase({
   const openMemberProfile = useOpenMemberProfile()
   const canOpenSenderProfile = !isOwn && !!msg.sender_id && !senderDeparted
   const openSenderProfile = () => { if (canOpenSenderProfile) openMemberProfile(msg.sender_id!) }
+  // Swipe right on the bubble → reply. Convention #7's THIRD input, alongside
+  // the <400ms tap and the ≥400ms long-press; `onLock` is what stops a slow
+  // swipe from also firing the long-press timer those two share.
+  //
+  // The glyph is driven by a direct DOM write, not React state: this fires on
+  // every touchmove, and re-rendering a row inside a ~100-row transcript at
+  // touch frequency is a self-inflicted stutter (same reasoning as
+  // `subscribeKeyboard` not being a hook, Convention #28).
+  const replyGlyphRef = useRef<HTMLSpanElement>(null)
+  const bubbleRef = useSwipeToReply<HTMLDivElement>(
+    msg.deleted ? undefined : () => setReplyingTo(msg),
+    {
+      onLock: onPointerCancel,
+      onProgress: (p) => {
+        const g = replyGlyphRef.current
+        if (!g) return
+        g.style.opacity = String(p)
+        g.style.transform = `scale(${0.7 + p * 0.3})`
+      },
+    },
+  )
   const anyMenuOpen = isEmojiPickerOpen || isFullPickerOpen || isContextMenuOpen
   useLayoutEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- measured-placement reset; behavior-frozen (Convention #7), fix deferred
@@ -788,7 +809,16 @@ function MessageRowBase({
           </div>
         )}
 
-        {/* Avatar + bubble row */}
+        {/* Avatar + bubble row. An OWN bubble is right-aligned and flush to the
+            transcript's trailing inset, so answering a RIGHTWARD swipe means
+            travelling off the edge — the clip that allows that lives on the
+            transcript scroller (`overflow-x-hidden` in chats-tab.tsx), not here,
+            because `overflow: hidden` clips at the PADDING box and the scroller's
+            padding box is the screen. Clipping on this row instead cuts at its
+            CONTENT box, 16px in, which leaves a cream strip beside a hard-sliced
+            bubble and reads as a rendering bug (measured: row right edge 374,
+            screen 390). `overflow-clip-margin` does not rescue it — with a
+            one-axis `clip` it computes to 0px. */}
         <div className={`flex items-end gap-2 w-full ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
           {/* Avatar — shown for every incoming message. Tap opens the sender's
               profile (a sibling of the bubble → does not touch the bubble's
@@ -807,13 +837,39 @@ function MessageRowBase({
             </span>
           )}
 
+          {/* Bubble wrapper — carries the 75% clamp (moved off the bubble so the
+              bubble itself can translate) and anchors the reply glyph. The glyph
+              sits AT the bubble's resting left edge, hidden behind it, and is
+              uncovered by the swipe: anchoring to the bubble's own box is the
+              only placement that works for an incoming bubble (fixed left edge,
+              avatar beside it) and an own one (right-aligned, left edge varies
+              with content) without measuring anything. */}
+          <div className="relative flex max-w-[75%] min-w-0">
+            <span
+              ref={replyGlyphRef}
+              aria-hidden
+              style={{
+                position: "absolute", left: 8, top: "50%", marginTop: -8,
+                opacity: 0, transform: "scale(0.7)", pointerEvents: "none",
+                display: "inline-flex",
+              }}
+            >
+              <CornerUpLeft style={{ width: 16, height: 16, color: "var(--muted-text)" }} />
+            </span>
           <div
-            title="Long-press for reply and reactions"
+            ref={bubbleRef}
+            // The swipe target, and the e2e anchor for it — same role
+            // `data-pocket-row` plays for the mobile list gestures.
+            data-message-bubble={msg.id}
+            title="Swipe right to reply · long-press for reactions"
             onPointerDown={() => onPointerDown(msg)}
             onPointerUp={() => onPointerUp(msg)}
             onPointerLeave={onPointerCancel}
             onPointerCancel={onPointerCancel}
-            className={`max-w-[75%] text-[14px] leading-[1.4] select-none overflow-hidden ${
+            // pan-y leaves vertical scrolling and pull-to-refresh entirely to the
+            // browser — the swipe only ever claims a horizontal drag.
+            style={{ touchAction: "pan-y" }}
+            className={`relative text-[14px] leading-[1.4] select-none overflow-hidden ${
               isJumbo
                 // No surface, no padding, no radius — the emoji IS the message.
                 // Same element and same handlers, so Convention #7's tap/long-press
@@ -963,6 +1019,7 @@ function MessageRowBase({
                 )}
               </>
             )}
+          </div>
           </div>
         </div>
 

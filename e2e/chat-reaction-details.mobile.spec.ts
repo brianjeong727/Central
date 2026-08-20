@@ -127,7 +127,7 @@ test.describe("reaction details — mobile (390) pill interaction + sheet", () =
     await expect(page.getByRole("tooltip")).toHaveCount(0)
 
     // Round-trips: react again via the quick-react bar, tap the pill again.
-    const bubble = page.locator('div[title="Long-press for reply and reactions"]').filter({ hasText: TOGGLE_MSG })
+    const bubble = page.locator('div[data-message-bubble]').filter({ hasText: TOGGLE_MSG })
     await bubble.click()
     const thumbsUp = page.getByRole("button", { name: "👍", exact: true })
     await expect(thumbsUp).toBeVisible({ timeout: 2000 })
@@ -139,7 +139,7 @@ test.describe("reaction details — mobile (390) pill interaction + sheet", () =
 
   test("long-press (>=400ms touch) opens the reactor sheet, grouped by emoji with the pressed emoji first, names resolved and 'You' for the viewer — and does not toggle the reaction or leak to the bubble's own menu", async ({ page }) => {
     await page.goto(`/home?tab=chats&chat=${sheetGroupId}`)
-    const bubble = page.locator('div[title="Long-press for reply and reactions"]').filter({ hasText: SHEET_MSG })
+    const bubble = page.locator('div[data-message-bubble]').filter({ hasText: SHEET_MSG })
     await expect(bubble).toBeVisible({ timeout: 20000 })
 
     const heartPill = pillLocator(page, "❤️")

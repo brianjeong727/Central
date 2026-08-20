@@ -3881,7 +3881,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           legitimately begins near the bottom of the viewport. Marked at the
           component so e2e/mobile-screen-sweep skips it by property rather than by
           keeping a list of screen names (same shape as `data-empty-state`). */}
-      <div data-bottom-anchored ref={scrollContainerRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto px-4 md:px-6 pt-2 pb-4 md:py-4">
+      {/* `overflow-x-hidden` is load-bearing for swipe-to-reply: an own bubble
+          translates rightward past this box, and `overflow-y-auto` alone leaves
+          overflow-x computed as `auto`, so that travel would become real
+          horizontal scroll. `hidden` clips at the PADDING box — the screen edge —
+          which is the cut iMessage makes. */}
+      <div data-bottom-anchored ref={scrollContainerRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-6 pt-2 pb-4 md:py-4">
         {loading ? (
           <Spinner />
         ) : messages.length === 0 ? (
