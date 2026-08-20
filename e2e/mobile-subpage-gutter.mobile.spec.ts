@@ -61,11 +61,11 @@ test.describe("mobile subpage gutter contract (20px, never doubled)", () => {
     if (ev) { teamId = (ev as { team_id: string }).team_id; eventTitle = (ev as { title: string }).title }
   })
 
-  test.beforeEach(() => {
-    test.skip(!teamId, "no team-owned event in this lane's sandbox")
-  })
-
   test("event workspace hub and its spokes hold the 20px gutter", async ({ page }) => {
+    // Only THIS test needs an event. The skip used to sit in a beforeEach, which
+    // silently took the team-settings test down with it — and team settings is a
+    // screen with no event in it at all.
+    test.skip(!teamId, "no team-owned event in this lane's sandbox")
     await page.goto(`/home?tab=plan&team=${teamId}`)
     const card = page.getByText(eventTitle, { exact: true }).filter({ visible: true }).first()
     await card.waitFor({ state: "visible", timeout: 30_000 })
