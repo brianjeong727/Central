@@ -42,10 +42,13 @@ export async function GET(request: NextRequest) {
     const admin = createAdminClient()
 
     // Mint policy (full rationale in lib/oauth-account-guard.ts, shared with the
-    // native Sign in with Apple path): flow=signup stamps the durable
-    // central_signup marker; anything else — INCLUDING a missing flow param — runs
-    // signin-strict and tears down fresh unknown mints. An attacker hand-crafting a
-    // code-bearing redirect_to WITHOUT params must not slip through a lenient path.
+    // native Sign in with Apple path): the teardown fires ONLY on an explicit
+    // flow=signin. Every other value — signup, stranded, or a flow we simply lost —
+    // takes the permissive branch, because absence of the marker is our bug and only
+    // a sign-in asserts "I already have an account". This paragraph used to argue the
+    // opposite, and that argument is what deleted real signups when GoTrue stripped
+    // our params; if you are here to restore the strict default, read the function
+    // doc first.
     const { allowed } = await enforceOAuthAccountPolicy(admin, data.user, flow)
     if (!allowed) {
       await supabase.auth.signOut()
@@ -116,8 +119,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL("/home", base))
     }
 
-    console.log("[auth/callback] no ministry → landing")
-    return NextResponse.redirect(new URL("/landing", base))
+    // /ministries, NOT /landing. A user who has just finished creating an account
+    // has somewhere to be — browse, enter an invite code, or register a ministry —
+    // and the marketing page's primary CTA is "Get started", which points straight
+    // back at /signup. Dropping a freshly signed-up user there is the second reason
+    // this flow read as "it just brings me back to the create an account page".
+    // Matches proxy.ts ("/ministries is the canonical landing" for a no-ministry
+    // user) and the native path's NATIVE_FALLBACK, which already answered /ministries.
+    console.log("[auth/callback] no ministry → ministries")
+    return NextResponse.redirect(new URL("/ministries", base))
 
   } catch (err) {
     console.error("[auth/callback] unexpected error:", err)

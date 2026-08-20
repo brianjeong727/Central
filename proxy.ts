@@ -73,16 +73,23 @@ export async function proxy(request: NextRequest) {
   // to the bare origin. With detectSessionInUrl OFF the browser correctly refuses to
   // redeem it — but the user is left dumped on the marketing page with a cryptic code
   // and no verdict. Forward any code-bearing root request into the guarded callback so
-  // the real exchange + unknown-mint teardown runs and the user lands on /login with a
-  // proper message. flow=signin: a stranded code is always a sign-in return (register
-  // uses intent=register, preserved if present).
+  // the real exchange runs and the user gets a verdict instead of a cryptic URL.
+  //
+  // flow=stranded, NOT signin. A stranded code is precisely the case where we do not
+  // know what the user was doing — the marker was lost on the way here — and this
+  // recovery is reached only when our own redirect configuration is wrong. Labelling
+  // it a sign-in is what turned a config mismatch into account destruction at launch:
+  // the mint guard tore down every fresh Google/Apple signup that came through here
+  // (lib/oauth-account-guard.ts holds the full account). "stranded" reaches the guard
+  // as a non-signin value and therefore takes the permissive branch — an admitted mint
+  // costs nothing, a deleted one costs a user their provider identity.
   if (
     (request.nextUrl.pathname === '/' || request.nextUrl.pathname === '/landing') &&
     request.nextUrl.searchParams.has('code')
   ) {
     const cb = new URL('/auth/callback', request.url)
     cb.search = request.nextUrl.search
-    if (!cb.searchParams.has('flow')) cb.searchParams.set('flow', 'signin')
+    if (!cb.searchParams.has('flow')) cb.searchParams.set('flow', 'stranded')
     return NextResponse.redirect(cb)
   }
 
