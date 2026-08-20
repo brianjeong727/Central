@@ -2290,6 +2290,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const [seenByCount, setSeenByCount] = useState<number | null>(null)
   const [seenByOpen, setSeenByOpen] = useState(false)
   const [seenByList, setSeenByList] = useState<{ name: string; avatarUrl: string | null }[] | null>(null)
+  // "Who reacted" — the pill that was long-pressed. Its emoji floats first in the
+  // sheet; the sheet itself lists every reactor on that message.
+  const [reactorSheet, setReactorSheet] = useState<{ messageId: string; emoji: string } | null>(null)
   // Departed members — show "left" indicator on their messages.
   // SWR-cached ministry-scoped lookup, pure fetcher; derived to a Set below.
   const { data: departuresData } = useSWR(
@@ -3119,6 +3122,22 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     reactionsRef.current = reactions
   }, [reactions])
 
+  // Same trick for the reactor-name resolver the DESKTOP hover tooltip calls: the
+  // rows are memoized, so the callback must never change identity, but the roster
+  // it reads arrives asynchronously. `loaded` rides along because "not in the map"
+  // means two different things before and after the SWR resolves — and calling live
+  // people "Former member" for the first second of a cold room is a false statement,
+  // not a neutral placeholder.
+  const rosterLookupRef = useRef<{ loaded: boolean; byId: Map<string, string> }>({ loaded: false, byId: new Map() })
+  useEffect(() => {
+    rosterLookupRef.current = { loaded: rosterLoaded, byId: new Map(roster.map((m) => [m.id, m.displayName])) }
+  }, [roster, rosterLoaded])
+  const resolveReactorName = useCallback((uid: string): string | null => {
+    const r = rosterLookupRef.current
+    if (!r.loaded) return null
+    return r.byId.get(uid) ?? "Former member"
+  }, [])
+
   // Scroll to bottom after initial load
   useEffect(() => {
     if (!loading) scrollToBottom(false)
@@ -3626,6 +3645,45 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     }
   }, [supabase, userId])
 
+  // Stable (empty dep list) so passing it to every MessageRow can't defeat the memo
+  // boundary — the sheet's CONTENT is derived below, outside the rows.
+  const handleShowReactors = useCallback((messageId: string, emoji: string) => {
+    setReactorSheet({ messageId, emoji })
+  }, [])
+
+  // Sheet content: this message's reactions grouped by emoji, held emoji first, then
+  // by size. Identity resolves through the roster SWR already in hand — no fetch.
+  // Someone who left the chat (or deleted their account) is absent from it: they
+  // render as "Former member", never as a uuid and never silently dropped.
+  //
+  // `rosterLoaded` is load-bearing, not defensive: before the SWR resolves the map is
+  // EMPTY, and without this guard a fast long-press on a cold room would tell you
+  // every person who reacted had left. The sheet shows its spinner instead.
+  const reactorGroups = useMemo<ReactorGroup[]>(() => {
+    if (!reactorSheet || !rosterLoaded) return []
+    const rows = reactions[reactorSheet.messageId] ?? []
+    if (rows.length === 0) return []
+    const byId = new Map(roster.map((m) => [m.id, m]))
+    const byEmoji = new Map<string, ReactorGroup["reactors"]>()
+    for (const r of rows) {
+      const member = byId.get(r.user_id)
+      const list = byEmoji.get(r.emoji) ?? []
+      list.push({
+        id: r.id,
+        name: r.user_id === userId ? "You" : (member?.displayName ?? "Former member"),
+        avatarUrl: member?.avatarUrl ?? null,
+      })
+      byEmoji.set(r.emoji, list)
+    }
+    return [...byEmoji.entries()]
+      .map(([emoji, reactors]) => ({ emoji, reactors }))
+      .sort((a, b) => {
+        if (a.emoji === reactorSheet.emoji) return -1
+        if (b.emoji === reactorSheet.emoji) return 1
+        return b.reactors.length - a.reactors.length
+      })
+  }, [reactorSheet, rosterLoaded, reactions, roster, userId])
+
   // O(1) per-row search-match lookup for the memoized rows.
 
   // Per-message resolved link preview — each row receives ONE object (or
@@ -3896,6 +3954,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   onUnpin={handleUnpin}
                   onScrollToMessage={scrollToMessage}
                   onOpenVoteSheet={openVoteSheet}
+                  onShowReactors={handleShowReactors}
+                  resolveReactorName={resolveReactorName}
                   setEmojiPickerFor={setEmojiPickerFor}
                   setFullReactionPickerFor={setFullReactionPickerFor}
                   setContextMenuFor={setContextMenuFor}
@@ -4151,6 +4211,13 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         )
       })()}
 
+      {/* Who reacted (touch long-press on a reaction pill). Unmounts itself if the
+          last reaction on the message is removed while it is open. Stays mounted —
+          on a spinner — until the roster resolves, so no row is ever mislabelled. */}
+      {reactorSheet && (!rosterLoaded || reactorGroups.length > 0) && (
+        <ReactorSheet groups={reactorGroups} loading={!rosterLoaded} onClose={() => setReactorSheet(null)} />
+      )}
+
       {/* Poll creator modal */}
       {showPollCreator && !groupArchived && (
         <CentralModal
@@ -4283,5 +4350,72 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       </div>
     )}
     </>
+  )
+}
+
+// ── "Who reacted" sheet ──────────────────────────────────────────────────────
+// Opened by a ≥400ms TOUCH press on a reaction pill (message-row.tsx). Lists EVERY
+// reactor on that message grouped by emoji, with the pressed emoji's group first —
+// the pill you held is the one you asked about, but the whole picture is one
+// scroll away, which is the iMessage/Messenger grammar.
+//
+// Identity comes from the already-loaded ["chat-roster", groupId] SWR — no fetch,
+// no realtime subscription (Convention #18: this stays an on-demand read). A
+// reactor who has since left the chat, or whose account is gone, is not in that
+// roster; they render as "Former member" rather than a raw uuid or a silently
+// dropped row. While the roster is still resolving the sheet shows a spinner —
+// the caller passes `loading` — because an empty roster would otherwise assert
+// that every live person had left.
+//
+// PHONE-WIDTH ONLY, and sized to mobile_design_system.md §2/§4 accordingly: a row
+// whose subject is a person takes a 40px round MonogramChip and a 15/600 title,
+// with 13 reserved for meta. Desktop deliberately has NO modal counterpart — it
+// reveals the same names in a hover tooltip on the pill itself, and two doors to
+// one room is what this delete avoids.
+export type ReactorGroup = {
+  emoji: string
+  reactors: { id: string; name: string; avatarUrl: string | null }[]
+}
+
+function ReactorSheet({ groups, loading, onClose }: { groups: ReactorGroup[]; loading: boolean; onClose: () => void }) {
+  return (
+    <PocketSheet title="Reactions" onClose={onClose} zIndex={210}>
+      {loading ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="w-5 h-5 border-2 border-[var(--plum)] border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-[22px]">
+          {groups.map((g) => (
+            <div key={g.emoji}>
+              <div className="flex items-center mb-2">
+                {/* The reaction emoji IS the content here, not iconography — the same
+                    carve-out the chat emoji picker holds. */}
+                <span
+                  className="inline-flex items-center gap-1.5"
+                  style={{ background: "var(--ivory)", borderRadius: 999, padding: "4px 10px", fontSize: 15 }}
+                >
+                  <span>{g.emoji}</span>
+                  <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{g.reactors.length}</span>
+                </span>
+              </div>
+              <div className="flex flex-col gap-2">
+                {g.reactors.map((r) => (
+                  <div key={r.id} className="flex items-center gap-3">
+                    <MonogramChip
+                      initials={r.name.charAt(0).toUpperCase()}
+                      avatarUrl={r.avatarUrl}
+                      className="w-10 h-10"
+                      style={{ fontSize: 13 }}
+                    />
+                    <span style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>{r.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </PocketSheet>
   )
 }

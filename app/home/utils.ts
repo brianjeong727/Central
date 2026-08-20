@@ -214,6 +214,129 @@ export function chatPreviewLabel(content?: string | null, attachmentType?: strin
   return ""
 }
 
+// ── Reaction previews ────────────────────────────────────────────────────────
+// A reaction is a first-class event in the chat list: when it is the most recent
+// thing that happened in a room, the row reads as a sentence naming the actor,
+// the emoji and what was reacted to — the iMessage/Messenger grammar.
+//
+// Deliberately a plain STRING, like every other preview. Five render sites consume
+// `last_message`/`lastMessage` as text (mobile list, desktop panel, Home strip, ⌘K,
+// SSR boot); a compound shape would have to be understood by all of them.
+//
+// The row that carries a reaction preview sets `last_sender` to null — the sentence
+// already names the actor, and chat-list-view prefixes `${last_sender}: `.
+
+/** How much of the reacted-to message is echoed back inside the quotes. */
+const RX_TARGET_MAX = 40
+
+export type ReactionPreviewInput = {
+  emoji: string | null
+  /** Who reacted. Compared against `viewerId` to render "You". */
+  reactorId: string | null
+  reactorName: string | null
+  /** The reacted-TO message. */
+  targetContent: string | null
+  targetAttachmentType: string | null
+  targetHasPoll: boolean | null
+  targetSenderId: string | null
+  viewerId?: string | null
+}
+
+/** `Brian reacted 👍 to "See you Friday"` — the ONE place this sentence is built. */
+export function reactionPreviewLabel(input: ReactionPreviewInput): string {
+  const { emoji, reactorId, reactorName, viewerId } = input
+  if (!emoji) return ""
+  const actor = viewerId && reactorId === viewerId ? "You" : (reactorName || "Someone")
+
+  // Being the author changes the POSSESSIVE ("your photo"), and it suppresses the
+  // quote — echoing your own words back at you is less useful than being told the
+  // message was yours. It does NOT flatten a photo/file/poll into "your message":
+  // the shape of the thing is the informative part either way.
+  const isAuthor = !!viewerId && input.targetSenderId === viewerId
+
+  const isPhoto = !!input.targetAttachmentType?.startsWith("image/")
+  const isFile = !isPhoto && !!input.targetAttachmentType
+  const isPoll = !isPhoto && !isFile && !!input.targetHasPoll
+
+  let object: string
+  if (isAuthor) {
+    object = isPhoto ? "your photo" : isFile ? "your file" : isPoll ? "your poll" : "your message"
+  } else if (input.targetContent && input.targetContent.trim()) {
+    // Text outranks an attachment for everyone else, exactly as chatPreviewLabel
+    // orders it — a captioned photo reads as its caption.
+    const text = previewBody(input.targetContent)
+    const clipped = text.length > RX_TARGET_MAX ? `${text.slice(0, RX_TARGET_MAX - 1).trimEnd()}…` : text
+    object = `"${clipped}"`
+  } else {
+    object = isPhoto ? "a photo" : isFile ? "a file" : isPoll ? "a poll" : "a message"
+  }
+  return `${actor} reacted ${emoji} to ${object}`
+}
+
+/** The reaction columns both chat RPCs return (get_chat_list / get_chat_previews). */
+export type ReactionRowFields = {
+  last_rx_at: string | null
+  last_rx_emoji: string | null
+  last_rx_user_id: string | null
+  last_rx_user_name: string | null
+  last_rx_target_content: string | null
+  last_rx_target_attachment_type: string | null
+  last_rx_target_has_poll: boolean | null
+  last_rx_target_sender_id: string | null
+}
+
+/** The message columns both chat RPCs return. */
+export type MessageRowFields = {
+  last_msg_content: string | null
+  last_msg_attachment_type: string | null
+  last_msg_has_poll: boolean | null
+  last_msg_sender_name: string | null
+  last_msg_at: string | null
+}
+
+/**
+ * Decide what a conversation row SAYS and what it sorts by: the newest reaction
+ * wins only when it is strictly newer than the last message (or there is no
+ * message at all); otherwise nothing about today's behaviour changes.
+ *
+ * ONE implementation, shared by mapChatListRows (client fetcher + SSR boot) and
+ * rowsToChatPreviews (Home strip) — the two must produce byte-identical shapes or
+ * the list visibly reshuffles on hydration.
+ */
+export function chatRowPreview(
+  row: Partial<ReactionRowFields> & MessageRowFields,
+  viewerId?: string | null,
+): { label: string; senderName: string | null; at: string | null } {
+  const rxAt = row.last_rx_at ?? null
+  const msgAt = row.last_msg_at ?? null
+  const rxWins =
+    !!rxAt && !!row.last_rx_emoji &&
+    (!msgAt || new Date(rxAt).getTime() > new Date(msgAt).getTime())
+
+  if (rxWins) {
+    return {
+      label: reactionPreviewLabel({
+        emoji: row.last_rx_emoji ?? null,
+        reactorId: row.last_rx_user_id ?? null,
+        reactorName: row.last_rx_user_name ?? null,
+        targetContent: row.last_rx_target_content ?? null,
+        targetAttachmentType: row.last_rx_target_attachment_type ?? null,
+        targetHasPoll: row.last_rx_target_has_poll ?? null,
+        targetSenderId: row.last_rx_target_sender_id ?? null,
+        viewerId,
+      }),
+      // The sentence names the actor already — a "Brian: " prefix would double it.
+      senderName: null,
+      at: rxAt,
+    }
+  }
+  return {
+    label: chatPreviewLabel(row.last_msg_content, row.last_msg_attachment_type, row.last_msg_has_poll),
+    senderName: row.last_msg_sender_name ?? null,
+    at: msgAt,
+  }
+}
+
 // Preview label for a replied-to / pinned / forwarded message. Text wins; falls
 // back to "Photo" for images or the attachment name / "File" otherwise.
 export function replyPreviewLabel(
@@ -255,32 +378,38 @@ export type ChatPreviewRow = {
   // other participant's. Resolved to ONE url below via chatChipAvatar().
   group_avatar_url: string | null
   partner_avatar_url: string | null
-}
+} & ReactionRowFields
 
 /** Map + sort `get_chat_previews` rows into the ChatPreview shape the Home strip
- *  renders. Newest first; rows with no message sort last (never interleaved). */
-export function rowsToChatPreviews(rows: ChatPreviewRow[]): ChatPreview[] {
+ *  renders. Newest first; rows with no message sort last (never interleaved).
+ *  `viewerId` is what lets a reaction preview say "You" / "your message". */
+export function rowsToChatPreviews(rows: ChatPreviewRow[], viewerId?: string | null): ChatPreview[] {
   return rows
-    .map((row) => ({
-      id: row.group_id,
-      groupName: row.group_name,
-      type: row.group_type,
-      lastMessage: chatPreviewLabel(row.last_msg_content, row.last_msg_attachment_type, row.last_msg_has_poll),
-      lastMessageSender: row.last_msg_sender_name ?? "",
-      unreadCount: Number(row.unread_count),
-      initials: getInitials(row.group_name),
-      // ChatPreview crosses into components/central (a LEAF), so the DM branch
-      // is applied HERE and the strip only ever sees the resolved url.
-      avatarUrl: chatChipAvatar({
+    .map((row) => {
+      const preview = chatRowPreview(row, viewerId)
+      return {
+        id: row.group_id,
+        groupName: row.group_name,
         type: row.group_type,
-        group_avatar_url: row.group_avatar_url,
-        partner_avatar_url: row.partner_avatar_url,
-      }),
-      time: row.last_msg_at ? formatChatListTime(row.last_msg_at) : "",
-      muted: row.muted ?? false,
-      pinned: row.pinned ?? false,
-      _ts: row.last_msg_at ?? "",
-    }))
+        lastMessage: preview.label,
+        lastMessageSender: preview.senderName ?? "",
+        unreadCount: Number(row.unread_count),
+        initials: getInitials(row.group_name),
+        // ChatPreview crosses into components/central (a LEAF), so the DM branch
+        // is applied HERE and the strip only ever sees the resolved url.
+        avatarUrl: chatChipAvatar({
+          type: row.group_type,
+          group_avatar_url: row.group_avatar_url,
+          partner_avatar_url: row.partner_avatar_url,
+        }),
+        // Timestamp AND sort key come from whichever event won — a reaction bumps
+        // the row exactly like a message does.
+        time: preview.at ? formatChatListTime(preview.at) : "",
+        muted: row.muted ?? false,
+        pinned: row.pinned ?? false,
+        _ts: preview.at ?? "",
+      }
+    })
     .sort((a, b) => {
       if (!a._ts && !b._ts) return 0
       if (!a._ts) return 1

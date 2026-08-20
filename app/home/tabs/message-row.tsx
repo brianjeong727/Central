@@ -1,6 +1,7 @@
 "use client"
 
-import { memo, useState, useEffect, useRef, useLayoutEffect } from "react"
+import { memo, useId, useState, useEffect, useRef, useLayoutEffect } from "react"
+import { createPortal } from "react-dom"
 import dynamic from "next/dynamic"
 import { Check, MoreHorizontal, Trash2, CornerUpLeft, Plus, Pencil, Forward, Pin, FileDown, Flag } from "lucide-react"
 import { MonogramChip, ConfirmDialog } from "@/components/central"
@@ -70,6 +71,19 @@ function formatDateLabel(dateStr: string): string {
   return isToday ? `TODAY · ${month} ${day}` : `${date.toLocaleString("en-US", { weekday: "short" }).toUpperCase()} · ${month} ${day}`
 }
 
+// "Brian", "Brian and Anna", "Brian, Anna and Josh", and past the cap
+// "A, B, … H and 4 more". Capped because the design contract is explicit about not
+// designing for unbounded scale — a 60-person room must not render a 60-name tip.
+const RX_TIP_MAX_NAMES = 8
+function listSentence(names: string[]): string {
+  if (names.length === 1) return names[0]
+  if (names.length <= RX_TIP_MAX_NAMES) {
+    return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`
+  }
+  const shown = names.slice(0, RX_TIP_MAX_NAMES)
+  return `${shown.join(", ")} and ${names.length - RX_TIP_MAX_NAMES} more`
+}
+
 function renderMentions(content: string, isOwn: boolean): React.ReactNode {
   const parts = content.split(/(@\S+)/g)
   return <>{parts.map((part, i) =>
@@ -134,6 +148,8 @@ function MessageRowBase({
   onUnpin,
   onScrollToMessage,
   onOpenVoteSheet,
+  onShowReactors,
+  resolveReactorName,
   setEmojiPickerFor,
   setFullReactionPickerFor,
   setContextMenuFor,
@@ -221,13 +237,214 @@ function MessageRowBase({
   const isJumbo = jumboCount !== null
 
   // Grouped reactions — derived from this row's reactions slice only
-  const rxMap: Record<string, { count: number; userReacted: boolean }> = {}
+  const rxMap: Record<string, { count: number; userReacted: boolean; userIds: string[] }> = {}
   for (const rx of reactions ?? []) {
-    if (!rxMap[rx.emoji]) rxMap[rx.emoji] = { count: 0, userReacted: false }
+    if (!rxMap[rx.emoji]) rxMap[rx.emoji] = { count: 0, userReacted: false, userIds: [] }
     rxMap[rx.emoji].count++
+    rxMap[rx.emoji].userIds.push(rx.user_id)
     if (rx.user_id === userId) rxMap[rx.emoji].userReacted = true
   }
   const rxGroups = Object.entries(rxMap).map(([emoji, v]) => ({ emoji, ...v }))
+
+  // ── Reaction-pill interaction ──────────────────────────────────────────────
+  // TOUCH: tap toggles, ≥400ms opens the "who reacted" sheet — the same 400ms
+  // grammar as Convention #7, but entirely LOCAL to the pill (the pointerdown
+  // still stopPropagation()s, so the bubble's own timer never starts).
+  //
+  // MOUSE: press-and-hold is DELIBERATELY not a gesture here. Nothing else in
+  // Central works that way, and arming it meant a slow click silently lost its
+  // toggle. A desktop click has exactly one meaning — toggle — and the reactors
+  // are revealed by HOVER instead (see the tooltip below). So the whole timer
+  // path, and with it the trailing-click suppression, is skipped for a mouse.
+  //
+  // The trailing `click` after a touch long-press is the trap: without eating it,
+  // opening the sheet would ALSO toggle. `suppressClick` is armed the moment the
+  // sheet fires (and on cancel/multi-touch) and disarmed at the start of the next
+  // fresh press, so a gesture that never emits a click can't leave it poisoned.
+  // Keyboard activation (Enter/Space) emits a click with no pointerdown, so it
+  // always falls through to the toggle.
+  const rxPress = useRef<{
+    timer: ReturnType<typeof setTimeout> | null
+    pointerId: number | null
+    x: number
+    y: number
+    suppressClick: boolean
+  }>({ timer: null, pointerId: null, x: 0, y: 0, suppressClick: false })
+
+  // A row unmounting mid-press (pagination, room switch) must not fire the sheet.
+  useEffect(() => {
+    const p = rxPress.current
+    return () => { if (p.timer) clearTimeout(p.timer) }
+  }, [])
+
+  const endRxPress = (suppressClick: boolean) => {
+    const p = rxPress.current
+    if (p.timer) { clearTimeout(p.timer); p.timer = null }
+    p.pointerId = null
+    if (suppressClick) p.suppressClick = true
+  }
+
+  const handleRxPointerDown = (e: React.PointerEvent<HTMLButtonElement>, emoji: string) => {
+    // Keep the bubble's 400ms timer out of this — same guarantee the bare
+    // stopPropagation used to give.
+    e.stopPropagation()
+    // A mouse never long-presses. Desktop reaches the reactors by hovering.
+    if (e.pointerType === "mouse") return
+    const p = rxPress.current
+    if (p.pointerId !== null) {
+      // A second finger landed mid-gesture — abandon it entirely and eat the click.
+      endRxPress(true)
+      return
+    }
+    p.pointerId = e.pointerId
+    p.x = e.clientX
+    p.y = e.clientY
+    p.suppressClick = false
+    p.timer = setTimeout(() => {
+      p.timer = null
+      p.suppressClick = true
+      onShowReactors?.(msg.id, emoji)
+    }, 400)
+  }
+
+  const handleRxPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const p = rxPress.current
+    if (p.pointerId === null || p.pointerId !== e.pointerId) return
+    // 12px of slop: a sloppy tap still counts, a drag or a scroll does not (and a
+    // drag is not a toggle either, so the click is eaten too).
+    if (Math.abs(e.clientX - p.x) > 12 || Math.abs(e.clientY - p.y) > 12) endRxPress(true)
+  }
+
+  const handleRxPointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    e.stopPropagation()
+    endRxPress(false)
+  }
+
+  const handleRxPointerCancel = () => { endRxPress(true) }
+
+  const handleRxClick = (e: React.MouseEvent<HTMLButtonElement>, emoji: string) => {
+    e.stopPropagation()
+    if (rxPress.current.suppressClick) { rxPress.current.suppressClick = false; return }
+    onReact(msg.id, emoji)
+  }
+
+  // ── Desktop tooltip: who reacted with THIS emoji ───────────────────────────
+  // Slack/Discord vocabulary, and the only non-touch route to the reactor names —
+  // click keeps its single meaning. TWO triggers:
+  //
+  //   • HOVER, gated on `(hover: hover) and (pointer: fine)` so a touch device can
+  //     never fire it (its route is the long-press sheet above) and a tablet on the
+  //     desktop layout doesn't get a tooltip it cannot dismiss.
+  //   • FOCUS-VISIBLE, ungated by pointer type — a keyboard user on ANY device gets
+  //     the names by tabbing to the pill. `:focus-visible` (not `:focus`) is the
+  //     whole trick: the browser only matches it when it judges focus came from the
+  //     keyboard, so click-to-toggle does NOT pop a tooltip at the cursor.
+  //
+  // Enter/Space still toggle — the tooltip is descriptive, never an action target,
+  // which is why it carries `aria-describedby` rather than being focusable itself.
+  //
+  // Portaled to <body> like ActionMenu (Convention #20's reasoning, not its
+  // component): the transcript is an overflow-hidden scroll container, so an
+  // absolutely-positioned tip would clip against it. Position is MEASURED after
+  // mount — flip below when there is no room above, clamp to the viewport —
+  // because the pill sits anywhere in a scrolling column.
+  const [rxTip, setRxTip] = useState<{
+    emoji: string
+    text: string
+    /** The pill, in viewport coords. */
+    anchor: DOMRect
+    /** The TRANSCRIPT column (the pill's nearest scrollable ancestor), in viewport
+     *  coords. The tip is clamped to this, not to the window: reaction pills sit near
+     *  the left gutter of the message column, and a viewport clamp let the tip run out
+     *  past the column and float over the conversation-list panel beside it. */
+    bounds: DOMRect
+  } | null>(null)
+  const [rxTipPos, setRxTipPos] = useState<{ left: number; top: number } | null>(null)
+  const rxTipRef = useRef<HTMLDivElement>(null)
+  // One id per ROW, pointed at by whichever pill is currently described (only one
+  // tooltip can be open at a time). Without it a screen reader announces the pill as
+  // just "👍 3" — the names are the whole point of the affordance.
+  const rxTipId = useId()
+
+  // Deliberately useEffect, not useLayoutEffect: the tip paints once unpositioned at
+  // opacity 0, then lands and fades. A layout effect would flush both before paint —
+  // correct position, but no --dur-fast fade, because the browser never sees the 0.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- measured placement, same pattern as the menu above
+    if (!rxTip) { setRxTipPos(null); return }
+    const el = rxTipRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const a = rxTip.anchor
+    const b = rxTip.bounds
+    const minLeft = b.left + 8
+    const maxRight = b.right - 8
+    // Centred on the pill by default. When that would cross a column edge, ANCHOR to
+    // the pill's own matching edge rather than sliding to a clamped position — an
+    // incoming pill sits at the left gutter, so left-aligned keeps the tip visually
+    // tied to the thing it describes; own-message pills mirror it on the right.
+    let left = a.left + a.width / 2 - r.width / 2
+    if (left < minLeft) left = a.left
+    if (left + r.width > maxRight) left = a.right - r.width
+    // Last resort for a tip wider than its column.
+    left = Math.max(minLeft, Math.min(left, maxRight - r.width))
+    const above = a.top - r.height - 6
+    setRxTipPos({ left, top: above < 8 ? a.bottom + 6 : above })
+  }, [rxTip])
+
+  // Any scroll invalidates the measured anchor — close rather than chase it. Escape
+  // dismisses it too (WAI-ARIA tooltip practice), for the hovered case as well as
+  // the focused one.
+  useEffect(() => {
+    if (!rxTip) return
+    const close = () => setRxTip(null)
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close() }
+    window.addEventListener("scroll", close, true)
+    window.addEventListener("keydown", onKey)
+    return () => {
+      window.removeEventListener("scroll", close, true)
+      window.removeEventListener("keydown", onKey)
+    }
+  }, [rxTip])
+
+  // Shared by both triggers. Returns without showing anything if the roster has not
+  // resolved — `resolveReactorName` returns null only in that case, and naming live
+  // people "Former member" is a false statement, not a neutral placeholder.
+  const showRxTip = (anchorEl: HTMLElement, emoji: string, userIds: string[]) => {
+    if (!resolveReactorName) return
+    const names: string[] = []
+    for (const uid of userIds) {
+      if (uid === userId) { names.push("You"); continue }
+      const n = resolveReactorName(uid)
+      if (n === null) return
+      names.push(n)
+    }
+    if (names.length === 0) return
+    // Nearest scrollable ancestor = the messages column (same walk the menu-placement
+    // effect above does). Its box is the horizontal budget the tip may use.
+    let c: HTMLElement | null = anchorEl.parentElement
+    while (c) { const oy = getComputedStyle(c).overflowY; if (oy === "auto" || oy === "scroll") break; c = c.parentElement }
+    const bounds = c
+      ? c.getBoundingClientRect()
+      : new DOMRect(0, 0, window.innerWidth, window.innerHeight)
+    setRxTip({ emoji, text: `${listSentence(names)} reacted with ${emoji}`, anchor: anchorEl.getBoundingClientRect(), bounds })
+  }
+
+  const handleRxHover = (e: React.MouseEvent<HTMLButtonElement>, emoji: string, userIds: string[]) => {
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return
+    showRxTip(e.currentTarget, emoji, userIds)
+  }
+
+  const handleRxFocus = (e: React.FocusEvent<HTMLButtonElement>, emoji: string, userIds: string[]) => {
+    // `:focus-visible` is the browser's own keyboard-vs-pointer judgement — the
+    // reason this can be wired up at all without a tooltip popping on every click.
+    // `matches` throws on an unsupported selector in old engines; that degrades to
+    // "no keyboard tooltip", never to a broken pill.
+    let keyboard = false
+    try { keyboard = e.currentTarget.matches(":focus-visible") } catch { keyboard = false }
+    if (!keyboard) return
+    showRxTip(e.currentTarget, emoji, userIds)
+  }
 
   // Deleted poll tombstone
   if (msg.message_type === "poll" && msg.deleted) {
@@ -759,11 +976,21 @@ function MessageRowBase({
         {/* Reactions */}
         {!msg.deleted && rxGroups.length > 0 && (
           <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? "pr-1" : "pl-9"}`}>
-            {rxGroups.map(({ emoji, count, userReacted }) => (
+            {rxGroups.map(({ emoji, count, userReacted, userIds }) => (
               <button
                 key={emoji}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={() => onReact(msg.id, emoji)}
+                onPointerDown={(e) => handleRxPointerDown(e, emoji)}
+                onPointerMove={handleRxPointerMove}
+                onPointerUp={handleRxPointerUp}
+                onPointerCancel={handleRxPointerCancel}
+                onContextMenu={(e) => e.preventDefault()}
+                onClick={(e) => handleRxClick(e, emoji)}
+                onMouseEnter={(e) => handleRxHover(e, emoji, userIds)}
+                onMouseLeave={() => setRxTip(null)}
+                onFocus={(e) => handleRxFocus(e, emoji, userIds)}
+                onBlur={() => setRxTip(null)}
+                aria-describedby={rxTip?.emoji === emoji ? rxTipId : undefined}
+                style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
                 className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[12px] transition-all active:scale-95 ${
                   userReacted
                     ? "bg-[var(--plum)]"
@@ -775,6 +1002,33 @@ function MessageRowBase({
               </button>
             ))}
           </div>
+        )}
+        {rxTip && typeof document !== "undefined" && createPortal(
+          <div
+            ref={rxTipRef}
+            id={rxTipId}
+            role="tooltip"
+            style={{
+              position: "fixed",
+              left: rxTipPos?.left ?? 0,
+              top: rxTipPos?.top ?? 0,
+              zIndex: 200,
+              maxWidth: 260,
+              padding: "8px 10px",
+              background: "var(--cream-panel)",
+              border: "1px solid var(--line-2)",
+              borderRadius: 10,
+              fontSize: 13,
+              lineHeight: 1.4,
+              color: "var(--body)",
+              pointerEvents: "none",
+              opacity: rxTipPos ? 1 : 0,
+              transition: "opacity var(--dur-fast) ease-out",
+            }}
+          >
+            {rxTip.text}
+          </div>,
+          document.body,
         )}
 
         {/* Delete confirmation */}

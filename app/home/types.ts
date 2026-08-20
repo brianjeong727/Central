@@ -64,6 +64,9 @@ export interface NotificationSettings {
   /** Tier 1 — Run Sheet deadline nudges: task-due reminders + tap-to-confirm requests.
    *  Confirmation ESCALATIONS (to the leader) ride `activity`, not this key. Default on. */
   deadlines?: boolean
+  /** Tier 1 — someone reacts to one of YOUR messages. Only the message author is
+   *  ever notified, and never for their own reaction. Default on. */
+  reactions?: boolean
   /** Tier 2 — group-chat firehose control. Default 'smart' (all <30 members, mentions-only ≥30). */
   group_mode?: GroupNotifyMode
   /** Tier 3 — desk-work push on web. Default on. */
@@ -360,6 +363,15 @@ export interface MessageRowProps {
   onUnpin: () => void
   onScrollToMessage: (id: string) => void
   onOpenVoteSheet: (pollId: string, hasVoted: boolean) => void
+  /** TOUCH only: long-press on a reaction pill → open the "who reacted" sheet for
+   *  this message, with `emoji`'s group floated first. Stable callback (useCallback
+   *  in ChatScreen) so the memo boundary survives it. */
+  onShowReactors?: (messageId: string, emoji: string) => void
+  /** Nickname-aware chat display name for a reactor, for the DESKTOP hover tooltip.
+   *  `null` means the roster has not resolved yet and the caller must NOT invent a
+   *  name; a known-absent member resolves to "Former member". Reads through a ref so
+   *  it stays referentially stable (the memo boundary depends on it). */
+  resolveReactorName?: (userId: string) => string | null
   setEmojiPickerFor: (id: string | null) => void
   setFullReactionPickerFor: (id: string | null) => void
   setContextMenuFor: (id: string | null) => void
