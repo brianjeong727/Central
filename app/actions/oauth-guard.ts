@@ -136,9 +136,11 @@ async function nativeDestination(
   if (profileErr) console.warn("[oauth-guard] profiles query error:", profileErr.message)
   if (profile?.ministry_id) return "/home"
 
-  // No ministry yet — the join flow, not the marketing landing (the shell
-  // never shows marketing surfaces). This is the ONE place the native
-  // destination deliberately differs from the web callback's /landing.
+  // No ministry yet — the join flow, not the marketing landing (the shell never
+  // shows marketing surfaces). The web callback used to answer /landing here and
+  // this was its one deliberate divergence; that turned out to deposit fresh
+  // signups on a page whose primary CTA is "Get started" → /signup, so the web
+  // path was brought into line and both now answer /ministries.
   return NATIVE_FALLBACK
 }
 
@@ -153,7 +155,12 @@ export async function verifyNativeOAuthSession(
   // id. `flow` is normalized rather than interpolated raw because it is untrusted
   // caller input (a newline in it would forge a log line).
   const t0 = Date.now()
-  const flowLabel = flow === "signup" ? "signup" : "signin"
+  // Three labels, not two. This collapsed everything non-signup onto "signin", which
+  // partitioned the branches correctly only while a missing flow WAS signin-strict.
+  // It now takes the permissive branch, so "flow=signin outcome=ok" would no longer
+  // distinguish a genuine returning user from an unknown flow we admitted — and this
+  // incident was reconstructed entirely from these lines.
+  const flowLabel = flow === "signin" ? "signin" : flow === "signup" ? "signup" : "other"
   let msGetUser = 0
   let msStamp = -1
   let msGuard = 0

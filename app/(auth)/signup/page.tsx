@@ -10,7 +10,7 @@ import { SplitShell, GoogleButton, AppleButton, AppleGlyph, GoogleGlyph, OrDivid
   PocketAuthScreen, PocketBack, PocketField, PocketSelect, PocketSubmit, PocketError,
   AuthSelect, AuthPendingVeil, gradYearOptions,
   pocketPillCard, pocketFieldLabel, pocketFieldBox, pocketH1, pocketSub } from "@/app/(auth)/shared"
-import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn, nativeAuthDebugMessage } from "@/lib/native-auth"
+import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn, nativeAuthDebugMessage, googleNativeFailureMessage } from "@/lib/native-auth"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
 import { inviteReturnPath, codeFromReturnPath } from "@/lib/invite-code"
@@ -231,7 +231,14 @@ function SignupContent() {
     const qs = q.toString()
     return qs ? `/login?${qs}` : "/login"
   })()
-  const [view, setView] = useState<View>(intent === "register" ? "admin" : "role-choice")
+  // intent=join already ANSWERS "how are you joining?" — it is only ever set by the
+  // invite landing and by the login page's no-account CTA, both of which know the
+  // person is joining an existing ministry. Making them re-answer it is the extra
+  // hop that made a rejected Google sign-in feel like being sent back to the start.
+  // role-choice stays reachable from this view's own Back control.
+  const [view, setView] = useState<View>(
+    intent === "register" ? "admin" : intent === "join" ? "member" : "role-choice"
+  )
   // Google web-OAuth can't run inside the WKWebView — the shell uses the native
   // Google sheet instead, shown only once the iOS client ID is configured
   // (see app/(auth)/login/page.tsx for the full rationale).
@@ -326,13 +333,23 @@ function SignupContent() {
       const res = await signInWithGoogleNative("signup")
       if (res.ok) { window.location.assign("/onboarding"); return }
       setPending(null)
-      if (res.error === "failed") setAdminError("Google sign-in didn't complete — please try again.")
-      else if (res.error === "unavailable") setAdminError("Google sign-in needs the latest app version — update Central and try again.")
+      // EVERY outcome except a deliberate cancel must say something. This used to
+      // return silently for `no-account` and `not-entitled` — and `no-account` is
+      // reachable here even though a signup can't be guard-rejected, because
+      // native-auth maps ANY failed verification to it, including a session that
+      // hadn't propagated yet. The tap looked like it did nothing. Same fix the
+      // Apple handlers already carry.
+      if (res.error !== "canceled") setAdminError(googleNativeFailureMessage(res))
       return
     }
     setPending(SETTING_UP)
     const supabase = createClient()
-    await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback?intent=register&flow=signup" } })
+    // A failed redirect start leaves ZERO server-side trace — no /auth/callback,
+    // no guard timing line — so it reads as "the button did nothing" and is
+    // invisible in logs. Surface it and drop the veil rather than stranding the
+    // user under a spinner on the page they were already on.
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: siteOrigin() + "/auth/callback?intent=register&flow=signup" } })
+    if (error) { setPending(null); setAdminError("Google sign-in couldn't start — please try again.") }
   }
 
   async function handleAdminApple() {
@@ -347,7 +364,12 @@ function SignupContent() {
     }
     setPending(SETTING_UP)
     const supabase = createClient()
-    await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: siteOrigin() + "/auth/callback?intent=register&flow=signup" } })
+    // A failed redirect start leaves ZERO server-side trace — no /auth/callback,
+    // no guard timing line — so it reads as "the button did nothing" and is
+    // invisible in logs. Surface it and drop the veil rather than stranding the
+    // user under a spinner on the page they were already on.
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: siteOrigin() + "/auth/callback?intent=register&flow=signup" } })
+    if (error) { setPending(null); setAdminError("Apple sign-in couldn't start — please try again.") }
   }
 
   const currentYear = new Date().getFullYear()
@@ -404,13 +426,19 @@ function SignupContent() {
       const res = await signInWithGoogleNative("signup")
       if (res.ok) { window.location.assign(invitePath ?? "/ministries?tab=code"); return }
       setPending(null)
-      if (res.error === "failed") setMemberError("Google sign-in didn't complete — please try again.")
-      else if (res.error === "unavailable") setMemberError("Google sign-in needs the latest app version — update Central and try again.")
+      // See handleAdminGoogle — silence on anything but a deliberate cancel is what
+      // left a real user tapping a button that appeared to do nothing.
+      if (res.error !== "canceled") setMemberError(googleNativeFailureMessage(res))
       return
     }
     setPending(SETTING_UP)
     const supabase = createClient()
-    await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: memberOauthRedirect(intent, invite) } })
+    // A failed redirect start leaves ZERO server-side trace — no /auth/callback,
+    // no guard timing line — so it reads as "the button did nothing" and is
+    // invisible in logs. Surface it and drop the veil rather than stranding the
+    // user under a spinner on the page they were already on.
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: memberOauthRedirect(intent, invite) } })
+    if (error) { setPending(null); setMemberError("Google sign-in couldn't start — please try again.") }
   }
 
   async function handleMemberApple() {
@@ -427,7 +455,12 @@ function SignupContent() {
     }
     setPending(SETTING_UP)
     const supabase = createClient()
-    await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: memberOauthRedirect(intent, invite) } })
+    // A failed redirect start leaves ZERO server-side trace — no /auth/callback,
+    // no guard timing line — so it reads as "the button did nothing" and is
+    // invisible in logs. Surface it and drop the veil rather than stranding the
+    // user under a spinner on the page they were already on.
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: memberOauthRedirect(intent, invite) } })
+    if (error) { setPending(null); setMemberError("Apple sign-in couldn't start — please try again.") }
   }
 
   async function handleResend() {

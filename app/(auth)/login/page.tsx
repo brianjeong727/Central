@@ -142,10 +142,13 @@ function LoginContent() {
     }
     setPending(SIGNING_IN)
     const supabase = createClient()
-    await supabase.auth.signInWithOAuth({
+    // A failed redirect start leaves ZERO server-side trace, so it reads as "the
+    // button did nothing" and is invisible in logs. Say so and drop the veil.
+    const { error: oauthErr } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: oauthRedirect("signin", intent, invite) },
     })
+    if (oauthErr) { setPending(null); setError("Google sign-in couldn't start — please try again.") }
   }
 
   async function handleAppleLogin() {
@@ -180,10 +183,13 @@ function LoginContent() {
   async function webAppleOAuth() {
     setPending(SIGNING_IN)
     const supabase = createClient()
-    await supabase.auth.signInWithOAuth({
+    // A failed redirect start leaves ZERO server-side trace, so it reads as "the
+    // button did nothing" and is invisible in logs. Say so and drop the veil.
+    const { error: oauthErr } = await supabase.auth.signInWithOAuth({
       provider: "apple",
       options: { redirectTo: oauthRedirect("signin", intent, invite) },
     })
+    if (oauthErr) { setPending(null); setError("Apple sign-in couldn't start — please try again.") }
   }
 
   const signupHref = (() => {
