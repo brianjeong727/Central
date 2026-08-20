@@ -84,4 +84,3 @@ export {
 } from "./pocket"
 export { ChatAvatar, chatAvatarLabel, type ChatAvatarMember } from "./chat-avatar"
 export { InviteShareModal } from "./invite-share-modal"
-export { FindYourPeopleCard, type FindYourPeopleGroup } from "./find-your-people-card"

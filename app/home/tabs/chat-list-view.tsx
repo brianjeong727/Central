@@ -35,9 +35,7 @@ import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
 import { ChatAvatar, chatAvatarLabel, SegmentedControl, PocketSearchField, PocketRow, PocketKicker, POCKET_KICKER_STYLE, useScrollResetOn, SwipeActionRow, ConfirmDialog, Toast } from "@/components/central"
-import { Compass } from "lucide-react"
-import { fetchOpenGroups, openGroupsKey } from "@/app/home/open-groups"
-import { OpenGroupsBrowse } from "./open-groups-view"
+import { OpenGroupsBody } from "./open-groups-view"
 import { ChatSearchView } from "../components/chat-search"
 import { findExistingDm } from "../dm"
 import { formatChatListTime } from "../utils"
@@ -269,7 +267,7 @@ function PocketChurchSections({ sections, canCreate, onOpen, onAddInSection, swi
   )
 }
 
-export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId, canCreateChurchChat, fallbackChats, initialSection, onComposerOpenChange, onOpenDraftDm }: ChatsTabProps) {
+export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryName, onOpenChat, onTotalUnreadChange, refreshKey, onOpenDirectory, activeGroupId, canCreateChurchChat, fallbackChats, initialSection, onComposerOpenChange, onOpenDraftDm, onSectionChange }: ChatsTabProps) {
   const { setParam } = useNavState()
   // Server-resolved (app/home/page.tsx → resolveChatsSection), never read off
   // window here — see the note on resolveChatsSection in ./chat-shared.
@@ -298,13 +296,6 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   // Open-group discovery. Its OWN SWR key, not the chat-list key — this is the
   // ministry's open rooms, most of which the user is not in, so it revalidates on
   // its own cadence. The row counts only rooms you could actually join.
-  const [browseOpen, setBrowseOpen] = useState(false)
-  const { data: openGroups } = useSWR(openGroupsKey(ministryId), fetchOpenGroups)
-  // The row appears whenever the ministry HAS open groups, not only when one is
-  // joinable. Gating on joinable-count hid the entry from the very people who set
-  // the groups up, since a creator belongs to all of them and the count was 0.
-  const openGroupTotal = (openGroups ?? []).length
-  const openGroupJoinable = (openGroups ?? []).filter((g) => !g.isMember).length
   const closeMobileSearch = useCallback(() => { setSearchOpen(false); setMobileSearch("") }, [])
 
   // Escape leaves search, mirroring the X.
@@ -498,11 +489,17 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   useEffect(() => {
     if (!activeGroupId) { subTabSyncedFor.current = null; return }
     if (subTabSyncedFor.current === activeGroupId) return
+    // The open scope is a DESTINATION the user chose, not a view of a thread, so
+    // an open chat must not drag the list back to church/mine. Without this guard,
+    // arriving at ?chats=open with any thread already open (the desktop default —
+    // the content area restores ?chat) silently snapped the scope back, and Home's
+    // Open groups tile appeared to do nothing at all.
+    if (subTab === "open") { subTabSyncedFor.current = activeGroupId; return }
     const g = (data ?? []).find((x) => x.id === activeGroupId)
     if (!g) return
     subTabSyncedFor.current = activeGroupId
     setSubTab(g.type === "church" ? "church" : "my")
-  }, [activeGroupId, data])
+  }, [activeGroupId, data, subTab])
 
   // Revalidate the shared list when a chat closes (refreshKey bumps) — without
   // putting refreshKey in the SWR key (that would fragment the cache).
@@ -534,19 +531,6 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
     setShowCreateChat("my")
   }
 
-  // Browse replaces the list entirely — it is a full-bleed push surface, so it
-  // gets edge-swipe-back for free from SubpageShell (Convention #22).
-  if (browseOpen) {
-    return (
-      <OpenGroupsBrowse
-        userId={userId}
-        ministryId={ministryId}
-        onBack={() => setBrowseOpen(false)}
-        onOpenChat={(id, name) => { setBrowseOpen(false); handleOpenChat(id, name) }}
-      />
-    )
-  }
-
   return (
     <div className="pb-2 md:pb-0 md:h-full md:flex md:flex-col">
       {/* Mobile chrome (B3 Pocket) — the scope switch IS the title. "Chats" as a
@@ -556,11 +540,19 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           the directory ghost. Ratified with Brian 2026-08-17. */}
       <PocketChrome
         title="Chats"
+        // Three CATEGORIES of chat, not two plus an action: the ones the church
+        // made, the ones you made, the ones anyone can join. "My chats" shortened
+        // to "Mine" because the options ARE the 22/600 chrome title and cannot
+        // shrink or wrap — Church 74 + Mine 51 + Open 54 + 32 of gaps = 211px
+        // against a 247px budget on a 375-wide phone (two round buttons and their
+        // gaps take 88 of the 335 content width). "My chats" + "Browse" was 278
+        // and pushed the buttons off screen. Measured, not estimated.
         scope={{
-          options: [{ id: "church", label: "Church" }, { id: "my", label: "My chats" }],
+          options: [{ id: "church", label: "Church" }, { id: "my", label: "Mine" }, { id: "open", label: "Open" }],
           value: subTab,
           onChange: (t) => {
             setSubTab(t as ChatsSection)
+            onSectionChange?.(t as ChatsSection)
             setSearch("")
             setParam("chats", t === "church" ? null : t)
           },
@@ -595,14 +587,18 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         />
       </div>
 
-      {/* Desktop mode switcher — exclusive filter (Church | My Chats), SegmentedControl (R4/R12) */}
+      {/* Desktop mode switcher — exclusive filter (Church | Mine | Open), SegmentedControl (R4/R12).
+          Labels match the phone's chrome scope exactly so the two viewports are ONE
+          idea rather than two vocabularies for the same three buckets; three at the
+          old "Church Chats"/"My Chats" length would not have fit the panel anyway. */}
       <div className="hidden md:flex flex-shrink-0 px-4 py-3">
         <SegmentedControl
           aria-label="Chat scope"
-          options={[{ id: "church", label: "Church Chats" }, { id: "my", label: "My Chats" }]}
+          options={[{ id: "church", label: "Church" }, { id: "my", label: "Mine" }, { id: "open", label: "Open" }]}
           value={subTab}
           onChange={(t) => {
             setSubTab(t)
+            onSectionChange?.(t)
             setSearch("")
             setParam("chats", t === "church" ? null : t)
           }}
@@ -622,6 +618,9 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           below to the search view IN PLACE, so the field stays pinned and the
           change reads as a transition rather than a navigation. Chats + people,
           so you can reach someone you have never messaged. */}
+      {/* Chat search is scoped to the CHATS — hidden while browsing open groups,
+          which is a short list with nothing to filter and no messages to search. */}
+      {subTab !== "open" && (
       <div className="md:hidden mb-4 px-5">
         <PocketSearchField
           value={mobileSearch}
@@ -639,6 +638,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           ) : undefined}
         />
       </div>
+      )}
 
       {searchOpen ? (
         <div className="md:hidden chat-search-enter px-5">
@@ -658,32 +658,15 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         <PushSubscribeCard userId={userId} ministryId={ministryId} notificationSettings={userProfile.notification_settings} variant="pocket" style={{ marginBottom: 16 }} />
       </div>
 
-      {/* Discovery, deliberately understated: ONE row, and only when there is
-          actually something to browse. An always-present row for an empty list is
-          the clutter this feature exists to avoid. */}
-      {openGroupTotal > 0 && (
-        <PocketRow
-          immersive
-          isFirst
-          leading={
-            <div style={{
-              width: 46, height: 46, borderRadius: "var(--r-callout)", flexShrink: 0,
-              background: "var(--pocket-track)", display: "grid", placeItems: "center",
-            }}>
-              <Compass style={{ width: 20, height: 20, color: "var(--plum)" }} strokeWidth={1.7} />
-            </div>
-          }
-          title="Open groups"
-          sub={openGroupJoinable > 0
-            ? `${openGroupJoinable} group${openGroupJoinable === 1 ? "" : "s"} you can join`
-            : `${openGroupTotal} group${openGroupTotal === 1 ? "" : "s"}, you're in all of them`}
-          chevron
-          ariaLabel="Browse open groups"
-          onClick={() => setBrowseOpen(true)}
-        />
-      )}
-
-      {loading ? (
+      {subTab === "open" ? (
+        /* The third scope's body — the same list that used to be a push surface,
+           now rendered in place under the one chrome row. It brings its own
+           loading and empty states, so it sits OUTSIDE the chat-list `loading`
+           branch: it waits on its own RPC, not on the chat list's. */
+        <div className="px-5">
+          <OpenGroupsBody userId={userId} ministryId={ministryId} onOpenChat={handleOpenChat} />
+        </div>
+      ) : loading ? (
         <Spinner />
       ) : subTab === "my" ? (
         /* My chats — one full-bleed run of rows; pinned-first order. */
@@ -742,6 +725,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           )}
         </div>
       )}
+
       </>
       )}
 
@@ -915,8 +899,9 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
 // Mirrors DirectoryMemberListPanel: own state + data fetching, minimal props.
 
 export interface ChatListPanelProps {
-  /** Opens the browse-open-groups page in the desktop content area. */
-  onBrowseOpenGroups?: () => void
+  /** Reports a scope change up so the shell can seed the next mount (the panel is
+   *  conditionally rendered and re-reads its seed on every return to Chats). */
+  onSectionChange?: (section: ChatsSection) => void
   userId: string
   ministryId: string
   ministryName: string
@@ -933,12 +918,7 @@ export interface ChatListPanelProps {
   onOpenDraftDm?: (person: { id: string; name: string }) => void
 }
 
-export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole, fallbackChats, initialSection, onOpenDraftDm, onBrowseOpenGroups }: ChatListPanelProps) {
-  // Same SWR key as the mobile list — one fetch serves both, and a join in either
-  // place updates the other.
-  const { data: panelOpenGroups } = useSWR(openGroupsKey(ministryId), fetchOpenGroups)
-  // Same rule as the mobile list: present whenever open groups exist at all.
-  const panelOpenGroupCount = (panelOpenGroups ?? []).length
+export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId, onOpenChat, refreshKey, canCreateChurchChat, userProfile, userRole, fallbackChats, initialSection, onOpenDraftDm, onSectionChange }: ChatListPanelProps) {
   const { setParam } = useNavState()
   // Server-resolved — same single source as ChatsTab (./chat-shared).
   const [subTab, setSubTab] = useState<ChatsSection>(initialSection)
@@ -1001,11 +981,17 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
   useEffect(() => {
     if (!activeGroupId) { subTabSyncedFor.current = null; return }
     if (subTabSyncedFor.current === activeGroupId) return
+    // The open scope is a DESTINATION the user chose, not a view of a thread, so
+    // an open chat must not drag the list back to church/mine. Without this guard,
+    // arriving at ?chats=open with any thread already open (the desktop default —
+    // the content area restores ?chat) silently snapped the scope back, and Home's
+    // Open groups tile appeared to do nothing at all.
+    if (subTab === "open") { subTabSyncedFor.current = activeGroupId; return }
     const g = (data ?? []).find((x) => x.id === activeGroupId)
     if (!g) return
     subTabSyncedFor.current = activeGroupId
     setSubTab(g.type === "church" ? "church" : "my")
-  }, [activeGroupId, data])
+  }, [activeGroupId, data, subTab])
 
   // Revalidate the shared list when a chat closes (refreshKey bumps) — without
   // fragmenting the cache by putting refreshKey in the SWR key.
@@ -1071,30 +1057,17 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
       {!searchOpen && (
       <>
 
-      {/* Discovery — the desktop twin of the mobile chat list's row. One line, only
-          when there is something to browse; it opens the browse PAGE in the content
-          area (never a modal — design contract hard do-not #1). */}
-      {panelOpenGroupCount > 0 && onBrowseOpenGroups && (
-        <button
-          onClick={onBrowseOpenGroups}
-          aria-label="Browse open groups"
-          className="w-full flex items-center gap-2.5 px-3 py-2 mb-1 flex-shrink-0 text-left transition-colors hover:bg-[var(--ivory)]"
-          style={{ background: "none", border: "none", cursor: "pointer" }}
-        >
-          <Compass style={{ width: 15, height: 15, color: "var(--plum)", flexShrink: 0 }} strokeWidth={1.8} />
-          <span className="flex-1 min-w-0 text-[13.5px]" style={{ color: "var(--ink)" }}>Open groups</span>
-          <span className="text-[12px]" style={{ color: "var(--muted-text)" }}>{panelOpenGroupCount}</span>
-        </button>
-      )}
-
-      {/* Church / My mode switcher — exclusive filter, SegmentedControl (R4/R12) */}
+      {/* Church / Mine / Open — exclusive filter, SegmentedControl (R4/R12). Labels
+          match the phone's chrome scope exactly so the two viewports are ONE idea
+          rather than two vocabularies for the same three buckets. */}
       <div className="px-3 flex-shrink-0">
         <SegmentedControl
           aria-label="Chat scope"
-          options={[{ id: "church", label: "Church" }, { id: "my", label: "My Chats" }]}
+          options={[{ id: "church", label: "Church" }, { id: "my", label: "Mine" }, { id: "open", label: "Open" }]}
           value={subTab}
           onChange={(t) => {
             setSubTab(t)
+            onSectionChange?.(t)
             setSearch("")
             setParam("chats", t === "church" ? null : t)
           }}
@@ -1122,6 +1095,15 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
 
       {/* List */}
       <div className={`flex-1 overflow-y-auto ${subTab === "church" ? "pt-3" : ""}`}>
+        {subTab === "open" ? (
+          /* The open scope's body. Outside the chat-list `loading` branch below —
+             it waits on its own RPC, and it carries its own loading and empty
+             states. */
+          <div className="px-3 pt-2">
+            <OpenGroupsBody userId={userId} ministryId={ministryId} onOpenChat={handleOpenChatPanel} variant="panel" />
+          </div>
+        ) : (
+        <>
         <PushSubscribeCard userId={userId} ministryId={ministryId} notificationSettings={userProfile?.notification_settings} style={{ margin: "4px 12px 12px", padding: 16 }} />
         {loading ? (
           <div className="px-2 pt-2"><Spinner /></div>
@@ -1184,6 +1166,8 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
             )}
           </>
         )}
+        </>
+        )}
       </div>
 
       {/* Dashed "New message" footer — personal tab only */}
@@ -1205,6 +1189,7 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
           </button>
         </div>
       )}
+
       </>
       )}
 

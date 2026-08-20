@@ -56,7 +56,6 @@ const AnnouncementDetailView = dynamic(() => import("./tabs/announcements-tab").
 // The module is small and SSR-clean; the heavy half (thread/settings/composer)
 // stays behind the dynamics below. See app/home/tabs/chat-list-view.tsx.
 import { ChatsTab, ChatListPanel } from "./tabs/chat-list-view"
-import { OpenGroupsBrowse } from "./tabs/open-groups-view"
 import { retainThreads, prefetchThread } from "./chat-thread-cache"
 import { useBlocks } from "./use-blocks"
 
@@ -234,10 +233,13 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // `id: ""` + `draftUserId` == a DRAFT direct message: the conversation has no
   // group row yet, and won't until the first message is actually sent. Drafts are
   // deliberately NOT restored from ?chat — there is nothing to restore.
-  // Desktop browse-open-groups occupies the CHAT CONTENT AREA, the same slot a
-  // thread uses — it is a page you navigate to, not a modal (design contract hard
-  // do-not #1). Opening any chat clears it.
-  const [browseOpenGroups, setBrowseOpenGroups] = useState(false)
+  // The Chats scope (church | mine | open), owned here because ChatsTab and the
+  // desktop panel are both conditionally rendered — they unmount on every tab
+  // switch and re-read their seed on the way back. They report changes up via
+  // onSectionChange so re-entering Chats resumes where you left off, and Home's
+  // Open groups tile seeds "open" before navigating.
+  const [chatsSection, setChatsSection] = useState<"church" | "my" | "open">(initialChatsSection)
+
   const [globalOpenChat, setGlobalOpenChat] = useState<{ id: string; name: string; draftUserId?: string } | null>(() => {
     const chatId = searchParams.get("chat")
     return chatId && initialTab === "chats" ? { id: chatId, name: "" } : null
@@ -252,6 +254,16 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     setActiveTabState("chats")
     setGlobalOpenChat({ id: "", name: person.name, draftUserId: person.id })
     setParams({ tab: "chats", chat: null, chats: "my" })
+  }, [setParams])
+  // Home's Open groups tile — land on the Chats tab's third scope. Mirrors
+  // openDraftDm: seed the scope the list will mount on (ChatsTab is conditionally
+  // rendered, so it re-reads its seed on every entry), clear any open thread so the
+  // list is what you actually see, and do ONE atomic param write (Convention #5).
+  const openOpenGroups = useCallback(() => {
+    setChatsSection("open")
+    setActiveTabState("chats")
+    setGlobalOpenChat(null)
+    setParams({ tab: "chats", chat: null, chats: "open" })
   }, [setParams])
   // The draft's group now exists. Swap in the real id WITHOUT changing the React
   // key (see the ChatScreen mounts below), so the in-flight send finishes in the
@@ -1072,11 +1084,6 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // chat — all in one replace.
   function handleOpenChat(id: string, name: string, type?: string) {
     setActiveTabState("chats")
-    // Browse occupies the same desktop content slot as a thread and wins the
-    // render, so opening a chat from ANYWHERE — the sidebar, search, the command
-    // palette — has to close it or the click looks ignored. Clearing it here
-    // instead of at each call site is what makes that true for every entry point.
-    setBrowseOpenGroups(false)
     setGlobalOpenChat({ id, name })
     const sub = type ? (type === "church" ? "church" : "my") : null
     setParams({ tab: "chats", chat: id, ...(sub ? { chats: sub } : {}) })
@@ -1278,7 +1285,6 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         onDirectoryMemberSelect={handleDirectoryMemberSelect}
         chatPanelContent={
           <ChatListPanel
-            onBrowseOpenGroups={() => setBrowseOpenGroups(true)}
             userId={userId}
             ministryId={ministryId}
             ministryName={ministryName}
@@ -1289,7 +1295,8 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             userProfile={initialProfile}
             userRole={initialProfile.role}
             fallbackChats={chatListData}
-            initialSection={initialChatsSection}
+            initialSection={chatsSection}
+            onSectionChange={setChatsSection}
             onOpenDraftDm={openDraftDm}
           />
         }
@@ -1366,6 +1373,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 onOpenChat={handleOpenChat}
                 onOpenAnnouncement={handleOpenAnnouncement}
                 onGoToTab={(t) => handleNavClick(t)}
+                onBrowseOpenGroups={openOpenGroups}
                 activeQuestion={activeQuestion}
                 hasResponded={hasResponded}
                 onResponded={() => setHasResponded(true)}
@@ -1397,7 +1405,8 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                   activeGroupId={globalOpenChat?.id}
                   canCreateChurchChat={canCreateChurchChat}
                   fallbackChats={chatListData}
-                  initialSection={initialChatsSection}
+                  initialSection={chatsSection}
+                  onSectionChange={setChatsSection}
                   onComposerOpenChange={setComposerOpen}
                   onOpenDraftDm={openDraftDm}
                 />
@@ -1409,14 +1418,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                   overlay below mount for the same group → duplicate realtime channel topic
                   ("cannot add postgres_changes callbacks after subscribe()"). */}
               <div className="hidden md:flex md:flex-col md:flex-1 md:overflow-hidden" style={{ background: "var(--cream)" }}>
-                {isDesktop && browseOpenGroups ? (
-                  <OpenGroupsBrowse
-                    userId={userId}
-                    ministryId={ministryId}
-                    onBack={() => setBrowseOpenGroups(false)}
-                    onOpenChat={handleOpenChat}
-                  />
-                ) : isDesktop && globalOpenChat ? (
+                {isDesktop && globalOpenChat ? (
                   <ChatScreen
                     key={globalOpenChat.draftUserId ?? globalOpenChat.id}
                     groupId={globalOpenChat.id}

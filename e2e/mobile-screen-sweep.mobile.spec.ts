@@ -238,9 +238,36 @@ function outOfBudget() { return Date.now() > walkDeadline }
 async function tapRow(page: Page, title: string): Promise<boolean> {
   const el = page.locator(`[data-pocket-row="${title.replace(/"/g, '\\"')}"]`).filter({ visible: true }).first()
   if (!(await el.count())) return false
-  await el.click().catch(() => {})
+  // A SHORT click timeout, not the 30s default. A swallowed `.catch()` on a click
+  // that can never land is the difference between a walk that finishes and one that
+  // burns the whole 900s budget: when a full-screen overlay is covering the list,
+  // every remaining row on that screen costs a full actionability timeout each.
+  await el.click({ timeout: 3_000 }).catch(() => {})
   await page.waitForTimeout(900)
   return true
+}
+
+/**
+ * How many "up a level" controls are on screen. This is the OVERLAY DETECTOR.
+ *
+ * The walk decides a tap did nothing by comparing row lists before and after — but a
+ * full-screen overlay (ChatScreen) is `fixed inset-0` and does NOT remove the list
+ * beneath it from the DOM, and Playwright's visibility check tests layout, not
+ * occlusion. So opening a chat leaves the row list byte-identical and reads as a
+ * no-op: the walk moves to the next row WITHOUT backing out, and every later tap on
+ * that screen is a click into an overlay.
+ *
+ * That bug was latent for as long as the chat list happened to put its one
+ * navigating row FIRST — it was tapped and backed out of before any chat row could
+ * cover the screen. Moving that row to the bottom (2026-08-20) made the chat rows go
+ * first and the walk spent its entire budget clicking at a covered list, which is a
+ * 2.8min run becoming a 15min timeout with no violation behind it.
+ *
+ * Every stacked mobile header routes through BackChevron (Convention #22), so an
+ * opened surface always adds one and a genuine inline toggle adds none.
+ */
+async function backCount(page: Page): Promise<number> {
+  return page.locator(".back-chevron").filter({ visible: true }).count()
 }
 
 async function goBack(page: Page) {
@@ -263,6 +290,7 @@ async function walkRows(page: Page, label: string, depth = 1) {
     visited.push(`${label} — walked ${titles.length} of ${all.length} rows (capped)`)
   }
   const home = all.join("|")
+  const homeBacks = await backCount(page)
   for (const t of titles) {
     if (outOfBudget()) { visited.push(`${label} — walk stopped early (time budget)`); return }
     // The sweep runs against the REAL sandbox, and this walk taps every row it
@@ -274,7 +302,10 @@ async function walkRows(page: Page, label: string, depth = 1) {
     // rows unchanged — don't record it as a screen, and don't try to back out.
     // Compare against the FULL list, not the capped one — on a screen with more
     // rows than the cap, a no-op tap would otherwise look like navigation.
-    if ((await rowTitles(page)).join("|") === home) continue
+    //
+    // Rows alone are NOT enough: a full-screen overlay leaves them untouched (see
+    // backCount). Unchanged rows count as a no-op only if no new way back appeared.
+    if ((await rowTitles(page)).join("|") === home && (await backCount(page)) <= homeBacks) continue
     await check(page, `${label} → ${t}`)
     if (depth > 0) await walkRows(page, `${label} → ${t}`, depth - 1)
     await goBack(page)
@@ -283,7 +314,10 @@ async function walkRows(page: Page, label: string, depth = 1) {
     // outright, say) leaves us on some unrelated screen whose rows happen to share
     // a title — chat NAMES are rows too — and the loop drills onward through the
     // app indefinitely. That burned a whole 900s budget without reaching Plan.
-    if ((await rowTitles(page)).join("|") !== home) {
+    // Landed back HERE = the same rows AND no leftover overlay. Checking rows alone
+    // would let an overlay that failed to close look like a successful return, and
+    // the next row would be tapped into it.
+    if ((await rowTitles(page)).join("|") !== home || (await backCount(page)) > homeBacks) {
       visited.push(`${label} — back overshot after "${t}"; stopped walking this screen`)
       return
     }

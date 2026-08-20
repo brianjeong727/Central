@@ -40,7 +40,6 @@ import { useState } from "react"
 import useSWR from "swr"
 import { ChevronRight, Users } from "lucide-react"
 import {
-  SubpageShell,
   PocketRow,
   PocketKicker,
   ChatAvatar,
@@ -84,16 +83,28 @@ const ROW_GRID: React.CSSProperties = {
   borderRadius: 0,
 }
 
-export function OpenGroupsBrowse({
+// The open-groups list as a BARE BODY — no shell, no header, no back control.
+//
+// This used to be `OpenGroupsBrowse`, a `SubpageShell` push surface reached from
+// an entry row in the chat list. It is now the third SCOPE of the Chats screen
+// (chat-shared.ts `ChatsSection`), so the screen's own chrome already names it and
+// a shell here would be a second header on one screen — which mobile §1 forbids
+// outright ("No two-header screens"). Losing the shell also loses a push/pop, a
+// back chevron and the state that drove them: switching scope is not navigation.
+export function OpenGroupsBody({
   userId,
   ministryId,
-  onBack,
   onOpenChat,
+  variant = "page",
 }: {
   userId: string
   ministryId: string
-  onBack: () => void
   onOpenChat: (groupId: string, groupName: string) => void
+  /** "panel" is the desktop SIDEBAR density. The page rows are built for the full
+   *  content area — a 46px avatar, a 17px name and a Join button — and a ~240px
+   *  panel crushed that to "Boa…" with "3 members" wrapping onto two lines. Same
+   *  data, same join/undo path, panel-scale markup. */
+  variant?: "page" | "panel"
 }) {
   const { data, mutate, isLoading } = useSWR(openGroupsKey(ministryId), fetchOpenGroups)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -136,29 +147,67 @@ export function OpenGroupsBrowse({
   const countLabel = `${groups.length} group${groups.length === 1 ? "" : "s"}`
   const memberLabel = (g: OpenGroup) => `${g.memberCount} member${g.memberCount === 1 ? "" : "s"}`
 
+  // ── Desktop sidebar panel ────────────────────────────────────────────────
+  // No description and no count eyebrow: the segmented control directly above
+  // already says "Open", and a panel this narrow cannot afford a sentence that
+  // wraps to three lines before the first row.
+  if (variant === "panel") {
+    return (
+      <div className="flex flex-col gap-1">
+        {error && (
+          <p className="text-[12px] px-1" style={{ color: "var(--danger)", margin: "0 0 8px" }} role="alert">{error}</p>
+        )}
+        {isLoading && groups.length === 0 && (
+          <p style={{ fontSize: 12, color: "var(--muted-text)", padding: "8px 4px", fontFamily: "var(--sans)" }}>Loading…</p>
+        )}
+        {!isLoading && groups.length === 0 && (
+          <p style={{ fontSize: 12, color: "var(--muted-text)", padding: "8px 4px", fontFamily: "var(--sans)" }}>No open groups yet</p>
+        )}
+        {groups.map((g) => (
+          <div
+            key={g.id}
+            className={`flex items-center gap-2.5 px-2 py-2 rounded-lg ${g.isMember ? "cursor-pointer hover:bg-[var(--ivory)]" : ""}`}
+            {...(g.isMember
+              ? { role: "button" as const, tabIndex: 0, "aria-label": `Open ${g.name}`,
+                  onClick: () => onOpenChat(g.id, g.name),
+                  onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
+                    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenChat(g.id, g.name) }
+                  } }
+              : {})}
+          >
+            <ChatAvatar size={30} title={g.name} avatarUrl={g.avatarUrl} surface="var(--cream)" />
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div className="text-[13.5px] truncate" style={{ color: "var(--ink)", fontWeight: 500 }}>{g.name}</div>
+              <div className="text-[11.5px] truncate" style={{ color: "var(--muted-text)" }}>{memberLabel(g)}</div>
+            </div>
+            {g.isMember ? (
+              <span className="text-[11px] flex-shrink-0" style={{ color: "var(--muted-text)" }}>Joined</span>
+            ) : (
+              <button
+                onClick={(e) => { e.stopPropagation(); void join(g) }}
+                disabled={busyId === g.id}
+                className="text-[12px] flex-shrink-0"
+                style={{ color: "var(--plum)", background: "none", border: 0, padding: "2px 4px", cursor: "pointer", fontWeight: 500 }}
+              >
+                {busyId === g.id ? "…" : "Join"}
+              </button>
+            )}
+          </div>
+        ))}
+        {joined && (
+          <Toast message={`Joined ${joined.name}`} actionLabel="Undo" onAction={() => undoJoin(joined)} onDismiss={() => setJoined(null)} />
+        )}
+      </div>
+    )
+  }
+
   return (
-    <SubpageShell
-      crumbs={[{ label: "Chats", onClick: onBack }, { label: "Open groups" }]}
-      title="Open groups"
-      mobileTitle="Open groups"
-      // FULL WIDTH, LEFT-ALIGNED — §7.0 splits by CONTENT TYPE, and this is a
-      // COLLECTION: "lists of cards, tables, stat grids… no reading-measure
-      // constraint — let them fill the content area out to the page padding. Do
-      // not trap a list or grid in a fixed narrow column." The capped/centred
-      // clause governs reading- and form-measure content (prose, a single-column
-      // form), which a list of joinable groups is not. The handoff proposed a
-      // 720px centred column and it was drift, not a variant — do not reintroduce
-      // one here. Title, description, count eyebrow and card all sit at the same
-      // md:px-14 inset, and the header rules span the content width.
-      width="full"
-    >
-      {/* The 15px sentence §3 puts in the title block; SubpageShell has no
-          subtitle slot, so it leads the body. Phone width keeps its shipped
-          14.5/1.6 and its own gutter — the desktop body is what this redesign
-          replaces. */}
-      {/* NO horizontal padding of its own: SubpageShell's body wrapper is
-          `w-full px-5 md:px-14`, so a `px-5` here stacked to 40px at phone width
-          (Convention #26 — a subpage owns exactly ONE 20px gutter). */}
+    <>
+      {/* The 15px sentence that used to sit in the shell's title block. Phone
+          width keeps its shipped 14.5/1.6.
+          NO horizontal padding of its own — the HOST owns the one gutter
+          (Convention #26: exactly ONE 20px inset, never stacked). Mobile mounts
+          this inside the chat list's own `px-5`; desktop inside the panel. */}
       <p
         className="md:pt-6 text-[14.5px] md:text-[15px] leading-[1.6] md:leading-[1.55] md:max-w-[56ch] md:text-pretty"
         style={{ color: "var(--body)", margin: "0 0 18px" }}
@@ -351,6 +400,6 @@ export function OpenGroupsBrowse({
           onDismiss={() => setJoined(null)}
         />
       )}
-    </SubpageShell>
+    </>
   )
 }

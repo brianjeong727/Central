@@ -3,7 +3,7 @@
 import { useState } from "react"
 import dynamic from "next/dynamic"
 import useSWR, { useSWRConfig } from "swr"
-import { Bell, Calendar, Gift, Settings } from "lucide-react"
+import { Bell, Calendar, Compass, Gift, Settings } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { EYEBROW_STYLE } from "../components/shared"
 import { PocketHeader } from "../components/pocket-header"
@@ -14,7 +14,7 @@ import { formatInZone, startOfTodayInstantISO } from "@/lib/tz"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getSetupChecklist, setLeadersInvited, dismissSetupChecklist } from "@/app/actions/setup-checklist"
-import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard, FindYourPeopleCard, MonogramChip, PocketCard, PocketRowCard, PocketRow, PocketButton, PocketRoundButton, POCKET_KICKER_STYLE } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard, MonogramChip, PocketCard, PocketRowCard, PocketRow, PocketButton, PocketRoundButton, POCKET_KICKER_STYLE } from "@/components/central"
 import { useIsNativeShell } from "@/lib/native-auth"
 import type { HeroSlide, SetupChecklistData, UpNextEventDetail } from "@/components/central"
 // Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
@@ -29,7 +29,7 @@ import { announcementAsksAck, audienceOrFilter } from "@/lib/announcement-audien
 import { fetchRsvpCounts } from "@/lib/announcement-counts"
 import { acknowledgeAnnouncement } from "@/lib/announcement-ack"
 import { HomeDeadlines } from "./home-deadlines"
-import { fetchOpenGroups, joinOpenGroup, openGroupsKey, type OpenGroup } from "../open-groups"
+import { fetchOpenGroups, openGroupsKey, type OpenGroup } from "../open-groups"
 
 export { HomeTabProps }
 
@@ -230,6 +230,7 @@ export function HomeTab({
   onOpenChat,
   onOpenAnnouncement,
   onGoToTab,
+  onBrowseOpenGroups,
   activeQuestion,
   hasResponded,
   onResponded,
@@ -270,22 +271,22 @@ export function HomeTab({
   // Card shows only while eligible AND at least one item is open (all done → hidden).
   const checklistData = checklist?.eligible && checklist.items.some((i) => !i.done) ? checklist : null
 
-  // ── "Find your people" — open groups this member could join ────────────────
+  // ── Open groups — a quick-tile DESTINATION, not a card ─────────────────────
+  // This was "Find your people": a bordered card with a description, four inline
+  // Join buttons and a dismiss X, sitting ABOVE Up Next. Three surfaces exposed
+  // open groups and all three put it FIRST — ahead of the hero here, ahead of the
+  // Church/My switcher in the desktop sidebar, ahead of the list on the phone —
+  // so a first-week discovery feature outranked the content every screen exists
+  // for. That is what read as loud; the card was just the audible one (Brian,
+  // 2026-08-20). It is now a tile in the quick row near the bottom, where a
+  // secondary destination belongs, and the tile opens the browse page directly so
+  // demoting it costs no taps.
+  //
   // Same SWR key as the browse list and the chat list's entry row, so all three
   // share one fetch and a join anywhere updates them together.
-  const { data: openGroupsAll, mutate: mutateOpenGroups } = useSWR(openGroupsKey(ministryId), fetchOpenGroups)
-  const [openCardDismissed, setOpenCardDismissed] = useState<boolean>(!!profile.open_groups_card_dismissed)
+  const { data: openGroupsAll } = useSWR(openGroupsKey(ministryId), fetchOpenGroups)
   const joinableGroups = (openGroupsAll ?? []).filter((g: OpenGroup) => !g.isMember)
-
-  async function handleJoinOpenGroup(id: string) {
-    await joinOpenGroup(id, profile.id)
-    void mutateOpenGroups()
-  }
-
-  async function handleDismissOpenCard() {
-    setOpenCardDismissed(true)   // optimistic — the card should vanish on tap
-    await supabase.from("profiles").update({ open_groups_card_dismissed: true }).eq("id", profile.id)
-  }
+  const openGroupTotal = (openGroupsAll ?? []).length
 
   async function handleChecklistToggle(done: boolean) {
     if (!checklist?.eligible) return
@@ -1291,16 +1292,6 @@ export function HomeTab({
             />
           )}
 
-          {/* ── Find your people — the open-group picker (mobile) ── */}
-          {!openCardDismissed && (
-            <FindYourPeopleCard
-              groups={joinableGroups.map((g: OpenGroup) => ({ id: g.id, name: g.name, memberCount: g.memberCount }))}
-              onJoin={handleJoinOpenGroup}
-              onDismiss={handleDismissOpenCard}
-              onSeeAll={onSeeChats}
-            />
-          )}
-
           {/* ── Up Next — mobile (Pocket scroll-snap carousel) ── */}
           <section>
             {/* §4.1b constant "Featured" eyebrow above the carousel.
@@ -1373,19 +1364,40 @@ export function HomeTab({
             </section>
           )}
 
-          {/* ── Quick tile — mobile. Give only; web-only (the native shell hides it).
-              The "first workspace" tile that used to share this row is GONE (Brian,
+          {/* ── Quick tiles — mobile. Secondary DESTINATIONS, stacked full-bleed.
+              Give is web-only (App Store 3.2.2(iv)), so this section used to be
+              gated wholly on !nativeShell; Open groups is not, hence the per-tile
+              gates — in the shell the row now has an occupant instead of being
+              empty. The "first workspace" tile that once sat here is GONE (Brian,
               2026-08-05): Workspace is a bottom-nav destination, so the tile was a
               second door to a place already one tap away, and it arbitrarily showed
-              userTeams[0] — meaningless for anyone on more than one team. ── */}
-          {!nativeShell && (
-          <section>
-            <PocketQuickTile
-              icon={<div style={{ width: 44, height: 44, borderRadius: 999, background: "var(--plum)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Gift style={{ width: 19, height: 19, color: "var(--cream-on-dark)" }} strokeWidth={1.7} /></div>}
-              label="Give"
-              subtitle="Support the ministry"
-              onClick={() => onGoToTab?.("give")}
-            />
+              userTeams[0] — meaningless for anyone on more than one team. Open
+              groups is NOT that: it has no nav destination of its own, and its
+              subtitle carries a live count rather than an arbitrary pick. ── */}
+          {(openGroupTotal > 0 || !nativeShell) && (
+          <section className="flex flex-col" style={{ gap: "var(--space-6)" }}>
+            {/* Present whenever the ministry HAS open groups, not only when one is
+                joinable — gating on the joinable count hides the entry from the
+                very people who set the groups up, since a creator is in all of
+                them. Same rule as the chat list's row. */}
+            {openGroupTotal > 0 && (
+              <PocketQuickTile
+                icon={<div style={{ width: 44, height: 44, borderRadius: 999, background: "var(--plum)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Compass style={{ width: 19, height: 19, color: "var(--cream-on-dark)" }} strokeWidth={1.7} /></div>}
+                label="Open groups"
+                subtitle={joinableGroups.length > 0
+                  ? `${joinableGroups.length} group${joinableGroups.length === 1 ? "" : "s"} you can join`
+                  : `${openGroupTotal} group${openGroupTotal === 1 ? "" : "s"}, you're in all of them`}
+                onClick={() => (onBrowseOpenGroups ? onBrowseOpenGroups() : onSeeChats())}
+              />
+            )}
+            {!nativeShell && (
+              <PocketQuickTile
+                icon={<div style={{ width: 44, height: 44, borderRadius: 999, background: "var(--plum)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Gift style={{ width: 19, height: 19, color: "var(--cream-on-dark)" }} strokeWidth={1.7} /></div>}
+                label="Give"
+                subtitle="Support the ministry"
+                onClick={() => onGoToTab?.("give")}
+              />
+            )}
           </section>
           )}
 

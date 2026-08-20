@@ -63,8 +63,21 @@ export function isLockedChat(group: ChatGroup, ministryName: string): boolean {
 // "church" while a client arriving at ?chats=my rendered "my" — the wrong
 // segment painted first and React had to discard it. It was also duplicated
 // verbatim in ChatsTab and ChatListPanel.
-export type ChatsSection = "church" | "my"
+// THREE scopes, not two. Open groups are a third bucket of the same object —
+// the chats the church made, the ones you made, and the ones anyone can join —
+// so they belong in the same exclusive switch rather than as an entry row
+// somewhere in the body. A row at the TOP outranked the conversations; a row at
+// the BOTTOM was below the fold the moment a ministry had a screenful of chats
+// (Brian, 2026-08-20). A scope is neither: it never scrolls, it costs the body
+// no pixels, and it can't outrank a list it isn't above.
+//
+// The labels are CATEGORIES, deliberately parallel — "which chats? church ones /
+// mine / open ones". "Browse" was rejected for this slot: it is an action
+// wearing a category's clothes, and it does not fit besides (the options ARE the
+// 22/600 chrome title, and three of them plus the two round buttons have to fit
+// 375px — Church 74 + Mine 51 + Open 54 + 32 of gaps = 211 against a 247 budget).
+export type ChatsSection = "church" | "my" | "open"
 export function resolveChatsSection(raw: string | string[] | null | undefined): ChatsSection {
   const v = Array.isArray(raw) ? raw[0] : raw
-  return v === "my" ? "my" : "church"
+  return v === "my" ? "my" : v === "open" ? "open" : "church"
 }
