@@ -6473,19 +6473,103 @@ export function TimelineView({
   onSelectEvent: (e: CalendarEvent) => void
 }) {
   const timeZone = useMinistryTimezone()
+  // Pinned at mount, like EventsAgendaList's — the split only moves at midnight.
+  const now = useMemo(() => new Date(), [])
+  const [showPast, setShowPast] = useState(false)
+
+  // TOP-LEVEL ONLY. A sub-event is an interior part of its parent's plan, never a
+  // sibling of it — EventsAgendaList has always filtered these out and this list
+  // never did, so a 3-night Welcome Week rendered four rows: the week, then each
+  // night beside it. The MONTH GRID still gets every event: a night is a real
+  // dated thing and belongs as a dot on the day it happens.
+  const topLevel = useMemo(() => events.filter(e => e.parent_event_id == null), [events])
+  // Same rule as the events list (isEventOver): over = its LAST ministry-zone day
+  // has passed. This view is headed "Upcoming" and used to render everything ever,
+  // oldest first — so opening Calendar on a team with a year of history landed you
+  // on last August with today somewhere far below.
+  const upcoming = useMemo(() => topLevel.filter(e => !isEventOver(e, now, timeZone)), [topLevel, now, timeZone])
+  const past = useMemo(() => topLevel.filter(e => isEventOver(e, now, timeZone)), [topLevel, now, timeZone])
+
   // Group by yyyy-MM of the MINISTRY-zone day. `start_date.slice(0, 7)` took the
   // UTC month straight off the ISO text, so an 8pm-ET event on the last of the
   // month filed itself under the NEXT month's header.
-  const groups: Record<string, CalendarEvent[]> = {}
-  for (const ev of events) {
-    const key = eventStartYMD(ev, timeZone).slice(0, 7)
-    if (!groups[key]) groups[key] = []
-    groups[key].push(ev)
+  // `newestFirst` has to reverse the MONTH KEYS, not just the rows: the archive is
+  // read newest-first (the thing that just ended sits right under the bar), and
+  // reversing only the event array is undone the moment they are re-grouped and the
+  // keys sorted ascending — which shipped for one screenshot as "August 2025" above
+  // "March 2026".
+  function byMonth(list: CalendarEvent[], newestFirst = false): [string, CalendarEvent[]][] {
+    const groups: Record<string, CalendarEvent[]> = {}
+    for (const ev of list) {
+      const key = eventStartYMD(ev, timeZone).slice(0, 7)
+      if (!groups[key]) groups[key] = []
+      groups[key].push(ev)
+    }
+    const keys = Object.keys(groups).sort()
+    if (newestFirst) keys.reverse()
+    return keys.map(k => [k, groups[k]])
   }
 
-  const monthKeys = Object.keys(groups).sort()
+  function renderRow(ev: CalendarEvent, dim: boolean) {
+    const cfg = getEventConfig(ev)
+    const dayLong = formatYMD(eventStartYMD(ev, timeZone), { weekday: "long", month: "long", day: "numeric" })
+    const dateStr = ev.all_day
+      ? dayLong
+      : dayLong +
+        " · " + eventTimeLabel(ev.start_date, timeZone) +
+        " – " + eventTimeLabel(ev.end_date, timeZone)
 
-  if (monthKeys.length === 0) {
+    return (
+      <button
+        key={ev.id}
+        onClick={() => onSelectEvent(ev)}
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 10,
+          background: dim ? "var(--cream-2)" : "var(--cream-panel)",
+          border: "1px solid var(--line-2)",
+          borderRadius: 10,
+          padding: "10px 12px",
+          cursor: "pointer",
+          textAlign: "left",
+          width: "100%",
+          opacity: dim ? 0.82 : 1,
+        }}
+      >
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: cfg.dot, flexShrink: 0, marginTop: 5 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontWeight: 500, fontSize: 14, color: dim ? "var(--body)" : "var(--ink)" }}>{ev.title}</span>
+            <span style={{ fontSize: 11, fontWeight: 500, color: cfg.text, background: cfg.bg, padding: "1px 7px", borderRadius: 9999 }}>
+              {cfg.label}
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>{dateStr}</div>
+          {ev.location && <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 1 }}>{ev.location}</div>}
+        </div>
+      </button>
+    )
+  }
+
+  function renderMonths(list: CalendarEvent[], dim: boolean, newestFirst = false) {
+    return byMonth(list, newestFirst).map(([key, evs]) => {
+      const [yyyy, mm] = key.split("-")
+      const monthLabel = new Date(Number(yyyy), Number(mm) - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+      return (
+        <div key={key}>
+          <div style={{ ...MONO_STYLE, marginBottom: 8 }}>
+            {monthLabel}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {evs.map(ev => renderRow(ev, dim))}
+          </div>
+        </div>
+      )
+    })
+  }
+
+  if (topLevel.length === 0) {
     return (
       <div style={{ textAlign: "center", padding: "40px 0", color: "var(--muted-text)", fontSize: 14 }}>
         No events yet.
@@ -6495,59 +6579,33 @@ export function TimelineView({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {monthKeys.map((key) => {
-        const [yyyy, mm] = key.split("-")
-        const monthLabel = new Date(Number(yyyy), Number(mm) - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-        return (
-          <div key={key}>
-            <div style={{ ...MONO_STYLE, marginBottom: 8 }}>
-              {monthLabel}
+      {renderMonths(upcoming, false)}
+      {upcoming.length === 0 && past.length > 0 && (
+        <div style={{ textAlign: "center", padding: "24px 0 0", color: "var(--muted-text)", fontSize: 14 }}>
+          Nothing coming up.
+        </div>
+      )}
+      {past.length > 0 && (
+        <>
+          {/* Past archive — collapsed by default, most recent first. Same
+              affordance the events list uses, so the two read as one idea. */}
+          <button
+            onClick={() => setShowPast(v => !v)}
+            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+          >
+            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+            <ChevronDown className="w-3.5 h-3.5" style={{ color: "var(--muted-text)", transform: showPast ? "rotate(180deg)" : "none", transition: "transform 200ms ease" }} />
+            <span style={{ ...MONO_STYLE }}>Past events</span>
+            <span style={{ ...MONO_STYLE, fontSize: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "1px 7px" }}>{past.length}</span>
+            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </button>
+          {showPast && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              {renderMonths([...past].reverse(), true, true)}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {groups[key].map((ev) => {
-                const cfg = getEventConfig(ev)
-                const dayLong = formatYMD(eventStartYMD(ev, timeZone), { weekday: "long", month: "long", day: "numeric" })
-                const dateStr = ev.all_day
-                  ? dayLong
-                  : dayLong +
-                    " · " + eventTimeLabel(ev.start_date, timeZone) +
-                    " – " + eventTimeLabel(ev.end_date, timeZone)
-
-                return (
-                  <button
-                    key={ev.id}
-                    onClick={() => onSelectEvent(ev)}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 10,
-                      background: "var(--cream-panel)",
-                      border: "1px solid var(--line-2)",
-                      borderRadius: 10,
-                      padding: "10px 12px",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      width: "100%",
-                    }}
-                  >
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: cfg.dot, flexShrink: 0, marginTop: 5 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: "var(--ink)" }}>{ev.title}</span>
-                        <span style={{ fontSize: 11, fontWeight: 500, color: cfg.text, background: cfg.bg, padding: "1px 7px", borderRadius: 9999 }}>
-                          {cfg.label}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>{dateStr}</div>
-                      {ev.location && <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 1 }}>{ev.location}</div>}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )
-      })}
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -7303,6 +7361,17 @@ export function MinistryCalendar({
     { keepPreviousData: false },
   )
   const events = useMemo(() => calData?.events ?? [], [calData])
+  // The right rail answers "what is coming up", so it takes the SAME set the
+  // list does — top-level only, not-yet-over (see TimelineView). It used to map
+  // `events` whole, which counted a year of history and listed a multi-day
+  // event's nights alongside it: Central's board read "Events · 36" against a
+  // handful of real upcoming things. The MONTH GRID below still gets every
+  // event; a past day and a sub-event dot both belong on a calendar.
+  const railNow = useMemo(() => new Date(), [])
+  const railEvents = useMemo(
+    () => events.filter(e => e.parent_event_id == null && !isEventOver(e, railNow, timeZone)),
+    [events, railNow, timeZone],
+  )
   const plannedEventIds = calData?.plannedIds ?? EMPTY_ID_SET
   const tableReady = calData?.tableReady ?? true
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -7487,32 +7556,21 @@ export function MinistryCalendar({
         {!isMobile && (
         <div style={{ width: 232, flexShrink: 0, borderLeft: "1px solid var(--line-2)", paddingLeft: 20 }}>
           <p style={{ ...MONO_STYLE, margin: "0 0 10px" }}>
-            Events · {events.length || 3}
+            Upcoming · {railEvents.length}
           </p>
 
-          {events.length === 0 ? (
-            /* Default placeholder items when calendar isn't seeded yet */
-            [
-              { title: "Welcoming Night", category: "welcoming" as Category, date: "Aug 29" },
-              { title: "Coffeehouse", category: "social" as Category, date: "Oct 4" },
-              { title: "Turkeybowl", category: "social" as Category, date: "Nov 7" },
-            ].map((item) => {
-              const cfg = CATEGORY_CONFIG[item.category]
-              return (
-                <div key={item.title} style={{ display: "flex", flexDirection: "column", gap: 4, padding: "10px 0", borderBottom: "1px solid var(--body-bg)" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: cfg.dot, flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title}</span>
-                  </div>
-                  <span style={{ fontSize: 11, color: "var(--muted-text)", paddingLeft: 14 }}>{item.date}</span>
-                  <span style={{ ...PLAN_STATUS_PILL.needsPlanning, marginLeft: 14, display: "inline-block", width: "fit-content" }}>
-                    Needs planning
-                  </span>
-                </div>
-              )
-            })
+          {railEvents.length === 0 ? (
+            /* Was three HARDCODED fake events ("Welcoming Night", "Coffeehouse",
+               "Turkeybowl") with Needs-planning pills, shown whenever the list came
+               back empty — a seeding-era placeholder that reads as real data in a
+               live congregation. Narrowing the rail to upcoming-only would have made
+               it appear far more often (any team whose events are all in the past),
+               so it goes now rather than later. */
+            <p style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "6px 0 0", lineHeight: 1.45 }}>
+              Nothing coming up.
+            </p>
           ) : (
-            events.map((ev) => {
+            railEvents.map((ev) => {
               const cfg = getEventConfig(ev)
               const isPlanned = plannedEventIds.has(ev.id)
               const dateStr = formatYMD(eventStartYMD(ev, timeZone), { month: "short", day: "numeric" })

@@ -63,16 +63,20 @@ test.beforeAll(async () => {
     // Not started at all.
     { title: FUTURE, start: ymdOffset(30), end: ymdOffset(31) },
   ]
-  for (const r of rows) {
+  const insert = async (title: string, start: string, end: string, parent: string | null = null) => {
     const { data, error: e } = await sb.client.from("calendar_events").insert({
-      ministry_id: sb.ministryId, team_id: teamId, title: r.title,
-      all_day: true, start_day: r.start, end_day: r.end,
-      start_date: `${r.start}T04:00:00Z`, end_date: `${r.end}T23:59:59Z`,
-      created_by: adminId,
+      ministry_id: sb.ministryId, team_id: teamId, title,
+      all_day: true, start_day: start, end_day: end,
+      start_date: `${start}T04:00:00Z`, end_date: `${end}T23:59:59Z`,
+      created_by: adminId, parent_event_id: parent,
     }).select("id").single()
     if (e) throw e
-    eventIds.push((data as { id: string }).id)
+    const id = (data as { id: string }).id
+    eventIds.push(id)
+    return id
   }
+
+  for (const r of rows) await insert(r.title, r.start, r.end)
 })
 
 test.afterAll(async () => {
