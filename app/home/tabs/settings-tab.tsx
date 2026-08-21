@@ -35,7 +35,7 @@ import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@
 import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
-import { isValidInviteCode } from "@/lib/invite-code"
+import { isLinkableCode } from "@/lib/invite-code"
 import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, InviteShareModal, PocketKicker, PocketRowCard, PocketRow, PocketSwitch, PocketSheet, useScrollResetOn } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
@@ -2116,7 +2116,7 @@ export function SettingsTab({
                         Pre-rotation codes predate the current format, and offering a link
                         for one would print a QR that the invite route refuses — the leader
                         would find out from a room full of students, not from us. */}
-                    {isValidInviteCode(inviteCode) ? (
+                    {isLinkableCode(inviteCode) ? (
                       <button onClick={() => setShareOpen(true)} style={{ marginTop: 12, padding: 0, background: "none", border: "none", color: "var(--plum)", fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
                         <QrCode style={{ width: 13, height: 13 }} /> Share link or QR
                       </button>

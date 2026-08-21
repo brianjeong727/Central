@@ -38,7 +38,7 @@ function resolveSignupGrade(
 import { presetById } from "@/app/home/workspace-presets"
 import { ADMIN_ROLES, LEADER_ROLES, MEMBER_TIER, isAdminRole, isStaffRole } from "@/lib/roles"
 import { SUPER_UUID } from "./super-constants"
-import { generateInviteCode, normalizeCode, legacyLookupVariant } from "@/lib/invite-code"
+import { generateInviteCode, lookupVariants } from "@/lib/invite-code"
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
 
@@ -72,30 +72,22 @@ export async function joinMinistryByCode(
   if (authErr || !user) return { ministryName: null, error: "Not authenticated." }
 
   const admin = createAdminClient()
-  // Crockford input folding (I/L→1, O→0) so a code read off a poster or heard
-  // aloud still resolves. lib/invite-code.ts is the one definition of that rule.
-  const code = normalizeCode(inviteCode)
-
-  // LEGACY BRIDGE — remove once every stored code is rotated to the 10-char format.
-  // Pre-rotation codes are base36, which uses ALL 26 letters, so a stored code holding
-  // an I, L or O does not survive Crockford folding (~40.7% of six-char base36 codes
-  // contain one). Without this retry those ministries silently lose their invite code
-  // on the one path that still works for them — typing it.
-  const legacy = legacyLookupVariant(inviteCode)
+  // Every form the typed code could have been STORED as — Crockford-folded (a
+  // generated code, so one read off a poster or heard aloud still resolves), and
+  // plain-uppercase, which covers BOTH the custom codes a ministry chooses and the
+  // pre-rotation base36 ones whose I/L/O do not survive folding (~40.7% of six-char
+  // base36 codes contain one; without this those ministries silently lose their code
+  // on the one path that still works for them — typing it). lib/invite-code.ts is
+  // the single definition, so a fourth caller cannot invent a fourth rule.
+  const variants = lookupVariants(inviteCode)
 
   const findBy = async (column: "invite_code" | "staff_invite_code") => {
     const { data } = await admin
       .from("ministries")
-      .select("id, name, status")
-      .eq(column, code)
+      .select("id, name, status, invite_code_is_custom")
+      .in(column, variants)
       .maybeSingle()
-    if (data || !legacy) return data
-    const { data: legacyHit } = await admin
-      .from("ministries")
-      .select("id, name, status")
-      .eq(column, legacy)
-      .maybeSingle()
-    return legacyHit
+    return data
   }
 
   // Check member code first

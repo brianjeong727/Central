@@ -25,7 +25,7 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
-import { normalizeCode, INVITE_CODE_RE } from "@/lib/invite-code"
+import { INVITE_CODE_RE, isValidCustomCode, lookupVariants } from "@/lib/invite-code"
 import { InviteLanding, InviteInvalid } from "./invite-client"
 
 export const dynamic = "force-dynamic"
@@ -35,23 +35,33 @@ export default async function InvitePage({ params }: { params: Promise<{ code: s
   // Next has already percent-decoded the route param. Decoding a second time throws
   // on a stray "%", which would make malformed input the one class that answers
   // differently from every other invalid code — so it is not done.
-  const code = normalizeCode(raw ?? "")
+  // Every form the input could have been STORED as — Crockford-folded (a generated
+  // code), plain-uppercase (a custom code, and the legacy base36 ones whose I/L/O do
+  // not survive folding), or both where the formats overlap. The database decides
+  // which exists; this page does not try to classify the string itself.
+  const variants = lookupVariants(raw ?? "")
 
   // Malformed codes never reach the database.
-  if (!INVITE_CODE_RE.test(code)) return <InviteInvalid />
+  if (!variants.some((v) => INVITE_CODE_RE.test(v) || isValidCustomCode(v))) return <InviteInvalid />
 
   // invite_code is column-revoked from authenticated/anon, so the lookup runs on the
   // admin client. It selects ONLY the member column — a staff code cannot match.
   const admin = createAdminClient()
   const { data: ministry } = await admin
     .from("ministries")
-    .select("id, name, status")
-    .eq("invite_code", code)
+    .select("id, name, status, invite_code, invite_code_is_custom")
+    .in("invite_code", variants)
     .maybeSingle()
 
   // Unknown code, staff code, and a ministry that is pending/rejected/archived all
   // render identically — no oracle.
   if (!ministry || ministry.status !== "active") return <InviteInvalid />
+
+  // Hand the landing the STORED code, not the typed one. The lookup matched on one of
+  // several variants, and only the stored form is guaranteed to match again when the
+  // landing submits it — a user who typed a generated code's O where a 0 lives would
+  // otherwise be handed back their own typo to re-submit.
+  const code: string = ministry.invite_code
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
