@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Copy, Check, QrCode, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen, Building2, Zap, MessageSquare, Flag, LayoutGrid, ScrollText } from "lucide-react"
+import { Copy, Check, QrCode, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen, Building2, Zap, MessageSquare, Flag, LayoutGrid, ScrollText, ListFilter } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
 import { EYEBROW_STYLE, PlanLineIcon, EmptyState } from "../components/shared"
@@ -36,7 +36,7 @@ import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import { isValidInviteCode } from "@/lib/invite-code"
-import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, InviteShareModal, PocketKicker, PocketRowCard, PocketRow, PocketFilterChip, PocketSwitch, useScrollResetOn } from "@/components/central"
+import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, InviteShareModal, PocketKicker, PocketRowCard, PocketRow, PocketSwitch, PocketSheet, useScrollResetOn } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
 import { useOpenMemberProfile } from "../member-profile-context"
@@ -299,6 +299,7 @@ export function SettingsTab({
   // People tab state
   const [peopleSearch, setPeopleSearch] = useState("")
   const [peopleFilter, setPeopleFilter] = useState<RoleFilter>("all")
+  const [peopleFilterSheet, setPeopleFilterSheet] = useState(false)
   const [peopleChangingRole, setPeopleChangingRole] = useState<string | null>(null)
   const [peopleRemoveConfirmId, setPeopleRemoveConfirmId] = useState<string | null>(null)
   const [peopleRemoving, setPeopleRemoving] = useState(false)
@@ -1145,7 +1146,7 @@ export function SettingsTab({
   })
 
   // People stat tiles double as exclusive role filters — desktop renders them as
-  // stat cards, mobile as a scrollable PocketFilterChip row.
+  // stat cards, mobile as a filter button + PocketSheet picker.
   const PEOPLE_STAT_TILES: { label: string; value: number; filter: RoleFilter }[] = [
     { label: "Members",  value: totalMembers,                                              filter: "all" },
     { label: "Admins",   value: totalAdmins,                                               filter: "admin" },
@@ -1153,6 +1154,10 @@ export function SettingsTab({
     { label: "Regular",  value: totalMembers - totalLeaders - totalAdmins - totalVisitors, filter: "member" },
     { label: "Visitors", value: totalVisitors,                                             filter: "visitor" },
   ]
+  // The tile the mobile filter button names. "all" is the resting state and reads
+  // as plain "All" rather than "Members · 7" — a button that always shows a count
+  // looks like a filter is applied when none is.
+  const activePeopleTile = peopleFilter === "all" ? null : PEOPLE_STAT_TILES.find(t => t.filter === peopleFilter) ?? null
 
   const TABS: { key: ActiveSettingsTab; label: string }[] = [
     { key: "general", label: "General" },
@@ -1550,7 +1555,7 @@ export function SettingsTab({
               </div>
 
               {/* Stat tiles — desktop grid; on mobile they collapse to the scrollable
-                  PocketFilterChip row below (the tiles ARE exclusive filters). */}
+                  filter button + sheet below (the tiles ARE exclusive filters). */}
               <div className="max-md:!hidden" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 14 }}>
                 {PEOPLE_STAT_TILES.map(({ value, label, filter }) => (
                   <button key={label} onClick={() => setPeopleFilter(filter)} style={{ ...CARD, padding: "18px", cursor: "pointer", textAlign: "left", background: peopleFilter === filter ? "var(--plum-tint)" : (CARD.background as string | undefined), borderColor: peopleFilter === filter ? "var(--plum)" : "var(--line)" }}>
@@ -1560,20 +1565,40 @@ export function SettingsTab({
                 ))}
               </div>
 
-              {/* Mobile filter chips — horizontally scrollable, counts inline; solid plum on-state */}
-              <div className="md:hidden -mx-5 px-5" style={{ display: "flex", gap: 8, overflowX: "auto", WebkitOverflowScrolling: "touch", marginTop: -8 }}>
-                {PEOPLE_STAT_TILES.map(({ value, label, filter }) => (
-                  <PocketFilterChip key={label} label={`${label} · ${value}`} active={peopleFilter === filter} onClick={() => setPeopleFilter(filter)} />
-                ))}
-              </div>
-
-              {/* Search + filter */}
+              {/* Search + filter.
+                  The five filters used to be a horizontally-scrollable chip rail at
+                  phone width. It hid 173px of itself past the screen edge: the last
+                  two filters were unreachable unless you happened to discover you
+                  could swipe a row that gave no sign it moved. A filter BUTTON puts
+                  every option on one reachable surface and costs one tap.
+                  The rail pattern (PocketFilterChipRow) stays correct where the
+                  chips actually fit — Announcements, Chats — and is measured by
+                  e2e/mobile-overflow-sweep.mobile.spec.ts, which is what decides. */}
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 280, maxWidth: 420, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)" }}>
+                <div className="md:hidden" style={{ order: 2, width: "100%", display: "flex", justifyContent: "flex-start" }}>
+                  <button
+                    onClick={() => setPeopleFilterSheet(true)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      padding: "9px 14px", borderRadius: 10,
+                      border: `1px solid ${peopleFilter === "all" ? "var(--line-2)" : "var(--plum)"}`,
+                      background: peopleFilter === "all" ? "var(--cream-panel)" : "var(--plum-tint)",
+                      color: "var(--ink)", fontSize: 14, cursor: "pointer",
+                      transition: "background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)",
+                    }}
+                  >
+                    <ListFilter style={{ width: 15, height: 15, color: "var(--muted-text)", flexShrink: 0 }} />
+                    {activePeopleTile ? `${activePeopleTile.label} · ${activePeopleTile.value}` : "All"}
+                  </button>
+                </div>
+                {/* min-w-0 at phone width so the field can shrink inside the wrap
+                    container; the desktop 280 floor is kept — there it sits beside
+                    the FilterChip group and must not collapse. */}
+                <div className="min-w-0 md:min-w-[280px]" style={{ flex: 1, maxWidth: 420, display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream-panel)" }}>
                   <Search style={{ width: 15, height: 15, color: "var(--muted-text)", flexShrink: 0 }} />
                   <input value={peopleSearch} onChange={e => setPeopleSearch(e.target.value)} placeholder="Search members…" style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "var(--ink)", fontFamily: "var(--font-inter)" }} />
                 </div>
-                {/* Desktop-only — the mobile filter is the PocketFilterChip row above */}
+                {/* Desktop-only — the mobile filter is the button above */}
                 <div className="max-md:!hidden" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {(["all", "admin", "leader", "member", "visitor"] as const).map(f => (
                     <FilterChip key={f} selected={peopleFilter === f} onClick={() => setPeopleFilter(f)} tone="plum">
@@ -1582,6 +1607,36 @@ export function SettingsTab({
                   ))}
                 </div>
               </div>
+
+              {/* Mobile filter picker. Portaled (z 200), so it clears the section
+                  body and the floating nav pill without either being reflowed. */}
+              {peopleFilterSheet && (
+                <PocketSheet title="Filter people" onClose={() => setPeopleFilterSheet(false)}>
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    {PEOPLE_STAT_TILES.map(({ label, value, filter }, i) => {
+                      const on = peopleFilter === filter
+                      return (
+                        <button
+                          key={label}
+                          onClick={() => { setPeopleFilter(filter); setPeopleFilterSheet(false) }}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 12,
+                            padding: "14px 4px", background: "none", border: "none",
+                            borderBottom: i < PEOPLE_STAT_TILES.length - 1 ? "1px solid var(--line-3)" : "none",
+                            cursor: "pointer", textAlign: "left", width: "100%",
+                          }}
+                        >
+                          <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: on ? "var(--plum)" : "var(--ink)" }}>
+                            {filter === "all" ? "All" : label}
+                          </span>
+                          <span style={{ fontSize: 13, color: "var(--muted-text)", flexShrink: 0 }}>{value}</span>
+                          {on && <Check style={{ width: 16, height: 16, color: "var(--plum)", flexShrink: 0 }} />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </PocketSheet>
+              )}
 
               {/* Remove confirm banner */}
               {peopleRemoveConfirmId && (() => {
@@ -1807,8 +1862,13 @@ export function SettingsTab({
                 <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", maxWidth: 640, lineHeight: 1.55 }}>Behind-the-scenes rules that keep chats current and new members in the right rooms. Changes take effect when you save.</p>
               </div>
 
-              {/* Active toggles */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {/* Active toggles.
+                  ONE column at phone width. Grid items default to `min-width: auto`,
+                  so a two-column track never shrinks below the cards' min-content
+                  width (208px here) — it just pushes the layout past the screen and
+                  scrolls the whole shell sideways. Guarded by
+                  e2e/mobile-overflow-sweep.mobile.spec.ts. */}
+              <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 16 }}>
                 {([
                   { key: "auto_sg_chats",     label: "Auto-create small group chats",                                                         sub: "When groups are finalized for the semester, a chat is opened per group." },
                   { key: "auto_grade_chats",  label: "Grade & Young Adult chats",                                                             sub: "New members are auto-added to their class-year chat (Freshman – Senior, Young Adult) when they join. Off by default." },
@@ -1834,7 +1894,7 @@ export function SettingsTab({
               {/* Coming soon */}
               <div>
                 <p style={{ ...SECTION_LABEL, marginBottom: 12 }}>Coming soon</p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 16 }}>
                   {([
                     { key: "auto_praise_chat",    label: "Auto-create praise team chats", sub: "When a Sunday week is confirmed, a new chat is opened with that week's lineup." },
                     { key: "auto_archive_praise", label: "Auto-archive praise team chats", sub: "After Sunday at 11:59 pm, the chat is archived from your active list." },

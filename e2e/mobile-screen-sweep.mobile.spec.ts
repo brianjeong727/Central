@@ -484,14 +484,34 @@ test.describe("mobile screen sweep — one margin rule, every screen", () => {
         await check(page, "Event hub")
         await walkRows(page, "Event", 0)
       }
-    }
+    } else visited.push("Team hub / Event hub        SKIPPED (no team-owned event in this sandbox)")
 
     // ── Finance workspace ──
     if (financeTeamId) {
       await page.goto(`/home?tab=plan&team=${financeTeamId}`)
       await check(page, "Finance hub")
       await walkRows(page, "Finance", 1)
-    }
+
+      // Team settings sits behind the hub GEAR, not a PocketRow, so the discovery
+      // walk could never reach it — which is exactly how it drifted into a second
+      // identity+actions header row under the chrome and a STACKED PocketBackRow
+      // on its add-member sub-view, with every assertion here still passing. One
+      // explicit hop each; from settings, "Add members" is its own pushed screen.
+      await page.goto(`/home?tab=plan&team=${financeTeamId}`)
+      await page.waitForTimeout(1400)
+      const gear = page.getByTitle("Team settings").filter({ visible: true }).first()
+      if (await gear.count()) {
+        await gear.click().catch(() => {})
+        await page.waitForTimeout(1600)
+        await check(page, "Team → Settings")
+        const addBtn = page.getByRole("button", { name: "Add members" }).filter({ visible: true }).first()
+        if (await addBtn.count()) {
+          await addBtn.click().catch(() => {})
+          await page.waitForTimeout(1200)
+          await check(page, "Team → Settings → Add members")
+        } else visited.push("Team → Settings → Add members  SKIPPED (control absent)")
+      } else visited.push("Team → Settings             SKIPPED (gear absent)")
+    } else visited.push("Finance hub                 SKIPPED (no finance team seeded)")
 
     console.log("\n===== MOBILE SCREEN SWEEP =====")
     for (const v of visited) console.log("  " + v)

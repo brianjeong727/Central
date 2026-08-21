@@ -46,7 +46,7 @@ import { useIsMobile } from "../use-is-mobile"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, EventSectionHeader, EventMetaLine, NightDivider, InlineAddRow, InlineAddCard, ActionCard, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketBackRow, PocketRoundButton, PocketButton, PocketFactsGrid, PocketStatCard, PocketSheet, PocketSearchField, POCKET_KICKER_STYLE, MONO_METRIC_STYLE, useScrollResetOn } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, EventSectionHeader, EventMetaLine, NightDivider, InlineAddRow, InlineAddCard, ActionCard, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketRoundButton, PocketButton, PocketFactsGrid, PocketStatCard, PocketSheet, PocketSearchField, PocketSwitch, PocketTag, PocketFilterChipRow, MobileChromeActions, POCKET_KICKER_STYLE, MONO_METRIC_STYLE, useScrollResetOn } from "@/components/central"
 import { FinanceWorkspace, MobileFactsGrid, type FinanceSection } from "../components/finance-workspace"
 import { MobilePocketHub, PocketHubChrome } from "../components/mobile-pocket-hub"
 import { teamIconKey } from "../workspace-presets"
@@ -12685,6 +12685,29 @@ function GgToggle({ checked, onChange, label, desc, disabled, tooltip }: {
   )
 }
 
+// Phone-width settings switch row (mobile_design_system §4 Forms): label + desc
+// on the left, a 46×28 `PocketSwitch` on the right, inside a PocketCard. The
+// desktop `GgToggle` above is a different animal — a 36×20 switch LEADING the
+// label — and its track is a hardcoded hex, which §6 forbids on mobile.
+function MobileSettingSwitchRow({ label, desc, checked, saving, onChange, isLast = false }: {
+  label: string
+  desc: string
+  checked: boolean
+  saving?: boolean
+  onChange: (next: boolean) => void
+  isLast?: boolean
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: isLast ? "14px 0 16px" : "16px 0 14px", opacity: saving ? 0.5 : 1 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: 0 }}>{label}</p>
+        <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "3px 0 0", lineHeight: 1.4 }}>{desc}</p>
+      </div>
+      <PocketSwitch checked={checked} ariaLabel={label} onChange={(next) => { if (!saving) onChange(next) }} />
+    </div>
+  )
+}
+
 
 // ── AddWorkspaceModal ─────────────────────────────────────────────────────────
 //
@@ -13393,49 +13416,115 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
     </div>
   )
 
-  return (
-    <SubpageShell title="Settings" mobileTitle="Team settings" crumbs={[{ label: localTeamName, onClick: onClose }, { label: "Settings" }]} width="full">
+  // Phone-width twin of `addMemberForm`. Separate rather than shared because the
+  // Pocket primitives are the mobile contract and the desktop ones are the web
+  // contract (§4 — they are deliberately NOT interchangeable): the shared form
+  // was rendering a bordered `--cream-panel` search box and hand-rolled role
+  // pills at phone width, neither of which exists in the mobile system.
+  const addMemberFormMobile = (
+    <div className="flex flex-col" style={{ gap: 22 }}>
+      {roles.length > 0 && (
+        <div>
+          <PocketKicker label="Default role" style={{ marginBottom: 4 }} />
+          <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 4px 10px", lineHeight: 1.4 }}>Pre-fills every selection — change them individually below.</p>
+          <PocketFilterChipRow>
+            {roles.map((r) => (
+              <PocketFilterChip key={r.id} label={r.name} active={defaultRoleId === r.id} onClick={() => setDefaultRoleId(r.id)} />
+            ))}
+          </PocketFilterChipRow>
+        </div>
+      )}
 
-      {/* ── Mobile header — SubpageShell's `title` is desktop-only, so mobile keeps a
-          self-contained header (team icon + name + inline actions). The mobile back
-          row ("← {team}") is rendered by SubpageShell, so no ArrowLeft here. ── */}
-      <div className="md:hidden flex items-center justify-between mb-5" style={{ paddingBottom: 14, borderBottom: "1px solid var(--line-3)" }}>
-        {showAddMember ? (
-          <PocketBackRow label="Settings" onBack={() => { setShowAddMember(false); setError(null) }} style={{ marginBottom: 0 }} />
-        ) : (
-          <>
-            <div className="flex items-center gap-2">
-              <PlanLineIcon iconKey={team.icon ?? "users"} size={22} bg="var(--plum)" fg="var(--cream)" />
-              <span className="text-[14px] font-medium text-[var(--ink)]">{localTeamName}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              {canCreateGroupChat && (chatCreated ? (
-                <CentralButton
-                  variant="primary" size="sm"
-                  onClick={() => { onOpenChat?.(chatCreated.id, chatCreated.name); onClose() }}
-                  style={{ height: 36 }}
-                >
-                  <MessageCircle className="w-3.5 h-3.5" /> Open chat
-                </CentralButton>
-              ) : (
-                <button
-                  onClick={handleCreateGroupChat}
-                  disabled={creatingChat}
-                  className="size-9 flex items-center justify-center rounded-full hover:bg-[var(--body-bg)] transition-colors"
-                  style={{ border: "none", background: "transparent", cursor: creatingChat ? "not-allowed" : "pointer", opacity: creatingChat ? 0.5 : 1 }}
-                >
-                  <MessageCircle className="w-4 h-4 text-[var(--muted-text)]" />
-                </button>
-              ))}
-              {canDelete && (
-                <button onClick={() => setConfirmDelete(true)} className="size-9 flex items-center justify-center rounded-full hover:bg-[color-mix(in_srgb,var(--danger)_8%,var(--cream))] transition-colors">
-                  <Trash2 className="w-4 h-4 text-[var(--muted-text)]" />
-                </button>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+      <PocketSearchField value={addSearch} onChange={setAddSearch} placeholder="Search members" />
+
+      {filteredAdd.length === 0 ? (
+        <EmptyState
+          variant="quiet"
+          icon={<Users style={{ width: 22, height: 22 }} />}
+          title={addSearch ? "No one matches that" : "Everyone's already on this team"}
+          subtitle={addSearch ? "Try a different name." : "There's no one left in the ministry to add."}
+        />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {filteredAdd.map((member, mi) => {
+            const selected = selectedIds.has(member.id)
+            return (
+              <button
+                key={member.id}
+                onClick={() => {
+                  const wasSelected = selectedIds.has(member.id)
+                  setSelectedIds((prev) => {
+                    const next = new Set(prev)
+                    if (wasSelected) next.delete(member.id)
+                    else next.add(member.id)
+                    return next
+                  })
+                  if (wasSelected) {
+                    setMemberRoles((prev) => { const r = { ...prev }; delete r[member.id]; return r })
+                  } else {
+                    setMemberRoles((prev) => ({ ...prev, [member.id]: defaultRoleId }))
+                  }
+                }}
+                // FULL-BLEED picker row (§4 "no cards for rows you tap through"):
+                // it owns the 20px gutter itself and cancels the shell's, so the
+                // avatar lines up with the search field above while the selected
+                // fill and the tap target run edge to edge. Separated by TOP
+                // hairlines, suppressed on the first row.
+                style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "12px 20px", margin: "0 -20px",
+                  borderTop: mi === 0 ? "none" : "1px solid var(--line-3)",
+                  borderLeft: "none", borderRight: "none", borderBottom: "none",
+                  background: selected ? "var(--ivory)" : "transparent",
+                  cursor: "pointer", textAlign: "left" as const, transition: "background 0.12s",
+                }}
+              >
+                <MonogramChip initials={getInitials(member.name)} className="w-9 h-9 text-[13px] font-medium" />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{member.name}</p>
+                  {selected && roles.length > 1 ? (
+                    <select
+                      value={memberRoles[member.id] ?? defaultRoleId}
+                      onChange={(e) => { e.stopPropagation(); setMemberRoles((prev) => ({ ...prev, [member.id]: e.target.value })) }}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ marginTop: 2, fontSize: 13, color: "var(--plum)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0, maxWidth: "100%" }}
+                    >
+                      {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                    </select>
+                  ) : (
+                    member.email && <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{member.email}</p>
+                  )}
+                </div>
+                {/* §4 Forms: checkbox 22 at --r-check, 1.5px hairline → plum. */}
+                <span style={{
+                  width: 22, height: 22, borderRadius: "var(--r-check)", flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: selected ? "var(--plum)" : "transparent",
+                  border: selected ? "1.5px solid var(--plum)" : "1.5px solid var(--line-2)",
+                }}>
+                  {selected && <Check style={{ width: 12, height: 12, color: "var(--cream-on-dark)" }} />}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+
+  return (
+    <SubpageShell
+      // Add-member is a PUSHED SCREEN, not an inline swap: it gets its own crumb,
+      // so the shell's ONE chrome chevron walks back to Settings (§0.3 — never a
+      // second PocketBackRow stacked under the chrome row) and the desktop
+      // breadcrumb reads Team › Settings › Add members instead of stopping short.
+      title={showAddMember ? "Add members" : "Settings"}
+      mobileTitle={showAddMember ? "Add members" : "Team settings"}
+      crumbs={showAddMember
+        ? [{ label: localTeamName, onClick: onClose }, { label: "Settings", onClick: () => { setShowAddMember(false); setError(null) } }, { label: "Add members" }]
+        : [{ label: localTeamName, onClick: onClose }, { label: "Settings" }]}
+      width="full"
+    >
 
       {error && (
         <div className="rounded-xl px-4 py-3 mb-4 text-[13px] text-[var(--plum)] font-medium" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)" }}>{error}</div>
@@ -13443,128 +13532,188 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
 
       {/* ── Mobile content ── */}
       <div className="md:hidden">
-          {!showAddMember && (
-            <>
-              {loading ? <Spinner /> : (
-                <div className="flex flex-col gap-6">
-                  <div>
-                    <PlanSectionHeader>Roles</PlanSectionHeader>
-                    <div className="flex flex-col gap-2">
-                      {roles.length === 0 && (
-                        <p className="text-[13px] text-[var(--muted-text)] text-center py-4">No roles defined.</p>
-                      )}
-                      {roles.map((role) => (
-                        <div key={role.id} className="bg-[var(--ivory)] rounded-[var(--r-pocket)] p-4">
-                          <p className="text-[14px] font-medium text-[var(--ink)] mb-2">{role.name}</p>
-                          {role.permissions.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5">
-                              {role.permissions.map((p) => (
-                                <span key={p} className="text-[11px] bg-[var(--line-2)] text-[var(--body)] px-2 py-0.5 rounded-full">
-                                  {PERMISSION_LABELS[p] ?? p}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-[12px] text-[var(--muted-text)]">No permissions assigned</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {canManageTeam && (
-                    <div>
-                      <PlanSectionHeader>Leadership</PlanSectionHeader>
-                      <div className="bg-[var(--ivory)] rounded-[var(--r-pocket)] p-4 flex flex-col gap-4">
-                        <GgToggle
-                          checked={allowCoPresidency}
-                          onChange={handleToggleCoPresidency}
-                          disabled={savingCoPres}
-                          label="Co-presidency"
-                          desc="Allow this team to have two presidents instead of one."
-                        />
-                        <div className="h-px bg-[var(--line-3)]" />
-                        <GgToggle
-                          checked={allowAdminMembers}
-                          onChange={handleToggleAdminMembers}
-                          disabled={savingAdminMembers}
-                          label="Allow admins as members"
-                          desc="By default admins govern teams without being members. Enable this to let an admin also be a member."
-                        />
-                      </div>
-                    </div>
+        {/* The screen's actions live IN the chrome row (Convention #25). They used
+            to sit in a hand-rolled identity+icons rail directly under it, which was
+            a second header (§1 no-two-header-screens) and pushed the body down by
+            its own height. Delete moved to the danger zone at the foot of the page,
+            where §1 says a destructive action belongs. */}
+        {!showAddMember && canCreateGroupChat && (
+          <MobileChromeActions>
+            <PocketRoundButton
+              variant="ghost"
+              ariaLabel={chatCreated ? "Open team chat" : "Create team chat"}
+              onClick={() => {
+                if (chatCreated) { onOpenChat?.(chatCreated.id, chatCreated.name); onClose(); return }
+                if (!creatingChat) void handleCreateGroupChat()
+              }}
+            >
+              <MessageCircle style={{ width: 16, height: 16, opacity: creatingChat ? 0.5 : 1 }} />
+            </PocketRoundButton>
+          </MobileChromeActions>
+        )}
+
+        {!showAddMember && (
+          loading ? <Spinner /> : (
+            <div className="flex flex-col" style={{ gap: 26 }}>
+              {/* Identity card — the screen names the OBJECT it configures in the
+                  BODY (the Church Settings → General / member-detail grammar), so
+                  the chrome row stays one plain "Team settings" header. */}
+              <PocketCard style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <PlanLineIcon iconKey={team.icon ?? "users"} size={46} radius={14} bg="var(--pocket-track)" fg="var(--plum)" />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 600, letterSpacing: "-0.01em", lineHeight: 1.15, color: "var(--ink)", margin: 0, overflowWrap: "anywhere" }}>{localTeamName}</p>
+                  <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "4px 0 0" }}>
+                    {members.length} {members.length === 1 ? "member" : "members"} · {roles.length} {roles.length === 1 ? "role" : "roles"}
+                  </p>
+                </div>
+              </PocketCard>
+
+              <div>
+                <PocketKicker label="Roles" />
+                <div className="flex flex-col gap-2">
+                  {roles.length === 0 && (
+                    <p style={{ fontSize: 13, color: "var(--muted-text)", textAlign: "center", padding: "16px 0", margin: 0 }}>No roles defined.</p>
                   )}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3 flex-1 mr-3">
-                        <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "18px", fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.01em" }}>Members</span>
-                        <div className="flex-1 h-px bg-[var(--line-3)]" />
-                      </div>
-                      {canManageTeam && (
-                        <button onClick={() => setShowAddMember(true)} className="text-[12px] font-medium text-[var(--plum)] hover:opacity-70 flex-shrink-0">
-                          + Add
-                        </button>
+                  {roles.map((role) => (
+                    <PocketCard key={role.id} padding={16}>
+                      <p style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: 0 }}>{role.name}</p>
+                      {role.permissions.length > 0 ? (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                          {role.permissions.map((p) => (
+                            <PocketTag key={p} label={PERMISSION_LABELS[p] ?? p} />
+                          ))}
+                        </div>
+                      ) : (
+                        <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "6px 0 0" }}>No permissions assigned</p>
                       )}
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      {members.length === 0 && <p className="text-[13px] text-[var(--muted-text)] text-center py-4">No one&apos;s here yet.</p>}
-                      {members.map((m, i) => {
-                        const isConfirming = confirmRemoveId === m.user_id
-                        const isRevealed = mobileRevealMemberId === m.user_id
-                        return (
-                          <div key={m.user_id} className="flex items-center gap-3 rounded-[var(--r-pocket-sm)] p-3"
-                            style={{ background: isConfirming ? "color-mix(in srgb, var(--danger) 8%, var(--cream))" : "var(--ivory)", transition: "background 0.1s" }}
-                            onClick={() => { if (canManageTeam && m.user_id !== userId && !isConfirming) setMobileRevealMemberId(id => id === m.user_id ? null : m.user_id) }}
-                          >
-                            <span onClick={(e) => { e.stopPropagation(); openMemberProfile(m.user_id) }} style={{ cursor: "pointer", display: "inline-flex", flexShrink: 0 }}>
-                              <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-medium" />
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <p onClick={(e) => { e.stopPropagation(); openMemberProfile(m.user_id) }} className="text-[14px] font-medium text-[var(--ink)] truncate cursor-pointer">{m.name}</p>
-                              {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
-                                <select
-                                  // `?? ""` + the matching placeholder option keeps this
-                                  // CONTROLLED for a roleless member. Binding null made
-                                  // React fall back to uncontrolled, which renders the
-                                  // first option — so someone with no role was shown as
-                                  // holding whatever role sorted first.
-                                  value={m.role_id ?? ""}
-                                  onChange={e => { e.stopPropagation(); handleChangeRole(m.user_id, e.target.value) }}
-                                  onClick={e => e.stopPropagation()}
-                                  style={{ fontSize: 12, color: m.role_id ? "var(--body)" : "var(--faint)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0, marginTop: 1 }}
-                                >
-                                  {!m.role_id && <option value="" disabled>No role</option>}
-                                  {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                                </select>
-                              ) : (
-                                <p className="text-[12px] text-[var(--muted-text)]">{m.role_name}</p>
-                              )}
-                            </div>
-                            {canManageTeam && m.user_id !== userId && (
-                              isConfirming ? (
-                                <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
-                                  <button onClick={e => { e.stopPropagation(); handleRemoveMember(m.user_id) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--danger)" }}><Check className="w-4 h-4" /></button>
-                                  <button onClick={e => { e.stopPropagation(); setConfirmRemoveId(null) }} style={{ width: 28, height: 28, borderRadius: 6, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X className="w-4 h-4" /></button>
-                                </div>
-                              ) : (
-                                <button
-                                  onClick={e => { e.stopPropagation(); setConfirmRemoveId(m.user_id); setMobileRevealMemberId(null) }}
-                                  style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0, color: "var(--muted-text)", opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
-                                >
-                                  <X style={{ width: 14, height: 14 }} />
-                                </button>
-                              )
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
+                    </PocketCard>
+                  ))}
+                </div>
+              </div>
+
+              {canManageTeam && (
+                <div>
+                  <PocketKicker label="Leadership" />
+                  <PocketCard padding="2px 18px">
+                    <MobileSettingSwitchRow
+                      label="Co-presidency"
+                      desc="Allow this team to have two presidents instead of one."
+                      checked={allowCoPresidency}
+                      saving={savingCoPres}
+                      onChange={handleToggleCoPresidency}
+                    />
+                    <div style={{ height: 1, background: "var(--line-3)" }} />
+                    <MobileSettingSwitchRow
+                      label="Allow admins as members"
+                      desc="By default admins govern teams without being members. Enable this to let an admin also be a member."
+                      checked={allowAdminMembers}
+                      saving={savingAdminMembers}
+                      onChange={handleToggleAdminMembers}
+                      isLast
+                    />
+                  </PocketCard>
                 </div>
               )}
-            </>
-          )}
-          {showAddMember && addMemberForm}
-        </div>
+
+              <div>
+                <PocketKicker
+                  label="Members"
+                  style={{ marginBottom: 10 }}
+                  action={canManageTeam ? (
+                    <PocketRoundButton variant="plum" ariaLabel="Add members" onClick={() => setShowAddMember(true)}>
+                      <Plus style={{ width: 16, height: 16 }} />
+                    </PocketRoundButton>
+                  ) : undefined}
+                />
+                {members.length === 0 ? (
+                  <PocketCard>
+                    <p style={{ fontSize: 13, color: "var(--muted-text)", textAlign: "center", margin: 0 }}>No one&apos;s here yet.</p>
+                  </PocketCard>
+                ) : (
+                  <PocketRowCard>
+                    {members.map((m, i) => {
+                      const isConfirming = confirmRemoveId === m.user_id
+                      const isRevealed = mobileRevealMemberId === m.user_id
+                      const canAct = canManageTeam && m.user_id !== userId
+                      return (
+                        <div
+                          key={m.user_id}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 12, padding: "11px 0",
+                            borderBottom: i === members.length - 1 ? "none" : "1px solid var(--line-3)",
+                          }}
+                          onClick={() => { if (canAct && !isConfirming) setMobileRevealMemberId(id => id === m.user_id ? null : m.user_id) }}
+                        >
+                          <span onClick={(e) => { e.stopPropagation(); openMemberProfile(m.user_id) }} style={{ cursor: "pointer", display: "inline-flex", flexShrink: 0 }}>
+                            <MonogramChip initials={getInitials(m.name)} className="w-9 h-9 text-[13px] font-medium" />
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p
+                              onClick={(e) => { e.stopPropagation(); openMemberProfile(m.user_id) }}
+                              style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "pointer" }}
+                            >
+                              {m.name}
+                            </p>
+                            {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
+                              <select
+                                // `?? ""` + the matching placeholder option keeps this
+                                // CONTROLLED for a roleless member. Binding null made
+                                // React fall back to uncontrolled, which renders the
+                                // first option — so someone with no role was shown as
+                                // holding whatever role sorted first.
+                                value={m.role_id ?? ""}
+                                onChange={e => { e.stopPropagation(); handleChangeRole(m.user_id, e.target.value) }}
+                                onClick={e => e.stopPropagation()}
+                                style={{ fontSize: 13, color: m.role_id ? "var(--muted-text)" : "var(--faint)", border: "none", background: "transparent", cursor: "pointer", outline: "none", padding: 0, marginTop: 2 }}
+                              >
+                                {!m.role_id && <option value="" disabled>No role</option>}
+                                {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                              </select>
+                            ) : (
+                              <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "2px 0 0" }}>{m.role_name}</p>
+                            )}
+                          </div>
+                          {canAct && (
+                            isConfirming ? (
+                              <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+                                <button aria-label={`Remove ${m.name}`} onClick={e => { e.stopPropagation(); handleRemoveMember(m.user_id) }} style={{ width: 32, height: 32, borderRadius: 999, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--danger)" }}><Check className="w-4 h-4" /></button>
+                                <button aria-label="Cancel" onClick={e => { e.stopPropagation(); setConfirmRemoveId(null) }} style={{ width: 32, height: 32, borderRadius: 999, border: "none", background: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, color: "var(--muted-text)" }}><X className="w-4 h-4" /></button>
+                              </div>
+                            ) : (
+                              <button
+                                aria-label={`Remove ${m.name} from team`}
+                                onClick={e => { e.stopPropagation(); setConfirmRemoveId(m.user_id); setMobileRevealMemberId(null) }}
+                                style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", cursor: "pointer", padding: 4, flexShrink: 0, color: "var(--muted-text)", opacity: isRevealed ? 1 : 0, transition: "opacity 0.15s", pointerEvents: isRevealed ? "auto" : "none" }}
+                              >
+                                <X style={{ width: 15, height: 15 }} />
+                              </button>
+                            )
+                          )}
+                        </div>
+                      )
+                    })}
+                  </PocketRowCard>
+                )}
+              </div>
+
+              {/* Danger zone (§1) — red mono eyebrow, outline-only destructive
+                  button. Never a filled red, and never a bare trash glyph in the
+                  chrome, where a one-tap destroy sits next to navigation. */}
+              {canDelete && (
+                <div>
+                  <div style={{ margin: "0 4px 10px" }}>
+                    <span style={{ ...POCKET_KICKER_STYLE, color: "var(--danger)" }}>Danger zone</span>
+                  </div>
+                  <PocketButton variant="destructiveOutline" onClick={() => setConfirmDelete(true)}>
+                    <Trash2 style={{ width: 14, height: 14 }} /> Delete team
+                  </PocketButton>
+                </div>
+              )}
+            </div>
+          )
+        )}
+        {showAddMember && addMemberFormMobile}
+      </div>
 
         {/* ── Desktop content ── */}
         {!showAddMember ? (
@@ -13878,10 +14027,10 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
           </div>
         ) : (
           <div className="hidden md:block" style={{ paddingTop: 28 }}>
-            <p style={{ ...EYEBROW_STYLE, fontWeight: 400, marginBottom: 6 }}>
-              TEAM SETTINGS · {team.name.toUpperCase()}
-            </p>
-            <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 25, color: "var(--ink)", lineHeight: 1.1, marginBottom: 8 }}>Add members</p>
+            {/* No eyebrow and no serif headline here — the breadcrumb already reads
+                "… / {team} / Settings / Add members" and the SubpageShell PageTitle
+                is "Add members"; §4.18 forbids hand-rolling a second header in the
+                body, and the eyebrow repeated the crumb word for word. */}
             <p style={{ fontSize: 15, color: "var(--body)", marginBottom: 32 }}>Select people from your ministry and assign them a role on this team.</p>
             {addMemberForm}
           </div>
@@ -13889,22 +14038,32 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
 
       {/* Add-member action row (inline under SubpageShell; interim sub-view) */}
       {showAddMember && selectedIds.size > 0 && (
-        <div style={{ borderTop: "1px solid var(--line)", marginTop: 20 }}
-          className="py-4 pb-8 md:pb-5"
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-            <p style={{ fontSize: 14, color: "var(--body)", margin: 0 }}>
-              <span style={{ fontWeight: 500, color: "var(--ink)" }}>{selectedIds.size}</span> {selectedIds.size === 1 ? "member" : "members"} selected
-            </p>
-            <CentralButton
-              variant="primary" size="md"
-              onClick={handleAddMembers}
-              disabled={saving}
-            >
-              {saving ? "Adding…" : `Add ${selectedIds.size} ${selectedIds.size === 1 ? "member" : "members"}`}
-            </CentralButton>
+        <>
+          <div style={{ borderTop: "1px solid var(--line)", marginTop: 20 }}
+            className="hidden md:block py-4 pb-5"
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <p style={{ fontSize: 14, color: "var(--body)", margin: 0 }}>
+                <span style={{ fontWeight: 500, color: "var(--ink)" }}>{selectedIds.size}</span> {selectedIds.size === 1 ? "member" : "members"} selected
+              </p>
+              <CentralButton
+                variant="primary" size="md"
+                onClick={handleAddMembers}
+                disabled={saving}
+              >
+                {saving ? "Adding…" : `Add ${selectedIds.size} ${selectedIds.size === 1 ? "member" : "members"}`}
+              </CentralButton>
+            </div>
           </div>
-        </div>
+          {/* Mobile: one full-width plum primary, no rule above it — a hairline
+              across a phone screen reads as a section break, and the count is
+              already in the button's own label. */}
+          <div className="md:hidden" style={{ marginTop: 20 }}>
+            <PocketButton variant="primary" onClick={handleAddMembers} disabled={saving} style={{ width: "100%" }}>
+              {saving ? "Adding…" : `Add ${selectedIds.size} ${selectedIds.size === 1 ? "member" : "members"}`}
+            </PocketButton>
+          </div>
+        </>
       )}
 
       {/* Top-layer dialogs — rendered via portal so a transformed content-enter

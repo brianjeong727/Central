@@ -755,7 +755,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     })
     if (!data) return
 
-    setRecentChats(rowsToChatPreviews(data as ChatPreviewRow[]))
+    setRecentChats(rowsToChatPreviews(data as ChatPreviewRow[], userId))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, ministryId])
 
@@ -963,6 +963,31 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     }
   }, [globalMutate, userId, ministryId])
 
+  // A reaction can change the chat-list preview AND the Home recent-chats strip, and
+  // neither can be patched locally: the sentence needs the reacted-TO message, which
+  // the broadcast payload doesn't carry. So both are refetched — behind ONE 300ms
+  // throttle, because a burst (several people reacting to the same message in a big
+  // room) is otherwise N round trips per connected client. This is the same shape
+  // the message path already enforces on itself; `refetchChatList` carries its own
+  // throttle too, so the outer gate exists to cover `loadRecentChats`, which does not.
+  const reactionRefreshThrottle = useRef<{ last: number; timer: ReturnType<typeof setTimeout> | null }>({ last: 0, timer: null })
+  const refreshChatsForReaction = useCallback(() => {
+    const run = () => {
+      reactionRefreshThrottle.current.last = Date.now()
+      refetchChatList()
+      loadRecentChats()
+    }
+    const elapsed = Date.now() - reactionRefreshThrottle.current.last
+    if (elapsed >= 300) {
+      run()
+    } else if (!reactionRefreshThrottle.current.timer) {
+      reactionRefreshThrottle.current.timer = setTimeout(() => {
+        reactionRefreshThrottle.current.timer = null
+        run()
+      }, 300 - elapsed)
+    }
+  }, [refetchChatList, loadRecentChats])
+
   // Sender-name cache for the recent-chats preview: the same sender re-appears on
   // every message they send, so we resolve their name from profiles ONCE per session
   // and serve cache hits synchronously (no per-event select). Own messages skip the
@@ -1037,13 +1062,25 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       subscribeChatTopic(gid, (e) => {
         if (e.operation === "INSERT" && e.table === "messages") {
           handleMessageRecord(e.record as unknown as Parameters<typeof handleMessageRecord>[0])
+          return
+        }
+        // A reaction is now visible activity in the list (it can win the preview
+        // line and bump the row), so the list must move when one lands. DELETE too:
+        // un-reacting has to revert the preview to whatever was there before.
+        //
+        // No new channel — the SAME per-group topic the message path already rides
+        // carries message_reactions INSERT/DELETE (the DB's broadcast_chat_change
+        // trigger). The throttled refresher covers both consumers in one gate.
+        // Unread counts are untouched: a reaction never adds to the badge.
+        if (e.table === "message_reactions" && (e.operation === "INSERT" || e.operation === "DELETE")) {
+          refreshChatsForReaction()
         }
       })
     )
 
     return () => { unsubs.forEach((u) => u()) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, memberGroupKey, refetchChatList, initialProfile.name])
+  }, [userId, memberGroupKey, refetchChatList, refreshChatsForReaction, initialProfile.name])
 
   // Single RPC call replaces N parallel COUNT queries (one per group)
   const recountTotalUnread = useCallback(async () => {

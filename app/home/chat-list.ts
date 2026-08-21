@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase"
-import { chatPreviewLabel } from "./utils"
+import { chatRowPreview, type ReactionRowFields } from "./utils"
 import type { ChatGroup } from "./types"
 import type { ChatAvatarMember } from "@/components/central/chat-avatar"
 
@@ -34,7 +34,7 @@ export type ChatListRow = {
   /** First three of them, recency-ordered. `[]` for named chats and DMs — the
    *  SQL only pays for the cluster where one can actually render. */
   cluster_members: ChatAvatarMember[] | null
-}
+} & ReactionRowFields
 
 // ── Dead-thread signal (deleted-account counterpart) ─────────────────────────
 // get_dm_groups_with_deleted_counterpart() returns the CALLER'S OWN dm group ids
@@ -69,36 +69,48 @@ export function toDeletedDmSet(result: unknown): Set<string> {
 // Deliberately kept in this module (which has no module-level side effects — the
 // browser client is created lazily inside createClient()) so a SERVER component can
 // import it without pulling a browser client into the server graph.
-export function mapChatListRows(rows: ChatListRow[], deletedDmIds?: ReadonlySet<string>): ChatGroup[] {
+export function mapChatListRows(
+  rows: ChatListRow[],
+  deletedDmIds?: ReadonlySet<string>,
+  // The viewer, so a reaction preview can say "You" / "your message". Threaded from
+  // BOTH callers (client fetcher below, SSR boot in app/home/page.tsx) — they must
+  // stay in lockstep or the sentence changes on hydration.
+  viewerId?: string | null,
+): ChatGroup[] {
   // get_chat_list surfaces groups.is_central_chat directly (row.is_central), so the
   // previously-required follow-up groups lookup is gone. Used only to flag the
   // solid-plum monogram chip in the mobile Pocket list.
-  const groups = (rows ?? []).map((row) => ({
-    id: row.group_id,
-    name: row.group_name,
-    type: row.group_type,
-    archived: row.group_archived ?? false,
-    last_message: chatPreviewLabel(row.last_msg_content, row.last_msg_attachment_type, row.last_msg_has_poll) || null,
-    last_sender: row.last_msg_sender_name ?? null,
-    last_message_time: row.last_msg_at ?? null,
-    unread_count: Number(row.unread_count),
-    category: (row.group_category ?? null) as ChatGroup["category"],
-    muted: row.muted ?? false,
-    pinned: row.pinned ?? false,
-    is_central_chat: row.is_central ?? false,
-    counterpart_deleted: deletedDmIds?.has(row.group_id) ?? false,
-    // Carried RAW onto the ChatGroup — the DM-vs-group choice is made once, at
-    // render, by chatChipAvatar() (app/home/chat-avatar.ts). Collapsing them to
-    // a single field here would put a second derivation point in the codebase,
-    // which is exactly what the W1 policy gap makes unsafe. The RPC spelling is
-    // kept verbatim (NOT renamed to a plain `avatar_url`) so any consumer that
-    // reads the group photo without the resolver trips check-chat-avatar.sh.
-    group_avatar_url: row.group_avatar_url ?? null,
-    partner_avatar_url: row.partner_avatar_url ?? null,
-    name_is_generated: row.name_is_generated ?? false,
-    other_member_count: Number(row.other_member_count ?? 0),
-    cluster_members: row.cluster_members ?? [],
-  })) as ChatGroup[]
+  const groups = (rows ?? []).map((row) => {
+    // Message-or-reaction, decided in ONE shared place (app/home/utils.ts). Unread
+    // counts are untouched by this — a reaction never adds to the badge.
+    const preview = chatRowPreview(row, viewerId)
+    return {
+      id: row.group_id,
+      name: row.group_name,
+      type: row.group_type,
+      archived: row.group_archived ?? false,
+      last_message: preview.label || null,
+      last_sender: preview.senderName,
+      last_message_time: preview.at,
+      unread_count: Number(row.unread_count),
+      category: (row.group_category ?? null) as ChatGroup["category"],
+      muted: row.muted ?? false,
+      pinned: row.pinned ?? false,
+      is_central_chat: row.is_central ?? false,
+      counterpart_deleted: deletedDmIds?.has(row.group_id) ?? false,
+      // Carried RAW onto the ChatGroup — the DM-vs-group choice is made once, at
+      // render, by chatChipAvatar() (app/home/chat-avatar.ts). Collapsing them to
+      // a single field here would put a second derivation point in the codebase,
+      // which is exactly what the W1 policy gap makes unsafe. The RPC spelling is
+      // kept verbatim (NOT renamed to a plain `avatar_url`) so any consumer that
+      // reads the group photo without the resolver trips check-chat-avatar.sh.
+      group_avatar_url: row.group_avatar_url ?? null,
+      partner_avatar_url: row.partner_avatar_url ?? null,
+      name_is_generated: row.name_is_generated ?? false,
+      other_member_count: Number(row.other_member_count ?? 0),
+      cluster_members: row.cluster_members ?? [],
+    }
+  }) as ChatGroup[]
 
   // Dead threads (the other person deleted their account) sink BELOW every live
   // conversation; recency orders each partition exactly as before. Pinning is
@@ -133,5 +145,5 @@ export async function fetchChatList([, userId, ministryId]: [string, string, str
   // (Only the LIST's own failure earns that; see above.)
   if (listResult.error) throw listResult.error
 
-  return mapChatListRows((listResult.data ?? []) as ChatListRow[], toDeletedDmSet(deletedResult))
+  return mapChatListRows((listResult.data ?? []) as ChatListRow[], toDeletedDmSet(deletedResult), userId)
 }

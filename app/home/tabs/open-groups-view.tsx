@@ -83,6 +83,13 @@ const ROW_GRID: React.CSSProperties = {
   borderRadius: 0,
 }
 
+// Members EXCLUDING the viewer — what ChatAvatar's arrangement and "+N" count
+// are both keyed on. You are never in your own cluster, so a room you have
+// already joined counts one fewer than its roster.
+function otherMemberCount(g: OpenGroup): number {
+  return Math.max(0, g.memberCount - (g.isMember ? 1 : 0))
+}
+
 // The open-groups list as a BARE BODY — no shell, no header, no back control.
 //
 // This used to be `OpenGroupsBrowse`, a `SubpageShell` push surface reached from
@@ -153,7 +160,9 @@ export function OpenGroupsBody({
   // wraps to three lines before the first row.
   if (variant === "panel") {
     return (
-      <div className="flex flex-col gap-1">
+      // `data-open-groups` marks the run wherever it renders — the cluster-avatar
+      // spec scopes to it, and this is now a third surface drawing the same list.
+      <div className="flex flex-col gap-1" data-open-groups>
         {error && (
           <p className="text-[12px] px-1" style={{ color: "var(--danger)", margin: "0 0 8px" }} role="alert">{error}</p>
         )}
@@ -175,7 +184,12 @@ export function OpenGroupsBody({
                   } }
               : {})}
           >
-            <ChatAvatar size={30} title={g.name} avatarUrl={g.avatarUrl} surface="var(--cream)" />
+            {/* The member cluster, not the title's first initial — same rule the page
+                rows follow (a room must look like the SAME object before and after
+                you join it). This variant landed in the same merge that introduced
+                the cluster, so it is brought along rather than left as a third
+                surface quietly drawing the old solo chip. */}
+            <ChatAvatar size={30} title={g.name} avatarUrl={g.avatarUrl} members={g.clusterMembers} otherCount={otherMemberCount(g)} surface="var(--cream)" />
             <div style={{ minWidth: 0, flex: 1 }}>
               <div className="text-[13.5px] truncate" style={{ color: "var(--ink)", fontWeight: 500 }}>{g.name}</div>
               <div className="text-[11.5px] truncate" style={{ color: "var(--muted-text)" }}>{memberLabel(g)}</div>
@@ -248,7 +262,12 @@ export function OpenGroupsBody({
           />
         </div>
       ) : (
-        <>
+        // `data-open-groups` is a TEST HOOK, in the same spirit as `data-pocket-row`.
+        // The browse screen is a SubpageShell rendered OVER the chat list, which
+        // stays mounted underneath — so a whole-document assertion about this
+        // screen's avatars silently reads the chat list's instead. It did: the
+        // phone case passed with the cluster deliberately removed.
+        <div data-open-groups>
           {/* ── Phone width — the shipped full-bleed immersive run ──────────── */}
           {/* FULL-BLEED: an `immersive` PocketRow owns the 20px screen gutter
               itself, so its host must not also apply one. SubpageShell's body is
@@ -263,11 +282,14 @@ export function OpenGroupsBody({
                 key={g.id}
                 immersive
                 isFirst={i === 0}
-                // Same primitive and size the chat list itself uses, so a row here
-                // and the row it becomes after joining are the same object.
-                // MonogramChip has no intrinsic size and would collapse to its
-                // content — a one-letter name rendered visibly narrower.
-                leading={<ChatAvatar size={46} title={g.name} avatarUrl={g.avatarUrl} />}
+                // Same primitive, size AND DATA the chat list uses, so a row here
+                // and the row it becomes after joining are the same object. It
+                // used to render the title's first letter, which spent the whole
+                // chip repeating the label printed right beside it; the cluster
+                // shows the one thing the row does not already say — who is in
+                // there. `list_open_groups` supplies the three faces (see the
+                // disclosure note in app/home/open-groups.ts).
+                leading={<ChatAvatar size={46} title={g.name} avatarUrl={g.avatarUrl} members={g.clusterMembers} otherCount={otherMemberCount(g)} />}
                 title={g.name}
                 sub={memberLabel(g)}
                 meta={g.isMember ? "Joined" : busyId === g.id ? "Joining…" : "Join"}
@@ -313,7 +335,7 @@ export function OpenGroupsBody({
                         }
                       : {})}
                   >
-                    <ChatAvatar size={46} title={g.name} avatarUrl={g.avatarUrl} surface="var(--cream-panel)" />
+                    <ChatAvatar size={46} title={g.name} avatarUrl={g.avatarUrl} members={g.clusterMembers} otherCount={otherMemberCount(g)} surface="var(--cream-panel)" />
                     <div style={{ minWidth: 0 }}>
                       <div
                         style={{
@@ -389,7 +411,7 @@ export function OpenGroupsBody({
               })}
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {joined && (

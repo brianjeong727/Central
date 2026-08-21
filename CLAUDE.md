@@ -90,7 +90,7 @@ For each item: state it plainly, propose the exact edit, and wait for approval. 
 4. **Optimistic updates** on all user-facing writes (messages, reactions, RSVPs).
 5. **All DB writes** go through the browser Supabase client or server actions — no raw fetch.
 6. **App shell structure:** `app/home/home-app.tsx` is the tab orchestrator (~713 lines) — it owns global state (`activeTab`, `globalOpenChat`, `totalChatsUnread`, `chatRefreshKey`, `recentChats`, `userTeams`, etc.) and renders the active tab. Each tab is its own file in `app/home/tabs/`. Shared UI components live in `components/central/`. When building new UI inside a tab, add it to that tab's file or extract a component into `components/central/` — do not add tab-level logic back into `home-app.tsx`.
-7. **Tap vs long-press in ChatScreen:** < 400ms = emoji picker, ≥ 400ms = reply — never break this.
+7. **Tap vs long-press vs swipe in ChatScreen:** on a message bubble, < 400ms = emoji picker, ≥ 400ms = context menu (Reply lives there), and a rightward drag ≥ 56px = reply (`useSwipeToReply`) — never break this. The swipe is the same direction on your own bubble as on anyone else's. The three share one press timer, so the swipe hook fires `onLock` the instant it commits to a horizontal drag and the row wires that to `onPointerCancel`; without it a slow swipe opens the context menu mid-drag. `onPointerLeave`/`onPointerCancel` do **not** reliably fire for a touch dragging *within* the element, which is why the cancel has to be explicit.
 8. **ministry_id on all writes:** every INSERT/UPDATE must include `.eq("ministry_id", ministryId)` — defense-in-depth on top of RLS. Exception where the column does not exist: `event_tasks` has **no `ministry_id`** — scope those writes by the ministry-filtered `event_plan_id` instead (the same path `notification_ledger`'s RLS uses). Verify the column exists before assuming; do not invent one.
 9. **SECURITY DEFINER helpers:** use `auth_ministry_id()` and `auth_is_admin_or_leader()` in RLS policies — never query `profiles` directly inside other table policies.
 10. **RSVP is a toggle:** one row per (user, announcement). Insert on first click, delete on second. Never allow duplicate RSVPs.
@@ -401,9 +401,9 @@ HomeApp (root — owns all global state)
 |---------|-------|--------|----------|
 | `group-messages-{groupId}` | `messages` | INSERT | `ChatScreen` |
 | `reactions-{groupId}` | `message_reactions` | INSERT, DELETE | `ChatScreen` |
-| `home-app-recent-chats` | `messages` | INSERT — **filtered to the user's own group IDs** (`group_id=in.(…)`), not the whole table | `HomeApp` |
+| `chat:{groupId}` (broadcast hub) | `messages` + `message_reactions` | INSERT/UPDATE/DELETE via `broadcast_chat_change()` | `HomeApp` subscribes one per member group (`chat-broadcast.ts`) — drives the chat list's preview, ordering and reaction refresh |
 | `read-receipts-{groupId}` | `group_members` | UPDATE — **only subscribed for chats with < 30 members** (≥30 use on-demand "Seen by N") | `ChatScreen` |
-| `own-memberships-{userId}` | `group_members` | INSERT, UPDATE, DELETE — filtered to `user_id=eq.{userId}` | `HomeApp` — refreshes the scoped `home-app-recent-chats` filter when the user creates/joins/leaves a chat |
+| `own-memberships-{userId}` | `group_members` | INSERT, UPDATE, DELETE — filtered to `user_id=eq.{userId}` | `HomeApp` — re-subscribes the per-group broadcast hubs when the user creates/joins/leaves a chat |
 | `typing-{groupId}` | — | broadcast | `ChatScreen` (typing indicator) |
 | `chat-nicknames-{groupId}` | `chat_nicknames` | INSERT, UPDATE, DELETE — filtered to `group_id=eq.{groupId}` (RLS-filtered to group members; requires `replica identity full` so DELETE payloads carry `group_id`) | `ChatScreen` — revalidates the `["chat-roster"]` roster SWR so a nickname set/changed/cleared by anyone updates every member's display names live |
 
@@ -411,10 +411,10 @@ HomeApp (root — owns all global state)
 The push dispatch route (`app/api/push/dispatch/route.ts`) gained 3 cron/action-driven resolvers: `task_due` (table `event_tasks`), `confirm_request` + `confirm_escalation` (table `event_confirmations`). `task_due`/`confirm_request` gate on the new `NotificationSettings.deadlines` pref (default on); `confirm_escalation` rides the existing `activity` pref. Fired by `run_sheet_tick()` (see Schema → Run Sheet) and the `event-confirmations.ts` actions (immediate delivery on manual request). The driving cron is live: `run-sheet-tick` (job 9, `5 * * * *`, scheduled 2026-07-21) — `run_sheet_tick()` self-gates to the 9–10am PT window.
 
 **Notification taxonomy (ratified 2026-07-12).** Four tiers govern what may push:
-- **T1 push, default ON** — DMs, @mentions, replies to you, published announcements (always on, official channel), task/role assignments, DGL week assignment, receipt decision to submitter, role changes.
+- **T1 push, default ON** — DMs, @mentions, replies to you, published announcements (always on, official channel), task/role assignments, DGL week assignment, receipt decision to submitter, role changes, reactions to YOUR message (author only; honors per-chat mute and the `reactions` pref).
 - **T2 group chats, SMART default** — all messages under 30 members, mentions-only at ≥30 (same threshold as read receipts, Convention #18). Per-chat mute (`group_members.notify_mode`) is a hard override; user pref can force all/mentions/off.
 - **T3 desk-work, web ON / mobile daily digest** — form responses (leader), receipt submitted (treasurer), sign-off needed (president), new member joined (admins), pulse responses (pastor), moderation threshold (admins).
-- **T4 never push** — reactions, poll votes, view/RSVP counts, pins, journal/streaks, edits, meeting notes. Pulse QUESTIONS to members are T1 (rare, weighty). No quiet-hours engine.
+- **T4 never push** — poll votes, view/RSVP counts, pins, journal/streaks, edits, meeting notes. Pulse QUESTIONS to members are T1 (rare, weighty). No quiet-hours engine.
 
 ### Supabase project
 - Project ID: `wgqpnilaokfipocsugqo`
@@ -456,6 +456,8 @@ The push dispatch route (`app/api/push/dispatch/route.ts`) gained 3 cron/action-
 
 **Messaging**
 `polls`, `poll_votes`, `message_reactions`, `group_sessions`, `chat_offenses` (per-user profanity-filter offense counter; written only via the service-role `recordChatOffense` action + `increment_chat_offense` RPC; admins read), `chat_nicknames` (shared per-chat nicknames — one per `(group_id, target_user_id)` — in personal group chats + DMs only; SELECT = any group member, writes are service-role-only via the `setChatNickname`/`clearChatNickname` action which moderates server-side; the `group_is_personal()` helper (`type IN ('my','dm')`) gates the write RLS; `replica identity full` for realtime)
+
+`message_reactions` fires `notify_new_reaction` (AFTER INSERT → `notify_push_dispatch`), and `get_chat_list`/`get_chat_previews` now return eight `last_rx_*` columns describing the newest reaction in each chat.
 
 `group_members` per-chat prefs: `muted`, `pinned`, `last_read_at`, `notify_mode` (`all`/`mentions`/`off`, NULL = inherit the global `notification_settings.group_mode`). **`muted` is OUTPUT-ONLY** — the `sync_group_member_notify_mode` BEFORE INSERT/UPDATE trigger derives it from `notify_mode`, so express intent via `notify_mode`; a contradicting `muted` is silently discarded. The table has **no table-level UPDATE grant** — clients hold `GRANT UPDATE (last_read_at, muted, pinned, notify_mode)` only, so **a new column is silently non-updatable until it is added to that list** (same trap as `ministries.timezone`).
 

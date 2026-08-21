@@ -224,6 +224,111 @@ async function resolveMessage(
   return results
 }
 
+// ── Reaction recipients ──────────────────────────────────────────────────────
+// Fired by the AFTER INSERT trigger on message_reactions. The audience is exactly
+// ONE person — the author of the reacted-to message — and never the reactor
+// themselves. Nothing here trusts the POST body: every fact is re-read with the
+// service-role client from the reaction row outward.
+//
+// Deliberately overrides the ratified T4 "reactions never push" taxonomy — Brian's
+// call. It behaves as a Tier-1 personal event: default on, honours the per-chat
+// mute/notify_mode hard override exactly as resolveMessage does.
+async function resolveReaction(
+  admin: ReturnType<typeof createAdminClient>,
+  recordId: string,
+): Promise<Resolved[]> {
+  const { data: rx } = await admin
+    .from("message_reactions")
+    .select("id, message_id, user_id, emoji")
+    .eq("id", recordId)
+    .single()
+  if (!rx || !rx.message_id || !rx.user_id) return []
+
+  // group_id on the reaction row is nullable (trigger-set, historically absent),
+  // so the group is taken from the MESSAGE — the only authoritative source.
+  const { data: msg } = await admin
+    .from("messages")
+    .select("id, group_id, sender_id, content, message_type, attachment_type, poll_id, deleted")
+    .eq("id", rx.message_id)
+    .single()
+  if (!msg || !msg.sender_id) return []
+  // A tombstone must never resurface as a notification, and a system message has
+  // no author to notify.
+  if (msg.deleted || msg.message_type === "system") return []
+  // Reacting to your own message is not news.
+  if (msg.sender_id === rx.user_id) return []
+
+  const { data: group } = await admin
+    .from("groups")
+    .select("id, name, type")
+    .eq("id", msg.group_id)
+    .single()
+  if (!group) return []
+
+  // The author must still BE in the room. A removed/departed member gets nothing.
+  const { data: membership } = await admin
+    .from("group_members")
+    .select("user_id, muted, notify_mode")
+    .eq("group_id", msg.group_id)
+    .eq("user_id", msg.sender_id)
+    .maybeSingle()
+  if (!membership) return []
+  // Mute is a HARD override, same as resolveMessage: it silences this too.
+  if (membership.muted || (membership.notify_mode as ChatNotifyMode | null) === "off") return []
+
+  const { data: profs } = await admin
+    .from("profiles")
+    .select("id, name, notification_settings")
+    .in("id", [...new Set([msg.sender_id, rx.user_id])])
+  const profMap = new Map((profs ?? []).map((p) => [p.id, p]))
+
+  const settings: NotificationSettings =
+    (profMap.get(msg.sender_id)?.notification_settings as NotificationSettings) ?? {}
+  if (settings.reactions === false) return []
+
+  // Nickname-aware, matching the list row and the reactor sheet. The RPC's lateral
+  // resolves the reactor through chat_nicknames, so without this the SAME person is
+  // named two different ways in the notification and in the row it opens. Nicknames
+  // exist only in personal chats and DMs (the group_is_personal() gate on the write
+  // RLS), so a church chat never pays for the lookup.
+  let reactorName = profMap.get(rx.user_id)?.name ?? "Someone"
+  if (group.type === "my" || group.type === "dm") {
+    const { data: nick } = await admin
+      .from("chat_nicknames")
+      .select("nickname")
+      .eq("group_id", msg.group_id)
+      .eq("target_user_id", rx.user_id)
+      .maybeSingle()
+    if (nick?.nickname) reactorName = nick.nickname
+  }
+  const isDM = group.type === "dm"
+  const title = isDM
+    ? `${reactorName} reacted ${rx.emoji}`
+    : `${reactorName} reacted ${rx.emoji} · ${group.name}`
+
+  // Never an empty body — a message with no text still has a shape worth naming.
+  let body = preview(msg.content, 120)
+  if (!body) {
+    if (msg.attachment_type?.startsWith("image/")) body = "Your photo"
+    else if (msg.attachment_type) body = "Your file"
+    else if (msg.poll_id) body = "Your poll"
+    else body = "Your message"
+  }
+
+  return [{
+    userId: msg.sender_id,
+    reason: "reaction",
+    payload: {
+      title,
+      body,
+      url: `/home?tab=chats&chat=${group.id}`,
+      // Per MESSAGE, not per group: a burst of reactions on one message collapses
+      // into a single tray entry instead of stacking.
+      tag: `reaction-${msg.id}`,
+    },
+  }]
+}
+
 // ── Announcement recipients ──────────────────────────────────────────────────
 // The audience rule itself lives in lib/announcement-audience.ts (ONE copy,
 // shared with both feeds and the acknowledgment denominator); this is only its
@@ -1050,6 +1155,7 @@ export async function POST(req: NextRequest) {
   try {
     if (event === "desk_digest") resolved = await resolveDeskDigest(admin)
     else if (table === "messages") resolved = await resolveMessage(admin, recordId)
+    else if (table === "message_reactions") resolved = await resolveReaction(admin, recordId)
     else if (table === "announcements" && event === "event_reminder") resolved = await resolveEventReminder(admin, recordId)
     else if (table === "announcements" && event === "announcement_nudge") resolved = await resolveAnnouncementNudge(admin, recordId)
     else if (table === "announcements") resolved = await resolveAnnouncement(admin, recordId)

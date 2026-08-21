@@ -98,7 +98,7 @@ export default async function HomePage({
 
   // Shared with the client refetcher (home-app `loadRecentChats`) — see
   // rowsToChatPreviews. The two used to be hand-kept copies and had drifted.
-  const initialRecentChats: ChatPreview[] = rowsToChatPreviews((chatResult.data ?? []) as ChatPreviewRow[])
+  const initialRecentChats: ChatPreview[] = rowsToChatPreviews((chatResult.data ?? []) as ChatPreviewRow[], user.id)
 
   // Same mapper the client fetcher uses (app/home/chat-list.ts), so the server seed
   // and any later client revalidation produce identical shapes — otherwise the list
@@ -106,6 +106,9 @@ export default async function HomePage({
   const initialChatList: ChatGroup[] = mapChatListRows(
     (chatListResult.data ?? []) as ChatListRow[],
     toDeletedDmSet(deletedDmResult),
+    // Same viewer the client fetcher passes — a reaction preview must not read
+    // "Brian reacted …" on the server and "You reacted …" after hydration.
+    user.id,
   )
 
   // Build UserTeam[]
