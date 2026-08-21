@@ -24,16 +24,25 @@ import { adminState, sandbox } from "./fixtures"
  */
 async function maxChipPieces(page: Page): Promise<number> {
   return page.evaluate(() => {
-    // SCOPED to the browse screen. It is a SubpageShell drawn over the chat list,
-    // which stays mounted underneath — a document-wide scan reads the chat list's
-    // clusters instead, and this assertion passed with the cluster deliberately
-    // removed until it was scoped. `data-open-groups` marks the run.
-    const root = document.querySelector("[data-open-groups]")
-    if (!root) return -1
+    // SCOPED to the browse run. The chat list stays mounted underneath — a
+    // document-wide scan reads ITS clusters instead, and this assertion passed
+    // with the cluster deliberately removed until it was scoped.
+    //
+    // And scoping to the FIRST match is not enough either: open groups now renders
+    // at BOTH viewports at once (the phone scope body and the desktop sidebar
+    // panel are both mounted, one of them CSS-hidden), so the first in document
+    // order is the desktop panel even on a 390px page. Take every run that is
+    // actually VISIBLE — offsetParent is null for a display:none ancestor — which
+    // reads the right one at either width without naming either.
+    const roots = Array.from(document.querySelectorAll("[data-open-groups]"))
+      .filter((el) => (el as HTMLElement).offsetParent !== null)
+    if (roots.length === 0) return -1
     let max = 0
-    for (const el of Array.from(root.querySelectorAll('span[aria-hidden="true"]'))) {
-      const n = el.querySelectorAll("[data-monogram]").length
-      if (n > max) max = n
+    for (const root of roots) {
+      for (const el of Array.from(root.querySelectorAll('span[aria-hidden="true"]'))) {
+        const n = el.querySelectorAll("[data-monogram]").length
+        if (n > max) max = n
+      }
     }
     return max
   })
@@ -46,7 +55,9 @@ async function openBrowse(page: Page) {
   // "too loud" at the top and went undiscoverable at the bottom; a scope is
   // neither). ?chats=open is server-resolved by resolveChatsSection.
   await page.goto("/home?tab=chats&chats=open")
-  await expect(page.locator("[data-open-groups]").first()).toBeVisible({ timeout: 20000 })
+  // `visible=true` for the same reason maxChipPieces filters on offsetParent: both
+  // viewports' runs are mounted, and the first in document order is the desktop one.
+  await expect(page.locator("[data-open-groups]").locator("visible=true").first()).toBeVisible({ timeout: 20000 })
   await page.waitForTimeout(1200)
 }
 
