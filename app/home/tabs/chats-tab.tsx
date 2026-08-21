@@ -3545,28 +3545,36 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     setSending(false)
   }, [supabase, groupId, userId, userName, bumpChatListForOwnSend, modSettings, modIsChurch, modIsPersonal, modIsMinistryDefault, draftRecipient, onDmCreated])
 
-  // For each own message: which other members have it as their most-recently-read own message.
+  // For each message: which other members have read UP TO IT and no further — the
+  // Messenger arrangement, where everyone's little face sits under the last thing
+  // they saw.
+  //
+  // This used to consider only the VIEWER'S OWN messages (`sender_id === userId`),
+  // so a reader whose last-read message was somebody else's produced no receipt
+  // anywhere. In a group that is the normal case — the newest messages are usually
+  // not yours — and the whole feature read as "nobody has seen this", which is
+  // exactly how it looked broken. Read state was never about who read YOUR
+  // messages; it is how far each person has got.
+  //
   // Reuses the PRIOR array reference for any message whose receipts didn't change, so
-  // memoized own-message rows don't re-render when an unrelated message/read event
-  // rebuilds the map.
+  // memoized rows don't re-render when an unrelated message/read event rebuilds the map.
   const prevReadReceiptMapRef = useRef<Record<string, { name: string; avatarUrl: string | null }[]>>({})
   const readReceiptMap = useMemo(() => {
     const map: Record<string, { name: string; avatarUrl: string | null }[]> = {}
     // Large rooms don't do live per-member receipts — skip the members×messages walk.
-    if (!isLargeRoom) {
-      const ownMsgs = messages.filter((m) => m.sender_id === userId)
-      if (ownMsgs.length > 0) {
-        for (const { name, lastReadAt, avatarUrl } of Object.values(memberReadMap)) {
-          if (!lastReadAt) continue
-          let target: Message | null = null
-          for (const m of ownMsgs) {
-            if (m.created_at <= lastReadAt) target = m
-            else break
-          }
-          if (target) {
-            if (!map[target.id]) map[target.id] = []
-            map[target.id].push({ name, avatarUrl })
-          }
+    if (!isLargeRoom && messages.length > 0) {
+      for (const { name, lastReadAt, avatarUrl } of Object.values(memberReadMap)) {
+        if (!lastReadAt) continue
+        // `messages` is ascending, so the last one at or before their stamp is the
+        // furthest they have read — hence the `break`.
+        let target: Message | null = null
+        for (const m of messages) {
+          if (m.created_at <= lastReadAt) target = m
+          else break
+        }
+        if (target) {
+          if (!map[target.id]) map[target.id] = []
+          map[target.id].push({ name, avatarUrl })
         }
       }
     }
@@ -3581,7 +3589,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     }
     prevReadReceiptMapRef.current = map
     return map
-  }, [messages, memberReadMap, userId, isLargeRoom])
+  }, [messages, memberReadMap, isLargeRoom])
 
   // Large-room "Seen by N": the user's own most-recent (non-system) message.
   const latestOwnMsg = useMemo(() => {

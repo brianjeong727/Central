@@ -1100,9 +1100,21 @@ function MessageRowBase({
           </div>
         )}
 
-        {/* Timestamp + read receipts (own messages: every message; incoming: skip since time is in header) */}
-        {isOwn && (
-          <div className="flex items-center gap-1.5 mt-1 pr-1">
+        {/* Read receipts + (own only) the timestamp.
+            Receipts hang off ANY message, not just your own: they mark how far
+            each person has read, and the last thing somebody read is usually not
+            something you sent. They stay right-aligned on both sides — the row
+            reads as a margin note about the conversation, not as part of an
+            incoming bubble. Incoming messages get no timestamp here (theirs is in
+            the group header), so this row is receipts alone for them. */}
+        {(isOwn || (readReceipts?.length ?? 0) > 0) && (
+          // `w-full` is load-bearing on the incoming side: the column wrapper is
+          // `items-start` there, so the row shrinks to its content and
+          // `justify-end` has nothing to push against — the chips rendered hard
+          // LEFT, under the avatar. Spanning the column first is what puts them
+          // on the right, where Messenger keeps them regardless of who sent the
+          // message they are marking.
+          <div className={`flex items-center gap-1.5 mt-1 pr-1 ${isOwn ? "" : "w-full justify-end"}`}>
             {(readReceipts?.length ?? 0) > 0 && (
               <div className="flex items-center">
                 {readReceipts!.map(({ name, avatarUrl }, idx) => (
@@ -1116,7 +1128,7 @@ function MessageRowBase({
                 ))}
               </div>
             )}
-            <span className="text-[11px] text-[var(--muted-text)]">{formatMessageTime(msg.created_at)}</span>
+            {isOwn && <span className="text-[11px] text-[var(--muted-text)]">{formatMessageTime(msg.created_at)}</span>}
           </div>
         )}
 
