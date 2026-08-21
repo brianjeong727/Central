@@ -22,6 +22,7 @@
 // name-and-headcount oracle for every private chat in the ministry.
 
 import { createClient } from "@/lib/supabase"
+import type { ChatAvatarMember } from "@/components/central/chat-avatar"
 
 export interface OpenGroup {
   id: string
@@ -30,6 +31,11 @@ export interface OpenGroup {
   memberCount: number
   isMember: boolean
   lastMessageAt: string | null
+  /** Up to three members EXCLUDING the viewer, recency-ordered — the same shape
+   *  and ordering `get_chat_list` returns, so a room's avatar is IDENTICAL before
+   *  and after you join it. Empty from `open_group_card`, which deliberately
+   *  stays minimal (it resolves an attacker-supplied group id). */
+  clusterMembers: ChatAvatarMember[]
 }
 
 /** SWR key for the ministry's browsable open groups. */
@@ -49,6 +55,7 @@ type Row = {
   member_count: number | null
   is_member: boolean | null
   last_message_at?: string | null
+  cluster_members?: ChatAvatarMember[] | null
 }
 
 function mapRow(r: Row): OpenGroup {
@@ -59,6 +66,7 @@ function mapRow(r: Row): OpenGroup {
     memberCount: r.member_count ?? 0,
     isMember: r.is_member ?? false,
     lastMessageAt: r.last_message_at ?? null,
+    clusterMembers: r.cluster_members ?? [],
   }
 }
 
