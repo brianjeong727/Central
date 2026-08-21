@@ -71,6 +71,10 @@ const USER_ID_TABLES = [
   // row is TOMBSTONED, not deleted (only auth.users is hard-deleted), so this
   // list is the only thing that stops acknowledgments outliving the account.
   "announcement_acknowledgements",
+  // Same reason. A pending request that outlives its account sits in an admin's
+  // queue as a ghost, and approving it would relocate a scrubbed "Former member"
+  // tombstone into the ministry.
+  "ministry_join_requests",
   "message_reactions",
   "poll_votes",
   "devotionals",

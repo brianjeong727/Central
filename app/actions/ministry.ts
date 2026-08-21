@@ -100,6 +100,14 @@ export async function joinMinistryByCode(
   const isStaff = !byMember && !!byStaff
 
   if (!ministry) return { ministryName: null, error: "No ministry found with that invite code." }
+  // A CUSTOM member code never grants membership outright — it opens a request
+  // (app/actions/join-requests.ts). Refusing here rather than at the call site is what
+  // makes that true for every entry point: /j/, typed code, and the post-auth landing
+  // all funnel through this action. The staff code is exempt because it is never
+  // custom — it stays generated precisely because it hands out admin-tier roles.
+  if (!isStaff && ministry.invite_code_is_custom) {
+    return { ministryName: null, error: "REQUEST_REQUIRED" }
+  }
   if (ministry.status === "pending") return { ministryName: null, error: "This ministry is not yet active." }
   if (ministry.status === "rejected") return { ministryName: null, error: "This ministry is not available." }
   // Catch-all — any non-active status (archived etc.) is not joinable.

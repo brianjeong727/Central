@@ -78,7 +78,13 @@ export function isValidInviteCode(raw: string | null | undefined): boolean {
 // other. `lookupVariants` below is the single answer to that: try every form the
 // input could have been stored as, and let the database decide which exists.
 
-export const CUSTOM_CODE_MIN_LEN = 4
+// SIX, not four. The code stops being a secret when it becomes custom, but it does
+// not stop being an ORACLE: `/j/<CODE>` names the ministry to a signed-out visitor,
+// and a 4-char [A-Z0-9] space is 1.6M — walkable. Six is 2.2e9, which puts bulk
+// enumeration of every church's name out of reach while still fitting GRACE1,
+// PITTCCM and CENTRAL. The request path adds the other half (ban checks and a
+// per-ministry request cap) since there is no rate limiter to lean on.
+export const CUSTOM_CODE_MIN_LEN = 6
 export const CUSTOM_CODE_MAX_LEN = 20
 
 /** A–Z, 0–9 and internal hyphens; never leading, trailing or doubled. */
