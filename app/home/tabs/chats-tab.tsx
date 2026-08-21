@@ -37,7 +37,7 @@ import type { ModerationSettings } from "@/lib/moderation"
 import { recordChatOffense } from "@/app/actions/moderation"
 import { isChatManageRole, isLeaderRole } from "@/lib/roles"
 import { fetchOpenGroups, openGroupsKey } from "@/app/home/open-groups"
-import { subscribeKeyboard, useSwipeDownToDismissKeyboard } from "@/lib/keyboard-inset"
+import { subscribeKeyboard, useSwipeDownToDismissKeyboard, dismissKeyboard } from "@/lib/keyboard-inset"
 import { storagePathFromPublicUrl, removeStorageObject } from "@/lib/storage-cleanup"
 import { useBackIntent } from "@/lib/back-intent"
 import { attachmentStillReferenced } from "@/app/actions/attachment-refs"
@@ -2478,15 +2478,35 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
   // Convention #7: < 400ms tap = emoji picker, ≥ 400ms long-press = context menu.
   // Timer + fired flag stay here in ChatScreen; rows call these with their msg.
+  // Opening a message menu means the user has stopped typing and started acting on
+  // a message, so the keyboard goes away — the same thing iMessage does on a
+  // long-press. It is also the cheapest way to give the menu room: with the keys up
+  // the transcript is roughly half as tall, and the 435px reaction picker cannot fit
+  // in it on any phone. The measured clamp in message-row.tsx still holds the line
+  // if the keyboard stays (Android gesture nav, an external keyboard); this just
+  // means it rarely has to.
+  //
+  // Gated on a keyboard ACTUALLY being up, not on being mobile. `dismissKeyboard`
+  // blurs whatever owns the caret, and on desktop that is the composer someone was
+  // mid-sentence in — clicking a message to react would silently drop their cursor.
+  // `[data-kb-open]` is the one signal that a keyboard is occluding anything
+  // (Convention #28), so it is the right condition rather than a width check.
+  const dismissKeyboardIfOpen = useCallback(() => {
+    if (typeof document !== "undefined" && document.documentElement.hasAttribute("data-kb-open")) {
+      dismissKeyboard()
+    }
+  }, [])
+
   const handlePointerDown = useCallback((msg: Message) => {
     if (msg.deleted) return
     longPressFiredRef.current = false
     longPressTimer.current = setTimeout(() => {
       longPressFiredRef.current = true
       longPressTimer.current = null
+      dismissKeyboardIfOpen()
       setContextMenuFor(msg.id)
     }, 400)
-  }, [])
+  }, [dismissKeyboardIfOpen])
 
   const handlePointerUp = useCallback((msg: Message) => {
     if (msg.deleted) return
@@ -2503,11 +2523,15 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         }
       } else {
         // Text message: short tap opens the emoji picker
-        setEmojiPickerFor((prev) => (prev === msg.id ? null : msg.id))
+        setEmojiPickerFor((prev) => {
+          const next = prev === msg.id ? null : msg.id
+          if (next) dismissKeyboardIfOpen()
+          return next
+        })
       }
     }
     // If timer already fired (long press), do nothing here
-  }, [])
+  }, [dismissKeyboardIfOpen])
 
   const handlePointerCancel = useCallback(() => {
     if (longPressTimer.current) {

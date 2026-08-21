@@ -452,6 +452,18 @@ html[data-kb-native] .kb-lift {
 .pocket-chiprow::-webkit-scrollbar { display: none; }
 .pocket-chiprow > * { flex: 0 0 auto; }
 
+/* Message menus (reaction bar / context menu / reaction picker) — the wrapper is
+   clamped to the room measured inside the transcript, so on a short screen (or one
+   with the software keyboard still up) it scrolls rather than running off the edge.
+   The scrollbar is hidden because the menu is a floating panel with rounded corners:
+   a gutter renders as a hairline down its right edge, which reads as a seam in the
+   panel rather than as an affordance. Touch scrolling is unaffected. */
+.msg-menu-clamp {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.msg-menu-clamp::-webkit-scrollbar { display: none; }
+
 /* Chat search — the body swaps IN PLACE under a pinned search field, so the
    change should read as the page settling, not as a navigation. Short, and the
    same ease-out curve PocketSheet uses. */
