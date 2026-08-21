@@ -416,6 +416,10 @@ export interface HomeTabProps {
   // directory / announcements) + the mobile chrome Settings gear (settings).
   // Wired to the shell's handleNavClick so navigation stays one atomic param replace.
   onGoToTab?: (tab: "give" | "plan" | "directory" | "announcements" | "settings") => void
+  /** Land on Chats' third scope (open groups). Routed through the shell rather
+   *  than onGoToTab because it must set BOTH the tab and the scope in one atomic
+   *  param replace (Convention #5) and seed the scope ChatsTab mounts on. */
+  onBrowseOpenGroups?: () => void
   activeQuestion?: CongregationQuestion | null
   hasResponded?: boolean
   onResponded?: () => void
@@ -578,7 +582,13 @@ export interface ChatsTabProps {
    * "my" on the client, which is a hydration mismatch — and this list is now
    * server-rendered. See app/home/tabs/chat-shared.ts.
    */
-  initialSection: "church" | "my"
+  initialSection: "church" | "my" | "open"
+  /** Reports a scope change UP so the shell can seed the next mount with it.
+   *  ChatsTab is conditionally rendered (`activeTab === "chats"`), so it unmounts on
+   *  every tab switch and re-reads `initialSection` on the way back — without this
+   *  the shell's copy goes stale and re-entering Chats would snap back to whatever
+   *  the server resolved at page load. */
+  onSectionChange?: (section: "church" | "my" | "open") => void
   // Reports whether the full-screen CreateChatScreen is up, so home-app can
   // suppress the floating pill nav (mobile design system §2.2).
   onComposerOpenChange?: (open: boolean) => void
@@ -1181,7 +1191,7 @@ export interface HomeAppProps {
   initialChatList?: ChatGroup[]
   /** `?chats` scope resolved on the SERVER, so the server-rendered chat list and
    *  the hydration render agree on which scope is showing. See chat-shared.ts. */
-  initialChatsSection?: "church" | "my"
+  initialChatsSection?: "church" | "my" | "open"
   initialUserTeams?: UserTeam[]
   initialActiveQuestion?: CongregationQuestion | null
   initialHasResponded?: boolean
