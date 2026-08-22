@@ -33,7 +33,12 @@ export const dynamic = "force-dynamic"
 //     computes per-recipient 24h pending counts, and emits ONE summary per eligible
 //     leader/admin — delivered ONLY to their NON-web subs (mobileOnly on the Resolved).
 
-type PushPayload = { title: string; body: string; url: string; tag: string }
+// `subtitle` is the MIDDLE line of an iOS banner (title / subtitle / body). Only
+// the APNs lane has one — the Web Notifications API and FCM both expose title +
+// body and nothing else — so the send loop folds it into the first line of the body
+// for those two rather than dropping it. Keeping it a separate field here means the
+// payload stays semantic and each lane renders it the best way it can.
+type PushPayload = { title: string; body: string; subtitle?: string; url: string; tag: string }
 // webOnly   = Tier-3 desk-work push: deliver to this recipient's platform='web' subs only.
 // mobileOnly = Tier-3 daily digest: deliver to this recipient's platform!='web' subs only.
 // counts     = digest per-recipient item breakdown (surfaced in dryRun for verification).
@@ -209,16 +214,21 @@ async function resolveMessage(
       reason = "group"
     }
 
-    let title: string
-    if (isDM) title = senderName
-    else if (reason === "mention") title = `${senderName} mentioned you · ${group.name}`
-    else if (reason === "reply") title = `${senderName} replied · ${group.name}`
-    else title = `${senderName} · ${group.name}`
+    // Messenger's shape (Brian, 2026-08-22): WHO on the first line, WHERE on the
+    // second, and the message itself on the third. A DM has no "where" worth
+    // saying — you already know a DM is from that person — so it stays two lines.
+    // This replaces "Sender · Chat" as a single run-on title, which read as one
+    // name when the chat name was long and pushed the message off the banner.
+    const subtitle = isDM
+      ? undefined
+      : reason === "mention" ? `mentioned you in ${group.name}`
+      : reason === "reply" ? `replied in ${group.name}`
+      : `to ${group.name}`
 
     results.push({
       userId: uid,
       reason,
-      payload: { title, body, url: `/home?tab=chats&chat=${group.id}`, tag: `chat-${group.id}` },
+      payload: { title: senderName, subtitle, body, url: `/home?tab=chats&chat=${group.id}`, tag: `chat-${group.id}` },
     })
   }
   return results
@@ -302,9 +312,9 @@ async function resolveReaction(
     if (nick?.nickname) reactorName = nick.nickname
   }
   const isDM = group.type === "dm"
-  const title = isDM
-    ? `${reactorName} reacted ${rx.emoji}`
-    : `${reactorName} reacted ${rx.emoji} · ${group.name}`
+  // Same who / where / what split the message notification uses.
+  const title = `${reactorName} reacted ${rx.emoji}`
+  const subtitle = isDM ? undefined : `in ${group.name}`
 
   // Never an empty body — a message with no text still has a shape worth naming.
   let body = preview(msg.content, 120)
@@ -320,6 +330,7 @@ async function resolveReaction(
     reason: "reaction",
     payload: {
       title,
+      subtitle,
       body,
       url: `/home?tab=chats&chat=${group.id}`,
       // Per MESSAGE, not per group: a burst of reactions on one message collapses
@@ -1210,11 +1221,20 @@ export async function POST(req: NextRequest) {
     // assert it with exact object equality, and the per-platform split it would
     // need is available in `lanes` below. `native` means "not the web-push lane".
     const routing: Record<string, { web: number; native: number }> = {}
+    // The notification TEXT, per recipient. Until this existed the wording was the
+    // one thing about push nobody could test — push-reaction.spec.ts says so in its
+    // header, and the title/body were verified by reading the resolver by hand. The
+    // shape of a banner is a product decision (who / where / what), so it deserves
+    // an assertion like any other. No new exposure: the endpoint is already behind
+    // PUSH_WEBHOOK_SECRET, and a caller holding that could simply send the real
+    // notification instead of asking for a dry run.
+    const payloads: Record<string, PushPayload> = {}
     let webLane = 0
     let apnsLane = 0
     let fcmLane = 0
     for (const r of resolved) {
       reasons[r.userId] = r.reason
+      payloads[r.userId] = r.payload
       if (r.webOnly) webOnly[r.userId] = true
       if (r.mobileOnly) mobileOnly[r.userId] = true
       if (r.counts) counts[r.userId] = r.counts
@@ -1237,6 +1257,7 @@ export async function POST(req: NextRequest) {
       webOnly,
       mobileOnly,
       counts,
+      payloads,
       routing,
       lanes: { web: webLane, apns: apnsLane, fcm: fcmLane },
       count: resolved.length,
@@ -1267,7 +1288,13 @@ export async function POST(req: NextRequest) {
   const sends: Promise<SendResult>[] = []
   for (const r of resolved) {
     const list = subsForRecipient(r, subsByUser.get(r.userId) ?? [])
-    const json = JSON.stringify(r.payload)
+    // Web and FCM have no subtitle field, so it becomes the body's first line.
+    // Done HERE rather than in the service worker because the SW is a cached
+    // static file: an installed one that predates this change would silently drop
+    // a `subtitle` key it does not know about, and there is no way to make every
+    // client update before the next notification lands.
+    const flatBody = r.payload.subtitle ? `${r.payload.subtitle}\n${r.payload.body}` : r.payload.body
+    const json = JSON.stringify({ ...r.payload, body: flatBody })
     for (const sub of list) {
       if (sub.platform === "android-native") {
         // Native FCM lane. endpoint is 'fcm:<token>' — strip the prefix.
@@ -1282,7 +1309,7 @@ export async function POST(req: NextRequest) {
           sendFcmNotification({
             token,
             title: r.payload.title,
-            body: r.payload.body,
+            body: flatBody,
             url: r.payload.url,
             tag: r.payload.tag,
           })
@@ -1305,6 +1332,7 @@ export async function POST(req: NextRequest) {
           sendApnsNotification({
             token,
             title: r.payload.title,
+            subtitle: r.payload.subtitle,
             body: r.payload.body,
             url: r.payload.url,
             tag: r.payload.tag,

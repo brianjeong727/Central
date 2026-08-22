@@ -112,6 +112,14 @@ function isPermanentFailure(err: ApnsError): boolean {
 export async function sendApnsNotification(opts: {
   token: string
   title: string
+  /**
+   * The middle line of an iOS banner — title (bold) / subtitle / body. APNs is the
+   * ONLY lane that has one: the Web Notifications API and FCM both expose just
+   * title + body, so the dispatch route folds this into the body for those two.
+   * Chat uses it for "to {chat name}", which is what gives a group message the
+   * three-line Messenger shape instead of a "Sender · Chat" run-on title.
+   */
+  subtitle?: string
   body: string
   url: string
   tag: string
@@ -126,7 +134,7 @@ export async function sendApnsNotification(opts: {
   const notification = new Notification(opts.token, {
     type: PushType.alert,
     priority: Priority.immediate,
-    alert: { title: opts.title, body: opts.body },
+    alert: { title: opts.title, ...(opts.subtitle ? { subtitle: opts.subtitle } : {}), body: opts.body },
     sound: "default",
     threadId: opts.tag,
     data: { url: opts.url },
