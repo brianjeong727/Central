@@ -1,6 +1,7 @@
 "use client"
 
 import dynamic from "next/dynamic"
+import useSWR from "swr"
 import { Home, MessageCircle, BookOpen, ClipboardList, User, Plus, Receipt, Waypoints, PanelLeftClose, PanelLeftOpen } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { PlanLineIcon, sidebarItemStyle } from "./shared"
@@ -8,6 +9,7 @@ import { DirectoryListSkeleton } from "@/components/central"
 import { RAIL_LABEL_STYLE } from "@/components/central/typography"
 import { sectionForTab } from "@/components/central/nav-sections"
 import { useIsNativeShell } from "@/lib/native-auth"
+import { getPendingJoinRequestCount } from "@/app/actions/join-requests"
 import { useBreadcrumbExtra } from "../breadcrumb-context"
 
 // Lazy — pulls the 631-line directory-tab module into its own async chunk instead
@@ -117,6 +119,22 @@ export function DesktopSidebar({
   superSwitcherSlot,
 }: DesktopSidebarProps) {
   const supabase = createClient()
+
+  // People waiting to join. The badge on Church Settings is the ONLY thing that tells
+  // an admin a request exists — a ministry running a custom code takes requests
+  // instead of granting membership outright (app/actions/join-requests.ts), and the
+  // requester's side cannot resolve until an admin acts. A queue nobody looks at is
+  // the whole failure mode, so this is deliberately in the shell rather than inside
+  // the Settings page it points at.
+  //
+  // Keyed null for non-admins so the request is never made; the action re-derives the
+  // gate server-side and answers 0 regardless, so a member's shell can neither fetch
+  // nor render a count.
+  const { data: joinReqRes } = useSWR(
+    isAdmin && directoryMinistryId ? (["join-request-count", directoryMinistryId] as const) : null,
+    () => getPendingJoinRequestCount(directoryMinistryId as string),
+  )
+  const joinRequestCount = joinReqRes?.count ?? 0
 
   const navItems: { id: Tab; label: string; icon: React.FC<{ className?: string }> }[] = [
     { id: "home",      label: "Home",        icon: Home },
@@ -290,6 +308,23 @@ export function DesktopSidebar({
             {restrictedItems.map(item => (
               <button key={item.tab} style={subItemStyle(activeTab === item.tab)} onClick={() => onTabChange(item.tab)}>
                 <span style={{ flex: 1 }}>{item.label}</span>
+                {/* People waiting to join. Only ever non-zero for an admin — the
+                    action re-derives the gate server-side and answers 0 for everyone
+                    else, so this cannot leak a count into a member's shell. Same
+                    badge grammar as the Reimbursements nav row. */}
+                {item.tab === "settings" && joinRequestCount > 0 && (
+                  <span
+                    aria-label={`${joinRequestCount} waiting to join`}
+                    style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999,
+                      background: "var(--plum-2)", color: "var(--cream-on-dark)",
+                      fontSize: 12, fontWeight: 500, fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {joinRequestCount}
+                  </span>
+                )}
               </button>
             ))}
           </>

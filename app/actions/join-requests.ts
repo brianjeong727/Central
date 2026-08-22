@@ -282,3 +282,25 @@ export async function decideJoinRequest(
   })
   return { error }
 }
+
+// ─── Admin: how many are waiting ─────────────────────────────────────────────
+// Powers the Church Settings nav badge. An admin who never opens Settings would
+// otherwise never learn anyone is waiting, and a queue nobody looks at is the whole
+// failure mode of request-to-join — the requester's side cannot resolve until this
+// side acts, so this is the load-bearing half of "tell someone".
+//
+// Returns 0 rather than an error for a non-admin: this feeds a badge on a nav item
+// every member's shell renders, so a failure here must be invisible, never a thrown
+// action or an error toast on someone else's screen.
+export async function getPendingJoinRequestCount(ministryId: string): Promise<{ count: number }> {
+  const ctx = await requireMinistryAdmin(ministryId)
+  if (ctx.error !== null) return { count: 0 }
+
+  const admin = createAdminClient()
+  const { count } = await admin
+    .from("ministry_join_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("ministry_id", ministryId)
+    .eq("status", "pending")
+  return { count: count ?? 0 }
+}
