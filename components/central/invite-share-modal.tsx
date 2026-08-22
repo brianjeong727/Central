@@ -73,13 +73,49 @@ export function InviteShareModal({
   onClose,
   inviteCode,
   ministryName,
+  isCustomCode,
 }: {
   onClose: () => void
   inviteCode: string
   ministryName?: string | null
+  /** A custom code opens a REQUEST an admin approves; a generated one grants
+   *  membership outright. The sheet must not promise the wrong one — "joins straight
+   *  away" on a request code is a lie the sharer only finds out about from the person
+   *  they invited.
+   *
+   *  REQUIRED, deliberately. It shipped optional-with-a-false-default for about an
+   *  hour, and in that hour both existing call sites silently kept promising instant
+   *  join on a request code. A default is exactly what let the wrong answer be the
+   *  quiet one; making it required moves the failure to the compiler. */
+  isCustomCode: boolean
 }) {
   const [copied, setCopied] = useState<"link" | "code" | null>(null)
+  const [shared, setShared] = useState(false)
   const link = inviteLinkFor(inviteCode)
+
+  // The system share sheet — iMessage, WhatsApp, Messenger, AirDrop, all of it, for
+  // free. Deliberately the WEB API rather than @capacitor/share: a Capacitor plugin
+  // needs a new binary and would reach nobody who has already installed the app,
+  // whereas navigator.share ships with a web deploy and works in the WKWebView today.
+  // Undefined on desktop Chrome/Firefox, so the button only renders where it exists
+  // and Copy remains the answer everywhere else.
+  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function"
+
+  async function shareNative() {
+    try {
+      await navigator.share({
+        title: ministryName ? `Join ${ministryName} on Central` : "Join us on Central",
+        text: ministryName
+          ? `Join ${ministryName} on Central — use code ${inviteCode}`
+          : `Join us on Central — use code ${inviteCode}`,
+        url: link,
+      })
+      setShared(true)
+    } catch {
+      // An AbortError is the user dismissing the sheet, which is not a failure and
+      // must not surface as one.
+    }
+  }
 
   useEffect(() => {
     if (!copied) return
@@ -99,10 +135,38 @@ export function InviteShareModal({
   return (
     <CentralModal onClose={onClose} eyebrow="Invite" title="Share Central">
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-        <p style={{ fontSize: 14.5, lineHeight: 1.6, color: "var(--body)", margin: "0 0 22px", maxWidth: 380 }}>
-          Anyone who scans this or opens the link joins {ministryName ?? "your ministry"} straight
-          away — they never have to type a code.
+        <p style={{ fontSize: 14.5, lineHeight: 1.6, color: "var(--body)", margin: "0 0 20px", maxWidth: 380 }}>
+          {isCustomCode ? (
+            <>Anyone who scans this or opens the link can ask to join {ministryName ?? "your ministry"} — an admin lets them in.</>
+          ) : (
+            <>Anyone who scans this or opens the link joins {ministryName ?? "your ministry"} straight
+            away — they never have to type a code.</>
+          )}
         </p>
+
+        {/* THE CODE, FIRST AND BIG. Someone standing at large group needs to read it
+            aloud without tapping anything, and a code you have to hunt for is a code
+            nobody shares. The link and QR are for the people who can see the screen. */}
+        <button
+          onClick={() => copy("code")}
+          aria-label="Copy invite code"
+          style={{
+            width: "100%", padding: "16px 18px", borderRadius: 14,
+            background: "var(--ivory)", border: "1px solid var(--line-2)",
+            cursor: "pointer", marginBottom: 20,
+          }}
+        >
+          <span style={{ ...EYEBROW_STYLE, display: "block", marginBottom: 6 }}>
+            {copied === "code" ? "Copied" : "Join code"}
+          </span>
+          <span style={{
+            display: "block", fontFamily: "ui-monospace, Menlo, monospace",
+            fontSize: 26, letterSpacing: 3, fontWeight: 500, color: "var(--ink)",
+            overflowWrap: "anywhere",
+          }}>
+            {inviteCode}
+          </span>
+        </button>
 
         <div
           style={{
@@ -170,33 +234,17 @@ export function InviteShareModal({
           </div>
         </div>
 
-        {/* The code stays available for anyone typing it by hand. */}
-        <button
-          onClick={() => copy("code")}
-          style={{
-            marginTop: 14,
-            padding: "6px 10px",
-            borderRadius: 8,
-            border: "none",
-            background: "transparent",
-            color: "var(--muted-text)",
-            fontSize: 13,
-            cursor: "pointer",
-          }}
-        >
-          {copied === "code" ? (
-            "Code copied"
-          ) : (
-            <>
-              Or share the code:{" "}
-              <span style={{ fontFamily: "ui-monospace, Menlo, monospace", letterSpacing: 1, color: "var(--ink)" }}>
-                {inviteCode}
-              </span>
-            </>
-          )}
-        </button>
+        {canShare && (
+          <CentralButton variant="primary" onClick={shareNative} style={{ marginTop: 20, width: "100%" }}>
+            {shared ? "Shared" : "Share…"}
+          </CentralButton>
+        )}
 
-        <CentralButton variant="secondary" onClick={onClose} style={{ marginTop: 22, width: "100%" }}>
+        <CentralButton
+          variant="secondary"
+          onClick={onClose}
+          style={{ marginTop: canShare ? 10 : 22, width: "100%" }}
+        >
           Done
         </CentralButton>
       </div>

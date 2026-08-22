@@ -2596,6 +2596,7 @@ export function SettingsTab({
         <InviteShareModal
           onClose={() => setShareOpen(false)}
           inviteCode={inviteCode}
+          isCustomCode={codeIsCustom}
           ministryName={ministryInfo?.name ?? ministryName}
         />
       )}

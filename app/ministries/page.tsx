@@ -4,7 +4,8 @@ import { Suspense, useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase"
-import { getUserMinistries, getPublicMinistries, joinMinistryById, joinMinistryByCode, setCurrentMinistry, getMemberInviteCode } from "@/app/actions/ministry"
+import { getUserMinistries, getPublicMinistries, joinMinistryById, joinMinistryByCode, setCurrentMinistry } from "@/app/actions/ministry"
+import { getMemberInviteCode, requestToJoinMinistry } from "@/app/actions/join-requests"
 import { Spinner, RingCrossLogo } from "@/app/home/components/shared"
 import { MonogramChip } from "@/components/central/MonogramChip"
 import { PlanSubTabStrip } from "@/components/central/plan-sub-tab-strip"
@@ -103,7 +104,13 @@ function MinistriesContent() {
   // so members can share their ministry's code without asking an admin.
   const [memberCodes, setMemberCodes] = useState<Record<string, string>>({})
   // Share sheet for a ministry I belong to — member code only.
-  const [shareFor, setShareFor] = useState<{ code: string; name: string } | null>(null)
+  const [shareFor, setShareFor] = useState<{ code: string; name: string; isCustom: boolean } | null>(null)
+  // Whether each ministry's code opens a REQUEST rather than granting membership —
+  // the share sheet promises one or the other and must not guess.
+  const [customCodes, setCustomCodes] = useState<Record<string, boolean>>({})
+  // Set when a typed code opened a REQUEST. Replaces the join form's result, because
+  // there is nothing further for them to do here.
+  const [requestedName, setRequestedName] = useState<string | null>(null)
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null)
 
   // Gender + school pickers — every join path enforces the same
@@ -125,8 +132,11 @@ function MinistriesContent() {
             // Fetch each ministry's member code (fails silently per-ministry).
             data.forEach(async (m) => {
               try {
-                const { inviteCode: code } = await getMemberInviteCode(m.id)
-                if (code) setMemberCodes(prev => ({ ...prev, [m.id]: code }))
+                const { code, isCustom } = await getMemberInviteCode(m.id)
+                if (code) {
+                  setMemberCodes(prev => ({ ...prev, [m.id]: code }))
+                  setCustomCodes(prev => ({ ...prev, [m.id]: isCustom }))
+                }
               } catch { /* ignore */ }
             })
           }
@@ -214,6 +224,7 @@ function MinistriesContent() {
   async function doCodeJoin() {
     setJoiningCode(true)
     setCodeError(null)
+    setRequestedName(null)
     try {
       const { error, isStaffCode, ministryName } = await joinMinistryByCode(inviteCode)
       if (isStaffCode) {
@@ -222,6 +233,18 @@ function MinistriesContent() {
         setStaffMinistryName(ministryName)
         setNeedsStaffRole(true)
         setJoiningCode(false)
+        return
+      }
+      // A CUSTOM code opens a request rather than granting membership, and
+      // joinMinistryByCode signals that with a sentinel rather than doing it — the
+      // two paths have different guards and different copy. Without this branch the
+      // user is shown the raw string "REQUEST_REQUIRED" in a red error box, which is
+      // the most likely way a shared code travels: read aloud and TYPED, not scanned.
+      if (error === "REQUEST_REQUIRED") {
+        const req = await requestToJoinMinistry(inviteCode)
+        setJoiningCode(false)
+        if (req.error) { setCodeError(req.error); return }
+        setRequestedName(req.ministryName)
         return
       }
       if (error) { setCodeError(error); setJoiningCode(false); return }
@@ -302,6 +325,7 @@ function MinistriesContent() {
           onClose={() => setShareFor(null)}
           inviteCode={shareFor.code}
           ministryName={shareFor.name}
+          isCustomCode={shareFor.isCustom}
         />
       )}
       <PostJoinPickerModals pickers={pickers} />
@@ -488,7 +512,7 @@ function MinistriesContent() {
                       {isLinkableCode(memberCodes[m.id]) && (
                         <button
                           type="button"
-                          onClick={() => setShareFor({ code: memberCodes[m.id], name: m.name })}
+                          onClick={() => setShareFor({ code: memberCodes[m.id], name: m.name, isCustom: customCodes[m.id] === true })}
                           style={{
                             display: "inline-flex", alignItems: "center", marginTop: 4,
                             padding: 0, background: "transparent", border: "none",
@@ -590,6 +614,12 @@ function MinistriesContent() {
             <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.6, margin: "0 0 22px", maxWidth: 480 }}>
               Have an invite code from a ministry leader? Enter it below to join their workspace directly.
             </p>
+
+            {requestedName && (
+              <div style={{ marginBottom: 16, borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "12px 16px", fontSize: 13.5, color: "var(--body)", lineHeight: 1.55 }} role="status">
+                You&apos;ve asked to join <strong style={{ color: "var(--ink)" }}>{requestedName}</strong>. An admin will let you in — nothing else to do.
+              </div>
+            )}
 
             {codeError && (
               <div style={{ marginBottom: 16, borderRadius: 10, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 18%, transparent)", padding: "10px 14px", fontSize: 13, color: "var(--danger)" }}>
@@ -754,6 +784,11 @@ function MinistriesContent() {
           {tab === "code" && (
             <div style={{ marginTop: 22 }}>
               <p style={{ ...mSub, margin: "0 0 18px" }}>Have an invite code from a ministry leader? Enter it to join their workspace directly.</p>
+              {requestedName && (
+                <div style={{ marginBottom: 14, borderRadius: 12, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "12px 14px", fontSize: 13, color: "var(--body)", lineHeight: 1.55 }} role="status">
+                  You&apos;ve asked to join <strong style={{ color: "var(--ink)" }}>{requestedName}</strong>. An admin will let you in.
+                </div>
+              )}
               {codeError && (
                 <div style={{ marginBottom: 14, borderRadius: 12, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 18%, transparent)", padding: "10px 14px", fontSize: 13, color: "var(--danger)" }}>{codeError}</div>
               )}

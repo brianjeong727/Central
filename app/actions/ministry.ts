@@ -1231,25 +1231,12 @@ export async function getMinistryCodes(ministryId: string): Promise<{
 }
 
 // ─── Member: read the MEMBER invite code only ────────────────────────────────
-// Brian-approved rule change (2026-07-04): any member of a ministry may read its
-// member invite code to invite friends. The staff code stays admin-only — this
-// action NEVER selects it (getMinistryCodes above is the admin-gated path).
-export async function getMemberInviteCode(ministryId: string): Promise<{
-  inviteCode: string | null
-  error: string | null
-}> {
-  const authz = await requireSameMinistry(ministryId)
-  if (authz.error !== null) return { inviteCode: null, error: authz.error }
-
-  const admin = createAdminClient()
-  const { data, error } = await admin
-    .from("ministries")
-    .select("invite_code")
-    .eq("id", ministryId)
-    .maybeSingle()
-  if (error || !data) return { inviteCode: null, error: error?.message ?? "Ministry not found." }
-  return { inviteCode: data.invite_code ?? null, error: null }
-}
+// MOVED to app/actions/join-requests.ts (2026-08-22). There were briefly TWO
+// exported functions with this name in two "use server" files — meaning two live
+// POST endpoints — and only the new one consulted `member_can_invite`. A ministry
+// that narrowed sharing to leaders would have seen the Home tile refuse while
+// /ministries handed the same member the code, a QR and a share sheet: the flag was
+// decorative. One gate needs one function.
 
 // ─── Admin: excommunicate a member (permanent ban — can never rejoin) ───────────
 export async function excommunicateMember(targetUserId: string): Promise<{ error: string | null }> {
