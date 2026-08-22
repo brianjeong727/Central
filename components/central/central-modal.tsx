@@ -78,25 +78,42 @@ export function CentralModal({
 
   return (
     <div
-      className={`animate-backdrop-in ${sheet ? "flex items-end md:items-center" : "flex items-center"} justify-center`}
+      // `kb-lift` is what keeps a bottom sheet reachable while a keyboard is up.
+      // The shell claims the layout (`resize: "none"`, Convention #28), so the
+      // layout viewport does NOT shrink when the keys appear — a sheet pinned to
+      // `items-end` therefore sits at the bottom of a full-height screen, i.e.
+      // entirely BEHIND the keyboard. The poll composer autofocuses its question
+      // field, so it opened the keyboard onto itself and the whole sheet was
+      // invisible. Padding the backdrop by `--kb-inset` moves the flex end-edge up
+      // to the top of the keys. No-op on desktop (the class resets at md) and when
+      // nothing is focused (`--kb-inset` is 0).
+      className={`animate-backdrop-in kb-lift ${sheet ? "flex items-end md:items-center" : "flex items-center"} justify-center`}
       style={{
         position: "fixed",
         inset: 0,
         zIndex: z,
         background: "var(--veil)",
-        padding: sheet ? 0 : "0 20px",
+        // Horizontal ONLY. An inline `padding` shorthand sets padding-bottom too,
+        // and an inline style outranks every stylesheet rule — so `padding: 0`
+        // here silently beat `.kb-lift`'s padding-bottom and the sheet stayed
+        // flush with the bottom of the screen, behind the keyboard, exactly as
+        // before the fix. Same trap globals.css calls out for `.kb-lift` itself.
+        paddingLeft: sheet ? 0 : 20,
+        paddingRight: sheet ? 0 : 20,
       }}
       onClick={requestClose}
     >
       <div
-        className={sheet ? "animate-dialog-in rounded-t-[var(--r-callout)] md:rounded-[var(--r-callout)]" : "animate-dialog-in"}
+        className={`animate-dialog-in kb-modal-h ${sheet ? "rounded-t-[var(--r-callout)] md:rounded-[var(--r-callout)]" : ""}`}
         style={{
           position: "relative",
           background: "var(--cream-2)",
           ...(sheet ? {} : { borderRadius: "var(--r-callout)" }),
           width: "100%",
           maxWidth,
-          maxHeight: "85vh",
+          // maxHeight lives in `.kb-modal-h` (globals.css) so it resets at md
+          // alongside `.kb-lift`. Inline it was NOT reset, and a stray inset
+          // resized — and so re-centred — a desktop modal by a few pixels.
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
