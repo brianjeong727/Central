@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { mutate } from "swr"
 import { Copy, Check, QrCode, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen, Building2, Zap, MessageSquare, Flag, LayoutGrid, ScrollText, ListFilter } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
@@ -35,7 +36,8 @@ import type { ModerationSettings, ModBehavior, ModStrictness, ModScope } from "@
 import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
-import { isLinkableCode } from "@/lib/invite-code"
+import { isLinkableCode, customCodeProblem, normalizeCustomCode, CUSTOM_CODE_MAX_LEN } from "@/lib/invite-code"
+import { setCustomInviteCode, listJoinRequests, decideJoinRequest, type JoinRequestRow } from "@/app/actions/join-requests"
 import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, InviteShareModal, PocketKicker, PocketRowCard, PocketRow, PocketSwitch, PocketSheet, useScrollResetOn } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
@@ -331,6 +333,20 @@ export function SettingsTab({
   const [copied, setCopied] = useState(false)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
+  // Custom-code editor. `codeIsCustom` drives the card's explanation of what the code
+  // DOES (grant membership vs open a request) — the two behave completely differently
+  // for the person on the other end, so the card must say which.
+  const [codeIsCustom, setCodeIsCustom] = useState(false)
+  const [editingCode, setEditingCode] = useState(false)
+  const [draftCode, setDraftCode] = useState("")
+  const [codeError, setCodeError] = useState<string | null>(null)
+  const [savingCode, setSavingCode] = useState(false)
+  const [confirmCustom, setConfirmCustom] = useState(false)
+  // The approval queue. Its SWR key is shared with the nav badge so approving or
+  // declining updates BOTH — a decided request that stays counted in the shell is the
+  // one thing that would make an admin distrust the number.
+  const [joinRequests, setJoinRequests] = useState<JoinRequestRow[]>([])
+  const [decidingId, setDecidingId] = useState<string | null>(null)
 
   // Staff invite code
   const [staffCode, setStaffCode] = useState<string | null>(null)
@@ -534,6 +550,7 @@ export function SettingsTab({
 
       setInviteCode(codesRes.inviteCode)
       setStaffCode(codesRes.staffInviteCode)
+      setCodeIsCustom(codesRes.inviteCodeIsCustom)
       if (min) {
         setMinistryInfo({ name: min.name, university: min.university, size: min.size })
         setIsPublic(min.is_public ?? false)
@@ -767,8 +784,66 @@ export function SettingsTab({
     setRegenerating(true)
     setShowRegenerateConfirm(false)
     const { code, error } = await regenerateInviteCode()
-    if (!error && code) setInviteCode(code)
+    // A generated code restores instant join — the server clears the flag, and the
+    // card has to stop saying "people ask to join" the moment it does.
+    if (!error && code) { setInviteCode(code); setCodeIsCustom(false); setEditingCode(false) }
     setRegenerating(false)
+  }
+
+  const refreshJoinRequests = useCallback(async () => {
+    if (!isAdmin) return
+    const { requests } = await listJoinRequests(ministryId)
+    setJoinRequests(requests)
+    // Same key the Church Settings nav badge reads.
+    void mutate(["join-request-count", ministryId])
+  }, [isAdmin, ministryId])
+
+  useEffect(() => { void refreshJoinRequests() }, [refreshJoinRequests])
+
+  async function decideRequest(requestId: string, approve: boolean) {
+    setDecidingId(requestId)
+    // Optimistic (Convention #4): the row leaves the list on tap. Deciding is a
+    // conversational write, not a staged setting.
+    const snapshot = joinRequests
+    setJoinRequests((prev) => prev.filter((r) => r.id !== requestId))
+    const { error } = await decideJoinRequest(ministryId, requestId, approve)
+    setDecidingId(null)
+    if (error) { setJoinRequests(snapshot); return }
+    void refreshJoinRequests()
+  }
+
+  // ── Custom code ─────────────────────────────────────────────────────────────
+  function startEditingCode() {
+    setDraftCode(inviteCode ?? "")
+    setCodeError(null)
+    setConfirmCustom(false)
+    setEditingCode(true)
+  }
+
+  // Validated on every keystroke so the reason appears while they type rather than
+  // after they commit — customCodeProblem is the SAME predicate the action runs, so
+  // the form and the server cannot disagree about what is allowed.
+  function onDraftChange(next: string) {
+    const up = normalizeCustomCode(next)
+    setDraftCode(up)
+    setCodeError(up ? customCodeProblem(up) : null)
+  }
+
+  async function handleSaveCustomCode() {
+    const problem = customCodeProblem(draftCode)
+    if (problem) { setCodeError(problem); return }
+    setSavingCode(true)
+    const { code, error } = await setCustomInviteCode(ministryId, draftCode)
+    setSavingCode(false)
+    if (error || !code) { setCodeError(error ?? "Couldn't save that code."); return }
+    // The link is DERIVED from the code (inviteLinkFor), never stored — so the new
+    // link and QR exist the instant this lands, and every previously shared one is
+    // already dead. That is why the confirm names the cost before we get here.
+    setInviteCode(code)
+    setCodeIsCustom(true)
+    setEditingCode(false)
+    setConfirmCustom(false)
+    void refreshJoinRequests()
   }
 
   function copyStaffCode() {
@@ -2104,7 +2179,11 @@ export function SettingsTab({
                   {/* Invite code */}
                   <div className={CARD_CLS} style={{ ...CARD, padding: 22 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Invite code</div>
-                    <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Share with members to let them join directly.</div>
+                    <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
+                      {codeIsCustom
+                        ? "A code you chose, so it's memorable — people who enter it ask to join, and you approve them below."
+                        : "Share with members to let them join directly."}
+                    </div>
                     <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
                       <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "var(--ink)", fontWeight: 500, textAlign: "center", display: "block" }}>{inviteCode ?? "———"}</span>
                       <button onClick={copyInviteCode} disabled={!inviteCode} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
@@ -2125,9 +2204,69 @@ export function SettingsTab({
                         {isAdmin ? "Regenerate this code to get a shareable link and QR." : "Ask an admin to regenerate this code to get a shareable link."}
                       </div>
                     ) : null}
-                    {isAdmin && (showRegenerateConfirm ? (
+                    {isAdmin && !editingCode && !showRegenerateConfirm && (
+                      <button onClick={startEditingCode} style={{ marginTop: 12, marginRight: 16, padding: 0, background: "none", border: "none", color: "var(--plum)", fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <Pencil style={{ width: 12, height: 12 }} /> {codeIsCustom ? "Change code" : "Choose your own code"}
+                      </button>
+                    )}
+
+                    {isAdmin && editingCode && (
                       <div style={{ marginTop: 14, borderRadius: 10, border: "1px solid var(--line)", background: "#F7F4EF", padding: "12px 14px" }}>
-                        <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>The old code will stop working immediately.</p>
+                        <label htmlFor="custom-code" style={{ display: "block", fontSize: 12, color: "var(--body)", marginBottom: 6 }}>
+                          Letters, numbers and hyphens. People who enter it will ask to join rather than getting in straight away.
+                        </label>
+                        <input
+                          id="custom-code"
+                          value={draftCode}
+                          onChange={(e) => onDraftChange(e.target.value)}
+                          maxLength={CUSTOM_CODE_MAX_LEN}
+                          autoCapitalize="characters"
+                          autoComplete="off"
+                          spellCheck={false}
+                          placeholder="GRACEPGH"
+                          style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${codeError ? "var(--danger)" : "var(--line-2)"}`, background: "var(--cream)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 15, letterSpacing: 1.5, color: "var(--ink)" }}
+                        />
+                        {codeError && (
+                          <p role="alert" style={{ marginTop: 6, fontSize: 12, color: "var(--danger)" }}>{codeError}</p>
+                        )}
+                        {/* The cost, named BEFORE they commit. The link is derived from
+                            the code, so a new code IS a new link — every poster, QR and
+                            pasted message carrying the old one stops working the moment
+                            this saves, and there is no undo for someone already holding
+                            it. Same reasoning as the Regenerate confirm beside it. */}
+                        {confirmCustom ? (
+                          <div style={{ marginTop: 10 }}>
+                            <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>
+                              Your link becomes /j/{draftCode}. Any poster, QR or message with the old code stops working immediately.
+                            </p>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button onClick={() => setConfirmCustom(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Back</button>
+                              <CentralButton variant="danger-solid" onClick={handleSaveCustomCode} disabled={savingCode} style={{ padding: "5px 10px", borderRadius: 8, fontSize: 12 }}>{savingCode ? "Saving…" : "Yes, change it"}</CentralButton>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+                            <button onClick={() => { setEditingCode(false); setCodeError(null) }} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
+                            <CentralButton
+                              variant="primary"
+                              onClick={() => setConfirmCustom(true)}
+                              disabled={!!customCodeProblem(draftCode) || draftCode === inviteCode}
+                              style={{ padding: "5px 10px", borderRadius: 8, fontSize: 12 }}
+                            >
+                              Save code
+                            </CentralButton>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {isAdmin && !editingCode && (showRegenerateConfirm ? (
+                      <div style={{ marginTop: 14, borderRadius: 10, border: "1px solid var(--line)", background: "#F7F4EF", padding: "12px 14px" }}>
+                        <p style={{ fontSize: 12, color: "var(--body)", marginBottom: 8 }}>
+                          {codeIsCustom
+                            ? "You'll get a new random code, and people will join instantly again instead of asking. The old code stops working immediately."
+                            : "The old code will stop working immediately."}
+                        </p>
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={() => setShowRegenerateConfirm(false)} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--line-2)", fontSize: 12, color: "var(--body)", cursor: "pointer", background: "transparent" }}>Cancel</button>
                           <CentralButton variant="danger-solid" onClick={handleRegenerate} disabled={regenerating} style={{ padding: "5px 10px", borderRadius: 8, fontSize: 12 }}>{regenerating ? "Regenerating…" : "Yes, regenerate"}</CentralButton>
@@ -2135,7 +2274,7 @@ export function SettingsTab({
                       </div>
                     ) : (
                       <button onClick={() => setShowRegenerateConfirm(true)} style={{ marginTop: 12, padding: 0, background: "none", border: "none", color: "var(--muted-text)", fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                        <RefreshCw style={{ width: 12, height: 12 }} /> Regenerate code
+                        <RefreshCw style={{ width: 12, height: 12 }} /> {codeIsCustom ? "Back to a random code" : "Regenerate code"}
                       </button>
                     ))}
                   </div>
@@ -2168,6 +2307,68 @@ export function SettingsTab({
                     </div>
                   )}
                 </div>
+
+                {/* People waiting to join — only ever populated for a ministry running a
+                    custom code, since a generated one still grants membership outright.
+                    Seated here rather than under Members because this IS the join-code
+                    surface: the code is what produced the queue, and the badge on the
+                    Church Settings nav item points at this. */}
+                {isAdmin && (
+                  <div style={{ marginTop: 26 }}>
+                    <SectionHeader eyebrow="Requests" title="Waiting to join" titleSize={20} hideTitleOnMobile />
+                    {joinRequests.length === 0 ? (
+                      <p style={{ marginTop: 8, fontSize: 13.5, color: "var(--muted-text)", lineHeight: 1.55 }}>
+                        {codeIsCustom
+                          ? "Nobody's waiting. People who enter your code will show up here."
+                          : "Your code lets people join straight away, so there's nothing to approve. Choose your own code above to review people first."}
+                      </p>
+                    ) : (
+                      <div className={CARD_CLS} style={{ ...CARD, padding: 0, marginTop: 12, overflow: "hidden" }}>
+                        {joinRequests.map((r, i) => (
+                          <div
+                            key={r.id}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 12, padding: "14px 18px",
+                              borderTop: i === 0 ? "none" : "1px solid var(--line-3)",
+                            }}
+                          >
+                            <MonogramChip
+                              initials={getInitials(r.name ?? r.email ?? "?")}
+                              avatarUrl={r.avatarUrl ?? undefined}
+                              title={r.name ?? undefined}
+                              style={{ width: 38, height: 38, fontSize: 14, fontWeight: 500 }}
+                            />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {r.name ?? "Someone"}
+                              </div>
+                              <div style={{ fontSize: 12.5, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {r.email ?? "\u2014"}
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                              <button
+                                onClick={() => decideRequest(r.id, false)}
+                                disabled={decidingId === r.id}
+                                style={{ padding: "6px 12px", borderRadius: 999, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer" }}
+                              >
+                                Decline
+                              </button>
+                              <CentralButton
+                                variant="primary"
+                                onClick={() => decideRequest(r.id, true)}
+                                disabled={decidingId === r.id}
+                                style={{ padding: "6px 14px", borderRadius: 999, fontSize: 13 }}
+                              >
+                                {decidingId === r.id ? "\u2026" : "Approve"}
+                              </CentralButton>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </section>
 
               {/* Calendar integration */}

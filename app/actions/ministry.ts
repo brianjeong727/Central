@@ -885,7 +885,15 @@ export async function regenerateInviteCode(): Promise<{ code: string | null; err
 
   const admin = createAdminClient()
   const newCode = await uniqueInviteCode(admin)
-  const { error } = await admin.from("ministries").update({ invite_code: newCode }).eq("id", profile.ministry_id)
+  // Clearing invite_code_is_custom is NOT incidental. A generated code carries the
+  // 32^10 entropy the whole instant-join model rests on (lib/invite-code.ts), so
+  // regenerating restores instant join. Leaving the flag set would keep the ministry
+  // taking requests for a code that no longer needs them — with nothing on the screen
+  // to explain why people are still queuing.
+  const { error } = await admin
+    .from("ministries")
+    .update({ invite_code: newCode, invite_code_is_custom: false })
+    .eq("id", profile.ministry_id)
   if (error) return { code: null, error: error.message }
   return { code: newCode, error: null }
 }
@@ -1198,19 +1206,28 @@ export async function cancelArchiveRequest(ministryId: string): Promise<{ error:
 export async function getMinistryCodes(ministryId: string): Promise<{
   inviteCode: string | null
   staffInviteCode: string | null
+  /** Whether the MEMBER code is custom — i.e. whether typing it opens a request
+   *  instead of granting membership. The settings card has to say which, because the
+   *  two behave completely differently for the person on the other end. */
+  inviteCodeIsCustom: boolean
   error: string | null
 }> {
   const authz = await requireMinistryAdmin(ministryId)
-  if (authz.error !== null) return { inviteCode: null, staffInviteCode: null, error: authz.error }
+  if (authz.error !== null) return { inviteCode: null, staffInviteCode: null, inviteCodeIsCustom: false, error: authz.error }
 
   const admin = createAdminClient()
   const { data, error } = await admin
     .from("ministries")
-    .select("invite_code, staff_invite_code")
+    .select("invite_code, staff_invite_code, invite_code_is_custom")
     .eq("id", ministryId)
     .maybeSingle()
-  if (error || !data) return { inviteCode: null, staffInviteCode: null, error: error?.message ?? "Ministry not found." }
-  return { inviteCode: data.invite_code ?? null, staffInviteCode: data.staff_invite_code ?? null, error: null }
+  if (error || !data) return { inviteCode: null, staffInviteCode: null, inviteCodeIsCustom: false, error: error?.message ?? "Ministry not found." }
+  return {
+    inviteCode: data.invite_code ?? null,
+    staffInviteCode: data.staff_invite_code ?? null,
+    inviteCodeIsCustom: data.invite_code_is_custom === true,
+    error: null,
+  }
 }
 
 // ─── Member: read the MEMBER invite code only ────────────────────────────────

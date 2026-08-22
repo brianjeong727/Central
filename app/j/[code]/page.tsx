@@ -69,7 +69,7 @@ export default async function InvitePage({ params }: { params: Promise<{ code: s
   // Signed out — the landing invites them to make an account, and carries the code so
   // whichever auth path they take returns them here.
   if (!user) {
-    return <InviteLanding code={code} ministryName={ministry.name} state="signed-out" />
+    return <InviteLanding code={code} ministryName={ministry.name} state="signed-out" isCustomCode={ministry.invite_code_is_custom === true} />
   }
 
   const { data: profile } = await supabase
@@ -97,6 +97,7 @@ export default async function InvitePage({ params }: { params: Promise<{ code: s
     <InviteLanding
       code={code}
       ministryName={ministry.name}
+      isCustomCode={ministry.invite_code_is_custom === true}
       state={currentMinistryName ? "switching" : "signed-in"}
       currentMinistryName={currentMinistryName}
     />

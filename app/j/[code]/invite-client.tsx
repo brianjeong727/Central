@@ -13,6 +13,7 @@ import { SplitShell } from "@/app/(auth)/shared"
 import { CentralButton } from "@/components/central"
 import { EYEBROW_STYLE } from "@/components/central/typography"
 import { joinMinistryByCode } from "@/app/actions/ministry"
+import { requestToJoinMinistry } from "@/app/actions/join-requests"
 import { usePostJoinPickers, PostJoinPickerModals } from "@/app/ministries/post-join-pickers"
 
 const SERIF = "var(--font-instrument-serif)"
@@ -85,15 +86,41 @@ export function InviteLanding({
   ministryName,
   state,
   currentMinistryName,
+  isCustomCode = false,
 }: {
   code: string
   ministryName: string
   state: State
   currentMinistryName?: string | null
+  /** A CUSTOM code is memorable, therefore guessable, therefore not a key — entering
+   *  it opens a request an admin approves rather than granting membership outright
+   *  (lib/invite-code.ts). The whole page changes verb: ask, not join. */
+  isCustomCode?: boolean
 }) {
   const pickers = usePostJoinPickers()
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [requested, setRequested] = useState(false)
+
+  // The request path. Deliberately NOT routed through doJoin: joinMinistryByCode
+  // refuses a custom code outright (it would be granting membership on a guessable
+  // secret), so there is no shared branch to take.
+  async function doRequest() {
+    setJoining(true)
+    setError(null)
+    try {
+      const { state: reqState, error: reqErr } = await requestToJoinMinistry(code)
+      if (reqErr) { setError(reqErr); setJoining(false); return }
+      // "requested" and "already-pending" land on the same screen on purpose — a
+      // second tap must not read as a failure, and the person genuinely is waiting
+      // either way.
+      if (reqState) setRequested(true)
+      setJoining(false)
+    } catch {
+      setError("Something went wrong. Please try again.")
+      setJoining(false)
+    }
+  }
 
   // The one write on this page, and it only ever runs from an explicit tap.
   // Mirrors doCodeJoin() in app/ministries/page.tsx so every join path enforces the
@@ -126,6 +153,26 @@ export function InviteLanding({
   const signedOut = state === "signed-out"
   const switching = state === "switching"
 
+  // Waiting. The one screen with no action on it — which is the point: there is
+  // nothing they can do to speed it up, so offering a button would be a lie.
+  if (requested) {
+    return (
+      <Frame>
+        <span style={EYEBROW_STYLE}>Request sent</span>
+        <h1 className={H1_CLS} style={H1}>You&apos;ve asked to join {ministryName}.</h1>
+        <p style={SUB}>
+          An admin will let you in. You don&apos;t need to do anything else — check back
+          here, or just open Central again later.
+        </p>
+        <div style={{ marginTop: 28 }}>
+          <Link href="/ministries" style={{ textDecoration: "none" }}>
+            <CentralButton variant="secondary" style={{ width: "100%" }}>Browse other churches</CentralButton>
+          </Link>
+        </div>
+      </Frame>
+    )
+  }
+
   return (
     <Frame>
       <span style={EYEBROW_STYLE}>{switching ? "Switch church" : "You're invited"}</span>
@@ -135,8 +182,12 @@ export function InviteLanding({
       </h1>
 
       <p style={SUB}>
-        {signedOut ? (
+        {signedOut && isCustomCode ? (
+          <>Create your account and you can ask to join {ministryName} — an admin lets you in.</>
+        ) : signedOut ? (
           <>Create your account and you&apos;ll land inside {ministryName} — no code to type.</>
+        ) : isCustomCode ? (
+          <>Ask to join and an admin will let you in. You&apos;ll get access as soon as they do.</>
         ) : switching ? (
           <>
             You&apos;re currently in {currentMinistryName}. Joining {ministryName} makes it your
@@ -173,11 +224,15 @@ export function InviteLanding({
           <>
             <CentralButton
               variant="primary"
-              onClick={onJoinTap}
+              onClick={isCustomCode ? doRequest : onJoinTap}
               disabled={joining}
               style={{ width: "100%" }}
             >
-              {joining ? "Joining…" : switching ? `Switch to ${ministryName}` : `Join ${ministryName}`}
+              {joining
+                ? (isCustomCode ? "Sending…" : "Joining…")
+                : isCustomCode ? `Ask to join ${ministryName}`
+                : switching ? `Switch to ${ministryName}`
+                : `Join ${ministryName}`}
             </CentralButton>
             <Link href="/home" style={{ textDecoration: "none" }}>
               <CentralButton variant="secondary" style={{ width: "100%" }} disabled={joining}>
