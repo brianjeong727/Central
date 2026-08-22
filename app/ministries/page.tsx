@@ -16,7 +16,7 @@ import { BackChevron } from "@/components/central/back-chevron"
 // maxLength on both code inputs is BOUND to the generator's length. A longer code with
 // a stale maxLength truncates on entry, and every manual join then fails with
 // "No ministry found with that invite code" — a bug with no visible cause.
-import { INVITE_CODE_LEN, isValidInviteCode } from "@/lib/invite-code"
+import { CODE_INPUT_MAX_LEN, isLinkableCode } from "@/lib/invite-code"
 
 const SANS  = "var(--font-inter), system-ui, sans-serif"
 const SERIF = "var(--font-instrument-serif)"
@@ -485,7 +485,7 @@ function MinistriesContent() {
                         </button>
                       )}
                       {/* Only for codes /j/ accepts — see the twin note in settings-tab. */}
-                      {isValidInviteCode(memberCodes[m.id]) && (
+                      {isLinkableCode(memberCodes[m.id]) && (
                         <button
                           type="button"
                           onClick={() => setShareFor({ code: memberCodes[m.id], name: m.name })}
@@ -603,7 +603,7 @@ function MinistriesContent() {
                 value={inviteCode}
                 onChange={e => setInviteCode(e.target.value.toUpperCase())}
                 placeholder="MERCY24"
-                autoComplete="off" autoCapitalize="characters" maxLength={INVITE_CODE_LEN}
+                autoComplete="off" autoCapitalize="characters" maxLength={CODE_INPUT_MAX_LEN}
                 style={{
                   width: "100%", padding: "16px 18px",
                   border: "1px solid var(--line-2)", borderRadius: 10, background: "var(--cream)",
@@ -761,7 +761,7 @@ function MinistriesContent() {
                 <label style={{ display: "block", fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", color: "var(--muted-text)", textTransform: "uppercase", marginBottom: 7, paddingLeft: 4 }}>Invite code</label>
                 <input
                   value={inviteCode} onChange={e => setInviteCode(e.target.value.toUpperCase())}
-                  placeholder="MERCY24" autoComplete="off" autoCapitalize="characters" maxLength={INVITE_CODE_LEN}
+                  placeholder="MERCY24" autoComplete="off" autoCapitalize="characters" maxLength={CODE_INPUT_MAX_LEN}
                   style={{ width: "100%", minHeight: 52, border: "none", borderRadius: 16, background: "var(--ivory)", padding: "0 18px", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 20, letterSpacing: "3px", textTransform: "uppercase", color: "var(--ink)", outline: "none", boxSizing: "border-box" }}
                 />
                 <button type="submit" disabled={joiningCode || inviteCode.trim().length < 4} style={{

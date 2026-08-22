@@ -38,7 +38,7 @@ function resolveSignupGrade(
 import { presetById } from "@/app/home/workspace-presets"
 import { ADMIN_ROLES, LEADER_ROLES, MEMBER_TIER, isAdminRole, isStaffRole } from "@/lib/roles"
 import { SUPER_UUID } from "./super-constants"
-import { generateInviteCode, normalizeCode, legacyLookupVariant } from "@/lib/invite-code"
+import { generateInviteCode, lookupVariants } from "@/lib/invite-code"
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
 
@@ -72,30 +72,22 @@ export async function joinMinistryByCode(
   if (authErr || !user) return { ministryName: null, error: "Not authenticated." }
 
   const admin = createAdminClient()
-  // Crockford input folding (I/L→1, O→0) so a code read off a poster or heard
-  // aloud still resolves. lib/invite-code.ts is the one definition of that rule.
-  const code = normalizeCode(inviteCode)
-
-  // LEGACY BRIDGE — remove once every stored code is rotated to the 10-char format.
-  // Pre-rotation codes are base36, which uses ALL 26 letters, so a stored code holding
-  // an I, L or O does not survive Crockford folding (~40.7% of six-char base36 codes
-  // contain one). Without this retry those ministries silently lose their invite code
-  // on the one path that still works for them — typing it.
-  const legacy = legacyLookupVariant(inviteCode)
+  // Every form the typed code could have been STORED as — Crockford-folded (a
+  // generated code, so one read off a poster or heard aloud still resolves), and
+  // plain-uppercase, which covers BOTH the custom codes a ministry chooses and the
+  // pre-rotation base36 ones whose I/L/O do not survive folding (~40.7% of six-char
+  // base36 codes contain one; without this those ministries silently lose their code
+  // on the one path that still works for them — typing it). lib/invite-code.ts is
+  // the single definition, so a fourth caller cannot invent a fourth rule.
+  const variants = lookupVariants(inviteCode)
 
   const findBy = async (column: "invite_code" | "staff_invite_code") => {
     const { data } = await admin
       .from("ministries")
-      .select("id, name, status")
-      .eq(column, code)
+      .select("id, name, status, invite_code_is_custom")
+      .in(column, variants)
       .maybeSingle()
-    if (data || !legacy) return data
-    const { data: legacyHit } = await admin
-      .from("ministries")
-      .select("id, name, status")
-      .eq(column, legacy)
-      .maybeSingle()
-    return legacyHit
+    return data
   }
 
   // Check member code first
@@ -108,6 +100,14 @@ export async function joinMinistryByCode(
   const isStaff = !byMember && !!byStaff
 
   if (!ministry) return { ministryName: null, error: "No ministry found with that invite code." }
+  // A CUSTOM member code never grants membership outright — it opens a request
+  // (app/actions/join-requests.ts). Refusing here rather than at the call site is what
+  // makes that true for every entry point: /j/, typed code, and the post-auth landing
+  // all funnel through this action. The staff code is exempt because it is never
+  // custom — it stays generated precisely because it hands out admin-tier roles.
+  if (!isStaff && ministry.invite_code_is_custom) {
+    return { ministryName: null, error: "REQUEST_REQUIRED" }
+  }
   if (ministry.status === "pending") return { ministryName: null, error: "This ministry is not yet active." }
   if (ministry.status === "rejected") return { ministryName: null, error: "This ministry is not available." }
   // Catch-all — any non-active status (archived etc.) is not joinable.
@@ -885,7 +885,15 @@ export async function regenerateInviteCode(): Promise<{ code: string | null; err
 
   const admin = createAdminClient()
   const newCode = await uniqueInviteCode(admin)
-  const { error } = await admin.from("ministries").update({ invite_code: newCode }).eq("id", profile.ministry_id)
+  // Clearing invite_code_is_custom is NOT incidental. A generated code carries the
+  // 32^10 entropy the whole instant-join model rests on (lib/invite-code.ts), so
+  // regenerating restores instant join. Leaving the flag set would keep the ministry
+  // taking requests for a code that no longer needs them — with nothing on the screen
+  // to explain why people are still queuing.
+  const { error } = await admin
+    .from("ministries")
+    .update({ invite_code: newCode, invite_code_is_custom: false })
+    .eq("id", profile.ministry_id)
   if (error) return { code: null, error: error.message }
   return { code: newCode, error: null }
 }
@@ -1198,19 +1206,28 @@ export async function cancelArchiveRequest(ministryId: string): Promise<{ error:
 export async function getMinistryCodes(ministryId: string): Promise<{
   inviteCode: string | null
   staffInviteCode: string | null
+  /** Whether the MEMBER code is custom — i.e. whether typing it opens a request
+   *  instead of granting membership. The settings card has to say which, because the
+   *  two behave completely differently for the person on the other end. */
+  inviteCodeIsCustom: boolean
   error: string | null
 }> {
   const authz = await requireMinistryAdmin(ministryId)
-  if (authz.error !== null) return { inviteCode: null, staffInviteCode: null, error: authz.error }
+  if (authz.error !== null) return { inviteCode: null, staffInviteCode: null, inviteCodeIsCustom: false, error: authz.error }
 
   const admin = createAdminClient()
   const { data, error } = await admin
     .from("ministries")
-    .select("invite_code, staff_invite_code")
+    .select("invite_code, staff_invite_code, invite_code_is_custom")
     .eq("id", ministryId)
     .maybeSingle()
-  if (error || !data) return { inviteCode: null, staffInviteCode: null, error: error?.message ?? "Ministry not found." }
-  return { inviteCode: data.invite_code ?? null, staffInviteCode: data.staff_invite_code ?? null, error: null }
+  if (error || !data) return { inviteCode: null, staffInviteCode: null, inviteCodeIsCustom: false, error: error?.message ?? "Ministry not found." }
+  return {
+    inviteCode: data.invite_code ?? null,
+    staffInviteCode: data.staff_invite_code ?? null,
+    inviteCodeIsCustom: data.invite_code_is_custom === true,
+    error: null,
+  }
 }
 
 // ─── Member: read the MEMBER invite code only ────────────────────────────────
