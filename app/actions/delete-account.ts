@@ -48,7 +48,6 @@ const PROFILE_SCRUB: Record<string, unknown> = {
   // broken account deletion outright. The type here is Record<string, unknown>,
   // so nothing but this note and the migration keeps the two in step.
   major: null,
-  stage: null,
   hometown: null,
   gender: null,
   graduation_year: null,

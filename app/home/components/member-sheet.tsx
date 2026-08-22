@@ -119,7 +119,7 @@ export async function loadMemberDetail(
     // The school NAME comes through the profiles_school_id_fkey embed rather than a
     // second round trip — `school_id` is a ministry_schools reference, and a raw
     // uuid is not a fact anyone can read.
-    .select("id, name, graduation_year, grade, role, avatar_url, email, school_id, major, stage, hometown, bible_verse, favorite_verse, favorite_worship_song, ministry_schools!profiles_school_id_fkey(name)")
+    .select("id, name, graduation_year, grade, role, avatar_url, email, school_id, major, hometown, bible_verse, favorite_verse, favorite_worship_song, ministry_schools!profiles_school_id_fkey(name)")
     .eq("id", memberId)
     .eq("ministry_id", ministryId)
     .single()
@@ -250,10 +250,6 @@ export function MemberSheet({
                   cohortLabel(member.grade, member.graduation_year)
                     ? { label: isYoungAdult(member.grade) ? "Stage" : "Graduation year", value: cohortLabel(member.grade, member.graduation_year)! }
                     : null,
-                  // `stage` is the member's OWN answer; the cohort label above is
-                  // derived from grade/grad year. Both can be present and they are
-                  // not the same claim, so neither replaces the other.
-                  detail?.stage ? { label: "Stage", value: detail.stage } : null,
                   detail?.school_name ? { label: "School", value: detail.school_name } : null,
                   detail?.major ? { label: "Studying", value: detail.major } : null,
                   detail?.hometown ? { label: "From", value: detail.hometown } : null,

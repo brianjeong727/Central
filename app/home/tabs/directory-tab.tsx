@@ -462,7 +462,6 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
           const rows: { label: string; value: string; italic?: boolean }[] = []
           if (detail?.school_name) rows.push({ label: "SCHOOL", value: detail.school_name })
           if (detail?.major) rows.push({ label: "STUDYING", value: detail.major })
-          if (detail?.stage) rows.push({ label: "STAGE", value: detail.stage })
           if (detail?.hometown) rows.push({ label: "FROM", value: detail.hometown })
           if (verseVal) rows.push({ label: detail?.favorite_verse || "VERSE", value: verseVal, italic: true })
           if (detail?.favorite_worship_song) rows.push({ label: "WORSHIP SONG", value: detail.favorite_worship_song })

@@ -17,7 +17,6 @@ test.use({ storageState: adminState, viewport: { width: 390, height: 844 }, isMo
 
 const FILLED = {
   major: "Information Science",
-  stage: "Student",
   hometown: "Cherry Hill, NJ",
   favorite_verse: "Philippians 4:13",
   bible_verse: "I can do all things through him who strengthens me.",
@@ -60,21 +59,23 @@ test("a filled profile shows every v2 field, and the meter counts them", async (
   await seed(FILLED)
   await openProfile(page)
 
-  for (const label of ["EMAIL", "STUDYING", "STAGE", "FROM", "FAVORITE VERSE", "WORSHIP SONG"]) {
+  for (const label of ["EMAIL", "CLASS", "STUDYING", "FROM", "FAVORITE VERSE", "WORSHIP SONG"]) {
     await expect(vis(page, label).first(), `${label} row`).toBeVisible()
   }
   await expect(vis(page, FILLED.major).first()).toBeVisible()
   await expect(vis(page, FILLED.hometown).first()).toBeVisible()
   // The verse block prints the reference as its kicker and the words underneath.
   await expect(vis(page, FILLED.bible_verse).first()).toBeVisible()
-  // 6 of the 7 counted fields are set (school_id is the seventh and is unset here).
-  await expect(page.getByText(/^\d of 7 filled$/).filter({ visible: true }).first()).toHaveText("6 of 7 filled")
+  // 5 of the 6 counted fields are set (school_id is the sixth and is unset here).
+  // CLASS is deliberately NOT counted — onboarding fills it for everyone, so a
+  // point for it would be free and the meter would say less than it appears to.
+  await expect(page.getByText(/^\d of 6 filled$/).filter({ visible: true }).first()).toHaveText("5 of 6 filled")
 })
 
 test("the removed fields are gone — no testimony, bio, phone or prayer row", async ({ page }) => {
   await seed(FILLED)
   await openProfile(page)
-  for (const gone of ["TESTIMONY", "PHONE", "BIO", "ABOUT", "PRAYER", "FAVORITE BOOK"]) {
+  for (const gone of ["TESTIMONY", "PHONE", "BIO", "ABOUT", "PRAYER", "FAVORITE BOOK", "STAGE"]) {
     await expect(vis(page, gone), `${gone} must not be a row any more`).toHaveCount(0)
   }
 })
@@ -83,8 +84,8 @@ test("an empty profile invites you into each field without nagging", async ({ pa
   await seed(EMPTY)
   await openProfile(page)
   // Every unset row reads "Add" in plum — the design's one call to action, repeated.
-  expect(await vis(page, "Add").count()).toBeGreaterThanOrEqual(5)
-  await expect(page.getByText(/^\d of 7 filled$/).filter({ visible: true }).first()).toHaveText("0 of 7 filled")
+  expect(await vis(page, "Add").count()).toBeGreaterThanOrEqual(4)
+  await expect(page.getByText(/^\d of 6 filled$/).filter({ visible: true }).first()).toHaveText("0 of 6 filled")
   await expect(vis(page, "Everything here is visible to your ministry.").first()).toBeVisible()
 })
 
@@ -113,7 +114,7 @@ test("tapping a value edits it in place and blur commits that one field", async 
   }, { timeout: 10_000 }).toBe("Pittsburgh, PA")
 
   // The meter reacts to the field that was just filled.
-  await expect(page.getByText(/^\d of 7 filled$/).filter({ visible: true }).first()).toHaveText("1 of 7 filled")
+  await expect(page.getByText(/^\d of 6 filled$/).filter({ visible: true }).first()).toHaveText("1 of 6 filled")
 })
 
 test("the name is gated — a blocked name keeps you in the field with a reason", async ({ page }) => {
@@ -136,4 +137,33 @@ test("the name is gated — a blocked name keeps you in the field with a reason"
   const sb = sandbox()
   const { data } = await sb.client.from("profiles").select("name").eq("id", adminId).single()
   expect((data as { name: string } | null)?.name).toBe(originalName)
+})
+
+test("CLASS is the real cohort — pre-filled, and changing it warns about the class chat", async ({ page }) => {
+  const sb = sandbox()
+  // Onboarding always sets this (signup and /complete-profile both gate on it), so
+  // the row should arrive populated rather than reading "Add".
+  await sb.client.from("profiles").update({ graduation_year: 2027, grade: null }).eq("id", adminId).eq("ministry_id", sb.ministryId)
+  await seed(EMPTY)
+  await openProfile(page)
+
+  const cls = page.getByLabel("Class").filter({ visible: true }).first()
+  await expect(cls).toHaveValue("2027")
+  // It is a real cohort control, not free text: Young Adult is an option, which is
+  // the state `grade = 'young_adult'` represents.
+  await expect(cls.locator("option", { hasText: "Young Adult" })).toHaveCount(1)
+
+  await cls.selectOption("2029")
+
+  // The class-chat prompt is the whole point of routing this through the cohort
+  // path — a bare graduation_year write leaves someone in their old class chat.
+  await expect(page.getByText(/You.re now Class of 2029/).filter({ visible: true }).first())
+    .toBeVisible({ timeout: 15_000 })
+
+  await expect.poll(async () => {
+    const { data } = await sandbox().client.from("profiles").select("graduation_year").eq("id", adminId).single()
+    return (data as { graduation_year: number | null } | null)?.graduation_year
+  }, { timeout: 10_000 }).toBe(2029)
+
+  await sb.client.from("profiles").update({ graduation_year: 2027 }).eq("id", adminId).eq("ministry_id", sb.ministryId)
 })

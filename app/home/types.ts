@@ -26,7 +26,6 @@ export interface Profile {
   favorite_verse?: string | null
   favorite_worship_song?: string | null
   major?: string | null
-  stage?: string | null
   hometown?: string | null
   ministry_id?: string | null
   avatar_url?: string | null
@@ -617,7 +616,6 @@ export interface DirectoryMemberDetail extends DirectoryMember {
   favorite_verse: string | null
   favorite_worship_song: string | null
   major: string | null
-  stage: string | null
   hometown: string | null
   school_id: string | null
   /** Resolved through the ministry_schools embed in loadMemberDetail — the row

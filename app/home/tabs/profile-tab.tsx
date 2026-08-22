@@ -782,7 +782,7 @@ export function JournalSection({
 // The verse is a PAIR: `favorite_verse` is the reference, `bible_verse` is the words.
 type ProfileDraftField =
   | "name" | "graduation_year"
-  | "major" | "stage" | "hometown"
+  | "major" | "hometown"
   | "favorite_verse" | "bible_verse" | "favorite_worship_song"
 
 const PROFILE_SECTIONS: {
@@ -796,7 +796,6 @@ const PROFILE_SECTIONS: {
     fields: [
       { key: "graduation_year", label: "Graduation year", placeholder: "e.g. 2027", multiline: false, inputType: "number" },
       { key: "major", label: "Studying", placeholder: "Your major", multiline: false },
-      { key: "stage", label: "Stage", placeholder: "Student or young adult", multiline: false },
       { key: "hometown", label: "From", placeholder: "Where you grew up", multiline: false },
     ],
   },
@@ -811,6 +810,16 @@ const PROFILE_SECTIONS: {
   },
 ]
 
+// The sentinel the CLASS select uses for the non-year cohort. Not a year, so it can
+// never collide with one.
+const YOUNG_ADULT_OPTION = "young-adult"
+/** Class years the picker offers: last year through six ahead, which covers a
+ *  freshman who just arrived and anyone correcting a year they mistyped. */
+function cohortYearOptions(): number[] {
+  const now = new Date().getFullYear()
+  return Array.from({ length: 8 }, (_, i) => now - 1 + i)
+}
+
 // ── Profile v2 · the phone row list ───────────────────────────────────────────
 // The order the design puts them in. EMAIL is read-only: it is the account's login
 // identity, not a profile fact someone edits here. SCHOOL is NOT in this list — it
@@ -818,7 +827,6 @@ const PROFILE_SECTIONS: {
 const PROFILE_V2_ROWS: { key: string; label: string; placeholder: string; readOnly?: boolean }[] = [
   { key: "email", label: "EMAIL", placeholder: "", readOnly: true },
   { key: "major", label: "STUDYING", placeholder: "Your major" },
-  { key: "stage", label: "STAGE", placeholder: "Student or young adult" },
   { key: "hometown", label: "FROM", placeholder: "Where you grew up" },
   { key: "favorite_verse", label: "FAVORITE VERSE", placeholder: "e.g. Philippians 4:13" },
   { key: "favorite_worship_song", label: "WORSHIP SONG", placeholder: "A song that moves you" },
@@ -827,7 +835,10 @@ const PROFILE_V2_ROWS: { key: string; label: string; placeholder: string; readOn
 // What the completeness meter counts. Email is excluded — it is filled for everyone
 // the moment they have an account, so counting it would start every profile at 1/8
 // and mean nothing.
-const PROFILE_V2_COUNTED = ["major", "stage", "hometown", "favorite_verse", "bible_verse", "favorite_worship_song", "school_id"] as const
+// `graduation_year` is not counted: onboarding fills the cohort for everyone (the
+// signup + /complete-profile gates both require it), so counting it would give
+// every profile a free point and make the meter say less than it appears to.
+const PROFILE_V2_COUNTED = ["major", "hometown", "favorite_verse", "bible_verse", "favorite_worship_song", "school_id"] as const
 const PROFILE_V2_FIELD_COUNT = PROFILE_V2_COUNTED.length
 
 // ── Account & support cluster ─────────────────────────────────────────────────
@@ -1204,7 +1215,6 @@ export function ProfileTab({
     name: initialProfile.name ?? "",
     graduation_year: String(initialProfile.graduation_year ?? ""),
     major: initialProfile.major ?? "",
-    stage: initialProfile.stage ?? "",
     hometown: initialProfile.hometown ?? "",
     favorite_verse: initialProfile.favorite_verse ?? "",
     bible_verse: initialProfile.bible_verse ?? "",
@@ -1254,6 +1264,7 @@ export function ProfileTab({
     }).length,
     [profile],
   )
+  const [cohortSaving, setCohortSaving] = useState(false)
   const [inlineField, setInlineField] = useState<ProfileDraftField | null>(null)
   const [inlineDraft, setInlineDraft] = useState("")
   const [inlineError, setInlineError] = useState<string | null>(null)
@@ -1266,6 +1277,46 @@ export function ProfileTab({
     if (!settings.enabled) return null
     const { flaggedCount } = moderateText(next, { strictness: settings.strictness, behavior: settings.behavior })
     return flaggedCount > 0 ? "That name was blocked by the ministry's language filter. Try another." : null
+  }
+
+  /**
+   * CLASS is not a text field — it is the cohort, and changing it also changes which
+   * class chat someone sits in. So it commits through the SAME path the desktop form
+   * uses: `setYoungAdult` (the server action that moves the membership) for the
+   * student↔young-adult switch, then the year write, then the class-chat prompt.
+   * A bare `graduation_year` UPDATE is how a student who corrected 2027 → 2029 stayed
+   * in the Class of 2027 chat with nothing anywhere saying so.
+   *
+   * Onboarding always fills this (signup and /complete-profile both gate on it), so
+   * on a real account the row arrives populated and this is only ever a correction.
+   */
+  async function commitCohort(next: string) {
+    const wantYoungAdult = next === YOUNG_ADULT_OPTION
+    const wasYoungAdult = isYoungAdult(profile.grade)
+    const previousYear = profile.graduation_year ?? null
+    const newYear = wantYoungAdult ? null : (next ? parseInt(next) : null)
+    if (wantYoungAdult === wasYoungAdult && newYear === previousYear) return
+
+    setCohortSaving(true)
+    if (wantYoungAdult !== wasYoungAdult) {
+      const res = await setYoungAdult(wantYoungAdult)
+      if (res?.error) { setInlineError(res.error); setCohortSaving(false); return }
+      setProfile(prev => ({ ...prev, grade: wantYoungAdult ? "young_adult" : null }))
+    }
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({ graduation_year: newYear })
+      .eq("id", userId)
+      .eq("ministry_id", initialProfile.ministry_id ?? "")
+      .select()
+      .single()
+    setCohortSaving(false)
+    if (error) { setInlineError("Couldn't save that. Try again."); return }
+    if (data) setProfile(data as Profile)
+    if (newYear && newYear !== previousYear && !wantYoungAdult) {
+      setClassPrompt({ from: previousYear, to: newYear })
+      setKeepOldClass(false)
+    }
   }
 
   function beginInline(key: ProfileDraftField) {
@@ -1325,7 +1376,6 @@ export function ProfileTab({
       name: profile.name ?? "",
       graduation_year: String(profile.graduation_year ?? ""),
       major: profile.major ?? "",
-      stage: profile.stage ?? "",
       hometown: profile.hometown ?? "",
       favorite_verse: profile.favorite_verse ?? "",
       bible_verse: profile.bible_verse ?? "",
@@ -1399,7 +1449,6 @@ export function ProfileTab({
         name,
         graduation_year: draft.graduation_year ? parseInt(draft.graduation_year) : null,
         major: draft.major || null,
-        stage: draft.stage || null,
         hometown: draft.hometown || null,
         favorite_verse: draft.favorite_verse || null,
         bible_verse: draft.bible_verse || null,
@@ -1861,25 +1910,6 @@ export function ProfileTab({
             {inlineError && <p style={{ fontSize: 12.5, color: "var(--danger)", margin: "6px 0 0" }}>{inlineError}</p>}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 9, minWidth: 0 }}>
               <PocketTag label={roleLabel(profile.role, null)} variant="role" />
-              {inlineField === "graduation_year" ? (
-                <input
-                  value={inlineDraft}
-                  autoFocus
-                  inputMode="numeric"
-                  onChange={e => setInlineDraft(e.target.value)}
-                  onBlur={commitInline}
-                  placeholder="2027"
-                  aria-label="Graduation year"
-                  style={{ width: 84, border: "none", background: "var(--ivory)", borderRadius: 10, padding: "4px 9px", fontSize: 13.5, color: "var(--ink)", outline: "none" }}
-                />
-              ) : (
-                // The class line is TAPPABLE rather than a row of its own: the design
-                // shows it here, and it still needs an editor — moving the year is
-                // also what moves someone between class chats (see commitInline).
-                <button onClick={() => beginInline("graduation_year")} style={{ background: "none", border: "none", padding: 0, cursor: "text", fontSize: 13.5, color: cohortLabel(profile.grade, profile.graduation_year) ? "var(--body)" : "var(--plum)", fontWeight: cohortLabel(profile.grade, profile.graduation_year) ? 400 : 600, whiteSpace: "nowrap" }}>
-                  {cohortLabel(profile.grade, profile.graduation_year) ?? "Add class year"}
-                </button>
-              )}
             </div>
             {removePhotoButton(true)}
           </div>
@@ -1926,6 +1956,47 @@ export function ProfileTab({
             no edit mode, no Save. Rows are separated by a TOP rule so the run reads
             as one list under the meter rather than a stack of boxes. ── */}
         <div className="md:hidden" style={{ padding: "18px 20px 22px" }}>
+          {/* CLASS — filled at onboarding for everyone, and the one row whose edit
+              reaches past this table: changing it moves class-chat membership. */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "15px 0", borderTop: "1px solid var(--line-3)", minHeight: 24, opacity: cohortSaving ? 0.5 : 1 }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "1.2px", color: "var(--muted-text)", flex: "none" }}>CLASS</div>
+            <select
+              value={isYoungAdult(profile.grade) ? YOUNG_ADULT_OPTION : String(profile.graduation_year ?? "")}
+              onChange={e => { if (!cohortSaving) void commitCohort(e.target.value) }}
+              aria-label="Class"
+              disabled={cohortSaving}
+              style={{ border: "none", background: "transparent", fontSize: 14.5, fontWeight: cohortLabel(profile.grade, profile.graduation_year) ? 500 : 600, color: cohortLabel(profile.grade, profile.graduation_year) ? "var(--ink)" : "var(--plum)", textAlign: "right", outline: "none", padding: 0, cursor: "pointer", maxWidth: "70%" }}
+            >
+              <option value="">Add</option>
+              {cohortYearOptions().map(y => <option key={y} value={String(y)}>Class of {y}</option>)}
+              <option value={YOUNG_ADULT_OPTION}>Young Adult</option>
+            </select>
+          </div>
+
+          {/* SCHOOL — picked in the post-join flow when the ministry defines schools.
+              Rendered whenever the person HAS one, even if the option list has not
+              loaded, so an onboarding answer never reads back as blank. */}
+          {(schoolOptions.length > 0 || currentSchoolId) && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "15px 0", borderTop: "1px solid var(--line-3)", minHeight: 24 }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "1.2px", color: "var(--muted-text)", flex: "none" }}>SCHOOL</div>
+              {schoolOptions.length > 0 ? (
+                <select
+                  value={currentSchoolId ?? ""}
+                  onChange={e => handleSchoolChange(e.target.value)}
+                  aria-label="School"
+                  style={{ border: "none", background: "transparent", fontSize: 14.5, fontWeight: currentSchoolId ? 500 : 600, color: currentSchoolId ? "var(--ink)" : "var(--plum)", textAlign: "right", outline: "none", padding: 0, cursor: "pointer", maxWidth: "70%" }}
+                >
+                  <option value="">Add</option>
+                  {schoolOptions.map(sc => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
+                </select>
+              ) : (
+                <div style={{ fontSize: 14.5, fontWeight: 500, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {schoolOptions.find(sc => sc.id === currentSchoolId)?.name ?? "—"}
+                </div>
+              )}
+            </div>
+          )}
+
           {PROFILE_V2_ROWS.map(r => {
             const editingThis = inlineField === r.key
             const raw = r.key === "email" ? profile.email : getFieldValue(r.key as ProfileDraftField)
@@ -1955,24 +2026,6 @@ export function ProfileTab({
               </div>
             )
           })}
-
-          {/* School is a ministry_schools REFERENCE, not free text — 46 profiles
-              already point at one and the ministry defines the list. So this row
-              keeps the same grammar but commits through a native select. */}
-          {schoolOptions.length > 0 && (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "15px 0", borderTop: "1px solid var(--line-3)", minHeight: 24 }}>
-              <div style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "1.2px", color: "var(--muted-text)", flex: "none" }}>SCHOOL</div>
-              <select
-                value={currentSchoolId ?? ""}
-                onChange={e => handleSchoolChange(e.target.value)}
-                aria-label="School"
-                style={{ border: "none", background: "transparent", fontSize: 14.5, fontWeight: currentSchoolId ? 500 : 600, color: currentSchoolId ? "var(--ink)" : "var(--plum)", textAlign: "right", outline: "none", padding: 0, cursor: "pointer", maxWidth: "70%" }}
-              >
-                <option value="">Add</option>
-                {schoolOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-          )}
         </div>
 
         {/* ── Mobile: the verse, given its own ground. It is the one thing on this
