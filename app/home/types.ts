@@ -14,10 +14,10 @@ export interface Profile {
   grade?: string | null
   needs_grad_check?: boolean
   role: string
-  about_me: string | null
+  about_me?: string | null
   bible_verse: string | null
-  prayer_request: string | null
-  pray_for_me: string | null
+  prayer_request?: string | null
+  pray_for_me?: string | null
   phone?: string | null
   bio?: string | null
   testimony?: string | null
@@ -609,16 +609,16 @@ export interface DirectoryMember {
 // Full profile shape — fetched on demand (per member) when a detail view opens.
 export interface DirectoryMemberDetail extends DirectoryMember {
   email: string
-  phone: string | null
-  about_me: string | null
-  bio: string | null
+  phone?: string | null
+  about_me?: string | null
+  bio?: string | null
   bible_verse: string | null
   favorite_verse: string | null
-  prayer_request: string | null
-  pray_for_me: string | null
-  testimony: string | null
+  prayer_request?: string | null
+  pray_for_me?: string | null
+  testimony?: string | null
   favorite_worship_song: string | null
-  favorite_book_of_bible: string | null
+  favorite_book_of_bible?: string | null
 }
 
 export interface UserTeam {

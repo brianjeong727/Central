@@ -749,7 +749,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     const existingIds = new Set(members.map((m) => m.user_id))
     const { data } = await supabase
       .from("profiles")
-      .select("id, name, role, graduation_year, email, about_me, bible_verse, prayer_request, pray_for_me, avatar_url")
+      .select("id, name, role, graduation_year, email, bible_verse, avatar_url")
       .eq("ministry_id", ministryId)
       .order("name")
     setAllProfiles((data ?? []).filter((p: Profile) => !existingIds.has(p.id)))

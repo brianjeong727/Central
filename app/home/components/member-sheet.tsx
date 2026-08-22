@@ -116,7 +116,7 @@ export async function loadMemberDetail(
 ): Promise<DirectoryMemberDetail | null> {
   const { data } = await supabase
     .from("profiles")
-    .select("id, name, graduation_year, grade, role, avatar_url, email, phone, about_me, bio, bible_verse, favorite_verse, prayer_request, pray_for_me, testimony, favorite_worship_song, favorite_book_of_bible")
+    .select("id, name, graduation_year, grade, role, avatar_url, email, bible_verse, favorite_verse, favorite_worship_song")
     .eq("id", memberId)
     .eq("ministry_id", ministryId)
     .single()

@@ -772,7 +772,7 @@ export function JournalSection({
 
 // ── Profile field config ──────────────────────────────────────────────────────
 
-type ProfileDraftField = "name" | "phone" | "graduation_year" | "bio" | "testimony" | "favorite_verse" | "favorite_worship_song" | "favorite_book_of_bible" | "prayer_request"
+type ProfileDraftField = "name" | "graduation_year" | "favorite_verse" | "favorite_worship_song"
 
 const PROFILE_SECTIONS: {
   id: string
@@ -784,31 +784,26 @@ const PROFILE_SECTIONS: {
     label: "Contact",
     fields: [
       { key: "graduation_year", label: "Graduation year", placeholder: "e.g. 2027", multiline: false, inputType: "number" },
-      { key: "phone", label: "Phone", placeholder: "Your phone number", multiline: false, inputType: "tel" },
     ],
   },
   {
     id: "about",
     label: "About",
     fields: [
-      { key: "bio", label: "Bio", placeholder: "Write a short bio…", multiline: true },
     ],
   },
   {
     id: "faith",
     label: "Faith",
     fields: [
-      { key: "testimony", label: "Testimony", placeholder: "Share your faith story…", multiline: true },
       { key: "favorite_verse", label: "Favorite verse", placeholder: "e.g. Philippians 4:13", multiline: false },
       { key: "favorite_worship_song", label: "Favorite worship song", placeholder: "A song that moves you", multiline: false },
-      { key: "favorite_book_of_bible", label: "Favorite book of the Bible", placeholder: "e.g. Psalms", multiline: false },
     ],
   },
   {
     id: "prayer",
     label: "Prayer",
     fields: [
-      { key: "prayer_request", label: "Prayer request", placeholder: "Share what you'd like prayer for…", multiline: true },
     ],
   },
 ]
@@ -1186,13 +1181,8 @@ export function ProfileTab({
   const [draft, setDraft] = useState<Record<ProfileDraftField, string>>({
     name: initialProfile.name ?? "",
     graduation_year: String(initialProfile.graduation_year ?? ""),
-    phone: initialProfile.phone ?? "",
-    bio: initialProfile.bio ?? "",
-    testimony: initialProfile.testimony ?? "",
     favorite_verse: initialProfile.favorite_verse ?? "",
     favorite_worship_song: initialProfile.favorite_worship_song ?? "",
-    favorite_book_of_bible: initialProfile.favorite_book_of_bible ?? "",
-    prayer_request: initialProfile.prayer_request ?? "",
   })
   // Inline error under the name field — currently only the moderation refusal.
   const [nameError, setNameError] = useState<string | null>(null)
@@ -1227,13 +1217,8 @@ export function ProfileTab({
     setDraft({
       name: profile.name ?? "",
       graduation_year: String(profile.graduation_year ?? ""),
-      phone: profile.phone ?? "",
-      bio: profile.bio ?? "",
-      testimony: profile.testimony ?? "",
       favorite_verse: profile.favorite_verse ?? "",
       favorite_worship_song: profile.favorite_worship_song ?? "",
-      favorite_book_of_bible: profile.favorite_book_of_bible ?? "",
-      prayer_request: profile.prayer_request ?? "",
     })
     setNameError(null)
     setEditing(true)
@@ -1302,13 +1287,8 @@ export function ProfileTab({
       .update({
         name,
         graduation_year: draft.graduation_year ? parseInt(draft.graduation_year) : null,
-        phone: draft.phone || null,
-        bio: draft.bio || null,
-        testimony: draft.testimony || null,
         favorite_verse: draft.favorite_verse || null,
         favorite_worship_song: draft.favorite_worship_song || null,
-        favorite_book_of_bible: draft.favorite_book_of_bible || null,
-        prayer_request: draft.prayer_request || null,
       })
       .eq("id", userId)
       .eq("ministry_id", initialProfile.ministry_id ?? "")
@@ -1560,7 +1540,7 @@ export function ProfileTab({
                           value={draft[field.key]}
                           onChange={e => setDraft(d => ({ ...d, [field.key]: e.target.value }))}
                           placeholder={field.placeholder}
-                          rows={field.key === "testimony" ? 5 : 3}
+                          rows={3}
                           style={{ display: "block", width: "100%", fontSize: 14, color: "var(--ink)", lineHeight: 1.65, background: "transparent", border: "none", outline: "none", resize: "vertical", fontFamily: "inherit", padding: 0, boxSizing: "border-box" }}
                         />
                       ) : (
