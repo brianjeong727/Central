@@ -22,11 +22,12 @@
 
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
-import { requireMinistryAdmin } from "./authz"
+import { requireMinistryAdmin, requireMinistryMembership } from "./authz"
 import { autoAddUserToChats } from "./auto-chats"
 import { admitUserToMinistry } from "@/lib/ministry-membership"
 import { moderateText, SEVERE } from "@/lib/moderation"
 import { customCodeProblem, normalizeCustomCode, lookupVariants } from "@/lib/invite-code"
+import { isLeaderRole } from "@/lib/roles"
 
 /** Requests one person may file at one ministry, ever. The partial unique index caps
  *  PENDING at one; without this, decline → re-request → decline grows unboundedly and
@@ -303,4 +304,72 @@ export async function getPendingJoinRequestCount(ministryId: string): Promise<{ 
     .eq("ministry_id", ministryId)
     .eq("status", "pending")
   return { count: count ?? 0 }
+}
+
+// ─── Any member: the code, for sharing ───────────────────────────────────────
+// Members cannot read `ministries.invite_code` directly — the column is REVOKED from
+// `authenticated`, so every read goes through a gated action. getMinistryCodes is the
+// admin one and returns BOTH codes; this is the member one and returns exactly one.
+//
+// IT MUST NEVER TOUCH staff_invite_code. That code grants pastor/deacon/elder, and the
+// whole point of the column revoke is that a member-reachable path cannot leak it. The
+// select below names one column on purpose — not `*`, not a shared helper that returns
+// a row — so a future edit has to add the staff column deliberately rather than
+// inherit it.
+//
+// WHO MAY SHARE: everyone, unless the ministry turns it off. A ministry on a CUSTOM
+// code is safe either way (sharing produces a REQUEST an admin approves), but on a
+// generated code the code IS membership — so `member_can_invite = false` narrows
+// sharing to leader-tier, and that is the case the flag exists for.
+export async function getMemberInviteCode(ministryId: string): Promise<{
+  code: string | null
+  isCustom: boolean
+  ministryName: string | null
+  error: string | null
+}> {
+  // MEMBERSHIP, not "your active ministry" — see the note on requireMinistryMembership.
+  const ctx = await requireMinistryMembership(ministryId)
+  if (ctx.error !== null) return { code: null, isCustom: false, ministryName: null, error: ctx.error }
+
+  const admin = createAdminClient()
+  // The error is NOT discarded. There are no generated DB types here, so nothing
+  // catches a column that does not exist yet — PostgREST 400s the WHOLE select, data
+  // comes back null, and a swallowed error would surface to every member of every
+  // ministry as "Only leaders can share the invite". A deploy that lands before its
+  // migration must read as a failure, not as a policy decision.
+  const { data, error } = await admin
+    .from("ministries")
+    .select("name, invite_code, invite_code_is_custom, member_can_invite")
+    .eq("id", ministryId)
+    .maybeSingle()
+
+  if (error) return { code: null, isCustom: false, ministryName: null, error: error.message }
+  if (!data) return { code: null, isCustom: false, ministryName: null, error: "Ministry not found." }
+
+  if (data.member_can_invite === false && !isLeaderRole(ctx.role)) {
+    return { code: null, isCustom: false, ministryName: null, error: "Only leaders can share the invite here." }
+  }
+
+  return {
+    code: data.invite_code ?? null,
+    isCustom: data.invite_code_is_custom === true,
+    ministryName: data.name ?? null,
+    error: null,
+  }
+}
+
+// ─── Admin: who may share ────────────────────────────────────────────────────
+export async function setMemberCanInvite(
+  ministryId: string,
+  allowed: boolean,
+): Promise<{ error: string | null }> {
+  const ctx = await requireMinistryAdmin(ministryId)
+  if (ctx.error !== null) return { error: ctx.error }
+
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from("ministries")
+    .update({ member_can_invite: allowed })
+    .eq("id", ministryId)
+  return { error: error?.message ?? null }
 }

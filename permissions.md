@@ -137,7 +137,11 @@ The DG-dinner `reimbursement_forms` flow is **retired** — replaced by free-for
 
 Public ministries carry a member invite code too — codes work alongside browse-join (both assign `member`). If an admin-tier person joins via the member path, an existing admin can promote them in Settings → Members.
 
-**Member code visibility (2026-07-04):** any member of a ministry may READ its member invite code (`getMemberInviteCode`, member-gated) — surfaced on the My Ministries card so anyone can invite a friend. The **staff code stays admin-only** (`getMinistryCodes`, admin-gated). Regenerating either code remains admin-only.
+**Member code visibility (2026-07-04, revised 2026-08-22):** any member of a ministry may READ its member invite code and share it — `getMemberInviteCode` (`app/actions/join-requests.ts`), gated on **membership**: their active ministry, or any ministry they hold a `user_ministries` row for. (It was gated on the ACTIVE ministry until 2026-08-22, so a member of two churches silently got no code for the non-active one.) Surfaced on the My Ministries card and on the Home "Invite someone" tile. The **staff code stays admin-only** (`getMinistryCodes`, admin-gated) and the member action never selects it. Regenerating either code remains admin-only.
+
+**Narrowing it (2026-08-22):** a ministry may restrict sharing to leader-tier via `ministries.member_can_invite` (Church Settings → Workspace → Who can invite). Default **TRUE**, so no member loses an access they already had. Enforced **in the action, not in RLS** — `invite_code` is column-revoked from `authenticated`, which makes that action the only reader, so **there must never be a second one**. There briefly were two (one per file, only one honouring the flag), and the flag was decorative until they were collapsed.
+
+**What sharing GRANTS depends on the code.** A generated code admits people outright — it carries the 32^10 entropy the instant-join model rests on (`lib/invite-code.ts`). A **custom** code (`ministries.invite_code_is_custom`) is memorable and therefore guessable, so it is not a key: entering it opens a row in `ministry_join_requests` that an admin approves, and member sharing is safe by construction there. Approval runs the same membership write instant join runs (`lib/ministry-membership.ts`), so the two paths cannot produce different members. Note this is a property of the CODE, not the ministry: a `is_public` ministry still admits people directly from browse via `joinMinistryById`, whatever its code.
 
 ---
 

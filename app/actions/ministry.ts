@@ -1210,46 +1210,40 @@ export async function getMinistryCodes(ministryId: string): Promise<{
    *  instead of granting membership. The settings card has to say which, because the
    *  two behave completely differently for the person on the other end. */
   inviteCodeIsCustom: boolean
+  /** Whether every member may share the code, or only leaders. Read HERE rather than
+   *  from a client select: the column is deliberately ungranted to `authenticated`,
+   *  so naming it in a browser query would 403 the entire request. */
+  memberCanInvite: boolean
   error: string | null
 }> {
   const authz = await requireMinistryAdmin(ministryId)
-  if (authz.error !== null) return { inviteCode: null, staffInviteCode: null, inviteCodeIsCustom: false, error: authz.error }
+  if (authz.error !== null) return { inviteCode: null, staffInviteCode: null, inviteCodeIsCustom: false, memberCanInvite: true, error: authz.error }
 
   const admin = createAdminClient()
   const { data, error } = await admin
     .from("ministries")
-    .select("invite_code, staff_invite_code, invite_code_is_custom")
+    .select("invite_code, staff_invite_code, invite_code_is_custom, member_can_invite")
     .eq("id", ministryId)
     .maybeSingle()
-  if (error || !data) return { inviteCode: null, staffInviteCode: null, inviteCodeIsCustom: false, error: error?.message ?? "Ministry not found." }
+  if (error || !data) return { inviteCode: null, staffInviteCode: null, inviteCodeIsCustom: false, memberCanInvite: true, error: error?.message ?? "Ministry not found." }
   return {
     inviteCode: data.invite_code ?? null,
     staffInviteCode: data.staff_invite_code ?? null,
     inviteCodeIsCustom: data.invite_code_is_custom === true,
+    // Default TRUE on a null: members have been able to share since 2026-07-04, so an
+    // unset column must never read as "revoked".
+    memberCanInvite: data.member_can_invite !== false,
     error: null,
   }
 }
 
 // ─── Member: read the MEMBER invite code only ────────────────────────────────
-// Brian-approved rule change (2026-07-04): any member of a ministry may read its
-// member invite code to invite friends. The staff code stays admin-only — this
-// action NEVER selects it (getMinistryCodes above is the admin-gated path).
-export async function getMemberInviteCode(ministryId: string): Promise<{
-  inviteCode: string | null
-  error: string | null
-}> {
-  const authz = await requireSameMinistry(ministryId)
-  if (authz.error !== null) return { inviteCode: null, error: authz.error }
-
-  const admin = createAdminClient()
-  const { data, error } = await admin
-    .from("ministries")
-    .select("invite_code")
-    .eq("id", ministryId)
-    .maybeSingle()
-  if (error || !data) return { inviteCode: null, error: error?.message ?? "Ministry not found." }
-  return { inviteCode: data.invite_code ?? null, error: null }
-}
+// MOVED to app/actions/join-requests.ts (2026-08-22). There were briefly TWO
+// exported functions with this name in two "use server" files — meaning two live
+// POST endpoints — and only the new one consulted `member_can_invite`. A ministry
+// that narrowed sharing to leaders would have seen the Home tile refuse while
+// /ministries handed the same member the code, a QR and a share sheet: the flag was
+// decorative. One gate needs one function.
 
 // ─── Admin: excommunicate a member (permanent ban — can never rejoin) ───────────
 export async function excommunicateMember(targetUserId: string): Promise<{ error: string | null }> {

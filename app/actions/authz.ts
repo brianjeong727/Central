@@ -57,6 +57,37 @@ export async function requireMinistryAdmin(ministryId: string): Promise<AuthzRes
   return ctx
 }
 
+// Caller must BELONG to the given ministry — their active one, or any other they
+// still hold a user_ministries row for.
+//
+// requireSameMinistry compares against profiles.ministry_id, which is the ministry the
+// user is currently LOOKING AT, not the set they belong to. That is right for a write
+// into the active tenant and wrong for a read about any of them: /ministries lists
+// every ministry from user_ministries and asks for each one's invite code, so a member
+// of two churches silently got no code for the non-active one, inside a catch that
+// swallowed it — no error, just a card that never showed a code.
+//
+// Mirrors the live `ministries` SELECT policy exactly ("Members can view their
+// ministries": id = auth_ministry_id() OR a user_ministries row), so the action and
+// RLS agree about what membership means. Safe to widen: every departure path
+// (removeMember, excommunicateMember, selfLeaveMinistry) deletes the user_ministries
+// row, so a former member retains nothing.
+export async function requireMinistryMembership(ministryId: string): Promise<AuthzResult> {
+  const ctx = await requireMinistryMember()
+  if (ctx.error !== null) return ctx
+  if (ctx.ministryId === ministryId) return ctx
+
+  const admin = createAdminClient()
+  const { data } = await admin
+    .from("user_ministries")
+    .select("ministry_id")
+    .eq("user_id", ctx.userId)
+    .eq("ministry_id", ministryId)
+    .maybeSingle()
+  if (!data) return deny("Not authorized.")
+  return { ...ctx, ministryId }
+}
+
 // Caller must belong to the given ministry AND be leader-tier (leader + admin,
 // deacon, elder, pastor). Exactly the DB's auth_is_admin_or_leader() and exactly
 // lib/roles.ts's isLeaderRole — the three must stay in lockstep, since a gate the

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import dynamic from "next/dynamic"
 import useSWR, { useSWRConfig } from "swr"
-import { Bell, Calendar, Compass, Gift, Settings } from "lucide-react"
+import { Bell, Calendar, Compass, Gift, Settings, UserPlus } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { EYEBROW_STYLE } from "../components/shared"
 import { PocketHeader } from "../components/pocket-header"
@@ -30,6 +30,8 @@ import { fetchRsvpCounts } from "@/lib/announcement-counts"
 import { acknowledgeAnnouncement } from "@/lib/announcement-ack"
 import { HomeDeadlines } from "./home-deadlines"
 import { fetchOpenGroups, openGroupsKey, type OpenGroup } from "../open-groups"
+import { getMemberInviteCode } from "@/app/actions/join-requests"
+import { InviteShareModal } from "@/components/central"
 
 export { HomeTabProps }
 
@@ -287,6 +289,28 @@ export function HomeTab({
   const { data: openGroupsAll } = useSWR(openGroupsKey(ministryId), fetchOpenGroups)
   const joinableGroups = (openGroupsAll ?? []).filter((g: OpenGroup) => !g.isMember)
   const openGroupTotal = (openGroupsAll ?? []).length
+
+  // ── Invite — any member can share the way in ────────────────────────────────
+  // The code is fetched ON DEMAND, not with the page: members cannot read
+  // ministries.invite_code directly (the column is revoked from `authenticated`), so
+  // this is a gated action, and loading it for everyone on every Home render would be
+  // a request per session for a sheet most people never open.
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [invite, setInvite] = useState<{ code: string; isCustom: boolean; name: string | null } | null>(null)
+  const [inviteBusy, setInviteBusy] = useState(false)
+  const [inviteDenied, setInviteDenied] = useState(false)
+
+  async function openInvite() {
+    setInviteBusy(true)
+    const res = await getMemberInviteCode(ministryId)
+    setInviteBusy(false)
+    // A ministry can narrow sharing to leaders. The tile stays visible and says so on
+    // tap rather than vanishing: a control that disappears for reasons you cannot see
+    // reads as a bug, and "only leaders can share this" is a sentence worth reading.
+    if (res.error || !res.code) { setInviteDenied(true); return }
+    setInvite({ code: res.code, isCustom: res.isCustom, name: res.ministryName })
+    setInviteOpen(true)
+  }
 
   async function handleChecklistToggle(done: boolean) {
     if (!checklist?.eligible) return
@@ -1374,7 +1398,10 @@ export function HomeTab({
               userTeams[0] — meaningless for anyone on more than one team. Open
               groups is NOT that: it has no nav destination of its own, and its
               subtitle carries a live count rather than an arbitrary pick. ── */}
-          {(openGroupTotal > 0 || !nativeShell) && (
+          {/* Always rendered now: Invite has no gate of its own (Give is web-only per
+              App Store 3.2.2(iv), and Open groups needs groups to exist). */}
+          {(
+
           <section className="flex flex-col" style={{ gap: "var(--space-6)" }}>
             {/* Present whenever the ministry HAS open groups, not only when one is
                 joinable — gating on the joinable count hides the entry from the
@@ -1390,6 +1417,12 @@ export function HomeTab({
                 onClick={() => (onBrowseOpenGroups ? onBrowseOpenGroups() : onSeeChats())}
               />
             )}
+            <PocketQuickTile
+              icon={<div style={{ width: 44, height: 44, borderRadius: 999, background: "var(--plum)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><UserPlus style={{ width: 19, height: 19, color: "var(--cream-on-dark)" }} strokeWidth={1.7} /></div>}
+              label="Invite someone"
+              subtitle={inviteBusy ? "Getting your code…" : inviteDenied ? "Only leaders can share the invite" : "Share your join code or link"}
+              onClick={openInvite}
+            />
             {!nativeShell && (
               <PocketQuickTile
                 icon={<div style={{ width: 44, height: 44, borderRadius: 999, background: "var(--plum)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Gift style={{ width: 19, height: 19, color: "var(--cream-on-dark)" }} strokeWidth={1.7} /></div>}
@@ -1426,6 +1459,18 @@ export function HomeTab({
             setManagerOpen(false)
             mutate()
           }}
+        />
+      )}
+
+      {/* The one shared invite surface — same component Church Settings and
+          /ministries open, so the code, the link and the QR can never disagree
+          about what they point at. */}
+      {inviteOpen && invite && (
+        <InviteShareModal
+          inviteCode={invite.code}
+          ministryName={invite.name}
+          isCustomCode={invite.isCustom}
+          onClose={() => setInviteOpen(false)}
         />
       )}
     </div>
