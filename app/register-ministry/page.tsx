@@ -15,19 +15,38 @@ export default async function RegisterMinistryPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, ministry_id")
     .eq("id", user.id)
     .maybeSingle()
 
   const role = (profile?.role ?? "member").toLowerCase()
   const isAdminTier = isAdminRole(role)
+  const hasMinistry = !!profile?.ministry_id
 
   // Admin-tier → registration wizard
   if (isAdminTier) {
     redirect("/onboarding")
   }
 
-  // Non-admin logged-in user — show gated message
+  // NO MINISTRY → the wizard, whatever the role says.
+  //
+  // This gate was written for "you belong to a ministry as a member", and every
+  // fresh signup is role='member' with no ministry — so it was catching exactly
+  // the people the page exists for, and catching them in a LOOP: /ministries →
+  // "Register your ministry" → this card → its "Back to my ministry" button →
+  // /home → proxy sees no ministry → /ministries. Every button led back to the
+  // same page, which is precisely how it was reported.
+  //
+  // Nothing downstream needs the role to be admin first: proxy.ts already lets a
+  // user with no ministry into /onboarding, and the wizard self-promotes the
+  // registrant to a founder role when it completes. The role check was the only
+  // thing standing between a new person and the product.
+  if (!hasMinistry) {
+    redirect("/onboarding")
+  }
+
+  // A member OF AN EXISTING MINISTRY asking to register another one — the case
+  // this card was actually written for, and where "Back to my ministry" resolves.
   const SERIF = "var(--font-instrument-serif)"
   const SANS  = "var(--font-inter), system-ui, sans-serif"
 
