@@ -17,7 +17,7 @@ import { unblockUser } from "@/app/actions/blocks"
 import { useBlocks } from "../use-blocks"
 import { MODERATION_DEFAULTS, moderateText, type ModerationSettings } from "@/lib/moderation"
 import { storagePathFromPublicUrl, removeStorageObject } from "@/lib/storage-cleanup"
-import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, SerifInput, MonogramChip, PocketFilterChip, PocketCard, PocketButton, PocketTag, PocketRoundButton, PocketRow, PocketRowCard, PocketKicker, useScrollResetOn, useEdgeSwipeBack, PendingVeil } from "@/components/central"
+import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, SerifInput, MonogramChip, PocketFilterChip, PocketCard, PocketButton, PocketTag, PocketRoundButton, PocketRow, PocketRowCard, PocketKicker, useScrollResetOn, useEdgeSwipeBack, PendingVeil, ImageCropper } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
@@ -1179,6 +1179,9 @@ export function ProfileTab({
   const journalSwipeRef = useEdgeSwipeBack<HTMLDivElement>(backToProfileRoot)
   useScrollResetOn([activeSection])
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  // The picked file, held while the user positions it. Choosing a photo no longer
+  // uploads it — it opens the cropper, and the upload is what CONFIRM does.
+  const [cropFile, setCropFile] = useState<File | null>(null)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [draft, setDraft] = useState<Record<ProfileDraftField, string>>({
     name: initialProfile.name ?? "",
@@ -1359,37 +1362,32 @@ export function ProfileTab({
     window.location.assign("/")
   }
 
-  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  // Picking a photo OPENS THE CROPPER; it no longer uploads anything. The input is
+  // reset immediately so re-picking the same file still fires a change event.
+  function handleAvatarPick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
+    e.target.value = ""
     if (!file) return
-    setUploadingAvatar(true)
     setAvatarError(null)
-    // The extension lands inside the STORAGE KEY, and the key is what the RLS
-    // policy matches on — so it cannot be whatever the user's filename happened to
-    // end with. `photo.tar.gz` gave `gz`; a name ending in a 40-character token
-    // gave a 40-character extension. Clamp to a known image set, defaulting to the
-    // format the bytes are actually converted to below.
-    const raw = file.name.split(".").pop()?.toLowerCase()
-    const candidate = raw && raw !== file.name.toLowerCase() ? raw : ""
-    const ALLOWED_EXT = ["jpg", "jpeg", "png", "webp", "gif", "heic", "heif", "avif"]
-    const ext = ALLOWED_EXT.includes(candidate) ? candidate : "jpg"
+    setCropFile(file)
+  }
+
+  /**
+   * Store the bytes and repoint the profile at them.
+   *
+   * `ext` is what lands in the STORAGE KEY, and the key is what the RLS policy
+   * matches on — so it can never be whatever the user's filename happened to end
+   * with. `photo.tar.gz` gave `gz`; a name ending in a 40-character token gave a
+   * 40-character extension. The cropper's output is always JPEG, so the normal
+   * path passes "jpg"; the fallback path clamps to a known set.
+   */
+  async function uploadAvatar(uploadBody: Blob | File, uploadContentType: string, ext: string) {
+    setUploadingAvatar(true)
     const fileName = `${userId}.${ext}`
-    // Downscale to a 512px JPEG before upload; on decode failure keep the raw file.
-    // Path stays identical — Supabase serves the stored contentType, so a .png path
-    // holding JPEG bytes resolves correctly.
-    let uploadBody: Blob | File = file
-    let uploadContentType = file.type || "image/png"
-    try {
-      uploadBody = await downscaleToJpeg(file)
-      uploadContentType = "image/jpeg"
-    } catch {
-      uploadBody = file
-      uploadContentType = file.type || "image/png"
-    }
     const { data: uploadData, error } = await supabase.storage
       .from("profile-images")
       .upload(fileName, uploadBody, { upsert: true, contentType: uploadContentType })
-    if (error) { setAvatarError(error.message); setUploadingAvatar(false); e.target.value = ""; return }
+    if (error) { setAvatarError(error.message); setUploadingAvatar(false); return }
     if (uploadData) {
       const { data: { publicUrl } } = supabase.storage.from("profile-images").getPublicUrl(uploadData.path)
       // The stored path is `{userId}.{ext}`, so every upload overwrites the SAME
@@ -1420,14 +1418,34 @@ export function ProfileTab({
       if (pointerErr) {
         setAvatarError("Couldn't save your new photo. Please try again.")
         setUploadingAvatar(false)
-        e.target.value = ""
         return
       }
       setProfile(p => ({ ...p, avatar_url: versioned }))
       onAvatarChange?.(versioned)
     }
     setUploadingAvatar(false)
-    e.target.value = ""
+  }
+
+  /**
+   * The cropper could not decode the file — HEIC on a browser without a decoder is
+   * the realistic case. Rather than refuse the photo (a regression: this used to
+   * upload fine, just centre-cropped by CSS), fall back to the OLD path and say so.
+   */
+  async function uploadUncropped(file: File) {
+    const raw = file.name.split(".").pop()?.toLowerCase()
+    const candidate = raw && raw !== file.name.toLowerCase() ? raw : ""
+    const ALLOWED_EXT = ["jpg", "jpeg", "png", "webp", "gif", "heic", "heif", "avif"]
+    const ext = ALLOWED_EXT.includes(candidate) ? candidate : "jpg"
+    let body: Blob | File = file
+    let type = file.type || "image/png"
+    try {
+      body = await downscaleToJpeg(file)
+      type = "image/jpeg"
+    } catch {
+      body = file
+      type = file.type || "image/png"
+    }
+    await uploadAvatar(body, type, ext)
   }
 
   async function handleAvatarRemove() {
@@ -1702,7 +1720,7 @@ export function ProfileTab({
           <PocketCard padding="20px">
             <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
               <label className="group relative flex-shrink-0" style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
-                <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+                <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarPick} disabled={uploadingAvatar} />
                 {profile.avatar_url
                   ? <Image src={profile.avatar_url} alt="Profile" fill sizes="56px" style={{ objectFit: "cover" }} />
                   : <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--cream-on-dark)" }}>{getInitials(profile.name)}</span>
@@ -1855,7 +1873,7 @@ export function ProfileTab({
         <div className="hidden md:block px-14 pt-8">
           <div style={{ display: "flex", alignItems: "center", gap: 24, background: "var(--cream)", border: "1px solid var(--line)", borderRadius: "var(--r-card)", padding: "24px 28px" }}>
             <label className="group relative flex-shrink-0" style={{ width: 64, height: 64, borderRadius: "999px", background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
-              <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+              <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarPick} disabled={uploadingAvatar} />
               {profile.avatar_url
                 ? <Image src={profile.avatar_url} alt="Profile" fill sizes="64px" style={{ objectFit: "cover" }} />
                 : <span style={{ fontFamily: "var(--serif)", fontSize: 26, color: "var(--cream)" }}>{getInitials(profile.name)}</span>
@@ -1948,6 +1966,28 @@ export function ProfileTab({
           {renderProfileSections(true)}
         </div>
         )}
+
+      {/* Move-and-scale before the upload. Choosing a photo opens this; CONFIRM is
+          what stores anything. Rendered once for both viewports — the mobile and
+          desktop identity cards each have their own file input, but they both
+          just set `cropFile`. */}
+      {cropFile && (
+        <ImageCropper
+          file={cropFile}
+          busy={uploadingAvatar}
+          onCancel={() => setCropFile(null)}
+          onConfirm={async (blob) => {
+            await uploadAvatar(blob, "image/jpeg", "jpg")
+            setCropFile(null)
+          }}
+          onError={async (message) => {
+            const picked = cropFile
+            setCropFile(null)
+            setAvatarError(`${message.replace(/\.$/, "")} — we've used it as it is.`)
+            if (picked) await uploadUncropped(picked)
+          }}
+        />
+      )}
 
       {/* Class-chat move, offered after a graduation-year edit (see handleSave).
           ConfirmDialog rather than a bespoke panel — Convention #20 / hard-do-not
