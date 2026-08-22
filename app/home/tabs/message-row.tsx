@@ -1028,9 +1028,19 @@ function MessageRowBase({
           </div>
         )}
 
-        {/* Reactions */}
+        {/* Reactions — a badge that DIGS INTO the bubble (the Messenger shape).
+            Pulled up by 8px so it overlaps the bubble's bottom edge by roughly a
+            third of its own height, and ringed in the chat surface so the overlap
+            reads as one chip sitting ON the message rather than a pill fused to
+            it. `relative z-10` because the bubble is painted after this in the
+            column and would otherwise cover the part that overlaps.
+            The ring is a GAP IN THE SURFACE, not a border — the same technique
+            (and the same 2px) the avatar cluster uses between overlapping faces,
+            which is why it is exempt from the 1px hairline rule. It must stay the
+            colour of whatever is BEHIND the bubble, so it disappears into the
+            page instead of drawing a second outline. */}
         {!msg.deleted && rxGroups.length > 0 && (
-          <div className={`flex flex-wrap gap-1 mt-1 ${isOwn ? "pr-1" : "pl-9"}`}>
+          <div className={`relative z-10 flex flex-wrap gap-1 -mt-2 ${isOwn ? "pr-3" : "pl-11"}`}>
             {rxGroups.map(({ emoji, count, userReacted, userIds }) => (
               <button
                 key={emoji}
@@ -1046,7 +1056,7 @@ function MessageRowBase({
                 onBlur={() => setRxTip(null)}
                 aria-describedby={rxTip?.emoji === emoji ? rxTipId : undefined}
                 style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
-                className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[12px] transition-all active:scale-95 ${
+                className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[12px] transition-all active:scale-95 border-2 border-[var(--cream)] ${
                   userReacted
                     ? "bg-[var(--plum)]"
                     : "bg-[var(--ivory)]"
