@@ -5,10 +5,23 @@
 # governed by the ask-then-write rule instead: Claude may write it, but only after
 # Brian explicitly approves the exact text in that task (see orchestration SKILL.md
 # Step 5 and the Capture section of CLAUDE.md itself).
+#
+# permissions.md followed on 2026-08-22, on Brian's instruction and for the same
+# reason. The block never protected the CANON — it protected the keystrokes. What
+# actually keeps permissions.md honest is that a human reads the exact text before it
+# lands, and ask-then-write preserves that while dropping a copy-paste step; the diff
+# stays reviewable and revertable either way.
+#
+# THE RULE THAT REPLACES IT, and it is not optional: propose the exact wording, WAIT
+# for Brian to approve it in that task, then write it. A standing preference, an
+# earlier task's approval, or "he asked for the feature so he must want the doc line"
+# do not count. If the applied text has to differ from what was approved, re-ask.
+# MINISTRY_CONTEXT.md stays blocked — it is ministry vocabulary and workflow, which
+# Claude has no independent way to verify.
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 
-PROTECTED=("permissions.md" "MINISTRY_CONTEXT.md")
+PROTECTED=("MINISTRY_CONTEXT.md")
 
 # Match the exact repo-root file, not any path that merely ENDS in the name —
 # the old suffix match false-blocked e.g. a hypothetical docs/foo-permissions.md.
