@@ -1210,22 +1210,29 @@ export async function getMinistryCodes(ministryId: string): Promise<{
    *  instead of granting membership. The settings card has to say which, because the
    *  two behave completely differently for the person on the other end. */
   inviteCodeIsCustom: boolean
+  /** Whether every member may share the code, or only leaders. Read HERE rather than
+   *  from a client select: the column is deliberately ungranted to `authenticated`,
+   *  so naming it in a browser query would 403 the entire request. */
+  memberCanInvite: boolean
   error: string | null
 }> {
   const authz = await requireMinistryAdmin(ministryId)
-  if (authz.error !== null) return { inviteCode: null, staffInviteCode: null, inviteCodeIsCustom: false, error: authz.error }
+  if (authz.error !== null) return { inviteCode: null, staffInviteCode: null, inviteCodeIsCustom: false, memberCanInvite: true, error: authz.error }
 
   const admin = createAdminClient()
   const { data, error } = await admin
     .from("ministries")
-    .select("invite_code, staff_invite_code, invite_code_is_custom")
+    .select("invite_code, staff_invite_code, invite_code_is_custom, member_can_invite")
     .eq("id", ministryId)
     .maybeSingle()
-  if (error || !data) return { inviteCode: null, staffInviteCode: null, inviteCodeIsCustom: false, error: error?.message ?? "Ministry not found." }
+  if (error || !data) return { inviteCode: null, staffInviteCode: null, inviteCodeIsCustom: false, memberCanInvite: true, error: error?.message ?? "Ministry not found." }
   return {
     inviteCode: data.invite_code ?? null,
     staffInviteCode: data.staff_invite_code ?? null,
     inviteCodeIsCustom: data.invite_code_is_custom === true,
+    // Default TRUE on a null: members have been able to share since 2026-07-04, so an
+    // unset column must never read as "revoked".
+    memberCanInvite: data.member_can_invite !== false,
     error: null,
   }
 }

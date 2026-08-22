@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { mutate } from "swr"
+import useSWR, { mutate } from "swr"
 import { Copy, Check, QrCode, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen, Building2, Zap, MessageSquare, Flag, LayoutGrid, ScrollText, ListFilter } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
@@ -37,7 +37,7 @@ import type { GovernanceSettings } from "../types"
 import { getInitials, formatRelativeTime } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import { isLinkableCode, customCodeProblem, normalizeCustomCode, CUSTOM_CODE_MAX_LEN } from "@/lib/invite-code"
-import { setCustomInviteCode, listJoinRequests, decideJoinRequest, type JoinRequestRow } from "@/app/actions/join-requests"
+import { setCustomInviteCode, setMemberCanInvite, listJoinRequests, decideJoinRequest, type JoinRequestRow } from "@/app/actions/join-requests"
 import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, InviteShareModal, PocketKicker, PocketRowCard, PocketRow, PocketSwitch, PocketSheet, useScrollResetOn } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
@@ -342,10 +342,19 @@ export function SettingsTab({
   const [codeError, setCodeError] = useState<string | null>(null)
   const [savingCode, setSavingCode] = useState(false)
   const [confirmCustom, setConfirmCustom] = useState(false)
-  // The approval queue. Its SWR key is shared with the nav badge so approving or
-  // declining updates BOTH — a decided request that stays counted in the shell is the
-  // one thing that would make an admin distrust the number.
-  const [joinRequests, setJoinRequests] = useState<JoinRequestRow[]>([])
+  // Who may share the code. Staged behind Save like every other settings control
+  // (Convention #21) — this one decides whether every member keeps an access they
+  // have had since 2026-07-04, so it is not a thing to flip by brushing past it.
+  const [memberCanInvite, setMemberCanInviteState] = useState(true)
+  const [inviteShareEditing, setInviteShareEditing] = useState(false)
+  const [inviteShareDraft, setInviteShareDraft] = useState(true)
+  const [inviteShareSaving, setInviteShareSaving] = useState(false)
+  const [inviteShareSaved, setInviteShareSaved] = useState(false)
+  const [inviteShareError, setInviteShareError] = useState<string | null>(null)
+  // The approval queue. SWR rather than a fetch-in-an-effect: an effect that calls a
+  // loader which setStates is both a cascading render and a lint error, and the nav
+  // badge already reads this data through SWR — one mechanism, and approving
+  // revalidates BOTH keys, so a decided request cannot stay counted in the shell.
   const [decidingId, setDecidingId] = useState<string | null>(null)
 
   // Staff invite code
@@ -551,6 +560,7 @@ export function SettingsTab({
       setInviteCode(codesRes.inviteCode)
       setStaffCode(codesRes.staffInviteCode)
       setCodeIsCustom(codesRes.inviteCodeIsCustom)
+      setMemberCanInviteState(codesRes.memberCanInvite)
       if (min) {
         setMinistryInfo({ name: min.name, university: min.university, size: min.size })
         setIsPublic(min.is_public ?? false)
@@ -790,26 +800,45 @@ export function SettingsTab({
     setRegenerating(false)
   }
 
-  const refreshJoinRequests = useCallback(async () => {
-    if (!isAdmin) return
-    const { requests } = await listJoinRequests(ministryId)
-    setJoinRequests(requests)
-    // Same key the Church Settings nav badge reads.
-    void mutate(["join-request-count", ministryId])
-  }, [isAdmin, ministryId])
-
-  useEffect(() => { void refreshJoinRequests() }, [refreshJoinRequests])
+  const { data: joinReqRes, mutate: mutateJoinRequests } = useSWR(
+    isAdmin ? (["join-requests", ministryId] as const) : null,
+    () => listJoinRequests(ministryId),
+  )
+  const joinRequests: JoinRequestRow[] = joinReqRes?.requests ?? []
 
   async function decideRequest(requestId: string, approve: boolean) {
     setDecidingId(requestId)
     // Optimistic (Convention #4): the row leaves the list on tap. Deciding is a
     // conversational write, not a staged setting.
-    const snapshot = joinRequests
-    setJoinRequests((prev) => prev.filter((r) => r.id !== requestId))
+    const snapshot = joinReqRes
+    void mutateJoinRequests(
+      { requests: joinRequests.filter((r) => r.id !== requestId), error: null },
+      { revalidate: false },
+    )
     const { error } = await decideJoinRequest(ministryId, requestId, approve)
     setDecidingId(null)
-    if (error) { setJoinRequests(snapshot); return }
-    void refreshJoinRequests()
+    if (error) { void mutateJoinRequests(snapshot, { revalidate: false }); return }
+    void mutateJoinRequests()
+    // The nav badge's own key — the shell must not keep counting a decided request.
+    void mutate(["join-request-count", ministryId])
+  }
+
+  // ── Who may share the code ──────────────────────────────────────────────────
+  function startInviteShareEdit() {
+    setInviteShareDraft(memberCanInvite)
+    setInviteShareError(null)
+    setInviteShareEditing(true)
+  }
+  const inviteShareDirty = inviteShareDraft !== memberCanInvite
+  async function saveInviteShare() {
+    setInviteShareSaving(true)
+    setInviteShareError(null)
+    const { error } = await setMemberCanInvite(ministryId, inviteShareDraft)
+    setInviteShareSaving(false)
+    if (error) { setInviteShareError(error); return }
+    setMemberCanInviteState(inviteShareDraft)
+    setInviteShareEditing(false)
+    flashSaved(setInviteShareSaved)
   }
 
   // ── Custom code ─────────────────────────────────────────────────────────────
@@ -843,7 +872,7 @@ export function SettingsTab({
     setCodeIsCustom(true)
     setEditingCode(false)
     setConfirmCustom(false)
-    void refreshJoinRequests()
+    void mutateJoinRequests()
   }
 
   function copyStaffCode() {
@@ -2196,7 +2225,7 @@ export function SettingsTab({
                         for one would print a QR that the invite route refuses — the leader
                         would find out from a room full of students, not from us. */}
                     {isLinkableCode(inviteCode) ? (
-                      <button onClick={() => setShareOpen(true)} style={{ marginTop: 12, padding: 0, background: "none", border: "none", color: "var(--plum)", fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <button onClick={() => setShareOpen(true)} style={{ marginTop: 12, marginRight: 16, padding: 0, background: "none", border: "none", color: "var(--plum)", fontSize: 13, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
                         <QrCode style={{ width: 13, height: 13 }} /> Share link or QR
                       </button>
                     ) : inviteCode ? (
@@ -2307,6 +2336,49 @@ export function SettingsTab({
                     </div>
                   )}
                 </div>
+
+                {/* Who may share the code. Sits between the codes and the queue because
+                    it is about the codes above it, not about the people below. */}
+                {isAdmin && (
+                  <div style={{ marginTop: 26 }}>
+                    <div style={{ marginBottom: 16 }}>
+                      <SectionHeader eyebrow="Sharing" title="Who can invite" titleSize={20} hideTitleOnMobile action={
+                        <SectionEditControls
+                          editing={inviteShareEditing} dirty={inviteShareDirty} saving={inviteShareSaving}
+                          saved={inviteShareSaved} disabled={!isAdmin}
+                          onEdit={startInviteShareEdit}
+                          onCancel={() => { setInviteShareEditing(false); setInviteShareError(null) }}
+                          onSave={saveInviteShare}
+                        />
+                      } />
+                    </div>
+                    {(() => {
+                      const shown = inviteShareEditing ? inviteShareDraft : memberCanInvite
+                      return (
+                        <div className={CARD_CLS} style={{ ...CARD, padding: "20px 22px", display: "flex", alignItems: "flex-start", gap: 16 }}>
+                          <InCardToggle on={shown} locked={!inviteShareEditing} onToggle={() => setInviteShareDraft(v => !v)} />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Anyone can invite</div>
+                            <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
+                              {shown
+                                ? "Every member can share the join code, link and QR from their Home tab."
+                                : "Only leaders can share the join code. Members won't see it."}
+                            </div>
+                            {/* The consequence depends on which KIND of code is live, and
+                                the two are not close: a custom code produces requests you
+                                approve, a generated one hands out membership. */}
+                            <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5 }}>
+                              {codeIsCustom
+                                ? "Your code is a custom one, so anyone they share it with asks to join and you approve them."
+                                : "Your code is a random one, so anyone they share it with joins straight away. Choose your own code above if you'd rather approve people first."}
+                            </div>
+                            {inviteShareError && <div style={{ marginTop: 6, fontSize: 12, color: "var(--danger)" }}>{inviteShareError}</div>}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                )}
 
                 {/* People waiting to join — only ever populated for a ministry running a
                     custom code, since a generated one still grants membership outright.
