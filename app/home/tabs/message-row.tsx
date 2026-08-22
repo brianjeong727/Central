@@ -21,11 +21,25 @@ export function LazyEmojiPicker({
   theme = "light",
   previewPosition = "none",
   skinTonePosition = "none",
+  perLine,
 }: {
   onEmojiSelect: (e: { native: string }) => void
   theme?: string
   previewPosition?: string
   skinTonePosition?: string
+  /**
+   * Emoji columns. emoji-mart derives its WIDTH from this (≈ perLine × 36 + chrome),
+   * so it is how the message-row picker fits a narrow phone: at the default 9 the
+   * picker is a fixed 352px, wider than the transcript column on a 375 or 320
+   * device, and 48px of it hung off the left edge.
+   *
+   * `dynamicWidth` was the obvious alternative and it does not work here: it makes
+   * emoji-mart MEASURE its container, and the container is an absolutely-positioned
+   * div whose width arrives a commit later — it latched onto the empty box and
+   * rendered a 190px picker inside a 352px wrapper. Deriving the columns ourselves
+   * has no measurement race in it.
+   */
+  perLine?: number
 }) {
   const [emojiData, setEmojiData] = useState<unknown>(null)
   useEffect(() => {
@@ -52,8 +66,19 @@ export function LazyEmojiPicker({
       theme={theme}
       previewPosition={previewPosition}
       skinTonePosition={skinTonePosition}
+      {...(perLine ? { perLine } : {})}
     />
   )
+}
+
+/**
+ * Emoji columns that will fit `maxW`. emoji-mart's own default is 9, which renders
+ * a 352px picker — fine at 390 and up, 9px too wide at 375, and 64px too wide at
+ * 320. ~36px per emoji button plus ~28px of picker chrome (its padding and the
+ * scrollbar gutter); floored at 6 so it stays a grid rather than a column.
+ */
+function emojiPerLine(maxW: number): number {
+  return Math.max(6, Math.min(9, Math.floor((maxW - 28) / 36)))
 }
 
 export function formatFileSize(bytes: number): string {
@@ -164,7 +189,13 @@ function MessageRowBase({
   // near the top of the scroll viewport. Runs in useLayoutEffect (before
   // paint) so the menu paints in its final position — no visible flicker.
   const menuRef = useRef<HTMLDivElement>(null)
-  const [placeBelow, setPlaceBelow] = useState(false)
+  // Where the open menu goes AND how big it may be. Position alone was not enough:
+  // the old effect only asked "does ABOVE clip the top?" and flipped below if so,
+  // never checking whether BELOW clips the bottom — so the 435px reaction picker
+  // ran 51px off the foot of a 390×844 screen from a mid-transcript message, and
+  // 85px behind the keyboard from a message near the top. Measured, not guessed.
+  const [menuBox, setMenuBox] = useState<{ below: boolean; maxH: number; maxW: number } | null>(null)
+  const placeBelow = menuBox?.below ?? false
   const [confirmDeletePoll, setConfirmDeletePoll] = useState(false)
   // Tap an incoming sender's name/avatar → open their profile (global overlay).
   // Context read bypasses the memo boundary; the opener is stable, so this never
@@ -196,25 +227,58 @@ function MessageRowBase({
   const anyMenuOpen = isEmojiPickerOpen || isFullPickerOpen || isContextMenuOpen
   useLayoutEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- measured-placement reset; behavior-frozen (Convention #7), fix deferred
-    if (!anyMenuOpen) { setPlaceBelow(false); return }
+    if (!anyMenuOpen) { setMenuBox(null); return }
     const menuEl = menuRef.current
     const wrapper = menuEl?.parentElement            // the `flex flex-col relative` message wrapper
     if (!menuEl || !wrapper) return
     const measure = () => {
-      // nearest scrollable ancestor = the messages scroll container (its top edge is the clip line under the header)
+      // Nearest scrollable ancestor = the messages scroll container. Its box IS the
+      // budget, on both axes: its top edge is the clip line under the header, and
+      // its BOTTOM already rises with the software keyboard (the chat surface is
+      // `.kb-lift`, Convention #28), so measuring the container needs no separate
+      // keyboard arithmetic — one measurement covers both states.
       let c: HTMLElement | null = wrapper
       while (c) { const oy = getComputedStyle(c).overflowY; if (oy === "auto" || oy === "scroll") break; c = c.parentElement }
-      const containerTop = c ? c.getBoundingClientRect().top : 0
-      const wrapperTop = wrapper.getBoundingClientRect().top
-      const menuHeight = menuEl.getBoundingClientRect().height
-      // Placement-INDEPENDENT test (uses height + message top, NOT the menu's own top, so it can't oscillate):
-      // above-placement puts the menu top at ~ wrapperTop - 4 - menuHeight. Flip below if that clips the container top.
-      setPlaceBelow((wrapperTop - 4 - menuHeight) < (containerTop + 8))
+      const box = c ? c.getBoundingClientRect() : new DOMRect(0, 0, window.innerWidth, window.innerHeight)
+      const w = wrapper.getBoundingClientRect()
+      const GAP = 8
+      const roomAbove = Math.max(0, w.top - box.top - GAP)
+      const roomBelow = Math.max(0, box.bottom - w.bottom - GAP)
+      // `scrollHeight` of the CONTENT, never the rendered height: the wrapper below
+      // carries the `maxHeight` this computes, so reading its rect would feed the
+      // clamp back into its own input and let the two oscillate.
+      const natural = menuEl.scrollHeight
+      // Prefer ABOVE (iMessage's grammar, and it keeps the message itself in view);
+      // fall to BELOW only when above cannot hold it; if neither can, take the
+      // roomier side and let the clamp scroll.
+      const below = natural <= roomAbove ? false : natural <= roomBelow ? true : roomBelow > roomAbove
+      setMenuBox({
+        below,
+        // The REAL room, with no minimum. A floor was tried (120px) and it is
+        // exactly the thing this effect exists to prevent: on a 375×667 with the
+        // keyboard up the transcript is ~205px tall, the room above a mid-message
+        // is ~88, and the floor pushed the menu 32px off the top of it. A cramped
+        // menu that scrolls is strictly better than a roomy one you cannot see.
+        maxH: below ? roomBelow : roomAbove,
+        // The content column is the horizontal budget. The reaction picker is a
+        // fixed 352px wide, which is WIDER than the column on a 320 or 375 device —
+        // 48px of it hung off the left edge, and since the transcript clips
+        // horizontally it was silently cut rather than merely overflowing.
+        maxW: Math.max(0, w.width),
+      })
     }
     measure()
-    // Re-measure if the menu's height changes after mount (e.g. the lazy full picker finishing load).
+    // Re-measure if the menu's height changes after mount (e.g. the lazy full picker
+    // finishing load) — AND if the CONTAINER changes, which is what happens when the
+    // software keyboard opens or closes under an already-open menu. Without the
+    // second observation the menu keeps the verdict it was born with: open the
+    // keyboard while a menu is up and the transcript halves beneath it, leaving the
+    // menu hanging behind the keys with nothing to correct it.
     const ro = new ResizeObserver(measure)
     ro.observe(menuEl)
+    let scroller: HTMLElement | null = wrapper
+    while (scroller) { const oy = getComputedStyle(scroller).overflowY; if (oy === "auto" || oy === "scroll") break; scroller = scroller.parentElement }
+    if (scroller) ro.observe(scroller)
     return () => ro.disconnect()
     // Depend on WHICH menu is open, not merely whether one is. `anyMenuOpen` stays
     // true across emoji-bar → full-picker (the bar closes as the picker opens), so
@@ -656,7 +720,8 @@ function MessageRowBase({
         {isEmojiPickerOpen && (
           <div
             ref={menuRef}
-            className={`absolute z-[160] ${placeBelow ? "top-[calc(100%-4px)]" : "bottom-[calc(100%-4px)]"} ${isOwn ? "right-0" : "left-0"}`}
+            className={`msg-menu-clamp absolute z-[160] ${placeBelow ? "top-[calc(100%-4px)]" : "bottom-[calc(100%-4px)]"} ${isOwn ? "right-0" : "left-0"}`}
+            style={menuBox ? { maxHeight: menuBox.maxH, maxWidth: menuBox.maxW, overflowY: "auto" } : undefined}
             onPointerDown={(e) => e.stopPropagation()}
           >
             <div className="bg-[var(--ivory)] rounded-2xl px-3 py-2.5 flex gap-3 items-center">
@@ -686,10 +751,22 @@ function MessageRowBase({
         {isFullPickerOpen && (
           <div
             ref={menuRef}
-            className={`absolute z-[161] ${placeBelow ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
+            className={`msg-menu-clamp absolute z-[161] ${placeBelow ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
+            style={menuBox
+              ? { maxWidth: menuBox.maxW, maxHeight: menuBox.maxH, overflowY: "auto", borderRadius: 12 }
+              : undefined}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <LazyEmojiPicker onEmojiSelect={(e: { native: string }) => { onReact(msg.id, e.native); setFullReactionPickerFor(null) }} />
+            {/* Mounted only once the box is measured, so emoji-mart is built with
+                the right column count the first time — it sizes itself on mount and
+                does not resize afterwards. useLayoutEffect fills `menuBox` before
+                paint, so this costs no visible delay. */}
+            {menuBox && (
+              <LazyEmojiPicker
+                perLine={emojiPerLine(menuBox.maxW)}
+                onEmojiSelect={(e: { native: string }) => { onReact(msg.id, e.native); setFullReactionPickerFor(null) }}
+              />
+            )}
           </div>
         )}
 
@@ -697,7 +774,8 @@ function MessageRowBase({
         {isContextMenuOpen && (
           <div
             ref={menuRef}
-            className={`absolute z-[160] ${placeBelow ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
+            className={`msg-menu-clamp absolute z-[160] ${placeBelow ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
+            style={menuBox ? { maxHeight: menuBox.maxH, maxWidth: menuBox.maxW, overflowY: "auto", borderRadius: 16 } : undefined}
             onPointerDown={(e) => e.stopPropagation()}
           >
             <div className="bg-[var(--ivory)] rounded-2xl overflow-hidden min-w-[160px]">
