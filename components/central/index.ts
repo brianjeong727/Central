@@ -84,4 +84,5 @@ export {
   PocketFilterChipRow,
 } from "./pocket"
 export { ChatAvatar, chatAvatarLabel, type ChatAvatarMember } from "./chat-avatar"
+export { ImageCropper } from "./image-cropper"
 export { InviteShareModal } from "./invite-share-modal"
