@@ -319,7 +319,6 @@ export interface MessageRowProps {
   showGroupGap: boolean
   senderDeparted: boolean
   userId: string
-  canPin: boolean
   isAdminOrLeader: boolean
   // Per-row booleans (never the shared open-id — keeps React.memo effective)
   isEmojiPickerOpen: boolean
@@ -356,11 +355,6 @@ export interface MessageRowProps {
   onDeleteMessage: (msgId: string) => void
   onDeletePoll: (msgId: string, pollId: string) => void
   onSaveEdit: () => void
-  onStartEdit: (msg: Message) => void
-  onForward: (msg: Message) => void
-  onReport: (msg: Message) => void
-  onPin: (msgId: string) => void
-  onUnpin: () => void
   onScrollToMessage: (id: string) => void
   onOpenVoteSheet: (pollId: string, hasVoted: boolean) => void
   /** TOUCH only: long-press on a reaction pill → open the "who reacted" sheet for
@@ -374,7 +368,6 @@ export interface MessageRowProps {
   resolveReactorName?: (userId: string) => string | null
   setEmojiPickerFor: (id: string | null) => void
   setFullReactionPickerFor: (id: string | null) => void
-  setContextMenuFor: (id: string | null) => void
   setDeletingId: (id: string | null) => void
   setEditingId: (id: string | null) => void
   setEditText: (text: string) => void
