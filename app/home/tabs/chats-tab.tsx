@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from "react"
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, useSyncExternalStore } from "react"
 import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { BellOff, Camera, Check, FileDown, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Pin, Plus, Search, Trash2, User, Users, X } from "lucide-react"
+import { BellOff, Camera, Check, CornerUpLeft, FileDown, Flag, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Pin, Plus, Search, Trash2, User, Users, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -12,10 +12,10 @@ import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames"
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
-import { ConfirmDialog, MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, PocketSheet, ChatAvatar, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE } from "@/components/central"
+import { ConfirmDialog, MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, PocketSheet, ChatAvatar, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE, MessageMenuOverlay, type MessageMenuAction } from "@/components/central"
 import { getOrCreateDm } from "../dm"
 import { isMobileViewport } from "@/lib/breakpoints"
-import { getInitials, formatRelativeTime, replyPreviewLabel } from "../utils"
+import { getInitials, formatRelativeTime, replyPreviewLabel, REACTION_EMOJIS } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData, ChatNotifyMode, NotificationSettings } from "../types"
 import { useOpenMemberProfile } from "../member-profile-context"
@@ -2110,6 +2110,45 @@ const sameMinute = (a: Message, b: Message) =>
 // conversation collapses into one write instead of one per message.
 const READ_COALESCE_MS = 4000
 
+/**
+ * Resolves the pressed bubble and hands it to the immersive menu.
+ *
+ * The overlay needs the real DOM node — it measures it and clones it — but a
+ * React render must not go looking in the document. So the lookup happens in a
+ * layout effect and the overlay mounts on the frame after, which is also when
+ * the row has already been re-rendered with its original hidden.
+ */
+function MessageMenuMount({
+  messageId, align, onReact, onMoreReactions, actions, onClose,
+}: {
+  messageId: string
+  align: "left" | "right"
+  onReact: (emoji: string) => void
+  onMoreReactions: () => void
+  actions: MessageMenuAction[]
+  onClose: () => void
+}) {
+  const [el, setEl] = useState<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    // CSS.escape: message ids are uuids today, but a selector built from data is
+    // a selector waiting to be broken by the first id that isn't.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the node can only be found AFTER the row has rendered; there is no render-time answer
+    setEl(document.querySelector<HTMLElement>(`[data-message-bubble="${CSS.escape(messageId)}"]`))
+  }, [messageId])
+  if (!el) return null
+  return (
+    <MessageMenuOverlay
+      anchorEl={el}
+      align={align}
+      reactions={REACTION_EMOJIS}
+      onReact={onReact}
+      onMoreReactions={onMoreReactions}
+      actions={actions}
+      onClose={onClose}
+    />
+  )
+}
+
 export function ChatScreen({ groupId, groupName, userId, userName, ministryId, ministryName, userRole, onClose, onRead, onNameChange, inline = false, draftRecipient = null, onDmCreated, onOpenChat }: ChatScreenProps) {
   // Draft DM (no group yet). Guards the create so a double-tap on Send can't
   // race two groups into existence.
@@ -3986,7 +4025,6 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   showGroupGap={isFirstInGroup && i > 0 && !showDateSep}
                   senderDeparted={!!(msg.sender_id && departedIds.has(msg.sender_id))}
                   userId={userId}
-                  canPin={canPin}
                   isAdminOrLeader={canModerate}
                   isEmojiPickerOpen={emojiPickerFor === msg.id}
                   isFullPickerOpen={fullReactionPickerFor === msg.id}
@@ -4017,18 +4055,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   onDeleteMessage={handleDeleteMessage}
                   onDeletePoll={handleDeletePoll}
                   onSaveEdit={handleEditMessage}
-                  onStartEdit={startEdit}
-                  onForward={openForwardSheet}
-                  onReport={setReportingMsg}
-                  onPin={handlePin}
-                  onUnpin={handleUnpin}
                   onScrollToMessage={scrollToMessage}
                   onOpenVoteSheet={openVoteSheet}
                   onShowReactors={handleShowReactors}
                   resolveReactorName={resolveReactorName}
                   setEmojiPickerFor={setEmojiPickerFor}
                   setFullReactionPickerFor={setFullReactionPickerFor}
-                  setContextMenuFor={setContextMenuFor}
                   setDeletingId={setDeletingId}
                   setEditingId={setEditingId}
                   setEditText={setEditText}
@@ -4386,6 +4418,35 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       )}
 
       {/* Report message (§1.2) */}
+      {/* Immersive long-press menu. ONE mount for the whole transcript, not one
+          per row: it portals to the body so it can dim and blur everything behind
+          it, which an element inside the scroll container cannot do. */}
+      {contextMenuFor && (() => {
+        const m = messages.find((x) => x.id === contextMenuFor)
+        if (!m || m.deleted) return null
+        const own = m.sender_id === userId
+        const acts: MessageMenuAction[] = []
+        acts.push({ key: "reply", label: "Reply", icon: <CornerUpLeft className="w-4 h-4" />, onSelect: () => setReplyingTo(m) })
+        acts.push({ key: "forward", label: "Forward", icon: <Forward className="w-4 h-4" />, onSelect: () => openForwardSheet(m) })
+        if (!own) acts.push({ key: "report", label: "Report", icon: <Flag className="w-4 h-4" />, onSelect: () => setReportingMsg(m) })
+        if (canPin) {
+          const pinned = pinnedMessageId === m.id
+          acts.push({ key: "pin", label: pinned ? "Unpin" : "Pin", icon: <Pin className="w-4 h-4" />, onSelect: () => (pinned ? handleUnpin() : handlePin(m.id)) })
+        }
+        if (own && m.content) acts.push({ key: "edit", label: "Edit", icon: <Pencil className="w-4 h-4" />, onSelect: () => startEdit(m) })
+        if (own) acts.push({ key: "delete", label: "Delete", icon: <Trash2 className="w-4 h-4" />, danger: true, onSelect: () => setDeletingId(m.id) })
+        return (
+          <MessageMenuMount
+            messageId={m.id}
+            align={own ? "right" : "left"}
+            onReact={(emoji) => handleReact(m.id, emoji)}
+            onMoreReactions={() => setFullReactionPickerFor(m.id)}
+            actions={acts}
+            onClose={() => setContextMenuFor(null)}
+          />
+        )
+      })()}
+
       {reportingMsg && (
         <ReportModal
           targetType="message"

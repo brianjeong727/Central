@@ -85,4 +85,5 @@ export {
 } from "./pocket"
 export { ChatAvatar, chatAvatarLabel, type ChatAvatarMember } from "./chat-avatar"
 export { ImageCropper } from "./image-cropper"
+export { MessageMenuOverlay, resolveLayout, type MessageMenuAction } from "./message-menu-overlay"
 export { InviteShareModal } from "./invite-share-modal"

@@ -3,7 +3,7 @@
 import { memo, useId, useState, useEffect, useRef, useLayoutEffect } from "react"
 import { createPortal } from "react-dom"
 import dynamic from "next/dynamic"
-import { Check, MoreHorizontal, Trash2, CornerUpLeft, Plus, Pencil, Forward, Pin, FileDown, Flag } from "lucide-react"
+import { Check, MoreHorizontal, Trash2, CornerUpLeft, Plus, Forward, Pin, FileDown } from "lucide-react"
 import { MonogramChip, ConfirmDialog, useSwipeToReply } from "@/components/central"
 import { formatMessageTime, REACTION_EMOJIS } from "../utils"
 import { useOpenMemberProfile } from "../member-profile-context"
@@ -135,7 +135,6 @@ function MessageRowBase({
   userId,
   ministryId,
   onOpenChat,
-  canPin,
   isAdminOrLeader,
   isEmojiPickerOpen,
   isFullPickerOpen,
@@ -166,18 +165,12 @@ function MessageRowBase({
   onDeleteMessage,
   onDeletePoll,
   onSaveEdit,
-  onStartEdit,
-  onForward,
-  onReport,
-  onPin,
-  onUnpin,
   onScrollToMessage,
   onOpenVoteSheet,
   onShowReactors,
   resolveReactorName,
   setEmojiPickerFor,
   setFullReactionPickerFor,
-  setContextMenuFor,
   setDeletingId,
   setEditingId,
   setEditText,
@@ -224,7 +217,10 @@ function MessageRowBase({
       },
     },
   )
-  const anyMenuOpen = isEmojiPickerOpen || isFullPickerOpen || isContextMenuOpen
+  // The long-press menu is no longer one of these — it is the portaled overlay,
+  // which does its own placement against the VIEWPORT rather than against this
+  // scroll container. Only the tap emoji bar and the full picker are placed here.
+  const anyMenuOpen = isEmojiPickerOpen || isFullPickerOpen
   useLayoutEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- measured-placement reset; behavior-frozen (Convention #7), fix deferred
     if (!anyMenuOpen) { setMenuBox(null); return }
@@ -286,7 +282,7 @@ function MessageRowBase({
     // while the ResizeObserver was still watching the DETACHED bar, and placeBelow
     // kept the ~44px bar's verdict. The 435px picker then rendered above a message
     // 204px down and 235px of it sat off the top of the screen, unreachable.
-  }, [anyMenuOpen, isEmojiPickerOpen, isFullPickerOpen, isContextMenuOpen])
+  }, [anyMenuOpen, isEmojiPickerOpen, isFullPickerOpen])
 
   const groupGap = showGroupGap ? "mt-3" : ""
 
@@ -771,94 +767,14 @@ function MessageRowBase({
         )}
 
         {/* Context menu */}
-        {isContextMenuOpen && (
-          <div
-            ref={menuRef}
-            className={`msg-menu-clamp absolute z-[160] ${placeBelow ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]"} ${isOwn ? "right-0" : "left-0"}`}
-            style={menuBox ? { maxHeight: menuBox.maxH, maxWidth: menuBox.maxW, overflowY: "auto", borderRadius: 16 } : undefined}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <div className="bg-[var(--ivory)] rounded-2xl overflow-hidden min-w-[160px]">
-              {!msg.deleted && (
-                <div className="flex gap-3 items-center px-3 py-2.5 border-b border-[var(--line-3)]">
-                  {REACTION_EMOJIS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={(e) => { e.stopPropagation(); onReact(msg.id, emoji); setContextMenuFor(null) }}
-                      className="text-[20px] hover:scale-125 active:scale-95 transition-transform"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                  <button
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setFullReactionPickerFor(msg.id) }}
-                    className="w-9 h-9 rounded-full bg-[var(--line-2)] flex items-center justify-center text-[var(--body)] hover:bg-[var(--line)] transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-              <button
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setReplyingTo(msg) }}
-                className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--line-3)] active:bg-[var(--line-2)] transition-colors border-b border-[var(--line-3)]"
-              >
-                <CornerUpLeft className="w-4 h-4 text-[var(--body)]" />
-                Reply
-              </button>
-              <button
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => { e.stopPropagation(); onForward(msg) }}
-                className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--line-3)] active:bg-[var(--line-2)] transition-colors border-b border-[var(--line-3)]"
-              >
-                <Forward className="w-4 h-4 text-[var(--body)]" />
-                Forward
-              </button>
-              {!isOwn && !msg.deleted && (
-                <button
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); onReport(msg) }}
-                  className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--line-3)] active:bg-[var(--line-2)] transition-colors border-b border-[var(--line-3)]"
-                >
-                  <Flag className="w-4 h-4 text-[var(--body)]" />
-                  Report
-                </button>
-              )}
-              {!msg.deleted && canPin && (
-                <button
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => { e.stopPropagation(); isPinned ? onUnpin() : onPin(msg.id) }}
-                  className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--line-3)] active:bg-[var(--line-2)] transition-colors border-b border-[var(--line-3)]"
-                >
-                  <Pin className="w-4 h-4 text-[var(--body)]" />
-                  {isPinned ? "Unpin" : "Pin"}
-                </button>
-              )}
-              {isOwn && !msg.deleted && msg.content && (
-                <button
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => { e.stopPropagation(); onStartEdit(msg) }}
-                  className="w-full text-left px-4 py-3 text-[14px] text-[var(--ink)] flex items-center gap-2.5 hover:bg-[var(--line-3)] active:bg-[var(--line-2)] transition-colors border-b border-[var(--line-3)]"
-                >
-                  <Pencil className="w-4 h-4 text-[var(--body)]" />
-                  Edit
-                </button>
-              )}
-              {isOwn && !msg.deleted && (
-                <button
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => { e.stopPropagation(); setContextMenuFor(null); setDeletingId(msg.id) }}
-                  className="w-full text-left px-4 py-3 text-[14px] text-[var(--danger)] flex items-center gap-2.5 hover:bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] active:bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+        {/* The long-press menu is NOT here any more. It lives in the portaled
+            MessageMenuOverlay that ChatScreen mounts (components/central), because
+            an anchored menu inside this row is inside the transcript's own scroll
+            container: it cannot dim what surrounds it, it can be clipped by that
+            container, and near the top or bottom of the screen it has nowhere to
+            go. `isContextMenuOpen` still arrives as a prop — it is what dims THIS
+            row's original bubble while its clone is lifted out (see the bubble's
+            `visibility` above). */}
 
         {/* Pinned indicator */}
         {isPinned && (
@@ -946,7 +862,11 @@ function MessageRowBase({
             onPointerCancel={onPointerCancel}
             // pan-y leaves vertical scrolling and pull-to-refresh entirely to the
             // browser — the swipe only ever claims a horizontal drag.
-            style={{ touchAction: "pan-y" }}
+            // While the immersive menu is up, the ORIGINAL is hidden and its clone
+            // in the overlay stands in for it. `visibility`, not `display`: the row
+            // must keep its height or the transcript reflows underneath the menu and
+            // the bubble the user is looking at appears to jump when it closes.
+            style={{ touchAction: "pan-y", visibility: isContextMenuOpen ? "hidden" : undefined }}
             className={`relative text-[14px] leading-[1.4] select-none overflow-hidden ${
               isJumbo
                 // No surface, no padding, no radius — the emoji IS the message.
