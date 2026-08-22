@@ -16,6 +16,11 @@ import { sandbox } from "./fixtures"
 
 loadEnv()
 
+// LOGGED OUT, explicitly. The chromium project ships `storageState: ADMIN_STATE`,
+// so without this every test here starts as the E2E admin — /login then bounces
+// straight past the form and `fill` waits forever for a field that is not there.
+test.use({ storageState: { cookies: [], origins: [] } })
+
 const PASSWORD = "e2e-Nomin!stry-2026"
 
 async function signIn(page: Page, email: string, password: string) {
@@ -29,6 +34,9 @@ async function signIn(page: Page, email: string, password: string) {
 }
 
 test.describe("register-ministry with no ministry", () => {
+  // Signing in for real, twice per test, on a dev server that may still be
+  // compiling the route — the 30s default is not enough for the first one.
+  test.describe.configure({ timeout: 120_000 })
   let userId = ""
   const email = `e2e.nomin.${Date.now()}@test.com`
 
