@@ -41,6 +41,15 @@ const PROFILE_SCRUB: Record<string, unknown> = {
   bible_verse: null,
   favorite_verse: null,
   favorite_worship_song: null,
+  // Profile v2 (2026-08-22). `phone`, `about_me`, `bio`, `prayer_request`,
+  // `pray_for_me`, `testimony` and `favorite_book_of_bible` were dropped from the
+  // table — listing them here would make the scrub UPDATE reference columns that
+  // no longer exist, and PostgREST rejects the whole statement, which would have
+  // broken account deletion outright. The type here is Record<string, unknown>,
+  // so nothing but this note and the migration keeps the two in step.
+  major: null,
+  stage: null,
+  hometown: null,
   gender: null,
   graduation_year: null,
   grade: null,

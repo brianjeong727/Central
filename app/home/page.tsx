@@ -45,10 +45,10 @@ export default async function HomePage({
   if (user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) redirect("/admin")
 
   // Boot-slim: fetch only columns the shell + tabs actually consume off initialProfile.
-  // Dropped about_me/bible_verse/pray_for_me — the directory reads its OWN fetched member
-  // detail, and nothing reads these off the boot profile (null-backfilled below to satisfy
-  // the Profile type). prayer_request stays: ProfileTab seeds its edit form from it and
-  // never refetches. Other fat fields (testimony/bio/favorite_*) were never in this select.
+  // The Profile-v2 identity fields (major/stage/hometown/favorite_*) are deliberately
+  // NOT here — ProfileTab seeds its own form from them, so they would be boot weight
+  // for a screen most sessions never open. `bible_verse` is null-backfilled below to
+  // satisfy the Profile type, same as it always was.
   const { data: profile } = await supabase
     .from("profiles")
     .select("id, name, email, graduation_year, grade, needs_grad_check, role, ministry_id, avatar_url, school_id, seen_workspace_nav_hint, grad_prompt_dismissed, compact_sidebar, open_groups_card_dismissed, notification_settings")
@@ -171,10 +171,10 @@ export default async function HomePage({
 
   const initialHasResponded = !!respondedResult.data
 
-  // Null-backfill the boot-dropped fat columns (about_me/bible_verse/pray_for_me) so the
-  // Profile shape stays complete for consumers/typing even though the shell never reads them.
+  // Null-backfill the boot-dropped column so the Profile shape stays complete for
+  // consumers/typing even though the shell never reads it.
   const safeProfile = profile
-    ? { ...profile, about_me: null, bible_verse: null, pray_for_me: null }
+    ? { ...profile, bible_verse: null }
     : {
         id: user.id,
         name: user.email?.split("@")[0] ?? "Member",
@@ -183,10 +183,7 @@ export default async function HomePage({
         grade: null,
         needs_grad_check: false,
         role: "member",
-        about_me: null,
         bible_verse: null,
-        prayer_request: null,
-        pray_for_me: null,
         ministry_id: null,
         avatar_url: null,
         school_id: null,

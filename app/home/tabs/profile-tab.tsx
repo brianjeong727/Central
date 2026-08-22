@@ -772,7 +772,18 @@ export function JournalSection({
 
 // ── Profile field config ──────────────────────────────────────────────────────
 
-type ProfileDraftField = "name" | "graduation_year" | "favorite_verse" | "favorite_worship_song"
+// Profile v2 (cdesign "Profile Prototype v2", 2026-08-22). The profile is a short,
+// fully PUBLIC identity card, which is the reason for the shape of this list: every
+// long-form or contact field is gone (`bio`, `testimony`, `prayer_request`,
+// `pray_for_me`, `about_me`, `phone`, `favorite_book_of_bible` were dropped from the
+// table — all of them held zero non-empty values across 502 live profiles). What is
+// left is what a congregation can usefully know about someone at a glance.
+//
+// The verse is a PAIR: `favorite_verse` is the reference, `bible_verse` is the words.
+type ProfileDraftField =
+  | "name" | "graduation_year"
+  | "major" | "stage" | "hometown"
+  | "favorite_verse" | "bible_verse" | "favorite_worship_song"
 
 const PROFILE_SECTIONS: {
   id: string
@@ -780,16 +791,13 @@ const PROFILE_SECTIONS: {
   fields: { key: ProfileDraftField; label: string; placeholder: string; multiline: boolean; inputType?: string }[]
 }[] = [
   {
-    id: "contact",
-    label: "Contact",
-    fields: [
-      { key: "graduation_year", label: "Graduation year", placeholder: "e.g. 2027", multiline: false, inputType: "number" },
-    ],
-  },
-  {
     id: "about",
     label: "About",
     fields: [
+      { key: "graduation_year", label: "Graduation year", placeholder: "e.g. 2027", multiline: false, inputType: "number" },
+      { key: "major", label: "Studying", placeholder: "Your major", multiline: false },
+      { key: "stage", label: "Stage", placeholder: "Student or young adult", multiline: false },
+      { key: "hometown", label: "From", placeholder: "Where you grew up", multiline: false },
     ],
   },
   {
@@ -797,13 +805,8 @@ const PROFILE_SECTIONS: {
     label: "Faith",
     fields: [
       { key: "favorite_verse", label: "Favorite verse", placeholder: "e.g. Philippians 4:13", multiline: false },
-      { key: "favorite_worship_song", label: "Favorite worship song", placeholder: "A song that moves you", multiline: false },
-    ],
-  },
-  {
-    id: "prayer",
-    label: "Prayer",
-    fields: [
+      { key: "bible_verse", label: "The words", placeholder: "Add the words, so people see why it stayed with you.", multiline: true },
+      { key: "favorite_worship_song", label: "Worship song", placeholder: "A song that moves you", multiline: false },
     ],
   },
 ]
@@ -1181,7 +1184,11 @@ export function ProfileTab({
   const [draft, setDraft] = useState<Record<ProfileDraftField, string>>({
     name: initialProfile.name ?? "",
     graduation_year: String(initialProfile.graduation_year ?? ""),
+    major: initialProfile.major ?? "",
+    stage: initialProfile.stage ?? "",
+    hometown: initialProfile.hometown ?? "",
     favorite_verse: initialProfile.favorite_verse ?? "",
+    bible_verse: initialProfile.bible_verse ?? "",
     favorite_worship_song: initialProfile.favorite_worship_song ?? "",
   })
   // Inline error under the name field — currently only the moderation refusal.
@@ -1217,7 +1224,11 @@ export function ProfileTab({
     setDraft({
       name: profile.name ?? "",
       graduation_year: String(profile.graduation_year ?? ""),
+      major: profile.major ?? "",
+      stage: profile.stage ?? "",
+      hometown: profile.hometown ?? "",
       favorite_verse: profile.favorite_verse ?? "",
+      bible_verse: profile.bible_verse ?? "",
       favorite_worship_song: profile.favorite_worship_song ?? "",
     })
     setNameError(null)
@@ -1287,7 +1298,11 @@ export function ProfileTab({
       .update({
         name,
         graduation_year: draft.graduation_year ? parseInt(draft.graduation_year) : null,
+        major: draft.major || null,
+        stage: draft.stage || null,
+        hometown: draft.hometown || null,
         favorite_verse: draft.favorite_verse || null,
+        bible_verse: draft.bible_verse || null,
         favorite_worship_song: draft.favorite_worship_song || null,
       })
       .eq("id", userId)

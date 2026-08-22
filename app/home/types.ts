@@ -14,16 +14,20 @@ export interface Profile {
   grade?: string | null
   needs_grad_check?: boolean
   role: string
-  about_me?: string | null
+  // Profile v2 (2026-08-22): the profile is a short, fully-public identity card.
+  // `about_me` / `bio` / `testimony` / `phone` / `prayer_request` / `pray_for_me` /
+  // `favorite_book_of_bible` were DROPPED from the table — every one of them held
+  // zero non-empty values across all 502 live profiles.
+  //
+  // The verse is a pair: `favorite_verse` is the REFERENCE ("Philippians 4:13"),
+  // `bible_verse` is the words. The design shows the reference as the kicker over
+  // the text, which is why they are two columns and not one.
   bible_verse: string | null
-  prayer_request?: string | null
-  pray_for_me?: string | null
-  phone?: string | null
-  bio?: string | null
-  testimony?: string | null
-  favorite_worship_song?: string | null
   favorite_verse?: string | null
-  favorite_book_of_bible?: string | null
+  favorite_worship_song?: string | null
+  major?: string | null
+  stage?: string | null
+  hometown?: string | null
   ministry_id?: string | null
   avatar_url?: string | null
   school_id?: string | null
@@ -609,16 +613,16 @@ export interface DirectoryMember {
 // Full profile shape — fetched on demand (per member) when a detail view opens.
 export interface DirectoryMemberDetail extends DirectoryMember {
   email: string
-  phone?: string | null
-  about_me?: string | null
-  bio?: string | null
   bible_verse: string | null
   favorite_verse: string | null
-  prayer_request?: string | null
-  pray_for_me?: string | null
-  testimony?: string | null
   favorite_worship_song: string | null
-  favorite_book_of_bible?: string | null
+  major: string | null
+  stage: string | null
+  hometown: string | null
+  school_id: string | null
+  /** Resolved through the ministry_schools embed in loadMemberDetail — the row
+   *  itself only stores the uuid. */
+  school_name: string | null
 }
 
 export interface UserTeam {
