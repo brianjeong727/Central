@@ -311,6 +311,20 @@ html[data-kb-native] .kb-lift {
   }
 }
 
+/* A modal/sheet's height has to lose the keyboard too, not just its offset —
+   `.kb-lift` moves the bottom edge up, and without this a tall sheet simply runs
+   off the TOP instead of scrolling inside itself. Paired with `.kb-lift` and
+   reset at the same breakpoint, so a stray inset can never move a desktop modal
+   (which is what happens if the clamp is written inline and md-less). */
+.kb-modal-h {
+  max-height: min(85vh, calc(100dvh - var(--kb-inset) - 24px));
+}
+@variant md {
+  .kb-modal-h {
+    max-height: 85vh;
+  }
+}
+
 /* Compact shell — context panel hidden; rail only. Re-declares BOTH vars because
    --shell-offset substitutes var() at the :root declaration, so overriding
    --sidebar-width alone would not recompute the inherited offset. */
