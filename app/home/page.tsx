@@ -45,13 +45,15 @@ export default async function HomePage({
   if (user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) redirect("/admin")
 
   // Boot-slim: fetch only columns the shell + tabs actually consume off initialProfile.
-  // Dropped about_me/bible_verse/pray_for_me — the directory reads its OWN fetched member
-  // detail, and nothing reads these off the boot profile (null-backfilled below to satisfy
-  // the Profile type). prayer_request stays: ProfileTab seeds its edit form from it and
-  // never refetches. Other fat fields (testimony/bio/favorite_*) were never in this select.
+  //
+  // The Profile-v2 identity fields ARE here, and they have to be: ProfileTab seeds
+  // its state from `initialProfile` once and NEVER refetches, so dropping them from
+  // this select does not make them lazy — it makes them permanently absent, and the
+  // profile renders every row as "Add" over data that exists. (Tried it; that is
+  // exactly what happened.) They are short text columns; the fat ones stay out.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, name, email, graduation_year, grade, needs_grad_check, role, ministry_id, avatar_url, school_id, seen_workspace_nav_hint, grad_prompt_dismissed, compact_sidebar, open_groups_card_dismissed, notification_settings")
+    .select("id, name, email, graduation_year, grade, needs_grad_check, role, ministry_id, avatar_url, school_id, major, hometown, favorite_verse, bible_verse, favorite_worship_song, show_journal_entries, show_journal_streak, seen_workspace_nav_hint, grad_prompt_dismissed, compact_sidebar, open_groups_card_dismissed, notification_settings")
     .eq("id", user.id)
     .single()
 
@@ -171,10 +173,8 @@ export default async function HomePage({
 
   const initialHasResponded = !!respondedResult.data
 
-  // Null-backfill the boot-dropped fat columns (about_me/bible_verse/pray_for_me) so the
-  // Profile shape stays complete for consumers/typing even though the shell never reads them.
   const safeProfile = profile
-    ? { ...profile, about_me: null, bible_verse: null, pray_for_me: null }
+    ? profile
     : {
         id: user.id,
         name: user.email?.split("@")[0] ?? "Member",
@@ -183,10 +183,11 @@ export default async function HomePage({
         grade: null,
         needs_grad_check: false,
         role: "member",
-        about_me: null,
         bible_verse: null,
-        prayer_request: null,
-        pray_for_me: null,
+        favorite_verse: null,
+        favorite_worship_song: null,
+        major: null,
+        hometown: null,
         ministry_id: null,
         avatar_url: null,
         school_id: null,

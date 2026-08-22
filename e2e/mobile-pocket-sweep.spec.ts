@@ -214,11 +214,15 @@ test.describe("mobile Pocket sweep — directory via chats (e)", () => {
   // EmptyState) needs a profile WITH shared details to prove the sections
   // actually render. Seed them onto the sandbox admin; baseline is all-null,
   // so clearing back to null in afterAll restores the tenant exactly.
+  // Profile v2 (2026-08-22): `bio`, `testimony` and `prayer_request` were dropped
+  // from the table, so seeding them here would fail the whole UPDATE and take this
+  // spec's beforeAll with it. The v2 identity fields are what the member detail
+  // renders now.
   const DETAIL_FIELDS = {
-    bio: `${E2E_PREFIX} sandbox admin bio for the member-detail spec.`,
-    testimony: `${E2E_PREFIX} came to faith through a campus Bible study.`,
     favorite_verse: `${E2E_PREFIX} Psalm 46:10`,
-    prayer_request: `${E2E_PREFIX} pray for the incoming freshmen.`,
+    bible_verse: `${E2E_PREFIX} Be still, and know that I am God.`,
+    major: `${E2E_PREFIX} Information Science`,
+    hometown: `${E2E_PREFIX} Cherry Hill, NJ`,
   }
 
   test.beforeAll(async () => {
@@ -251,7 +255,7 @@ test.describe("mobile Pocket sweep — directory via chats (e)", () => {
     await expect(vis(page, "Send Message").first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByRole("button", { name: "Member actions" }).filter({ visible: true }).first()).toBeVisible()
     // Shared details actually render when data exists (the with-data path).
-    await expect(vis(page, DETAIL_FIELDS.testimony).first()).toBeVisible({ timeout: 10000 })
+    await expect(vis(page, DETAIL_FIELDS.bible_verse).first()).toBeVisible({ timeout: 10000 })
 
     const back = page.getByRole("button", { name: "Back to Directory" }).filter({ visible: true }).first()
     await back.click()

@@ -366,9 +366,10 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
     openDraftDm({ id: member.id, name: member.name })
   }
 
+  // Profile v2 (2026-08-22): phone is gone from the profile entirely — a number is
+  // not something a whole congregation should read off a directory page.
   const infoRows = [
     { label: "EMAIL", value: detail?.email || null },
-    { label: "PHONE", value: detail?.phone || null },
     { label: "ROLE", value: roleLabel(member.role, member.id) || null },
     { label: "CLASS", value: cohortLabel(member.grade, member.graduation_year) },
   ].filter(r => r.value)
@@ -455,15 +456,15 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
               </div>
             )
           }
-          const aboutVal = detail?.bio || detail?.about_me
-          const verseVal = detail?.favorite_verse || detail?.bible_verse
+          // The verse is a REFERENCE plus its words; show the words, labelled with
+          // the reference, and fall back to the bare reference when only that exists.
+          const verseVal = detail?.bible_verse || detail?.favorite_verse
           const rows: { label: string; value: string; italic?: boolean }[] = []
-          if (aboutVal) rows.push({ label: "ABOUT", value: aboutVal })
-          if (detail?.testimony) rows.push({ label: "TESTIMONY", value: detail.testimony })
-          if (verseVal) rows.push({ label: "VERSE", value: verseVal, italic: true })
+          if (detail?.school_name) rows.push({ label: "SCHOOL", value: detail.school_name })
+          if (detail?.major) rows.push({ label: "STUDYING", value: detail.major })
+          if (detail?.hometown) rows.push({ label: "FROM", value: detail.hometown })
+          if (verseVal) rows.push({ label: detail?.favorite_verse || "VERSE", value: verseVal, italic: true })
           if (detail?.favorite_worship_song) rows.push({ label: "WORSHIP SONG", value: detail.favorite_worship_song })
-          if (detail?.favorite_book_of_bible) rows.push({ label: "FAVORITE BOOK", value: detail.favorite_book_of_bible })
-          if (detail?.prayer_request) rows.push({ label: "PRAYER", value: detail.prayer_request })
           return rows.map(row => (
             <div key={row.label} style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, padding: "14px 0", borderBottom: "1px solid var(--line)", alignItems: "start" }}>
               <span style={{ fontSize: 11, fontWeight: 400, letterSpacing: "0.1em", color: "var(--muted-text)", textTransform: "uppercase", paddingTop: 1 }}>{row.label}</span>

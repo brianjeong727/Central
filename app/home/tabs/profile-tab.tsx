@@ -772,7 +772,18 @@ export function JournalSection({
 
 // ── Profile field config ──────────────────────────────────────────────────────
 
-type ProfileDraftField = "name" | "graduation_year" | "favorite_verse" | "favorite_worship_song"
+// Profile v2 (cdesign "Profile Prototype v2", 2026-08-22). The profile is a short,
+// fully PUBLIC identity card, which is the reason for the shape of this list: every
+// long-form or contact field is gone (`bio`, `testimony`, `prayer_request`,
+// `pray_for_me`, `about_me`, `phone`, `favorite_book_of_bible` were dropped from the
+// table — all of them held zero non-empty values across 502 live profiles). What is
+// left is what a congregation can usefully know about someone at a glance.
+//
+// The verse is a PAIR: `favorite_verse` is the reference, `bible_verse` is the words.
+type ProfileDraftField =
+  | "name" | "graduation_year"
+  | "major" | "hometown"
+  | "favorite_verse" | "bible_verse" | "favorite_worship_song"
 
 const PROFILE_SECTIONS: {
   id: string
@@ -780,16 +791,12 @@ const PROFILE_SECTIONS: {
   fields: { key: ProfileDraftField; label: string; placeholder: string; multiline: boolean; inputType?: string }[]
 }[] = [
   {
-    id: "contact",
-    label: "Contact",
-    fields: [
-      { key: "graduation_year", label: "Graduation year", placeholder: "e.g. 2027", multiline: false, inputType: "number" },
-    ],
-  },
-  {
     id: "about",
     label: "About",
     fields: [
+      { key: "graduation_year", label: "Graduation year", placeholder: "e.g. 2027", multiline: false, inputType: "number" },
+      { key: "major", label: "Studying", placeholder: "Your major", multiline: false },
+      { key: "hometown", label: "From", placeholder: "Where you grew up", multiline: false },
     ],
   },
   {
@@ -797,16 +804,42 @@ const PROFILE_SECTIONS: {
     label: "Faith",
     fields: [
       { key: "favorite_verse", label: "Favorite verse", placeholder: "e.g. Philippians 4:13", multiline: false },
-      { key: "favorite_worship_song", label: "Favorite worship song", placeholder: "A song that moves you", multiline: false },
-    ],
-  },
-  {
-    id: "prayer",
-    label: "Prayer",
-    fields: [
+      { key: "bible_verse", label: "The words", placeholder: "Add the words, so people see why it stayed with you.", multiline: true },
+      { key: "favorite_worship_song", label: "Worship song", placeholder: "A song that moves you", multiline: false },
     ],
   },
 ]
+
+// The sentinel the CLASS select uses for the non-year cohort. Not a year, so it can
+// never collide with one.
+const YOUNG_ADULT_OPTION = "young-adult"
+/** Class years the picker offers: last year through six ahead, which covers a
+ *  freshman who just arrived and anyone correcting a year they mistyped. */
+function cohortYearOptions(): number[] {
+  const now = new Date().getFullYear()
+  return Array.from({ length: 8 }, (_, i) => now - 1 + i)
+}
+
+// ── Profile v2 · the phone row list ───────────────────────────────────────────
+// The order the design puts them in. EMAIL is read-only: it is the account's login
+// identity, not a profile fact someone edits here. SCHOOL is NOT in this list — it
+// is a ministry_schools reference and renders as its own select row.
+const PROFILE_V2_ROWS: { key: string; label: string; placeholder: string; readOnly?: boolean }[] = [
+  { key: "email", label: "EMAIL", placeholder: "", readOnly: true },
+  { key: "major", label: "STUDYING", placeholder: "Your major" },
+  { key: "hometown", label: "FROM", placeholder: "Where you grew up" },
+  { key: "favorite_verse", label: "FAVORITE VERSE", placeholder: "e.g. Philippians 4:13" },
+  { key: "favorite_worship_song", label: "WORSHIP SONG", placeholder: "A song that moves you" },
+]
+
+// What the completeness meter counts. Email is excluded — it is filled for everyone
+// the moment they have an account, so counting it would start every profile at 1/8
+// and mean nothing.
+// `graduation_year` is not counted: onboarding fills the cohort for everyone (the
+// signup + /complete-profile gates both require it), so counting it would give
+// every profile a free point and make the meter say less than it appears to.
+const PROFILE_V2_COUNTED = ["major", "hometown", "favorite_verse", "bible_verse", "favorite_worship_song", "school_id"] as const
+const PROFILE_V2_FIELD_COUNT = PROFILE_V2_COUNTED.length
 
 // ── Account & support cluster ─────────────────────────────────────────────────
 // Blocked users (list + unblock), switch ministry, contact & support, privacy —
@@ -1181,7 +1214,10 @@ export function ProfileTab({
   const [draft, setDraft] = useState<Record<ProfileDraftField, string>>({
     name: initialProfile.name ?? "",
     graduation_year: String(initialProfile.graduation_year ?? ""),
+    major: initialProfile.major ?? "",
+    hometown: initialProfile.hometown ?? "",
     favorite_verse: initialProfile.favorite_verse ?? "",
+    bible_verse: initialProfile.bible_verse ?? "",
     favorite_worship_song: initialProfile.favorite_worship_song ?? "",
   })
   // Inline error under the name field — currently only the moderation refusal.
@@ -1212,12 +1248,137 @@ export function ProfileTab({
 
   const [draftYoungAdult, setDraftYoungAdult] = useState(false)
 
+  // ── Profile v2 · inline per-field editing (mobile) ─────────────────────────
+  // The phone profile has no edit MODE: you tap a value, it becomes an input, and
+  // blurring commits that one field. Desktop keeps its staged Edit/Save form —
+  // a pointer has room for a real form and no keyboard covering half the screen.
+  //
+  // Convention #21 (settings stage behind Save) does not reach here: that rule is
+  // about SETTINGS surfaces, where a half-applied set of toggles is incoherent.
+  // These are independent facts about a person, and iMessage-style commit-on-blur
+  // is what the design asks for.
+  const filledCount = useMemo(
+    () => PROFILE_V2_COUNTED.filter(k => {
+      const v = (profile as unknown as Record<string, unknown>)[k]
+      return typeof v === "string" ? v.trim().length > 0 : v != null
+    }).length,
+    [profile],
+  )
+  const [cohortSaving, setCohortSaving] = useState(false)
+  const [inlineField, setInlineField] = useState<ProfileDraftField | null>(null)
+  const [inlineDraft, setInlineDraft] = useState("")
+  const [inlineError, setInlineError] = useState<string | null>(null)
+
+  /** The name is the one field with a gate — it is what the whole ministry sees. */
+  async function nameRefusal(next: string): Promise<string | null> {
+    if (!next.trim()) return "Enter your name — this is what your ministry sees."
+    let settings = modSettings
+    if (!settings) settings = await mutateModSettings().catch(() => undefined) ?? MODERATION_DEFAULTS
+    if (!settings.enabled) return null
+    const { flaggedCount } = moderateText(next, { strictness: settings.strictness, behavior: settings.behavior })
+    return flaggedCount > 0 ? "That name was blocked by the ministry's language filter. Try another." : null
+  }
+
+  /**
+   * CLASS is not a text field — it is the cohort, and changing it also changes which
+   * class chat someone sits in. So it commits through the SAME path the desktop form
+   * uses: `setYoungAdult` (the server action that moves the membership) for the
+   * student↔young-adult switch, then the year write, then the class-chat prompt.
+   * A bare `graduation_year` UPDATE is how a student who corrected 2027 → 2029 stayed
+   * in the Class of 2027 chat with nothing anywhere saying so.
+   *
+   * Onboarding always fills this (signup and /complete-profile both gate on it), so
+   * on a real account the row arrives populated and this is only ever a correction.
+   */
+  async function commitCohort(next: string) {
+    const wantYoungAdult = next === YOUNG_ADULT_OPTION
+    const wasYoungAdult = isYoungAdult(profile.grade)
+    const previousYear = profile.graduation_year ?? null
+    const newYear = wantYoungAdult ? null : (next ? parseInt(next) : null)
+    if (wantYoungAdult === wasYoungAdult && newYear === previousYear) return
+
+    setCohortSaving(true)
+    if (wantYoungAdult !== wasYoungAdult) {
+      const res = await setYoungAdult(wantYoungAdult)
+      if (res?.error) { setInlineError(res.error); setCohortSaving(false); return }
+      setProfile(prev => ({ ...prev, grade: wantYoungAdult ? "young_adult" : null }))
+    }
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({ graduation_year: newYear })
+      .eq("id", userId)
+      .eq("ministry_id", initialProfile.ministry_id ?? "")
+      .select()
+      .single()
+    setCohortSaving(false)
+    if (error) { setInlineError("Couldn't save that. Try again."); return }
+    if (data) setProfile(data as Profile)
+    if (newYear && newYear !== previousYear && !wantYoungAdult) {
+      setClassPrompt({ from: previousYear, to: newYear })
+      setKeepOldClass(false)
+    }
+  }
+
+  function beginInline(key: ProfileDraftField) {
+    setInlineError(null)
+    setInlineDraft(key === "graduation_year" ? String(profile.graduation_year ?? "") : (getFieldValue(key) || ""))
+    setInlineField(key)
+  }
+
+  async function commitInline() {
+    const key = inlineField
+    if (!key) return
+    const next = inlineDraft.trim()
+    const current = key === "graduation_year" ? String(profile.graduation_year ?? "") : (getFieldValue(key) || "")
+    if (next === current) { setInlineField(null); return }
+
+    if (key === "name") {
+      const refusal = await nameRefusal(next)
+      // Stay in the field on a refusal — dropping back to read mode would show the
+      // OLD name with no explanation, which reads as the edit silently failing.
+      if (refusal) { setInlineError(refusal); return }
+    }
+
+    // The class chat does not follow the year on its own (see saveEdit) — the same
+    // prompt has to fire here, or a year corrected from the phone leaves the person
+    // in their old class chat with nothing anywhere saying so.
+    const previousYear = profile.graduation_year ?? null
+    const patch: Record<string, string | number | null> =
+      key === "graduation_year"
+        ? { graduation_year: next ? parseInt(next) : null }
+        : { [key]: next || null }
+
+    setInlineField(null)
+    setInlineError(null)
+    setProfile(prev => ({ ...prev, ...patch } as Profile))   // optimistic (Convention #4)
+    const { data, error } = await supabase
+      .from("profiles")
+      .update(patch)
+      .eq("id", userId)
+      .eq("ministry_id", initialProfile.ministry_id ?? "")
+      .select()
+      .single()
+    if (error) { setProfile(prev => ({ ...prev })); setInlineError("Couldn't save that. Try again."); return }
+    if (data) setProfile(data as Profile)
+
+    if (key === "graduation_year") {
+      const newYear = next ? parseInt(next) : null
+      if (newYear && newYear !== previousYear && !isYoungAdult(profile.grade)) {
+        setClassPrompt({ from: previousYear, to: newYear })
+        setKeepOldClass(false)
+      }
+    }
+  }
+
   const startEdit = () => {
     setDraftYoungAdult(isYoungAdult(profile.grade))
     setDraft({
       name: profile.name ?? "",
       graduation_year: String(profile.graduation_year ?? ""),
+      major: profile.major ?? "",
+      hometown: profile.hometown ?? "",
       favorite_verse: profile.favorite_verse ?? "",
+      bible_verse: profile.bible_verse ?? "",
       favorite_worship_song: profile.favorite_worship_song ?? "",
     })
     setNameError(null)
@@ -1287,7 +1448,10 @@ export function ProfileTab({
       .update({
         name,
         graduation_year: draft.graduation_year ? parseInt(draft.graduation_year) : null,
+        major: draft.major || null,
+        hometown: draft.hometown || null,
         favorite_verse: draft.favorite_verse || null,
+        bible_verse: draft.bible_verse || null,
         favorite_worship_song: draft.favorite_worship_song || null,
       })
       .eq("id", userId)
@@ -1681,112 +1845,216 @@ export function ProfileTab({
             Editing swaps the title to "Edit profile" + Cancel/Save (§1). ── */}
         {settingsView === null && (<>
         <PocketChrome
-          title={editing ? "Edit profile" : "Profile"}
+          title="Profile"
           // No chevron on the root: Profile is a pill TAB ROOT now, and a tab root
           // has no level to go up to (§3 — sub-screens get the chevron, roots don't).
           // It carried `onBack` → Home back when Profile was a subpage reached from
           // the chrome avatar. While EDITING the chrome's own Cancel action exits the
           // form, so a chevron there would just be a second cancel.
           back={undefined}
-          action={editing
-            ? <PocketButton variant="quiet" compact surface="page" onClick={cancelEdit}>Cancel</PocketButton>
-            : <PocketRoundButton ariaLabel="Settings" onClick={() => openSettings("hub")}><Settings size={16} /></PocketRoundButton>}
-          action2={editing ? <PocketButton variant="primary" compact onClick={saveEdit} disabled={saving || !nameValid}>{saving ? "Saving…" : "Save"}</PocketButton> : undefined}
+          // Profile v2: no Cancel/Save pair, because there is no edit MODE at phone
+          // width — each field commits on blur. The gear is the row's only action.
+          action={<PocketRoundButton ariaLabel="Settings" onClick={() => openSettings("hub")}><Settings size={16} /></PocketRoundButton>}
         />
 
-        {/* ── Mobile: identity card (tonal ivory). Edit is a quiet plum action tucked
-            into the card's top-right corner — no dedicated button row. ── */}
-        <div className="md:hidden px-5 pb-2">
-          <PocketCard padding="20px">
-            <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
-              <label className="group relative flex-shrink-0" style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--plum)", display: "grid", placeItems: "center", overflow: "hidden", cursor: uploadingAvatar ? "not-allowed" : "pointer" }} aria-label="Change profile photo">
-                <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0, overflow: "hidden" }} onChange={handleAvatarPick} disabled={uploadingAvatar} />
-                {profile.avatar_url
-                  ? <Image src={profile.avatar_url} alt="Profile" fill sizes="56px" style={{ objectFit: "cover" }} />
-                  : <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--cream-on-dark)" }}>{getInitials(profile.name)}</span>
-                }
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 35%, transparent)" }}>
-                  <Camera style={{ width: 14, height: 14, color: "white" }} />
-                </div>
-                {uploadingAvatar && <div className="absolute inset-0 flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 40%, transparent)" }}><div className="animate-spin" style={{ width: 18, height: 18, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} /></div>}
-              </label>
-              {/* Sibling of the avatar, never inside the <label> — nesting it there
-                  makes every tap open the file picker instead of removing. */}
-              <div style={{ flex: 1, minWidth: 0, paddingRight: !editing ? 40 : 0 }}>
-                {editing ? (
-                  <>
-                    <SerifInput
-                      value={draft.name}
-                      onChange={(e) => { setDraft(d => ({ ...d, name: e.target.value })); if (nameError) setNameError(null) }}
-                      fontSize={22}
-                      aria-label="Your name"
-                      placeholder="Your name"
-                      autoComplete="name"
-                      maxLength={80}
-                      style={{ letterSpacing: "-0.01em", lineHeight: 1.15 }}
-                    />
-                    {/* Same copy as desktop — without it the disabled Save at the
-                        top of the chrome has no explanation at phone width. 12.5
-                        is the mobile ramp's off-ramp/hint size (PocketField), not
-                        desktop's 12. */}
-                    {!nameValid && (
-                      <p style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "6px 0 0" }}>
-                        Enter your name — this is what your ministry sees.
-                      </p>
-                    )}
-                    {nameError && (
-                      <p style={{ fontSize: 12.5, color: "var(--danger)", margin: "6px 0 0" }}>{nameError}</p>
-                    )}
-                  </>
-                ) : (
-                  <h1 style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: 0, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.name}</h1>
-                )}
-                <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, minWidth: 0 }}>
-                  <PocketTag label={roleLabel(profile.role, null)} variant="role" />
-                  <span style={{ fontSize: 13, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.email}</span>
-                </div>
-                {removePhotoButton(true)}
-                {(cohortLabel(profile.grade, profile.graduation_year) || (currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation)) && (
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 5 }}>
-                    {cohortLabel(profile.grade, profile.graduation_year) && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{cohortLabel(profile.grade, profile.graduation_year)}</span>}
-                    {currentSchoolId && schoolOptions.find(s => s.id === currentSchoolId)?.abbreviation && <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{schoolOptions.find(s => s.id === currentSchoolId)!.abbreviation}</span>}
-                  </div>
-                )}
-              </div>
-              {!editing && (
-                <button onClick={startEdit} aria-label="Edit profile" style={{ position: "absolute", top: 0, right: 0, display: "inline-flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: "var(--plum)", fontSize: 12.5, fontWeight: 600, padding: 0, WebkitTapHighlightColor: "transparent" }}>
-                  <Pencil size={12.5} />Edit
-                </button>
+        {/* ── Mobile: identity (Profile v2). NOT a card — the design puts the person
+            on the page surface, so the first thing under the chrome is them, not a
+            container holding them. Tap the name to edit it in place; tap the avatar
+            to change the photo. ── */}
+        {/* `flex items-start` lives in the CLASS, never in `style` — an inline
+            `display` overrides `md:hidden` and the whole block leaks onto desktop
+            (it did; the mobile identity rendered above the desktop page header).
+            Same trap SubpageShell's chrome row documents. */}
+        <div className="md:hidden flex items-start" style={{ padding: "8px 20px 0", gap: 16 }}>
+          <label
+            className="relative"
+            style={{ width: 88, height: 88, borderRadius: 999, background: "var(--plum)", display: "grid", placeItems: "center", overflow: "visible", cursor: uploadingAvatar ? "not-allowed" : "pointer", flex: "none" }}
+            aria-label="Change profile photo"
+          >
+            <input type="file" accept="image/*" style={{ position: "absolute", width: 0, height: 0, opacity: 0 }} onChange={handleAvatarPick} disabled={uploadingAvatar} />
+            <span style={{ position: "absolute", inset: 0, borderRadius: 999, overflow: "hidden", display: "grid", placeItems: "center" }}>
+              {profile.avatar_url
+                ? <Image src={profile.avatar_url} alt="Profile" fill sizes="88px" style={{ objectFit: "cover" }} />
+                : <span style={{ fontFamily: "var(--serif)", fontSize: 31, fontWeight: 600, color: "var(--cream-on-dark)" }}>{getInitials(profile.name)}</span>}
+              {uploadingAvatar && (
+                <span className="absolute inset-0 flex items-center justify-center" style={{ background: "color-mix(in srgb, var(--ink) 40%, transparent)" }}>
+                  <span className="animate-spin" style={{ width: 20, height: 20, border: "2px solid white", borderTopColor: "transparent", borderRadius: "50%" }} />
+                </span>
               )}
+            </span>
+            {/* The affordance the old 56px avatar only had on HOVER — which a phone
+                does not have, so on touch the avatar looked inert. */}
+            <span aria-hidden style={{ position: "absolute", right: -2, bottom: -2, width: 30, height: 30, borderRadius: 999, background: "var(--ivory)", border: "2px solid var(--cream)", display: "grid", placeItems: "center" }}>
+              <Camera style={{ width: 14, height: 14, color: "var(--plum)" }} />
+            </span>
+          </label>
+
+          <div style={{ flex: 1, minWidth: 0, paddingTop: 6 }}>
+            {inlineField === "name" ? (
+              <input
+                value={inlineDraft}
+                autoFocus
+                onChange={e => { setInlineDraft(e.target.value); if (inlineError) setInlineError(null) }}
+                onBlur={commitInline}
+                placeholder="Your name"
+                maxLength={80}
+                aria-label="Your name"
+                style={{ width: "100%", border: "none", background: "var(--ivory)", borderRadius: 12, padding: "7px 11px", fontFamily: "var(--serif)", fontSize: 26, fontWeight: 600, letterSpacing: "-0.025em", color: "var(--ink)", boxSizing: "border-box", outline: "none" }}
+              />
+            ) : (
+              <button onClick={() => beginInline("name")} style={{ display: "flex", alignItems: "center", gap: 9, background: "none", border: "none", padding: 0, cursor: "text", textAlign: "left", maxWidth: "100%" }}>
+                <span style={{ fontFamily: "var(--serif)", fontSize: 26, fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1.1, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{profile.name}</span>
+                <Pencil style={{ width: 14, height: 14, color: "var(--faint)", flex: "none" }} />
+              </button>
+            )}
+            {inlineError && <p style={{ fontSize: 12.5, color: "var(--danger)", margin: "6px 0 0" }}>{inlineError}</p>}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 9, minWidth: 0 }}>
+              <PocketTag label={roleLabel(profile.role, null)} variant="role" />
             </div>
-            {avatarError && <p style={{ fontSize: 11, color: "var(--danger)", margin: "10px 0 0" }}>{avatarError}</p>}
+            {removePhotoButton(true)}
+          </div>
+        </div>
+
+        {/* ── Mobile: completeness. It exists to say the profile is UNFINISHED without
+            nagging, and the sentence under it is the one thing people get wrong about
+            a profile — who can see it. ── */}
+        <div className="md:hidden" style={{ padding: "22px 20px 0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1, height: 4, borderRadius: 999, background: "var(--pocket-track)", overflow: "hidden" }}>
+              <div style={{ width: `${Math.round((filledCount / PROFILE_V2_FIELD_COUNT) * 100)}%`, height: "100%", background: "var(--plum)", transition: "width var(--dur-layout, 240ms) cubic-bezier(0.23,1,0.32,1)" }} />
+            </div>
+            <div style={{ fontSize: 12, color: "var(--muted-text)", flex: "none" }}>{filledCount} of {PROFILE_V2_FIELD_COUNT} filled</div>
+          </div>
+          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8 }}>Everything here is visible to your ministry.</div>
+        </div>
+
+        {/* ── Mobile: Journal. Ratified 2026-08-22 — it STAYS on the profile rather
+            than moving to Workspace (private, per-user data has no workspace to
+            belong to, and the toggles governing who can see it live here), but it
+            gets a real destination card instead of the 40px hub row it had, which
+            read as one more field in a list of fields. ── */}
+        <div className="md:hidden" style={{ padding: "22px 20px 0" }}>
+          <PocketKicker label="Personal" />
+          <PocketCard padding={0}>
+            <button
+              onClick={() => onSectionChange("journal")}
+              style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", background: "none", border: "none", padding: "16px 18px", cursor: "pointer", textAlign: "left" }}
+            >
+              <span style={{ width: 46, height: 46, borderRadius: "var(--r-callout)", background: "var(--pocket-track)", display: "grid", placeItems: "center", flex: "none" }}>
+                <BookOpen style={{ width: 20, height: 20, color: "var(--plum)" }} strokeWidth={1.8} />
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)" }}>Journal</span>
+                <span style={{ display: "block", fontSize: 14, color: "var(--muted-text)", marginTop: 3 }}>Devotionals, prayers &amp; verses</span>
+              </span>
+              <ChevronRight style={{ width: 16, height: 16, color: "var(--faint)", flex: "none" }} />
+            </button>
           </PocketCard>
         </div>
 
-        {/* ── Mobile: Journal — the ONE hub row on the profile root (§3 hub-and-spoke).
-            Journal's phone-width UI has existed since the Pocket build but had no
-            entry point at this width: `onSectionChange` was wired only in
-            desktop-nav.tsx, so on a phone it was reachable solely by hand-typing
-            ?section=journal. It stays a pushed screen rather than a pill tab —
-            it's private and low-frequency next to the four ministry surfaces —
-            and it sits above ABOUT/FAITH/PRAYER because it's a destination, not
-            a field. Hidden while editing (the root is a form then) and while the
-            settings drill is up (this whole block is inside that guard). ── */}
-        {!editing && (
-          <div className="md:hidden px-5" style={{ paddingTop: 10 }}>
-            <PocketKicker label="Personal" />
-            <PocketRowCard>
-              <PocketRow
-                leading={<SettingsIconChip icon={<BookOpen size={17} strokeWidth={2} />} />}
-                title="Journal"
-                sub="Devotionals, prayers & verses"
-                chevron
-                isLast
-                onClick={() => onSectionChange("journal")}
-              />
-            </PocketRowCard>
+        {/* ── Mobile: the fields. Tap a value, it becomes an input, blur commits it —
+            no edit mode, no Save. Rows are separated by a TOP rule so the run reads
+            as one list under the meter rather than a stack of boxes. ── */}
+        <div className="md:hidden" style={{ padding: "18px 20px 22px" }}>
+          {/* CLASS — filled at onboarding for everyone, and the one row whose edit
+              reaches past this table: changing it moves class-chat membership. */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "15px 0", borderTop: "1px solid var(--line-3)", minHeight: 24, opacity: cohortSaving ? 0.5 : 1 }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "1.2px", color: "var(--muted-text)", flex: "none" }}>CLASS</div>
+            <select
+              value={isYoungAdult(profile.grade) ? YOUNG_ADULT_OPTION : String(profile.graduation_year ?? "")}
+              onChange={e => { if (!cohortSaving) void commitCohort(e.target.value) }}
+              aria-label="Class"
+              disabled={cohortSaving}
+              style={{ border: "none", background: "transparent", fontSize: 14.5, fontWeight: cohortLabel(profile.grade, profile.graduation_year) ? 500 : 600, color: cohortLabel(profile.grade, profile.graduation_year) ? "var(--ink)" : "var(--plum)", textAlign: "right", outline: "none", padding: 0, cursor: "pointer", maxWidth: "70%" }}
+            >
+              <option value="">Add</option>
+              {cohortYearOptions().map(y => <option key={y} value={String(y)}>Class of {y}</option>)}
+              <option value={YOUNG_ADULT_OPTION}>Young Adult</option>
+            </select>
           </div>
-        )}
+
+          {/* SCHOOL — picked in the post-join flow when the ministry defines schools.
+              Rendered whenever the person HAS one, even if the option list has not
+              loaded, so an onboarding answer never reads back as blank. */}
+          {(schoolOptions.length > 0 || currentSchoolId) && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "15px 0", borderTop: "1px solid var(--line-3)", minHeight: 24 }}>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "1.2px", color: "var(--muted-text)", flex: "none" }}>SCHOOL</div>
+              {schoolOptions.length > 0 ? (
+                <select
+                  value={currentSchoolId ?? ""}
+                  onChange={e => handleSchoolChange(e.target.value)}
+                  aria-label="School"
+                  style={{ border: "none", background: "transparent", fontSize: 14.5, fontWeight: currentSchoolId ? 500 : 600, color: currentSchoolId ? "var(--ink)" : "var(--plum)", textAlign: "right", outline: "none", padding: 0, cursor: "pointer", maxWidth: "70%" }}
+                >
+                  <option value="">Add</option>
+                  {schoolOptions.map(sc => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
+                </select>
+              ) : (
+                <div style={{ fontSize: 14.5, fontWeight: 500, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {schoolOptions.find(sc => sc.id === currentSchoolId)?.name ?? "—"}
+                </div>
+              )}
+            </div>
+          )}
+
+          {PROFILE_V2_ROWS.map(r => {
+            const editingThis = inlineField === r.key
+            const raw = r.key === "email" ? profile.email : getFieldValue(r.key as ProfileDraftField)
+            const filled = !!(raw || "").trim()
+            return (
+              <div
+                key={r.key}
+                onClick={r.readOnly ? undefined : () => beginInline(r.key as ProfileDraftField)}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "15px 0", borderTop: "1px solid var(--line-3)", cursor: r.readOnly ? "default" : "text", minHeight: 24 }}
+              >
+                <div style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "1.2px", color: "var(--muted-text)", flex: "none" }}>{r.label}</div>
+                {editingThis ? (
+                  <input
+                    value={inlineDraft}
+                    autoFocus
+                    onChange={e => setInlineDraft(e.target.value)}
+                    onBlur={commitInline}
+                    placeholder={r.placeholder}
+                    aria-label={r.label}
+                    style={{ flex: 1, minWidth: 0, border: "none", background: "var(--ivory)", borderRadius: 10, padding: "8px 11px", fontSize: 14.5, color: "var(--ink)", textAlign: "right", outline: "none" }}
+                  />
+                ) : (
+                  <div style={{ fontSize: 14.5, fontWeight: filled ? 500 : 600, color: filled ? "var(--ink)" : "var(--plum)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {filled ? raw : (r.readOnly ? "—" : "Add")}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* ── Mobile: the verse, given its own ground. It is the one thing on this
+            screen written in someone's own voice, so it closes the page as a
+            full-bleed block rather than a row with the words truncated into it. ── */}
+        <div
+          className="md:hidden"
+          onClick={() => inlineField !== "bible_verse" && beginInline("bible_verse")}
+          style={{ background: "var(--ivory)", padding: "22px 20px", cursor: "text" }}
+        >
+          <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.4px", color: "var(--muted-text)" }}>
+            {(profile.favorite_verse || "Favorite verse").toUpperCase()}
+          </div>
+          {inlineField === "bible_verse" ? (
+            <textarea
+              value={inlineDraft}
+              autoFocus
+              rows={3}
+              onChange={e => setInlineDraft(e.target.value)}
+              onBlur={commitInline}
+              aria-label="Verse text"
+              style={{ width: "100%", marginTop: 10, border: "none", background: "var(--cream)", borderRadius: 12, padding: 12, fontSize: 17, lineHeight: 1.5, color: "var(--ink)", resize: "none", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }}
+            />
+          ) : (
+            <div style={{ fontStyle: "italic", fontSize: 18, lineHeight: 1.5, color: profile.bible_verse ? "var(--ink)" : "var(--muted-text)", marginTop: 10 }}>
+              {profile.bible_verse || "Add the words, so people see why it stayed with you."}
+            </div>
+          )}
+        </div>
         </>)}
 
         {/* ── Mobile: settings drill (gear → hub → section). md:hidden; desktop keeps
@@ -1938,14 +2206,10 @@ export function ProfileTab({
           </div>
         </div>
 
-        {/* ── Mobile: profile content — About / Faith / Prayer only. Notifications,
-            Account & support, Sign out, and Danger zone moved into the gear → settings
-            hub above (§ Profile). Hidden while in the settings drill. ── */}
-        {settingsView === null && (
-        <div className="md:hidden px-5 pb-6" style={{ paddingTop: 24 }}>
-          {renderProfileSections(true)}
-        </div>
-        )}
+        {/* The phone has no section CARDS any more — Profile v2 renders the same
+            facts as inline rows above, so `renderProfileSections` is desktop-only.
+            Notifications, Account & support, Sign out and Danger zone stay in the
+            gear → settings drill. */}
 
       {/* Move-and-scale before the upload. Choosing a photo opens this; CONFIRM is
           what stores anything. Rendered once for both viewports — the mobile and

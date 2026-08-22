@@ -116,11 +116,18 @@ export async function loadMemberDetail(
 ): Promise<DirectoryMemberDetail | null> {
   const { data } = await supabase
     .from("profiles")
-    .select("id, name, graduation_year, grade, role, avatar_url, email, bible_verse, favorite_verse, favorite_worship_song")
+    // The school NAME comes through the profiles_school_id_fkey embed rather than a
+    // second round trip — `school_id` is a ministry_schools reference, and a raw
+    // uuid is not a fact anyone can read.
+    .select("id, name, graduation_year, grade, role, avatar_url, email, school_id, major, hometown, bible_verse, favorite_verse, favorite_worship_song, ministry_schools!profiles_school_id_fkey(name)")
     .eq("id", memberId)
     .eq("ministry_id", ministryId)
     .single()
-  return data ?? null
+  if (!data) return null
+  const raw = data as unknown as Record<string, unknown>
+  const sch = raw.ministry_schools as { name?: string } | { name?: string }[] | null
+  const school = Array.isArray(sch) ? sch[0] : sch
+  return { ...(raw as unknown as DirectoryMemberDetail), school_name: school?.name ?? null }
 }
 
 // ── Mobile full-screen sheet ────────────────────────────────────────────────
@@ -231,35 +238,31 @@ export function MemberSheet({
               )
             }
 
-            const aboutVal = detail?.bio || detail?.about_me
-            const verseVal = detail?.favorite_verse || detail?.bible_verse
+            // Profile v2: the verse is a REFERENCE plus its words. Show the words
+            // when they exist (that is the part worth reading) and fall back to the
+            // bare reference when only that was filled in.
+            const verseVal = detail?.bible_verse || detail?.favorite_verse
 
             const sections: { id: string; label: string; fields: { label: string; value: string; italic?: boolean }[] }[] = [
               {
-                id: "contact", label: "Contact",
+                id: "about", label: "About",
                 fields: [
                   cohortLabel(member.grade, member.graduation_year)
                     ? { label: isYoungAdult(member.grade) ? "Stage" : "Graduation year", value: cohortLabel(member.grade, member.graduation_year)! }
                     : null,
-                  detail?.phone ? { label: "Phone", value: detail.phone } : null,
+                  detail?.school_name ? { label: "School", value: detail.school_name } : null,
+                  detail?.major ? { label: "Studying", value: detail.major } : null,
+                  detail?.hometown ? { label: "From", value: detail.hometown } : null,
                 ].filter(Boolean) as { label: string; value: string }[]
-              },
-              {
-                id: "about", label: "About",
-                fields: aboutVal ? [{ label: "Bio", value: aboutVal }] : []
               },
               {
                 id: "faith", label: "Faith",
                 fields: [
-                  detail?.testimony ? { label: "Testimony", value: detail.testimony } : null,
-                  verseVal ? { label: "Favorite verse", value: verseVal, italic: true } : null,
-                  detail?.favorite_worship_song ? { label: "Favorite worship song", value: detail.favorite_worship_song } : null,
-                  detail?.favorite_book_of_bible ? { label: "Favorite book of the Bible", value: detail.favorite_book_of_bible } : null,
+                  verseVal
+                    ? { label: detail?.favorite_verse || "Favorite verse", value: verseVal, italic: true }
+                    : null,
+                  detail?.favorite_worship_song ? { label: "Worship song", value: detail.favorite_worship_song } : null,
                 ].filter(Boolean) as { label: string; value: string; italic?: boolean }[]
-              },
-              {
-                id: "prayer", label: "Prayer",
-                fields: detail?.prayer_request ? [{ label: "Prayer request", value: detail.prayer_request }] : []
               }
             ].filter(s => s.fields.length > 0)
 
