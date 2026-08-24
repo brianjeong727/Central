@@ -12,7 +12,7 @@ import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames"
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
-import { ConfirmDialog, MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, CentralModal, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, PocketSheet, ChatAvatar, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE, MessageMenuOverlay, type MessageMenuAction } from "@/components/central"
+import { ConfirmDialog, MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, IconButton, CentralModal, Input, FormField, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, PocketSheet, ChatAvatar, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE, MONO_METRIC_STYLE, MessageMenuOverlay, type MessageMenuAction } from "@/components/central"
 import { getOrCreateDm } from "../dm"
 import { isMobileViewport } from "@/lib/breakpoints"
 import { getInitials, formatRelativeTime, replyPreviewLabel, REACTION_EMOJIS } from "../utils"
@@ -4399,64 +4399,105 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         <ReactorSheet groups={reactorGroups} loading={!rosterLoaded} onClose={() => setReactorSheet(null)} />
       )}
 
-      {/* Poll creator modal */}
+      {/* Poll creator (§4.17 modal + §4.4 form controls).
+          Was hand-rolled Tailwind that predated both: inputs painted
+          `--cream-panel` on a `--cream-panel` sheet, so at phone width the option
+          fields all but vanished into the sheet behind them; a bespoke
+          `focus:border-plum/40` instead of the shared `central-field` focus rule;
+          labels at their own tracking rather than EYEBROW_STYLE; and a full-width
+          `text-white` submit (raw white, and 12px radius where the scale says 10)
+          fighting the modal's own right-aligned footer row. All of it is primitives
+          now, so the next token change reaches it. */}
       {showPollCreator && !groupArchived && (
         <CentralModal
-          onClose={() => setShowPollCreator(false)}
+          onClose={() => { setShowPollCreator(false); setPollQuestion(""); setPollOptions(["", ""]) }}
+          eyebrow="Poll"
           title="Create a poll"
           sheet
           maxWidth={440}
+          // A stray backdrop tap used to throw away a half-written poll.
+          dirty={pollQuestion.trim().length > 0 || pollOptions.some(o => o.trim().length > 0)}
           footer={
-            <button
-              onClick={handleCreatePoll}
-              disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}
-              className="w-full bg-[var(--plum)] hover:bg-[var(--plum-2)] disabled:opacity-50 text-white font-medium py-3.5 rounded-xl transition-colors text-[14px]"
-            >
-              Create poll
-            </button>
+            <>
+              <CentralButton variant="quiet" size="sm" onClick={() => { setShowPollCreator(false); setPollQuestion(""); setPollOptions(["", ""]) }}>
+                Cancel
+              </CentralButton>
+              <CentralButton
+                variant="primary"
+                size="md"
+                onClick={handleCreatePoll}
+                disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}
+              >
+                Create poll
+              </CentralButton>
+            </>
           }
         >
-            <div className="flex flex-col gap-3">
-              <div>
-                <label className="text-[11px] font-normal text-[var(--muted-text)] uppercase tracking-wide mb-1.5 block">Question</label>
-                <input
-                  autoFocus
-                  value={pollQuestion}
-                  onChange={e => setPollQuestion(e.target.value)}
-                  placeholder="Ask something…"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--cream-panel)] text-[14px] text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--plum)]/40 transition-colors"
-                />
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <FormField label="Question">
+              <Input
+                autoFocus
+                value={pollQuestion}
+                onChange={e => setPollQuestion(e.target.value)}
+                placeholder="Ask something…"
+              />
+            </FormField>
+
+            {/* The cap rides the LABEL as a mono metric, not FormField's helper slot —
+                helper renders after the children, so "Two to five choices." landed
+                under the Add-option button and read as a caption for it. A count is a
+                value, so MONO_METRIC_STYLE (mixed case), and textTransform is reset
+                because the label span it sits inside is an uppercase eyebrow.
+                Counts ROWS, not filled ones: it answers "how many choices do I have
+                and how many more may I add", which is what makes the Add-option
+                button disappearing at five make sense. Counting filled options would
+                read "0 of 5" with two empty boxes sitting right under it. */}
+            <FormField
+              label={
+                <span style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                  Options
+                  <span style={{ ...MONO_METRIC_STYLE, textTransform: "none" }}>
+                    {pollOptions.length} of 5
+                  </span>
+                </span>
+              }
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {pollOptions.map((opt, oi) => (
+                  <div key={oi} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Input
+                      value={opt}
+                      onChange={e => setPollOptions(prev => { const next = [...prev]; next[oi] = e.target.value; return next })}
+                      placeholder={`Option ${oi + 1}`}
+                    />
+                    {/* Only offered once removing still leaves a valid poll. 34px is
+                        the same round-action box the mobile chrome uses, so this is
+                        a real tap target rather than the bare 16px glyph it was. */}
+                    {pollOptions.length > 2 && (
+                      <IconButton
+                        dim={34}
+                        aria-label={`Remove option ${oi + 1}`}
+                        onClick={() => setPollOptions(prev => prev.filter((_, i) => i !== oi))}
+                      >
+                        <X className="w-4 h-4" />
+                      </IconButton>
+                    )}
+                  </div>
+                ))}
+                {pollOptions.length < 5 && (
+                  <CentralButton
+                    variant="create"
+                    size="sm"
+                    onClick={() => setPollOptions(prev => [...prev, ""])}
+                    style={{ alignSelf: "flex-start", marginTop: 2 }}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add option
+                  </CentralButton>
+                )}
               </div>
-              <div>
-                <label className="text-[11px] font-normal text-[var(--muted-text)] uppercase tracking-wide mb-1.5 block">Options</label>
-                <div className="flex flex-col gap-2">
-                  {pollOptions.map((opt, oi) => (
-                    <div key={oi} className="flex items-center gap-2">
-                      <input
-                        value={opt}
-                        onChange={e => setPollOptions(prev => { const next = [...prev]; next[oi] = e.target.value; return next })}
-                        placeholder={`Option ${oi + 1}`}
-                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-[var(--line)] bg-[var(--cream-panel)] text-[14px] text-[var(--ink)] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--plum)]/40 transition-colors"
-                      />
-                      {pollOptions.length > 2 && (
-                        <button onClick={() => setPollOptions(prev => prev.filter((_, i) => i !== oi))} className="text-[var(--faint)] hover:text-[var(--body)] transition-colors">
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  {pollOptions.length < 5 && (
-                    <button
-                      onClick={() => setPollOptions(prev => [...prev, ""])}
-                      className="flex items-center gap-1.5 text-[13px] text-[var(--plum)] font-medium hover:opacity-70 transition-opacity self-start mt-1"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Add option
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
+            </FormField>
+          </div>
         </CentralModal>
       )}
 
