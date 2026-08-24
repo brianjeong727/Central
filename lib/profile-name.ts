@@ -22,6 +22,7 @@
 
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 import { isYoungAdult } from "./cohort"
+import { isMemberTier } from "./roles"
 
 type Meta = Record<string, unknown> | null | undefined
 
@@ -111,15 +112,22 @@ export async function reconcileProfileName(admin: SupabaseClient, user: User): P
 // signed-up young adult to /complete-profile with "Enter a valid graduation
 // year." and no way past.
 //
-// Admin-tier is exempt elsewhere (the caller checks tier); this answers only the
-// member/visitor question.
+// The ROLE check lives here rather than at each caller. It used to sit in proxy.ts
+// alone (`isMemberTier(role) && memberProfileIncomplete(...)`), which meant the page
+// had no idea the rule existed: anyone reaching /complete-profile directly was shown
+// a class-year picker and told "Enter a valid graduation year", pastor or not. Only
+// member/visitor owe a cohort — Central is a college ministry and the cohort exists
+// to seat a student in their class chat; a pastor has no graduating class, and asking
+// for one is the same dead end the young-adult clause below was written to fix.
 export function memberProfileIncomplete(p: {
+  role: string | null | undefined
   gender: string | null | undefined
   graduation_year: number | null | undefined
   grade: string | null | undefined
   name: string | null | undefined
   email: string | null | undefined
 }): boolean {
+  if (!isMemberTier(p.role)) return false
   if (!p.gender) return true
   // A cohort is required, but a young adult satisfies it WITHOUT a year.
   if (p.graduation_year == null && !isYoungAdult(p.grade)) return true

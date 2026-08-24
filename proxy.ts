@@ -1,6 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { isMemberTier } from '@/lib/roles'
 import { resolveUser } from '@/lib/auth-claims'
 import { memberProfileIncomplete } from '@/lib/profile-name'
 
@@ -319,13 +318,17 @@ export async function proxy(request: NextRequest) {
     // Shared with /complete-profile via memberProfileIncomplete — inlining the
     // rule here is what let the gate demand a graduation year the form could not
     // supply, stranding young adults (who have none by design).
-    profileComplete = !(isMemberTier(role) && memberProfileIncomplete({
+    // The member/visitor check now lives INSIDE memberProfileIncomplete, so this gate
+    // and /complete-profile cannot disagree about who is exempt (they did: the page
+    // never knew about the tier rule and asked pastors for a graduating class).
+    profileComplete = !memberProfileIncomplete({
+      role,
       gender: profRow?.gender,
       graduation_year: profRow?.graduation_year,
       grade: profRow?.grade,
       name: profRow?.name,
       email: profRow?.email,
-    }))
+    })
 
     // Cache ONLY the settled steady state (active ministry + complete profile) AND only
     // when the read was clean (never cache a degraded/errored read — it re-queries next
@@ -378,7 +381,23 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/terms') ||
     pathname.startsWith('/support')
 
-  if (isMemberTier(role) && !profileComplete && !gateExempt) {
+  // `mid &&` — the gate waits until the user is actually IN a ministry, and that is
+  // what keeps it off the founders. Every account starts as role='member' (
+  // handle_new_user hardcodes it, because the metadata role was forgeable), and a
+  // ministry founder's real role is not written until submitMinistryApplication runs
+  // at the END of the registration wizard. So for the whole of registration a pastor
+  // is member-tier with no gender and no graduation year — and any step outside the
+  // exempt registration routes (reopening the app at /home, a link from an email,
+  // coming back to an abandoned wizard) used to demand a graduation year from someone
+  // who has not been a student for twenty years. That is the first thing a new church
+  // sees of Central.
+  //
+  // Nothing is lost by waiting. The reason the cohort is collected at all is so
+  // autoAddUserToChats can seat a member in their class chat at JOIN time; a member
+  // who now joins without one gets the central chat, is gated on the very next
+  // request, and /complete-profile calls changeClassChat to seat them (see that file).
+  // The founder is promoted out of member-tier by the wizard and is never asked.
+  if (mid && !profileComplete && !gateExempt) {
     const nextPath = pathname + (request.nextUrl.search || '')
     const url = new URL('/complete-profile', request.url)
     if (nextPath && nextPath !== '/complete-profile') url.searchParams.set('next', nextPath)
