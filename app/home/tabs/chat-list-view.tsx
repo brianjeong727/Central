@@ -137,6 +137,7 @@ function PocketChatRow({ group, isFirst, onClick }: { group: ChatGroup; isFirst:
           otherCount={group.other_member_count}
           nameIsGenerated={group.name_is_generated}
           isCentral={group.is_central_chat}
+          isDM={group.type === "dm"}
           // Full-bleed rows sit on the page surface, so the ring between
           // overlapping circles has to be cream, not the old card ivory.
           surface="var(--cream)"
@@ -834,6 +835,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
             otherCount={group.other_member_count}
             nameIsGenerated={group.name_is_generated}
             isCentral={group.is_central_chat}
+            isDM={group.type === "dm"}
             surface="var(--cream-panel)"
             className="flex-shrink-0"
           />
@@ -881,6 +883,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
           otherCount={group.other_member_count}
           nameIsGenerated={group.name_is_generated}
           isCentral={group.is_central_chat}
+          isDM={group.type === "dm"}
           // Desktop panel rows sit on the panel fill, and the active row tints —
           // the ring follows whichever is behind it.
           surface={isActive ? "var(--plum-tint)" : "var(--cream)"}

@@ -1045,6 +1045,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
         members: chat.cluster_members ?? [],
         otherCount: chat.other_member_count ?? 0,
         isCentral: chat.is_central_chat,
+        isDM: shared.isDM,
         key: `${chat.id}:${bannerSeq.current}`,
       })
     }

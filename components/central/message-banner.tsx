@@ -50,6 +50,8 @@ export interface MessageBannerContent {
   members?: ChatAvatarMember[]
   otherCount?: number
   isCentral?: boolean
+  /** A DM's chip falls back to the person's INITIALS, not one letter. */
+  isDM?: boolean
   /** Changes for every banner, including a second one from the SAME chat — it is
    *  what re-arms the dwell timer and restarts the entrance. */
   key: string
@@ -158,6 +160,7 @@ export function MessageBanner({
           members={content.members}
           otherCount={content.otherCount}
           isCentral={content.isCentral}
+          isDM={content.isDM}
           // The ring between clustered circles is a hole in whatever is behind
           // them, so it has to be the CARD's fill, not the page's.
           surface="var(--ivory)"

@@ -98,6 +98,7 @@ export function ChatAvatar({
   members = [],
   otherCount = 0,
   isCentral = false,
+  isDM = false,
   surface = "var(--cream)",
   className = "",
   style,
@@ -120,6 +121,14 @@ export function ChatAvatar({
    *  ministry's name and "B" identifies nothing. A photo always wins over the mark
    *  — the glyph is the DEFAULT, sized to be replaced. */
   isCentral?: boolean
+  /** groups.type === "dm". A DM's title is a PERSON'S NAME, so its letter
+   *  fallback is their initials — the same two letters the directory and every
+   *  roster show for them. Every other chat title was typed by someone and takes
+   *  a single letter (a "Sunday Setup Crew" reading "SC" invents an acronym
+   *  nobody chose). The type has to be told to us: `cluster_members` is empty for
+   *  a DM by design, so there is no member to derive initials from and the title
+   *  string alone cannot say which kind of title it is. */
+  isDM?: boolean
   /** The ring between overlapping circles is a gap in the ROW's own background,
    *  not a cream stroke — so a pressed or selected row must pass its own fill. */
   surface?: string
@@ -139,6 +148,9 @@ export function ChatAvatar({
   // no other members at all (nothing to draw, so fall back to the title letter).
   const solo = otherCount <= 1 || members.length === 0
 
+  // What the chip says when there is no face and no photo to show.
+  const titleInitials = isDM ? initialsOf(title) : title.charAt(0).toUpperCase()
+
   // A chat's OWN photo wins over everything — the cluster, the single face, the
   // letter and the church mark. It is the most deliberate identity the chat has,
   // because somebody chose it. (For a DM this is the partner's profile photo,
@@ -146,7 +158,7 @@ export function ChatAvatar({
   if (avatarUrl) {
     return (
       <MonogramChip
-        initials={title.charAt(0).toUpperCase()}
+        initials={titleInitials}
         avatarUrl={avatarUrl}
         className={className}
         style={{ width: size, height: size, flexShrink: 0, fontFamily: "var(--serif)", fontSize: Math.round(size * 0.35), fontWeight: 600, ...style }}
@@ -178,7 +190,7 @@ export function ChatAvatar({
     const one = members[0] ?? null
     return (
       <MonogramChip
-        initials={one ? initialsOf(one.name) : title.charAt(0).toUpperCase()}
+        initials={one ? initialsOf(one.name) : titleInitials}
         avatarUrl={one?.avatar_url ?? null}
         className={className}
         style={{ width: size, height: size, flexShrink: 0, fontFamily: "var(--serif)", fontSize: Math.round(size * 0.35), fontWeight: 600, ...style }}
