@@ -1531,6 +1531,32 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               <PocketFilterChip label="Leaders" active={memberFilter === "leaders"} onClick={() => setMemberFilter("leaders")} />
             </PocketFilterChipRow>
             <PocketSearchField value={memberSearch} onChange={setMemberSearch} placeholder="Search members" style={{ marginBottom: 16 }} />
+            {/* ABOVE the roster, not under it. This is something you ACT on, and a
+                list of 70 people is a long way to scroll before finding out you
+                could have cleaned it. It states the count as a fact and offers the
+                fix beside it, and it is absent entirely when the list is clean —
+                so it never reads as a permanent control. */}
+            {canManage && deletedMemberCount > 0 && (
+              <div
+                className="flex items-center justify-between gap-3"
+                style={{
+                  marginBottom: 12, padding: "11px 14px",
+                  background: "var(--ivory)", borderRadius: "var(--r-card)",
+                }}
+              >
+                <span className="text-[13px]" style={{ color: "var(--muted-text)" }}>
+                  {deletedMemberCount} deleted account{deletedMemberCount !== 1 ? "s" : ""} in this list
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setConfirmPurge(true)}
+                  className="text-[13px] font-semibold flex-shrink-0"
+                  style={{ background: "none", border: "none", padding: 0, color: "var(--plum)", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+                >
+                  Remove
+                </button>
+              </div>
+            )}
             {loading ? <Spinner /> : visibleMembers.length === 0 ? (
               <EmptyState
                 icon={<Users className="w-7 h-7" />}
@@ -1559,19 +1585,6 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                   />
                 ))}
               </PocketRowCard>
-            )}
-            {/* Sits UNDER the roster, not in the chrome row: it is a response to
-                something you can see in the list above it, and it disappears the
-                moment the list is clean. */}
-            {canManage && deletedMemberCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setConfirmPurge(true)}
-                className="w-full text-[13px] font-medium"
-                style={{ marginTop: 14, padding: "12px 0", background: "none", border: "none", color: "var(--plum)", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
-              >
-                Remove {deletedMemberCount} deleted account{deletedMemberCount !== 1 ? "s" : ""}
-              </button>
             )}
           </div>
           ) : (
@@ -1830,13 +1843,32 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               </div>
             )}
 
-            {/* Members — Add lives in the ContentHeader action slot (§3.2) */}
+            {/* Members — actions live in the ContentHeader action slot (§3.2).
+                The purge sits to the LEFT of Add members: a list helper goes left
+                of the section's own action (Convention #15), and putting it in the
+                header is what makes it the first thing you see rather than
+                something you find after scrolling 70 rows. Absent when the list is
+                clean, so it never reads as permanent chrome. */}
             <div style={{ marginBottom: 12 }}>
               <ContentHeader
                 label={isDM ? "Conversation with" : "Members"}
-                action={(canManage || isDM) && !dmPartnerGone ? (
-                  <ContentActionButton variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} label={isDM ? "Start a group chat" : "Add members"} onClick={() => { setShowAddMembers(true); loadAllProfiles() }} />
-                ) : undefined}
+                action={
+                  (canManage && deletedMemberCount > 0) || ((canManage || isDM) && !dmPartnerGone) ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      {canManage && deletedMemberCount > 0 && (
+                        <ContentActionButton
+                          variant="ghost"
+                          icon={<Trash2 style={{ width: 14, height: 14 }} />}
+                          label={`Remove ${deletedMemberCount} deleted account${deletedMemberCount !== 1 ? "s" : ""}`}
+                          onClick={() => setConfirmPurge(true)}
+                        />
+                      )}
+                      {(canManage || isDM) && !dmPartnerGone && (
+                        <ContentActionButton variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} label={isDM ? "Start a group chat" : "Add members"} onClick={() => { setShowAddMembers(true); loadAllProfiles() }} />
+                      )}
+                    </div>
+                  ) : undefined
+                }
               />
             </div>
             <div style={{ background: "var(--cream)", border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden" }}>
@@ -1895,17 +1927,6 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                 )
               })}
             </div>
-            {/* Same affordance as the mobile Members screen, same placement rule:
-                directly under the list it is about, gone once the list is clean. */}
-            {canManage && deletedMemberCount > 0 && (
-              <button
-                type="button"
-                onClick={() => setConfirmPurge(true)}
-                style={{ marginTop: 12, padding: 0, background: "none", border: "none", color: "var(--plum)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}
-              >
-                Remove {deletedMemberCount} deleted account{deletedMemberCount !== 1 ? "s" : ""}
-              </button>
-            )}
             {isChurch && canManage && (
               <p style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 10, lineHeight: 1.5 }}>Member changes sync to the small group home page if this chat is linked to a group.</p>
             )}
