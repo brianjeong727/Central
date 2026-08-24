@@ -16,6 +16,7 @@ import { unsubscribeFromPush, type PushState } from "@/lib/push"
 // Native-aware wrappers: inside the Capacitor iOS shell these route to APNs; on plain
 // web they fall through to the identical lib/push path (web behavior byte-unchanged).
 import { subscribeToPushUnified, getPushStateUnified } from "@/lib/native-push"
+import { APP_STORE_URL, iosNeedsInstallForPush } from "@/lib/push"
 import type { NotificationSettings, GroupNotifyMode } from "../types"
 
 // Merge a saved-settings write that PRESERVES keys we don't own here (e.g.
@@ -354,10 +355,20 @@ export function NotificationsSection({
 
   const permission = pushState?.permission ?? "default"
   const subscribed = pushState?.subscribed ?? false
+  // Read after mount only — it reads navigator, and rendering it during SSR would
+  // make the server and the client disagree about which copy this row carries.
+  const needsAppForPush = pushState !== null && iosNeedsInstallForPush()
 
   let permissionLabel: string
   let permissionSub: string
-  if (permission === "unsupported") {
+  // An "unsupported" state is not a valid resting place for the product's main
+  // channel. On iPhone it is also not the browser's fault in any way the member can
+  // act on — Apple gives PushManager to installed apps only — so the row names the
+  // ONE thing that fixes it instead of blaming Safari and stopping there.
+  if (permission === "unsupported" && needsAppForPush) {
+    permissionLabel = "Not available in Safari"
+    permissionSub = "iPhone only sends notifications to installed apps."
+  } else if (permission === "unsupported") {
     permissionLabel = "Not supported"
     permissionSub = "This browser doesn't support push notifications."
   } else if (permission === "denied") {
@@ -392,6 +403,16 @@ export function NotificationsSection({
             <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 1.5 }}>{permissionSub}</div>
             {enableError && (
               <div style={{ marginTop: 6, fontSize: 13, color: "var(--danger)", lineHeight: 1.5 }}>{enableError}</div>
+            )}
+            {permission === "unsupported" && needsAppForPush && (
+              <a
+                href={APP_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: "inline-block", marginTop: 8, fontSize: 13, fontWeight: 600, color: "var(--plum)", textDecoration: "underline", textUnderlineOffset: 3 }}
+              >
+                Get Central on the App Store
+              </a>
             )}
           </div>
           {permission !== "unsupported" && permission !== "denied" && (

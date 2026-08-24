@@ -22,6 +22,7 @@ import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
 import { getPushStateUnified } from "@/lib/native-push"
+import { iosNeedsInstallForPush } from "@/lib/push"
 import { downscaleToJpeg } from "@/lib/downscale-image"
 import type { Profile, Devotional, Prayer, Verse, NotificationSettings } from "../types"
 import { cohortLabel, isYoungAdult } from "@/lib/cohort"
@@ -1216,9 +1217,12 @@ export function ProfileTab({
     let cancelled = false
     getPushStateUnified().then((st) => {
       if (cancelled) return
-      // `supported: false` (a browser with no Push API) is not "off" — there is
-      // nothing to turn on, so say nothing rather than imply a broken setting.
-      setPushOnHere(st.supported ? st.subscribed : null)
+      // `supported: false` splits in two. On an iPhone browser it still reads "Off"
+      // to the member — they get nothing — and the row now holds the one action that
+      // fixes it (the App Store link), so the marker should pull them into it. On a
+      // desktop browser with no Push API there is genuinely nothing to turn on, so
+      // say nothing rather than imply a broken setting.
+      setPushOnHere(st.supported ? st.subscribed : iosNeedsInstallForPush() ? false : null)
     })
     return () => { cancelled = true }
   }, [settingsView])

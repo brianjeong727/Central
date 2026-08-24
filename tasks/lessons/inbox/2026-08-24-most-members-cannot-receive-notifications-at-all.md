@@ -29,6 +29,19 @@ carry the ONE action that makes it available ("Get Central from the App Store" /
 "Add to Home Screen"), or the feature is effectively off for everyone outside the
 happy path and the product has no way of knowing.
 
-**Not fixed here** — putting an App Store link in the product is a distribution
-decision (which surfaces, how prominent, whether it also promotes Add to Home
-Screen), not a bug fix. Raised to Brian.
+**Fixed (the copy only, by Brian's call).** The notifications row on an iPhone
+browser now reads "Not available in Safari / iPhone only sends notifications to
+installed apps." with a link to the real listing, and the phone-width settings hub
+marks that row "Off" so it is findable at all. Scoped deliberately: a desktop browser
+without push still gets the plain message, because there is no app to send that
+person to.
+
+**The App Store id is not recorded anywhere in the repo** and must not be guessed.
+`https://apps.apple.com/us/app/central-os/id6791196078` — resolved from the Capacitor
+bundle id via Apple's public lookup:
+`curl "https://itunes.apple.com/lookup?bundleId=app.joincentral"`. Worth knowing the
+next time something needs to link to the app.
+
+**Still open** — how loudly to promote the app to the ~49 members who have never been
+told it exists (a banner, the landing page, onboarding) is a distribution decision, not
+a bug fix. Only the dead-end copy was in scope.
