@@ -19,6 +19,7 @@ import { MODERATION_DEFAULTS, moderateText, type ModerationSettings } from "@/li
 import { storagePathFromPublicUrl, removeStorageObject } from "@/lib/storage-cleanup"
 import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, SerifInput, MonogramChip, PocketFilterChip, PocketCard, PocketButton, PocketTag, PocketRoundButton, PocketRow, PocketRowCard, PocketKicker, useScrollResetOn, useEdgeSwipeBack, PendingVeil, ImageCropper } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
+import { dismissKeyboard, subscribeKeyboard, useSwipeDownToDismissKeyboard } from "@/lib/keyboard-inset"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
 import { getPushStateUnified } from "@/lib/native-push"
@@ -1231,6 +1232,68 @@ export function ProfileTab({
   // chevron, per Convention #22.
   const backToProfileRoot = useCallback(() => onSectionChange("spiritual-profile"), [onSectionChange])
   const journalSwipeRef = useEdgeSwipeBack<HTMLDivElement>(backToProfileRoot)
+
+  // ── Getting the keyboard back OFF the profile ──────────────────────────────
+  // Profile v2 commits a field by BLURRING it, and at phone width the screen is
+  // rows end to end with nothing bare to tap — so "put the keyboard away" and
+  // "save what I typed" are the same act, and there was no way to perform it.
+  // The shell also hides iOS's own `^ v Done` accessory bar (lib/keyboard-inset.ts,
+  // for the chat composer's sake), so there was no native escape either.
+  //
+  // Two ways out now, both of them the ones people already try:
+  //   • a deliberate swipe DOWN anywhere on the screen — the same gesture the chat
+  //     transcript uses, so it is one habit rather than two;
+  //   • a tap on anything that is not itself a control. On this screen that also
+  //     does the right thing when you tap ANOTHER row: pointerdown blurs (and so
+  //     commits) the field you were in, and the click that follows opens the one
+  //     you aimed at.
+  const profileRootRef = useRef<HTMLDivElement | null>(null)
+  useSwipeDownToDismissKeyboard(profileRootRef)
+
+  const dismissOnEmptyTap = useCallback((e: React.PointerEvent) => {
+    const target = e.target as HTMLElement | null
+    // Anything that handles its own focus keeps it — including the next INPUT,
+    // which must take focus rather than lose it.
+    if (target?.closest("input, textarea, select, button, a, [role='button'], [contenteditable='true']")) return
+    dismissKeyboard()
+  }, [])
+
+  // Keep the field you are typing in ABOVE the keyboard. The shell claims
+  // `resize: "none"` (Convention #28), so the WebView never shrinks and iOS's own
+  // scroll-into-view has nothing to work against — and the verse block, the one
+  // thing on this screen you actually write a sentence into, is the LAST thing on
+  // the page. It disappeared under the keys the moment it was tapped.
+  //
+  // Two moments need it and only one is a focus event: the FIRST field (focus
+  // fires before the keyboard exists, so the scroll has to wait for the height to
+  // land) and every field after it (the keyboard is already up, so `open` never
+  // changes again and only focus can drive it).
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!window.matchMedia?.("(pointer: coarse)").matches) return
+    const root = profileRootRef.current
+    if (!root) return
+
+    let kbOpen = false
+    const reveal = () => {
+      const active = document.activeElement as HTMLElement | null
+      if (!active || !root.contains(active)) return
+      if (!active.matches("input, textarea, select")) return
+      // One frame after the inset lands, so the spacer's height already exists
+      // and there is somewhere to scroll TO.
+      requestAnimationFrame(() => active.scrollIntoView({ block: "center", behavior: "smooth" }))
+    }
+    const onFocusIn = () => { if (kbOpen) reveal() }
+    root.addEventListener("focusin", onFocusIn)
+    const stop = subscribeKeyboard(({ open }) => {
+      // The web path emits several times per keyboard slide; only the CLOSED →
+      // OPEN edge is a new reason to move the page.
+      if (open === kbOpen) return
+      kbOpen = open
+      if (open) reveal()
+    })
+    return () => { root.removeEventListener("focusin", onFocusIn); stop() }
+  }, [])
   useScrollResetOn([activeSection])
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   // The picked file, held while the user positions it. Choosing a photo no longer
@@ -1827,7 +1890,11 @@ export function ProfileTab({
   const journalShowStats = (profile.show_journal_entries ?? false) || (profile.show_journal_streak ?? false)
 
   return (
-    <div className="pb-6 md:pb-0 md:flex md:flex-col md:min-h-full">
+    <div
+      ref={profileRootRef}
+      onPointerDown={dismissOnEmptyTap}
+      className="pb-6 md:pb-0 md:flex md:flex-col md:min-h-full"
+    >
 
       {activeSection === "journal" && (
         <div ref={journalSwipeRef}>
@@ -2042,7 +2109,12 @@ export function ProfileTab({
                     onBlur={commitInline}
                     placeholder={r.placeholder}
                     aria-label={r.label}
-                    style={{ flex: 1, minWidth: 0, border: "none", background: "var(--ivory)", borderRadius: 10, padding: "8px 11px", fontSize: 14.5, color: "var(--ink)", textAlign: "right", outline: "none" }}
+                    // 44px is the tap minimum (§2) and it is also what makes
+                    // PASTING work: iOS offers the Paste callout above a long
+                    // press that lands INSIDE the field, and on a ~36px strip
+                    // under a fingertip it mostly does not — you get the page's
+                    // selection and nothing to paste into.
+                    style={{ flex: 1, minWidth: 0, minHeight: 44, boxSizing: "border-box", border: "none", background: "var(--ivory)", borderRadius: 10, padding: "8px 11px", fontSize: 14.5, color: "var(--ink)", textAlign: "right", outline: "none" }}
                   />
                 ) : (
                   <div style={{ fontSize: 14.5, fontWeight: filled ? 500 : 600, color: filled ? "var(--ink)" : "var(--plum)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -2303,6 +2375,15 @@ export function ProfileTab({
         onClose={() => setClassPrompt(null)}
       />
       </div>}
+
+      {/* Room to scroll the last field clear of the keyboard. Without it the verse
+          block — the bottom of the page, and the one field you write a sentence
+          into — sits under the keys however hard you scroll.
+          A SPACER rather than `kb-lift` on the root: the class sets padding-bottom
+          outright, so on the root it would beat the `pb-6` above and leave the page
+          with no bottom padding at all whenever the keyboard is closed (which is
+          almost always). Collapses to 0 with the keyboard, and at md. */}
+      <div className="kb-lift md:hidden" data-kb-spacer aria-hidden />
     </div>
   )
 }
