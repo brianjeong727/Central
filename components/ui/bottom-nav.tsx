@@ -51,7 +51,11 @@ export function BottomNav({ activeTab, onTabChange, chatsUnread = 0, showPlan = 
   if (hidden) return null
   return (
     <div
-      className="fixed left-1/2 -translate-x-1/2 z-50 md:hidden"
+      // `kb-hide` (globals.css) takes the pill off screen while a keyboard is up.
+      // It floats over the bottom of every scroll region, so on a FORM it lands
+      // squarely on whichever field you were reaching for next — and the home
+      // indicator it clears is behind the keys anyway (Convention #28).
+      className="fixed left-1/2 -translate-x-1/2 z-50 md:hidden kb-hide"
       style={{ bottom: "calc(env(safe-area-inset-bottom) + 14px)" }}
     >
       <nav
