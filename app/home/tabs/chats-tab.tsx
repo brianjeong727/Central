@@ -21,6 +21,7 @@ import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatGro
 import { useOpenMemberProfile } from "../member-profile-context"
 import { InsetHairline } from "@/components/central/hairline"
 import { chatCapabilities } from "../chat-permissions"
+import { dismissDelivered } from "@/lib/notification-dismiss"
 import { chatChipAvatarFromParts, chatAvatarStoragePath, chatGroupPhotoPatch } from "../chat-avatar"
 import { downscaleToJpeg } from "@/lib/downscale-image"
 import { subscribeChatTopic } from "../chat-broadcast"
@@ -3131,11 +3132,21 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     }, READ_COALESCE_MS)
   }, [flushRead])
 
+  // Reading a chat takes its notifications back down.
+  //
+  // Tapping a push already clears it — the broken case is the ordinary one: you
+  // see the banner, open the app yourself, read the message, and the notification
+  // is still sitting there afterwards. Best-effort and silent (see
+  // lib/notification-dismiss.ts); this runs on a screen's open path and must never
+  // be able to break it.
+  const dismissThisChat = useCallback(() => { void dismissDelivered(`chat-${groupId}`) }, [groupId])
+
   // Open marks read immediately — that is the one write worth doing eagerly,
   // because it clears the unread badge the user just tapped past.
   useEffect(() => {
     pendingReadRef.current = new Date().toISOString()
     flushRead()
+    dismissThisChat()
     return () => {
       if (readFlushTimer.current) { clearTimeout(readFlushTimer.current); readFlushTimer.current = null }
       // Everything visible up to this moment counts as read — stamp NOW rather
@@ -3151,6 +3162,17 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId, userId])
+
+  // Coming BACK to the app with this chat already on screen. The open effect above
+  // fires once per mount, so it misses the exact shape of the complaint: a push
+  // lands while the app is backgrounded ON this chat, and returning to it leaves
+  // the notification behind because nothing re-ran. visibilitychange covers the
+  // web and the shell alike — Capacitor's WebView fires it on resume.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") dismissThisChat() }
+    document.addEventListener("visibilitychange", onVisible)
+    return () => document.removeEventListener("visibilitychange", onVisible)
+  }, [dismissThisChat])
 
   // Newest message by any route (initial load, realtime, load-older) — the close
   // flush reads this to decide whether a write is owed.

@@ -131,13 +131,18 @@ export async function sendApnsNotification(opts: {
   // the web service worker's notification `tag`; custom top-level `url` key for
   // deep-linking — lib/native-push.ts's pushNotificationActionPerformed reads
   // `notification.data.url` (Capacitor surfaces top-level custom keys under `data`).
+  //
+  // `tag` rides in the data too, even though thread-id already carries it. Capacitor's
+  // PushNotificationSchema.tag is ANDROID-ONLY and thread-id is not surfaced to JS at
+  // all, so on iOS the payload is the only way lib/notification-dismiss.ts can tell
+  // which delivered notifications belong to the chat you just read.
   const notification = new Notification(opts.token, {
     type: PushType.alert,
     priority: Priority.immediate,
     alert: { title: opts.title, ...(opts.subtitle ? { subtitle: opts.subtitle } : {}), body: opts.body },
     sound: "default",
     threadId: opts.tag,
-    data: { url: opts.url },
+    data: { url: opts.url, tag: opts.tag },
   })
 
   const first = primaryHost()
