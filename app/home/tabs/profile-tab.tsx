@@ -19,6 +19,7 @@ import { MODERATION_DEFAULTS, moderateText, type ModerationSettings } from "@/li
 import { storagePathFromPublicUrl, removeStorageObject } from "@/lib/storage-cleanup"
 import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, JournalListSkeleton, ConfirmDialog, ActionMenu, Input, SerifInput, MonogramChip, PocketFilterChip, PocketCard, PocketButton, PocketTag, PocketRoundButton, PocketRow, PocketRowCard, PocketKicker, useScrollResetOn, useEdgeSwipeBack, PendingVeil, ImageCropper } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
+import { dismissKeyboard, subscribeKeyboard, useSwipeDownToDismissKeyboard } from "@/lib/keyboard-inset"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
 import { downscaleToJpeg } from "@/lib/downscale-image"
@@ -1172,6 +1173,60 @@ export function ProfileTab({
   // chevron, per Convention #22.
   const backToProfileRoot = useCallback(() => onSectionChange("spiritual-profile"), [onSectionChange])
   const journalSwipeRef = useEdgeSwipeBack<HTMLDivElement>(backToProfileRoot)
+
+  // ── Getting the keyboard back OFF a form ───────────────────────────────────
+  // A profile at phone width is fields end to end, and the shell hides iOS's own
+  // `^ v Done` accessory bar (lib/keyboard-inset.ts, for the chat composer's
+  // sake) — so there was no built-in way out and barely any bare surface left to
+  // tap. Two ways out now, both of them the ones people already try:
+  //   • a deliberate swipe DOWN anywhere on the screen (the same gesture the chat
+  //     transcript uses, so it is one habit rather than two);
+  //   • a tap on anything that is not itself a control — a section label, a card
+  //     gap, the space under the last field.
+  const profileRootRef = useRef<HTMLDivElement | null>(null)
+  useSwipeDownToDismissKeyboard(profileRootRef)
+
+  const dismissOnEmptyTap = useCallback((e: React.PointerEvent) => {
+    const target = e.target as HTMLElement | null
+    // Anything interactive keeps its own behaviour — including the next FIELD,
+    // which must take focus rather than lose it.
+    if (target?.closest("input, textarea, select, button, a, label, [role='button'], [contenteditable='true']")) return
+    dismissKeyboard()
+  }, [])
+
+  // Keep the focused field ABOVE the keyboard. The shell claims `resize: "none"`
+  // (Convention #28), so the WebView never shrinks and iOS's own scroll-into-view
+  // has nothing to work against — a field in the bottom third simply types itself
+  // underneath the keys. Two moments need it, and only one of them is a focus
+  // event: the FIRST field (focus fires before the keyboard exists, so the scroll
+  // has to wait for the height to land) and every field after it (the keyboard is
+  // already up, so `open` never changes again and only focus can drive it).
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!window.matchMedia?.("(pointer: coarse)").matches) return
+    const root = profileRootRef.current
+    if (!root) return
+
+    let kbOpen = false
+    const reveal = () => {
+      const active = document.activeElement as HTMLElement | null
+      if (!active || !root.contains(active)) return
+      if (!active.matches("input, textarea, select")) return
+      // One frame after the inset lands, so `kb-lift`'s padding already exists
+      // and there is somewhere to scroll TO.
+      requestAnimationFrame(() => active.scrollIntoView({ block: "center", behavior: "smooth" }))
+    }
+    const onFocusIn = () => { if (kbOpen) reveal() }
+    root.addEventListener("focusin", onFocusIn)
+    const stop = subscribeKeyboard(({ open }) => {
+      // The web path emits several times per keyboard slide; only the CLOSED →
+      // OPEN edge is a new reason to move the page.
+      if (open === kbOpen) return
+      kbOpen = open
+      if (open) reveal()
+    })
+    return () => { root.removeEventListener("focusin", onFocusIn); stop() }
+  }, [])
   useScrollResetOn([activeSection])
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   // The picked file, held while the user positions it. Choosing a photo no longer
@@ -1508,6 +1563,15 @@ export function ProfileTab({
       ? { borderRadius: "var(--r-pocket)", overflow: "hidden", background: "var(--ivory)" }
       : { border: "1px solid var(--line)", borderRadius: 12, overflow: "hidden", background: "var(--cream)" }
     const fieldDivider = mobile ? "var(--line-3)" : "var(--line)"
+    // A 21px-tall input is under half the 44px minimum, and it is not only hard to
+    // TAP — it is what makes pasting fail. iOS puts the Paste callout above a long
+    // press that lands inside the field, and on a 21px strip under a fingertip it
+    // mostly does not: you get the page's selection instead and nothing to paste
+    // into. So the input's own box gets the height (a `label` wrapper would fix
+    // tapping and NOT pasting — the press has to land on the control itself), and
+    // the row's padding gives it back so the card barely moves.
+    const fieldBox: React.CSSProperties = mobile ? { minHeight: 44, padding: "11px 0", boxSizing: "border-box" } : { padding: 0 }
+    const rowPad = mobile && editing ? "4px 18px" : "14px 18px"
     const hasAnyContent = PROFILE_SECTIONS.some(s => s.fields.some(f => !!getFieldValue(f.key).trim()))
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -1520,12 +1584,18 @@ export function ProfileTab({
           const filledFields = applicable.filter(f => !!getFieldValue(f.key).trim())
           if (!editing && filledFields.length === 0 && !(section.id === "contact" && isYoungAdult(profile.grade))) return null
           const fieldsToRender = editing ? applicable : filledFields
+          // A section with nothing to show is a kicker floating over blank page.
+          // The read-mode guard above never caught it because these sections have
+          // no fields AT ALL — ABOUT and PRAYER rendered as two bare labels in the
+          // middle of the edit form. Contact is exempt: it appends the Stage row
+          // below, so it has content even when every field is filtered out.
+          if (fieldsToRender.length === 0 && section.id !== "contact") return null
           return (
             <div key={section.id}>
               <p style={{ ...MONO_STYLE, marginBottom: 10, marginTop: 0 }}>{section.label}</p>
               <div style={sectionCard}>
                 {fieldsToRender.map((field, i) => (
-                  <div key={field.key} style={{ padding: "14px 18px", borderTop: i > 0 ? `1px solid ${fieldDivider}` : "none" }}>
+                  <div key={field.key} style={{ padding: rowPad, borderTop: i > 0 ? `1px solid ${fieldDivider}` : "none" }}>
                     {editing ? (
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                         <p style={monoFieldLabel}>{field.label}</p>
@@ -1541,7 +1611,7 @@ export function ProfileTab({
                           onChange={e => setDraft(d => ({ ...d, [field.key]: e.target.value }))}
                           placeholder={field.placeholder}
                           rows={3}
-                          style={{ display: "block", width: "100%", fontSize: 14, color: "var(--ink)", lineHeight: 1.65, background: "transparent", border: "none", outline: "none", resize: "vertical", fontFamily: "inherit", padding: 0, boxSizing: "border-box" }}
+                          style={{ display: "block", width: "100%", fontSize: 14, color: "var(--ink)", lineHeight: 1.65, background: "transparent", border: "none", outline: "none", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box", ...fieldBox }}
                         />
                       ) : (
                         <input
@@ -1549,7 +1619,7 @@ export function ProfileTab({
                           value={draft[field.key]}
                           onChange={e => setDraft(d => ({ ...d, [field.key]: e.target.value }))}
                           placeholder={field.placeholder}
-                          style={{ display: "block", width: "100%", fontSize: 14, color: "var(--ink)", background: "transparent", border: "none", outline: "none", fontFamily: "inherit", padding: 0 }}
+                          style={{ display: "block", width: "100%", fontSize: 14, color: "var(--ink)", background: "transparent", border: "none", outline: "none", fontFamily: "inherit", ...fieldBox }}
                         />
                       )
                     ) : (
@@ -1601,7 +1671,7 @@ export function ProfileTab({
                 <select
                   value={currentSchoolId ?? ""}
                   onChange={e => handleSchoolChange(e.target.value)}
-                  style={{ width: "100%", fontSize: 14, color: "var(--ink)", background: "transparent", border: "none", outline: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+                  style={{ width: "100%", fontSize: 14, color: "var(--ink)", background: "transparent", border: "none", outline: "none", cursor: "pointer", fontFamily: "inherit", ...fieldBox }}
                 >
                   <option value="">Other / Not a student</option>
                   {schoolOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -1637,7 +1707,11 @@ export function ProfileTab({
   const journalShowStats = (profile.show_journal_entries ?? false) || (profile.show_journal_streak ?? false)
 
   return (
-    <div className="pb-6 md:pb-0 md:flex md:flex-col md:min-h-full">
+    <div
+      ref={profileRootRef}
+      onPointerDown={dismissOnEmptyTap}
+      className="pb-6 md:pb-0 md:flex md:flex-col md:min-h-full"
+    >
 
       {activeSection === "journal" && (
         <div ref={journalSwipeRef}>
@@ -1723,7 +1797,10 @@ export function ProfileTab({
                       placeholder="Your name"
                       autoComplete="name"
                       maxLength={80}
-                      style={{ letterSpacing: "-0.01em", lineHeight: 1.15 }}
+                      // Same 44px floor as the fields below (see `fieldBox`): a
+                      // 34px strip is under the tap minimum and is where a long
+                      // press to paste a name lands on the page instead.
+                      style={{ letterSpacing: "-0.01em", lineHeight: 1.15, minHeight: 44 }}
                     />
                     {/* Same copy as desktop — without it the disabled Save at the
                         top of the chrome has no explanation at phone width. 12.5
@@ -2013,6 +2090,15 @@ export function ProfileTab({
         onClose={() => setClassPrompt(null)}
       />
       </div>}
+
+      {/* Room to scroll the last field clear of the keyboard. Without it the bottom
+          of a form is simply unreachable — the page ends where the keyboard begins,
+          and the field you are typing in stays under it however hard you scroll.
+          A SPACER rather than `kb-lift` on the root: the class sets padding-bottom
+          outright, so on the root it would beat the `pb-6` above and leave the page
+          with no bottom padding at all whenever the keyboard is closed (which is
+          almost always). Collapses to 0 with the keyboard, and at md. */}
+      <div className="kb-lift md:hidden" data-kb-spacer aria-hidden />
     </div>
   )
 }
