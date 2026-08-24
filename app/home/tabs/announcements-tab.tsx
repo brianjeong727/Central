@@ -5,6 +5,7 @@ import Image from "next/image"
 import useSWR, { useSWRConfig } from "swr"
 import { useMinistryTimezone } from "../ministry-timezone-context"
 import { instantToZoned, zonedTimeToISO, formatInZone } from "@/lib/tz"
+import { dismissDelivered } from "@/lib/notification-dismiss"
 import { X, Check, ImageIcon, Trash2, Bell, Calendar, MoreHorizontal, Plus, Edit3, FileText, Pin, PinOff, Eye } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { logAudit } from "@/lib/audit"
@@ -2182,6 +2183,11 @@ export function AnnouncementDetailView({
       supabase.from("announcement_views")
         .upsert({ announcement_id: announcementId, user_id: userId }, { onConflict: "announcement_id,user_id", ignoreDuplicates: true })
         .then()
+
+      // Reading it takes its notification back down — same reason as a chat: a
+      // push still sitting in the tray for something you have already opened is
+      // the app telling you something untrue. Best-effort and silent.
+      void dismissDelivered(`announcement-${announcementId}`)
 
       const rsvpUserIds = (rsvpRows ?? []).map((r: { user_id: string }) => r.user_id)
       const userHasRsvped = rsvpUserIds.includes(userId)
