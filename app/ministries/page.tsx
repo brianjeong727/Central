@@ -10,7 +10,8 @@ import { Spinner, RingCrossLogo } from "@/app/home/components/shared"
 import { MonogramChip } from "@/components/central/MonogramChip"
 import { PlanSubTabStrip } from "@/components/central/plan-sub-tab-strip"
 import { CentralButton } from "@/components/central/button"
-import { CentralModal, InviteShareModal, PendingVeil } from "@/components/central"
+import { CentralModal, InviteShareModal, PendingVeil, DuplicateAccountDialog, type DuplicateAccountInfo } from "@/components/central"
+import { DUPLICATE_ACCOUNT } from "@/lib/duplicate-account"
 import { usePostJoinPickers, PostJoinPickerModals, SIZE_LABELS, ModalAction } from "./post-join-pickers"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { BackChevron } from "@/components/central/back-chevron"
@@ -111,6 +112,13 @@ function MinistriesContent() {
   // Set when a typed code opened a REQUEST. Replaces the join form's result, because
   // there is nothing further for them to do here.
   const [requestedName, setRequestedName] = useState<string | null>(null)
+  // The duplicate-account interstitial. `retry` is the SAME join, re-armed with
+  // confirmedNotDuplicate — held as a closure so "that isn't me" resumes exactly
+  // the path the person was on (public join, typed code, or request) rather than
+  // guessing which one it was.
+  const [dup, setDup] = useState<
+    { candidate: DuplicateAccountInfo; ministryName: string | null; retry: () => void | Promise<void> } | null
+  >(null)
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null)
 
   // Gender + school pickers — every join path enforces the same
@@ -206,10 +214,15 @@ function MinistriesContent() {
     window.location.assign("/home")
   }
 
-  async function doJoin(ministry: PublicMinistry) {
+  async function doJoin(ministry: PublicMinistry, confirmedNotDuplicate = false) {
     setJoiningId(ministry.id)
     setJoinError(null)
-    const { error } = await joinMinistryById(ministry.id)
+    const { error, duplicate } = await joinMinistryById(ministry.id, confirmedNotDuplicate)
+    if (error === DUPLICATE_ACCOUNT && duplicate) {
+      setDup({ candidate: duplicate, ministryName: ministry.name, retry: () => doJoin(ministry, true) })
+      setJoiningId(null)
+      return
+    }
     if (error) { setJoinError(error); setJoiningId(null); return }
     const shown = await pickers.maybeShowSchoolPicker(() => window.location.assign("/home"))
     if (shown) setJoiningId(null)
@@ -221,12 +234,12 @@ function MinistriesContent() {
     doJoin(ministry)
   }
 
-  async function doCodeJoin() {
+  async function doCodeJoin(confirmedNotDuplicate = false) {
     setJoiningCode(true)
     setCodeError(null)
     setRequestedName(null)
     try {
-      const { error, isStaffCode, ministryName } = await joinMinistryByCode(inviteCode)
+      const { error, isStaffCode, ministryName, duplicate } = await joinMinistryByCode(inviteCode, undefined, confirmedNotDuplicate)
       if (isStaffCode) {
         // Staff codes grant a pastor/deacon/elder role — open the role picker to
         // capture it before completing the join. The code never leaves in a URL.
@@ -241,10 +254,19 @@ function MinistriesContent() {
       // user is shown the raw string "REQUEST_REQUIRED" in a red error box, which is
       // the most likely way a shared code travels: read aloud and TYPED, not scanned.
       if (error === "REQUEST_REQUIRED") {
-        const req = await requestToJoinMinistry(inviteCode)
+        const req = await requestToJoinMinistry(inviteCode, confirmedNotDuplicate)
         setJoiningCode(false)
+        if (req.error === DUPLICATE_ACCOUNT && req.duplicate) {
+          setDup({ candidate: req.duplicate, ministryName: req.ministryName, retry: () => doCodeJoin(true) })
+          return
+        }
         if (req.error) { setCodeError(req.error); return }
         setRequestedName(req.ministryName)
+        return
+      }
+      if (error === DUPLICATE_ACCOUNT && duplicate) {
+        setDup({ candidate: duplicate, ministryName, retry: () => doCodeJoin(true) })
+        setJoiningCode(false)
         return
       }
       if (error) { setCodeError(error); setJoiningCode(false); return }
@@ -276,7 +298,7 @@ function MinistriesContent() {
     e.preventDefault()
     if (!isLoggedIn) { window.location.assign("/login?intent=join"); return }
     if (!inviteCode.trim()) return
-    if (pickers.genderGate(doCodeJoin)) return
+    if (pickers.genderGate(() => doCodeJoin())) return
     doCodeJoin()
   }
 
@@ -318,6 +340,21 @@ function MinistriesContent() {
   return (
     <>
       {signingOut && <PendingVeil label="Signing you out…" />}
+
+      {/* ── One account per ministry (interstitial, never a wall) ── */}
+      <DuplicateAccountDialog
+        open={!!dup}
+        candidate={dup?.candidate ?? null}
+        ministryName={dup?.ministryName ?? null}
+        busy={signingOut}
+        // "That's me" is the recommended path and it is just a sign-out: the
+        // account they want already exists, they simply need to be on it. Reuses
+        // handleSignOut so the veil, the signOut-rejects fallback and the /login
+        // landing are the same ones the trapped-user exit uses.
+        onSignInInstead={() => { setDup(null); handleSignOut() }}
+        onContinueAnyway={() => { const again = dup?.retry; setDup(null); void again?.() }}
+        onClose={() => setDup(null)}
+      />
 
       {/* ── Gender + school picker modals (shared across viewports; portaled) ── */}
       {shareFor && (

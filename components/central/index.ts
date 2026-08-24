@@ -87,3 +87,4 @@ export { ChatAvatar, chatAvatarLabel, type ChatAvatarMember } from "./chat-avata
 export { ImageCropper } from "./image-cropper"
 export { MessageMenuOverlay, resolveLayout, type MessageMenuAction } from "./message-menu-overlay"
 export { InviteShareModal } from "./invite-share-modal"
+export { DuplicateAccountDialog, type DuplicateAccountInfo } from "./duplicate-account-dialog"

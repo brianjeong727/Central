@@ -25,6 +25,7 @@ import { createAdminClient } from "@/lib/supabase-admin"
 import { requireMinistryAdmin, requireMinistryMembership } from "./authz"
 import { autoAddUserToChats } from "./auto-chats"
 import { admitUserToMinistry } from "@/lib/ministry-membership"
+import { findDuplicateInMinistry, DUPLICATE_ACCOUNT, type DuplicateCandidate } from "@/lib/duplicate-account"
 import { moderateText, SEVERE } from "@/lib/moderation"
 import { customCodeProblem, normalizeCustomCode, lookupVariants } from "@/lib/invite-code"
 import { isLeaderRole } from "@/lib/roles"
@@ -110,7 +111,10 @@ export async function setCustomInviteCode(
 // ─── Anyone signed in: ask to join ───────────────────────────────────────────
 export async function requestToJoinMinistry(
   rawCode: string,
-): Promise<{ ministryName: string | null; state: "requested" | "already-pending" | null; error: string | null }> {
+  /** Set once the duplicate-account interstitial has been shown and dismissed with
+   *  "that isn't me". Never inferred. */
+  confirmedNotDuplicate?: boolean,
+): Promise<{ ministryName: string | null; state: "requested" | "already-pending" | null; error: string | null; duplicate?: DuplicateCandidate }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ministryName: null, state: null, error: "Not authenticated." }
@@ -146,6 +150,15 @@ export async function requestToJoinMinistry(
     .from("profiles").select("ministry_id").eq("id", user.id).maybeSingle()
   if (profile?.ministry_id === ministry.id) {
     return { ministryName: ministry.name, state: null, error: "You're already in this ministry." }
+  }
+
+  // One account per person per ministry — checked BEFORE the request is filed, not
+  // at approval. Catching it here means the admin's queue never fills with
+  // duplicates in the first place, and the person finds out while they still
+  // remember which address they used, rather than days later.
+  if (!confirmedNotDuplicate) {
+    const dup = await findDuplicateInMinistry(admin, user.id, ministry.id)
+    if (dup) return { ministryName: ministry.name, state: null, error: DUPLICATE_ACCOUNT, duplicate: dup }
   }
 
   const { count } = await admin

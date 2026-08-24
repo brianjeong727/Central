@@ -39,6 +39,7 @@ import { presetById } from "@/app/home/workspace-presets"
 import { ADMIN_ROLES, LEADER_ROLES, MEMBER_TIER, isAdminRole, isStaffRole } from "@/lib/roles"
 import { SUPER_UUID } from "./super-constants"
 import { generateInviteCode, lookupVariants } from "@/lib/invite-code"
+import { findDuplicateInMinistry, DUPLICATE_ACCOUNT, type DuplicateCandidate } from "@/lib/duplicate-account"
 
 const ADMIN_EMAIL = "brianjeong13@gmail.com"
 
@@ -64,8 +65,12 @@ async function uniqueStaffCode(supabase: ReturnType<typeof createAdminClient>): 
 
 export async function joinMinistryByCode(
   inviteCode: string,
-  adminRole?: "pastor" | "deacon" | "elder"
-): Promise<{ ministryName: string | null; error: string | null; isStaffCode?: boolean }> {
+  adminRole?: "pastor" | "deacon" | "elder",
+  /** Set once the user has seen the duplicate-account interstitial and said the
+   *  existing account isn't theirs. Never inferred — the interstitial has to have
+   *  been shown for this to be true. */
+  confirmedNotDuplicate?: boolean,
+): Promise<{ ministryName: string | null; error: string | null; isStaffCode?: boolean; duplicate?: DuplicateCandidate }> {
   const supabase = await createClient()
 
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
@@ -150,6 +155,17 @@ export async function joinMinistryByCode(
   // their own member code) — no-op, so we never demote them.
   if (!isStaff && currentProfile.ministry_id === ministry.id) {
     return { ministryName: ministry.name, error: null }
+  }
+
+  // One account per person per ministry. This runs AFTER every other gate (code
+  // valid, ministry active, not banned, not already a member) so the interstitial
+  // is only ever shown to someone who would otherwise have joined right now.
+  // A staff code is exempt: it is handed out deliberately by a ministry to a
+  // specific person, and it is the one path where a second account with the same
+  // name is plausibly intentional.
+  if (!isStaff && !confirmedNotDuplicate) {
+    const dup = await findDuplicateInMinistry(admin, user.id, ministry.id)
+    if (dup) return { ministryName: ministry.name, error: DUPLICATE_ACCOUNT, duplicate: dup }
   }
 
   // Resolve the role to write. Staff joins use the validated adminRole above.
@@ -240,7 +256,10 @@ export async function getPublicMinistries(search?: string): Promise<{
   return { data, error: error?.message ?? null }
 }
 
-export async function joinMinistryById(ministryId: string): Promise<{ error: string | null }> {
+export async function joinMinistryById(
+  ministryId: string,
+  confirmedNotDuplicate?: boolean,
+): Promise<{ error: string | null; duplicate?: DuplicateCandidate }> {
   const supabase = await createClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return { error: "Not authenticated." }
@@ -276,6 +295,13 @@ export async function joinMinistryById(ministryId: string): Promise<{ error: str
   // Already in this ministry — no-op so we never demote an existing role.
   if (currentProfile.ministry_id === ministryId) {
     return { error: null }
+  }
+
+  // Same one-account-per-ministry gate as the code path, in the same position:
+  // after every other check, so nobody sees it who wasn't about to get in.
+  if (!confirmedNotDuplicate) {
+    const dup = await findDuplicateInMinistry(admin, user.id, ministryId)
+    if (dup) return { error: DUPLICATE_ACCOUNT, duplicate: dup }
   }
 
   // Same as the code-join path: the young-adult choice made at signup lives in
@@ -1101,11 +1127,35 @@ async function removeUserFromMinistryChats(
   userId: string,
   ministryId: string,
 ): Promise<void> {
-  const { data: groups } = await admin.from("groups").select("id").eq("ministry_id", ministryId)
-  const groupIds = (groups ?? []).map((g) => g.id)
-  if (groupIds.length) {
-    await admin.from("group_members").delete().eq("user_id", userId).in("group_id", groupIds)
+  const { data: groups } = await admin.from("groups").select("id, type").eq("ministry_id", ministryId)
+  const rows = (groups ?? []) as { id: string; type: string }[]
+  if (!rows.length) return
+
+  // A DM has no roster to fall back on. get_chat_list derives a DM's title per
+  // viewer by looking up "the other member" through group_members — and the very
+  // next statement deletes exactly that row, so the lookup returns nothing and the
+  // title falls through to `groups.name`, which was written from the CREATOR's
+  // side. Left alone, the survivor's DM with the person who just left is titled
+  // with the SURVIVOR'S OWN NAME (the same failure dm-identity.mobile.spec was
+  // written for, arriving by a different door).
+  //
+  // So stamp the departing person's name onto their DMs first. `groups.name` is
+  // shared by both viewers, which is normally why it can't be trusted — but the
+  // other party is on their way out of this ministry and will not see this chat
+  // again, so a one-sided name is exactly right here.
+  const dmIds = rows.filter((g) => g.type === "dm").map((g) => g.id)
+  if (dmIds.length) {
+    const { data: leaver } = await admin.from("profiles").select("name").eq("id", userId).maybeSingle()
+    const leaverName = leaver?.name?.trim()
+    if (leaverName) {
+      const { data: theirDms } = await admin
+        .from("group_members").select("group_id").eq("user_id", userId).in("group_id", dmIds)
+      const ids = (theirDms ?? []).map((r: { group_id: string }) => r.group_id)
+      if (ids.length) await admin.from("groups").update({ name: leaverName }).in("id", ids)
+    }
   }
+
+  await admin.from("group_members").delete().eq("user_id", userId).in("group_id", rows.map((g) => g.id))
 }
 
 // ─── Admin: remove a member from the ministry ────────────────────────────────
@@ -1126,6 +1176,18 @@ export async function removeMember(targetUserId: string): Promise<{ error: strin
   // target must not be the ministry's last admin-tier member.
   const blockErr = await lastAdminBlockError(admin, profile.ministry_id, targetUserId)
   if (blockErr) return { error: blockErr }
+
+  // Record the departure BEFORE the profile is detached. This is not just the
+  // "left" indicator any more: `auth_shares_chat_history` keeps a departed
+  // person's profile readable inside the chats they posted in, and this row is
+  // what tells the UI to render that name DIMMED rather than as a current member.
+  // removeMember was the one exit path that never wrote it (excommunicateMember
+  // and selfLeaveMinistry always did), so an admin-removed member was the only
+  // kind who came back looking like they had never left.
+  await admin.from("ministry_departures").upsert(
+    { user_id: targetUserId, ministry_id: profile.ministry_id },
+    { onConflict: "user_id,ministry_id" }
+  )
 
   const { error } = await admin.from("profiles").update({ ministry_id: null, role: "member" }).eq("id", targetUserId).eq("ministry_id", profile.ministry_id)
   if (error) return { error: error.message }
@@ -1382,49 +1444,24 @@ export async function setCurrentMinistry(ministryId: string): Promise<{ error: s
   return { error: error?.message ?? null }
 }
 
-// ─── Admin: clean up departed members after 30 days ─────────────────────────
-// Nulls sender_id on their messages (shows "Former Member") and removes the
-// departure record. Never touches profiles or auth.users.
-export async function runDepartedMemberCleanup(ministryId: string): Promise<{ cleaned: number; error: string | null }> {
-  const supabase = await createClient()
-  const { data: { user }, error: authErr } = await supabase.auth.getUser()
-  if (authErr || !user) return { cleaned: 0, error: "Not authenticated." }
-
-  const { data: profile } = await supabase.from("profiles").select("ministry_id, role").eq("id", user.id).maybeSingle()
-  if (!profile?.ministry_id) return { cleaned: 0, error: "No ministry found." }
-  if (!isAdminRole(profile.role)) return { cleaned: 0, error: "Unauthorized." }
-
-  const admin = createAdminClient()
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-
-  const { data: expired } = await admin
-    .from("ministry_departures")
-    .select("user_id")
-    .eq("ministry_id", ministryId)
-    .lt("left_at", cutoff)
-
-  if (!expired || expired.length === 0) return { cleaned: 0, error: null }
-
-  const userIds = expired.map((d: { user_id: string }) => d.user_id)
-
-  // Get all group IDs for this ministry
-  const { data: groups } = await admin.from("groups").select("id").eq("ministry_id", ministryId)
-  const groupIds = (groups ?? []).map((g: { id: string }) => g.id)
-
-  // Null out sender_id on messages so they display as "Former Member"
-  if (groupIds.length > 0) {
-    await admin
-      .from("messages")
-      .update({ sender_id: null })
-      .in("sender_id", userIds)
-      .in("group_id", groupIds)
-  }
-
-  // Remove departure records — "left" indicator disappears, cleanup is done
-  await admin.from("ministry_departures").delete().eq("ministry_id", ministryId).in("user_id", userIds)
-
-  return { cleaned: userIds.length, error: null }
-}
+// ─── RETIRED: the 30-day departed-member anonymiser ──────────────────────────
+//
+// It used to null `sender_id` on a departed member's messages and DELETE their
+// `ministry_departures` row, so after 30 days they became an anonymous "Former
+// Member" with no record they had ever been here.
+//
+// Both halves are now actively destructive. `ministry_departures` is the record
+// that keeps a past member's name resolving in the chats they posted in
+// (`auth_shares_chat_history`) and that tells the UI to dim it; nulling
+// `sender_id` severs the only link that predicate walks. Running this once would
+// have permanently erased the identity of everyone who had left — the exact thing
+// this change exists to preserve, and unrecoverable afterwards.
+//
+// The legitimate need it half-served — "erase me" — belongs to account deletion
+// (`deleteMyAccount`), which scrubs the person rather than the ministry's memory
+// of them. There is no replacement action here on purpose: an exported async
+// function in a "use server" file is a callable endpoint, so leaving a
+// deprecated one in place would leave the destructive path reachable.
 
 // Elevate members/visitors on a leader-tier team (DGL, Board) to "leader" role.
 // Never downgrades admins or existing leaders.
