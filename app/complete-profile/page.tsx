@@ -25,7 +25,7 @@ import { YOUNG_ADULT, isYoungAdult } from "@/lib/cohort"
 // import, and `setYoungAdult(true)` type-checks perfectly against
 // Dispatch<SetStateAction<boolean>> — so the call silently became a state write
 // and the chat move never ran.
-import { setYoungAdult as persistYoungAdult } from "@/app/actions/auto-chats"
+import { setYoungAdult as persistYoungAdult, changeClassChat } from "@/app/actions/auto-chats"
 import { YoungAdultCheck } from "@/app/(auth)/shared"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
@@ -228,9 +228,22 @@ function CompleteProfileContent() {
     // gate; this is what puts them in the right room. Best-effort: a user with no
     // ministry yet has no chats to move, and autoAddUserToChats will place them
     // correctly when they join, so its "not a member" refusal is expected here.
-    if (youngAdult) {
-      try { await persistYoungAdult(true) } catch { /* no ministry yet — placed at join */ }
-    }
+    // BOTH branches, not just the young-adult one. A member who already had a
+    // ministry when the gate first fired (everyone who joined before the gate
+    // shipped, and anyone demoted out of admin-tier since) was placed in chats at
+    // JOIN time, when their cohort was still null — so autoAddUserToChats gave
+    // them the central chat and nothing else, and this form silently completed the
+    // profile without ever putting them in their class room. Nothing downstream
+    // reconciles the two: the profile-tab prompt only fires when the year CHANGES,
+    // so re-picking the same year is a no-op and the member has no way out.
+    // (Abraham Noh, Central — Google signup 2026-06-28, gated after the fact,
+    // "Class of 2027" on his profile and not in the room. Found by Brian.)
+    // changeClassChat is self-only and derives the destination from the profile
+    // ALREADY SAVED above; keepPrevious with no previous year means join-only.
+    try {
+      if (youngAdult) await persistYoungAdult(true)
+      else await changeClassChat({ previousYear: null, keepPrevious: true })
+    } catch { /* no ministry yet — placed at join */ }
 
     setNavigating(true)
     window.location.assign(next)
