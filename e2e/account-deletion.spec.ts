@@ -11,7 +11,7 @@ import { sandbox, E2E_PREFIX } from "./fixtures"
 //     alterations land, calling auth.admin.deleteUser() either fails (a FK
 //     still references the user) or cascades the tombstone/messages away —
 //     so the assertions that depend on the delete actually running (redirect
-//     out, login fails, scrubbed tombstone, "Former member" message) live in a
+//     out, login fails, scrubbed tombstone, "Deleted account" message) live in a
 //     test.fixme block tagged TODO(migration). The guard/confirm-surface tests
 //     run live and are NOT gated.
 
@@ -47,7 +47,7 @@ test.beforeAll(async () => {
     .eq("id", userId)
   if (upErr) throw new Error(`[account-deletion] profile attach failed: ${upErr.message}`)
 
-  // 3. Arrange a message from them (must survive as "Former member").
+  // 3. Arrange a message from them (must survive as "Deleted account").
   adminId = await box.adminUserId()
   const group = await box.createGroup({ name: "Delete Trail", memberIds: [userId, adminId] })
   groupId = group.id
@@ -172,7 +172,7 @@ test.describe("account deletion — mobile confirm surface (390x844)", () => {
 test.describe("account deletion — full execution", () => {
   test.use({ storageState: { cookies: [], origins: [] } })
 
-  test("deletes auth identity, scrubs profile, keeps message as Former member", async ({ page }) => {
+  test("deletes auth identity, scrubs profile, keeps message as Deleted account", async ({ page }) => {
     const box = sandbox()
     await loginAsThrowaway(page)
     await page.goto("/home?tab=profile")
@@ -197,11 +197,11 @@ test.describe("account deletion — full execution", () => {
       .select("name, email, avatar_url, deleted_at")
       .eq("id", userId)
       .maybeSingle()
-    expect(tomb?.name).toBe("Former member")
+    expect(tomb?.name).toBe("Deleted account")
     expect(tomb?.email).toMatch(/^deleted\+.*@removed\.invalid$/) // NOT NULL col — scrub uses placeholder (block-1 fix)
     expect(tomb?.deleted_at).not.toBeNull()
 
-    // Their message still renders attributed to "Former member" in the chat.
+    // Their message still renders attributed to "Deleted account" in the chat.
     // (Re-authenticate as the sandbox admin here to read the room — omitted in
     //  this skipped scaffold; assert via service client that the message row
     //  survived with the tombstone sender.)
@@ -231,29 +231,16 @@ test.describe("account deletion — full execution", () => {
       expect(row.notify_mode).toBeNull()
     }
 
-    // Both title producers must now say "Former member" for the admin's view of
-    // that DM — get_chat_list (client SWR) and get_chat_previews (SSR/boot, which
-    // also backfills the ChatScreen header on a deep link).
-    for (const fn of ["get_chat_list", "get_chat_previews"] as const) {
-      const { data: rows, error } = await box.client.rpc(fn, {
-        p_user_id: adminId,
-        p_ministry_id: box.ministryId,
-      })
-      expect(error).toBeNull()
-      const row = (rows as { group_id: string; group_name: string }[] | null)
-        ?.find((r) => r.group_id === dmId)
-      expect(row, `${fn} did not return the DM`).toBeTruthy()
-      expect(row!.group_name, `${fn} DM title`).toBe("Former member")
-    }
-
-    // ── Third producer: the dead-thread signal ────────────────────────────────
-    // get_dm_groups_with_deleted_counterpart sinks + dims this DM in the
-    // conversations list. It is SECURITY INVOKER and takes NO arguments, so it
-    // must be called with the surviving admin's own JWT — box.client is
-    // service-role, where auth.uid() is null AND EXECUTE is deliberately not
-    // granted. Raw fetch rather than a second supabase-js client so this also
-    // covers the PostgREST half (a missing schema-cache entry or a missing
-    // EXECUTE grant is invisible to an SQL-only check).
+    // Every producer below needs the SURVIVING ADMIN'S OWN JWT, not box.client.
+    // box.client is service-role, where `auth.uid()` is null — and all three of
+    // these functions read the viewer from the SESSION, not from an argument.
+    // get_chat_list / get_chat_previews take a `p_user_id` but DELIBERATELY
+    // IGNORE it (finding A1: "structural, not granted — no session, no rows"),
+    // so calling them service-role returns an empty set forever and the DM-title
+    // assertions below silently could not fail for the right reason. Raw fetch
+    // rather than a second supabase-js client so this also covers the PostgREST
+    // half (a missing schema-cache entry or EXECUTE grant is invisible to an
+    // SQL-only check).
     const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     const tokenRes = await fetch(`${sbUrl}/auth/v1/token?grant_type=password`, {
@@ -261,8 +248,34 @@ test.describe("account deletion — full execution", () => {
       headers: { apikey: anonKey, "Content-Type": "application/json" },
       body: JSON.stringify({ email: process.env.E2E_ADMIN_EMAIL, password: process.env.E2E_PASSWORD }),
     })
-    expect(tokenRes.status, "admin sign-in for the dead-DM RPC").toBe(200)
+    expect(tokenRes.status, "admin sign-in for the viewer-scoped RPCs").toBe(200)
     const { access_token } = (await tokenRes.json()) as { access_token: string }
+    const asAdmin = async (fn: string, body: string) => {
+      const res = await fetch(`${sbUrl}/rest/v1/rpc/${fn}`, {
+        method: "POST",
+        headers: { apikey: anonKey, Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
+        body,
+      })
+      expect(res.status, `${fn} (authenticated)`).toBe(200)
+      return res.json()
+    }
+
+    // Both title producers must now say "Deleted account" for the admin's view of
+    // that DM — get_chat_list (client SWR) and get_chat_previews (SSR/boot, which
+    // also backfills the ChatScreen header on a deep link).
+    for (const fn of ["get_chat_list", "get_chat_previews"] as const) {
+      const rows = (await asAdmin(fn, JSON.stringify({
+        p_user_id: adminId,
+        p_ministry_id: box.ministryId,
+      }))) as { group_id: string; group_name: string }[]
+      const row = rows.find((r) => r.group_id === dmId)
+      expect(row, `${fn} did not return the DM`).toBeTruthy()
+      expect(row!.group_name, `${fn} DM title`).toBe("Deleted account")
+    }
+
+    // ── Third producer: the dead-thread signal ────────────────────────────────
+    // get_dm_groups_with_deleted_counterpart sinks + dims this DM in the
+    // conversations list. SECURITY INVOKER, no arguments — same JWT.
     const deadRes = await fetch(`${sbUrl}/rest/v1/rpc/get_dm_groups_with_deleted_counterpart`, {
       method: "POST",
       headers: { apikey: anonKey, Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },

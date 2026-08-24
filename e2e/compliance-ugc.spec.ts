@@ -52,13 +52,13 @@ async function longPress(page: Page, target: Locator, appears: Locator) {
 test.describe("compliance §5.1.1/§1.5 — public pages (signed out, mobile)", () => {
   test.use({ viewport: M, storageState: SIGNED_OUT })
 
-  test("1a. /privacy loads (200) with support email + Former-member retention line", async ({ page }) => {
+  test("1a. /privacy loads (200) with support email + Deleted-account retention line", async ({ page }) => {
     const errors = watchConsole(page)
     const resp = await page.goto("/privacy")
     expect(resp?.status(), "privacy HTTP status").toBe(200)
     await expect(page.getByRole("heading", { name: "Privacy Policy" })).toBeVisible()
     await expect(page.getByText("team@joincentral.app").first()).toBeVisible()
-    await expect(page.getByText(/Former member/)).toBeVisible()
+    await expect(page.getByText(/Deleted account/)).toBeVisible()
     expect(errors, `console/page errors:\n${errors.join("\n")}`).toEqual([])
   })
 

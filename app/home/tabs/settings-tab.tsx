@@ -19,7 +19,6 @@ import {
   archiveMinistry,
   cancelArchiveRequest,
   getMinistryCodes,
-  runDepartedMemberCleanup,
 } from "@/app/actions/ministry"
 import { updateAutomationSettings, runAnnualClassMaintenance, retroactivelyApplyToggle, archiveToggleChats, backfillTeamChats } from "@/app/actions/auto-chats"
 import { getReceiptLimits, upsertReceiptLimit, deleteReceiptLimit } from "@/app/actions/receipts"
@@ -311,8 +310,6 @@ export function SettingsTab({
   const [loadingBanned, setLoadingBanned] = useState(false)
   const [maintenanceRunning, setMaintenanceRunning] = useState(false)
   const [maintenanceResult, setMaintenanceResult] = useState<string | null>(null)
-  const [cleanupRunning, setCleanupRunning] = useState(false)
-  const [cleanupResult, setCleanupResult] = useState<string | null>(null)
   // retroactiveMsg removed — replaced by automationSaveMsg in Automations state block below
 
   // Ministry info
@@ -770,16 +767,6 @@ export function SettingsTab({
       setMaintenanceResult(parts.length ? parts.join(" · ") : "Nothing to do for this cycle.")
     }
     setMaintenanceRunning(false)
-  }
-
-  // ── Departed member cleanup ──────────────────────────────────────────────────
-  async function handleRunDepartedCleanup() {
-    setCleanupRunning(true)
-    setCleanupResult(null)
-    const { cleaned, error } = await runDepartedMemberCleanup(ministryId)
-    if (error) { setCleanupResult(`Error: ${error}`) }
-    else { setCleanupResult(cleaned > 0 ? `Cleaned up ${cleaned} member${cleaned !== 1 ? "s" : ""}.` : "No members ready for cleanup yet (< 30 days).") }
-    setCleanupRunning(false)
   }
 
   // ── Invite code ─────────────────────────────────────────────────────────────
@@ -2038,19 +2025,6 @@ export function SettingsTab({
                 </div>
               )}
 
-              {/* Departed member cleanup */}
-              {isAdmin && (
-                <div className={CARD_CLS} style={{ ...CARD, padding: 22, display: "flex", alignItems: "flex-start", gap: 18 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Departed member cleanup</div>
-                    <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Permanently anonymizes messages from members who left more than 30 days ago. Their messages remain but show as &ldquo;Former Member.&rdquo;</div>
-                    {cleanupResult && <div style={{ marginTop: 8, fontSize: 12, color: cleanupResult.startsWith("Error") ? "var(--danger)" : "#3E7A40" }}>{cleanupResult}</div>}
-                  </div>
-                  <button onClick={handleRunDepartedCleanup} disabled={cleanupRunning} style={{ padding: "8px 16px", borderRadius: 10, border: "1px solid var(--line-2)", background: cleanupRunning ? "var(--line-2)" : "var(--cream-panel)", color: cleanupRunning ? "var(--muted-text)" : "var(--ink)", fontSize: 13, fontWeight: 500, cursor: cleanupRunning ? "not-allowed" : "pointer", flexShrink: 0 }}>
-                    {cleanupRunning ? "Running…" : "Run now"}
-                  </button>
-                </div>
-              )}
             </div>
           )}
 

@@ -67,7 +67,7 @@ export default function PrivacyPage() {
         </p>
         <p style={P}>
           One honest exception: <strong>messages you already sent stay in the chats where you sent them</strong>, but they
-          are reattributed to &ldquo;Former member&rdquo; with no link back to you. We keep them so we don&apos;t erase the
+          are reattributed to &ldquo;Deleted account&rdquo; with no link back to you. We keep them so we don&apos;t erase the
           shared conversation history for everyone else in the chat. Everything else tied to your account is deleted.
         </p>
 

@@ -10,7 +10,9 @@
 import { useState } from "react"
 import Link from "next/link"
 import { SplitShell } from "@/app/(auth)/shared"
-import { CentralButton } from "@/components/central"
+import { CentralButton, DuplicateAccountDialog, type DuplicateAccountInfo } from "@/components/central"
+import { DUPLICATE_ACCOUNT } from "@/lib/duplicate-account"
+import { createClient } from "@/lib/supabase"
 import { EYEBROW_STYLE } from "@/components/central/typography"
 import { joinMinistryByCode } from "@/app/actions/ministry"
 import { requestToJoinMinistry } from "@/app/actions/join-requests"
@@ -101,15 +103,25 @@ export function InviteLanding({
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [requested, setRequested] = useState(false)
+  // Same interstitial as /ministries, same shape: the retry closure re-arms
+  // whichever path the person was on (link-join or link-request).
+  const [dup, setDup] = useState<
+    { candidate: DuplicateAccountInfo; retry: () => void | Promise<void> } | null
+  >(null)
 
   // The request path. Deliberately NOT routed through doJoin: joinMinistryByCode
   // refuses a custom code outright (it would be granting membership on a guessable
   // secret), so there is no shared branch to take.
-  async function doRequest() {
+  async function doRequest(confirmedNotDuplicate = false) {
     setJoining(true)
     setError(null)
     try {
-      const { state: reqState, error: reqErr } = await requestToJoinMinistry(code)
+      const { state: reqState, error: reqErr, duplicate } = await requestToJoinMinistry(code, confirmedNotDuplicate)
+      if (reqErr === DUPLICATE_ACCOUNT && duplicate) {
+        setDup({ candidate: duplicate, retry: () => doRequest(true) })
+        setJoining(false)
+        return
+      }
       if (reqErr) { setError(reqErr); setJoining(false); return }
       // "requested" and "already-pending" land on the same screen on purpose — a
       // second tap must not read as a failure, and the person genuinely is waiting
@@ -125,13 +137,20 @@ export function InviteLanding({
   // The one write on this page, and it only ever runs from an explicit tap.
   // Mirrors doCodeJoin() in app/ministries/page.tsx so every join path enforces the
   // same profile-completeness flow.
-  async function doJoin() {
+  async function doJoin(confirmedNotDuplicate = false) {
     setJoining(true)
     setError(null)
     try {
-      // ONE argument, always. Passing a role here is what would turn a link into a
-      // privilege grant; a staff code cannot reach this call in the first place.
-      const { error: joinErr, isStaffCode } = await joinMinistryByCode(code)
+      // NEVER a role here — passing one is what would turn a link into a privilege
+      // grant; a staff code cannot reach this call in the first place. The third
+      // argument is not a role, it is "the person has already seen the
+      // duplicate-account interstitial and said it wasn't them".
+      const { error: joinErr, isStaffCode, duplicate } = await joinMinistryByCode(code, undefined, confirmedNotDuplicate)
+      if (joinErr === DUPLICATE_ACCOUNT && duplicate) {
+        setDup({ candidate: duplicate, retry: () => doJoin(true) })
+        setJoining(false)
+        return
+      }
       if (isStaffCode || joinErr) {
         setError(joinErr ?? "This invite link isn't valid.")
         setJoining(false)
@@ -146,7 +165,7 @@ export function InviteLanding({
   }
 
   function onJoinTap() {
-    if (pickers.genderGate(doJoin)) return
+    if (pickers.genderGate(() => doJoin())) return
     doJoin()
   }
 
@@ -224,7 +243,11 @@ export function InviteLanding({
           <>
             <CentralButton
               variant="primary"
-              onClick={isCustomCode ? doRequest : onJoinTap}
+              // Wrapped, never passed bare: these take a `confirmedNotDuplicate`
+              // flag, and `onClick={doRequest}` hands React's MouseEvent to it —
+              // truthy, so every join would SKIP the duplicate check. tsc caught
+              // this one; the arrow is what stops the next one.
+              onClick={isCustomCode ? () => doRequest() : onJoinTap}
               disabled={joining}
               style={{ width: "100%" }}
             >
@@ -244,6 +267,20 @@ export function InviteLanding({
       </div>
 
       <PostJoinPickerModals pickers={pickers} />
+      <DuplicateAccountDialog
+        open={!!dup}
+        candidate={dup?.candidate ?? null}
+        ministryName={ministryName}
+        onSignInInstead={async () => {
+          setDup(null)
+          // Sign out and land on /login — the account they want already exists,
+          // they just need to be on it. Navigate even if signOut() rejects (a
+          // lock-acquire timeout does), or the page sits there doing nothing.
+          try { await createClient().auth.signOut() } finally { window.location.assign("/login") }
+        }}
+        onContinueAnyway={() => { const again = dup?.retry; setDup(null); void again?.() }}
+        onClose={() => setDup(null)}
+      />
     </Frame>
   )
 }

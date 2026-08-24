@@ -22,6 +22,11 @@ export interface ChatCapabilityInput {
    *  true (get_chat_list only returns rooms you belong to); ChatSettings computes
    *  it from the loaded roster. */
   isMemberOfChat: boolean
+  /** DMs only: the OTHER participant's account has been deleted (their profile is
+   *  a scrubbed tombstone). The one case where a DM may be deleted — see canDelete.
+   *  Callers that cannot cheaply know this (the chat list) leave it false, which
+   *  only ever withholds the action; it never grants one. */
+  partnerDeleted?: boolean
 }
 
 export interface ChatCapabilities {
@@ -33,16 +38,27 @@ export interface ChatCapabilities {
 }
 
 export function chatCapabilities(
-  { type, archived = false, isCentral = false, isMemberOfChat }: ChatCapabilityInput,
+  { type, archived = false, isCentral = false, isMemberOfChat, partnerDeleted = false }: ChatCapabilityInput,
   role: string,
 ): ChatCapabilities {
   const isChurch = type === "church"
   const isMy = type === "my"
+  const isDM = type === "dm"
   // The ministry chat is identified by its own column, never by name — a rename
   // can then never break the delete/archive guards.
   const isCentralChat = isChurch && isCentral
 
   const churchManage = isChurch && isLeaderRole(role) && isMemberOfChat
+
+  // A DM whose other side deleted their account is the ONE deletable DM. The
+  // rule that keeps DMs undeletable exists to protect the OTHER participant —
+  // their thread, their pushes, their copy of the history. When that person is a
+  // scrubbed tombstone there is no other participant left to protect, and what
+  // remains is a conversation with "Deleted account" that its owner can never be
+  // rid of. Membership is implied: only a member can open the settings that
+  // compute `partnerDeleted` from the loaded roster, and deleteGroup re-checks it
+  // server-side rather than trusting this.
+  const deadDM = isDM && partnerDeleted && isMemberOfChat
 
   return {
     canManage: churchManage || isMy,
@@ -52,6 +68,6 @@ export function chatCapabilities(
     canLeave: isMy,
     canArchive: churchManage && !archived && !isCentralChat,
     canUnarchive: churchManage && archived,
-    canDelete: churchManage && !isCentralChat,
+    canDelete: (churchManage && !isCentralChat) || deadDM,
   }
 }

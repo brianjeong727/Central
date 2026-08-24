@@ -47,9 +47,15 @@ test.describe("young adult joins a ministry", () => {
   // so the profile already carries it before the join runs — which is the whole
   // point of the case.
   async function signUpAndJoin(page: import("@playwright/test").Page, meta: Record<string, unknown>) {
-    const email = `yajoin.${Date.now()}.${process.pid}@test.com`
+    // The NAME has to be unique per user, not just the email. Both cases in this
+    // file join the SAME ministry, and a second member arriving with a name that
+    // already belongs to one now stops at the duplicate-account interstitial
+    // (lib/duplicate-account.ts) instead of joining — which is the product working,
+    // but it left the second test looking like the join had silently failed.
+    const stamp = `${Date.now()}.${process.pid}`
+    const email = `yajoin.${stamp}@test.com`
     const { data, error } = await admin.auth.admin.createUser({
-      email, password, email_confirm: true, user_metadata: { name: "YA Join", gender: "male", ...meta },
+      email, password, email_confirm: true, user_metadata: { name: `YA Join ${stamp}`, gender: "male", ...meta },
     })
     if (error) throw error
     made.push(data.user.id)

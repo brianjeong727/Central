@@ -111,6 +111,13 @@ export async function admitUserToMinistry(
     { onConflict: "user_id,ministry_id" },
   )
 
+  // NOTE: coming back clears the person's `ministry_departures` row — but that is
+  // NOT done here. Seven different places set profiles.ministry_id to a real
+  // ministry (this function, three paths in app/actions/ministry.ts, the founder
+  // and prior-ministry restores, and the super switcher), so a clear written at
+  // the call sites is a clear that one of them forgets. It lives in the
+  // `clear_departure_on_rejoin` BEFORE UPDATE trigger on profiles instead.
+
   // Chat assignment is injected rather than imported: app/actions/auto-chats.ts is a
   // "use server" module, and importing an action into a lib that a client component
   // might transitively reach is how a service-role path ends up in a browser bundle.

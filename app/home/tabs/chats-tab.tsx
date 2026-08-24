@@ -537,6 +537,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // same shape the chat list's swipe pin/mute already use.
   const [avatarToast, setAvatarToast] = useState<{ message: string; undo?: () => void } | null>(null)
   const [confirmAction, setConfirmAction] = useState<"archive" | "unarchive" | "delete" | "leave" | null>(null)
+  const [confirmPurge, setConfirmPurge] = useState(false)
   const [confirmRemoveMemberId, setConfirmRemoveMemberId] = useState<string | null>(null)
   const [hoveredMemberId, setHoveredMemberId] = useState<string | null>(null)
   const [mobileRevealMemberId, setMobileRevealMemberId] = useState<string | null>(null)
@@ -576,12 +577,21 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
   // /messages RLS. The gate itself lives in chat-permissions.ts, SHARED with the
   // chat list's swipe actions so the two can never offer different things.
   const isMemberOfChat = members.some((m) => m.user_id === userId)
-  const { canManage, canLeave, canArchive, canUnarchive, canDelete } = chatCapabilities(
-    { type: groupType, archived: groupArchived, isCentral, isMemberOfChat },
-    userRole,
-  )
   // The one other participant. A DM's roster is not a list — it is a person.
   const dmPartner = isDM ? members.find((m) => m.user_id !== userId) ?? null : null
+  // A DM with nobody on the other side. Everything this screen offers that acts
+  // ON that person — nicknaming them, forking the thread into a group chat with
+  // them in it — is meaningless now, so those rows come off. What's left is the
+  // history and the way out of it.
+  const dmPartnerGone = !!dmPartner?.deleted
+  const { canManage, canLeave, canArchive, canUnarchive, canDelete } = chatCapabilities(
+    { type: groupType, archived: groupArchived, isCentral, isMemberOfChat, partnerDeleted: dmPartnerGone },
+    userRole,
+  )
+  // Deleted-account tombstones sitting in this chat's member list. They are the
+  // only rows a manager can clear in bulk — everyone else is removed one at a time,
+  // deliberately, because removing a live person is a decision per person.
+  const deletedMemberCount = members.filter((m) => m.deleted).length
   // Adding someone to a DM FORKS: the pair keeps its thread untouched and a new
   // group chat is created with both of them plus whoever was picked (iMessage's
   // model). Reuses the add-members picker; only the commit differs.
@@ -1153,6 +1163,29 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
     mutateSettings((cur) => cur ? { ...cur, members: cur.members.filter((m) => m.user_id !== memberId) } : cur, { revalidate: false })
   }
 
+  // Clear every deleted-account tombstone out of this chat's roster in one pass.
+  //
+  // Safe because message attribution does NOT come from the roster: MESSAGE_SELECT
+  // embeds profiles!sender_id(name), and the tombstone profile survives (only
+  // auth.users is hard-deleted). So their old messages keep reading "Deleted
+  // account" after the membership row is gone — the roster row was only ever
+  // holding a place in the member LIST.
+  //
+  // No system message. Removing one live person is a social event the chat should
+  // be told about; sweeping out accounts that no longer exist is housekeeping, and
+  // announcing it would be noise on top of the noise being cleaned up.
+  async function handleRemoveDeletedAccounts() {
+    const ids = members.filter((m) => m.deleted).map((m) => m.user_id)
+    if (ids.length === 0) return
+    const snapshot = members
+    setMembers((prev) => prev.filter((m) => !m.deleted))
+    setConfirmPurge(false)
+    const { error: err } = await supabase.from("group_members").delete().eq("group_id", groupId).in("user_id", ids)
+    if (err) { setMembers(snapshot); setError(err.message); return }
+    await syncSmallGroupFromChatAction({ chatGroupId: groupId, addUserIds: [], removeUserIds: ids })
+    mutateSettings((cur) => cur ? { ...cur, members: cur.members.filter((m) => !m.deleted) } : cur, { revalidate: false })
+  }
+
   // DM + people → a NEW group chat. The DM itself is never mutated: no members
   // added, no system message, no rename. Named after the other participants
   // (never yourself), like every messaging app, and renameable afterwards.
@@ -1323,6 +1356,22 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         danger={false}
         onConfirm={() => { setPendingIsOpen(true); setConfirmOpenChat(false) }}
         onClose={() => setConfirmOpenChat(false)}
+      />
+      {/* Bulk, so it gets a modal confirm rather than the inline two-step the
+          per-member X uses (web_design_system §14 — the dense-row shortcut is for
+          one row at a time). Names the one thing someone would fear losing: the
+          messages. */}
+      <ConfirmDialog
+        open={confirmPurge}
+        title={`Remove ${deletedMemberCount} deleted account${deletedMemberCount !== 1 ? "s" : ""}?`}
+        message={<>These accounts no longer exist, so removing them only tidies the member list. Everything they wrote stays in the chat exactly as it is.</>}
+        confirmLabel="Remove"
+        // NOT `danger`: nothing is destroyed and nothing is lost — the accounts
+        // are already gone and their messages are untouched. A red "Danger zone"
+        // here would make housekeeping look like a decision with a cost.
+        danger={false}
+        onConfirm={handleRemoveDeletedAccounts}
+        onClose={() => setConfirmPurge(false)}
       />
     <SubpageShell
       title={showAddMembers ? addScreenTitle : "Settings"}
@@ -1511,6 +1560,19 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                 ))}
               </PocketRowCard>
             )}
+            {/* Sits UNDER the roster, not in the chrome row: it is a response to
+                something you can see in the list above it, and it disappears the
+                moment the list is clean. */}
+            {canManage && deletedMemberCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setConfirmPurge(true)}
+                className="w-full text-[13px] font-medium"
+                style={{ marginTop: 14, padding: "12px 0", background: "none", border: "none", color: "var(--plum)", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+              >
+                Remove {deletedMemberCount} deleted account{deletedMemberCount !== 1 ? "s" : ""}
+              </button>
+            )}
           </div>
           ) : (
           <>
@@ -1556,7 +1618,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               {/* Obvious add-members affordance (iMessage-style) — the first row of the
                   roster, plum chip + label so it reads clearly as an action. Replaces
                   the subtle kicker "+ Add" that was easy to miss on phone. */}
-              {(canManage || isDM) && (
+              {(canManage || isDM) && !dmPartnerGone && (
                 <button
                   type="button"
                   onClick={() => { setShowAddMembers(true); loadAllProfiles() }}
@@ -1590,7 +1652,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                         phone-width home used to be the Members roster — which a DM
                         no longer has. It gets its own settings row rather than a
                         second button crammed into the person row above. */}
-                    {canNickname && (
+                    {canNickname && !dmPartnerGone && (
                       <PocketRow
                         leading={<SettingsRowIcon><Pencil style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
                         title="Nickname"
@@ -1772,7 +1834,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             <div style={{ marginBottom: 12 }}>
               <ContentHeader
                 label={isDM ? "Conversation with" : "Members"}
-                action={(canManage || isDM) ? (
+                action={(canManage || isDM) && !dmPartnerGone ? (
                   <ContentActionButton variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} label={isDM ? "Start a group chat" : "Add members"} onClick={() => { setShowAddMembers(true); loadAllProfiles() }} />
                 ) : undefined}
               />
@@ -1800,7 +1862,9 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                             never --faint, which is a non-text token). */}
                         <p onClick={() => openMemberProfile(member.user_id)} style={{ fontSize: 14, color: member.deleted ? "var(--muted-text)" : "var(--ink)", fontWeight: 500, cursor: "pointer" }}>{member.nickname ?? member.name}</p>
                         {member.user_id === userId && <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "var(--cream)", color: "var(--muted-text)", letterSpacing: "0.06em", textTransform: "uppercase" }}>You</span>}
-                        {canNickname && (
+                        {/* No nickname pencil / role badge on a tombstone —
+                            see the mobile row for why. */}
+                        {canNickname && !member.deleted && (
                           <button
                             onClick={() => { setNicknameEditor({ userId: member.user_id, name: member.name, current: member.nickname ?? "" }); setNicknameInput(member.nickname ?? ""); setNicknameError(null) }}
                             aria-label={`Set nickname for ${member.name}`}
@@ -1815,7 +1879,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                         : member.graduation_year ? <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>Class of {member.graduation_year}</p> : null}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      {member.role && roleBadge(member.role, "md", member.user_id)}
+                      {member.role && !member.deleted && roleBadge(member.role, "md", member.user_id)}
                     </div>
                     {canManage && member.user_id !== userId ? (
                       isConfirming ? (
@@ -1831,6 +1895,17 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                 )
               })}
             </div>
+            {/* Same affordance as the mobile Members screen, same placement rule:
+                directly under the list it is about, gone once the list is clean. */}
+            {canManage && deletedMemberCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setConfirmPurge(true)}
+                style={{ marginTop: 12, padding: 0, background: "none", border: "none", color: "var(--plum)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+              >
+                Remove {deletedMemberCount} deleted account{deletedMemberCount !== 1 ? "s" : ""}
+              </button>
+            )}
             {isChurch && canManage && (
               <p style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 10, lineHeight: 1.5 }}>Member changes sync to the small group home page if this chat is linked to a group.</p>
             )}
@@ -2055,7 +2130,9 @@ function MobileMemberRow({
               lower-priority without dropping below AA (no opacity, no --faint). */}
           <p onClick={(e) => { e.stopPropagation(); onOpenProfile(member.user_id) }} className="text-[15px] font-semibold truncate cursor-pointer" style={{ color: member.deleted ? "var(--muted-text)" : "var(--ink)", letterSpacing: "-0.01em" }}>{member.nickname ?? member.name}</p>
           {isSelf && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", color: "var(--plum)" }}>You</span>}
-          {canNickname && (
+          {/* No nickname pencil on a tombstone — there is no person to name, and
+              the scrub already discarded any nickname they had. */}
+          {canNickname && !member.deleted && (
             <button
               onClick={(e) => { e.stopPropagation(); onEditNickname() }}
               aria-label={`Set nickname for ${member.name}`}
@@ -2068,7 +2145,9 @@ function MobileMemberRow({
         </div>
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
           {member.nickname && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>{member.name}</span>}
-          {member.role && <PocketTag label={roleLabel(member.role, member.user_id)} variant={roleVariant(member.role)} />}
+          {/* A tombstone's `role` is the scrub's placeholder, not a standing in
+              this ministry — rendering it as a badge asserts something false. */}
+          {member.role && !member.deleted && <PocketTag label={roleLabel(member.role, member.user_id)} variant={roleVariant(member.role)} />}
           {member.graduation_year && <span className="text-[11px]" style={{ color: "var(--muted-text)" }}>Class of {member.graduation_year}</span>}
         </div>
       </div>

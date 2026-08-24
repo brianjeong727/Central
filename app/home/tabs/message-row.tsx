@@ -792,10 +792,18 @@ function MessageRowBase({
         )}
         {!isOwn && isFirstInGroup && (
           <div className="flex items-baseline gap-1.5 mb-1 ml-9">
+            {/* Someone who left the ministry keeps their REAL name here — their
+                profile stays readable inside the chats they posted in
+                (auth_shares_chat_history). It drops to the tertiary text token,
+                same size and weight, so the row reads lower-priority without
+                falling below AA (never opacity on text, never --faint).
+                "Former member" is now only the fallback for a sender whose row is
+                genuinely unresolvable — a sender_id nulled long ago. */}
             <span
-              className={`text-[13px] font-medium text-[var(--ink)]${canOpenSenderProfile ? " cursor-pointer hover:underline" : ""}`}
+              className={`text-[13px] font-medium${canOpenSenderProfile ? " cursor-pointer hover:underline" : ""}`}
+              style={{ color: senderDeparted ? "var(--muted-text)" : "var(--ink)" }}
               onClick={canOpenSenderProfile ? openSenderProfile : undefined}
-            >{msg.sender_name || "Former Member"}</span>
+            >{msg.sender_name || "Former member"}</span>
             {senderDeparted && (
               <span className="text-[11px] text-[var(--muted-text)] italic">· left the ministry</span>
             )}
