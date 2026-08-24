@@ -79,7 +79,7 @@ import type { SwipeAction, SwipeSide } from "@/components/central/swipe-actions"
 import { PushSubscribeCard } from "../components/notifications"
 import { isChatManageRole } from "@/lib/roles"
 import { useBackIntent } from "@/lib/back-intent"
-import { CHURCH_SECTION_DEFS, sectionChurchChats, partitionPinned, isLockedChat, type ChurchSection, type ChatsSection } from "./chat-shared"
+import { CHURCH_SECTION_DEFS, sectionChurchChats, partitionPinned, isLockedChat, unreadByScope, type ChurchSection, type ChatsSection } from "./chat-shared"
 
 // The create-chat composer lives in the heavy chats-tab module. Reaching it with
 // a plain import would drag ChatScreen + ChatSettings back into this chunk and
@@ -190,6 +190,58 @@ export interface ChatSwipeConfig {
 // `bleed` is 0 now: it existed solely to cancel PocketRowCard's 18px inset so the
 // swipe panel reached the card's edge. With no card the panel already spans the
 // screen, and a non-zero bleed would overhang it.
+// ── Chat scope switcher (Church | Mine | Open) ───────────────────────────────
+// ONE implementation for both viewports. The desktop panel and the phone list each
+// render their own strip, and the previous pair of inline SegmentedControls had
+// already been copy-edited in lockstep twice; a third divergence would have shown
+// the unread dot on one width only.
+//
+// The dot exists because the switcher HIDES two of the three buckets. A message
+// arrives, the nav badge lights, you open Messages on the Church scope and see
+// nothing — the app looks like it lost your message when it is simply one tab over.
+// So the scope that holds it says so.
+//
+// Shown on the ACTIVE scope too, not just the inactive ones. It would be neater to
+// drop it once you are looking at the right list, but then the dot vanishes while
+// unread rows are still sitting under it — the strip would contradict the rows.
+//
+// No change to SegmentedControl: its `label` is already a ReactNode, so the dot
+// rides the label and every other segmented control in the app is untouched.
+function ChatScopeSwitcher({ value, onChange, unread, size = "sm" }: {
+  value: ChatsSection
+  onChange: (v: ChatsSection) => void
+  unread: { church: number; my: number }
+  size?: "sm" | "md"
+}) {
+  const label = (text: string, count: number) => (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      {text}
+      {count > 0 && (
+        <>
+          {/* Same plum dot the unread rows carry, sized down for a 12.5px chip.
+              aria-hidden + a real word for screen readers: a bare coloured circle
+              is not an announcement. */}
+          <span aria-hidden style={{ width: 6, height: 6, borderRadius: 999, background: "var(--plum)", flexShrink: 0 }} />
+          <span className="sr-only">, unread</span>
+        </>
+      )}
+    </span>
+  )
+  return (
+    <SegmentedControl
+      aria-label="Chat scope"
+      size={size}
+      options={[
+        { id: "church" as ChatsSection, label: label("Church", unread.church) },
+        { id: "my" as ChatsSection, label: label("Mine", unread.my) },
+        { id: "open" as ChatsSection, label: "Open" },
+      ]}
+      value={value}
+      onChange={onChange}
+    />
+  )
+}
+
 function PocketChatRun({ groups, onOpen, swipe }: {
   groups: ChatGroup[]
   onOpen: (id: string, name: string) => void
@@ -340,6 +392,8 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   const churchChats = allGroups.filter((g) => g.type === "church" && !g.archived)
   const archivedChurchChats = allGroups.filter((g) => g.type === "church" && g.archived)
   const myChats = allGroups.filter((g) => g.type !== "church")
+  // Which scope is holding the unread the nav badge is counting.
+  const scopeUnread = unreadByScope(allGroups)
   // The spinner is for having NOTHING to show — not for "a request is in
   // flight". Both cases it exists for are the empty case: a first load that
   // hasn't answered yet, and a poisoned/failed fetch (which must never fall
@@ -559,7 +613,14 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         // gaps take 88 of the 335 content width). "My chats" + "Browse" was 278
         // and pushed the buttons off screen. Measured, not estimated.
         scope={{
-          options: [{ id: "church", label: "Church" }, { id: "my", label: "Mine" }, { id: "open", label: "Open" }],
+          // Same unread split the desktop switcher reads, from the same helper —
+          // the phone is where a notification is actually opened, so this is the
+          // viewport the indicator exists for.
+          options: [
+            { id: "church", label: "Church", dot: scopeUnread.church > 0 },
+            { id: "my", label: "Mine", dot: scopeUnread.my > 0 },
+            { id: "open", label: "Open" },
+          ],
           value: subTab,
           onChange: (t) => {
             setSubTab(t as ChatsSection)
@@ -603,10 +664,9 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
           idea rather than two vocabularies for the same three buckets; three at the
           old "Church Chats"/"My Chats" length would not have fit the panel anyway. */}
       <div className="hidden md:flex flex-shrink-0 px-4 py-3">
-        <SegmentedControl
-          aria-label="Chat scope"
-          options={[{ id: "church", label: "Church" }, { id: "my", label: "Mine" }, { id: "open", label: "Open" }]}
+        <ChatScopeSwitcher
           value={subTab}
+          unread={scopeUnread}
           onChange={(t) => {
             setSubTab(t)
             onSectionChange?.(t)
@@ -976,6 +1036,8 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
   const churchChats = allGroups.filter((g) => g.type === "church" && !g.archived)
   const archivedChurchChats = allGroups.filter((g) => g.type === "church" && g.archived)
   const myChats = allGroups.filter((g) => g.type !== "church")
+  // Which scope is holding the unread the nav badge is counting.
+  const scopeUnread = unreadByScope(allGroups)
   // Same rule as ChatsTab above — spinner only when there is nothing to show.
   // See the note there on why leading with SWR's `isLoading` discarded the
   // server-seeded rows.
@@ -1084,10 +1146,9 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
           match the phone's chrome scope exactly so the two viewports are ONE idea
           rather than two vocabularies for the same three buckets. */}
       <div className="px-3 flex-shrink-0">
-        <SegmentedControl
-          aria-label="Chat scope"
-          options={[{ id: "church", label: "Church" }, { id: "my", label: "Mine" }, { id: "open", label: "Open" }]}
+        <ChatScopeSwitcher
           value={subTab}
+          unread={scopeUnread}
           onChange={(t) => {
             setSubTab(t)
             onSectionChange?.(t)

@@ -76,6 +76,33 @@ export function isLockedChat(group: ChatGroup, ministryName: string): boolean {
 // wearing a category's clothes, and it does not fit besides (the options ARE the
 // 22/600 chrome title, and three of them plus the two round buttons have to fit
 // 375px — Church 74 + Mine 51 + Open 54 + 32 of gaps = 211 against a 247 budget).
+// ── Unread, split by scope ──────────────────────────────────────────────────
+// The scope switcher (Church | Mine | Open) hides two of the three buckets, so a
+// notification could land in a scope you are not looking at and the list would
+// show you nothing — you would go to Messages, see an empty Church list, and
+// conclude the app had lost the message.
+//
+// The filter here is deliberately the SAME one the bottom-nav total uses
+// (`!archived && !muted`). These two numbers must PARTITION that badge exactly:
+// if the nav says 3 and the scopes account for 2, the feature has replaced "where
+// is it?" with "where are the other ones?" — worse than no indicator at all.
+// Muted is excluded for the same reason a muted row shows no dot: the user has
+// already said they don't want to be pulled back to it.
+//
+// "Open" is not a bucket of the user's chats (it is discovery — groups they have
+// not joined), so it has no unread and gets no dot.
+export function unreadByScope(groups: ChatGroup[]): { church: number; my: number } {
+  let church = 0
+  let my = 0
+  for (const g of groups) {
+    if (g.archived || g.muted) continue
+    if (g.unread_count <= 0) continue
+    if (g.type === "church") church += g.unread_count
+    else my += g.unread_count
+  }
+  return { church, my }
+}
+
 export type ChatsSection = "church" | "my" | "open"
 export function resolveChatsSection(raw: string | string[] | null | undefined): ChatsSection {
   const v = Array.isArray(raw) ? raw[0] : raw

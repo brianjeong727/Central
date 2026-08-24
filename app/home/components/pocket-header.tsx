@@ -76,7 +76,8 @@ const SCOPE_GAP = 16
 export function PocketChrome({ title, scope, action, action2, back }: {
   title: string
   scope?: {
-    options: readonly { id: string; label: string }[]
+    /** `dot` marks a scope that has something waiting in it — see the render below. */
+    options: readonly { id: string; label: string; dot?: boolean }[]
     value: string
     onChange: (id: string) => void
   }
@@ -104,6 +105,30 @@ export function PocketChrome({ title, scope, action, action2, back }: {
               }}
             >
               {o.label}
+              {/* A scope switch HIDES the other scopes, so something can be waiting
+                  in one you are not looking at and the screen shows you nothing —
+                  the nav badge lights, you open Chats on Church, see an empty list,
+                  and conclude the message was lost. The dot says which word to tap.
+
+                  Deliberately the plum dot the unread rows already use, at 6px for
+                  a 22px word. It is a node inside the chrome row, so: no text (the
+                  Convention #27 sweep measures leaf TEXT and would otherwise have a
+                  second candidate), aria-hidden with a real word beside it, and it
+                  costs 12px of a row whose width is measured — Church + Mine + Open
+                  is 211px of a 247px budget at 375, so two dots still fit with slack. */}
+              {o.dot && (
+                <>
+                  <span
+                    aria-hidden
+                    style={{
+                      display: "inline-block", width: 6, height: 6, borderRadius: 999,
+                      background: "var(--plum)", marginLeft: 6, verticalAlign: "middle",
+                      position: "relative", top: -1, flexShrink: 0,
+                    }}
+                  />
+                  <span className="sr-only">, unread</span>
+                </>
+              )}
             </button>
           ))}
         </div>
