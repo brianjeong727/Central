@@ -402,5 +402,12 @@ export function sandbox() {
       const { error } = await db.from("profiles").update({ notification_settings: settings }).eq("id", userId).eq("ministry_id", ministryId)
       if (error) throw error
     },
+
+    /** Read a sandbox user's notification_settings back (asserting what the UI wrote). */
+    async getNotificationSettings(userId: string): Promise<Record<string, unknown>> {
+      const { data, error } = await db.from("profiles").select("notification_settings").eq("id", userId).single()
+      if (error) throw error
+      return (data?.notification_settings ?? {}) as Record<string, unknown>
+    },
   }
 }

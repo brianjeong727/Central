@@ -16,10 +16,11 @@ import { unsubscribeFromPush, type PushState } from "@/lib/push"
 // Native-aware wrappers: inside the Capacitor iOS shell these route to APNs; on plain
 // web they fall through to the identical lib/push path (web behavior byte-unchanged).
 import { subscribeToPushUnified, getPushStateUnified } from "@/lib/native-push"
+import { APP_STORE_URL, iosNeedsInstallForPush } from "@/lib/push"
 import type { NotificationSettings, GroupNotifyMode } from "../types"
 
 // Merge a saved-settings write that PRESERVES keys we don't own here (e.g.
-// prompt_dismissed for the profile prefs; the tier prefs for the card dismiss).
+// prompt_snooze_until for the profile prefs; the tier prefs for the card dismiss).
 async function writeSettings(
   userId: string,
   ministryId: string,
@@ -33,10 +34,41 @@ async function writeSettings(
     .eq("ministry_id", ministryId)
 }
 
+// How long a dismissal holds. Long enough that the card is never a nag, short
+// enough that a mis-tap does not cost someone push notifications forever.
+const PROMPT_SNOOZE_DAYS = 14
+
+/**
+ * May the subscribe prompt appear right now?
+ *
+ * A dismissal is "not now", never "never". The old `prompt_dismissed` boolean was
+ * the latter, and it is why members sat in a live church with notifications off and
+ * no idea: its X is two millimetres from "Turn on notifications", one tap silenced
+ * the prompt permanently, and because permission was then never REQUESTED, iOS never
+ * listed Central under Settings → Notifications either — so the user's own instinct
+ * ("I'll fix it in Settings") dead-ended too. The only way back was Profile → gear →
+ * Notifications → Turn on, three levels behind an unlabelled gear.
+ *
+ * A legacy `prompt_dismissed: true` carrying no snooze is therefore treated as
+ * ALREADY EXPIRED — that is what brings the card back for everyone stranded by it.
+ * An unparseable date is treated the same way: fail toward asking.
+ */
+function promptSnoozed(settings?: NotificationSettings): boolean {
+  const until = settings?.prompt_snooze_until
+  if (!until) return false
+  const ts = Date.parse(until)
+  return Number.isFinite(ts) && ts > Date.now()
+}
+
+function snoozeFrom(now: number): string {
+  return new Date(now + PROMPT_SNOOZE_DAYS * 24 * 60 * 60 * 1000).toISOString()
+}
+
 // ── Chats-tab subscribe prompt ───────────────────────────────────────────────
-// Shown ONLY when permission is 'default' and there's no existing subscription and
-// the user hasn't dismissed it. Dismissal persists to profiles.notification_settings
-// (NOT localStorage — Convention #1). Never fires the permission request on load.
+// Shown ONLY when permission is 'default', there's no existing subscription, and the
+// user hasn't dismissed it within the last PROMPT_SNOOZE_DAYS. Persists to
+// profiles.notification_settings (NOT localStorage — Convention #1). Never fires the
+// permission request on load.
 export function PushSubscribeCard({
   userId,
   ministryId,
@@ -58,7 +90,7 @@ export function PushSubscribeCard({
 
   useEffect(() => {
     let cancelled = false
-    if (notificationSettings?.prompt_dismissed) return
+    if (promptSnoozed(notificationSettings)) return
     getPushStateUnified().then((state) => {
       if (cancelled) return
       setVisible(state.supported && state.permission === "default" && !state.subscribed)
@@ -66,7 +98,7 @@ export function PushSubscribeCard({
     return () => {
       cancelled = true
     }
-  }, [notificationSettings?.prompt_dismissed])
+  }, [notificationSettings])
 
   async function handleEnable() {
     setBusy(true)
@@ -85,9 +117,13 @@ export function PushSubscribeCard({
 
   async function handleDismiss() {
     setVisible(false)
+    // Snooze, and CLEAR the legacy boolean in the same write — leaving it set would
+    // mean the row still carried a permanent "never" that some future reader could
+    // honour again.
     await writeSettings(userId, ministryId, {
       ...(notificationSettings ?? {}),
-      prompt_dismissed: true,
+      prompt_dismissed: false,
+      prompt_snooze_until: snoozeFrom(Date.now()),
     })
   }
 
@@ -221,7 +257,12 @@ function ToggleRow({
 }
 
 // Fill absent keys with their defaults (absent = on / smart) for the UI.
-function normalize(s?: NotificationSettings): Required<Omit<NotificationSettings, "prompt_dismissed">> {
+// The prompt bookkeeping keys are OMITTED, not defaulted: this object is spread
+// wholesale over the saved settings on Save, so a defaulted value here would
+// silently overwrite the user's snooze every time they touched a toggle.
+function normalize(
+  s?: NotificationSettings,
+): Required<Omit<NotificationSettings, "prompt_dismissed" | "prompt_snooze_until">> {
   return {
     dms: s?.dms ?? true,
     mentions: s?.mentions ?? true,
@@ -314,10 +355,20 @@ export function NotificationsSection({
 
   const permission = pushState?.permission ?? "default"
   const subscribed = pushState?.subscribed ?? false
+  // Read after mount only — it reads navigator, and rendering it during SSR would
+  // make the server and the client disagree about which copy this row carries.
+  const needsAppForPush = pushState !== null && iosNeedsInstallForPush()
 
   let permissionLabel: string
   let permissionSub: string
-  if (permission === "unsupported") {
+  // An "unsupported" state is not a valid resting place for the product's main
+  // channel. On iPhone it is also not the browser's fault in any way the member can
+  // act on — Apple gives PushManager to installed apps only — so the row names the
+  // ONE thing that fixes it instead of blaming Safari and stopping there.
+  if (permission === "unsupported" && needsAppForPush) {
+    permissionLabel = "Not available in Safari"
+    permissionSub = "iPhone only sends notifications to installed apps."
+  } else if (permission === "unsupported") {
     permissionLabel = "Not supported"
     permissionSub = "This browser doesn't support push notifications."
   } else if (permission === "denied") {
@@ -352,6 +403,16 @@ export function NotificationsSection({
             <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 1.5 }}>{permissionSub}</div>
             {enableError && (
               <div style={{ marginTop: 6, fontSize: 13, color: "var(--danger)", lineHeight: 1.5 }}>{enableError}</div>
+            )}
+            {permission === "unsupported" && needsAppForPush && (
+              <a
+                href={APP_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: "inline-block", marginTop: 8, fontSize: 13, fontWeight: 600, color: "var(--plum)", textDecoration: "underline", textUnderlineOffset: 3 }}
+              >
+                Get Central on the App Store
+              </a>
             )}
           </div>
           {permission !== "unsupported" && permission !== "denied" && (

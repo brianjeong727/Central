@@ -76,8 +76,25 @@ export interface NotificationSettings {
   desk_web?: boolean
   /** Tier 3 — desk-work daily digest (mobile). Default on. */
   desk_digest?: boolean
-  /** Chats-tab subscribe prompt dismissed. Not localStorage (Convention #1). */
+  /**
+   * Chats-tab subscribe prompt dismissed. LEGACY, and deliberately no longer read
+   * as a permanent answer — see `prompt_snooze_until`. Left on the type because
+   * old rows still carry it and the writer must be able to clear it.
+   */
   prompt_dismissed?: boolean
+  /**
+   * When the chats-tab subscribe prompt may appear again (ISO instant). Not
+   * localStorage (Convention #1).
+   *
+   * This replaces `prompt_dismissed`, which was a ONE-WAY DOOR: its X sat two
+   * millimetres from "Turn on notifications", and one tap meant Central never
+   * asked again and never requested OS permission — so the app also never
+   * appeared under iOS Settings → Notifications, and the only way back was
+   * Profile → gear → Notifications → Turn on, which nobody found. A dismissal is
+   * "not now", never "never": a legacy `prompt_dismissed: true` with no snooze is
+   * treated as ALREADY EXPIRED, which is what un-strands those users.
+   */
+  prompt_snooze_until?: string
 }
 
 export interface Devotional {
