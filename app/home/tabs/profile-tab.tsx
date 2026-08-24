@@ -1261,38 +1261,74 @@ export function ProfileTab({
   // Keep the field you are typing in ABOVE the keyboard. The shell claims
   // `resize: "none"` (Convention #28), so the WebView never shrinks and iOS's own
   // scroll-into-view has nothing to work against — and the verse block, the one
-  // thing on this screen you actually write a sentence into, is the LAST thing on
-  // the page. It disappeared under the keys the moment it was tapped.
+  // thing on this screen you write a sentence into, is the LAST thing on the
+  // page. It disappeared under the keys the moment it was tapped.
   //
-  // Two moments need it and only one is a focus event: the FIRST field (focus
-  // fires before the keyboard exists, so the scroll has to wait for the height to
-  // land) and every field after it (the keyboard is already up, so `open` never
-  // changes again and only focus can drive it).
+  // Deliberately NOT `scrollIntoView`. Three reasons it did not do this job:
+  // it centres inside the LAYOUT viewport, which with `resize: "none"` is the
+  // whole screen INCLUDING the part the keyboard covers, so "centred" can still
+  // be behind the keys; `html { scroll-behavior: smooth }` makes it animate, and
+  // a smooth scroll started while iOS is animating the keyboard in gets
+  // clobbered by iOS's own scrolling; and it has no notion of `--kb-inset`, so
+  // it cannot know where the visible bottom actually is. This computes the
+  // overflow against the real visible bottom and scrolls by exactly that, once,
+  // instantly.
   useEffect(() => {
     if (typeof window === "undefined") return
     if (!window.matchMedia?.("(pointer: coarse)").matches) return
     const root = profileRootRef.current
     if (!root) return
 
-    let kbOpen = false
+    /** The nearest ancestor that actually scrolls. The shell's own region at
+     *  phone width, or the document — never assumed, because which one it is has
+     *  changed before. */
+    const scrollParent = (el: HTMLElement): HTMLElement => {
+      let node: HTMLElement | null = el.parentElement
+      while (node) {
+        const overflowY = getComputedStyle(node).overflowY
+        if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) return node
+        node = node.parentElement
+      }
+      return (document.scrollingElement as HTMLElement) ?? document.documentElement
+    }
+
+    const GAP = 14
     const reveal = () => {
       const active = document.activeElement as HTMLElement | null
       if (!active || !root.contains(active)) return
       if (!active.matches("input, textarea, select")) return
-      // One frame after the inset lands, so the spacer's height already exists
-      // and there is somewhere to scroll TO.
-      requestAnimationFrame(() => active.scrollIntoView({ block: "center", behavior: "smooth" }))
+      // Where the visible area actually ENDS, in the same coordinates
+      // getBoundingClientRect reports. Two readings, and the lower one wins:
+      // `--kb-inset` is what the keyboard layer measured, and the visual viewport
+      // is what the browser is currently showing. They differ on the native shell,
+      // where iOS scrolls the VISUAL viewport on focus while the layout viewport
+      // (and so innerHeight) stays the full screen — reading only the inset there
+      // would put the field a viewport-offset too low.
+      const kb = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--kb-inset")) || 0
+      const vv = window.visualViewport
+      const visibleBottom = Math.min(
+        vv ? vv.offsetTop + vv.height : Number.POSITIVE_INFINITY,
+        window.innerHeight - kb,
+      )
+      // Before the height lands this is 0, the overflow reads as negative, and
+      // the call is a no-op — which is why firing early costs nothing and why
+      // the retries below converge instead of over-scrolling.
+      const overflow = active.getBoundingClientRect().bottom - (visibleBottom - GAP)
+      if (overflow <= 0) return
+      scrollParent(active).scrollBy({ top: overflow, behavior: "instant" as ScrollBehavior })
     }
-    const onFocusIn = () => { if (kbOpen) reveal() }
-    root.addEventListener("focusin", onFocusIn)
-    const stop = subscribeKeyboard(({ open }) => {
-      // The web path emits several times per keyboard slide; only the CLOSED →
-      // OPEN edge is a new reason to move the page.
-      if (open === kbOpen) return
-      kbOpen = open
-      if (open) reveal()
-    })
-    return () => { root.removeEventListener("focusin", onFocusIn); stop() }
+
+    // Fired from BOTH ends, because neither alone covers both cases. Focus is
+    // what moves between fields once the keyboard is already up (`open` never
+    // changes again, so the subscription would never fire). The subscription is
+    // what covers the FIRST field, where focus happens before the keyboard
+    // exists. The delayed retries are for the native shell, where the inset
+    // arrives on `keyboardWillShow` while iOS is still animating and still
+    // moving the page underneath us.
+    const nudge = () => { reveal(); window.setTimeout(reveal, 120); window.setTimeout(reveal, 340) }
+    root.addEventListener("focusin", nudge)
+    const stop = subscribeKeyboard(() => reveal())
+    return () => { root.removeEventListener("focusin", nudge); stop() }
   }, [])
   useScrollResetOn([activeSection])
   const [uploadingAvatar, setUploadingAvatar] = useState(false)

@@ -81,7 +81,7 @@ test.describe("mobile profile + keyboard", () => {
     await expect(pill).toBeVisible()
   })
 
-  test("the verse at the bottom can be scrolled clear of the keyboard", async ({ page }) => {
+  test("the verse at the bottom lifts itself clear of the keyboard", async ({ page }) => {
     await openProfile(page)
     // Measured through evaluate, not boundingBox: with the keyboard closed the
     // spacer is 0px tall, which Playwright calls invisible and waits forever for.
@@ -89,30 +89,32 @@ test.describe("mobile profile + keyboard", () => {
       Math.round(document.querySelector("[data-kb-spacer]")!.getBoundingClientRect().height))
     expect(await spacerHeight()).toBe(0)
 
+    // The keyboard layer publishes its height as --kb-inset; there is no real
+    // keyboard headless, so set it the way the layer would — BEFORE focusing, so
+    // the focus handler sees the same world a real keyboard would present.
+    const KB = 300
+    await page.evaluate((kb) => document.documentElement.style.setProperty("--kb-inset", `${kb}px`), KB)
+    expect(await spacerHeight()).toBe(KB)
+
     // The verse block is the LAST thing on the page and the one field you write a
     // sentence into — the exact case that used to type itself under the keys.
     await page.getByText("Add the words, so people see why it stayed with you.").click()
     const verse = page.locator('textarea[aria-label="Verse text"]:visible').first()
     await expect(verse).toBeFocused()
 
-    const KB = 300
-    await page.evaluate((kb) => document.documentElement.style.setProperty("--kb-inset", `${kb}px`), KB)
-    expect(await spacerHeight()).toBe(KB)
-
-    // `behavior: "instant"` on purpose: globals.css sets `html { scroll-behavior:
-    // smooth }`, so a plain scrollTo animates and a synchronous read afterwards
-    // measures the position it started from.
-    await page.evaluate(() => {
-      const scroller = document.querySelector(".shell-scroll") as HTMLElement | null
-      scroller?.scrollTo({ top: scroller.scrollHeight, behavior: "instant" as ScrollBehavior })
-      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" as ScrollBehavior })
-    })
+    // Nothing here scrolls the page. That is the whole point of this test and the
+    // hole in the one it replaces: the previous version scrolled to the bottom
+    // ITSELF and then measured, which proved the ROOM existed and said nothing
+    // about whether the app ever uses it. The app has to do the scrolling.
+    await page.waitForTimeout(500)
     const clearance = await page.evaluate((kb) => {
       const el = document.querySelector('textarea[aria-label="Verse text"]') as HTMLElement
       return { bottom: Math.round(el.getBoundingClientRect().bottom), keyboardTop: window.innerHeight - kb }
     }, KB)
-    expect(clearance.bottom).toBeLessThanOrEqual(clearance.keyboardTop)
+    expect(clearance.bottom, `verse bottom ${clearance.bottom} must clear the keyboard at ${clearance.keyboardTop}`)
+      .toBeLessThanOrEqual(clearance.keyboardTop)
 
     await page.evaluate(() => document.documentElement.style.setProperty("--kb-inset", "0px"))
   })
+
 })
