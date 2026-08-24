@@ -143,7 +143,7 @@ export function ChatSearchView({
       return deskRow(
         c.id,
         <ChatAvatar size={38} title={c.name} avatarUrl={chatChipAvatar(c)} members={c.cluster_members}
-          otherCount={c.other_member_count} nameIsGenerated={c.name_is_generated} isCentral={c.is_central_chat}
+          otherCount={c.other_member_count} nameIsGenerated={c.name_is_generated} isCentral={c.is_central_chat} isDM={c.type === "dm"}
           surface="var(--cream)" className="flex-shrink-0" />,
         c.name,
         c.type === "dm" ? null : c.type === "church" ? "Church" : "Group",

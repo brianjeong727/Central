@@ -30,7 +30,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, useSyncExternalStore } from "react"
 import dynamic from "next/dynamic"
 import useSWR from "swr"
-import { Search, ChevronDown, X, Plus, Users, Pin, PinOff, Lock, Bell, BellOff, Archive, ArchiveRestore, LogOut } from "lucide-react"
+import { Search, ChevronDown, X, Plus, Users, Pin, PinOff, Lock, Bell, BellOff, LogOut } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, EmptyState, MONO_STYLE } from "../components/shared"
 import { PocketChrome, PocketRoundButton } from "../components/pocket-header"
@@ -74,7 +74,7 @@ function warmOnSettledPress(groupId: string) {
   window.addEventListener("pointerup", cleanup)
   window.addEventListener("pointercancel", cleanup)
 }
-import { setChatPinned, setChatMuted, setChatArchived, leaveChat } from "../chat-actions"
+import { setChatPinned, setChatMuted, leaveChat } from "../chat-actions"
 import type { SwipeAction, SwipeSide } from "@/components/central/swipe-actions"
 import { PushSubscribeCard } from "../components/notifications"
 import { isChatManageRole } from "@/lib/roles"
@@ -137,6 +137,7 @@ function PocketChatRow({ group, isFirst, onClick }: { group: ChatGroup; isFirst:
           otherCount={group.other_member_count}
           nameIsGenerated={group.name_is_generated}
           isCentral={group.is_central_chat}
+          isDM={group.type === "dm"}
           // Full-bleed rows sit on the page surface, so the ring between
           // overlapping circles has to be cream, not the old card ivory.
           surface="var(--cream)"
@@ -368,14 +369,26 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
   }
 
   // ── Swipe row actions (phone width) ────────────────────────────────────────
-  // An ACCELERATOR for things chat Settings already does — pin/mute for everyone,
-  // plus the one reversible room action the user's role allows. Church-chat
-  // DELETE is deliberately absent: it destroys the room and every message for all
-  // members, and a thumb-flick is the wrong distance from that. Archive (which a
-  // leader can undo) stands in for it; Delete keeps its deliberate path through
-  // Settings' danger zone.
+  // Two depths, iMessage's: a short swipe uncovers the tile to tap, a full one
+  // fires it the moment you let go.
+  //
+  // EXACTLY TWO quick actions per row — Pin one way, and ONE room action the
+  // other (ratified 2026-08-24). Which room action is the only thing that
+  // varies, and it is the one that matters for that kind of room: Leave where
+  // you can leave (a `my` chat), Mute where you cannot (a church chat, a DM —
+  // a DM is a pair, not a room you happen to be in). A third tile was not a
+  // third option so much as a smaller target for the two people actually use.
+  //
+  // Archive and Delete are NOT here. Delete destroys the room and every message
+  // for every member; Archive silences it for everyone. Both are things you do
+  // TO OTHER PEOPLE, and a thumb-flick is the wrong distance from either — they
+  // keep their deliberate path through chat Settings, where they already live.
+  //
+  // Leave and Mute both confirm, on BOTH paths (tap and full swipe) — the swipe
+  // gets you to the decision in one motion, it does not make it for you. Unmute
+  // and unpin do not: undoing something harmless is harmless.
   const [swipeOpen, setSwipeOpen] = useState<{ id: string; side: SwipeSide } | null>(null)
-  const [chatConfirm, setChatConfirm] = useState<{ kind: "archive" | "leave"; group: ChatGroup } | null>(null)
+  const [chatConfirm, setChatConfirm] = useState<{ kind: "mute" | "leave"; group: ChatGroup } | null>(null)
   const [chatToast, setChatToast] = useState<{ message: string; undo?: () => void } | null>(null)
 
   // Android hardware/gesture back closes an open row before it does anything
@@ -402,8 +415,7 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
     if (err) setChatToast({ message: err })
   }, [chatCtx])
 
-  const runMute = useCallback(async (g: ChatGroup) => {
-    const next = !g.muted
+  const runMute = useCallback(async (g: ChatGroup, next: boolean) => {
     setChatToast({
       message: next ? "Muted" : "Unmuted",
       undo: () => { setChatMuted(chatCtx(g), !next) },
@@ -421,38 +433,35 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
       userRole,
     )
     const ico = { width: 16, height: 16 } as const
+    // `commit` on both sides: with one tile per side there is no ambiguity about
+    // what a full swipe means, which is the reason the set is capped at two.
     const leading: SwipeAction[] = [{
       key: "pin",
       label: g.pinned ? "Unpin" : "Pin",
       icon: g.pinned ? <PinOff style={ico} /> : <Pin style={ico} />,
+      commit: true,
       onSelect: () => { runPin(g) },
     }]
-    const trailing: SwipeAction[] = [{
-      key: "mute",
-      label: g.muted ? "Unmute" : "Mute",
-      icon: g.muted ? <Bell style={ico} /> : <BellOff style={ico} />,
-      onSelect: () => { runMute(g) },
-    }]
-    if (caps.canArchive) trailing.push({
-      key: "archive", label: "Archive", tone: "strong", icon: <Archive style={ico} />,
-      onSelect: () => setChatConfirm({ kind: "archive", group: g }),
-    })
-    // Unarchive is reversible and low-stakes, so it fires straight from the swipe
-    // with an Undo rather than through a confirm.
-    else if (caps.canUnarchive) trailing.push({
-      key: "unarchive", label: "Unarchive", tone: "strong", icon: <ArchiveRestore style={ico} />,
-      onSelect: async () => {
-        setChatToast({ message: "Chat unarchived", undo: () => { setChatArchived(chatCtx(g), true) } })
-        const err = await setChatArchived(chatCtx(g), false)
-        if (err) setChatToast({ message: err })
-      },
-    })
-    if (caps.canLeave) trailing.push({
-      key: "leave", label: "Leave", tone: "strong", icon: <LogOut style={ico} />,
-      onSelect: () => setChatConfirm({ kind: "leave", group: g }),
-    })
+    const trailing: SwipeAction[] = [caps.canLeave
+      ? {
+          key: "leave", label: "Leave", tone: "strong", icon: <LogOut style={ico} />,
+          commit: true,
+          onSelect: () => setChatConfirm({ kind: "leave", group: g }),
+        }
+      : g.muted
+        ? {
+            key: "unmute", label: "Unmute", icon: <Bell style={ico} />,
+            commit: true,
+            onSelect: () => { runMute(g, false) },
+          }
+        : {
+            key: "mute", label: "Mute", icon: <BellOff style={ico} />,
+            commit: true,
+            onSelect: () => setChatConfirm({ kind: "mute", group: g }),
+          },
+    ]
     return { leading, trailing }
-  }, [userRole, runPin, runMute, chatCtx])
+  }, [userRole, runPin, runMute])
 
   const swipe: ChatSwipeConfig = {
     openId: swipeOpen?.id ?? null,
@@ -465,13 +474,15 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
     if (!chatConfirm) return
     const { kind, group } = chatConfirm
     setChatConfirm(null)
-    if (kind === "archive") {
-      const err = await setChatArchived(chatCtx(group), true)
-      setChatToast(err ? { message: err } : { message: "Chat archived" })
-    } else {
-      const err = await leaveChat(chatCtx(group))
-      setChatToast(err ? { message: err } : { message: `You left ${group.name}` })
+    if (kind === "mute") {
+      // Past the confirm it is the same optimistic write as any other row toggle,
+      // Undo toast included — the dialog is the deliberate step, not a different
+      // commit path.
+      runMute(group, true)
+      return
     }
+    const err = await leaveChat(chatCtx(group))
+    setChatToast(err ? { message: err } : { message: `You left ${group.name}` })
   }
 
   // Clear unread whenever activeGroupId changes (covers auto-open, HomeTab clicks, etc.)
@@ -766,17 +777,18 @@ export function ChatsTab({ userId, userProfile, userRole, ministryId, ministryNa
         />
       )}
 
-      {/* Swipe-action confirms. Archive and Leave both change what a room IS for
-          someone, so they get the same deliberate step Settings gives them
-          (Hard-do-not #10). Pin/mute stay instant with an Undo toast. */}
+      {/* Swipe-action confirms. Both room actions get the same deliberate step
+          Settings gives them (Hard-do-not #10) — and they need it MORE here, not
+          less, because a full swipe reaches them without a tap. Pin and the two
+          undo directions (unpin, unmute) stay instant with an Undo toast. */}
       <ConfirmDialog
         open={!!chatConfirm}
         danger={chatConfirm?.kind === "leave"}
-        title={chatConfirm?.kind === "archive" ? "Archive this chat?" : "Leave this chat?"}
-        message={chatConfirm?.kind === "archive"
-          ? "Members won't be able to send new messages. You can unarchive it later."
+        title={chatConfirm?.kind === "mute" ? "Mute this chat?" : "Leave this chat?"}
+        message={chatConfirm?.kind === "mute"
+          ? "You'll stop getting notifications for it. You can unmute any time."
           : "You'll stop receiving its messages."}
-        confirmLabel={chatConfirm?.kind === "archive" ? "Archive" : "Leave"}
+        confirmLabel={chatConfirm?.kind === "mute" ? "Mute" : "Leave"}
         onConfirm={confirmChatAction}
         onClose={() => setChatConfirm(null)}
       />
@@ -823,6 +835,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
             otherCount={group.other_member_count}
             nameIsGenerated={group.name_is_generated}
             isCentral={group.is_central_chat}
+            isDM={group.type === "dm"}
             surface="var(--cream-panel)"
             className="flex-shrink-0"
           />
@@ -870,6 +883,7 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
           otherCount={group.other_member_count}
           nameIsGenerated={group.name_is_generated}
           isCentral={group.is_central_chat}
+          isDM={group.type === "dm"}
           // Desktop panel rows sit on the panel fill, and the active row tints —
           // the ring follows whichever is behind it.
           surface={isActive ? "var(--plum-tint)" : "var(--cream)"}

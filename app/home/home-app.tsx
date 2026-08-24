@@ -11,13 +11,15 @@ import { EntrySplash } from "@/app/home/components/entry-splash"
 import type { ChatPreview } from "@/components/central/chat-strip"
 
 // Types
-import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings, ChatGroup, Crumb } from "./types"
+import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings, ChatGroup, ChatNotifyMode, NotificationSettings, Crumb } from "./types"
 import { formatChatListTime, getInitials, chatPreviewLabel, rowsToChatPreviews, type ChatPreviewRow } from "./utils"
-import { usePullToRefresh, PullToRefreshIndicator } from "@/components/central"
+import { usePullToRefresh, PullToRefreshIndicator, MessageBanner, type MessageBannerContent } from "@/components/central"
+import { chatNotifyCopy, chatNotifyReason, mentionToken, mentionTokensIn } from "@/lib/chat-notification"
 import { isGovernanceAdmin as computeIsGovernanceAdmin, teamAccessLevel } from "./governance"
 import { classifyTeam } from "./team-type"
 import { useNavState, ALL_FOLDED_PARAMS } from "./nav-state"
 import { fetchChatList } from "./chat-list"
+import { chatChipAvatar } from "./chat-avatar"
 import { useMinistryPresence } from "./use-presence"
 import { subscribeChatTopic } from "./chat-broadcast"
 
@@ -919,6 +921,153 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   const globalOpenChatRef = useRef(globalOpenChat)
   useEffect(() => { globalOpenChatRef.current = globalOpenChat }, [globalOpenChat])
 
+  // ── In-app message banner ──────────────────────────────────────────────────
+  // iOS deliberately suppresses its own notification banner while the app is
+  // foregrounded (lib/native-push.ts), and the Capacitor Android plugin never
+  // posts one in the foreground either. So a message arriving in ANY room other
+  // than the one on screen used to announce itself nowhere — you found out by
+  // wandering back to Chats. This is the banner iMessage and Messenger show
+  // instead, and it rides the realtime subscription that is already open for
+  // every one of the user's rooms rather than any new channel.
+  //
+  // Whether a message earns a banner is NOT decided here — lib/chat-notification.ts
+  // owns that, and the push route asks it the same question. The only rule that
+  // is local to this surface is the one Brian named: never banner the chat you
+  // are already looking at (`globalOpenChat` covers both the mobile overlay and
+  // the desktop inline pane — they are the same state).
+  const [banner, setBanner] = useState<MessageBannerContent | null>(null)
+  // Monotonic, so a SECOND message from the same room restarts the dwell timer
+  // and the entrance instead of silently inheriting the first one's remainder.
+  const bannerSeq = useRef(0)
+
+  // My per-chat notification overrides, and the nickname (if any) someone gave me
+  // in each room — the second token the composer can turn into an @mention of me.
+  // Both are tiny (one row per chat, at most), both are read INSIDE a realtime
+  // callback, and neither belongs in React state: a re-render per arriving
+  // message is exactly what the ref-based preview path above exists to avoid.
+  const chatPrefsRef = useRef(new Map<string, { muted: boolean; notify_mode: ChatNotifyMode | null }>())
+  const myNicknameRef = useRef(new Map<string, string>())
+  const chatListRef = useRef<ChatGroup[] | undefined>(chatListData)
+  useEffect(() => { chatListRef.current = chatListData }, [chatListData])
+  // Seeded from the SSR profile so the very first message of a session is judged
+  // correctly, then re-read alongside the per-chat prefs below.
+  const notifySettingsRef = useRef<NotificationSettings>(initialProfile.notification_settings ?? {})
+
+  // Reloaded whenever membership changes — the SAME signal (`memberGroupKey`) the
+  // topic subscriptions key off, so a chat joined mid-session gets its prefs the
+  // moment it gets its channel. The own-memberships realtime channel drives
+  // refreshMemberGroups, which is what moves that key.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const [{ data: prefs }, { data: nicks }, { data: me }] = await Promise.all([
+        supabase.from("group_members").select("group_id, muted, notify_mode").eq("user_id", userId),
+        supabase.from("chat_nicknames").select("group_id, nickname").eq("target_user_id", userId),
+        supabase.from("profiles").select("notification_settings").eq("id", userId).maybeSingle(),
+      ])
+      if (cancelled) return
+      if (me) notifySettingsRef.current = (me.notification_settings as NotificationSettings | null) ?? {}
+      chatPrefsRef.current = new Map(
+        (prefs ?? []).map((r) => [
+          r.group_id as string,
+          { muted: !!r.muted, notify_mode: (r.notify_mode as ChatNotifyMode | null) ?? null },
+        ]),
+      )
+      myNicknameRef.current = new Map(
+        (nicks ?? []).map((r) => [r.group_id as string, (r.nickname as string) ?? ""]),
+      )
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, memberGroupKey])
+
+  // Tapping a banner opens the conversation WITHOUT moving the active tab: you
+  // were doing something in Workspace, and closing the chat should put you back
+  // there rather than on the Chats list you never asked for. The overlay renders
+  // from any tab, so nothing else is needed. One atomic param write (Convention #5).
+  const openChatFromBanner = useCallback((groupId: string, groupName: string) => {
+    setBanner(null)
+    setGlobalOpenChat({ id: groupId, name: groupName })
+    setParams({ chat: groupId })
+  }, [setParams])
+
+  /** Raise a banner for an incoming message, if it earns one. Called from the
+   *  realtime preview path, so it already has the sender's name resolved and
+   *  cached — no extra query for the common case. */
+  const maybeBanner = useCallback((
+    msg: { group_id: string; content: string; sender_id: string; attachment_type: string | null; poll_id: string | null; reply_to_id?: string | null },
+    senderName: string,
+  ) => {
+    // Backgrounded: the OS notification is the one that fires, and racing it with
+    // an in-app banner nobody can see would only mean a stale card on resume.
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return
+    // The one rule that is local to this surface: never interrupt you with the
+    // conversation you are already reading. `globalOpenChat` is both the mobile
+    // overlay and the desktop inline pane, so this covers a laptop too.
+    if (globalOpenChatRef.current?.id === msg.group_id) return
+    const chat = chatListRef.current?.find((c) => c.id === msg.group_id)
+    // No row yet (a room joined seconds ago, before the list refetched) — there is
+    // no name or avatar to put on a card, and a blank banner is worse than none.
+    if (!chat) return
+
+    const pref = chatPrefsRef.current.get(msg.group_id)
+    const settings = notifySettingsRef.current
+    const tokens = mentionTokensIn(msg.content)
+    const myToken = mentionToken(initialProfile.name)
+    const nickToken = mentionToken(myNicknameRef.current.get(msg.group_id))
+    const shared = {
+      isDM: chat.type === "dm",
+      // other_member_count excludes the viewer; the threshold counts the room.
+      memberCount: (chat.other_member_count ?? 0) + 1,
+      chatMode: pref?.notify_mode ?? null,
+      muted: pref?.muted ?? chat.muted ?? false,
+      settings,
+      isMention: (!!myToken && tokens.has(myToken)) || (!!nickToken && tokens.has(nickToken)),
+    }
+
+    const raise = (reason: ReturnType<typeof chatNotifyReason>) => {
+      if (!reason) return
+      const { title, subtitle } = chatNotifyCopy(reason, {
+        senderName: senderName || "Someone",
+        groupName: chat.name,
+        isDM: shared.isDM,
+      })
+      bannerSeq.current += 1
+      setBanner({
+        groupId: chat.id,
+        groupName: chat.name,
+        title,
+        subtitle,
+        // The chat list's own labelling, so an attachment reads "Photo" rather
+        // than as an empty line.
+        body: chatPreviewLabel(msg.content, msg.attachment_type, !!msg.poll_id),
+        avatarUrl: chatChipAvatar(chat),
+        members: chat.cluster_members ?? [],
+        otherCount: chat.other_member_count ?? 0,
+        isCentral: chat.is_central_chat,
+        isDM: shared.isDM,
+        key: `${chat.id}:${bannerSeq.current}`,
+      })
+    }
+
+    const reason = chatNotifyReason({ ...shared, isReply: false })
+    if (reason) { raise(reason); return }
+
+    // A reply TO YOU survives a 'mentions'-only or large-room suppression, but
+    // proving one is a round trip (the broadcast carries the reply's id, not its
+    // author). So it is paid for only on a message that would otherwise be
+    // silent, that is actually a reply, and in a chat that has not been muted
+    // outright — mute silences replies too, and always has.
+    if (!msg.reply_to_id || shared.muted || shared.chatMode === "off" || settings.replies === false) return
+    supabase.from("messages").select("sender_id").eq("id", msg.reply_to_id).maybeSingle()
+      .then(({ data }) => {
+        if (data?.sender_id !== userId) return
+        if (globalOpenChatRef.current?.id === msg.group_id) return
+        raise(chatNotifyReason({ ...shared, isReply: true }))
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, initialProfile.name])
+
   // Throttled refetch of the shared chat-list SWR cache (the Messages sidebar).
   // Leading + trailing at 300ms: the first message in a burst refetches instantly,
   // the last one is always captured by the trailing call so the final order/preview/
@@ -1006,7 +1155,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     const groupIds = memberGroupKey.split(",").filter(Boolean)
     if (groupIds.length === 0) return
 
-    const handleMessageRecord = (msg: { group_id: string; content: string; created_at: string; sender_id: string; attachment_type: string | null; poll_id: string | null }) => {
+    const handleMessageRecord = (msg: { group_id: string; content: string; created_at: string; sender_id: string; attachment_type: string | null; poll_id: string | null; reply_to_id?: string | null }) => {
       // Drive the Messages sidebar live (order, preview, unread badges). This
       // throttled refetch ALSO refreshes the plain-fetch fallback (chatListData)
       // from the same RPC result — no separate loadChatList() needed here.
@@ -1035,6 +1184,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
             return tb.localeCompare(ta)
           })
         })
+        // Piggybacks on the SAME resolved name — the banner needs exactly the
+        // sender the preview line just named, and this path already pays for
+        // (and caches) that lookup. Your own message never banners.
+        if (!isOwnMessage) maybeBanner(msg, senderName)
       }
       // Resolve the sender name: own message → local profile name (no query);
       // cache hit → synchronous; cache miss → one profiles select, then cached.
@@ -1080,7 +1233,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
 
     return () => { unsubs.forEach((u) => u()) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, memberGroupKey, refetchChatList, refreshChatsForReaction, initialProfile.name])
+  }, [userId, memberGroupKey, refetchChatList, refreshChatsForReaction, initialProfile.name, maybeBanner])
 
   // Single RPC call replaces N parallel COUNT queries (one per group)
   const recountTotalUnread = useCallback(async () => {
@@ -1680,6 +1833,18 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
           draftRecipient={globalOpenChat.draftUserId ? { id: globalOpenChat.draftUserId, name: globalOpenChat.name } : null}
           onDmCreated={handleDmCreated}
           onOpenChat={handleOpenChat}
+        />
+      )}
+
+      {/* In-app notification banner. Portals to <body> at z 240, so it sits above
+          the chat screen it most often appears over — you get told about room B
+          while reading room A, which is the whole point. */}
+      {banner && (
+        <MessageBanner
+          key={banner.key}
+          content={banner}
+          onOpen={() => openChatFromBanner(banner.groupId, banner.groupName)}
+          onDismiss={() => setBanner((b) => (b?.key === banner.key ? null : b))}
         />
       )}
 

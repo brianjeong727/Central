@@ -32,7 +32,24 @@ self.addEventListener('push', (event) => {
     tag: data.tag || undefined,
     data: { url: data.url || '/home' },
   }
-  event.waitUntil(self.registration.showNotification(title, options))
+  // A focused app window shows its OWN in-app banner for chat messages
+  // (components/central/message-banner.tsx), so posting a system notification on
+  // top of it would be the same message announced twice. Skip only when a Central
+  // window is genuinely FOCUSED and is the app shell — a background tab, or a
+  // marketing page, still deserves the real notification.
+  //
+  // Skipping showNotification is allowed here rather than a violation of
+  // userVisibleOnly: the spec's enforcement carves out exactly the case where a
+  // visible client is already showing the user the content.
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      const inApp = clientList.some(
+        (c) => c.focused && c.visibilityState === 'visible' && String(c.url || '').includes('/home')
+      )
+      if (inApp) return undefined
+      return self.registration.showNotification(title, options)
+    })
+  )
 })
 
 self.addEventListener('notificationclick', (event) => {

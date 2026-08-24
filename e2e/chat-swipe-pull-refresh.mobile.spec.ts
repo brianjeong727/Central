@@ -54,7 +54,11 @@ async function readFrame(page: Page): Promise<Frame> {
 }
 
 const rowFor = (page: Page, name: string) => page.locator(`[data-pocket-row="${name}"]`)
-const muteButton = (page: Page) => page.getByRole("button", { name: "Mute", exact: true })
+// The row's ONE room-action tile. Which action it is depends on the room — Leave
+// where you can leave (this spec runs the "my" scope), Mute where you cannot — so
+// match either rather than naming one. A hidden-assertion needs a selector that
+// WOULD match if the panel had opened, or it passes for the wrong reason.
+const rowActionButton = (page: Page) => page.getByRole("button", { name: /^(Leave|Mute)$/ })
 
 async function openChats(page: Page) {
   await page.goto(`/home?tab=chats&chats=my`)
@@ -104,7 +108,7 @@ test.describe("chat-row swipe vs. shell pull-to-refresh", () => {
 
     expect(frame.gapHeight, "pull-to-refresh gap must open on a pure vertical drag").toBeGreaterThan(20)
     expect(frame.contentShift, "content must follow the finger down").toBeGreaterThan(20)
-    await expect(muteButton(page), "the swipe panel must never open on a vertical drag").toBeHidden()
+    await expect(rowActionButton(page), "the swipe panel must never open on a vertical drag").toBeHidden()
   })
 
   test("a horizontal drag on a row opens the swipe panel, never pull-to-refresh", async ({ page }) => {
@@ -120,7 +124,7 @@ test.describe("chat-row swipe vs. shell pull-to-refresh", () => {
 
     expect(frame.gapHeight, "pull-to-refresh must never arm on a horizontal drag").toBe(0)
     expect(frame.contentShift, "the shell scroller must not translate on a horizontal drag").toBe(0)
-    await expect(muteButton(page), "the swipe panel must open on a horizontal drag").toBeVisible()
+    await expect(rowActionButton(page), "the swipe panel must open on a horizontal drag").toBeVisible()
   })
 
   test("a drag starting within the left-edge zone opens no swipe panel", async ({ page }) => {
@@ -147,6 +151,6 @@ test.describe("chat-row swipe vs. shell pull-to-refresh", () => {
     const y0 = fg.y + fg.height / 2
     await drag(page, x0, y0, -150, 0)
 
-    await expect(muteButton(page), "a touch starting in the edge zone must not open the swipe panel").toBeHidden()
+    await expect(rowActionButton(page), "a touch starting in the edge zone must not open the swipe panel").toBeHidden()
   })
 })

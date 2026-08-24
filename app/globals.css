@@ -808,6 +808,141 @@ html[data-kb-native] .kb-lift {
   .central-icon-btn:not(:disabled):active { filter: brightness(0.94); }
 }
 
+/* ── MessageBanner (components/central/message-banner.tsx) ────────────────────
+   The in-app notification banner. Top-anchored because that is where every OS
+   puts one and where the eye already looks for it — and because the bottom is
+   spoken for by the floating nav pill and the toast.
+
+   `top` lives here, not inline, for the same reason `.toast-bottom` does: at
+   phone width it has to clear the safe-area notch, and an inline value would
+   outrank the desktop reset.
+
+   z 240 puts it above the modal tier (200) and ConfirmDialog (220). That is
+   deliberate and it is what every OS does: a banner that a modal can bury is a
+   banner that is silently lost, which is strictly worse than one that is briefly
+   in the way. It is 60px tall, top-anchored, auto-retires in 5s, and blocks
+   nothing outside its own rect. */
+.msg-banner {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  left: 50%;
+  width: min(430px, calc(100vw - 24px));
+  transform: translateX(-50%);
+  z-index: 240;
+  animation: msgBannerIn var(--dur-layout) var(--ease-out) both;
+}
+.msg-banner.msg-banner-out { animation: msgBannerOut 200ms var(--ease-out) both; }
+
+/* Desktop parks it top-RIGHT, not centred. Centred on a 1440px viewport it lands
+   over the breadcrumb and the page title — dead centre of where you are reading —
+   and it is off-centre against the content column anyway, because the shell's
+   sidebar makes the viewport's middle and the content's middle two different
+   places. Top-right is where every desktop OS and Slack put one, and it is clear
+   of both the rail and the crumb. */
+@media (min-width: 768px) {
+  .msg-banner {
+    top: 16px;
+    left: auto;
+    right: 20px;
+    width: 380px;
+    transform: none;
+    animation-name: msgBannerInDesk;
+  }
+  .msg-banner.msg-banner-out { animation-name: msgBannerOutDesk; }
+}
+
+.msg-banner-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--r-pocket);
+  background: var(--ivory);
+  box-shadow: var(--shadow-nav);
+  cursor: pointer;
+  text-align: left;
+  /* Vertical panning is the dismiss gesture; the browser keeps everything else. */
+  touch-action: pan-x;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+@keyframes msgBannerIn {
+  from { opacity: 0; transform: translate(-50%, -14px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes msgBannerOut {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to   { opacity: 0; transform: translate(-50%, -14px); }
+}
+@keyframes msgBannerInDesk {
+  from { opacity: 0; transform: translateY(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes msgBannerOutDesk {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(-14px); }
+}
+
+/* Reduced motion: the banner still ARRIVES and LEAVES — it just does not travel.
+   Suppressing the appearance entirely would hide the notification; suppressing
+   only the slide keeps the information and drops the movement. Two fades, because
+   the two placements park at different transforms and a shared keyframe would
+   yank the centred one to the right edge. */
+@keyframes msgBannerFade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .msg-banner,
+  .msg-banner.msg-banner-out { animation: msgBannerFade var(--dur-fast) var(--ease-out) both; }
+  .msg-banner.msg-banner-out { animation-direction: reverse; }
+  .msg-banner-card { transition: none; }
+}
+
+/* ── SwipeActionRow full-swipe commit (components/central/swipe-actions.tsx) ─
+   Drag a list row past the commit distance and the flagged tile SWALLOWS the
+   panel: its siblings fade out, its label steps --body → --ink, and the glyph
+   pops. That is the entire "release now and this fires" signal, and it is built
+   out of what the panel already has rather than a new colour — plum is a
+   surgical accent the chat list already spends elsewhere, and a danger FILL is
+   forbidden outright (mobile §4). It works because every tile shares one
+   --pocket-track fill: fade the siblings and what remains is one unbroken slab
+   with a single glyph on it, which is how iOS says the same thing.
+   The tile WIDTHS and `data-armed` are written from the drag handler, not from
+   React — an arm/disarm mid-drag must not re-render the row's children. */
+.swipe-tile { border: none; color: var(--body); transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+/* The seam between adjacent tiles. It lives HERE, not inline on the button,
+   because an inline `border-left` beats every stylesheet rule without
+   !important — which is exactly how the armed slab shipped with a hairline
+   still cutting it in two. `+` is also a truer statement of the rule than an
+   index check: never on the panel's outer edge, where it would read as a border
+   on the row itself. */
+.swipe-tile + .swipe-tile { border-left: 1px solid var(--line-3); }
+/* Resting tone. `strong` (the weightier action — leave/archive) takes its weight
+   from TEXT, never fill: one --pocket-track slab, two ink levels. */
+.swipe-tile[data-tone="strong"] { color: var(--ink); }
+.swipe-glyph { transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
+/* The GLYPH fades, never the tile. Fading the tile takes its background with it
+   and punches a tile-shaped hole of page cream into the end of the slab — which
+   is the exact opposite of the "one unbroken slab" this is going for. The tile
+   stays, its fill stays, only what is written on it leaves. */
+.swipe-panel[data-armed="1"] .swipe-tile[data-commit="0"] { border-left-color: transparent; }
+.swipe-panel[data-armed="1"] .swipe-tile[data-commit="0"] .swipe-glyph { opacity: 0; }
+/* Armed: the tile steps to its committed colour and the glyph pops. The colour
+   is the load-bearing half when the panel holds ONE tile — there are no siblings
+   to fade and the tile is already the full uncovered width, so the stretch says
+   nothing on its own. `strong` (leave) goes to --danger, which the contract
+   allows as TEXT and forbids as a fill; `default` (mute, pin) goes to --ink. */
+.swipe-panel[data-armed="1"] .swipe-tile[data-commit="1"] { color: var(--ink); }
+.swipe-panel[data-armed="1"] .swipe-tile[data-commit="1"][data-tone="strong"] { color: var(--danger); }
+.swipe-panel[data-armed="1"] .swipe-tile[data-commit="1"] .swipe-glyph { transform: scale(1.1); }
+
+/* Reduced motion: suppress the MOTION, never the SIGNAL. The arm state still
+   changes — it has to, or a full swipe fires with no warning at all — it just
+   changes instantly and without the glyph pop. Same rule as the press states
+   above. */
+@media (prefers-reduced-motion: reduce) {
+  .swipe-tile, .swipe-glyph { transition: none; }
+  .swipe-panel[data-armed="1"] .swipe-tile[data-commit="1"] .swipe-glyph { transform: none; }
+}
+
 /* ── CollapsibleRail (components/central/collapsible-rail.tsx) ─────────────
    The fold animates `grid-template-columns` so both columns move as one; the
    rail body only cross-fades (its pixel width is fixed, so it never re-wraps
