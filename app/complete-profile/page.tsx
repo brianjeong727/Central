@@ -20,6 +20,7 @@ import {
   pocketSub,
 } from "@/app/(auth)/shared"
 import { nameIsEmailDerived, memberProfileIncomplete } from "@/lib/profile-name"
+import { isMemberTier } from "@/lib/roles"
 import { YOUNG_ADULT, isYoungAdult } from "@/lib/cohort"
 // Aliased: the local `setYoungAdult` useState setter would otherwise SHADOW this
 // import, and `setYoungAdult(true)` type-checks perfectly against
@@ -134,6 +135,7 @@ function CompleteProfileContent() {
   // fallback rather than something a person typed — the same predicate proxy.ts
   // gates on (lib/profile-name.ts). Everyone else sees the form unchanged.
   const [needsName, setNeedsName] = useState(false)
+  const [cohortRequired, setCohortRequired] = useState(true)
   const [name, setName] = useState("")
   const [gender, setGender] = useState("")
   const [graduationYear, setGraduationYear] = useState("")
@@ -150,7 +152,13 @@ function CompleteProfileContent() {
   const gradYearNum = parseInt(graduationYear, 10)
   // A young adult has no graduating class, so the year requirement lifts for them
   // — this form is the only way an OAuth young adult can ever get past the gate.
-  const gradYearValid = youngAdult || (gradYearNum >= currentYear && gradYearNum <= currentYear + 6)
+  // Only member/visitor owe a cohort. Everyone starts as role='member' and a founder
+  // is not promoted until the registration wizard finishes, so an admin normally
+  // never reaches this page at all — but reaching it by any other route (a direct
+  // link, a role that changed) used to mean a pastor being told "Enter a valid
+  // graduation year" with no way past. Same rule the proxy gate uses, from the same
+  // predicate, so the two can't drift.
+  const gradYearValid = !cohortRequired || youngAdult || (gradYearNum >= currentYear && gradYearNum <= currentYear + 6)
   const nameValid = !needsName || name.trim().length >= 2
 
   useEffect(() => {
@@ -161,7 +169,7 @@ function CompleteProfileContent() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("gender, graduation_year, grade, name, email")
+        .select("role, gender, graduation_year, grade, name, email")
         .eq("id", user.id)
         .single()
 
@@ -170,6 +178,7 @@ function CompleteProfileContent() {
       // and sends them straight back into the gate.
       const placeholderName = nameIsEmailDerived(profile?.name, profile?.email)
       setNeedsName(placeholderName)
+      setCohortRequired(isMemberTier(profile?.role))
       // Seed the tick from what they already are, so someone the graduation flow
       // has already moved isn't asked to re-declare it.
       if (isYoungAdult(profile?.grade)) setYoungAdult(true)
@@ -180,6 +189,7 @@ function CompleteProfileContent() {
       // memberProfileIncomplete is the SAME predicate proxy.ts gates on; a private
       // copy here is what produces a redirect loop when the two drift.
       if (!memberProfileIncomplete({
+        role: profile?.role,
         gender: profile?.gender, graduation_year: profile?.graduation_year,
         grade: profile?.grade, name: profile?.name, email: profile?.email,
       })) {
@@ -210,7 +220,11 @@ function CompleteProfileContent() {
       // beside it. The completeness predicate passes either way, so it fails silently.
       .update({
         gender,
-        ...(youngAdult
+        // A non-member-tier profile is not given a cohort at all — not a year, not
+        // the young-adult sentinel. Writing one would put a pastor in a class chat.
+        ...(!cohortRequired
+          ? {}
+          : youngAdult
           ? { grade: YOUNG_ADULT, graduation_year: null }
           : { graduation_year: gradYearNum, grade: null }),
         ...(needsName ? { name: name.trim() } : {}),
@@ -241,7 +255,8 @@ function CompleteProfileContent() {
     // changeClassChat is self-only and derives the destination from the profile
     // ALREADY SAVED above; keepPrevious with no previous year means join-only.
     try {
-      if (youngAdult) await persistYoungAdult(true)
+      if (!cohortRequired) { /* no cohort written, so no room to move into */ }
+      else if (youngAdult) await persistYoungAdult(true)
       else await changeClassChat({ previousYear: null, keepPrevious: true })
     } catch { /* no ministry yet — placed at join */ }
 
@@ -276,7 +291,7 @@ function CompleteProfileContent() {
     ? "Enter your name to continue."
     : !gender
     ? "Select your gender to continue."
-    : !gradYearValid
+    : cohortRequired && !gradYearValid
     ? "Enter a valid graduation year."
     : null
 
@@ -309,7 +324,9 @@ function CompleteProfileContent() {
           A couple details.
         </h1>
         <p style={{ fontSize: 16, color: "var(--body)", lineHeight: 1.6, margin: "16px 0 30px" }}>
-          Just two things so we can place you in the right small group — then you&apos;re in.
+          {cohortRequired
+            ? "Just two things so we can place you in the right small group — then you're in."
+            : "One quick detail and you're in."}
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -335,7 +352,7 @@ function CompleteProfileContent() {
             </div>
           </div>
 
-          {!youngAdult && (
+          {cohortRequired && !youngAdult && (
           <AuthSelect
             label="GRADUATION YEAR"
             value={graduationYear}
@@ -346,7 +363,7 @@ function CompleteProfileContent() {
           </AuthSelect>
           )}
 
-          <YoungAdultCheck on={youngAdult} onToggle={() => setYoungAdult(v => !v)}/>
+          {cohortRequired && <YoungAdultCheck on={youngAdult} onToggle={() => setYoungAdult(v => !v)}/>}
 
           <Primary disabled={!gender || !gradYearValid || !nameValid || saving} loading={saving}>
             {saving ? "Saving…" : "Continue"}
@@ -367,7 +384,9 @@ function CompleteProfileContent() {
           <div style={mono}>One more thing</div>
           <h1 style={{ ...pocketH1, marginTop: 8 }}>A couple details.</h1>
         </div>
-        <p style={{ ...pocketSub, marginTop: 14 }}>Just two things so we can place you in the right small group — then you&apos;re in.</p>
+        <p style={{ ...pocketSub, marginTop: 14 }}>{cohortRequired
+          ? "Just two things so we can place you in the right small group — then you're in."
+          : "One quick detail and you're in."}</p>
         {error && <PocketError msg={error}/>}
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 22 }}>
           {needsName && (
@@ -388,14 +407,14 @@ function CompleteProfileContent() {
               ))}
             </div>
           </div>
-          {!youngAdult && (
+          {cohortRequired && !youngAdult && (
             <PocketSelect label="Graduation year" value={graduationYear} onChange={(e) => setGraduationYear(e.target.value)}
               hint="The year you graduate — it places you in the right class.">
               {yearOptions}
             </PocketSelect>
           )}
 
-          <YoungAdultCheck on={youngAdult} onToggle={() => setYoungAdult(v => !v)} compact/>
+          {cohortRequired && <YoungAdultCheck on={youngAdult} onToggle={() => setYoungAdult(v => !v)} compact/>}
           <PocketSubmit loading={saving} disabled={!gender || !gradYearValid || !nameValid || saving}>
             {saving ? "Saving…" : "Continue"}
           </PocketSubmit>
