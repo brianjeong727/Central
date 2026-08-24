@@ -28,7 +28,7 @@ async function loadDirectoryMembers(
     .from("profiles")
     .select("id, name, graduation_year, grade, role, avatar_url")
     .eq("ministry_id", ministryId)
-    .is("deleted_at", null) // hide deleted-account tombstones ("Former member")
+    .is("deleted_at", null) // hide deleted-account tombstones ("Deleted account")
     .order("name")
   return data ?? []
 }

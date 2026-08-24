@@ -39,6 +39,35 @@ export async function deleteGroup(groupId: string): Promise<{ error: string | nu
       .eq("user_id", user.id)
       .maybeSingle()
     if (!membership) return { error: "Insufficient permissions." }
+  } else if (group.type === "dm") {
+    // A DM is normally undeletable by ANYONE — the rule protects the other
+    // participant's copy of the thread. The single exception is a DM whose other
+    // side is a deleted account: there is nobody left to protect, and its owner
+    // is otherwise stuck with a conversation they can never clear. Gate is
+    // membership + "the other member is a tombstone", NOT a role — an ordinary
+    // member must be able to clear their own dead DM. Mirrors chatCapabilities'
+    // `deadDM`, and is the authority: the client value is never trusted.
+    // Two reads rather than a `profiles!user_id(...)` embed: a second FK between
+    // these tables would silently change the embed's shape, and this is a
+    // permission gate — it must fail closed, not fail interestingly.
+    const { data: dmMembers } = await admin
+      .from("group_members")
+      .select("user_id")
+      .eq("group_id", groupId)
+    const memberIds = (dmMembers ?? []).map((r: { user_id: string }) => r.user_id)
+    if (!memberIds.includes(user.id)) return { error: "Insufficient permissions." }
+    const otherIds = memberIds.filter((id) => id !== user.id)
+    // `otherIds.length > 0` guards the degenerate one-row DM, where "every other
+    // participant is deleted" would otherwise be vacuously true.
+    if (otherIds.length === 0) return { error: "Insufficient permissions." }
+    const { data: others } = await admin
+      .from("profiles")
+      .select("id, deleted_at")
+      .in("id", otherIds)
+    const rows = (others ?? []) as { id: string; deleted_at: string | null }[]
+    if (rows.length !== otherIds.length || !rows.every((r) => r.deleted_at)) {
+      return { error: "Insufficient permissions." }
+    }
   } else if (!isChatManageRole(profile.role)) {
     return { error: "Insufficient permissions." }
   }

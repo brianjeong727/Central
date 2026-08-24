@@ -1059,7 +1059,7 @@ function DeleteAccountSection({ email, onDeleted, mobile = false }: { email: str
         <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "18px 20px" }}>
           <p style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>Delete your account</p>
           <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 16px", lineHeight: 1.5 }}>
-            Permanently deletes your login and personal data — profile, journal, RSVPs, and form responses. Messages you sent stay in their chats, shown as “Former member.” This can’t be undone.
+            Permanently deletes your login and personal data — profile, journal, RSVPs, and form responses. Messages you sent stay in their chats, shown as “Deleted account.” This can’t be undone.
           </p>
           <PocketButton variant="destructiveOutline" onClick={() => setPhase("confirm")} style={{ width: "100%" }}>Delete account</PocketButton>
         </div>
@@ -1070,7 +1070,7 @@ function DeleteAccountSection({ email, onDeleted, mobile = false }: { email: str
         <div style={{ flex: 1, minWidth: 200 }}>
           <p style={{ fontFamily: "var(--serif)", fontSize: 20, fontWeight: 400, color: "var(--ink)", margin: "0 0 6px" }}>Delete your account</p>
           <p style={{ fontSize: 13, color: "var(--body)", margin: 0, lineHeight: 1.55 }}>
-            Permanently deletes your login and personal data — profile, journal, RSVPs, and form responses. Messages you sent stay in their chats, shown as “Former member.” This can’t be undone.
+            Permanently deletes your login and personal data — profile, journal, RSVPs, and form responses. Messages you sent stay in their chats, shown as “Deleted account.” This can’t be undone.
           </p>
         </div>
         <CentralButton variant="destructive" onClick={() => setPhase("confirm")} style={{ flexShrink: 0 }}>Delete account</CentralButton>

@@ -5,8 +5,8 @@
 // The AUTHENTICATED caller deletes THEIR OWN account only — there is no
 // admin-deletes-others path here. The auth.users identity is HARD-DELETED
 // ("deactivation" fails App Store review). A scrubbed "tombstone" profiles row
-// is left behind (name 'Former member', PII nulled, deleted_at set, ministry_id
-// KEPT) so their chat messages keep rendering attributed to "Former member"
+// is left behind (name 'Deleted account', PII nulled, deleted_at set, ministry_id
+// KEPT) so their chat messages keep rendering attributed to "Deleted account"
 // without an avatar; announcements/events they authored are reattributed to the
 // ministry (created_by → NULL).
 //
@@ -35,7 +35,13 @@ export interface DeleteAccountResult {
 // setting it null would raise 23502 and abort the whole deletion. It is set to a
 // deterministic non-null placeholder in the scrub UPDATE below (per userId).
 const PROFILE_SCRUB: Record<string, unknown> = {
-  name: "Former member",
+  // NOT "Former member". The two are different people and were being told apart
+  // by nothing: someone who LEFT the ministry is still a person who might come
+  // back, while this row is an account that no longer exists. Collapsing them
+  // under one label is what made every departed member read as deleted and made
+  // rosters look full of ghosts. Any change here needs the same change in the
+  // e2e assertions and a backfill of the existing tombstones.
+  name: "Deleted account",
   role: "member",
   avatar_url: null,
   bible_verse: null,
@@ -73,7 +79,7 @@ const USER_ID_TABLES = [
   // list is the only thing that stops acknowledgments outliving the account.
   "announcement_acknowledgements",
   // Same reason. A pending request that outlives its account sits in an admin's
-  // queue as a ghost, and approving it would relocate a scrubbed "Former member"
+  // queue as a ghost, and approving it would relocate a scrubbed "Deleted account"
   // tombstone into the ministry.
   "ministry_join_requests",
   "message_reactions",
@@ -101,7 +107,7 @@ const USER_ID_TABLES = [
 // ⚠️ `group_members` is deliberately NOT in the list above.
 //
 // The product promise (and the copy on the delete screen) is that messages you
-// sent STAY in their chats, shown as "Former member". Deleting the membership row
+// sent STAY in their chats, shown as "Deleted account". Deleting the membership row
 // broke exactly that: every membership-based join lost the person, so a DM with
 // them fell back to the stale `groups.name` — which showed the SURVIVING user
 // their own name as the conversation title. The roster and read receipts lost
@@ -205,7 +211,7 @@ export async function deleteMyAccount(emailConfirmation: string): Promise<Delete
   //      policy at all). Best-effort: a storage failure must never strand a
   //      deletion the user asked for — it logs the orphan and carries on.
   //      Chat attachments are deliberately NOT removed here: the product promise
-  //      is that messages you sent stay in their chats as "Former member", and
+  //      is that messages you sent stay in their chats as "Deleted account", and
   //      removing their images would leave broken pictures in conversations that
   //      are being kept on purpose.
   if (avatarPath) {
@@ -213,7 +219,7 @@ export async function deleteMyAccount(emailConfirmation: string): Promise<Delete
   }
 
   // (4) Scrub the profile into a tombstone (KEEP ministry_id so chat joins still
-  //     resolve "Former member"; set deleted_at so member lists hide it).
+  //     resolve "Deleted account"; set deleted_at so member lists hide it).
   const { error: scrubErr } = await admin
     .from("profiles")
     .update({
@@ -253,7 +259,7 @@ export async function deleteMyAccount(emailConfirmation: string): Promise<Delete
   }
 
   // Chat memberships are KEPT (see GROUP_MEMBER_SCRUB) so the tombstone still
-  // resolves as "Former member" in every chat it posted to — only the behavioural
+  // resolves as "Deleted account" in every chat it posted to — only the behavioural
   // columns are cleared.
   {
     const { error } = await admin
@@ -309,7 +315,7 @@ export async function deleteMyAccount(emailConfirmation: string): Promise<Delete
   await admin.from("audit_logs").insert({
     ministry_id: ministryId,
     actor_id: null, // actor no longer exists after this action
-    actor_name: "Former member",
+    actor_name: "Deleted account",
     action: "account.self_delete",
     entity_type: "profile",
     entity_id: userId,
