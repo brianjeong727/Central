@@ -21,6 +21,7 @@ import { CentralButton, IconButton, PlanSubTabStrip, TabPageHeader, PageTitle, J
 import { PocketChrome } from "../components/pocket-header"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
+import { getPushStateUnified } from "@/lib/native-push"
 import { downscaleToJpeg } from "@/lib/downscale-image"
 import type { Profile, Devotional, Prayer, Verse, NotificationSettings } from "../types"
 import { cohortLabel, isYoungAdult } from "@/lib/cohort"
@@ -1200,6 +1201,27 @@ export function ProfileTab({
   // Edge-swipe-back mirrors the chrome chevron (Convention #22): from a section →
   // hub, from the hub → profile.
   const settingsSwipeRef = useEdgeSwipeBack<HTMLDivElement>(settingsView === "hub" ? closeSettings : () => openSettings("hub"))
+  // Whether push is on FOR THIS DEVICE, shown on the settings-hub row. Desktop
+  // never needs this — it renders NotificationsSection inline, so the state is on
+  // screen. Phone width hides the whole section behind an unlabelled gear, and a
+  // row reading just "Notifications" says nothing about whether they work: someone
+  // who dismissed the subscribe prompt had no signal anywhere in the app that they
+  // were receiving nothing (and iOS does not list an app under Settings →
+  // Notifications until it has ASKED once, so the OS could not tell them either).
+  // Read only while the hub is open — getPushStateUnified re-registers with APNs
+  // when permission is granted, which is cheap but pointless on every Profile mount.
+  const [pushOnHere, setPushOnHere] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (settingsView !== "hub") return
+    let cancelled = false
+    getPushStateUnified().then((st) => {
+      if (cancelled) return
+      // `supported: false` (a browser with no Push API) is not "off" — there is
+      // nothing to turn on, so say nothing rather than imply a broken setting.
+      setPushOnHere(st.supported ? st.subscribed : null)
+    })
+    return () => { cancelled = true }
+  }, [settingsView])
   // Journal is a PUSHED screen off the profile root on mobile (desktop keeps it as
   // a sidebar section, where `back` is never rendered). Same handler as its chrome
   // chevron, per Convention #22.
@@ -2069,7 +2091,7 @@ export function ProfileTab({
               <div className="px-5 pt-2 pb-6">
                 <PocketKicker label="Settings" />
                 <PocketRowCard>
-                  <PocketRow leading={<SettingsIconChip icon={<Bell size={17} strokeWidth={2} />} />} title="Notifications" chevron onClick={() => openSettings("notifications")} />
+                  <PocketRow leading={<SettingsIconChip icon={<Bell size={17} strokeWidth={2} />} />} title="Notifications" meta={pushOnHere === null ? undefined : pushOnHere ? "On" : "Off"} chevron onClick={() => openSettings("notifications")} />
                   <PocketRow leading={<SettingsIconChip icon={<LifeBuoy size={17} strokeWidth={2} />} />} title="Account & support" chevron onClick={() => openSettings("account")} />
                   <PocketRow leading={<SettingsIconChip icon={<ShieldAlert size={17} strokeWidth={2} />} />} title="Danger zone" chevron isLast onClick={() => openSettings("danger")} />
                 </PocketRowCard>

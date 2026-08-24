@@ -83,6 +83,52 @@ test.describe.serial("Web push v1", () => {
       await expect(page.getByRole("button", { name: "Turn on notifications" })).toBeVisible()
       await expect(page.getByRole("button", { name: "Turning on…" })).toHaveCount(0)
     })
+
+    // Dismissing the card used to write `prompt_dismissed: true` and that was the
+    // END of it: Central never asked again, so it never REQUESTED OS permission, so
+    // iOS never listed the app under Settings → Notifications either — the user's own
+    // instinct dead-ended alongside the app's. The only way back was Profile → gear →
+    // Notifications → Turn on, and members did not find it. A dismissal is "not now".
+    test("a legacy permanent dismissal no longer silences the card, and dismissing now only snoozes it", async ({ page }) => {
+      const sb = sandbox()
+      await page.addInitScript(() => {
+        Object.defineProperty(Notification, "permission", { value: "default", configurable: true })
+      })
+
+      // The stranded state, exactly as it sits in production today.
+      await sb.setNotificationSettings(adminId, { prompt_dismissed: true })
+
+      await page.goto("/home?tab=chats")
+      const enableBtn = page.getByRole("button", { name: "Turn on notifications" })
+      await expect(enableBtn, "a legacy prompt_dismissed row must be asked again").toBeVisible({ timeout: 10_000 })
+
+      // Dismiss → the card goes away and the row records a snooze, not a verdict.
+      await page.getByRole("button", { name: "Dismiss notification prompt" }).click()
+      await expect(enableBtn).toHaveCount(0)
+
+      await expect
+        .poll(async () => {
+          const ns = await sb.getNotificationSettings(adminId)
+          return typeof ns.prompt_snooze_until === "string" ? "written" : "pending"
+        }, { timeout: 10_000 })
+        .toBe("written")
+
+      const ns = await sb.getNotificationSettings(adminId)
+      // The permanent flag must be CLEARED in the same write — leaving it set would
+      // keep a "never" on the row for any future reader to honour again.
+      expect(ns.prompt_dismissed).toBe(false)
+      const until = Date.parse(ns.prompt_snooze_until as string)
+      expect(until).toBeGreaterThan(Date.now())
+      // A snooze, not a life sentence: comfortably under a year.
+      expect(until).toBeLessThan(Date.now() + 365 * 24 * 60 * 60 * 1000)
+
+      // ...and the snooze is honoured on the next visit.
+      await page.goto("/home?tab=chats")
+      await page.waitForTimeout(2500)
+      await expect(page.getByRole("button", { name: "Turn on notifications" })).toHaveCount(0)
+
+      await sb.resetNotificationSettings(adminId)
+    })
   })
 
   // ── (a, fallback) service-client-arranged subscription row ─────────────
