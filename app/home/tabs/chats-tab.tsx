@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, use
 import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { BellOff, Camera, Check, CornerUpLeft, FileDown, Flag, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Pin, Plus, Search, Trash2, User, Users, X } from "lucide-react"
+import { Bell, BellOff, Camera, Check, CornerUpLeft, FileDown, Flag, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Pin, Plus, Search, Trash2, User, Users, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -433,7 +433,10 @@ function SettingsRowIcon({ children }: { children: ReactNode }) {
 // Row VALUE for the notification mode — the word the user picked, not a sentence
 // about it.
 function notifyLabel(mode: ChatNotifyMode): string {
-  return mode === "all" ? "All" : mode === "mentions" ? "Mentions" : "Off"
+  // "Muted", not "Off". The chat-list swipe action and the settings switch both
+  // call this state MUTED, and a third word for the same thing is what sent a
+  // real user hunting for an unmute button that existed under another name.
+  return mode === "all" ? "All" : mode === "mentions" ? "Mentions" : "Muted"
 }
 
 // ── Shared items ("Media, links & files") ────────────────────────────────────
@@ -1714,11 +1717,38 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             <div className="mb-6">
               <PocketKicker label="Privacy & support" style={{ margin: "0 4px 12px" }} />
               <PocketRowCard>
+                {/* MUTE, in the word the rest of the app uses for it.
+                    The swipe action on the chat list says "Mute" / "Unmute", and
+                    this screen used to answer with a row called "Notifications"
+                    reading "Off" — so someone who muted a chat came here hunting
+                    for "unmute" and found nothing that said it. Desktop has had
+                    this exact switch all along; mobile simply never got it, and
+                    the swipe (invisible until you swipe) was the only place the
+                    word appeared. Same handler as desktop: it drives notify_mode,
+                    so the two controls can never disagree. */}
+                {/* items-START, like "Open to everyone" below — the other two-line
+                    row in this card. Centering a two-line row's icon puts it at a
+                    different height from its neighbours' and the column of icons
+                    stops reading as a column. */}
+                <div className="flex items-start gap-3" style={{ padding: "13px 0" }}>
+                  <SettingsRowIcon><BellOff style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[15px] font-semibold" style={{ color: "var(--ink)", letterSpacing: "-0.01em" }}>Mute notifications</p>
+                    <p className="text-[13px] mt-0.5" style={{ color: "var(--muted-text)", lineHeight: 1.45 }}>Stay in the chat. Just stop the buzz.</p>
+                  </div>
+                  <PocketSwitch
+                    checked={pendingMuted}
+                    onChange={() => chooseNotifyMode(pendingMuted ? "all" : "off")}
+                    ariaLabel={pendingMuted ? "Unmute notifications" : "Mute notifications"}
+                  />
+                </div>
                 {/* Per-chat OVERRIDE of the global mode. The right-aligned value is
                     the mode actually in force — the inherited one until the user
-                    picks, with "smart" resolved by room size. */}
+                    picks, with "smart" resolved by room size. Muted reads as
+                    "Muted", not "Off": the switch above and this row are the same
+                    setting, so they have to agree in WORDS as well as in state. */}
                 <PocketRow
-                  leading={<SettingsRowIcon><BellOff style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
+                  leading={<SettingsRowIcon><Bell style={{ width: 17, height: 17 }} strokeWidth={1.7} /></SettingsRowIcon>}
                   title="Notifications"
                   meta={notifyLabel(pendingNotifyMode ?? inheritedNotify)}
                   chevron
