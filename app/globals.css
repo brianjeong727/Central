@@ -808,6 +808,53 @@ html[data-kb-native] .kb-lift {
   .central-icon-btn:not(:disabled):active { filter: brightness(0.94); }
 }
 
+/* ── SwipeActionRow full-swipe commit (components/central/swipe-actions.tsx) ─
+   Drag a list row past the commit distance and the flagged tile SWALLOWS the
+   panel: its siblings fade out, its label steps --body → --ink, and the glyph
+   pops. That is the entire "release now and this fires" signal, and it is built
+   out of what the panel already has rather than a new colour — plum is a
+   surgical accent the chat list already spends elsewhere, and a danger FILL is
+   forbidden outright (mobile §4). It works because every tile shares one
+   --pocket-track fill: fade the siblings and what remains is one unbroken slab
+   with a single glyph on it, which is how iOS says the same thing.
+   The tile WIDTHS and `data-armed` are written from the drag handler, not from
+   React — an arm/disarm mid-drag must not re-render the row's children. */
+.swipe-tile { border: none; color: var(--body); transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+/* The seam between adjacent tiles. It lives HERE, not inline on the button,
+   because an inline `border-left` beats every stylesheet rule without
+   !important — which is exactly how the armed slab shipped with a hairline
+   still cutting it in two. `+` is also a truer statement of the rule than an
+   index check: never on the panel's outer edge, where it would read as a border
+   on the row itself. */
+.swipe-tile + .swipe-tile { border-left: 1px solid var(--line-3); }
+/* Resting tone. `strong` (the weightier action — leave/archive) takes its weight
+   from TEXT, never fill: one --pocket-track slab, two ink levels. */
+.swipe-tile[data-tone="strong"] { color: var(--ink); }
+.swipe-glyph { transition: transform var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out); }
+/* The GLYPH fades, never the tile. Fading the tile takes its background with it
+   and punches a tile-shaped hole of page cream into the end of the slab — which
+   is the exact opposite of the "one unbroken slab" this is going for. The tile
+   stays, its fill stays, only what is written on it leaves. */
+.swipe-panel[data-armed="1"] .swipe-tile[data-commit="0"] { border-left-color: transparent; }
+.swipe-panel[data-armed="1"] .swipe-tile[data-commit="0"] .swipe-glyph { opacity: 0; }
+/* Armed: the tile steps to its committed colour and the glyph pops. The colour
+   is the load-bearing half when the panel holds ONE tile — there are no siblings
+   to fade and the tile is already the full uncovered width, so the stretch says
+   nothing on its own. `strong` (leave) goes to --danger, which the contract
+   allows as TEXT and forbids as a fill; `default` (mute, pin) goes to --ink. */
+.swipe-panel[data-armed="1"] .swipe-tile[data-commit="1"] { color: var(--ink); }
+.swipe-panel[data-armed="1"] .swipe-tile[data-commit="1"][data-tone="strong"] { color: var(--danger); }
+.swipe-panel[data-armed="1"] .swipe-tile[data-commit="1"] .swipe-glyph { transform: scale(1.1); }
+
+/* Reduced motion: suppress the MOTION, never the SIGNAL. The arm state still
+   changes — it has to, or a full swipe fires with no warning at all — it just
+   changes instantly and without the glyph pop. Same rule as the press states
+   above. */
+@media (prefers-reduced-motion: reduce) {
+  .swipe-tile, .swipe-glyph { transition: none; }
+  .swipe-panel[data-armed="1"] .swipe-tile[data-commit="1"] .swipe-glyph { transform: none; }
+}
+
 /* ── CollapsibleRail (components/central/collapsible-rail.tsx) ─────────────
    The fold animates `grid-template-columns` so both columns move as one; the
    rail body only cross-fades (its pixel width is fixed, so it never re-wraps
