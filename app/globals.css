@@ -808,6 +808,94 @@ html[data-kb-native] .kb-lift {
   .central-icon-btn:not(:disabled):active { filter: brightness(0.94); }
 }
 
+/* ── MessageBanner (components/central/message-banner.tsx) ────────────────────
+   The in-app notification banner. Top-anchored because that is where every OS
+   puts one and where the eye already looks for it — and because the bottom is
+   spoken for by the floating nav pill and the toast.
+
+   `top` lives here, not inline, for the same reason `.toast-bottom` does: at
+   phone width it has to clear the safe-area notch, and an inline value would
+   outrank the desktop reset.
+
+   z 240 puts it above the modal tier (200) and ConfirmDialog (220). That is
+   deliberate and it is what every OS does: a banner that a modal can bury is a
+   banner that is silently lost, which is strictly worse than one that is briefly
+   in the way. It is 60px tall, top-anchored, auto-retires in 5s, and blocks
+   nothing outside its own rect. */
+.msg-banner {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  left: 50%;
+  width: min(430px, calc(100vw - 24px));
+  transform: translateX(-50%);
+  z-index: 240;
+  animation: msgBannerIn var(--dur-layout) var(--ease-out) both;
+}
+.msg-banner.msg-banner-out { animation: msgBannerOut 200ms var(--ease-out) both; }
+
+/* Desktop parks it top-RIGHT, not centred. Centred on a 1440px viewport it lands
+   over the breadcrumb and the page title — dead centre of where you are reading —
+   and it is off-centre against the content column anyway, because the shell's
+   sidebar makes the viewport's middle and the content's middle two different
+   places. Top-right is where every desktop OS and Slack put one, and it is clear
+   of both the rail and the crumb. */
+@media (min-width: 768px) {
+  .msg-banner {
+    top: 16px;
+    left: auto;
+    right: 20px;
+    width: 380px;
+    transform: none;
+    animation-name: msgBannerInDesk;
+  }
+  .msg-banner.msg-banner-out { animation-name: msgBannerOutDesk; }
+}
+
+.msg-banner-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--r-pocket);
+  background: var(--ivory);
+  box-shadow: var(--shadow-nav);
+  cursor: pointer;
+  text-align: left;
+  /* Vertical panning is the dismiss gesture; the browser keeps everything else. */
+  touch-action: pan-x;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+@keyframes msgBannerIn {
+  from { opacity: 0; transform: translate(-50%, -14px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes msgBannerOut {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to   { opacity: 0; transform: translate(-50%, -14px); }
+}
+@keyframes msgBannerInDesk {
+  from { opacity: 0; transform: translateY(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes msgBannerOutDesk {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(-14px); }
+}
+
+/* Reduced motion: the banner still ARRIVES and LEAVES — it just does not travel.
+   Suppressing the appearance entirely would hide the notification; suppressing
+   only the slide keeps the information and drops the movement. Two fades, because
+   the two placements park at different transforms and a shared keyframe would
+   yank the centred one to the right edge. */
+@keyframes msgBannerFade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .msg-banner,
+  .msg-banner.msg-banner-out { animation: msgBannerFade var(--dur-fast) var(--ease-out) both; }
+  .msg-banner.msg-banner-out { animation-direction: reverse; }
+  .msg-banner-card { transition: none; }
+}
+
 /* ── SwipeActionRow full-swipe commit (components/central/swipe-actions.tsx) ─
    Drag a list row past the commit distance and the flagged tile SWALLOWS the
    panel: its siblings fade out, its label steps --body → --ink, and the glyph

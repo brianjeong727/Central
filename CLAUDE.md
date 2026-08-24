@@ -301,6 +301,8 @@ Next.js 16 (App Router), Supabase (Postgres + Realtime + RLS + Storage), Tailwin
 | `lib/keyboard-inset.ts` | The ONE software-keyboard layer. Publishes `--kb-inset` (layout viewport occluded by the keyboard), `[data-kb-open]` (a keyboard is showing in EITHER container) and `[data-kb-native]` (the shell). Shell path dynamic-imports `@capacitor/keyboard`, CLAIMS `resize: "none"` at runtime (`setResizeMode` then `getResizeMode` to confirm — never `"native"`, see Convention #28) and takes the height from `keyboardWillShow` and removes the iOS `^ v Done` accessory bar; web path measures `innerHeight - visualViewport.height`. Exports `startKeyboardInset()`, `subscribeKeyboard()` (NOT a hook — see #28), `useSwipeDownToDismissKeyboard()`, `dismissKeyboard()`. |
 | `components/keyboard-inset-bridge.tsx` | Starts the keyboard layer once from the root layout so the vars are live on every route (same shape as `NativeSplashRelease`). Renders nothing. |
 | `lib/profile-name.ts` | The ONE display-name policy for OAuth accounts. `providerFullName()` / `nameIsEmailDerived()` / `reconcileProfileName()`. Consumed by `/auth/callback`, `verifyNativeOAuthSession`, `proxy.ts`'s completeness gate, and `/complete-profile` — the predicate is shared so the gate and the page can never disagree and loop. Runtime-dependency-free (type-only supabase imports) so middleware can import it. |
+| `lib/chat-notification.ts` | The ONE encoding of whether a chat message notifies you, and the two fixed lines it says (WHO / WHERE). Shared by the push dispatch route and the in-app banner — iOS suppresses its own banner while the app is foregrounded, so the two are one feature seen from two places and a second copy of the rule would let muting a chat silence only one of them. Owns `SMART_ROOM_THRESHOLD` (30, Convention #18's number). |
+| `components/central/message-banner.tsx` | The in-app notification banner. Ivory `--r-pocket` card + `--shadow-nav`, top-centre at phone width and top-RIGHT on desktop, z 240 (above the modal tier — a banner a modal can bury is silently lost). Dumb: it renders what it is handed; eligibility is `lib/chat-notification.ts` and the mount is `home-app.tsx`'s realtime path. Retires in 5s, swipes up to dismiss, taps through to the chat WITHOUT moving the active tab. |
 | `lib/moderation.ts` | Chat profanity filter — tiered word list + `moderateText` (whole-word, leet-aware; scripture/theology terms excluded) + `MODERATION_DEFAULTS`. Pure TS, client+server. |
 | `app/actions/moderation.ts` | Chat-moderation server actions: `updateModerationSettings` (admin-gated, enum-validated) + `recordChatOffense` (fire-and-forget; atomic `increment_chat_offense` RPC; audits admins at every 5th offense). |
 | `app/actions/authz.ts` | Shared server-action auth guards: `requireMinistryMember` / `requireMinistryAdmin` / `requireSameMinistry` / `requireTeamMemberOrAdmin` — the pattern every service-role action must use. |
@@ -412,7 +414,7 @@ The push dispatch route (`app/api/push/dispatch/route.ts`) gained 3 cron/action-
 
 **Notification taxonomy (ratified 2026-07-12).** Four tiers govern what may push:
 - **T1 push, default ON** — DMs, @mentions, replies to you, published announcements (always on, official channel), task/role assignments, DGL week assignment, receipt decision to submitter, role changes, reactions to YOUR message (author only; honors per-chat mute and the `reactions` pref).
-- **T2 group chats, SMART default** — all messages under 30 members, mentions-only at ≥30 (same threshold as read receipts, Convention #18). Per-chat mute (`group_members.notify_mode`) is a hard override; user pref can force all/mentions/off.
+- **T2 group chats, SMART default** — all messages under 30 members, mentions-only at ≥30 (same threshold as read receipts, Convention #18). Per-chat mute (`group_members.notify_mode`) is a hard override; user pref can force all/mentions/off. The **IN-APP banner obeys the same resolution as the push** (ratified 2026-08-24) — same mute, same per-chat `notify_mode`, same ≥30 mentions-only default — so one control governs both. It is suppressed only for the chat currently open (`globalOpenChat`, which is the mobile overlay and the desktop inline pane alike) and when the document is hidden, where the OS notification is the one that fires.
 - **T3 desk-work, web ON / mobile daily digest** — form responses (leader), receipt submitted (treasurer), sign-off needed (president), new member joined (admins), pulse responses (pastor), moderation threshold (admins).
 - **T4 never push** — poll votes, view/RSVP counts, pins, journal/streaks, edits, meeting notes. Pulse QUESTIONS to members are T1 (rare, weighty). No quiet-hours engine.
 
@@ -533,6 +535,7 @@ Permission tiers:
 | Emoji picker | 160 |
 | Action menus (`ActionMenu` portal) | 200 |
 | Modals (`CentralModal`) | 200 (override e.g. 210 only to stack above another overlay) |
+| In-app message banner (`MessageBanner`) | 240 |
 | Mobile bottom sheet (`PocketSheet`) | 200 |
 
 ## Layout Rules

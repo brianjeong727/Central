@@ -7,6 +7,11 @@ import { getMinistryTimezone } from "@/lib/ministry-timezone"
 import { formatInZone, resolveMinistryTimezone, todayInZone } from "@/lib/tz"
 import { isAdminRole } from "@/lib/roles"
 import { audienceScope } from "@/lib/announcement-audience"
+// Whether a chat message notifies a recipient — and the two fixed lines it says —
+// is shared with the IN-APP banner (app/home/home-app.tsx). iOS suppresses its own
+// banner while the app is foregrounded, so the two are one feature seen from two
+// places; a second copy of the rule here would mean muting a chat silenced only one.
+import { chatNotifyCopy, chatNotifyReason, mentionToken, mentionTokensIn } from "@/lib/chat-notification"
 import type { NotificationSettings, ChatNotifyMode } from "@/app/home/types"
 
 export const runtime = "nodejs"
@@ -59,8 +64,6 @@ interface SubRow {
   auth: string | null
   platform: string
 }
-
-const SMART_THRESHOLD = 30 // mirrors read-receipt large-room threshold (Convention #18)
 
 // The subset of a recipient's subscriptions a given Resolved actually delivers to,
 // after Tier-3 platform gating. Shared by dryRun's routing breakdown and the real
@@ -142,10 +145,7 @@ async function resolveMessage(
   const profMap = new Map((profs ?? []).map((p) => [p.id, p]))
   const senderName = profMap.get(msg.sender_id)?.name ?? "Someone"
 
-  // Mentions are inserted by the composer as `@FirstName` (single token, no spaces).
-  const mentionTokens = new Set(
-    (msg.content?.match(/@(\w+)/g) ?? []).map((t: string) => t.slice(1).toLowerCase()),
-  )
+  const mentionTokens = mentionTokensIn(msg.content)
 
   // Nickname-aware mentions: the composer inserts the first word of a member's
   // chat nickname, so a mention token can resolve via that instead of the real
@@ -157,7 +157,7 @@ async function resolveMessage(
       .select("target_user_id, nickname")
       .eq("group_id", msg.group_id)
     for (const n of nicks ?? []) {
-      const tok = (n.nickname ?? "").split(" ")[0].toLowerCase()
+      const tok = mentionToken(n.nickname)
       if (tok) nicknameTokenByUser.set(n.target_user_id, tok)
     }
   }
@@ -184,46 +184,25 @@ async function resolveMessage(
   const results: Resolved[] = []
 
   for (const uid of recipientIds) {
-    const chatMode = chatModeMap.get(uid) ?? null
-    // 'off' (and its legacy `muted` mirror) is a hard override — it silences
-    // DMs, replies and mentions too, which is what mute has always meant here.
-    if (chatMode === "off" || muteMap.get(uid)) continue
     const settings: NotificationSettings =
       (profMap.get(uid)?.notification_settings as NotificationSettings) ?? {}
-    const firstName = (profMap.get(uid)?.name ?? "").split(" ")[0].toLowerCase()
+    const firstName = mentionToken(profMap.get(uid)?.name)
     const nickTok = nicknameTokenByUser.get(uid)
     const isMention = (!!firstName && mentionTokens.has(firstName)) || (!!nickTok && mentionTokens.has(nickTok))
-    const isReply = repliedAuthor === uid
 
-    let reason: string | null = null
-    if (isDM) {
-      // An explicit per-chat "all" is a deliberate opt-IN for this one thread,
-      // so it beats a global dms:false the same way it beats group_mode below.
-      if (chatMode !== "all" && settings.dms === false) continue
-      reason = "dm"
-    } else if (isReply && settings.replies !== false) {
-      reason = "reply"
-    } else if (isMention && settings.mentions !== false) {
-      reason = "mention"
-    } else {
-      // Per-chat choice wins over the global mode. 'mentions' lands here only
-      // for plain group traffic — replies and mentions already returned above.
-      const mode = chatMode ?? settings.group_mode ?? "smart"
-      if (mode === "off" || mode === "mentions") continue
-      if (mode === "smart" && memberCount >= SMART_THRESHOLD) continue
-      reason = "group"
-    }
-
-    // Messenger's shape (Brian, 2026-08-22): WHO on the first line, WHERE on the
-    // second, and the message itself on the third. A DM has no "where" worth
-    // saying — you already know a DM is from that person — so it stays two lines.
-    // This replaces "Sender · Chat" as a single run-on title, which read as one
-    // name when the chat name was long and pushed the message off the banner.
-    const subtitle = isDM
-      ? undefined
-      : reason === "mention" ? `mentioned you in ${group.name}`
-      : reason === "reply" ? `replied in ${group.name}`
-      : `to ${group.name}`
+    // Eligibility and the two fixed lines both come from lib/chat-notification.ts,
+    // shared with the in-app banner — see the note on the import.
+    const reason = chatNotifyReason({
+      isDM,
+      memberCount,
+      chatMode: chatModeMap.get(uid) ?? null,
+      muted: muteMap.get(uid),
+      settings,
+      isMention,
+      isReply: repliedAuthor === uid,
+    })
+    if (!reason) continue
+    const { subtitle } = chatNotifyCopy(reason, { senderName, groupName: group.name, isDM })
 
     results.push({
       userId: uid,
