@@ -145,4 +145,184 @@ test.describe("Meeting Notes v2", () => {
     const final = await sb.client.from("meeting_notes").select("id").eq("team_id", teamId)
     expect((final.data ?? []).length).toBe((before.data ?? []).length + 1)
   })
+
+  test("delete: danger zone removes the note from the list", async ({ page }) => {
+    const sb = sandbox()
+    const adminId = await sb.adminUserId()
+    const { data: lastRow } = await sb.client
+      .from("meeting_notes").select("note_number").eq("team_id", teamId)
+      .order("note_number", { ascending: false }).limit(1).maybeSingle()
+    const noteNumber = ((lastRow as { note_number?: number } | null)?.note_number ?? 0) + 1
+    const probeTitle = "E2E:: probe delete me"
+    const { data: note, error } = await sb.client
+      .from("meeting_notes")
+      .insert({ team_id: teamId, note_number: noteNumber, date: "2026-08-20", title: probeTitle, body: "", created_by: adminId, attendees: [adminId] })
+      .select().single()
+    expect(error).toBeFalsy()
+    const noteId = (note as { id: string }).id
+    createdNoteIds.push(noteId)
+
+    await openNotes(page)
+    await expect(page.getByText(probeTitle, { exact: true }).first()).toBeVisible({ timeout: 15000 })
+    await page.getByText(probeTitle, { exact: true }).first().click()
+    await expect(page.getByText("Danger zone")).toBeVisible({ timeout: 15000 })
+
+    // Opening the danger zone button must not delete on one click.
+    await page.getByRole("button", { name: "Delete note" }).click()
+    await expect(page.getByRole("button", { name: "Delete", exact: true })).toBeVisible()
+    await page.getByRole("button", { name: "Delete", exact: true }).click()
+
+    // Back on the list, and the note is genuinely gone (not just the detail closed).
+    await expect(page.getByPlaceholder("Search notes & decisions…")).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText(probeTitle, { exact: true })).toHaveCount(0)
+
+    const { data: gone } = await sb.client.from("meeting_notes").select("id").eq("id", noteId).maybeSingle()
+    expect(gone).toBeNull()
+    createdNoteIds.splice(createdNoteIds.indexOf(noteId), 1) // already gone, cleanup afterAll would no-op anyway
+  })
+
+  test("editable date: moving a note to a different month re-sorts and re-groups the list", async ({ page }) => {
+    const sb = sandbox()
+    const adminId = await sb.adminUserId()
+    const { data: lastRow } = await sb.client
+      .from("meeting_notes").select("note_number").eq("team_id", teamId)
+      .order("note_number", { ascending: false }).limit(1).maybeSingle()
+    const noteNumber = ((lastRow as { note_number?: number } | null)?.note_number ?? 0) + 1
+    const probeTitle = "E2E:: probe date move"
+    const { data: note, error } = await sb.client
+      .from("meeting_notes")
+      .insert({ team_id: teamId, note_number: noteNumber, date: "2026-01-10", title: probeTitle, body: "", created_by: adminId, attendees: [adminId] })
+      .select().single()
+    expect(error).toBeFalsy()
+    const noteId = (note as { id: string }).id
+    createdNoteIds.push(noteId)
+
+    await openNotes(page)
+    await expect(page.getByText("January 2026")).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText(probeTitle, { exact: true })).toBeVisible()
+    await page.getByText(probeTitle, { exact: true }).first().click()
+    await expect(page.getByText("Agenda", { exact: true })).toBeVisible({ timeout: 15000 })
+
+    // Open the date editor and move it to a different month.
+    await page.getByLabel("Change the meeting date").click()
+    const dateInput = page.locator('input[type="date"]')
+    await expect(dateInput).toBeVisible()
+    // A half-typed year must never reach the database — the date is held
+    // locally and committed on Enter/blur, and an implausible year is dropped.
+    await dateInput.fill("0002-05-15")
+    await dateInput.press("Enter")
+    await expect(page.getByLabel("Change the meeting date")).toBeVisible()
+    const { data: unchanged } = await sb.client.from("meeting_notes").select("date").eq("id", noteId).single()
+    expect((unchanged as { date: string }).date).toBe("2026-01-10")
+
+    await page.getByLabel("Change the meeting date").click()
+    await expect(dateInput).toBeVisible()
+    await dateInput.fill("2026-05-15")
+    await dateInput.press("Enter")
+
+    // DB truth: the plain YYYY-MM-DD string, no round-trip through a Date.
+    await expect.poll(async () => {
+      const { data } = await sb.client.from("meeting_notes").select("date").eq("id", noteId).single()
+      return (data as { date: string }).date
+    }, { timeout: 10000 }).toBe("2026-05-15")
+
+    // Back to the list — row moved out of January into May, digest re-sorted.
+    await page.locator("div.h-12").getByRole("button", { name: "Meeting Notes", exact: true }).click()
+    await expect(page.getByPlaceholder("Search notes & decisions…")).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText("May 2026")).toBeVisible({ timeout: 15000 })
+    const mayGroup = page.locator("div", { has: page.getByText("May 2026") }).first()
+    await expect(mayGroup.getByText(probeTitle, { exact: true })).toBeVisible()
+    // January 2026 group had only this probe note — it should no longer appear.
+    await expect(page.getByText("January 2026")).toHaveCount(0)
+  })
+
+  test("editable decision text persists across navigate away and back", async ({ page }) => {
+    const sb = sandbox()
+    const adminId = await sb.adminUserId()
+    const { data: lastRow } = await sb.client
+      .from("meeting_notes").select("note_number").eq("team_id", teamId)
+      .order("note_number", { ascending: false }).limit(1).maybeSingle()
+    const noteNumber = ((lastRow as { note_number?: number } | null)?.note_number ?? 0) + 1
+    const probeTitle = "E2E:: probe decision edit"
+    const { data: note, error } = await sb.client
+      .from("meeting_notes")
+      .insert({ team_id: teamId, note_number: noteNumber, date: "2026-04-02", title: probeTitle, body: "", created_by: adminId, attendees: [adminId] })
+      .select().single()
+    expect(error).toBeFalsy()
+    const noteId = (note as { id: string }).id
+    createdNoteIds.push(noteId)
+    const { data: decision, error: decErr } = await sb.client
+      .from("meeting_note_decisions")
+      .insert({ note_id: noteId, text: "E2E:: original decision text", sort_order: 0, created_by: adminId })
+      .select().single()
+    expect(decErr).toBeFalsy()
+    const decisionId = (decision as { id: string }).id
+
+    await openNotes(page)
+    await page.getByText(probeTitle, { exact: true }).first().click()
+    await expect(page.getByText("E2E:: original decision text")).toBeVisible({ timeout: 15000 })
+
+    const decisionField = page.getByPlaceholder("Decision…", { exact: true })
+    await decisionField.click()
+    await decisionField.fill("E2E:: edited decision text")
+
+    // Navigate away immediately — the pending debounced write must FLUSH on
+    // unmount, not get silently dropped.
+    await page.locator("div.h-12").getByRole("button", { name: "Meeting Notes", exact: true }).click()
+    await expect(page.getByPlaceholder("Search notes & decisions…")).toBeVisible({ timeout: 15000 })
+
+    await page.getByText(probeTitle, { exact: true }).first().click()
+    await expect(page.getByText("E2E:: edited decision text")).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText("E2E:: original decision text")).toHaveCount(0)
+
+    // Poll: the flushed write is fired on unmount and the assertions above are
+    // all served from the SWR cache, so they resolve before the PATCH lands.
+    await expect.poll(async () => {
+      const { data } = await sb.client.from("meeting_note_decisions").select("text").eq("id", decisionId).single()
+      return (data as { text: string }).text
+    }, { timeout: 10000 }).toBe("E2E:: edited decision text")
+  })
+
+  // Check-off is PRE-EXISTING shipped behaviour, and the debounce refactor
+  // silently regressed it: the optimistic ✓ painted, the PATCH was never sent,
+  // and a reload reverted it. Guarding the DB, not the checkmark.
+  test("agenda check-off reaches the database", async ({ page }) => {
+    const sb = sandbox()
+    const adminId = await sb.adminUserId()
+    const { data: lastRow } = await sb.client
+      .from("meeting_notes").select("note_number").eq("team_id", teamId)
+      .order("note_number", { ascending: false }).limit(1).maybeSingle()
+    const noteNumber = ((lastRow as { note_number?: number } | null)?.note_number ?? 0) + 1
+    const probeTitle = "E2E:: probe check off"
+    const { data: note, error } = await sb.client
+      .from("meeting_notes")
+      .insert({ team_id: teamId, note_number: noteNumber, date: "2026-04-03", title: probeTitle, body: "", created_by: adminId, attendees: [adminId] })
+      .select().single()
+    expect(error).toBeFalsy()
+    const noteId = (note as { id: string }).id
+    createdNoteIds.push(noteId)
+    const { data: item, error: itemErr } = await sb.client
+      .from("meeting_note_agenda_items")
+      .insert({ note_id: noteId, text: "E2E:: check me off", sort_order: 0, created_by: adminId })
+      .select().single()
+    expect(itemErr).toBeFalsy()
+    const itemId = (item as { id: string }).id
+
+    await openNotes(page)
+    await page.getByText(probeTitle, { exact: true }).first().click()
+    await expect(page.locator('input[value="E2E:: check me off"]')).toBeVisible({ timeout: 15000 })
+
+    await page.getByRole("button", { name: "Mark covered" }).first().click()
+    await expect.poll(async () => {
+      const { data } = await sb.client.from("meeting_note_agenda_items").select("done").eq("id", itemId).single()
+      return (data as { done: boolean }).done
+    }, { timeout: 10000 }).toBe(true)
+
+    // Survives a reload — the checkmark is coming from the row, not the cache.
+    await page.reload()
+    await openNotes(page)
+    await page.getByText(probeTitle, { exact: true }).first().click()
+    await expect(page.getByRole("button", { name: "Mark not covered" }).first()).toBeVisible({ timeout: 15000 })
+  })
+
 })
