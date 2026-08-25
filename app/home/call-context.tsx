@@ -26,7 +26,12 @@ import {
 // TYPE-only: the LiveKit SDK is ~200KB and nothing about it is needed until a
 // call actually starts, so the runtime import happens inside connect(). Every
 // session pays for the provider; only a session that calls pays for the SDK.
-import type { Room, RemoteTrack, Participant } from "livekit-client"
+import type { Room, RemoteTrack, Participant, VideoTrack } from "livekit-client"
+
+// The SDK module, captured on first connect. readPeers needs Track.Source at a
+// point where it cannot await an import, and a second dynamic import() would be
+// a second module instance — the enum identities would not match.
+let LK: typeof import("livekit-client") | null = null
 import { subscribeChatTopic } from "./chat-broadcast"
 import { isNativeShell } from "@/lib/native-auth"
 import { createClient } from "@/lib/supabase"
@@ -49,6 +54,10 @@ export interface CallPeer {
   name: string
   speaking: boolean
   muted: boolean
+  /** Their camera, when they have one published and unmuted. The TRACK itself,
+   *  not a flag: a <video> can only show a track by being handed the object. */
+  video: VideoTrack | null
+  isLocal: boolean
 }
 
 export interface ActiveCall {
@@ -88,6 +97,10 @@ interface CallApi {
   noteLiveCall: (groupId: string, info: LiveCallInfo | null) => void
   peers: CallPeer[]
   micOn: boolean
+  camOn: boolean
+  /** Which way your own camera points — the self-view mirrors only for the front
+   *  one, since the rear camera already shows the world the right way round. */
+  facingUser: boolean
   /** Set when the browser refuses to play audio until the user asks it to. */
   needsAudioUnlock: boolean
   error: string | null
@@ -96,6 +109,9 @@ interface CallApi {
   decline: () => Promise<void>
   hangUp: () => Promise<void>
   toggleMic: () => Promise<void>
+  toggleCamera: () => Promise<void>
+  /** Front/back on a phone. No-op where there is only one camera. */
+  flipCamera: () => Promise<void>
   unlockAudio: () => Promise<void>
   dismissError: () => void
 }
@@ -110,9 +126,10 @@ export function useCall(): CallApi {
 
 const INERT: CallApi = {
   active: null, incoming: null, liveCalls: {}, noteLiveCall: () => {},
-  peers: [], micOn: false, needsAudioUnlock: false, error: null,
+  peers: [], micOn: false, camOn: false, facingUser: true, needsAudioUnlock: false, error: null,
   start: async () => {}, accept: async () => {}, decline: async () => {}, hangUp: async () => {},
-  toggleMic: async () => {}, unlockAudio: async () => {}, dismissError: () => {},
+  toggleMic: async () => {}, toggleCamera: async () => {}, flipCamera: async () => {},
+  unlockAudio: async () => {}, dismissError: () => {},
 }
 
 interface CallRecord {
@@ -152,6 +169,9 @@ export function CallProvider({
   const [liveCalls, setLiveCalls] = useState<Record<string, LiveCallInfo>>({})
   const [peers, setPeers] = useState<CallPeer[]>([])
   const [micOn, setMicOn] = useState(true)
+  const [camOn, setCamOn] = useState(false)
+  const [facingUser, setFacingUser] = useState(true)
+  const facing = useRef<"user" | "environment">("user")
   const [needsAudioUnlock, setNeedsAudioUnlock] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -200,6 +220,9 @@ export function CallProvider({
     setActive(null)
     setPeers([])
     setMicOn(true)
+    setCamOn(false)
+    facing.current = "user"
+    setFacingUser(true)
     setNeedsAudioUnlock(false)
   }, [])
 
@@ -207,31 +230,53 @@ export function CallProvider({
 
   const readPeers = useCallback((room: Room) => {
     const all: Participant[] = [room.localParticipant, ...Array.from(room.remoteParticipants.values())]
+    const cam = LK?.Track.Source.Camera
     setPeers(
-      all.map((p) => ({
-        identity: p.identity,
-        name: p.name || "Someone",
-        speaking: p.isSpeaking,
-        muted: !p.isMicrophoneEnabled,
-      })),
+      all.map((p) => {
+        // A muted camera publication still exists — it just has nothing to show.
+        // Treating it as "no video" is what makes the tile fall back to the
+        // monogram instead of holding a frozen last frame.
+        const pub = cam ? p.getTrackPublication(cam) : undefined
+        const video = pub && !pub.isMuted ? (pub.videoTrack ?? null) : null
+        return {
+          identity: p.identity,
+          name: p.name || "Someone",
+          speaking: p.isSpeaking,
+          muted: !p.isMicrophoneEnabled,
+          video: video ?? null,
+          isLocal: p === room.localParticipant,
+        }
+      }),
     )
   }, [])
 
   /** Connect to the LiveKit room and wire every event we render from. */
   const connect = useCallback(
-    async (url: string, token: string) => {
-      const { Room, RoomEvent, Track } = await import("livekit-client")
+    async (url: string, token: string, kind: CallKind) => {
+      LK = await import("livekit-client")
+      const { Room, RoomEvent, Track } = LK
       const room = new Room({ adaptiveStream: true, dynacast: true })
       roomRef.current = room
 
       room
         .on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
-          if (track.kind !== Track.Kind.Audio) return
+          // Audio is attached by hand into a detached host, deliberately outside
+          // React: an <audio> element's lifetime is the track's, and a re-render
+          // must never be able to detach one mid-sentence. VIDEO is the opposite
+          // — it has to live in the layout — so it goes through readPeers and is
+          // attached by the tile that renders it.
+          if (track.kind !== Track.Kind.Audio) { readPeers(room); return }
           const el = track.attach()
           el.autoplay = true
           audioHost.current?.appendChild(el)
         })
-        .on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => { track.detach().forEach((el) => el.remove()) })
+        .on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+          if (track.kind !== Track.Kind.Audio) { readPeers(room); return }
+          track.detach().forEach((el) => el.remove())
+        })
+        .on(RoomEvent.TrackPublished, () => readPeers(room))
+        .on(RoomEvent.TrackUnpublished, () => readPeers(room))
+        .on(RoomEvent.LocalTrackUnpublished, () => readPeers(room))
         .on(RoomEvent.ParticipantConnected, () => {
           // Someone picked up — stop the ringback and start counting.
           ring.stop()
@@ -250,6 +295,10 @@ export function CallProvider({
       await room.connect(url, token)
       await room.localParticipant.setMicrophoneEnabled(true)
       setMicOn(true)
+      if (kind === "video") {
+        await room.localParticipant.setCameraEnabled(true, { facingMode: facing.current })
+        setCamOn(true)
+      }
       setNeedsAudioUnlock(!room.canPlaybackAudio)
       readPeers(room)
 
@@ -290,9 +339,11 @@ export function CallProvider({
       })
 
       try {
-        await connect(s.url, s.token)
+        await connect(s.url, s.token, kind)
       } catch {
-        setError("Couldn't reach the call. Check your microphone permission.")
+        setError(kind === "video"
+          ? "Couldn't reach the call. Check your camera and microphone permissions."
+          : "Couldn't reach the call. Check your microphone permission.")
         await leaveCallAction(s.callId, "cancelled").catch(() => {})
         teardown()
         return
@@ -332,9 +383,11 @@ export function CallProvider({
     const s = res as Exclude<typeof res, { error: string }>
     setActive((c) => (c ? { ...c, status: "active", answeredAt: Date.now() } : c))
     try {
-      await connect(s.url, s.token)
+      await connect(s.url, s.token, call.kind)
     } catch {
-      setError("Couldn't join the call. Check your microphone permission.")
+      setError(call.kind === "video"
+        ? "Couldn't join the call. Check your camera and microphone permissions."
+        : "Couldn't join the call. Check your microphone permission.")
       await leaveCallAction(s.callId).catch(() => {})
       teardown()
     }
@@ -363,6 +416,37 @@ export function CallProvider({
     await room.localParticipant.setMicrophoneEnabled(next)
     setMicOn(next)
   }, [])
+
+  const toggleCamera = useCallback(async () => {
+    const room = roomRef.current
+    if (!room) return
+    const next = !room.localParticipant.isCameraEnabled
+    await room.localParticipant.setCameraEnabled(next, next ? { facingMode: facing.current } : undefined)
+    setCamOn(next)
+    readPeers(room)
+  }, [readPeers])
+
+  /** Flip front/back by REPUBLISHING with the other facingMode rather than
+   *  switching device ids: on a phone the useful axis is which way the camera
+   *  points, and enumerateDevices labels are unreliable (and empty until a
+   *  permission has already been granted). */
+  const flipCamera = useCallback(async () => {
+    const room = roomRef.current
+    if (!room || !room.localParticipant.isCameraEnabled) return
+    facing.current = facing.current === "user" ? "environment" : "user"
+    setFacingUser(facing.current === "user")
+    try {
+      await room.localParticipant.setCameraEnabled(false)
+      await room.localParticipant.setCameraEnabled(true, { facingMode: facing.current })
+    } catch {
+      // Single-camera device: put the original back rather than leaving the
+      // call with no picture at all.
+      facing.current = facing.current === "user" ? "environment" : "user"
+      setFacingUser(facing.current === "user")
+      await room.localParticipant.setCameraEnabled(true, { facingMode: facing.current }).catch(() => {})
+    }
+    readPeers(room)
+  }, [readPeers])
 
   const unlockAudio = useCallback(async () => {
     const room = roomRef.current
@@ -452,11 +536,11 @@ export function CallProvider({
 
   const api = useMemo<CallApi>(
     () => ({
-      active, incoming, liveCalls, noteLiveCall, peers, micOn, needsAudioUnlock, error,
-      start, accept, decline, hangUp, toggleMic, unlockAudio,
+      active, incoming, liveCalls, noteLiveCall, peers, micOn, camOn, facingUser, needsAudioUnlock, error,
+      start, accept, decline, hangUp, toggleMic, toggleCamera, flipCamera, unlockAudio,
       dismissError: () => setError(null),
     }),
-    [active, incoming, liveCalls, noteLiveCall, peers, micOn, needsAudioUnlock, error, start, accept, decline, hangUp, toggleMic, unlockAudio],
+    [active, incoming, liveCalls, noteLiveCall, peers, micOn, camOn, facingUser, needsAudioUnlock, error, start, accept, decline, hangUp, toggleMic, toggleCamera, flipCamera, unlockAudio],
   )
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>

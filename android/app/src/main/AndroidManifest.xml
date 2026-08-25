@@ -38,4 +38,6 @@
          earpiece/speaker rather than always playing through media volume. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Video calls. iOS already carries NSCameraUsageDescription (photos). -->
+    <uses-permission android:name="android.permission.CAMERA" />
 </manifest>

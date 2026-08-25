@@ -75,6 +75,7 @@ async function openChat(page: Page, scope: "church" | "my", name: string) {
 }
 
 const callButton = (page: Page) => page.getByRole("button", { name: /Start a call|Join the call/ })
+const videoButton = (page: Page) => page.getByRole("button", { name: "Start a video call" })
 
 /** Put a live ringing call into a chat, as somebody else. Mirrors exactly what
  *  the server action writes, so the client cannot tell the difference. */
@@ -114,6 +115,9 @@ test.describe("start gate — member", () => {
     test.skip(!CONFIGURED, "LIVEKIT_URL unset — calling is hidden by design")
     await openChat(page, "my", MY)
     await expect(callButton(page)).toBeVisible()
+    // Audio and video are separate affordances so the person being called knows
+    // which one is arriving before they answer.
+    await expect(videoButton(page)).toBeVisible()
   })
 
   test("a member cannot start a call in a church chat", async ({ page }) => {
@@ -122,6 +126,7 @@ test.describe("start gate — member", () => {
     // The chat itself has to have loaded, or "no button" is trivially true.
     await expect(page.getByRole("button", { name: /message|Message/ }).or(page.locator("textarea")).first()).toBeVisible()
     await expect(callButton(page)).toHaveCount(0)
+    await expect(videoButton(page)).toHaveCount(0)
   })
 })
 
@@ -194,6 +199,10 @@ test.describe("ringing", () => {
     await expect(page.getByText("Call in progress")).toBeVisible({ timeout: 20_000 })
     await expect(page.getByRole("button", { name: "Join the call" })).toBeVisible()
     await expect(page.getByRole("dialog", { name: /started a call/ })).toHaveCount(0)
+    // The pair collapses to ONE button while a call is live: the kind is already
+    // decided, so offering a choice would be offering something impossible.
+    await expect(videoButton(page)).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Start a call" })).toHaveCount(0)
 
     await endCall(callId)
     await expect(page.getByText("Call in progress")).toHaveCount(0, { timeout: 20_000 })
