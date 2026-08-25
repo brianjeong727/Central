@@ -22,6 +22,7 @@ import { fetchChatList } from "./chat-list"
 import { chatChipAvatar } from "./chat-avatar"
 import { useMinistryPresence } from "./use-presence"
 import { subscribeChatTopic } from "./chat-broadcast"
+import { CallProvider } from "./call-context"
 
 // Components
 import { CommandPalette } from "./components/command-palette"
@@ -83,6 +84,13 @@ const NetworkTab = dynamic(() => import("./tabs/network-tab").then(m => m.Networ
 // (chat sender, RSVP chip, settings/team roster). Code-split: its JS ships only
 // once a profile is first opened.
 const GlobalMemberProfileOverlay = dynamic(() => import("./components/member-sheet").then(m => m.GlobalMemberProfileOverlay), { ssr: false })
+
+// Calling. The PROVIDER is imported statically — it owns the ring feed, so it has
+// to be listening from the moment the shell mounts, and a dynamic wrapper would
+// blank its children while it loaded. The heavy part (the LiveKit SDK, ~200KB) is
+// dynamically imported inside the provider when a call actually starts, so a
+// session that never calls never downloads it.
+const CallSurface = dynamic(() => import("./components/call-surface").then(m => m.CallSurface), { ssr: false })
 
 function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initialRecentChats, initialChatList, initialChatsSection = "church", initialUserTeams, initialActiveQuestion, initialHasResponded, initialGovernanceSettings }: HomeAppProps) {
   const supabase = createClient()
@@ -1437,6 +1445,7 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       className={`relative min-h-screen bg-[var(--cream)] max-w-[390px] mx-auto md:max-w-none md:flex md:h-screen md:overflow-hidden md:min-h-0 md:bg-[var(--cream)]${panelHidden ? " shell-compact" : ""}`}
       style={{ paddingTop: "env(safe-area-inset-top)" }}
     >
+      <CallProvider userId={userId} memberGroupKey={memberGroupKey}>
       <MemberProfileProvider open={openMemberProfile}>
       <DraftDmProvider open={openDraftDm}>
 
@@ -1930,8 +1939,13 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
       {/* Native cold-launch splash (self-gated: no-ops on web/desktop/warm nav, and
           releases the native launch splash even when it skips rendering). */}
       <EntrySplash />
+
+      {/* Ringing, the in-call panel and call errors. Last inside the providers so
+          it paints above every tab surface; its own overlays portal to <body>. */}
+      <CallSurface selfId={userId} />
       </DraftDmProvider>
       </MemberProfileProvider>
+      </CallProvider>
     </div>
   )
 }

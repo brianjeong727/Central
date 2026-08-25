@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, use
 import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Bell, BellOff, Camera, Check, CornerUpLeft, FileDown, Flag, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Pin, Plus, Search, Trash2, User, Users, X } from "lucide-react"
+import { Bell, BellOff, Camera, Check, CornerUpLeft, FileDown, Flag, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Phone, Pin, Plus, Search, Trash2, User, Users, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -21,6 +21,8 @@ import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatGro
 import { useOpenMemberProfile } from "../member-profile-context"
 import { InsetHairline } from "@/components/central/hairline"
 import { chatCapabilities } from "../chat-permissions"
+import { useCall } from "../call-context"
+import { callingAvailable, getLiveCall } from "@/app/actions/calls"
 import { dismissDelivered } from "@/lib/notification-dismiss"
 import { chatChipAvatarFromParts, chatAvatarStoragePath, chatGroupPhotoPatch } from "../chat-avatar"
 import { downscaleToJpeg } from "@/lib/downscale-image"
@@ -2555,6 +2557,50 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const canModerate = groupType === "church" ? (isLeaderRole(userRole) && isMemberOfChat) : isChatManageRole(userRole)
   const canPin = !groupArchived && (groupType !== "church" ? true : (isLeaderRole(userRole) && isMemberOfChat))
 
+  // ── Calling ────────────────────────────────────────────────────────────────
+  // The button is gated on the SAME predicate the server action and the SQL
+  // helper use (chatCapabilities().canStartCall → can_start_call()), so what the
+  // header offers and what the database permits cannot drift apart. A draft DM
+  // has no group row yet, so there is nothing to call into.
+  const { start: startCallFromChat, active: activeCall, liveCalls, noteLiveCall } = useCall()
+  const { data: callingOn } = useSWR("calling-available", () => callingAvailable(), {
+    revalidateOnFocus: false,
+    revalidateIfStale: false,
+    dedupingInterval: 10 * 60 * 1000,
+  })
+  const dmPartnerDeleted = useMemo(
+    () => (groupType === "dm" ? roster.some((m) => m.id !== userId && m.deleted) : false),
+    [groupType, roster, userId],
+  )
+  const callCaps = chatCapabilities(
+    { type: groupType, archived: groupArchived, isMemberOfChat, partnerDeleted: dmPartnerDeleted },
+    userRole,
+  )
+  const liveCallHere = groupId ? liveCalls[groupId] : undefined
+  // Someone can always JOIN a call already running, even where they could not
+  // have started it — see the asymmetry note in chat-permissions.ts.
+  const canCall = !!groupId && !!callingOn && rosterLoaded &&
+    (liveCallHere ? callCaps.canJoinCall : callCaps.canStartCall)
+  const inThisCall = activeCall?.groupId === groupId
+
+  // Seed the live-call map for THIS chat on open. The broadcast feed covers a
+  // call that starts while you are looking; this covers walking into a chat
+  // where one is already up.
+  useEffect(() => {
+    if (!groupId || !callingOn) return
+    let cancelled = false
+    void getLiveCall(groupId).then((c) => {
+      if (cancelled) return
+      noteLiveCall(groupId, c ? { callId: c.callId, kind: c.kind, startedBy: c.startedBy } : null)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [groupId, callingOn, noteLiveCall])
+
+  const onCallPress = useCallback(() => {
+    if (!groupId || inThisCall) return
+    void startCallFromChat(groupId, { title: displayName, isDM: groupType === "dm" })
+  }, [groupId, inThisCall, startCallFromChat, displayName, groupType])
+
   // @mention member list is loaded via useSWR above (see rosterData/mentionMembers).
   // ── Invite-to-a-group picker ──────────────────────────────────────────────
   // Shares the browse list's SWR key, so opening a chat costs no extra fetch when
@@ -4093,6 +4139,31 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 )}
               </div>
             </div>
+            {/* Call. The ONE action that earns a slot in the mobile chrome row:
+                everything else here is reachable by tapping the chat name, but a
+                call is time-sensitive and has to be one tap from the conversation.
+                Sized 34 on mobile to match the chevron/avatar that set the chrome
+                row height (Convention #27), 32 on the desktop panel to match the
+                settings button beside it. */}
+            {canCall && (
+              <button
+                onClick={onCallPress}
+                disabled={inThisCall}
+                aria-label={liveCallHere ? "Join the call" : "Start a call"}
+                title={liveCallHere ? "Join the call" : "Start a call"}
+                className="call-btn flex-shrink-0 grid place-items-center w-[34px] h-[34px] md:w-8 md:h-8"
+                style={{
+                  borderRadius: 8,
+                  border: `1px solid ${liveCallHere ? "var(--plum)" : "var(--line-2)"}`,
+                  background: liveCallHere ? "var(--plum-tint)" : "transparent",
+                  color: liveCallHere ? "var(--plum)" : "var(--body)",
+                  cursor: inThisCall ? "default" : "pointer",
+                  opacity: inThisCall ? 0.45 : 1,
+                }}
+              >
+                <Phone size={15} />
+              </button>
+            )}
             {/* Desktop action buttons — Search + User only */}
             <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
               <button onClick={() => setShowSettings(true)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "grid", placeItems: "center" }}>
@@ -4106,6 +4177,29 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         )}
       </div>
       {inline && <div className="hidden md:block"><InsetHairline style={{ margin: "0 16px" }} /></div>}
+
+      {/* A call running in this chat that you are not in. Without this a group
+          call is invisible to anyone who missed the ring — which, in a chat of
+          forty, is most of them. */}
+      {liveCallHere && !inThisCall && canCall && (
+        <button
+          onClick={onCallPress}
+          className="call-btn flex-shrink-0 w-full flex items-center gap-2 px-5 md:px-6"
+          style={{
+            padding: "10px 20px",
+            background: "var(--plum-tint)",
+            borderBottom: "1px solid var(--line)",
+            color: "var(--plum)",
+            fontSize: 13,
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+        >
+          <Phone size={14} className="flex-shrink-0" />
+          <span className="flex-1 truncate">Call in progress</span>
+          <span style={{ fontWeight: 500 }}>Join</span>
+        </button>
+      )}
 
       {/* ── Pinned message banner ── */}
       {pinnedMessage && (

@@ -70,6 +70,13 @@ export interface NotificationSettings {
   /** Tier 1 — someone reacts to one of YOUR messages. Only the message author is
    *  ever notified, and never for their own reaction. Default on. */
   reactions?: boolean
+  /** Tier 1 — someone starts a call in a chat you're in. Default on.
+   *
+   *  Deliberately NOT subject to the group_mode smart downgrade that governs
+   *  messages: a call is a live, time-boxed invitation that expires in a minute,
+   *  not a message that waits. Muting the chat (group_members.notify_mode 'off',
+   *  or `muted`) is still a hard override — a muted chat is silent, calls too. */
+  calls?: boolean
   /** Tier 2 — group-chat firehose control. Default 'smart' (all <30 members, mentions-only ≥30). */
   group_mode?: GroupNotifyMode
   /** Tier 3 — desk-work push on web. Default on. */

@@ -1115,3 +1115,57 @@ html[data-kb-native] .kb-lift {
   transform: translate(-50%, -50%);
 }
 .back-chevron:hover { color: var(--ink); }
+/* ─── Calling ──────────────────────────────────────────────────────────────
+   The ringing avatar and the round call controls. Unlayered on purpose (same
+   reason as the .kb-* classes): these sit on elements that also carry Tailwind
+   utilities, and a layered rule loses to them.
+
+   .call-ring-pulse is a plum ring that expands out of the monogram while a call
+   is ringing or connecting. It is the ONLY thing on the screen that moves, so
+   it carries the "this is live, act now" weight that a static card cannot —
+   which is also why it stops the moment the call connects. */
+.call-ring-pulse { position: relative; }
+.call-ring-pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 1px solid var(--plum);
+  animation: call-ring 1800ms cubic-bezier(0.23, 1, 0.32, 1) infinite;
+  pointer-events: none;
+}
+@keyframes call-ring {
+  0%   { opacity: 0.55; transform: scale(1); }
+  70%  { opacity: 0;    transform: scale(1.45); }
+  100% { opacity: 0;    transform: scale(1.45); }
+}
+
+/* Press feedback on the call controls. Colour changes ride --dur-fast; the
+   press is a transform so it never reflows the control row. */
+.call-btn {
+  transition: background var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+}
+.call-btn:active { transform: scale(0.96); }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The ring still has to READ as ringing without motion, so it holds at a
+     visible steady state rather than disappearing. */
+  .call-ring-pulse::after { animation: none; opacity: 0.4; }
+  .call-btn { transition: none; }
+  .call-btn:active { transform: none; }
+}
+
+/* The in-call panel. Phone width it is `fixed inset-0`, so it escapes the shell's
+   safe-area padding and has to supply its own — without the bottom inset the
+   end-call button lands on the home indicator. Desktop is a docked corner panel
+   and needs none of it. */
+.call-panel {
+  padding: calc(env(safe-area-inset-top, 0px) + 28px) 22px
+           calc(env(safe-area-inset-bottom, 0px) + 44px);
+}
+@media (min-width: 768px) {
+  .call-panel { padding: 24px 22px 22px; }
+}

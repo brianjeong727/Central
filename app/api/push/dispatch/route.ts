@@ -319,6 +319,82 @@ async function resolveReaction(
   }]
 }
 
+// ── Call started -> everyone else in the chat (Tier 1, `calls`) ──────────────
+// A ring is the one push where being late makes it worthless, so this ignores the
+// smart ≥30 downgrade that thins out group MESSAGES: the notification either
+// arrives while the call is up or it may as well not arrive. What it does honour
+// is the per-chat mute — `notify_mode: 'off'` (and its `muted` mirror) is a hard
+// override here exactly as it is for messages, because a chat someone silenced
+// must stay silent, and a call that rings through a mute is the fastest way to
+// make people mute the whole app instead.
+//
+// Nothing is trusted from the POST body: the call row, its group, its members and
+// the caller's name are all re-read with the service-role client.
+async function resolveCallStarted(admin: AdminClient, recordId: string): Promise<Resolved[]> {
+  const { data: call } = await admin
+    .from("calls")
+    .select("id, group_id, started_by, kind, status")
+    .eq("id", recordId)
+    .single()
+  if (!call || !call.started_by) return []
+  // The trigger fires on INSERT, but a call can be declined or cancelled before
+  // this route runs. Ringing a phone for a call that already ended is worse than
+  // missing it.
+  if (call.status !== "ringing") return []
+
+  const { data: group } = await admin
+    .from("groups")
+    .select("id, name, type")
+    .eq("id", call.group_id)
+    .single()
+  if (!group) return []
+
+  const { data: members } = await admin
+    .from("group_members")
+    .select("user_id, muted, notify_mode")
+    .eq("group_id", call.group_id)
+  if (!members || members.length === 0) return []
+
+  const recipientIds = members.filter((m) => m.user_id !== call.started_by).map((m) => m.user_id)
+  if (recipientIds.length === 0) return []
+
+  const { data: profs } = await admin
+    .from("profiles")
+    .select("id, name, notification_settings, deleted_at")
+    .in("id", [...recipientIds, call.started_by])
+  const profMap = new Map((profs ?? []).map((p) => [p.id, p]))
+  const callerName = profMap.get(call.started_by)?.name ?? "Someone"
+
+  const isDM = group.type === "dm"
+  const verb = call.kind === "video" ? "video call" : "call"
+  const results: Resolved[] = []
+
+  for (const m of members) {
+    if (m.user_id === call.started_by) continue
+    const prof = profMap.get(m.user_id)
+    if (!prof || prof.deleted_at) continue
+    const settings: NotificationSettings = (prof.notification_settings as NotificationSettings) ?? {}
+    if (settings.calls === false) continue
+    const mode = (m.notify_mode as ChatNotifyMode | null) ?? null
+    if (mode === "off" || m.muted) continue
+
+    results.push({
+      userId: m.user_id,
+      reason: isDM ? "call_dm" : "call_group",
+      payload: {
+        title: callerName,
+        subtitle: isDM ? undefined : `started a ${verb} in ${group.name ?? "a chat"}`,
+        body: isDM ? `Incoming ${verb}` : "Tap to join",
+        url: `/home?tab=chats&chat=${group.id}`,
+        // Per CALL, not per chat: a later call must not silently replace the
+        // notification for one that is still ringing.
+        tag: `call-${call.id}`,
+      },
+    })
+  }
+  return results
+}
+
 // ── Announcement recipients ──────────────────────────────────────────────────
 // The audience rule itself lives in lib/announcement-audience.ts (ONE copy,
 // shared with both feeds and the acknowledgment denominator); this is only its
@@ -1146,6 +1222,7 @@ export async function POST(req: NextRequest) {
     if (event === "desk_digest") resolved = await resolveDeskDigest(admin)
     else if (table === "messages") resolved = await resolveMessage(admin, recordId)
     else if (table === "message_reactions") resolved = await resolveReaction(admin, recordId)
+    else if (table === "calls" && event === "call_started") resolved = await resolveCallStarted(admin, recordId)
     else if (table === "announcements" && event === "event_reminder") resolved = await resolveEventReminder(admin, recordId)
     else if (table === "announcements" && event === "announcement_nudge") resolved = await resolveAnnouncementNudge(admin, recordId)
     else if (table === "announcements") resolved = await resolveAnnouncement(admin, recordId)

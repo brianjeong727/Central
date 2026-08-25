@@ -35,6 +35,11 @@ export interface ChatCapabilities {
   canArchive: boolean
   canUnarchive: boolean
   canDelete: boolean
+  /** May START a call here. JOINING a call that is already live needs only
+   *  membership — see canJoinCall. Mirrored in SQL by auth_can_start_call(). */
+  canStartCall: boolean
+  /** May JOIN a call already running in this chat. */
+  canJoinCall: boolean
 }
 
 export function chatCapabilities(
@@ -60,6 +65,20 @@ export function chatCapabilities(
   // server-side rather than trusting this.
   const deadDM = isDM && partnerDeleted && isMemberOfChat
 
+  // Calling. STARTING a call is asymmetric with joining one on purpose: a church
+  // chat is often the whole ministry, so letting any member ring forty people is
+  // a broadcast, not a call — starting there is in-chat leader-or-above (the same
+  // churchManage gate as moderation), while a dm/my chat is peers and any member
+  // may start. JOINING only ever needs membership: once a call is live, the
+  // decision to hold it has already been made, and a room the leaders are in that
+  // the members cannot enter would be worse than no call at all.
+  //
+  // An archived chat is read-only, and a DM whose partner is a scrubbed tombstone
+  // has nobody on the other end, so neither can host a call.
+  const liveChat = !archived && !(isDM && partnerDeleted)
+  const canStartCall = liveChat && isMemberOfChat && (isChurch ? churchManage : true)
+  const canJoinCall = liveChat && isMemberOfChat
+
   return {
     canManage: churchManage || isMy,
     // A DM is a PAIR, not a room you happen to be in — you cannot leave it, and
@@ -69,5 +88,7 @@ export function chatCapabilities(
     canArchive: churchManage && !archived && !isCentralChat,
     canUnarchive: churchManage && archived,
     canDelete: (churchManage && !isCentralChat) || deadDM,
+    canStartCall,
+    canJoinCall,
   }
 }
