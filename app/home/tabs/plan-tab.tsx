@@ -15639,13 +15639,30 @@ function SmallGroupLeadersTab({
                               flaggedKeys={new Set()}
                               rosterMembers={scheduleRosterMembers}
                               isMobile={!isDesktopView}
-                              onSwap={(wd, slot, uid, name) => {
+                              onSwap={async (wd, slot, uid, name) => {
+                                // Captured BEFORE the optimistic patch, so it still holds the
+                                // person being swapped out — that's what we put back on failure.
+                                const prevRow = existingAssignments.find(a => a.week_date === wd && a.slot === slot)
                                 setExistingAssignments(prev => prev.map(a =>
                                   a.week_date === wd && a.slot === slot ? { ...a, user_id: uid, user_name: name } : a
                                 ))
-                                if (rotationPhase === "published") {
-                                  const row = existingAssignments.find(a => a.week_date === wd && a.slot === slot)
-                                  if (row) void supabase.from("dgl_assignments").update({ user_id: uid }).eq("id", row.id)
+                                if (rotationPhase !== "published" || !prevRow) return
+                                // This used to be `void supabase.from(...)`. A PostgREST builder is
+                                // a lazy THENABLE, not a promise: it issues its request inside its
+                                // own .then(), and `void` never calls it. The update was built and
+                                // never sent, so a swap on a published rotation repainted the table
+                                // and was gone on reload. Never `void` a Supabase query.
+                                const { error } = await supabase
+                                  .from("dgl_assignments")
+                                  .update({ user_id: uid })
+                                  .eq("id", prevRow.id)
+                                if (error) {
+                                  setExistingAssignments(prev => prev.map(a =>
+                                    a.week_date === wd && a.slot === slot
+                                      ? { ...a, user_id: prevRow.user_id, user_name: prevRow.user_name }
+                                      : a
+                                  ))
+                                  setRotErr("Couldn't save that swap. Please try again.")
                                 }
                               }}
                             />
