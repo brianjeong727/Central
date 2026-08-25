@@ -204,6 +204,21 @@ function startFallback(supabase: SupabaseLike, groupId: string, entry: TopicEntr
       { event: "DELETE", schema: "public", table: "message_reactions", filter: `group_id=eq.${groupId}` },
       (payload) => emit(groupId, { operation: "DELETE", table: "message_reactions", record: null, old_record: payload.old as Record<string, unknown> }),
     )
+    // Calls ride this hub too (the `calls` table fires the same generic
+    // broadcast_chat_change trigger), so the fallback has to carry them or a
+    // client that has dropped to it silently never rings — and the retry loop
+    // means that can persist for a minute at a time. INSERT starts the ring,
+    // UPDATE ends it.
+    .on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "calls", filter: `group_id=eq.${groupId}` },
+      (payload) => emit(groupId, { operation: "INSERT", table: "calls", record: payload.new as Record<string, unknown>, old_record: null }),
+    )
+    .on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "calls", filter: `group_id=eq.${groupId}` },
+      (payload) => emit(groupId, { operation: "UPDATE", table: "calls", record: payload.new as Record<string, unknown>, old_record: null }),
+    )
     .subscribe()
   entry.fallback = channel
 }

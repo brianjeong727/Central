@@ -32,4 +32,10 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Calling. RECORD_AUDIO is the runtime permission Chrome's WebView asks for
+         on getUserMedia; MODIFY_AUDIO_SETTINGS lets the call route audio to the
+         earpiece/speaker rather than always playing through media volume. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 </manifest>
