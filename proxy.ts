@@ -178,6 +178,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/register-ministry') ||
     pathname.startsWith('/privacy') ||
     pathname.startsWith('/terms') ||
+    pathname.startsWith('/delete-account') ||
     pathname.startsWith('/support')
 
   // No auth — gate protected paths to login/signup
@@ -379,6 +380,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/landing') ||
     pathname.startsWith('/privacy') ||
     pathname.startsWith('/terms') ||
+    pathname.startsWith('/delete-account') ||
     pathname.startsWith('/support')
 
   // `mid &&` — the gate waits until the user is actually IN a ministry, and that is
