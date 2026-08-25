@@ -12,7 +12,7 @@ import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames"
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
-import { ConfirmDialog, MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, IconButton, CentralModal, Input, FormField, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, PocketSheet, ChatAvatar, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE, MONO_METRIC_STYLE, MessageMenuOverlay, type MessageMenuAction } from "@/components/central"
+import { ConfirmDialog, MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, IconButton, CentralModal, Input, FormField, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, PocketRoundButton, PocketSheet, ChatAvatar, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE, MONO_METRIC_STYLE, MessageMenuOverlay, type MessageMenuAction } from "@/components/central"
 import { getOrCreateDm } from "../dm"
 import { isMobileViewport } from "@/lib/breakpoints"
 import { getInitials, formatRelativeTime, replyPreviewLabel, REACTION_EMOJIS } from "../utils"
@@ -4154,59 +4154,84 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 Sized 34 on mobile to match the chevron/avatar that set the chrome
                 row height (Convention #27), 32 on the desktop panel to match the
                 settings button beside it. */}
-            {/* A live call collapses the pair to ONE button: the kind is already
-                decided by whoever started it, so offering a choice would be
-                offering something that cannot happen. The icon reports which
-                kind you would be walking into. */}
-            {canCall && liveCallHere && (
-              <button
-                onClick={() => onCallPress(liveCallHere.kind)}
-                disabled={inThisCall}
-                aria-label="Join the call"
-                title="Join the call"
-                className="call-btn flex-shrink-0 grid place-items-center w-[34px] h-[34px] md:w-8 md:h-8"
-                style={{
-                  borderRadius: 8,
-                  border: "1px solid var(--plum)",
-                  background: "var(--plum-tint)",
-                  color: "var(--plum)",
-                  cursor: inThisCall ? "default" : "pointer",
-                  opacity: inThisCall ? 0.45 : 1,
-                }}
-              >
-                {liveCallHere.kind === "video" ? <Video size={15} /> : <Phone size={15} />}
-              </button>
+            {/* Calling. TWO languages, one per width, because the chrome rows are
+                two different things.
+
+                Phone: the shared PocketRoundButton — 34px, round, ivory fill, no
+                border. Two bordered squares here read as a toolbar bolted onto a
+                header whose only other controls are a bare chevron and an avatar,
+                and they were loud enough to compete with the chat's name for the
+                little width a phone has. mobile_design_system.md §3 allows a
+                chrome row 0–2 actions; this is that budget, spent quietly.
+
+                Desktop: the bordered 32px square, in the existing action cluster
+                beside Settings, matching the control already there.
+
+                A live call collapses the pair to ONE button either way — the kind
+                was decided by whoever started it, so offering a choice would be
+                offering something that cannot happen — and goes plum-filled,
+                which is the screen's one accent while a call is up. */}
+            {canCall && (
+              <div className="md:hidden flex items-center gap-1.5 flex-shrink-0">
+                {liveCallHere ? (
+                  <PocketRoundButton
+                    variant="plum"
+                    onClick={() => onCallPress(liveCallHere.kind)}
+                    ariaLabel="Join the call"
+                  >
+                    {liveCallHere.kind === "video" ? <Video size={15} /> : <Phone size={15} />}
+                  </PocketRoundButton>
+                ) : (
+                  <>
+                    <PocketRoundButton onClick={() => onCallPress("audio")} ariaLabel="Start a call">
+                      <Phone size={15} />
+                    </PocketRoundButton>
+                    <PocketRoundButton onClick={() => onCallPress("video")} ariaLabel="Start a video call">
+                      <Video size={15} />
+                    </PocketRoundButton>
+                  </>
+                )}
+              </div>
             )}
-            {canCall && !liveCallHere && (
-              <>
-                <button
-                  onClick={() => onCallPress("audio")}
-                  aria-label="Start a call"
-                  title="Start a call"
-                  className="call-btn flex-shrink-0 grid place-items-center w-[34px] h-[34px] md:w-8 md:h-8"
-                  style={{
-                    borderRadius: 8, border: "1px solid var(--line-2)",
-                    background: "transparent", color: "var(--body)", cursor: "pointer",
-                  }}
-                >
-                  <Phone size={15} />
-                </button>
-                <button
-                  onClick={() => onCallPress("video")}
-                  aria-label="Start a video call"
-                  title="Start a video call"
-                  className="call-btn flex-shrink-0 grid place-items-center w-[34px] h-[34px] md:w-8 md:h-8"
-                  style={{
-                    borderRadius: 8, border: "1px solid var(--line-2)",
-                    background: "transparent", color: "var(--body)", cursor: "pointer",
-                  }}
-                >
-                  <Video size={15} />
-                </button>
-              </>
-            )}
-            {/* Desktop action buttons — Search + User only */}
+            {/* Desktop action buttons — call, video, then Settings */}
             <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
+              {canCall && (liveCallHere ? (
+                <button
+                  onClick={() => onCallPress(liveCallHere.kind)}
+                  disabled={inThisCall}
+                  aria-label="Join the call"
+                  title="Join the call"
+                  className="call-btn grid place-items-center w-8 h-8"
+                  style={{
+                    borderRadius: 8, border: "1px solid var(--plum)",
+                    background: "var(--plum-tint)", color: "var(--plum)",
+                    cursor: inThisCall ? "default" : "pointer", opacity: inThisCall ? 0.45 : 1,
+                  }}
+                >
+                  {liveCallHere.kind === "video" ? <Video size={14} /> : <Phone size={14} />}
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => onCallPress("audio")}
+                    aria-label="Start a call"
+                    title="Start a call"
+                    className="call-btn grid place-items-center w-8 h-8"
+                    style={{ borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer" }}
+                  >
+                    <Phone size={14} />
+                  </button>
+                  <button
+                    onClick={() => onCallPress("video")}
+                    aria-label="Start a video call"
+                    title="Start a video call"
+                    className="call-btn grid place-items-center w-8 h-8"
+                    style={{ borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer" }}
+                  >
+                    <Video size={14} />
+                  </button>
+                </>
+              ))}
               <button onClick={() => setShowSettings(true)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "grid", placeItems: "center" }}>
                 <User size={14} />
               </button>
