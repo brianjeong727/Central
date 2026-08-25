@@ -75,6 +75,30 @@ test.describe("Meeting Notes v2 — touch reachability (390px)", () => {
     await page.goto(`/home?tab=plan&team=${teamId}`)
     await page.getByText("Meeting notes", { exact: true }).filter({ visible: true }).first().click()
     await page.getByPlaceholder("Search notes & decisions…").filter({ visible: true }).first().waitFor({ timeout: 15000 })
+
+    // ── The per-row ⋯ (where Delete lives now) at phone width. ──
+    // The trigger claims ≥44px of its OWN width rather than overlaying an
+    // expander leftwards, so a thumb aiming at the menu can never land on the
+    // row and open the note. `data-pocket-row` must still be on the tappable
+    // row button — e2e/mobile-screen-sweep discovers every phone screen through
+    // it, so a PocketRow change that hoists it silently deletes that coverage.
+    const rowMenu = page.getByRole("button", { name: `Actions for ${probeTitle}` }).filter({ visible: true }).first()
+    await expect(rowMenu).toBeVisible()
+    const menuBox = await rowMenu.boundingBox()
+    expect(menuBox!.width).toBeGreaterThanOrEqual(44)
+    // The 44px touch target is a `.tap-expand-y` CSS `::after` pseudo-element
+    // (globals.css), not a child <span> — pseudo-elements aren't real DOM nodes,
+    // so they're read via computed style rather than a locator. `left:0;right:0`
+    // on the pseudo means it spans the button's own box exactly.
+    const menuPseudo = await rowMenu.evaluate((el) => {
+      const cs = window.getComputedStyle(el, "::after")
+      return { height: parseFloat(cs.height), width: parseFloat(cs.width) }
+    })
+    expect(menuPseudo.height).toBeGreaterThanOrEqual(44)
+    const rowButton = page.locator(`[data-pocket-row="${probeTitle}"]`).filter({ visible: true }).first()
+    const rowBox = await rowButton.boundingBox()
+    expect(menuBox!.x).toBeGreaterThanOrEqual(rowBox!.x + rowBox!.width - 1)
+
     await page.getByText(probeTitle, { exact: true }).filter({ visible: true }).first().click()
     await expect(page.getByText("Agenda", { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 20000 })
 
@@ -89,14 +113,20 @@ test.describe("Meeting Notes v2 — touch reachability (390px)", () => {
     // hit area is the transparent aria-hidden expander pinned to the button's
     // OWN box (which claims 44px of width on touch), so it can never overhang
     // the text field beside it and arm the wrong remove.
-    const removeExpander = agendaRemove.locator('span[aria-hidden]')
-    const expanderBox = await removeExpander.boundingBox()
-    expect(expanderBox?.width).toBeGreaterThanOrEqual(44)
-    expect(expanderBox?.height).toBeGreaterThanOrEqual(44)
+    // Same `.tap-expand-y` pseudo-element technique as the kebab above — read via
+    // computed style, and derive its screen position from the real button's own
+    // rect (the pseudo spans `left:0;right:0` of it exactly).
+    const removePseudo = await agendaRemove.evaluate((el) => {
+      const cs = window.getComputedStyle(el, "::after")
+      const rect = el.getBoundingClientRect()
+      return { height: parseFloat(cs.height), width: parseFloat(cs.width), x: rect.x }
+    })
+    expect(removePseudo.width).toBeGreaterThanOrEqual(44)
+    expect(removePseudo.height).toBeGreaterThanOrEqual(44)
     const agendaText = page.locator('input[value="E2E:: probe agenda touch"]')
     const textBox = await agendaText.boundingBox()
     // The expander starts at or after the text field's right edge — no overlap.
-    expect(expanderBox!.x).toBeGreaterThanOrEqual(textBox!.x + textBox!.width - 1)
+    expect(removePseudo.x).toBeGreaterThanOrEqual(textBox!.x + textBox!.width - 1)
 
     // The "detail…" line is revealed by INTERACTION, not painted empty under
     // every agenda item (which turns the note into a form). Tapping the item

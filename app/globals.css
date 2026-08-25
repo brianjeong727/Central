@@ -1115,6 +1115,29 @@ html[data-kb-native] .kb-lift {
   transform: translate(-50%, -50%);
 }
 .back-chevron:hover { color: var(--ink); }
+
+/* Vertical-only 44px tap expander for a control that is already wide enough
+   horizontally (the meeting-note date label, a row's ⋯ trigger, an inline X).
+   Pinned to the host's OWN left/right edges, so unlike a centered 44×44 it can
+   never reach across to a neighbouring control and arm the wrong one.
+
+   It is a PSEUDO-ELEMENT, never a child <span>, and that is load-bearing: a child
+   makes the host a non-leaf, and the mobile screen sweep's detector measures the
+   first painted TEXT LEAF under the chrome row. A span expander on the date button
+   made the sweep walk straight past the date and measure the "Edit" pill on the
+   next line instead — reporting a 106px body start on a screen whose layout had
+   not moved at all. Convention #27: fix the markup or the detector, never the
+   threshold. */
+.tap-expand-y { position: relative; }
+.tap-expand-y::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 44px;
+  transform: translateY(-50%);
+}
 /* ─── Calling ──────────────────────────────────────────────────────────────
    The ringing avatar and the round call controls. Unlayered on purpose (same
    reason as the .kb-* classes): these sit on elements that also carry Tailwind

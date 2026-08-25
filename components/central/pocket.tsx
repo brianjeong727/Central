@@ -175,9 +175,21 @@ export function PocketRowCard({ children, style }: { children: ReactNode; style?
 // computed this in JS; a `:first-child` rule can't reach an inline style, and on
 // the chat list the rows aren't even adjacent siblings — each is wrapped in a
 // SwipeActionRow).
+// `trailing` hangs a per-row control (today: an ActionMenu kebab) BESIDE the row
+// rather than inside it — a button nested in a button is invalid HTML, and the
+// row itself is a <button>. It is deliberately additive: with `trailing`
+// undefined this renders the exact single <button> it always has (same style
+// object, same key order, same divider), which is what keeps the other ~56 call
+// sites across 15 files untouched. Only when a trailing element is present does
+// the row become a flex wrapper, and then the DIVIDER moves to that wrapper so
+// the hairline spans the whole row instead of stopping short under the control.
+// `data-pocket-row` never leaves the tappable button — e2e/mobile-screen-sweep
+// DISCOVERS every phone screen by walking those buttons (Convention #27), so
+// hoisting it to the wrapper would silently delete a whole class of coverage
+// while every assertion still passed.
 export function PocketRow({
   leading, title, titleAccessory, titleDim = false, sub, time, showDot = false, meta, chevron = false,
-  isLast = false, immersive = false, isFirst = false, ariaLabel, onClick, onPointerDown,
+  isLast = false, immersive = false, isFirst = false, ariaLabel, trailing, onClick, onPointerDown,
 }: {
   leading?: ReactNode
   title: string
@@ -195,6 +207,9 @@ export function PocketRow({
   isLast?: boolean
   immersive?: boolean
   isFirst?: boolean
+  /** A control rendered as a SIBLING of the row button (per-row kebab). It sits
+   *  outside the row's tap area, so tapping it can never open the row. */
+  trailing?: ReactNode
   onClick: () => void
   /** Fires on press, BEFORE the click resolves — the seam for warming whatever the
    *  row is about to open. Purely a head-start hook: it must never be where the
@@ -203,7 +218,13 @@ export function PocketRow({
    *  given press has settled into a tap. */
   onPointerDown?: () => void
 }) {
-  return (
+  // The row's separating hairline. It belongs to the ROW, so it rides the button
+  // when the button IS the row, and moves to the wrapper the moment something
+  // sits beside it.
+  const divider: CSSProperties = immersive
+    ? { borderTop: isFirst ? "none" : "1px solid var(--line-3)" }
+    : { borderBottom: isLast ? "none" : "1px solid var(--line-3)" }
+  const row = (
     <button
       onClick={onClick}
       onPointerDown={onPointerDown}
@@ -220,10 +241,10 @@ export function PocketRow({
         // Immersive carries its own 20px gutter because the list escapes the
         // screen's padded wrapper — the tap target is the full screen width,
         // which is the entire point of the pattern.
-        padding: immersive ? "14px 20px" : "13px 0",
-        ...(immersive
-          ? { borderTop: isFirst ? "none" : "1px solid var(--line-3)" }
-          : { borderBottom: isLast ? "none" : "1px solid var(--line-3)" }),
+        // With a trailing control the RIGHT gutter moves to the wrapper, so the
+        // control sits in it rather than outside it.
+        padding: immersive ? (trailing ? "14px 0 14px 20px" : "14px 20px") : "13px 0",
+        ...(trailing ? { flex: 1, minWidth: 0 } : divider),
       }}
     >
       {leading}
@@ -245,6 +266,13 @@ export function PocketRow({
       {meta && <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{meta}</span>}
       {chevron && <ChevronRight style={{ width: 15, height: 15, color: "var(--faint)", flexShrink: 0 }} />}
     </button>
+  )
+  if (!trailing) return row
+  return (
+    <div style={{ display: "flex", alignItems: "center", paddingRight: immersive ? 20 : 0, ...divider }}>
+      {row}
+      {trailing}
+    </div>
   )
 }
 

@@ -16,11 +16,11 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import useSWR from "swr"
-import { Plus, X, ChevronRight, ArrowUpRight, Trash2 } from "lucide-react"
+import { Plus, X, ChevronRight, ArrowUpRight, Trash2, MoreHorizontal } from "lucide-react"
 import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
 import { ActionMenu } from "@/components/central/action-menu"
-import { SubpageShell, SerifInput, PocketRow, PocketRowCard, PocketButton, ConfirmDialog, POCKET_KICKER_STYLE } from "@/components/central"
+import { SubpageShell, SerifInput, PocketRow, PocketRowCard, ConfirmDialog } from "@/components/central"
 import { EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
 import { getInitials } from "../utils"
 import { useIsMobile } from "../use-is-mobile"
@@ -272,15 +272,15 @@ function RowRemove({
       type="button"
       aria-label={label}
       onClick={onArm}
+      // Vertical half of the 44px target via `.tap-expand-y` (globals.css) — a
+      // pseudo-element, never a child span (see the date button above).
+      className={touch ? "tap-expand-y" : undefined}
       style={{
         color: "var(--faint)", cursor: "pointer", paddingTop: top, position: "relative", flexShrink: 0,
         ...(touch ? { width: 44, display: "flex", justifyContent: "flex-end", alignItems: "flex-start" } : null),
       }}
     >
       <X style={{ width: 13, height: 13 }} />
-      {touch && (
-        <span aria-hidden style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 44, transform: "translateY(-50%)" }} />
-      )}
     </button>
   )
 }
@@ -294,7 +294,6 @@ export function MeetingNoteDetail({
   onSaveTitle,
   onSaveBody,
   onSaveDate,
-  onDeleteNote,
   onNoteMetaChange,
   onOpenEvent,
   canWrite = true,
@@ -308,8 +307,6 @@ export function MeetingNoteDetail({
   onSaveBody: (id: string, body: string) => Promise<void>
   /** Persist a new meeting DATE (plain YYYY-MM-DD) + re-sort the list cache. */
   onSaveDate: (id: string, date: string) => Promise<void>
-  /** Delete the note. Resolves false when the write changed nothing (RLS). */
-  onDeleteNote: (id: string) => Promise<boolean>
   /** Persist + reflect linked_event_id / attendees changes on the list cache. */
   onNoteMetaChange: (id: string, patch: Partial<MeetingNote>) => void
   onOpenEvent?: (eventId: string) => void
@@ -491,9 +488,6 @@ export function MeetingNoteDetail({
   const [activeAgenda, setActiveAgenda] = useState<string | null>(null)
   const [editingDate, setEditingDate] = useState(false)
   const [dateDraft, setDateDraft] = useState(note.date)
-  const [confirmDeleteNote, setConfirmDeleteNote] = useState(false)
-  const [deletingNote, setDeletingNote] = useState(false)
-  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => { setDateDraft(note.date) }, [note.id, note.date])
 
@@ -511,15 +505,6 @@ export function MeetingNoteDetail({
     if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || year < 1900 || year > 2999) { setDateDraft(note.date); return }
     if (v === note.date) return
     void onSaveDate(note.id, v)
-  }
-
-  async function handleDeleteNote() {
-    setDeletingNote(true)
-    setDeleteError(null)
-    const ok = await onDeleteNote(note.id)
-    setDeletingNote(false)
-    if (ok) { setConfirmDeleteNote(false); onBack(); return }
-    setDeleteError("That didn't go through — the note is still here. Try again, or ask an admin.")
   }
 
   const noteDateLabel = (() => {
@@ -565,16 +550,17 @@ export function MeetingNoteDetail({
               type="button"
               aria-label="Change the meeting date"
               onClick={() => setEditingDate(true)}
+              /* ≥44px tap target without a visually bigger control — the label is
+                 already ~180px wide, so the expander only grows VERTICALLY, pinned
+                 to the button's own edges (`.tap-expand-y`, globals.css). It has to
+                 be a pseudo-element: a child <span> expander leaves this button a
+                 non-leaf, and the mobile screen sweep measures the first painted
+                 TEXT LEAF — it skipped the date and reported the "Edit" pill a line
+                 lower as a 106px body start on an unmoved screen. */
+              className={isMobile ? "tap-expand-y" : undefined}
               style={{ ...MONO_STYLE, background: "none", border: "none", borderBottom: "1px dashed var(--dashed)", padding: "0 0 2px", cursor: "pointer", position: "relative" }}
             >
               {noteDateLabel}
-              {/* ≥44px tap target without a visually bigger control — the label
-                  is already ~180px wide, so the expander only has to grow
-                  VERTICALLY, and it is pinned to the button's own left/right
-                  edges so it can never reach a neighbour in the meta row. */}
-              {isMobile && (
-                <span aria-hidden style={{ position: "absolute", left: 0, right: 0, top: "50%", height: 44, transform: "translateY(-50%)" }} />
-              )}
             </button>
           )}
           <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--body)" }}>
@@ -833,55 +819,72 @@ export function MeetingNoteDetail({
           />
         </div>
 
-        {/* Danger zone (§4.20) — mono "Danger zone" eyebrow in --danger over an
-            OUTLINE-only destructive button. Never a filled red, and never a bare
-            trash glyph in the chrome row, where a one-tap destroy would sit
-            next to navigation. It lives at the FOOT of the note at both widths:
-            this screen deliberately passes no `title` to SubpageShell (the note
-            headlines itself in the body), so hosting a kebab in the shell's
-            titleAction would mean rendering the note's name twice, stacked. */}
-        {canWrite && (
-          isMobile ? (
-            <div style={{ marginTop: 40 }}>
-              <div style={{ margin: "0 4px 10px" }}>
-                <span style={{ ...POCKET_KICKER_STYLE, color: "var(--danger)" }}>Danger zone</span>
-              </div>
-              <PocketButton variant="destructiveOutline" onClick={() => { setDeleteError(null); setConfirmDeleteNote(true) }}>
-                <Trash2 style={{ width: 14, height: 14 }} /> Delete note
-              </PocketButton>
-            </div>
-          ) : (
-            <div style={{ marginTop: 44 }}>
-              <p style={{ ...EYEBROW_STYLE, color: "var(--danger)", margin: "0 0 12px" }}>Danger zone</p>
-              <div style={{ height: 1, background: "var(--line)", marginBottom: 16 }} />
-              <button
-                type="button"
-                onClick={() => { setDeleteError(null); setConfirmDeleteNote(true) }}
-                style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 18px", background: "transparent", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: "var(--r-chip)", color: "var(--danger)", fontSize: 14, cursor: "pointer" }}
-              >
-                <Trash2 style={{ width: 14, height: 14 }} /> Delete note
-              </button>
-            </div>
-          )
-        )}
+        {/* No danger zone here (moved 2026-08-25). Delete is a PER-ROW action on
+            the meeting-notes LIST now — a ⋯ kebab per row (web_design_system.md:220:
+            "Kebab (⋯). Only for low-frequency, destructive, or per-row actions"),
+            which is also the slot the next per-note actions (duplicate, archive,
+            post recap) hang off. The open note is for writing the note. */}
       </div>
-
-      <ConfirmDialog
-        open={confirmDeleteNote}
-        title="Delete this meeting note?"
-        message={deleteError
-          ? <span style={{ color: "var(--danger)" }}>{deleteError}</span>
-          : "This permanently removes the note, its agenda and its decisions for everyone."}
-        confirmLabel="Delete"
-        loading={deletingNote}
-        onConfirm={() => { void handleDeleteNote() }}
-        onClose={() => { setConfirmDeleteNote(false); setDeleteError(null) }}
-      />
     </SubpageShell>
   )
 }
 
 // ── List ─────────────────────────────────────────────────────────────────────
+
+// The per-row ⋯ menu. `items` is the extension point the whole change exists for:
+// a second action (Duplicate, Archive, Post recap) is ONE entry in this array and
+// nothing around it moves. Destructive stays LAST and `tone: "danger"` (--danger
+// text on transparent — ActionMenu owns that skin), and §14 still applies: the
+// kebab ARMS a ConfirmDialog, it never destroys on the tap.
+//
+// Always ActionMenu, never a hand-rolled dropdown (Convention #20) — it portals
+// to <body> and flips above the trigger, which is what keeps the LAST row's menu
+// on screen instead of clipped under the viewport bottom, and what stops
+// PocketRowCard's `overflow: hidden` from cutting it off on mobile.
+function NoteRowMenu({ note, touch, onDelete }: {
+  note: MeetingNote
+  /** Phone width: widen the trigger to a 44px target (§ touch minimums). */
+  touch: boolean
+  onDelete: (note: MeetingNote) => void
+}) {
+  const label = `Actions for ${note.title || "note"}`
+  return (
+    <ActionMenu
+      align="right"
+      minWidth={168}
+      items={[
+        {
+          key: "delete",
+          label: "Delete note",
+          tone: "danger",
+          icon: <Trash2 style={{ width: 14, height: 14 }} />,
+          onSelect: () => onDelete(note),
+        },
+      ]}
+      renderTrigger={({ toggle }) => (
+        <button
+          type="button"
+          aria-label={label}
+          onClick={toggle}
+          // Vertical half of the 44px target via `.tap-expand-y` (globals.css) — a
+          // pseudo-element, never a child span (see the date button).
+          className={touch ? "tap-expand-y" : undefined}
+          style={{
+            // On touch the trigger itself is 44 wide rather than an overlay
+            // expander: an expander reaching left would sit ON TOP of the row's
+            // own tap area, so a thumb aiming at the menu would open the note.
+            width: touch ? 44 : 28, height: 28, borderRadius: 6, padding: 0,
+            display: "flex", alignItems: "center", justifyContent: touch ? "flex-end" : "center",
+            background: "none", border: "none", cursor: "pointer",
+            position: "relative", flexShrink: 0,
+          }}
+        >
+          <MoreHorizontal style={{ width: 16, height: 16, color: "var(--faint)" }} />
+        </button>
+      )}
+    />
+  )
+}
 
 export function MeetingNotesSection({
   teamId,
@@ -914,6 +917,11 @@ export function MeetingNotesSection({
   )
   const notes = useMemo(() => data?.notes ?? [], [data])
   const [creating, setCreating] = useState(false)
+  // Row-kebab delete (§14 ConfirmDialog). The note is held whole, not by id, so
+  // the dialog can name it even after the row it came from has re-sorted away.
+  const [confirmDelete, setConfirmDelete] = useState<MeetingNote | null>(null)
+  const [deletingNote, setDeletingNote] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Revalidate the digest whenever the LIST becomes visible. The section
   // renders from two mount sites (full-bleed detail vs. normal section), so a
@@ -1000,7 +1008,7 @@ export function MeetingNotesSection({
   // Children (agenda items, decisions) are ON DELETE CASCADE — no manual
   // cleanup. `.select()` is load-bearing: an RLS-denied delete is not an error,
   // it silently affects ZERO rows, so the returned rows are the only honest
-  // signal that the note is actually gone. The detail awaits this behind the
+  // signal that the note is actually gone. The row kebab awaits this behind the
   // ConfirmDialog's loading state rather than patching optimistically — an
   // optimistic destroy that quietly rolls back re-materializes a note the user
   // has already been told is gone.
@@ -1013,6 +1021,38 @@ export function MeetingNotesSection({
   function noteMetaChange(id: string, patch: Partial<MeetingNote>) {
     void mutateNotes(prev => prev ? { ...prev, notes: prev.notes.map(n => n.id === id ? { ...n, ...patch } : n) } : prev, { revalidate: false })
   }
+  // Runs the confirmed delete behind the dialog's own loading state. `deleteNote`
+  // drops the row from the digest cache itself on success; a FALSE means the
+  // write touched nothing (RLS), so the dialog stays open carrying the reason
+  // rather than closing on a destroy that never happened.
+  async function handleDeleteNote(note: MeetingNote) {
+    setDeletingNote(true)
+    setDeleteError(null)
+    const ok = await deleteNote(note.id)
+    setDeletingNote(false)
+    if (!ok) { setDeleteError("That didn't go through — the note is still here. Try again, or ask an admin."); return }
+    setConfirmDelete(null)
+    // The kebab only exists on the list, so the detail is not normally mounted
+    // here — but a note that IS open must never survive its own deletion.
+    if (openNoteId === note.id) onOpenNote(null)
+  }
+  function armDelete(note: MeetingNote) {
+    setDeleteError(null)
+    setConfirmDelete(note)
+  }
+  const deleteDialog = (
+    <ConfirmDialog
+      open={confirmDelete !== null}
+      title="Delete this meeting note?"
+      message={deleteError
+        ? <span style={{ color: "var(--danger)" }}>{deleteError}</span>
+        : "This permanently removes the note, its agenda and its decisions for everyone."}
+      confirmLabel="Delete"
+      loading={deletingNote}
+      onConfirm={() => { if (confirmDelete) void handleDeleteNote(confirmDelete) }}
+      onClose={() => { setConfirmDelete(null); setDeleteError(null) }}
+    />
+  )
 
   // Detail view. While the list payload is still in flight (or a just-created
   // note hasn't landed in the cache yet), hold a loading state — falling
@@ -1032,7 +1072,6 @@ export function MeetingNotesSection({
         onSaveTitle={saveTitle}
         onSaveBody={saveBody}
         onSaveDate={saveDate}
-        onDeleteNote={deleteNote}
         onNoteMetaChange={noteMetaChange}
         onOpenEvent={onOpenEvent}
         canWrite={canWrite}
@@ -1077,6 +1116,7 @@ export function MeetingNotesSection({
   // Mobile: Pocket rows with the digest as the sub line.
   if (isMobile) {
     return (
+      <>
       <PocketRowCard>
         {filtered.map((note, i) => {
           const decs = decisionsOf(note)
@@ -1096,10 +1136,15 @@ export function MeetingNotesSection({
               chevron
               isLast={i === filtered.length - 1}
               onClick={() => onOpenNote(note.id)}
+              // Readers get the row exactly as it has always been — no trailing
+              // element, so PocketRow renders its original single <button>.
+              trailing={canWrite ? <NoteRowMenu note={note} touch onDelete={armDelete} /> : undefined}
             />
           )
         })}
       </PocketRowCard>
+      {deleteDialog}
+      </>
     )
   }
 
@@ -1119,18 +1164,31 @@ export function MeetingNotesSection({
             const draft = isDraft(note, decs.length)
             const attendeePeople = (note.attendees ?? []).map(id => ({ id, name: data?.personNames[id] ?? "Member" }))
             return (
-              <button
+              // The row is a DIV wrapping a full-width open-the-note <button>
+              // plus the kebab as a SIBLING — a button inside a button is invalid
+              // HTML, and this row used to be the outer button. Everything that
+              // belongs to the ROW (padding, hairline, radius, hover) moved to
+              // the wrapper so the hover tint and the divider still span the
+              // whole row including the kebab. Same pattern as the ministry
+              // members list in settings-tab.tsx.
+              <div
                 key={note.id}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "14px 10px",
+                  borderBottom: "1px solid var(--line-3)", borderRadius: 10, transition: "background .12s",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--cream-2)" }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "none" }}
+              >
+              <button
                 type="button"
                 onClick={() => onOpenNote(note.id)}
                 aria-label={`Open ${note.title || "note"}`}
                 style={{
-                  width: "100%", textAlign: "left", display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) auto",
-                  gap: 16, alignItems: "center", padding: "14px 10px", borderBottom: "1px solid var(--line-3)",
-                  borderRadius: 10, cursor: "pointer", background: "none", transition: "background .12s",
+                  flex: 1, minWidth: 0, textAlign: "left", display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) auto",
+                  gap: 16, alignItems: "center", padding: 0, border: "none",
+                  cursor: "pointer", background: "none",
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--cream-2)" }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "none" }}
               >
                 <span style={{ textAlign: "center", lineHeight: 1.05 }}>
                   <span style={{ display: "block", fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)" }}>{String(d.getDate()).padStart(2, "0")}</span>
@@ -1163,6 +1221,8 @@ export function MeetingNotesSection({
                   <ChevronRight style={{ width: 15, height: 15, color: "var(--dashed)", flexShrink: 0 }} />
                 </span>
               </button>
+              {canWrite && <NoteRowMenu note={note} touch={false} onDelete={armDelete} />}
+              </div>
             )
           })}
         </div>
@@ -1170,6 +1230,7 @@ export function MeetingNotesSection({
       {filtered.length === 0 && (
         <p style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic", marginTop: 24 }}>No notes match “{query}”.</p>
       )}
+      {deleteDialog}
     </div>
   )
 }
