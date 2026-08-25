@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, use
 import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Bell, BellOff, Camera, Check, CornerUpLeft, FileDown, Flag, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Phone, Pin, Plus, Search, Trash2, User, Users, X } from "lucide-react"
+import { Bell, BellOff, Camera, Check, CornerUpLeft, FileDown, Flag, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Phone, Pin, Plus, Search, Trash2, User, Users, Video, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -2605,9 +2605,9 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     return () => { cancelled = true }
   }, [groupId, callingOn, noteLiveCall])
 
-  const onCallPress = useCallback(() => {
+  const onCallPress = useCallback((kind: "audio" | "video" = "audio") => {
     if (!groupId || inThisCall) return
-    void startCallFromChat(groupId, { title: displayName, isDM: groupType === "dm" })
+    void startCallFromChat(groupId, { title: displayName, isDM: groupType === "dm", kind })
   }, [groupId, inThisCall, startCallFromChat, displayName, groupType])
 
   // @mention member list is loaded via useSWR above (see rosterData/mentionMembers).
@@ -4154,24 +4154,56 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 Sized 34 on mobile to match the chevron/avatar that set the chrome
                 row height (Convention #27), 32 on the desktop panel to match the
                 settings button beside it. */}
-            {canCall && (
+            {/* A live call collapses the pair to ONE button: the kind is already
+                decided by whoever started it, so offering a choice would be
+                offering something that cannot happen. The icon reports which
+                kind you would be walking into. */}
+            {canCall && liveCallHere && (
               <button
-                onClick={onCallPress}
+                onClick={() => onCallPress(liveCallHere.kind)}
                 disabled={inThisCall}
-                aria-label={liveCallHere ? "Join the call" : "Start a call"}
-                title={liveCallHere ? "Join the call" : "Start a call"}
+                aria-label="Join the call"
+                title="Join the call"
                 className="call-btn flex-shrink-0 grid place-items-center w-[34px] h-[34px] md:w-8 md:h-8"
                 style={{
                   borderRadius: 8,
-                  border: `1px solid ${liveCallHere ? "var(--plum)" : "var(--line-2)"}`,
-                  background: liveCallHere ? "var(--plum-tint)" : "transparent",
-                  color: liveCallHere ? "var(--plum)" : "var(--body)",
+                  border: "1px solid var(--plum)",
+                  background: "var(--plum-tint)",
+                  color: "var(--plum)",
                   cursor: inThisCall ? "default" : "pointer",
                   opacity: inThisCall ? 0.45 : 1,
                 }}
               >
-                <Phone size={15} />
+                {liveCallHere.kind === "video" ? <Video size={15} /> : <Phone size={15} />}
               </button>
+            )}
+            {canCall && !liveCallHere && (
+              <>
+                <button
+                  onClick={() => onCallPress("audio")}
+                  aria-label="Start a call"
+                  title="Start a call"
+                  className="call-btn flex-shrink-0 grid place-items-center w-[34px] h-[34px] md:w-8 md:h-8"
+                  style={{
+                    borderRadius: 8, border: "1px solid var(--line-2)",
+                    background: "transparent", color: "var(--body)", cursor: "pointer",
+                  }}
+                >
+                  <Phone size={15} />
+                </button>
+                <button
+                  onClick={() => onCallPress("video")}
+                  aria-label="Start a video call"
+                  title="Start a video call"
+                  className="call-btn flex-shrink-0 grid place-items-center w-[34px] h-[34px] md:w-8 md:h-8"
+                  style={{
+                    borderRadius: 8, border: "1px solid var(--line-2)",
+                    background: "transparent", color: "var(--body)", cursor: "pointer",
+                  }}
+                >
+                  <Video size={15} />
+                </button>
+              </>
             )}
             {/* Desktop action buttons — Search + User only */}
             <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
@@ -4192,7 +4224,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
           forty, is most of them. */}
       {liveCallHere && !inThisCall && canCall && (
         <button
-          onClick={onCallPress}
+          onClick={() => onCallPress(liveCallHere.kind)}
           className="call-btn flex-shrink-0 w-full flex items-center gap-2 px-5 md:px-6"
           style={{
             padding: "10px 20px",
@@ -4204,8 +4236,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             textAlign: "left",
           }}
         >
-          <Phone size={14} className="flex-shrink-0" />
-          <span className="flex-1 truncate">Call in progress</span>
+          {liveCallHere.kind === "video"
+            ? <Video size={14} className="flex-shrink-0" />
+            : <Phone size={14} className="flex-shrink-0" />}
+          <span className="flex-1 truncate">
+            {liveCallHere.kind === "video" ? "Video call in progress" : "Call in progress"}
+          </span>
           <span style={{ fontWeight: 500 }}>Join</span>
         </button>
       )}
