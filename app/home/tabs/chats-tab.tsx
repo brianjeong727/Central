@@ -4030,18 +4030,26 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
   // Mobile: edge-swipe from the left closes the chat, mirroring the header back
   // chevron (§0.3). Disabled on the desktop inline render; coarse-pointer gated.
-  const chatSwipeRef = useEdgeSwipeBack<HTMLDivElement>(inline ? undefined : onClose)
+  // `showSettings` disarms both: while the settings subpage covers the chat, IT owns
+  // back (SubpageShell registers its own swipe + back-intent). Leaving the chat's
+  // armed would make a back-swipe inside settings close the whole conversation
+  // instead of returning to it.
+  const chatSwipeRef = useEdgeSwipeBack<HTMLDivElement>(inline || showSettings ? undefined : onClose)
   // Android hardware/gesture back closes the chat too — same handler, same gate as
   // the swipe (Convention #22). ChatScreen is a shell-escaping overlay rather than a
   // SubpageShell, so it registers its own, exactly as it wires its own edge-swipe.
-  useBackIntent(inline ? undefined : onClose)
+  useBackIntent(inline || showSettings ? undefined : onClose)
 
-  // Settings is now an in-content subpage (SubpageShell), not a portal sibling.
-  // Early-return it so it REPLACES the chat in the same slot: on desktop it fills
-  // the inline content area (shell breadcrumb is the back); off desktop the chat is
-  // a full-screen overlay, so the settings inherit the same fixed frame (mobile
-  // back row comes from SubpageShell). onClose closes the whole chat unchanged.
-  if (showSettings) {
+  // Settings COVERS the chat; it must never REPLACE it. This used to be an early
+  // return, which unmounted the whole chat subtree — transcript, composer and all —
+  // and rebuilt it on the way back. Four bugs fell out of that one line: the
+  // transcript scroll position reset to the top, the composer's typed draft and any
+  // staged attachment were destroyed, and `useEdgeSwipeBack`'s listeners were left
+  // bound to the detached transcript node (its effect keys on [active, …], not on
+  // the element, and ChatScreen itself never unmounted — so it never re-bound and
+  // swipe-to-close silently died for the rest of the session).
+  // Keeping the chat mounted behind an opaque overlay fixes all four at the source.
+  const settingsOverlay = showSettings ? (() => {
     const settingsEl = (
       <ChatSettings
         groupId={groupId}
@@ -4065,12 +4073,27 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     // Inset ONLY — ChatSettings renders a SubpageShell, whose chrome row already
     // owns the 12px (POCKET_OVERLAY_INSET_CLS, not …PAD_TOP_CLS). Stacking both
     // put chat settings at 24-30px instead of 12-19.
-    return inline ? settingsEl : (
+    // Inline (desktop) gets an absolutely-positioned cover inside the chat's own
+    // box rather than a bare return, so it occupies the identical rect it did as a
+    // replacement — same slot, same size — while the chat survives underneath.
+    // Two mount points, because `position: fixed` is not reliably viewport-relative
+    // here: AnimateIn sets `transform: translateY(0)` while animating, and ANY
+    // transform makes an element the containing block for its fixed descendants.
+    // The overlay path therefore mounts OUTSIDE AnimateIn; the inline path mounts
+    // INSIDE it (where `animate` is false, so no transform, and the added
+    // `relative` is what the absolute cover resolves against). Inline deliberately
+    // covers the chat's own box rather than returning bare, so it occupies the
+    // identical rect it did as a replacement — same slot, same size.
+    return inline ? (
+      <div className="absolute inset-0 z-20 overflow-y-auto" style={{ background: "var(--cream)" }}>
+        {settingsEl}
+      </div>
+    ) : (
       <div className="fixed inset-0 z-[110] overflow-y-auto pt-[env(safe-area-inset-top)] md:pt-0 md:left-[var(--shell-offset)]" style={{ background: "var(--cream)" }}>
         {settingsEl}
       </div>
     )
-  }
+  })() : null
 
   return (
     <>
@@ -4087,7 +4110,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         WebView already shrank — same markup, both containers. Desktop resets it. */}
     <AnimateIn
       animate={!inline}
-      className={inline ? "flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 kb-lift z-[100] bg-[var(--cream)] md:bg-[var(--cream-panel)] flex flex-col md:left-[var(--shell-offset)]"}
+      className={inline ? "relative flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 kb-lift z-[100] bg-[var(--cream)] md:bg-[var(--cream-panel)] flex flex-col md:left-[var(--shell-offset)]"}
     >
     <div ref={chatSwipeRef} className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
@@ -4816,7 +4839,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         />
       )}
     </div>
+    {inline && settingsOverlay}
     </AnimateIn>
+
+    {!inline && settingsOverlay}
 
     {/* Image lightbox */}
     {lightboxUrl && (
