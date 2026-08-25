@@ -28,6 +28,7 @@ import {
 // session pays for the provider; only a session that calls pays for the SDK.
 import type { Room, RemoteTrack, Participant } from "livekit-client"
 import { subscribeChatTopic } from "./chat-broadcast"
+import { isNativeShell } from "@/lib/native-auth"
 import { createClient } from "@/lib/supabase"
 import {
   startCall as startCallAction,
@@ -135,6 +136,16 @@ export function CallProvider({
   children: React.ReactNode
 }) {
   const supabase = useMemo(() => createClient(), [])
+
+  // Calling is OFF inside the installed native shell, and this is the choke
+  // point rather than just the button: the ring arrives over realtime whatever
+  // the UI offers, and answering one calls getUserMedia. The shipped binary has
+  // no microphone usage string, and iOS TERMINATES an app that reaches for a
+  // TCC-protected resource without one — so a ring the user can answer is a
+  // crash. The plist and manifest changes are committed but only reach a device
+  // in a NEW BINARY; a web deploy cannot carry them. Delete this with the build
+  // that ships them.
+  const blocked = useMemo(() => isNativeShell(), [])
 
   const [active, setActive] = useState<ActiveCall | null>(null)
   const [incoming, setIncoming] = useState<IncomingCall | null>(null)
@@ -255,7 +266,7 @@ export function CallProvider({
   // ── start ──────────────────────────────────────────────────────────────────
   const start = useCallback(
     async (groupId: string, opts: { title: string; isDM: boolean; kind?: CallKind }) => {
-      if (activeRef.current) return
+      if (blocked || activeRef.current) return
       const kind = opts.kind ?? "audio"
       ring.primeAudio()
       setActive({
@@ -298,13 +309,13 @@ export function CallProvider({
         }, RING_TIMEOUT_MS)
       }
     },
-    [connect, teardown],
+    [connect, teardown, blocked],
   )
 
   // ── answer / decline ───────────────────────────────────────────────────────
   const accept = useCallback(async () => {
     const call = incomingRef.current
-    if (!call) return
+    if (blocked || !call) return
     ring.stop()
     setIncoming(null)
     setActive({
@@ -327,7 +338,7 @@ export function CallProvider({
       await leaveCallAction(s.callId).catch(() => {})
       teardown()
     }
-  }, [connect, teardown])
+  }, [connect, teardown, blocked])
 
   const decline = useCallback(async () => {
     const call = incomingRef.current
@@ -361,7 +372,7 @@ export function CallProvider({
 
   // ── the ring feed ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!userId || !memberGroupKey) return
+    if (blocked || !userId || !memberGroupKey) return
     const groupIds = memberGroupKey.split(",").filter(Boolean)
 
     const onCall = async (rec: CallRecord) => {
@@ -429,7 +440,7 @@ export function CallProvider({
     })()
 
     return () => { cancelled = true; unsubs.forEach((u) => u()) }
-  }, [userId, memberGroupKey, supabase, teardown, noteLiveCall])
+  }, [blocked, userId, memberGroupKey, supabase, teardown, noteLiveCall])
 
   // An unanswered incoming ring gives up on its own, so a missed call does not
   // leave a ringing screen the user has to dismiss.

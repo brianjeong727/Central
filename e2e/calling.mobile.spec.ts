@@ -218,9 +218,13 @@ test.describe("ringing", () => {
       return `${data?.status}/${data?.end_reason}`
     }, { timeout: 20_000 }).toBe("ended/declined")
 
-    // …and the conversation carries the record of it.
-    const { data: msgs } = await sb.client
-      .from("messages").select("content").eq("group_id", myId).eq("message_type", "system")
-    expect((msgs ?? []).some((m) => m.content === "Call declined")).toBe(true)
+    // …and the conversation carries the record of it. POLLED, not read once:
+    // finalizeCall stamps the call row BEFORE it posts the summary line, so the
+    // assertion above can go green while this write is still in flight.
+    await expect.poll(async () => {
+      const { data } = await sb.client
+        .from("messages").select("content").eq("group_id", myId).eq("message_type", "system")
+      return (data ?? []).map((m) => m.content)
+    }, { timeout: 20_000 }).toContain("Call declined")
   })
 })
