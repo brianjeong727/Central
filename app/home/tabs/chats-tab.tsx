@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, use
 import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Bell, BellOff, Camera, Check, CornerUpLeft, FileDown, Flag, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Pin, Plus, Search, Trash2, User, Users, X } from "lucide-react"
+import { Bell, BellOff, Camera, Check, CornerUpLeft, FileDown, Flag, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Phone, Pin, Plus, Search, Trash2, User, Users, Video, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -12,7 +12,7 @@ import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames"
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
-import { ConfirmDialog, MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, IconButton, CentralModal, Input, FormField, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, PocketSheet, ChatAvatar, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE, MONO_METRIC_STYLE, MessageMenuOverlay, type MessageMenuAction } from "@/components/central"
+import { ConfirmDialog, MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, IconButton, CentralModal, Input, FormField, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, PocketRoundButton, PocketSheet, ChatAvatar, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE, MONO_METRIC_STYLE, MessageMenuOverlay, type MessageMenuAction } from "@/components/central"
 import { getOrCreateDm } from "../dm"
 import { isMobileViewport } from "@/lib/breakpoints"
 import { getInitials, formatRelativeTime, replyPreviewLabel, REACTION_EMOJIS } from "../utils"
@@ -21,6 +21,9 @@ import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatGro
 import { useOpenMemberProfile } from "../member-profile-context"
 import { InsetHairline } from "@/components/central/hairline"
 import { chatCapabilities } from "../chat-permissions"
+import { useCall } from "../call-context"
+import { callingBlockedInShell } from "@/lib/native-auth"
+import { callingAvailable, getLiveCall } from "@/app/actions/calls"
 import { dismissDelivered } from "@/lib/notification-dismiss"
 import { chatChipAvatarFromParts, chatAvatarStoragePath, chatGroupPhotoPatch } from "../chat-avatar"
 import { downscaleToJpeg } from "@/lib/downscale-image"
@@ -2555,6 +2558,59 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const canModerate = groupType === "church" ? (isLeaderRole(userRole) && isMemberOfChat) : isChatManageRole(userRole)
   const canPin = !groupArchived && (groupType !== "church" ? true : (isLeaderRole(userRole) && isMemberOfChat))
 
+  // ── Calling ────────────────────────────────────────────────────────────────
+  // The button is gated on the SAME predicate the server action and the SQL
+  // helper use (chatCapabilities().canStartCall → can_start_call()), so what the
+  // header offers and what the database permits cannot drift apart. A draft DM
+  // has no group row yet, so there is nothing to call into.
+  const { start: startCallFromChat, active: activeCall, liveCalls, noteLiveCall } = useCall()
+  const { data: callingOn } = useSWR("calling-available", () => callingAvailable(), {
+    revalidateOnFocus: false,
+    revalidateIfStale: false,
+    dedupingInterval: 10 * 60 * 1000,
+  })
+  const dmPartnerDeleted = useMemo(
+    () => (groupType === "dm" ? roster.some((m) => m.id !== userId && m.deleted) : false),
+    [groupType, roster, userId],
+  )
+  const callCaps = chatCapabilities(
+    { type: groupType, archived: groupArchived, isMemberOfChat, partnerDeleted: dmPartnerDeleted },
+    userRole,
+  )
+  const liveCallHere = groupId ? liveCalls[groupId] : undefined
+  // Hidden in any shell whose BINARY predates the microphone/camera usage
+  // strings — there, touching them terminates the app rather than failing. Keyed
+  // on the binary's capability marker rather than on being native, because one
+  // web deploy serves every installed version at once. See callingBlockedInShell().
+  const nativeShell = useSyncExternalStore(
+    () => () => {},
+    callingBlockedInShell,
+    () => false,   // SSR cannot see a user agent; the client re-renders once.
+  )
+  // Someone can always JOIN a call already running, even where they could not
+  // have started it — see the asymmetry note in chat-permissions.ts.
+  const canCall = !nativeShell && !!groupId && !!callingOn && rosterLoaded &&
+    (liveCallHere ? callCaps.canJoinCall : callCaps.canStartCall)
+  const inThisCall = activeCall?.groupId === groupId
+
+  // Seed the live-call map for THIS chat on open. The broadcast feed covers a
+  // call that starts while you are looking; this covers walking into a chat
+  // where one is already up.
+  useEffect(() => {
+    if (!groupId || !callingOn) return
+    let cancelled = false
+    void getLiveCall(groupId).then((c) => {
+      if (cancelled) return
+      noteLiveCall(groupId, c ? { callId: c.callId, kind: c.kind, startedBy: c.startedBy } : null)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [groupId, callingOn, noteLiveCall])
+
+  const onCallPress = useCallback((kind: "audio" | "video" = "audio") => {
+    if (!groupId || inThisCall) return
+    void startCallFromChat(groupId, { title: displayName, isDM: groupType === "dm", kind })
+  }, [groupId, inThisCall, startCallFromChat, displayName, groupType])
+
   // @mention member list is loaded via useSWR above (see rosterData/mentionMembers).
   // ── Invite-to-a-group picker ──────────────────────────────────────────────
   // Shares the browse list's SWR key, so opening a chat costs no extra fetch when
@@ -3974,18 +4030,26 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
   // Mobile: edge-swipe from the left closes the chat, mirroring the header back
   // chevron (§0.3). Disabled on the desktop inline render; coarse-pointer gated.
-  const chatSwipeRef = useEdgeSwipeBack<HTMLDivElement>(inline ? undefined : onClose)
+  // `showSettings` disarms both: while the settings subpage covers the chat, IT owns
+  // back (SubpageShell registers its own swipe + back-intent). Leaving the chat's
+  // armed would make a back-swipe inside settings close the whole conversation
+  // instead of returning to it.
+  const chatSwipeRef = useEdgeSwipeBack<HTMLDivElement>(inline || showSettings ? undefined : onClose)
   // Android hardware/gesture back closes the chat too — same handler, same gate as
   // the swipe (Convention #22). ChatScreen is a shell-escaping overlay rather than a
   // SubpageShell, so it registers its own, exactly as it wires its own edge-swipe.
-  useBackIntent(inline ? undefined : onClose)
+  useBackIntent(inline || showSettings ? undefined : onClose)
 
-  // Settings is now an in-content subpage (SubpageShell), not a portal sibling.
-  // Early-return it so it REPLACES the chat in the same slot: on desktop it fills
-  // the inline content area (shell breadcrumb is the back); off desktop the chat is
-  // a full-screen overlay, so the settings inherit the same fixed frame (mobile
-  // back row comes from SubpageShell). onClose closes the whole chat unchanged.
-  if (showSettings) {
+  // Settings COVERS the chat; it must never REPLACE it. This used to be an early
+  // return, which unmounted the whole chat subtree — transcript, composer and all —
+  // and rebuilt it on the way back. Four bugs fell out of that one line: the
+  // transcript scroll position reset to the top, the composer's typed draft and any
+  // staged attachment were destroyed, and `useEdgeSwipeBack`'s listeners were left
+  // bound to the detached transcript node (its effect keys on [active, …], not on
+  // the element, and ChatScreen itself never unmounted — so it never re-bound and
+  // swipe-to-close silently died for the rest of the session).
+  // Keeping the chat mounted behind an opaque overlay fixes all four at the source.
+  const settingsOverlay = showSettings ? (() => {
     const settingsEl = (
       <ChatSettings
         groupId={groupId}
@@ -4009,12 +4073,27 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     // Inset ONLY — ChatSettings renders a SubpageShell, whose chrome row already
     // owns the 12px (POCKET_OVERLAY_INSET_CLS, not …PAD_TOP_CLS). Stacking both
     // put chat settings at 24-30px instead of 12-19.
-    return inline ? settingsEl : (
+    // Inline (desktop) gets an absolutely-positioned cover inside the chat's own
+    // box rather than a bare return, so it occupies the identical rect it did as a
+    // replacement — same slot, same size — while the chat survives underneath.
+    // Two mount points, because `position: fixed` is not reliably viewport-relative
+    // here: AnimateIn sets `transform: translateY(0)` while animating, and ANY
+    // transform makes an element the containing block for its fixed descendants.
+    // The overlay path therefore mounts OUTSIDE AnimateIn; the inline path mounts
+    // INSIDE it (where `animate` is false, so no transform, and the added
+    // `relative` is what the absolute cover resolves against). Inline deliberately
+    // covers the chat's own box rather than returning bare, so it occupies the
+    // identical rect it did as a replacement — same slot, same size.
+    return inline ? (
+      <div className="absolute inset-0 z-20 overflow-y-auto" style={{ background: "var(--cream)" }}>
+        {settingsEl}
+      </div>
+    ) : (
       <div className="fixed inset-0 z-[110] overflow-y-auto pt-[env(safe-area-inset-top)] md:pt-0 md:left-[var(--shell-offset)]" style={{ background: "var(--cream)" }}>
         {settingsEl}
       </div>
     )
-  }
+  })() : null
 
   return (
     <>
@@ -4031,7 +4110,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         WebView already shrank — same markup, both containers. Desktop resets it. */}
     <AnimateIn
       animate={!inline}
-      className={inline ? "flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 kb-lift z-[100] bg-[var(--cream)] md:bg-[var(--cream-panel)] flex flex-col md:left-[var(--shell-offset)]"}
+      className={inline ? "relative flex flex-col h-full bg-[var(--cream)] w-full" : "fixed inset-0 kb-lift z-[100] bg-[var(--cream)] md:bg-[var(--cream-panel)] flex flex-col md:left-[var(--shell-offset)]"}
     >
     <div ref={chatSwipeRef} className={inline ? "w-full h-full flex flex-col" : "max-w-[390px] mx-auto w-full h-full flex flex-col md:max-w-none"}>
 
@@ -4093,8 +4172,90 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                 )}
               </div>
             </div>
-            {/* Desktop action buttons — Search + User only */}
+            {/* Call. The ONE action that earns a slot in the mobile chrome row:
+                everything else here is reachable by tapping the chat name, but a
+                call is time-sensitive and has to be one tap from the conversation.
+                Sized 34 on mobile to match the chevron/avatar that set the chrome
+                row height (Convention #27), 32 on the desktop panel to match the
+                settings button beside it. */}
+            {/* Calling. TWO languages, one per width, because the chrome rows are
+                two different things.
+
+                Phone: the shared PocketRoundButton — 34px, round, ivory fill, no
+                border. Two bordered squares here read as a toolbar bolted onto a
+                header whose only other controls are a bare chevron and an avatar,
+                and they were loud enough to compete with the chat's name for the
+                little width a phone has. mobile_design_system.md §3 allows a
+                chrome row 0–2 actions; this is that budget, spent quietly.
+
+                Desktop: the bordered 32px square, in the existing action cluster
+                beside Settings, matching the control already there.
+
+                A live call collapses the pair to ONE button either way — the kind
+                was decided by whoever started it, so offering a choice would be
+                offering something that cannot happen — and goes plum-filled,
+                which is the screen's one accent while a call is up. */}
+            {canCall && (
+              <div className="md:hidden flex items-center gap-1.5 flex-shrink-0">
+                {liveCallHere ? (
+                  <PocketRoundButton
+                    variant="plum"
+                    onClick={() => onCallPress(liveCallHere.kind)}
+                    ariaLabel="Join the call"
+                  >
+                    {liveCallHere.kind === "video" ? <Video size={15} /> : <Phone size={15} />}
+                  </PocketRoundButton>
+                ) : (
+                  <>
+                    <PocketRoundButton onClick={() => onCallPress("audio")} ariaLabel="Start a call">
+                      <Phone size={15} />
+                    </PocketRoundButton>
+                    <PocketRoundButton onClick={() => onCallPress("video")} ariaLabel="Start a video call">
+                      <Video size={15} />
+                    </PocketRoundButton>
+                  </>
+                )}
+              </div>
+            )}
+            {/* Desktop action buttons — call, video, then Settings */}
             <div className="hidden md:flex items-center gap-1.5 flex-shrink-0">
+              {canCall && (liveCallHere ? (
+                <button
+                  onClick={() => onCallPress(liveCallHere.kind)}
+                  disabled={inThisCall}
+                  aria-label="Join the call"
+                  title="Join the call"
+                  className="call-btn grid place-items-center w-8 h-8"
+                  style={{
+                    borderRadius: 8, border: "1px solid var(--plum)",
+                    background: "var(--plum-tint)", color: "var(--plum)",
+                    cursor: inThisCall ? "default" : "pointer", opacity: inThisCall ? 0.45 : 1,
+                  }}
+                >
+                  {liveCallHere.kind === "video" ? <Video size={14} /> : <Phone size={14} />}
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => onCallPress("audio")}
+                    aria-label="Start a call"
+                    title="Start a call"
+                    className="call-btn grid place-items-center w-8 h-8"
+                    style={{ borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer" }}
+                  >
+                    <Phone size={14} />
+                  </button>
+                  <button
+                    onClick={() => onCallPress("video")}
+                    aria-label="Start a video call"
+                    title="Start a video call"
+                    className="call-btn grid place-items-center w-8 h-8"
+                    style={{ borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer" }}
+                  >
+                    <Video size={14} />
+                  </button>
+                </>
+              ))}
               <button onClick={() => setShowSettings(true)} style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", cursor: "pointer", display: "grid", placeItems: "center" }}>
                 <User size={14} />
               </button>
@@ -4106,6 +4267,33 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         )}
       </div>
       {inline && <div className="hidden md:block"><InsetHairline style={{ margin: "0 16px" }} /></div>}
+
+      {/* A call running in this chat that you are not in. Without this a group
+          call is invisible to anyone who missed the ring — which, in a chat of
+          forty, is most of them. */}
+      {liveCallHere && !inThisCall && canCall && (
+        <button
+          onClick={() => onCallPress(liveCallHere.kind)}
+          className="call-btn flex-shrink-0 w-full flex items-center gap-2 px-5 md:px-6"
+          style={{
+            padding: "10px 20px",
+            background: "var(--plum-tint)",
+            borderBottom: "1px solid var(--line)",
+            color: "var(--plum)",
+            fontSize: 13,
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+        >
+          {liveCallHere.kind === "video"
+            ? <Video size={14} className="flex-shrink-0" />
+            : <Phone size={14} className="flex-shrink-0" />}
+          <span className="flex-1 truncate">
+            {liveCallHere.kind === "video" ? "Video call in progress" : "Call in progress"}
+          </span>
+          <span style={{ fontWeight: 500 }}>Join</span>
+        </button>
+      )}
 
       {/* ── Pinned message banner ── */}
       {pinnedMessage && (
@@ -4651,7 +4839,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         />
       )}
     </div>
+    {inline && settingsOverlay}
     </AnimateIn>
+
+    {!inline && settingsOverlay}
 
     {/* Image lightbox */}
     {lightboxUrl && (

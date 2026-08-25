@@ -34,6 +34,14 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Calling. RECORD_AUDIO is the runtime permission Chrome's WebView asks for
+         on getUserMedia; MODIFY_AUDIO_SETTINGS lets the call route audio to the
+         earpiece/speaker rather than always playing through media volume. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Video calls. iOS already carries NSCameraUsageDescription (photos). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <!-- Google Play Services (pulled in by the social-login plugin) merges the
          advertising-ID permissions in for its Privacy Sandbox adservices support.
          Central shows no ads, imports no ad SDK, and declares "no advertising ID"

@@ -44,6 +44,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Central uses the camera to take photos for chat messages and your profile picture.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Central uses the microphone so you can talk on calls with people in your ministry.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Central accesses your photo library so you can share photos in chat and set your profile picture.</string>
 	<key>UILaunchStoryboardName</key>
@@ -66,6 +68,14 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<!-- Keeps a call alive when the app is backgrounded. WKWebView's
+		     microphoneCaptureState is muted shortly after
+		     applicationDidEnterBackground without this, so the other side
+		     silently stops hearing you while the call still reads as connected. -->
+		<string>audio</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>

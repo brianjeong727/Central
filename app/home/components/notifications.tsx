@@ -271,6 +271,7 @@ function normalize(
     activity: s?.activity ?? true,
     deadlines: s?.deadlines ?? true,
     reactions: s?.reactions ?? true,
+    calls: s?.calls ?? true,
     group_mode: s?.group_mode ?? "smart",
     desk_web: s?.desk_web ?? true,
     desk_digest: s?.desk_digest ?? true,
@@ -445,6 +446,7 @@ export function NotificationsSection({
         <ToggleRow title="Activity & assignments" sub="You're given a task, role, or DGL week, a receipt is decided, your role changes, or your pastor asks a question." on={pending.activity} onToggle={() => set("activity", !pending.activity)} mobile={mobile} />
         <ToggleRow title="Deadlines" sub="Task due dates and confirmation requests." on={pending.deadlines} onToggle={() => set("deadlines", !pending.deadlines)} mobile={mobile} />
         <ToggleRow title="Reactions" sub="Someone reacts to one of your messages." on={pending.reactions} onToggle={() => set("reactions", !pending.reactions)} mobile={mobile} />
+        <ToggleRow title="Calls" sub="Someone starts a call in a chat you're in. Muted chats stay silent either way." on={pending.calls} onToggle={() => set("calls", !pending.calls)} mobile={mobile} />
 
         {/* Group chat mode */}
         <div style={{ display: "flex", alignItems: "center", gap: mobile ? 14 : 16, padding: mobile ? "14px 0" : "14px 18px", borderTop: `1px solid ${groupDivider}` }}>

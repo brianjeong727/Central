@@ -31,6 +31,25 @@ export function isNativeShell(): boolean {
   return typeof navigator !== "undefined" && navigator.userAgent.includes("CentralShell")
 }
 
+/**
+ * Is CALLING unsafe in the shell this bundle happens to be running inside?
+ *
+ * The web bundle is shared by every installed binary simultaneously, while the
+ * microphone/camera usage strings only exist in binaries built after they were
+ * added. A shell without them does not fail politely — iOS TERMINATES an app
+ * that reaches for a TCC-protected resource with no usage description — so the
+ * question the UI must ask is "does THIS binary have them?", never "am I
+ * native?". The binary answers by appending CentralCalls/<n> to its user agent
+ * (capacitor.config.ts); a shell that does not, cannot call.
+ *
+ * Browsers are never blocked — they ask for permission the normal way.
+ */
+export function callingBlockedInShell(): boolean {
+  if (typeof navigator === "undefined") return false
+  const ua = navigator.userAgent
+  return ua.includes("CentralShell") && !ua.includes("CentralCalls/")
+}
+
 // Hydration-safe render-time probe: the server snapshot is always false (SSR
 // can't see the UA), the client snapshot re-renders once after hydration in
 // the shell. Never subscribes — the UA can't change mid-session.

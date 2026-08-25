@@ -14,13 +14,13 @@
 // meeting_note_agenda_items / meeting_note_decisions (RLS mirrors the parent).
 // All client-side writes — same pattern the old section used.
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import useSWR from "swr"
-import { Plus, X, ChevronRight, ArrowUpRight } from "lucide-react"
+import { Plus, X, ChevronRight, ArrowUpRight, Trash2, MoreHorizontal } from "lucide-react"
 import type { Editor } from "@tiptap/core"
 import { createClient } from "@/lib/supabase"
 import { ActionMenu } from "@/components/central/action-menu"
-import { SubpageShell, SerifInput, PocketRow, PocketRowCard } from "@/components/central"
+import { SubpageShell, SerifInput, PocketRow, PocketRowCard, ConfirmDialog } from "@/components/central"
 import { EYEBROW_STYLE, MONO_STYLE } from "../components/shared"
 import { getInitials } from "../utils"
 import { useIsMobile } from "../use-is-mobile"
@@ -69,6 +69,37 @@ const todayYMD = () => {
 // A note is a live draft while it has no decisions and its meeting date hasn't passed.
 function isDraft(note: MeetingNote, decisionCount: number): boolean {
   return decisionCount === 0 && note.date >= todayYMD()
+}
+
+// ── Debounced text saves ─────────────────────────────────────────────────────
+// The optimistic cache patch stays IMMEDIATE (every keystroke); only the
+// Supabase UPDATE is deferred, on the same 400ms beat the title field already
+// uses. Agenda item text used to issue one UPDATE per keystroke — a
+// 40-character edit was 40 round trips.
+//
+// Keyed per (row, field-set) so editing an item's text and its detail line
+// inside one window can't cancel each other, and pending writes FLUSH on
+// unmount: navigating back within 400ms of the last keystroke must not
+// silently drop the edit.
+const SAVE_DEBOUNCE_MS = 400
+
+type PendingWrite = () => Promise<void>
+
+function useDebouncedSave(delay = SAVE_DEBOUNCE_MS) {
+  const pending = useRef(new Map<string, { timer: ReturnType<typeof setTimeout>; run: PendingWrite }>())
+  useEffect(() => {
+    const map = pending.current
+    return () => {
+      map.forEach(({ timer, run }) => { clearTimeout(timer); void run() })
+      map.clear()
+    }
+  }, [])
+  return useCallback((key: string, run: PendingWrite) => {
+    const prev = pending.current.get(key)
+    if (prev) clearTimeout(prev.timer)
+    const timer = setTimeout(() => { pending.current.delete(key); void run() }, delay)
+    pending.current.set(key, { timer, run })
+  }, [delay])
 }
 
 // ── Fetchers ─────────────────────────────────────────────────────────────────
@@ -147,6 +178,113 @@ function SectionHead({ kicker, hint }: { kicker: string; hint?: string }) {
   )
 }
 
+// Borderless auto-growing text field. Same inline, chromeless treatment as the
+// agenda item's <input>, but a decision is a SENTENCE: it WRAPS today, and at
+// phone width almost every decision is two lines, so a single-line <input>
+// would collapse it into a horizontally scrolling sliver. Enter commits
+// (blurs) rather than inserting a newline — a decision stays one paragraph.
+function GrowText({
+  value, onChange, placeholder, style,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+  style?: React.CSSProperties
+}) {
+  const ref = useRef<HTMLTextAreaElement | null>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = "0px"
+    el.style.height = `${el.scrollHeight}px`
+  }, [value])
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      placeholder={placeholder}
+      onChange={e => onChange(e.target.value)}
+      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur() } }}
+      style={{ width: "100%", background: "none", border: "none", outline: "none", fontFamily: "var(--sans)", padding: 0, resize: "none", overflow: "hidden", display: "block", ...style }}
+    />
+  )
+}
+
+// §14 inline two-step remove for a DENSE row (agenda item / decision) — a modal
+// would be overkill here, and firing the delete on the first click (what these
+// rows used to do) is exactly what §14 forbids.
+//
+// Visibility: hover-revealed on desktop, ALWAYS visible on touch — there is no
+// hover on a phone, so the hover-only gate made these unreachable there.
+//
+// Touch target: the glyph stays 13px, but on touch the button CLAIMS a 44px-wide
+// layout box (glyph pinned to its right edge, so nothing moves visually) and the
+// transparent expander is pinned to that box's own left/right edges. Centring an
+// oversized 44×44 overlay on the glyph instead — the first shape of this — hung
+// ~15px of live hit area over the agenda text field beside it and over the
+// decision card above, where a positioned element wins hit-testing against a
+// static sibling and a tap at the end of a line armed the wrong remove. A real
+// flex box costs the text field 31px of width and cannot overlap anything.
+function RowRemove({
+  label, visible, confirming, deleting, touch, onArm, onCancel, onConfirm, top = 4,
+}: {
+  label: string
+  visible: boolean
+  confirming: boolean
+  deleting: boolean
+  touch: boolean
+  onArm: () => void
+  onCancel: () => void
+  onConfirm: () => void
+  top?: number
+}) {
+  if (confirming) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 5, flexShrink: 0, paddingTop: Math.max(top - 2, 0) }}>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={deleting}
+          style={{
+            fontSize: 11, fontWeight: 600, color: "var(--danger)",
+            background: "color-mix(in srgb, var(--danger) 7%, var(--cream))",
+            border: "1px solid color-mix(in srgb, var(--danger) 28%, transparent)",
+            borderRadius: 6, padding: "3px 8px", cursor: deleting ? "default" : "pointer",
+            whiteSpace: "nowrap", opacity: deleting ? 0.5 : 1,
+          }}
+        >
+          {deleting ? "Deleting…" : "Delete"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{ fontSize: 11, color: "var(--muted-text)", background: "none", border: "none", cursor: "pointer", padding: "3px 4px" }}
+        >
+          Cancel
+        </button>
+      </div>
+    )
+  }
+  if (!visible) return null
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onArm}
+      // Vertical half of the 44px target via `.tap-expand-y` (globals.css) — a
+      // pseudo-element, never a child span (see the date button above).
+      className={touch ? "tap-expand-y" : undefined}
+      style={{
+        color: "var(--faint)", cursor: "pointer", paddingTop: top, position: "relative", flexShrink: 0,
+        ...(touch ? { width: 44, display: "flex", justifyContent: "flex-end", alignItems: "flex-start" } : null),
+      }}
+    >
+      <X style={{ width: 13, height: 13 }} />
+    </button>
+  )
+}
+
 export function MeetingNoteDetail({
   note,
   teamId,
@@ -155,6 +293,7 @@ export function MeetingNoteDetail({
   onBack,
   onSaveTitle,
   onSaveBody,
+  onSaveDate,
   onNoteMetaChange,
   onOpenEvent,
   canWrite = true,
@@ -166,6 +305,8 @@ export function MeetingNoteDetail({
   onBack: () => void
   onSaveTitle: (id: string, title: string) => Promise<void>
   onSaveBody: (id: string, body: string) => Promise<void>
+  /** Persist a new meeting DATE (plain YYYY-MM-DD) + re-sort the list cache. */
+  onSaveDate: (id: string, date: string) => Promise<void>
   /** Persist + reflect linked_event_id / attendees changes on the list cache. */
   onNoteMetaChange: (id: string, patch: Partial<MeetingNote>) => void
   onOpenEvent?: (eventId: string) => void
@@ -173,6 +314,7 @@ export function MeetingNoteDetail({
 }) {
   const supabase = createClient()
   const isMobile = useIsMobile()
+  const saveLater = useDebouncedSave()
   const [localTitle, setLocalTitle] = useState(note.title)
   const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
    
@@ -282,9 +424,33 @@ export function MeetingNoteDetail({
       .single()
     if (data) void mutateSections(prev => prev ? { ...prev, agenda: [...prev.agenda, data as MeetingAgendaItem] } : prev, { revalidate: false })
   }
-  async function patchAgendaItem(id: string, patch: Partial<MeetingAgendaItem>) {
+  // A PostgREST query builder is a LAZY thenable — it only issues the HTTP
+  // request when something awaits it or calls `.then()`. `void builder` does
+  // NEITHER: it evaluates the expression and discards the value, so the PATCH
+  // is constructed and thrown away and nothing is ever sent. Paired with an
+  // optimistic cache patch that shape is silent data loss — the UI shows the
+  // edit, a reload reveals the database never took it. Every write below is
+  // `await`ed inside an async closure, and a failed one revalidates so the
+  // cache can never keep showing a value the database refused.
+  //
+  // `debounce` is for TEXT fields only — a discrete toggle (done) writes at once.
+  function patchAgendaItem(id: string, patch: Partial<MeetingAgendaItem>, debounce = false) {
     void mutateSections(prev => prev ? { ...prev, agenda: prev.agenda.map(a => a.id === id ? { ...a, ...patch } : a) } : prev, { revalidate: false })
-    await supabase.from("meeting_note_agenda_items").update(patch).eq("id", id)
+    const write = async () => {
+      const { error } = await supabase.from("meeting_note_agenda_items").update(patch).eq("id", id)
+      if (error) void mutateSections()
+    }
+    if (debounce) saveLater(`agenda:${id}:${Object.keys(patch).join(",")}`, write)
+    else void write()
+  }
+  function patchDecision(id: string, patch: Partial<MeetingDecision>, debounce = false) {
+    void mutateSections(prev => prev ? { ...prev, decisions: prev.decisions.map(d => d.id === id ? { ...d, ...patch } : d) } : prev, { revalidate: false })
+    const write = async () => {
+      const { error } = await supabase.from("meeting_note_decisions").update(patch).eq("id", id)
+      if (error) void mutateSections()
+    }
+    if (debounce) saveLater(`decision:${id}:${Object.keys(patch).join(",")}`, write)
+    else void write()
   }
   async function removeAgendaItem(id: string) {
     void mutateSections(prev => prev ? { ...prev, agenda: prev.agenda.filter(a => a.id !== id) } : prev, { revalidate: false })
@@ -311,6 +477,35 @@ export function MeetingNoteDetail({
   const [decisionDraft, setDecisionDraft] = useState("")
   const [hoveredAgenda, setHoveredAgenda] = useState<string | null>(null)
   const [hoveredDecision, setHoveredDecision] = useState<string | null>(null)
+  // §14 two-step state shape — ONE `confirmRemoveId` (so only one row can be
+  // armed at a time, agenda and decisions sharing it since ids are uuids) and a
+  // separate `removingId` for the in-flight state.
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  // The agenda row the user is INSIDE (focus anywhere within it). On touch this
+  // is what reveals the "detail…" line — a phone has no hover, but painting the
+  // empty field on every row turns the note from a document into a form.
+  const [activeAgenda, setActiveAgenda] = useState<string | null>(null)
+  const [editingDate, setEditingDate] = useState(false)
+  const [dateDraft, setDateDraft] = useState(note.date)
+
+  useEffect(() => { setDateDraft(note.date) }, [note.id, note.date])
+
+  // A native date input emits COMPLETE, valid intermediate values while a year
+  // is typed digit by digit — 0002-08-25, then 0020-…, then 0202-… — so a
+  // per-keystroke write persists year 2 the instant the user tabs away
+  // mid-entry, which is precisely the misfiling this affordance exists to fix
+  // (and it fired four writes plus four digest re-sorts for one edit). The
+  // value is held locally and committed ONCE, on blur or Enter, and a year
+  // outside the plausible range is discarded rather than stored.
+  function commitDate() {
+    setEditingDate(false)
+    const v = dateDraft
+    const year = Number(v.slice(0, 4))
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || year < 1900 || year > 2999) { setDateDraft(note.date); return }
+    if (v === note.date) return
+    void onSaveDate(note.id, v)
+  }
 
   const noteDateLabel = (() => {
     const d = new Date(note.date + "T12:00:00")
@@ -324,7 +519,50 @@ export function MeetingNoteDetail({
       <div style={{ padding: `0 ${px}px` }}>
         {/* ── Meta row: date · attendees · linked event ── */}
         <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-          <span style={MONO_STYLE}>{noteDateLabel}</span>
+          {/* The meeting DATE is the affordance — a note written up two days
+              after the meeting was permanently misfiled (it also sorts and
+              month-groups off this). Resting appearance stays the MONO_STYLE
+              label with a dashed underline, the same quiet weight as the
+              "Edit"/"Link an event" pills beside it; click reveals a native
+              date input. `meeting_notes.date` is a DATE column, so the value is
+              a plain YYYY-MM-DD string end to end — <input type="date"> emits
+              exactly that, and it must never round-trip through a Date
+              (Convention #23). */}
+          {!canWrite ? (
+            <span style={MONO_STYLE}>{noteDateLabel}</span>
+          ) : editingDate ? (
+            <input
+              type="date"
+              autoFocus
+              min="1900-01-01"
+              max="2999-12-31"
+              value={dateDraft}
+              onChange={e => setDateDraft(e.target.value)}
+              onBlur={commitDate}
+              onKeyDown={e => {
+                if (e.key === "Enter") commitDate()
+                if (e.key === "Escape") { setDateDraft(note.date); setEditingDate(false) }
+              }}
+              style={{ ...MONO_STYLE, color: "var(--ink)", background: "none", border: "1px solid var(--line-2)", borderRadius: 8, padding: "3px 8px", outline: "none", minHeight: isMobile ? 44 : 30 }}
+            />
+          ) : (
+            <button
+              type="button"
+              aria-label="Change the meeting date"
+              onClick={() => setEditingDate(true)}
+              /* ≥44px tap target without a visually bigger control — the label is
+                 already ~180px wide, so the expander only grows VERTICALLY, pinned
+                 to the button's own edges (`.tap-expand-y`, globals.css). It has to
+                 be a pseudo-element: a child <span> expander leaves this button a
+                 non-leaf, and the mobile screen sweep measures the first painted
+                 TEXT LEAF — it skipped the date and reported the "Edit" pill a line
+                 lower as a 106px body start on an unmoved screen. */
+              className={isMobile ? "tap-expand-y" : undefined}
+              style={{ ...MONO_STYLE, background: "none", border: "none", borderBottom: "1px dashed var(--dashed)", padding: "0 0 2px", cursor: "pointer", position: "relative" }}
+            >
+              {noteDateLabel}
+            </button>
+          )}
           <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "var(--body)" }}>
             <AvatarStack people={attendeePeople} />
             {attendeePeople.length > 0 && <span>{attendeePeople.length} attending</span>}
@@ -405,12 +643,18 @@ export function MeetingNoteDetail({
               <div key={item.id}
                 onMouseEnter={() => setHoveredAgenda(item.id)}
                 onMouseLeave={() => setHoveredAgenda(null)}
+                // React's onFocus/onBlur are focusIN/focusOUT — they bubble, so
+                // this tracks focus anywhere in the row. The relatedTarget check
+                // is what lets focus move from the item text to the detail line
+                // without the detail line unmounting out from under the tap.
+                onFocus={() => setActiveAgenda(item.id)}
+                onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setActiveAgenda(null) }}
                 style={{ display: "flex", gap: 13, alignItems: "flex-start", padding: "10px 2px", borderBottom: "1px solid var(--line-3)" }}>
                 <button
                   type="button"
                   disabled={!canWrite}
                   aria-label={item.done ? "Mark not covered" : "Mark covered"}
-                  onClick={() => { void patchAgendaItem(item.id, { done: !item.done }) }}
+                  onClick={() => { patchAgendaItem(item.id, { done: !item.done }) }}
                   style={{ fontFamily: "var(--mono)", fontSize: 12, color: item.done ? "var(--sage)" : "var(--muted-text)", width: 20, flexShrink: 0, paddingTop: 4, textAlign: "left", cursor: canWrite ? "pointer" : "default" }}
                 >
                   {item.done ? "✓" : i + 1}
@@ -419,14 +663,20 @@ export function MeetingNoteDetail({
                   <input
                     value={item.text}
                     readOnly={!canWrite}
-                    onChange={e => { void patchAgendaItem(item.id, { text: e.target.value }) }}
+                    onChange={e => { patchAgendaItem(item.id, { text: e.target.value }, true) }}
                     placeholder="Agenda item…"
                     style={{ width: "100%", background: "none", border: "none", outline: "none", fontSize: 15, lineHeight: 1.5, color: item.done ? "var(--body)" : "var(--ink)", fontFamily: "var(--sans)", padding: 0 }}
                   />
-                  {(item.sub_text !== null || hoveredAgenda === item.id) && canWrite ? (
+                  {/* The detail line reveals on hover OR on focus. Focus is
+                      what makes it reachable on a phone, where there is no
+                      hover — and it reveals it for the ONE row the user is in,
+                      where `isMobile ||` painted an empty "detail…" placeholder
+                      under every item and tipped the note from a document
+                      toward a form. */}
+                  {(item.sub_text !== null || activeAgenda === item.id || hoveredAgenda === item.id) && canWrite ? (
                     <input
                       value={item.sub_text ?? ""}
-                      onChange={e => { void patchAgendaItem(item.id, { sub_text: e.target.value || null }) }}
+                      onChange={e => { patchAgendaItem(item.id, { sub_text: e.target.value || null }, true) }}
                       placeholder="detail…"
                       style={{ width: "100%", background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--body)", fontFamily: "var(--sans)", padding: 0, marginTop: 3 }}
                     />
@@ -434,11 +684,22 @@ export function MeetingNoteDetail({
                     <div style={{ fontSize: 13, color: "var(--body)", marginTop: 3, lineHeight: 1.45 }}>{item.sub_text}</div>
                   ) : null}
                 </div>
-                {canWrite && hoveredAgenda === item.id && (
-                  <button type="button" aria-label="Remove agenda item" onClick={() => { void removeAgendaItem(item.id) }}
-                    style={{ color: "var(--faint)", cursor: "pointer", paddingTop: 4 }}>
-                    <X style={{ width: 13, height: 13 }} />
-                  </button>
+                {canWrite && (
+                  <RowRemove
+                    label="Remove agenda item"
+                    visible={isMobile || hoveredAgenda === item.id}
+                    confirming={confirmRemoveId === item.id}
+                    deleting={removingId === item.id}
+                    touch={isMobile}
+                    onArm={() => setConfirmRemoveId(item.id)}
+                    onCancel={() => setConfirmRemoveId(null)}
+                    onConfirm={async () => {
+                      setRemovingId(item.id)
+                      setConfirmRemoveId(null)
+                      await removeAgendaItem(item.id)
+                      setRemovingId(null)
+                    }}
+                  />
                 )}
               </div>
             ))}
@@ -475,16 +736,37 @@ export function MeetingNoteDetail({
               style={{ display: "flex", gap: 13, alignItems: "flex-start", background: "var(--cream-3)", border: "1px solid var(--line)", borderRadius: 12, padding: "14px 18px", marginBottom: 9 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold)", flexShrink: 0, marginTop: 7 }} />
               <div style={{ flex: 1, minWidth: 0, fontSize: 15, lineHeight: 1.5 }}>
-                {d.text}
+                {/* Editable in place — the only correction path used to be
+                    delete-and-retype. Mirrors the agenda item input. */}
+                {canWrite ? (
+                  <GrowText
+                    value={d.text}
+                    onChange={v => { patchDecision(d.id, { text: v }, true) }}
+                    placeholder="Decision…"
+                    style={{ fontSize: 15, lineHeight: 1.5, color: "var(--ink)" }}
+                  />
+                ) : d.text}
                 <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 4 }}>
                   {linkedEventTitle ? `Re: ${linkedEventTitle} · ` : ""}{memberName(d.created_by)}
                 </div>
               </div>
-              {canWrite && hoveredDecision === d.id && (
-                <button type="button" aria-label="Remove decision" onClick={() => { void removeDecision(d.id) }}
-                  style={{ color: "var(--faint)", cursor: "pointer", paddingTop: 2 }}>
-                  <X style={{ width: 13, height: 13 }} />
-                </button>
+              {canWrite && (
+                <RowRemove
+                  label="Remove decision"
+                  visible={isMobile || hoveredDecision === d.id}
+                  confirming={confirmRemoveId === d.id}
+                  deleting={removingId === d.id}
+                  touch={isMobile}
+                  top={2}
+                  onArm={() => setConfirmRemoveId(d.id)}
+                  onCancel={() => setConfirmRemoveId(null)}
+                  onConfirm={async () => {
+                    setRemovingId(d.id)
+                    setConfirmRemoveId(null)
+                    await removeDecision(d.id)
+                    setRemovingId(null)
+                  }}
+                />
               )}
             </div>
           ))}
@@ -536,12 +818,73 @@ export function MeetingNoteDetail({
             canWrite={canWrite}
           />
         </div>
+
+        {/* No danger zone here (moved 2026-08-25). Delete is a PER-ROW action on
+            the meeting-notes LIST now — a ⋯ kebab per row (web_design_system.md:220:
+            "Kebab (⋯). Only for low-frequency, destructive, or per-row actions"),
+            which is also the slot the next per-note actions (duplicate, archive,
+            post recap) hang off. The open note is for writing the note. */}
       </div>
     </SubpageShell>
   )
 }
 
 // ── List ─────────────────────────────────────────────────────────────────────
+
+// The per-row ⋯ menu. `items` is the extension point the whole change exists for:
+// a second action (Duplicate, Archive, Post recap) is ONE entry in this array and
+// nothing around it moves. Destructive stays LAST and `tone: "danger"` (--danger
+// text on transparent — ActionMenu owns that skin), and §14 still applies: the
+// kebab ARMS a ConfirmDialog, it never destroys on the tap.
+//
+// Always ActionMenu, never a hand-rolled dropdown (Convention #20) — it portals
+// to <body> and flips above the trigger, which is what keeps the LAST row's menu
+// on screen instead of clipped under the viewport bottom, and what stops
+// PocketRowCard's `overflow: hidden` from cutting it off on mobile.
+function NoteRowMenu({ note, touch, onDelete }: {
+  note: MeetingNote
+  /** Phone width: widen the trigger to a 44px target (§ touch minimums). */
+  touch: boolean
+  onDelete: (note: MeetingNote) => void
+}) {
+  const label = `Actions for ${note.title || "note"}`
+  return (
+    <ActionMenu
+      align="right"
+      minWidth={168}
+      items={[
+        {
+          key: "delete",
+          label: "Delete note",
+          tone: "danger",
+          icon: <Trash2 style={{ width: 14, height: 14 }} />,
+          onSelect: () => onDelete(note),
+        },
+      ]}
+      renderTrigger={({ toggle }) => (
+        <button
+          type="button"
+          aria-label={label}
+          onClick={toggle}
+          // Vertical half of the 44px target via `.tap-expand-y` (globals.css) — a
+          // pseudo-element, never a child span (see the date button).
+          className={touch ? "tap-expand-y" : undefined}
+          style={{
+            // On touch the trigger itself is 44 wide rather than an overlay
+            // expander: an expander reaching left would sit ON TOP of the row's
+            // own tap area, so a thumb aiming at the menu would open the note.
+            width: touch ? 44 : 28, height: 28, borderRadius: 6, padding: 0,
+            display: "flex", alignItems: "center", justifyContent: touch ? "flex-end" : "center",
+            background: "none", border: "none", cursor: "pointer",
+            position: "relative", flexShrink: 0,
+          }}
+        >
+          <MoreHorizontal style={{ width: 16, height: 16, color: "var(--faint)" }} />
+        </button>
+      )}
+    />
+  )
+}
 
 export function MeetingNotesSection({
   teamId,
@@ -574,6 +917,11 @@ export function MeetingNotesSection({
   )
   const notes = useMemo(() => data?.notes ?? [], [data])
   const [creating, setCreating] = useState(false)
+  // Row-kebab delete (§14 ConfirmDialog). The note is held whole, not by id, so
+  // the dialog can name it even after the row it came from has re-sorted away.
+  const [confirmDelete, setConfirmDelete] = useState<MeetingNote | null>(null)
+  const [deletingNote, setDeletingNote] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Revalidate the digest whenever the LIST becomes visible. The section
   // renders from two mount sites (full-bleed detail vs. normal section), so a
@@ -646,9 +994,65 @@ export function MeetingNotesSection({
     const { error } = await supabase.from("meeting_notes").update({ body, updated_by: userId, updated_at: now }).eq("id", id)
     if (error) void mutateNotes()
   }
+  // `date` is a plain YYYY-MM-DD calendar day straight off <input type="date">
+  // — never parsed into a Date on the way through (Convention #23). The digest
+  // is ordered `date desc` and the desktop list month-groups off
+  // `date.slice(0, 7)`, so the optimistic patch alone leaves the row in its old
+  // month and old position: revalidate after the write to re-sort and re-group.
+  async function saveDate(id: string, date: string) {
+    const now = new Date().toISOString()
+    void mutateNotes(prev => prev ? { ...prev, notes: prev.notes.map(n => n.id === id ? { ...n, date, updated_by: userId, updated_at: now } : n) } : prev, { revalidate: false })
+    await supabase.from("meeting_notes").update({ date, updated_by: userId, updated_at: now }).eq("id", id)
+    void mutateNotes()
+  }
+  // Children (agenda items, decisions) are ON DELETE CASCADE — no manual
+  // cleanup. `.select()` is load-bearing: an RLS-denied delete is not an error,
+  // it silently affects ZERO rows, so the returned rows are the only honest
+  // signal that the note is actually gone. The row kebab awaits this behind the
+  // ConfirmDialog's loading state rather than patching optimistically — an
+  // optimistic destroy that quietly rolls back re-materializes a note the user
+  // has already been told is gone.
+  async function deleteNote(id: string): Promise<boolean> {
+    const { data: removed, error } = await supabase.from("meeting_notes").delete().eq("id", id).select("id")
+    if (error || !removed || removed.length === 0) { void mutateNotes(); return false }
+    void mutateNotes(prev => prev ? { ...prev, notes: prev.notes.filter(n => n.id !== id) } : prev, { revalidate: false })
+    return true
+  }
   function noteMetaChange(id: string, patch: Partial<MeetingNote>) {
     void mutateNotes(prev => prev ? { ...prev, notes: prev.notes.map(n => n.id === id ? { ...n, ...patch } : n) } : prev, { revalidate: false })
   }
+  // Runs the confirmed delete behind the dialog's own loading state. `deleteNote`
+  // drops the row from the digest cache itself on success; a FALSE means the
+  // write touched nothing (RLS), so the dialog stays open carrying the reason
+  // rather than closing on a destroy that never happened.
+  async function handleDeleteNote(note: MeetingNote) {
+    setDeletingNote(true)
+    setDeleteError(null)
+    const ok = await deleteNote(note.id)
+    setDeletingNote(false)
+    if (!ok) { setDeleteError("That didn't go through — the note is still here. Try again, or ask an admin."); return }
+    setConfirmDelete(null)
+    // The kebab only exists on the list, so the detail is not normally mounted
+    // here — but a note that IS open must never survive its own deletion.
+    if (openNoteId === note.id) onOpenNote(null)
+  }
+  function armDelete(note: MeetingNote) {
+    setDeleteError(null)
+    setConfirmDelete(note)
+  }
+  const deleteDialog = (
+    <ConfirmDialog
+      open={confirmDelete !== null}
+      title="Delete this meeting note?"
+      message={deleteError
+        ? <span style={{ color: "var(--danger)" }}>{deleteError}</span>
+        : "This permanently removes the note, its agenda and its decisions for everyone."}
+      confirmLabel="Delete"
+      loading={deletingNote}
+      onConfirm={() => { if (confirmDelete) void handleDeleteNote(confirmDelete) }}
+      onClose={() => { setConfirmDelete(null); setDeleteError(null) }}
+    />
+  )
 
   // Detail view. While the list payload is still in flight (or a just-created
   // note hasn't landed in the cache yet), hold a loading state — falling
@@ -667,6 +1071,7 @@ export function MeetingNotesSection({
         onBack={() => { onOpenNote(null); void mutateNotes() }}
         onSaveTitle={saveTitle}
         onSaveBody={saveBody}
+        onSaveDate={saveDate}
         onNoteMetaChange={noteMetaChange}
         onOpenEvent={onOpenEvent}
         canWrite={canWrite}
@@ -711,6 +1116,7 @@ export function MeetingNotesSection({
   // Mobile: Pocket rows with the digest as the sub line.
   if (isMobile) {
     return (
+      <>
       <PocketRowCard>
         {filtered.map((note, i) => {
           const decs = decisionsOf(note)
@@ -730,10 +1136,15 @@ export function MeetingNotesSection({
               chevron
               isLast={i === filtered.length - 1}
               onClick={() => onOpenNote(note.id)}
+              // Readers get the row exactly as it has always been — no trailing
+              // element, so PocketRow renders its original single <button>.
+              trailing={canWrite ? <NoteRowMenu note={note} touch onDelete={armDelete} /> : undefined}
             />
           )
         })}
       </PocketRowCard>
+      {deleteDialog}
+      </>
     )
   }
 
@@ -753,18 +1164,31 @@ export function MeetingNotesSection({
             const draft = isDraft(note, decs.length)
             const attendeePeople = (note.attendees ?? []).map(id => ({ id, name: data?.personNames[id] ?? "Member" }))
             return (
-              <button
+              // The row is a DIV wrapping a full-width open-the-note <button>
+              // plus the kebab as a SIBLING — a button inside a button is invalid
+              // HTML, and this row used to be the outer button. Everything that
+              // belongs to the ROW (padding, hairline, radius, hover) moved to
+              // the wrapper so the hover tint and the divider still span the
+              // whole row including the kebab. Same pattern as the ministry
+              // members list in settings-tab.tsx.
+              <div
                 key={note.id}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "14px 10px",
+                  borderBottom: "1px solid var(--line-3)", borderRadius: 10, transition: "background .12s",
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--cream-2)" }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "none" }}
+              >
+              <button
                 type="button"
                 onClick={() => onOpenNote(note.id)}
                 aria-label={`Open ${note.title || "note"}`}
                 style={{
-                  width: "100%", textAlign: "left", display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) auto",
-                  gap: 16, alignItems: "center", padding: "14px 10px", borderBottom: "1px solid var(--line-3)",
-                  borderRadius: 10, cursor: "pointer", background: "none", transition: "background .12s",
+                  flex: 1, minWidth: 0, textAlign: "left", display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) auto",
+                  gap: 16, alignItems: "center", padding: 0, border: "none",
+                  cursor: "pointer", background: "none",
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--cream-2)" }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "none" }}
               >
                 <span style={{ textAlign: "center", lineHeight: 1.05 }}>
                   <span style={{ display: "block", fontFamily: "var(--serif)", fontSize: 19, fontWeight: 600, color: "var(--ink)" }}>{String(d.getDate()).padStart(2, "0")}</span>
@@ -797,6 +1221,8 @@ export function MeetingNotesSection({
                   <ChevronRight style={{ width: 15, height: 15, color: "var(--dashed)", flexShrink: 0 }} />
                 </span>
               </button>
+              {canWrite && <NoteRowMenu note={note} touch={false} onDelete={armDelete} />}
+              </div>
             )
           })}
         </div>
@@ -804,6 +1230,7 @@ export function MeetingNotesSection({
       {filtered.length === 0 && (
         <p style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic", marginTop: 24 }}>No notes match “{query}”.</p>
       )}
+      {deleteDialog}
     </div>
   )
 }

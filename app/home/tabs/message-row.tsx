@@ -822,10 +822,21 @@ function MessageRowBase({
             screen 390). `overflow-clip-margin` does not rescue it — with a
             one-axis `clip` it computes to 0px. */}
         <div className={`flex items-end gap-2 w-full ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
-          {/* Avatar — shown for every incoming message. Tap opens the sender's
-              profile (a sibling of the bubble → does not touch the bubble's
-              press/context-menu logic). Wrapper preserves the flex-end align. */}
-          {!isOwn && (
+          {/* Avatar — drawn ONCE per run, on the LAST (most recent) incoming
+              message, the way iMessage and Messenger do it: the face sits at the
+              bottom of the cluster and the bubbles above it hang off that one
+              anchor. Repeating it on every bubble re-states who is talking on a
+              line where nobody changed, which is the thing grouping exists to
+              stop — and the name row (isFirstInGroup) and the bubble radii were
+              already run-aware, so the avatar was the last piece still ignoring
+              the run. Earlier messages in the run get a spacer of the SAME width
+              instead: the row is `flex ... gap-2`, so simply omitting the avatar
+              would collapse the gap too and shift every non-final bubble 36px
+              left. Tap opens the sender's profile (a sibling of the bubble → does
+              not touch the bubble's press/context-menu logic). Wrapper preserves
+              the flex-end align. */}
+          {!isOwn && !isLastInGroup && <span aria-hidden className="w-7 shrink-0" />}
+          {!isOwn && isLastInGroup && (
             <span
               onClick={canOpenSenderProfile ? openSenderProfile : undefined}
               style={{ display: "inline-flex", alignSelf: "flex-end", cursor: canOpenSenderProfile ? "pointer" : "default" }}
