@@ -22,7 +22,7 @@ import { useOpenMemberProfile } from "../member-profile-context"
 import { InsetHairline } from "@/components/central/hairline"
 import { chatCapabilities } from "../chat-permissions"
 import { useCall } from "../call-context"
-import { useIsNativeShell } from "@/lib/native-auth"
+import { callingBlockedInShell } from "@/lib/native-auth"
 import { callingAvailable, getLiveCall } from "@/app/actions/calls"
 import { dismissDelivered } from "@/lib/notification-dismiss"
 import { chatChipAvatarFromParts, chatAvatarStoragePath, chatGroupPhotoPatch } from "../chat-avatar"
@@ -2578,14 +2578,15 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     userRole,
   )
   const liveCallHere = groupId ? liveCalls[groupId] : undefined
-  // The installed native binary has NO microphone usage string in its Info.plist
-  // (and no RECORD_AUDIO on Android). iOS does not fail softly there: touching a
-  // TCC-protected resource with no usage description TERMINATES the app, so a
-  // call button inside the shell is a crash, not a dead end. The permissions are
-  // committed but they only reach a device through a NEW BINARY — a web deploy
-  // cannot carry them — so calling stays hidden in the shell until that ships.
-  // Remove this line in the same change that ships the build with the plist.
-  const nativeShell = useIsNativeShell()
+  // Hidden in any shell whose BINARY predates the microphone/camera usage
+  // strings — there, touching them terminates the app rather than failing. Keyed
+  // on the binary's capability marker rather than on being native, because one
+  // web deploy serves every installed version at once. See callingBlockedInShell().
+  const nativeShell = useSyncExternalStore(
+    () => () => {},
+    callingBlockedInShell,
+    () => false,   // SSR cannot see a user agent; the client re-renders once.
+  )
   // Someone can always JOIN a call already running, even where they could not
   // have started it — see the asymmetry note in chat-permissions.ts.
   const canCall = !nativeShell && !!groupId && !!callingOn && rosterLoaded &&
