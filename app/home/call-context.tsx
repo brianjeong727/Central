@@ -33,7 +33,7 @@ import type { Room, RemoteTrack, Participant, VideoTrack } from "livekit-client"
 // a second module instance — the enum identities would not match.
 let LK: typeof import("livekit-client") | null = null
 import { subscribeChatTopic } from "./chat-broadcast"
-import { isNativeShell } from "@/lib/native-auth"
+import { callingBlockedInShell } from "@/lib/native-auth"
 import { createClient } from "@/lib/supabase"
 import {
   startCall as startCallAction,
@@ -166,15 +166,16 @@ export function CallProvider({
 }) {
   const supabase = useMemo(() => createClient(), [])
 
-  // Calling is OFF inside the installed native shell, and this is the choke
-  // point rather than just the button: the ring arrives over realtime whatever
-  // the UI offers, and answering one calls getUserMedia. The shipped binary has
-  // no microphone usage string, and iOS TERMINATES an app that reaches for a
-  // TCC-protected resource without one — so a ring the user can answer is a
-  // crash. The plist and manifest changes are committed but only reach a device
-  // in a NEW BINARY; a web deploy cannot carry them. Delete this with the build
-  // that ships them.
-  const blocked = useMemo(() => isNativeShell(), [])
+  // Calling is OFF in a shell whose BINARY lacks the microphone/camera usage
+  // strings, and this is the choke point rather than just the button: the ring
+  // arrives over realtime whatever the UI offers, and answering one calls
+  // getUserMedia, which on such a build terminates the app rather than failing.
+  //
+  // Keyed on the binary's own capability marker, not on being native — a web
+  // deploy reaches every installed app at once, so a bundle that turned calling
+  // on for "native" would turn it on for every phone that has not updated. See
+  // callingBlockedInShell().
+  const blocked = useMemo(() => callingBlockedInShell(), [])
 
   // Feature-detected rather than sniffed: if iOS ever ships getDisplayMedia the
   // button simply starts appearing, with nothing to remember to change.

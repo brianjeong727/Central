@@ -47,7 +47,15 @@ const config: CapacitorConfig = {
     // signed-out on /login, never the public marketing site. Appended (not overridden)
     // so the underlying Safari UA — and every heuristic that reads it — stays intact.
     // Takes effect only after the next `npx cap sync ios` + device build.
-    appendUserAgent: "CentralShell",
+    // "CentralCalls/1" is a CAPABILITY MARKER, not decoration. A web deploy
+    // reaches every installed binary at once, but Info.plist reaches only the
+    // ones built after it — so the bundle cannot ask "am I native?" to decide
+    // whether calling is safe, it has to ask "does THIS binary have the
+    // microphone and camera usage strings?". Only a build carrying them appends
+    // this token; older shells do not, and calling stays hidden there forever
+    // without anyone having to ship a follow-up. Bump the number if a future
+    // call feature needs a newer native capability.
+    appendUserAgent: "CentralShell CentralCalls/1",
   },
   android: {
     // Same cream as iOS — the WebView background behind the app while it paints.
@@ -60,7 +68,9 @@ const config: CapacitorConfig = {
     // site — a silent, non-crashing failure that looks like a routing bug.
     // Appended (not overridden) so the underlying Chrome UA stays intact.
     // Takes effect only after `npx cap sync android` + a new build.
-    appendUserAgent: "CentralShell",
+    // CentralCalls/1: see the iOS note — this build carries RECORD_AUDIO and
+    // CAMERA, and that is what the marker asserts.
+    appendUserAgent: "CentralShell CentralCalls/1",
   },
   plugins: {
     SplashScreen: {
