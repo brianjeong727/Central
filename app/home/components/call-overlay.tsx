@@ -18,7 +18,7 @@
 
 import { createPortal } from "react-dom"
 import { useEffect, useState } from "react"
-import { Mic, MicOff, PhoneOff, SwitchCamera, Video, VideoOff, Volume2 } from "lucide-react"
+import { Mic, MicOff, MonitorUp, PhoneOff, ScreenShareOff, SwitchCamera, Video, VideoOff, Volume2 } from "lucide-react"
 import { MonogramChip } from "@/components/central"
 import { EYEBROW_STYLE } from "@/components/central/typography"
 import { getInitials } from "../utils"
@@ -57,10 +57,13 @@ interface CallOverlayProps {
   selfId: string
   micOn: boolean
   camOn: boolean
+  screenOn: boolean
+  canShareScreen: boolean
   facingUser: boolean
   needsAudioUnlock: boolean
   onToggleMic: () => void
   onToggleCamera: () => void
+  onToggleScreenShare: () => void
   onFlipCamera: () => void
   onHangUp: () => void
   onUnlockAudio: () => void
@@ -103,8 +106,8 @@ function ControlButton({
 
 export function CallOverlay(props: CallOverlayProps) {
   const {
-    call, peers, selfId, micOn, camOn, facingUser, needsAudioUnlock,
-    onToggleMic, onToggleCamera, onFlipCamera, onHangUp, onUnlockAudio,
+    call, peers, selfId, micOn, camOn, screenOn, canShareScreen, facingUser, needsAudioUnlock,
+    onToggleMic, onToggleCamera, onToggleScreenShare, onFlipCamera, onHangUp, onUnlockAudio,
   } = props
   const elapsed = useElapsed(call.answeredAt)
   // Mounted under a dynamic({ ssr: false }) boundary, so document exists on the
@@ -117,11 +120,12 @@ export function CallOverlay(props: CallOverlayProps) {
     : elapsed ?? "Connected"
 
   const speaking = peers.find((p) => p.speaking && p.identity !== selfId)
-  // The surface follows the PICTURE, not the call's declared kind. Turning your
-  // camera on during an audio call has to put you on the video stage — otherwise
-  // the control publishes a track to everyone else and shows you nothing, and
-  // the audio panel has no place to render the face that just appeared.
-  const isVideo = call.kind === "video" || peers.some((p) => p.video)
+  // The surface follows whether there is ANYTHING TO LOOK AT, not the call's
+  // declared kind. Turning a camera on — or sharing a screen — during an audio
+  // call has to put everyone on the stage; otherwise the control publishes a
+  // track to the whole room and shows the person who pressed it nothing, and the
+  // audio panel has no place to render what just appeared.
+  const isVideo = call.kind === "video" || peers.some((p) => p.video || p.screen)
 
   const unlockButton = needsAudioUnlock && (
     <button
@@ -189,6 +193,20 @@ export function CallOverlay(props: CallOverlayProps) {
             <ControlButton onClick={onToggleCamera} label={camOn ? "Turn camera off" : "Turn camera on"} lit={!camOn} dark>
               {camOn ? <Video size={19} /> : <VideoOff size={19} />}
             </ControlButton>
+            {/* Desktop only, and by FEATURE DETECTION rather than a breakpoint:
+                getDisplayMedia does not exist on iOS Safari or Android Chrome, so
+                a share button on a phone is a button that cannot work. If mobile
+                browsers ever ship it, this simply starts appearing. */}
+            {canShareScreen && (
+              <ControlButton
+                onClick={onToggleScreenShare}
+                label={screenOn ? "Stop sharing your screen" : "Share your screen"}
+                lit={screenOn}
+                dark
+              >
+                {screenOn ? <ScreenShareOff size={19} /> : <MonitorUp size={19} />}
+              </ControlButton>
+            )}
             {/* Only where there is a second camera to flip TO, and only while
                 one is actually running. */}
             {camOn && (
@@ -271,6 +289,13 @@ export function CallOverlay(props: CallOverlayProps) {
           <ControlButton onClick={onToggleCamera} label={camOn ? "Turn camera off" : "Turn camera on"} lit={!camOn && false}>
             {camOn ? <Video size={19} /> : <VideoOff size={19} />}
           </ControlButton>
+          {/* Sharing a screen during a VOICE call is a normal thing to want —
+              "let me show you" does not require anyone's face. */}
+          {canShareScreen && (
+            <ControlButton onClick={onToggleScreenShare} label="Share your screen" lit={false}>
+              <MonitorUp size={19} />
+            </ControlButton>
+          )}
           {/* The one sanctioned solid --danger fill outside a confirm dialog:
               hanging up is the destructive confirm of a call, and it is the one
               control a person must be able to find without reading. */}

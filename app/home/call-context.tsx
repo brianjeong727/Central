@@ -57,6 +57,10 @@ export interface CallPeer {
   /** Their camera, when they have one published and unmuted. The TRACK itself,
    *  not a flag: a <video> can only show a track by being handed the object. */
   video: VideoTrack | null
+  /** Their screen, when they are sharing one. Kept separate from `video` because
+   *  the two are rendered completely differently — a face is cropped to fill its
+   *  tile, a screen must never be cropped at all. */
+  screen: VideoTrack | null
   isLocal: boolean
 }
 
@@ -98,6 +102,11 @@ interface CallApi {
   peers: CallPeer[]
   micOn: boolean
   camOn: boolean
+  screenOn: boolean
+  /** Whether this browser can capture a screen AT ALL. getDisplayMedia is
+   *  desktop-only — no iOS Safari, no Android Chrome — so the control is hidden
+   *  rather than offered and then failing. */
+  canShareScreen: boolean
   /** Which way your own camera points — the self-view mirrors only for the front
    *  one, since the rear camera already shows the world the right way round. */
   facingUser: boolean
@@ -110,6 +119,7 @@ interface CallApi {
   hangUp: () => Promise<void>
   toggleMic: () => Promise<void>
   toggleCamera: () => Promise<void>
+  toggleScreenShare: () => Promise<void>
   /** Front/back on a phone. No-op where there is only one camera. */
   flipCamera: () => Promise<void>
   unlockAudio: () => Promise<void>
@@ -126,9 +136,11 @@ export function useCall(): CallApi {
 
 const INERT: CallApi = {
   active: null, incoming: null, liveCalls: {}, noteLiveCall: () => {},
-  peers: [], micOn: false, camOn: false, facingUser: true, needsAudioUnlock: false, error: null,
+  peers: [], micOn: false, camOn: false, screenOn: false, canShareScreen: false,
+  facingUser: true, needsAudioUnlock: false, error: null,
   start: async () => {}, accept: async () => {}, decline: async () => {}, hangUp: async () => {},
-  toggleMic: async () => {}, toggleCamera: async () => {}, flipCamera: async () => {},
+  toggleMic: async () => {}, toggleCamera: async () => {}, toggleScreenShare: async () => {},
+  flipCamera: async () => {},
   unlockAudio: async () => {}, dismissError: () => {},
 }
 
@@ -164,12 +176,21 @@ export function CallProvider({
   // that ships them.
   const blocked = useMemo(() => isNativeShell(), [])
 
+  // Feature-detected rather than sniffed: if iOS ever ships getDisplayMedia the
+  // button simply starts appearing, with nothing to remember to change.
+  const canShareScreen = useMemo(
+    () => typeof navigator !== "undefined" &&
+      typeof navigator.mediaDevices?.getDisplayMedia === "function",
+    [],
+  )
+
   const [active, setActive] = useState<ActiveCall | null>(null)
   const [incoming, setIncoming] = useState<IncomingCall | null>(null)
   const [liveCalls, setLiveCalls] = useState<Record<string, LiveCallInfo>>({})
   const [peers, setPeers] = useState<CallPeer[]>([])
   const [micOn, setMicOn] = useState(true)
   const [camOn, setCamOn] = useState(false)
+  const [screenOn, setScreenOn] = useState(false)
   const [facingUser, setFacingUser] = useState(true)
   const facing = useRef<"user" | "environment">("user")
   const [needsAudioUnlock, setNeedsAudioUnlock] = useState(false)
@@ -221,6 +242,7 @@ export function CallProvider({
     setPeers([])
     setMicOn(true)
     setCamOn(false)
+    setScreenOn(false)
     facing.current = "user"
     setFacingUser(true)
     setNeedsAudioUnlock(false)
@@ -231,6 +253,7 @@ export function CallProvider({
   const readPeers = useCallback((room: Room) => {
     const all: Participant[] = [room.localParticipant, ...Array.from(room.remoteParticipants.values())]
     const cam = LK?.Track.Source.Camera
+    const scr = LK?.Track.Source.ScreenShare
     setPeers(
       all.map((p) => {
         // A muted camera publication still exists — it just has nothing to show.
@@ -238,12 +261,15 @@ export function CallProvider({
         // monogram instead of holding a frozen last frame.
         const pub = cam ? p.getTrackPublication(cam) : undefined
         const video = pub && !pub.isMuted ? (pub.videoTrack ?? null) : null
+        const spub = scr ? p.getTrackPublication(scr) : undefined
+        const screen = spub && !spub.isMuted ? (spub.videoTrack ?? null) : null
         return {
           identity: p.identity,
           name: p.name || "Someone",
           speaking: p.isSpeaking,
           muted: !p.isMicrophoneEnabled,
           video: video ?? null,
+          screen: screen ?? null,
           isLocal: p === room.localParticipant,
         }
       }),
@@ -276,7 +302,13 @@ export function CallProvider({
         })
         .on(RoomEvent.TrackPublished, () => readPeers(room))
         .on(RoomEvent.TrackUnpublished, () => readPeers(room))
-        .on(RoomEvent.LocalTrackUnpublished, () => readPeers(room))
+        .on(RoomEvent.LocalTrackUnpublished, () => {
+          // The browser has its own "Stop sharing" bar, and it is the one most
+          // people actually use. Reading the state back off the room is what
+          // keeps our button from claiming a share that already ended.
+          setScreenOn(room.localParticipant.isScreenShareEnabled)
+          readPeers(room)
+        })
         .on(RoomEvent.ParticipantConnected, () => {
           // Someone picked up — stop the ringback and start counting.
           ring.stop()
@@ -448,6 +480,22 @@ export function CallProvider({
     readPeers(room)
   }, [readPeers])
 
+  const toggleScreenShare = useCallback(async () => {
+    const room = roomRef.current
+    if (!room) return
+    const next = !room.localParticipant.isScreenShareEnabled
+    try {
+      // audio: true carries the tab's sound, so a shared clip or song is not
+      // silent for everyone watching it.
+      await room.localParticipant.setScreenShareEnabled(next, { audio: true })
+    } catch {
+      // The picker was dismissed, or the OS refused. Not an error worth a toast:
+      // the person pressed a button and then changed their mind.
+    }
+    setScreenOn(room.localParticipant.isScreenShareEnabled)
+    readPeers(room)
+  }, [readPeers])
+
   const unlockAudio = useCallback(async () => {
     const room = roomRef.current
     if (!room) return
@@ -536,11 +584,14 @@ export function CallProvider({
 
   const api = useMemo<CallApi>(
     () => ({
-      active, incoming, liveCalls, noteLiveCall, peers, micOn, camOn, facingUser, needsAudioUnlock, error,
-      start, accept, decline, hangUp, toggleMic, toggleCamera, flipCamera, unlockAudio,
+      active, incoming, liveCalls, noteLiveCall, peers, micOn, camOn, screenOn, canShareScreen,
+      facingUser, needsAudioUnlock, error,
+      start, accept, decline, hangUp, toggleMic, toggleCamera, toggleScreenShare, flipCamera, unlockAudio,
       dismissError: () => setError(null),
     }),
-    [active, incoming, liveCalls, noteLiveCall, peers, micOn, camOn, facingUser, needsAudioUnlock, error, start, accept, decline, hangUp, toggleMic, toggleCamera, flipCamera, unlockAudio],
+    [active, incoming, liveCalls, noteLiveCall, peers, micOn, camOn, screenOn, canShareScreen,
+     facingUser, needsAudioUnlock, error, start, accept, decline, hangUp, toggleMic, toggleCamera,
+     toggleScreenShare, flipCamera, unlockAudio],
   )
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>

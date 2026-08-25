@@ -13,8 +13,10 @@ import { Toast } from "@/components/central"
 
 export function CallSurface({ selfId }: { selfId: string }) {
   const {
-    active, incoming, peers, micOn, camOn, facingUser, needsAudioUnlock, error,
-    accept, decline, hangUp, toggleMic, toggleCamera, flipCamera, unlockAudio, dismissError,
+    active, incoming, peers, micOn, camOn, screenOn, canShareScreen, facingUser,
+    needsAudioUnlock, error,
+    accept, decline, hangUp, toggleMic, toggleCamera, toggleScreenShare, flipCamera,
+    unlockAudio, dismissError,
   } = useCall()
 
   return (
@@ -26,10 +28,13 @@ export function CallSurface({ selfId }: { selfId: string }) {
           selfId={selfId}
           micOn={micOn}
           camOn={camOn}
+          screenOn={screenOn}
+          canShareScreen={canShareScreen}
           facingUser={facingUser}
           needsAudioUnlock={needsAudioUnlock}
           onToggleMic={toggleMic}
           onToggleCamera={toggleCamera}
+          onToggleScreenShare={toggleScreenShare}
           onFlipCamera={flipCamera}
           onHangUp={hangUp}
           onUnlockAudio={unlockAudio}

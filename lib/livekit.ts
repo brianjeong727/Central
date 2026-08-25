@@ -73,10 +73,18 @@ export async function mintCallToken(opts: {
   const url = env("LIVEKIT_URL")
   if (!apiKey || !apiSecret || !url) throw new Error("livekit-not-configured")
 
-  const sources =
-    opts.kind === "video"
-      ? [TrackSource.MICROPHONE, TrackSource.CAMERA]
-      : [TrackSource.MICROPHONE]
+  // Screen share is granted for EVERY call, audio ones included: sharing a
+  // screen during a voice call is a normal thing to want, and the grant is not
+  // what decides whether it is offered — the browser is. getDisplayMedia is
+  // desktop-only, so the control is feature-detected client-side rather than
+  // gated here. SCREEN_SHARE_AUDIO rides along so a shared video or song is not
+  // silent for everyone watching.
+  const sources = [
+    TrackSource.MICROPHONE,
+    TrackSource.SCREEN_SHARE,
+    TrackSource.SCREEN_SHARE_AUDIO,
+    ...(opts.kind === "video" ? [TrackSource.CAMERA] : []),
+  ]
 
   const at = new AccessToken(apiKey, apiSecret, {
     identity: opts.identity,
