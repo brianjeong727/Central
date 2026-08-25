@@ -146,7 +146,7 @@ test.describe("Meeting Notes v2", () => {
     expect((final.data ?? []).length).toBe((before.data ?? []).length + 1)
   })
 
-  test("delete: danger zone removes the note from the list", async ({ page }) => {
+  test("delete: the row kebab removes the note from the list", async ({ page }) => {
     const sb = sandbox()
     const adminId = await sb.adminUserId()
     const { data: lastRow } = await sb.client
@@ -164,15 +164,26 @@ test.describe("Meeting Notes v2", () => {
 
     await openNotes(page)
     await expect(page.getByText(probeTitle, { exact: true }).first()).toBeVisible({ timeout: 15000 })
-    await page.getByText(probeTitle, { exact: true }).first().click()
-    await expect(page.getByText("Danger zone")).toBeVisible({ timeout: 15000 })
 
-    // Opening the danger zone button must not delete on one click.
-    await page.getByRole("button", { name: "Delete note" }).click()
-    await expect(page.getByRole("button", { name: "Delete", exact: true })).toBeVisible()
+    // Delete lives on the LIST row's ⋯ menu now, never inside the open note.
+    await page.getByRole("button", { name: `Actions for ${probeTitle}` }).click()
+    const menu = page.getByTestId("action-menu")
+    await expect(menu).toBeVisible()
+
+    // ActionMenu portals + flips, so the panel is always inside the viewport —
+    // the property that stops the LAST row's menu clipping off the bottom.
+    const box = await menu.boundingBox()
+    const vp = page.viewportSize()!
+    expect(box).toBeTruthy()
+    expect(box!.y).toBeGreaterThanOrEqual(0)
+    expect(box!.y + box!.height).toBeLessThanOrEqual(vp.height)
+
+    // Choosing Delete must ARM the confirm, never destroy on the tap (§14).
+    await menu.getByRole("button", { name: "Delete note" }).click()
+    await expect(page.getByText("Delete this meeting note?")).toBeVisible()
     await page.getByRole("button", { name: "Delete", exact: true }).click()
 
-    // Back on the list, and the note is genuinely gone (not just the detail closed).
+    // Still on the list, and the note is genuinely gone.
     await expect(page.getByPlaceholder("Search notes & decisions…")).toBeVisible({ timeout: 15000 })
     await expect(page.getByText(probeTitle, { exact: true })).toHaveCount(0)
 
