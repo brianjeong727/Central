@@ -314,19 +314,19 @@ function MessageRowBase({
   const groupGap = showGroupGap ? "mt-3" : ""
 
   const incomingRadius = isFirstInGroup && isLastInGroup
-    ? "rounded-[14px] rounded-tl-[4px]"
+    ? "rounded-[var(--r-pocket-sm)] rounded-tl-[4px]"
     : isFirstInGroup
-      ? "rounded-[14px] rounded-tl-[4px] rounded-bl-[6px]"
+      ? "rounded-[var(--r-pocket-sm)] rounded-tl-[4px] rounded-bl-[6px]"
       : isLastInGroup
-        ? "rounded-[14px] rounded-tl-[6px]"
-        : "rounded-[14px] rounded-l-[6px]"
+        ? "rounded-[var(--r-pocket-sm)] rounded-tl-[6px]"
+        : "rounded-[var(--r-pocket-sm)] rounded-l-[6px]"
   const outgoingRadius = isFirstInGroup && isLastInGroup
-    ? "rounded-[14px] rounded-tr-[4px]"
+    ? "rounded-[var(--r-pocket-sm)] rounded-tr-[4px]"
     : isFirstInGroup
-      ? "rounded-[14px] rounded-tr-[4px] rounded-br-[6px]"
+      ? "rounded-[var(--r-pocket-sm)] rounded-tr-[4px] rounded-br-[6px]"
       : isLastInGroup
-        ? "rounded-[14px] rounded-tr-[6px]"
-        : "rounded-[14px] rounded-r-[6px]"
+        ? "rounded-[var(--r-pocket-sm)] rounded-tr-[6px]"
+        : "rounded-[var(--r-pocket-sm)] rounded-r-[6px]"
 
   // Jumbo emoji (iMessage-style): one or two emoji ALONE render large and bare.
   // Only for a plain text message — a reply, an attachment or a link preview all
@@ -880,8 +880,9 @@ function MessageRowBase({
             // in the overlay stands in for it. `visibility`, not `display`: the row
             // must keep its height or the transcript reflows underneath the menu and
             // the bubble the user is looking at appears to jump when it closes.
-            style={{ touchAction: "pan-y", visibility: isContextMenuOpen ? "hidden" : undefined }}
-            className={`relative text-[14px] leading-[1.4] select-none overflow-hidden ${
+            style={{ touchAction: "pan-y", visibility: isContextMenuOpen ? "hidden" : undefined,
+                     fontSize: "var(--chat-msg-size)", lineHeight: "var(--chat-msg-lh)" }}
+            className={`relative select-none overflow-hidden ${
               isJumbo
                 // No surface, no padding, no radius — the emoji IS the message.
                 // Same element and same handlers, so Convention #7's tap/long-press
@@ -894,7 +895,7 @@ function MessageRowBase({
                   : isOwn
                     ? `bg-[var(--plum-2)] text-[var(--cream-on-dark)] ${outgoingRadius}`
                     : `bg-[var(--ivory)] text-[var(--ink)] ${incomingRadius}`
-            } ${!isJumbo && !msg.deleted && !msg.reply_to_id && !(msg.attachment_url && msg.attachment_type?.startsWith("image/")) ? "px-4 py-2.5" : ""}`}
+            } ${!isJumbo && !msg.deleted && !msg.reply_to_id && !(msg.attachment_url && msg.attachment_type?.startsWith("image/")) ? "chat-bubble-pad" : ""}`}
           >
             {msg.deleted ? (
               <span className="italic text-[13px]">Message deleted</span>
@@ -930,8 +931,9 @@ function MessageRowBase({
                     <div className="relative">
                       <div
                         aria-hidden
-                        className="text-[14px] leading-[1.4] invisible select-none whitespace-pre-wrap break-words"
-                        style={{ fontFamily: "inherit", wordBreak: "break-word" }}
+                        className="invisible select-none whitespace-pre-wrap break-words"
+                        style={{ fontSize: "var(--chat-msg-size)", lineHeight: "var(--chat-msg-lh)",
+                                 fontFamily: "inherit", wordBreak: "break-word" }}
                       >
                         {editText || " "}
                       </div>
@@ -940,7 +942,7 @@ function MessageRowBase({
                         value={editText ?? ""}
                         onChange={(e) => setEditText(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSaveEdit() } else if (e.key === "Escape") { setEditingId(null) } }}
-                        className="absolute inset-0 w-full h-full resize-none bg-transparent text-inherit text-[14px] leading-[1.4] outline-none"
+                        className="absolute inset-0 w-full h-full resize-none bg-transparent text-inherit outline-none"
                         style={{ fontFamily: "inherit", border: "none", padding: 0, margin: 0 }}
                       />
                     </div>
