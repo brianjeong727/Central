@@ -158,6 +158,41 @@ test.describe("chat keyboard inset (mobile)", () => {
 
   // Swipe DOWN to put the keyboard away. Real focus here (not the simulated inset) —
   // the gesture's job is to BLUR, and blur is the thing that dismisses a real keyboard.
+  test("sending keeps the caret in the composer, so the keyboard stays up", async ({ page }) => {
+    // Playwright cannot raise a real keyboard, and does not need to: the OS keeps
+    // it up for exactly as long as a text field holds focus. So the contract
+    // boundary that can regress in this repo is `document.activeElement`, and
+    // that is what this asserts — before the tap, and immediately after it.
+    //
+    // The bug: the send <button> took focus on tap, and the phone put the
+    // keyboard away the moment the caret left, so every message cost an extra
+    // tap to carry on typing. Two mechanisms, one fix — see composer.tsx.
+    await page.goto(`/home?tab=chats&chat=${chatId}`)
+
+    const composer = page.locator("textarea").filter({ visible: true }).first()
+    await composer.waitFor({ state: "visible", timeout: 15000 })
+    await composer.click()
+    // Unique per run: the same text also lands in the chat-list preview rows, and
+    // a re-run would otherwise match a previous run's copy.
+    const body = `keyboard survives ${Date.now()}`
+    await composer.fill(body)
+
+    const focusedBefore = await page.evaluate(() => document.activeElement?.tagName ?? null)
+    expect(focusedBefore).toBe("TEXTAREA")
+
+    const send = page.getByRole("button", { name: "Send message" }).filter({ visible: true }).first()
+    await send.click()
+
+    // The message really went (a fix that keeps focus by not sending is no fix).
+    await expect(page.getByText(body, { exact: true })).toBeVisible({ timeout: 15000 })
+
+    // …and the caret never left. Checked as the ELEMENT, not just the tag: a
+    // second textarea elsewhere would satisfy a tag check while the composer sat
+    // blurred.
+    const stillInComposer = await composer.evaluate((el) => document.activeElement === el)
+    expect(stillInComposer).toBe(true)
+  })
+
   test("swiping down dismisses the keyboard; scrolling history does not", async ({ page }) => {
     await page.goto(`/home?tab=chats&chat=${longChatId}`)
     const composer = page.locator("textarea, input[placeholder^='Message']").filter({ visible: true }).first()
