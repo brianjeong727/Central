@@ -425,7 +425,29 @@ function ComposerImpl({
               )}
             </div>
             <button
+              // Sending must NOT put the keyboard away. Tapping a <button> moves
+              // focus off the textarea, and a phone closes the keyboard the
+              // instant the caret leaves — so the composer collapsed after every
+              // message and the next one cost an extra tap. Preventing the
+              // pointerdown default keeps focus where it already is; the click
+              // still fires (same trick the @mention list above uses).
+              //
+              // This also sidesteps a second, subtler cause: `disabled` flips to
+              // true the moment the input clears, and a focused element that
+              // becomes disabled drops focus to <body> — which would close the
+              // keyboard even without the first problem. Focus never reaches the
+              // button now, so neither can fire.
+              //
+              // Re-focusing afterwards is NOT an alternative: iOS only opens the
+              // keyboard for a focus() inside the user gesture that caused it, so
+              // a restore after the async send would leave it shut anyway. The
+              // fix has to be never losing focus in the first place.
+              onPointerDown={(e) => e.preventDefault()}
               onClick={triggerSend}
+              // The glyph is the only label, so without this the control is
+              // nameless to a screen reader (and to anything else asking the
+              // accessibility tree what it does).
+              aria-label="Send message"
               disabled={(!inputText.trim() && !pendingAttachment) || sending}
               className="flex-shrink-0 w-11 h-11 flex items-center justify-center disabled:opacity-50 hover:bg-[var(--ink)] transition-all active:scale-95 rounded-full bg-[var(--plum)] md:rounded-[14px] md:bg-[var(--plum-2)]"
             >
