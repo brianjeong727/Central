@@ -2443,6 +2443,18 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
     for (const m of roster) map[m.id] = m.displayName
     return map
   }, [roster])
+  // senderId → profile photo, from the SAME roster row as the display name above.
+  // The two travel together on purpose: a message's name and its face describe one
+  // person, and resolving them from different sources is what let a nickname appear
+  // to "replace" someone's photo with its own initials. The roster is the seam
+  // (Convention #18); the per-message caches below are only a fallback for someone
+  // who is no longer in it. Values may legitimately be null (no photo, or a deleted
+  // account) — so presence in the map, not truthiness, decides whether it applies.
+  const avatarUrlById = useMemo(() => {
+    const map: Record<string, string | null> = {}
+    for (const m of roster) map[m.id] = m.avatarUrl
+    return map
+  }, [roster])
   const memberCount = roster.length
   // The header chip's image. A DM shows the OTHER person's profile photo, which
   // the roster already carries — so no extra query, and no read of the group's
@@ -2680,13 +2692,31 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       const voters = group.map(m => m.content.split(' voted for "')[0])
       result.push({ ...msg, _voteGroup: voters })
     }
-    // Resolve nickname-aware sender names — reactive to nickname changes, and
-    // covers messages whose stored sender_name predates a nickname.
+    // Resolve nickname-aware sender IDENTITY — name AND face together, reactive to
+    // nickname changes, and covering messages whose stored values predate one.
+    //
+    // The face has to ride along with the name. Resolving only the name left the
+    // photo on whatever the message row happened to carry, and a message that
+    // arrived over realtime carries null (the INSERT handler back-filled the name
+    // from profiles but never the avatar). The row then falls back to initials —
+    // of the NICKNAME, since that half did resolve — so setting a nickname read as
+    // "it replaced their profile picture with the nickname's initials."
+    //
+    // A sender who has LEFT the chat is not in the roster at all; they keep
+    // whatever the message stored, which is why this tests for PRESENCE in the map
+    // rather than a truthy value. A present-but-null avatar is a real answer (no
+    // photo, or a deleted account) and must win over a stale cached one.
     return result.map((m) => {
-      const dn = m.sender_id ? displayNameById[m.sender_id] : undefined
-      return dn && dn !== m.sender_name ? { ...m, sender_name: dn } : m
+      if (!m.sender_id) return m
+      const dn = displayNameById[m.sender_id]
+      const known = Object.prototype.hasOwnProperty.call(avatarUrlById, m.sender_id)
+      const av = known ? avatarUrlById[m.sender_id] : m.sender_avatar_url
+      const nameChanged = !!dn && dn !== m.sender_name
+      const avatarChanged = av !== m.sender_avatar_url
+      if (!nameChanged && !avatarChanged) return m
+      return { ...m, sender_name: dn ?? m.sender_name, sender_avatar_url: av }
     })
-  }, [messages, blockedIds, displayNameById])
+  }, [messages, blockedIds, displayNameById, avatarUrlById])
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "instant" })
@@ -3505,9 +3535,15 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
           let senderName = profilesCache.current[raw.sender_id!]
           if (!senderName) {
-            const { data: prof } = await supabase.from("profiles").select("name").eq("id", raw.sender_id).single()
+            // Both halves of the identity, in the one query. Fetching the name
+            // alone left avatarCache empty for a first-seen sender, so the message
+            // below was built with a null avatar and rendered as initials. The
+            // roster seam now corrects that on render, but this is where the null
+            // was minted — a fallback that is wrong is worse than no fallback.
+            const { data: prof } = await supabase.from("profiles").select("name, avatar_url").eq("id", raw.sender_id).single()
             senderName = prof?.name ?? "Unknown"
             profilesCache.current[raw.sender_id!] = senderName
+            avatarCache.current[raw.sender_id!] = (prof as { avatar_url: string | null } | null)?.avatar_url ?? null
           }
 
           // Resolve reply content from local cache or a quick fetch
