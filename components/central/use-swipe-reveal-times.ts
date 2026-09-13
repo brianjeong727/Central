@@ -106,10 +106,10 @@ export function useSwipeRevealTimes(
       }
       e.preventDefault()                                      // we own it (listener non-passive)
       dx = Math.max(0, -mx)
-      // Rubber-band past full reveal: the column keeps answering the finger but
-      // stops tracking it 1:1, so the labels read as "parked" rather than the
-      // conversation being dragged off the screen.
-      const shown = dx <= TIME_REVEAL_PX ? dx : TIME_REVEAL_PX + (dx - TIME_REVEAL_PX) * 0.3
+      // HARD STOP at full reveal (ratified with Brian 2026-09-13). A rubber-band
+      // past it was tried and read as "keep going": the column kept creeping, so
+      // the times never felt parked. The finger can travel; the column cannot.
+      const shown = Math.min(dx, TIME_REVEAL_PX)
       track!.style.transform = `translateX(${-shown}px)`
     }
 
