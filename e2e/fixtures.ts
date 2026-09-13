@@ -257,10 +257,10 @@ export function sandbox() {
      *  dispatch URL per app_config) — harmless no-op against fake/absent
      *  subscriptions, but tests should resolve recipients via a direct localhost
      *  dryRun POST rather than relying on that trigger. */
-    async insertMessage({ groupId, senderId, content }: { groupId: string; senderId: string; content: string }) {
+    async insertMessage({ groupId, senderId, content, createdAt }: { groupId: string; senderId: string; content: string; createdAt?: string }) {
       const { data, error } = await db
         .from("messages")
-        .insert({ group_id: groupId, sender_id: senderId, content, message_type: "text" })
+        .insert({ group_id: groupId, sender_id: senderId, content, message_type: "text", ...(createdAt ? { created_at: createdAt } : {}) })
         .select()
         .single()
       if (error) throw error

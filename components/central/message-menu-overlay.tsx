@@ -102,6 +102,7 @@ export function MessageMenuOverlay({
   onReact,
   onMoreReactions,
   actions,
+  caption,
   onClose,
 }: {
   /** The live bubble being pressed. Measured and cloned; never mutated. */
@@ -111,6 +112,13 @@ export function MessageMenuOverlay({
   onReact: (emoji: string) => void
   onMoreReactions?: () => void
   actions: MessageMenuAction[]
+  /**
+   * A muted line under the lifted bubble — the message's full date and time.
+   * Per-message times are hidden in the transcript and revealed by a swipe, and
+   * a gesture is never the only route to a fact (mobile §0.3): the long-press
+   * everyone already knows is the tap-reachable one.
+   */
+  caption?: string
   onClose: () => void
 }) {
   const cloneHostRef = useRef<HTMLDivElement | null>(null)
@@ -331,6 +339,19 @@ export function MessageMenuOverlay({
               minWidth: 184,
             } as React.CSSProperties}
           >
+            {caption && (
+              <p
+                data-msg-menu-caption
+                style={{
+                  margin: "0 0 6px", padding: "0 4px",
+                  fontSize: 11, color: "var(--muted-text)",
+                  textAlign: align === "right" ? "right" : "left",
+                  ...pop("top"),
+                }}
+              >
+                {caption}
+              </p>
+            )}
             <div style={{ ...surface, ...pop("top") }}>
               {actions.map((a, i) => (
                 <button
