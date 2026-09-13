@@ -160,6 +160,23 @@ test.describe("smarter chat timestamps", () => {
     for (const b of after) expect(b.x).toBeGreaterThanOrEqual(VIEWPORT_W)
   })
 
+  test("the reveal is a HARD STOP — a long drag parks the times at the row edge and no further", async ({ page }) => {
+    // Ratified 2026-09-13: a rubber-band past full reveal read as "keep going".
+    // The finger travels 240px; the column may travel exactly TIME_REVEAL_PX, so
+    // every label's right edge lands ON the transcript's trailing inset
+    // (viewport 390 − 16px padding = 374), not past it.
+    await openRoom(page)
+    const drag = await touchDrag(page, bubbleWith(page, `${FILLER} 20`), { dx: -240, steps: 12 })
+    const mid = await labelBoxes(page)
+    const inView = mid.filter((b) => b.right <= VIEWPORT_W)
+    expect(inView.length).toBeGreaterThan(5)
+    for (const b of inView) {
+      expect(b.right).toBeGreaterThanOrEqual(VIEWPORT_W - 16 - 1)
+      expect(b.right).toBeLessThanOrEqual(VIEWPORT_W - 16 + 1)
+    }
+    await drag.release()
+  })
+
   test("a slow leftward drag on a bubble does not open the long-press menu", async ({ page }) => {
     await openRoom(page)
     // 12 × 60ms = 720ms of finger-down travel, well past the 400ms timer.
