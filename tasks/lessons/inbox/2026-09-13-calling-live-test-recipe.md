@@ -5,7 +5,9 @@ three weeks every row in `calls` was `ended/cancelled` — eight rings, zero
 answers. "Implemented" and "a real answered call has run in production" were
 different facts, and only the DB could tell them apart. The first real
 connected call was 2026-09-13: Brian on the iOS binary, a Playwright browser as
-the other end. Both directions of audio confirmed, hang-up closed out clean.
+the other end. Both directions of audio confirmed, hang-up closed out clean. A VIDEO call the
+other way (browser rings the phone, `node call-driver.mjs call video`) connected
+and ended clean the same way — the fake camera shows as a moving test pattern.
 
 **The recipe (works without a second human):**
 - Other end = `tapprofile@sandbox.test` ("Tap Tester", admin in Brian's Sandbox).
