@@ -87,6 +87,13 @@ async function closeMenus(page: Page) {
     await scrim.first().dispatchEvent("pointerdown")
     await page.waitForTimeout(220)
   }
+  // The long-press menu is the immersive overlay (message-menu-overlay.tsx),
+  // which dismisses on a pointerdown anywhere on its own root, not on the scrim.
+  const overlay = page.locator(".msg-menu-root")
+  if (await overlay.count()) {
+    await overlay.first().dispatchEvent("pointerdown")
+    await page.waitForTimeout(220)
+  }
 }
 
 /** Park the anchor at a fraction of the visible transcript; false if it won't fit. */
@@ -112,6 +119,26 @@ async function park(page: Page, frac: number): Promise<boolean> {
 /** The open menu's box vs the transcript's. Null when no single menu is open. */
 async function menuVsBox(page: Page) {
   return page.evaluate(() => {
+    // The long-press CONTEXT menu is the immersive overlay: it lifts the message
+    // OUT of the transcript on purpose (that is what makes its placement
+    // solvable), so its bound is the VIEWPORT above the keyboard, not the
+    // transcript box. It went unmeasured — "0 menus open" — from the day it
+    // shipped (2026-08-22, one day after this spec), because the detector below
+    // only knew the in-row z-160 menus.
+    const actions = document.querySelector('[data-msg-menu="actions"]') as HTMLElement | null
+    const bar = document.querySelector('[data-msg-menu="reactions"]') as HTMLElement | null
+    if (actions && bar) {
+      const a = actions.getBoundingClientRect()
+      const b = bar.getBoundingClientRect()
+      const kb = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--kb-inset") || "0") || 0
+      return {
+        count: 1,
+        overTop: Math.round(0 - Math.min(a.top, b.top)),
+        overBottom: Math.round(Math.max(a.bottom, b.bottom) - (window.innerHeight - kb)),
+        overLeft: Math.round(0 - Math.min(a.left, b.left)),
+        overRight: Math.round(Math.max(a.right, b.right) - window.innerWidth),
+      } as const
+    }
     const menus = (Array.from(document.querySelectorAll("div")) as HTMLElement[]).filter(d => {
       const cs = getComputedStyle(d)
       if (cs.position !== "absolute") return false

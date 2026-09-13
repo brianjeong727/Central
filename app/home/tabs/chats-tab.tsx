@@ -12,10 +12,10 @@ import { syncSmallGroupFromChatAction } from "@/app/actions/auto-chats"
 import { setChatNickname, clearChatNickname } from "@/app/actions/chat-nicknames"
 import { MAX_NICKNAME_LEN } from "../types"
 import { Spinner, EmptyState, AnimateIn } from "../components/shared"
-import { ConfirmDialog, MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, IconButton, CentralModal, Input, FormField, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, PocketRoundButton, PocketSheet, ChatAvatar, Toast, useEdgeSwipeBack, BackChevron, POCKET_CHROME_TITLE, MONO_METRIC_STYLE, MessageMenuOverlay, type MessageMenuAction } from "@/components/central"
+import { ConfirmDialog, MonogramChip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, CentralButton, IconButton, CentralModal, Input, FormField, SegmentedControl, PocketFilterChip, PocketFilterChipRow, PocketSearchField, PocketRow, PocketRowCard, PocketKicker, PocketTag, PocketSwitch, PocketButton, PocketRoundButton, PocketSheet, ChatAvatar, Toast, useEdgeSwipeBack, useSwipeRevealTimes, BackChevron, POCKET_CHROME_TITLE, MONO_METRIC_STYLE, MessageMenuOverlay, type MessageMenuAction } from "@/components/central"
 import { getOrCreateDm } from "../dm"
 import { isMobileViewport } from "@/lib/breakpoints"
-import { getInitials, formatRelativeTime, replyPreviewLabel, REACTION_EMOJIS } from "../utils"
+import { getInitials, formatRelativeTime, formatTimeSepLabel, replyPreviewLabel, REACTION_EMOJIS } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import type { CreateChatScreenProps, ChatSettingsProps, ChatScreenProps, ChatGroup, GroupMember, Message, Reaction, Profile, Crumb, ProcessedMessage, LinkPreviewData, ChatNotifyMode, NotificationSettings } from "../types"
 import { useOpenMemberProfile } from "../member-profile-context"
@@ -2239,6 +2239,17 @@ const sameMinute = (a: Message, b: Message) =>
   a.sender_id === b.sender_id &&
   Math.abs(new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) < 60000
 
+// A centred time stamp opens each conversation WINDOW, not each calendar day:
+// the first message, and any message more than an hour after the one before it.
+// That is iMessage's rule (Messenger behaves the same in practice), and it is
+// what makes per-message times unnecessary in the flow — a burst of replies is
+// one window, a reply the next morning is a new one and says so. A day change
+// inside an hour (11:50 PM → 12:10 AM) is deliberately NOT a break: it is the
+// same conversation.
+const TIME_SEP_GAP_MS = 60 * 60_000
+const opensTimeWindow = (msg: Message, prev: Message | null) =>
+  !prev || new Date(msg.created_at).getTime() - new Date(prev.created_at).getTime() > TIME_SEP_GAP_MS
+
 // How long read progress may sit unwritten while a thread is open. Short enough
 // that a background tab-switch still lands quickly, long enough that a fast
 // conversation collapses into one write instead of one per message.
@@ -2253,13 +2264,14 @@ const READ_COALESCE_MS = 4000
  * the row has already been re-rendered with its original hidden.
  */
 function MessageMenuMount({
-  messageId, align, onReact, onMoreReactions, actions, onClose,
+  messageId, align, onReact, onMoreReactions, actions, caption, onClose,
 }: {
   messageId: string
   align: "left" | "right"
   onReact: (emoji: string) => void
   onMoreReactions: () => void
   actions: MessageMenuAction[]
+  caption?: string
   onClose: () => void
 }) {
   const [el, setEl] = useState<HTMLElement | null>(null)
@@ -2278,6 +2290,7 @@ function MessageMenuMount({
       onReact={onReact}
       onMoreReactions={onMoreReactions}
       actions={actions}
+      caption={caption}
       onClose={onClose}
     />
   )
@@ -2501,6 +2514,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const suppressScrollRef = useRef(false)
   // Upward (older-message) pagination — keyset cursor is the oldest loaded message.
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const messageTrackRef = useRef<HTMLDivElement>(null)
   const [hasMore, setHasMore] = useState(cachedThread?.hasMore ?? true)
   const loadingOlderRef = useRef(false)
   const lastTypingSentRef = useRef(0)
@@ -2795,6 +2809,12 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       longPressTimer.current = null
     }
   }, [])
+
+  // Drag the transcript LEFT → every message's time slides in beside its bubble
+  // (iMessage). Listeners on the scroller, one transform on the message column;
+  // `onLock` kills the long-press timer a drag that began on a bubble started,
+  // exactly as the bubble's own swipe-to-reply does (Convention #7).
+  useSwipeRevealTimes(scrollContainerRef, messageTrackRef, { onLock: handlePointerCancel })
 
   const handleDeleteMessage = useCallback(async (msgId: string) => {
     setDeletingId(null)
@@ -4376,7 +4396,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-0.5">
+          // `messageTrackRef`: the column `useSwipeRevealTimes` translates left to
+          // slide every row's parked time label into view (see message-row.tsx's
+          // MessageTimeLabel). The listeners live on the scroller above.
+          <div ref={messageTrackRef} className="flex flex-col gap-0.5">
             {processedMessages.map((msg, i) => {
               // Cheap neighbor-derivations only — all row rendering lives in the
               // memoized <MessageRow/> (app/home/tabs/message-row.tsx).
@@ -4385,7 +4408,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
               const nextMsg = i < processedMessages.length - 1 ? processedMessages[i + 1] : null
               const isFirstInGroup = !prevMsg || !sameMinute(msg, prevMsg)
               const isLastInGroup = !nextMsg || !sameMinute(msg, nextMsg)
-              const showDateSep = !prevMsg || new Date(prevMsg.created_at).toDateString() !== new Date(msg.created_at).toDateString()
+              const showTimeSep = opensTimeWindow(msg, prevMsg)
               const isLatestOwn = latestOwnMsg?.id === msg.id
               return (
                 <MessageRow
@@ -4397,8 +4420,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
                   isFirstMessage={i === 0}
                   isFirstInGroup={isFirstInGroup}
                   isLastInGroup={isLastInGroup}
-                  showDateSep={showDateSep}
-                  showGroupGap={isFirstInGroup && i > 0 && !showDateSep}
+                  showTimeSep={showTimeSep}
+                  showGroupGap={isFirstInGroup && i > 0 && !showTimeSep}
                   senderDeparted={!!(msg.sender_id && departedIds.has(msg.sender_id))}
                   userId={userId}
                   isAdminOrLeader={canModerate}
@@ -4859,6 +4882,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
             onReact={(emoji) => handleReact(m.id, emoji)}
             onMoreReactions={() => setFullReactionPickerFor(m.id)}
             actions={acts}
+            caption={formatTimeSepLabel(m.created_at)}
             onClose={() => setContextMenuFor(null)}
           />
         )

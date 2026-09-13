@@ -4,8 +4,8 @@ import { memo, useId, useState, useEffect, useRef, useLayoutEffect } from "react
 import { createPortal } from "react-dom"
 import dynamic from "next/dynamic"
 import { Check, MoreHorizontal, Trash2, CornerUpLeft, Plus, Forward, Pin, FileDown } from "lucide-react"
-import { MonogramChip, ConfirmDialog, useSwipeToReply } from "@/components/central"
-import { formatMessageTime, REACTION_EMOJIS } from "../utils"
+import { MonogramChip, ConfirmDialog, useSwipeToReply, TIME_REVEAL_PX } from "@/components/central"
+import { formatMessageTime, formatTimeSepLabel, REACTION_EMOJIS } from "../utils"
 import { useOpenMemberProfile } from "../member-profile-context"
 import type { MessageRowProps } from "../types"
 import { InviteCard } from "./invite-card"
@@ -87,13 +87,40 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function formatDateLabel(dateStr: string): string {
-  const date = new Date(dateStr)
-  const today = new Date()
-  const isToday = date.toDateString() === today.toDateString()
-  const month = date.toLocaleString("en-US", { month: "long" }).toUpperCase()
-  const day = date.getDate()
-  return isToday ? `TODAY · ${month} ${day}` : `${date.toLocaleString("en-US", { weekday: "short" }).toUpperCase()} · ${month} ${day}`
+// The centred stamp that opens a conversation window (the first message, and any
+// message more than an hour after the one before — iMessage's rule; the gap
+// itself is decided in chats-tab.tsx). The 24px above earns its keep BETWEEN
+// windows; at the very top of a thread there is nothing to separate from, so
+// that space is unearned and just leaves the first message floating.
+function TimeSeparator({ at, first }: { at: string; first: boolean }) {
+  return (
+    <div data-time-separator className={`flex justify-center mb-2 ${first ? "mt-1" : "mt-6"}`}>
+      <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
+        {formatTimeSepLabel(at)}
+      </span>
+    </div>
+  )
+}
+
+// A message's own time. NOT printed in the flow — iMessage's grammar: at phone
+// width it is parked `TIME_REVEAL_PX` past the row's right edge, clipped by the
+// transcript's `overflow-x-hidden`, and slides in beside its bubble when the
+// transcript is dragged left (`useSwipeRevealTimes`, wired in chats-tab.tsx). On
+// desktop there is no drag, so it is a static sibling of the bubble that shows on
+// row hover — Messenger-web's placement: `order-last` in a `flex-row-reverse` own
+// row puts it just LEFT of the bubble, and just RIGHT of an incoming one. The
+// host row supplies `relative group`. Always in the DOM, so a screen reader
+// hears it without either gesture.
+function MessageTimeLabel({ at }: { at: string }) {
+  return (
+    <span
+      data-message-time
+      className="pointer-events-none select-none whitespace-nowrap text-[11px] text-[var(--muted-text)] max-md:absolute max-md:top-1/2 max-md:-translate-y-1/2 max-md:w-14 max-md:text-right md:order-last md:self-center md:px-1 md:opacity-0 md:transition-opacity md:duration-150 md:group-hover:opacity-100"
+      style={{ right: -TIME_REVEAL_PX }}
+    >
+      {formatMessageTime(at)}
+    </span>
+  )
 }
 
 // "Brian", "Brian and Anna", "Brian, Anna and Josh", and past the cap
@@ -129,7 +156,7 @@ function MessageRowBase({
   isFirstMessage,
   isFirstInGroup,
   isLastInGroup,
-  showDateSep,
+  showTimeSep,
   showGroupGap,
   senderDeparted,
   userId,
@@ -285,14 +312,6 @@ function MessageRowBase({
   }, [anyMenuOpen, isEmojiPickerOpen, isFullPickerOpen])
 
   const groupGap = showGroupGap ? "mt-3" : ""
-
-  // Date separator spacing. The 24px above earns its keep BETWEEN days — it
-  // separates the previous day's messages from this stamp. At the very top of a
-  // thread there is nothing above it to separate from, so that space is unearned
-  // and just leaves the first message floating below the header.
-  const dateSepClass = showDateSep
-    ? `flex justify-center mb-2 ${isFirstMessage ? "mt-1" : "mt-6"}`
-    : ""
 
   const incomingRadius = isFirstInGroup && isLastInGroup
     ? "rounded-[14px] rounded-tl-[4px]"
@@ -546,14 +565,9 @@ function MessageRowBase({
 
     return (
       <div ref={(el) => { registerMessageRef(msg.id, el) }}>
-        {showDateSep && (
-          <div className={dateSepClass}>
-            <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-              {formatDateLabel(msg.created_at)}
-            </span>
-          </div>
-        )}
-        <div className="flex flex-col items-center mt-4 mb-1">
+        {showTimeSep && <TimeSeparator at={msg.created_at} first={isFirstMessage} />}
+        <div className="relative group flex flex-col items-center mt-4 mb-1">
+          <MessageTimeLabel at={msg.created_at} />
           <div className="w-full max-w-[290px] bg-[var(--ivory)] rounded-2xl overflow-hidden">
             {poll ? (
               <>
@@ -639,7 +653,6 @@ function MessageRowBase({
               </div>
             )}
           </div>
-          <p className="text-[11px] text-[var(--muted-text)] mt-1.5">{formatMessageTime(msg.created_at)}</p>
         </div>
       </div>
     )
@@ -651,14 +664,9 @@ function MessageRowBase({
   if (msg.message_type === "invite" && msg.invite_group_id) {
     return (
       <div ref={(el) => { registerMessageRef(msg.id, el) }}>
-        {showDateSep && (
-          <div className={dateSepClass}>
-            <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-              {formatDateLabel(msg.created_at)}
-            </span>
-          </div>
-        )}
-        <div className={`flex ${isOwn ? "justify-end" : "justify-start"} ${groupGap}`}>
+        {showTimeSep && <TimeSeparator at={msg.created_at} first={isFirstMessage} />}
+        <div className={`relative group flex ${isOwn ? "justify-end" : "justify-start"} ${groupGap}`}>
+          <MessageTimeLabel at={msg.created_at} />
           <InviteCard
             inviteGroupId={msg.invite_group_id}
             userId={userId}
@@ -679,13 +687,7 @@ function MessageRowBase({
     }
     return (
       <div ref={(el) => { registerMessageRef(msg.id, el) }}>
-        {showDateSep && (
-          <div className={dateSepClass}>
-            <span style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-              {formatDateLabel(msg.created_at)}
-            </span>
-          </div>
-        )}
+        {showTimeSep && <TimeSeparator at={msg.created_at} first={isFirstMessage} />}
         <div className="flex items-center gap-3 my-2 px-1">
           <div className="flex-1 h-px bg-[var(--line)]/70" />
           {/* WRAPS. `nowrap` here let any system line longer than the viewport push
@@ -702,14 +704,7 @@ function MessageRowBase({
 
   return (
     <div ref={(el) => { registerMessageRef(msg.id, el) }}>
-      {/* Date separator */}
-      {showDateSep && (
-        <div className={dateSepClass}>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontStyle: "italic", fontSize: "13px", color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-            {formatDateLabel(msg.created_at)}
-          </span>
-        </div>
-      )}
+      {showTimeSep && <TimeSeparator at={msg.created_at} first={isFirstMessage} />}
 
       <div className={`flex flex-col relative ${isOwn ? "items-end" : "items-start"} ${groupGap}`}>
         {/* Emoji picker */}
@@ -807,7 +802,6 @@ function MessageRowBase({
             {senderDeparted && (
               <span className="text-[11px] text-[var(--muted-text)] italic">· left the ministry</span>
             )}
-            <span className="text-[12px] text-[var(--muted-text)]">{formatMessageTime(msg.created_at)}</span>
           </div>
         )}
 
@@ -821,7 +815,8 @@ function MessageRowBase({
             bubble and reads as a rendering bug (measured: row right edge 374,
             screen 390). `overflow-clip-margin` does not rescue it — with a
             one-axis `clip` it computes to 0px. */}
-        <div className={`flex items-end gap-2 w-full ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
+        <div className={`relative group flex items-end gap-2 w-full ${isOwn ? "flex-row-reverse" : "flex-row"}`}>
+          <MessageTimeLabel at={msg.created_at} />
           {/* Avatar — drawn ONCE per run, on the LAST (most recent) incoming
               message, the way iMessage and Messenger do it: the face sits at the
               bottom of the cluster and the bubbles above it hang off that one
@@ -1127,14 +1122,14 @@ function MessageRowBase({
           </div>
         )}
 
-        {/* Read receipts + (own only) the timestamp.
+        {/* Read receipts.
             Receipts hang off ANY message, not just your own: they mark how far
             each person has read, and the last thing somebody read is usually not
             something you sent. They stay right-aligned on both sides — the row
             reads as a margin note about the conversation, not as part of an
-            incoming bubble. Incoming messages get no timestamp here (theirs is in
-            the group header), so this row is receipts alone for them. */}
-        {(isOwn || (readReceipts?.length ?? 0) > 0) && (
+            incoming bubble. The own-message timestamp that used to share this row
+            is gone: times are revealed by the transcript swipe (MessageTimeLabel). */}
+        {(readReceipts?.length ?? 0) > 0 && (
           // `w-full` is load-bearing on the incoming side: the column wrapper is
           // `items-start` there, so the row shrinks to its content and
           // `justify-end` has nothing to push against — the chips rendered hard
@@ -1155,7 +1150,6 @@ function MessageRowBase({
                 ))}
               </div>
             )}
-            {isOwn && <span className="text-[11px] text-[var(--muted-text)]">{formatMessageTime(msg.created_at)}</span>}
           </div>
         )}
 

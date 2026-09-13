@@ -180,18 +180,47 @@ export function formatMessageTime(dateStr: string): string {
 // for ME" is a question about the reader's own clock.
 export function formatChatListTime(dateStr: string): string {
   const d = new Date(dateStr)
-  const now = new Date()
-  // Calendar-day distance, not a 24h window: a message at 11:50 PM is "yesterday"
-  // at 12:10 AM, not "20 minutes ago rounded to today". Both ends are snapped to
-  // LOCAL midnight, and the rounding absorbs the 23/25-hour DST days.
-  const midnightToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const midnightThen = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-  const days = Math.round((midnightToday - midnightThen) / 86400000)
+  const days = calendarDaysAgo(d)
 
   if (days <= 0) return formatMessageTime(dateStr) // today (<0 = clock skew ahead)
   if (days === 1) return "Yesterday"
   if (days < 7) return d.toLocaleDateString("en-US", { weekday: "short" })
   return d.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" })
+}
+
+// Calendar-day distance, not a 24h window: a message at 11:50 PM is "yesterday"
+// at 12:10 AM, not "20 minutes ago rounded to today". Both ends are snapped to
+// LOCAL midnight, and the rounding absorbs the 23/25-hour DST days. Shared by the
+// chat-list stamp and the in-thread time separator so the two can never disagree
+// about which day a message belongs to.
+function calendarDaysAgo(d: Date): number {
+  const now = new Date()
+  const midnightToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const midnightThen = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  return Math.round((midnightToday - midnightThen) / 86400000)
+}
+
+// The centred separator INSIDE a thread — iMessage's "Today 3:42 PM" line. It
+// marks where a conversation window opens (the first message, and any message
+// more than an hour after the previous one), so unlike the list stamp it always
+// carries the clock time; the day ramps the same way:
+//   today      → TODAY · 3:42 PM
+//   yesterday  → YESTERDAY · 3:42 PM
+//   this week  → TUE · 3:42 PM
+//   this year  → SAT · SEP 5 · 3:42 PM
+//   older      → SEP 5, 2025 · 3:42 PM
+// Device-local like every chat timestamp (the Convention #23 exemption).
+export function formatTimeSepLabel(dateStr: string): string {
+  const d = new Date(dateStr)
+  const days = calendarDaysAgo(d)
+  const time = formatMessageTime(dateStr)
+  if (days <= 0) return `TODAY · ${time}`
+  if (days === 1) return `YESTERDAY · ${time}`
+  const weekday = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase()
+  if (days < 7) return `${weekday} · ${time}`
+  const monthDay = d.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toUpperCase()
+  if (d.getFullYear() === new Date().getFullYear()) return `${weekday} · ${monthDay} · ${time}`
+  return `${monthDay}, ${d.getFullYear()} · ${time}`
 }
 
 export function audienceLabel(audience: string | null): string {

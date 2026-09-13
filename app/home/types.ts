@@ -342,7 +342,7 @@ export interface MessageRowProps {
   isFirstMessage: boolean
   isFirstInGroup: boolean
   isLastInGroup: boolean
-  showDateSep: boolean
+  showTimeSep: boolean
   showGroupGap: boolean
   senderDeparted: boolean
   userId: string
