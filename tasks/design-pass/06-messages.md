@@ -53,6 +53,18 @@ And the conversation list on desktop is built at a different, much smaller type 
 
 **New:** the reaction chip inverts against its bubble and fills plum when you're among the reactors — a genuinely good rule that looks like drift until you know the axis is participation, not sender. The master/detail panel row has four implementations and no component (`PanelRow`). The lifted-message material and z 170 need a line.
 
+## 3b. Messages as a system
+
+The rooms are organised on two axes that don't nest. The top level splits by **who made the room** (church vs mine vs open); the second by **what it's for** (general / groups / teams). So a DG lands in Church → Groups or in Mine depending on whether the automation or a person created it; an event's planning room lands in Church → *Teams* or in Mine; and a class chat is silently moved from Church to Mine by a June cron. Neither axis answers the question a sophomore arrives with — "where do I ask about Friday?" — and the answer she learns can expire.
+
+Three structural findings on top of the screen-level ones:
+
+- **The code path that created a room decides its feature set.** A hand-made DG chat has nicknames, member management and Leave; the auto-created chat for the identical room has none of the three. The rational move for a DGL who notices is to abandon the automation.
+- **The church-chat create gate is a different predicate in each direction.** The UI grants it via the team-name regex; the server grants it to leader-tier alone. A member on "Student Org Board" is offered a button that fails; a leader with no team is denied a permission the doc gives them.
+- **Planning already lives in Messages and the planning system can't see it.** The captured DM assigns a run-of-show block and a reimbursement in plain prose, and the ministry's own retreat room is a hand-made personal chat sitting beside "Board games night" — not the roster-synced planning room the product builds. Central's central bet is losing to the path of least resistance inside its own app.
+
+The IA reviewer's recommendation, which I share: fix what the three scopes *claim* first — rename Mine's "DIRECT" header, badge open rooms inside Mine instead of double-homing them in a third scope, render empty section headers so their create exists when it's most needed, give planning rooms an **Events** section so they stop being filed under Teams — and make the real answer (sections by purpose across every chat type, ownership demoted to a permission and a row badge) cheaper to build later.
+
 ## 4. Decisions that are yours
 
 1. **Message search:** (a) full-text over message bodies — the biggest daily win, needs an index; (b) keep names-only, relabel "Find a chat or person", fix the empty state; (c) leave. Today it's (c) wearing (b)'s clothes.
@@ -61,6 +73,8 @@ And the conversation list on desktop is built at a different, much smaller type 
 4. **Compact sidebar in Messages:** (a) exempt Messages from the collapse; (b) a narrow avatar-only thread strip when compact; (c) accept it.
 5. **The immersive message menu on desktop:** keep the blur takeover at every width, or an anchored popover at `md:` and up?
 6. **DM name labels:** suppress the sender name and repeated avatar in a two-person DM (iMessage / WhatsApp / Signal), or keep for consistency with groups?
+7. **Scopes:** (a) keep Church / Mine / Open and fix their claims; (b) sections by purpose (Ministry · My groups · Direct · Events) with ownership as a badge; (c) recency-first with pinned sections.
+8. **Auto-created rooms:** should an auto-created DG chat carry the same capabilities (nicknames, members, leave) as a hand-made one?
 
 ## 5. How to look yourself
 

@@ -55,6 +55,313 @@ These are the implicit rules the app obeys. They are good rules; the later batch
 
 Batches 1–9 judge each network; Batch 10 takes the whole system apart.
 
-## 5. Coverage
+## 5. Coverage — populated state
 
-_(appended when the capture manifest is final — every inventory ID × viewport, captured / covered / SKIPPED with reason.)_
+Every inventory ID × viewport. "✓ n shots (roles)" = captured directly; "↳ in X" = visible inside X's capture; "SKIPPED — reason" = could not be reached by the rig and is reviewed from code; "n/a" = the screen exists only at the other width. Nothing is silently dropped.
+
+### N1
+
+| ID | desktop | mobile |
+|---|---|---|
+| N1.1 | ✓ 2 shots (visitor) | ✓ 2 shots (visitor) |
+| N1.2 | ✓ 2 shots (visitor) | ✓ 4 shots (visitor) |
+| N1.2.1 | SKIPPED — No-account-for-provider error needs an OAuth round trip; reviewed from code. | SKIPPED — No-account-for-provider error needs an OAuth round trip; reviewed from code. |
+| N1.3 | ✓ 2 shots (visitor) | ✓ 2 shots (visitor) |
+| N1.3.1 | ✓ 2 shots (visitor) | ✓ 2 shots (visitor) |
+| N1.3.2 | ✓ 2 shots (visitor) | ✓ 2 shots (visitor) |
+| N1.3.3 | SKIPPED — Verify-code step needs a real OTP email; reviewed from code. | SKIPPED — Verify-code step needs a real OTP email; reviewed from code. |
+| N1.4 | ✓ 2 shots (visitor) | ✓ 2 shots (visitor) |
+| N1.5 | ✓ 2 shots (visitor) | ✓ 2 shots (visitor) |
+| N1.6 | ✓ 2 shots (member) | ✓ 2 shots (member) |
+| N1.7 | ✓ 4 shots (visitor, member) | ✓ 4 shots (visitor, member) |
+| N1.7.1 | ✓ 2 shots (member) | ✓ 2 shots (member) |
+| N1.7.2 | SKIPPED — Duplicate-account dialog needs a second account with the same name; reviewed from code. | SKIPPED — Duplicate-account dialog needs a second account with the same name; reviewed from code. |
+| N1.7.3 | SKIPPED — Post-join pickers fire once after a join; reviewed from code. | SKIPPED — Post-join pickers fire once after a join; reviewed from code. |
+| N1.7.4 | SKIPPED — Staff role picker fires on a staff-code join; reviewed from code. | SKIPPED — Staff role picker fires on a staff-code join; reviewed from code. |
+| N1.7.5 | SKIPPED — Same InviteShareModal as N2.11. | SKIPPED — Same InviteShareModal as N2.11. |
+| N1.8 | ✓ 4 shots (visitor, member) | ✓ 4 shots (visitor, member) |
+| N1.8.1 | ✓ 2 shots (visitor) | ✓ 2 shots (visitor) |
+| N1.9 | ✓ 4 shots (visitor, member) | ✓ 4 shots (visitor, member) |
+| N1.10 | ↳ in N1.10.1 | ↳ in N1.10.1 |
+| N1.10.1 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N1.10.2 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N1.10.3 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N1.10.4 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N1.11 | SKIPPED — Pending page needs a ministry in 'pending' status; neither sandbox is. Reviewed from code. | SKIPPED — Pending page needs a ministry in 'pending' status; neither sandbox is. Reviewed from code. |
+| N1.12 | ✓ 2 shots (member) | ✓ 2 shots (member) |
+| N1.13 | ✓ 2 shots (visitor) | ✓ 2 shots (visitor) |
+| N1.14 | ✓ 2 shots (visitor) | ✓ 2 shots (visitor) |
+| N1.15 | ✓ 2 shots (visitor) | ✓ 2 shots (visitor) |
+| N1.16 | ✓ 2 shots (visitor) | ✓ 2 shots (visitor) |
+
+### N2
+
+| ID | desktop | mobile |
+|---|---|---|
+| N2.1 | ↳ in N2.3 | n/a |
+| N2.1.1 | ✓ 1 shot (admin) | n/a |
+| N2.1.2 | SKIPPED — Workspace nav-hint bubble is a one-time transient (profiles.seen_workspace_nav_hint); reviewed from code (desktop-nav.tsx). | n/a |
+| N2.1.3 | ↳ in N2.3 | n/a |
+| N2.2 | n/a | ↳ in N2.4 |
+| N2.3 | ✓ 10 shots (admin, pastor, leader, member, visitor) | n/a |
+| N2.3.1 | ↳ in N2.3 | n/a |
+| N2.3.2 | ↳ in N2.3 | n/a |
+| N2.3.3 | ↳ in N2.3 | n/a |
+| N2.3.4 | ↳ in N2.3 | n/a |
+| N2.3.5 | ↳ in N2.3 | n/a |
+| N2.3.6 | ↳ in N2.3 | n/a |
+| N2.4 | n/a | ✓ 10 shots (admin, pastor, leader, member, visitor) |
+| N2.4.1 | n/a | ↳ in N2.4 |
+| N2.4.2 | n/a | ↳ in N2.4 |
+| N2.4.3 | n/a | ↳ in N2.4 |
+| N2.4.4 | n/a | ↳ in N2.4 |
+| N2.4.5 | n/a | ↳ in N2.4 |
+| N2.4.6 | n/a | ↳ in N2.4 |
+| N2.4.7 | n/a | ↳ in N2.4 |
+| N2.4.8 | n/a | ↳ in N2.4 |
+| N2.4.9 | n/a | ↳ in N2.4 |
+| N2.5 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N2.6 | ✓ 4 shots (admin) | n/a |
+| N2.7 | ↳ in N5.4 | ↳ in N5.5.2 |
+| N2.8 | n/a | ✓ 2 shots (admin) |
+| N2.9 | SKIPPED — Super switcher is gated on the founder UUID; no test login can render it. Review from code + Brian's own screen. | SKIPPED — Super switcher is gated on the founder UUID; no test login can render it. Review from code + Brian's own screen. |
+| N2.10 | SKIPPED — Desktop member-actions kebab did not open under the rig; the report modal is captured on mobile (N2.10) and the menu reviewed from code (member-sheet.tsx MemberActionsMenu). | ✓ 1 shot (admin) |
+| N2.11 | ↳ in N6.7.2 | ✓ 2 shots (admin) |
+| N2.12 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N2.13 | ✓ 2 shots (member) | ✓ 2 shots (member) |
+| N2.14 | SKIPPED — Pending veil / pull-to-refresh are transient gesture states; reviewed from code. | SKIPPED — Pending veil / pull-to-refresh are transient gesture states; reviewed from code. |
+
+### N3
+
+| ID | desktop | mobile |
+|---|---|---|
+| N3.1 | ✓ 11 shots (admin, member) | n/a |
+| N3.2 | n/a | ✓ 9 shots (admin, member) |
+| N3.3 | ✓ 3 shots (admin) | ↳ in N3.2 |
+| N3.4 | ✓ 9 shots (admin) | ✓ 6 shots (admin) |
+| N3.5 | ✓ 19 shots (admin, member) | ✓ 19 shots (admin, member) |
+| N3.5.1 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N3.6 | SKIPPED — /announcements/<id> is a redirect stub to the tab — nothing renders. | SKIPPED — /announcements/<id> is a redirect stub to the tab — nothing renders. |
+| N3.7 | ✓ 3 shots (admin) | ✓ 3 shots (admin) |
+| N3.8 | ✓ 6 shots (admin) | ✓ 6 shots (admin) |
+| N3.9 | SKIPPED — locator.click: Timeout 5000ms exceeded. | SKIPPED — locator.click: Timeout 5000ms exceeded. |
+| N3.10 | ✓ 3 shots (admin) | ✓ 6 shots (admin) |
+
+### N4
+
+| ID | desktop | mobile |
+|---|---|---|
+| N4.1 | n/a | ✓ 4 shots (admin, member) |
+| N4.1.1 | ↳ in N4.2 | ↳ in N4.1 |
+| N4.1.2 | SKIPPED — locator.click: Timeout 8000ms exceeded. | ✓ 2 shots (admin) |
+| N4.1.3 | n/a | ↳ in N4.3 |
+| N4.2 | ✓ 6 shots (admin, member) | n/a |
+| N4.3 | ✓ 1 shot (admin) | ✓ 2 shots (admin) |
+| N4.4 | ✓ 2 shots (admin) | SKIPPED — locator.click: Timeout 5000ms exceeded. |
+| N4.5 | SKIPPED — locator.click: Timeout 6000ms exceeded. | SKIPPED — locator.click: Timeout 6000ms exceeded. |
+| N4.6 | ✓ 8 shots (admin, member) | ✓ 8 shots (admin, member) |
+| N4.6.1 | ↳ in N4.6 | ↳ in N4.6 |
+| N4.6.2 | ↳ in N4.6 | ↳ in N4.6 |
+| N4.6.3 | ↳ in N4.6 | ↳ in N4.6 |
+| N4.6.4 | ✓ 2 shots (admin) | ✓ 1 shot (admin) |
+| N4.6.5 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N4.6.6 | ✓ 2 shots (admin) | SKIPPED — locator.click: Timeout 5000ms exceeded. |
+| N4.6.7 | SKIPPED — locator.scrollIntoViewIfNeeded: Timeout 8000ms exceeded. | SKIPPED — locator.scrollIntoViewIfNeeded: Timeout 8000ms exceeded. |
+| N4.6.8 | ✓ 2 shots (admin) | ✓ 1 shot (admin) |
+| N4.6.9 | SKIPPED — Forward sheet opens from the context menu; menu captured in N4.6.5. | SKIPPED — Forward sheet opens from the context menu; menu captured in N4.6.5. |
+| N4.6.10 | SKIPPED — locator.click: Timeout 5000ms exceeded. | SKIPPED — locator.click: Timeout 5000ms exceeded. |
+| N4.6.11 | ↳ in N4.6 | ↳ in N4.6 |
+| N4.6.12 | ↳ in N4.6 | ↳ in N4.6 |
+| N4.6.13 | SKIPPED — Invite card renders only after an in-chat invite is sent; reviewed from code. | SKIPPED — Invite card renders only after an in-chat invite is sent; reviewed from code. |
+| N4.6.14 | ↳ in N4.6 | ↳ in N4.6 |
+| N4.7 | SKIPPED — locator.click: Timeout 5000ms exceeded. | ✓ 3 shots (admin) |
+| N4.7.1 | ↳ in N4.7 | ↳ in N4.7 |
+| N4.7.2 | SKIPPED — locator.click: Timeout 5000ms exceeded. | SKIPPED — locator.click: Timeout 5000ms exceeded. |
+| N4.7.3 | ↳ in N4.7 | SKIPPED — locator.click: Timeout 5000ms exceeded. |
+| N4.7.4 | ↳ in N4.7 | SKIPPED — locator.click: Timeout 5000ms exceeded. |
+| N4.7.5 | ↳ in N4.7 | ↳ in N4.7 |
+| N4.7.6 | ↳ in N4.7 | ↳ in N4.7 |
+| N4.7.7 | ↳ in N4.7 | SKIPPED — locator.click: Timeout 5000ms exceeded. |
+| N4.7.8 | ↳ in N4.7 | ↳ in N4.7 |
+| N4.7.9 | ↳ in N4.7 | ↳ in N4.7 |
+| N4.7.10 | ↳ in N4.7 | ↳ in N4.7 |
+| N4.7.11 | ↳ in N4.7 | SKIPPED — locator.click: Timeout 5000ms exceeded. |
+| N4.7.12 | ↳ in N4.7 | ↳ in N4.7 |
+| N4.8 | ↳ in N4.8.1 | ↳ in N4.8.1 |
+| N4.8.1 | SKIPPED — Calls need a LiveKit room + media device; the ring/overlay are reviewed from code and the in-thread call affordances in N4.6.1. | SKIPPED — Calls need a LiveKit room + media device; the ring/overlay are reviewed from code and the in-thread call affordances in N4.6.1. |
+| N4.8.2 | SKIPPED — Incoming-call surface not reproducible headless. | SKIPPED — Incoming-call surface not reproducible headless. |
+| N4.8.3 | SKIPPED — Video stage not reproducible headless. | SKIPPED — Video stage not reproducible headless. |
+| N4.8.4 | SKIPPED — Video grid not reproducible headless. | SKIPPED — Video grid not reproducible headless. |
+| N4.8.5 | SKIPPED — Screen share not reproducible headless. | SKIPPED — Screen share not reproducible headless. |
+| N4.9 | n/a | SKIPPED — locator.click: Timeout 8000ms exceeded. |
+
+### N5
+
+| ID | desktop | mobile |
+|---|---|---|
+| N5.1 | ✓ 2 shots (admin, member) | n/a |
+| N5.2 | n/a | ✓ 2 shots (admin, member) |
+| N5.3 | ✓ 2 shots (admin, member) | ✓ 2 shots (admin, member) |
+| N5.3.1 | SKIPPED — Desktop member-actions kebab did not open under the rig; the report modal is captured on mobile (N2.10) and the menu reviewed from code (member-sheet.tsx MemberActionsMenu). | ✓ 1 shot (admin) |
+| N5.3.2 | ✓ 1 shot (admin) | ✓ 1 shot (admin) |
+| N5.4 | ✓ 2 shots (admin, member) | n/a |
+| N5.5 | n/a | ✓ 2 shots (admin, member) |
+| N5.5.1 | n/a | ✓ 1 shot (admin) |
+| N5.5.2 | n/a | ✓ 1 shot (admin) |
+| N5.5.3 | n/a | ✓ 1 shot (admin) |
+| N5.5.4 | n/a | ✓ 1 shot (admin) |
+| N5.6 | ↳ in N5.6.1 | ↳ in N5.6.1 |
+| N5.6.1 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N5.6.2 | ✓ 1 shot (admin) | ✓ 1 shot (admin) |
+| N5.6.3 | ✓ 1 shot (admin) | ✓ 1 shot (admin) |
+| N5.7 | SKIPPED — Class-change prompt fires on a graduation-year transition; reviewed from code. | SKIPPED — Class-change prompt fires on a graduation-year transition; reviewed from code. |
+| N5.8 | ↳ in N5.8.1 | ↳ in N5.8.1 |
+| N5.8.1 | ✓ 1 shot (pastor) | ✓ 1 shot (pastor) |
+| N5.8.2 | ✓ 1 shot (pastor) | ✓ 1 shot (pastor) |
+| N5.8.3 | ✓ 1 shot (pastor) | ✓ 1 shot (pastor) |
+| N5.9 | ✓ 2 shots (admin, member) | ✓ 2 shots (admin, member) |
+
+### N6
+
+| ID | desktop | mobile |
+|---|---|---|
+| N6.0 | n/a | ✓ 4 shots (admin, pastor) |
+| N6.1 | ✓ 4 shots (admin, pastor) | ✓ 2 shots (admin) |
+| N6.1.1 | ↳ in N6.1 | ↳ in N6.1 |
+| N6.1.2 | ↳ in N6.1 | ↳ in N6.1 |
+| N6.1.3 | ✓ 1 shot (admin) | ↳ in N6.1 |
+| N6.1.4 | ↳ in N6.1 | ↳ in N6.1 |
+| N6.1.5 | ↳ in N6.1 | ↳ in N6.1 |
+| N6.1.6 | ↳ in N6.1 | ↳ in N6.1 |
+| N6.2 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N6.2.1 | ↳ in N6.2 | ↳ in N6.2 |
+| N6.2.2 | ↳ in N6.2 | ↳ in N6.2 |
+| N6.2.3 | SKIPPED — Role-change confirm: the row action menu did not open under the rig; reviewed from code (settings-tab.tsx:2775) and the People capture. | SKIPPED — Role-change confirm: the row action menu did not open under the rig; reviewed from code (settings-tab.tsx:2775) and the People capture. |
+| N6.2.4 | SKIPPED — Excommunicate is destructive; not exercised. Reviewed from code + the row menu shot. | SKIPPED — Excommunicate is destructive; not exercised. Reviewed from code + the row menu shot. |
+| N6.3 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N6.3.1 | ↳ in N6.3 | ↳ in N6.3 |
+| N6.3.2 | ↳ in N6.3 | ↳ in N6.3 |
+| N6.4 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N6.5 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N6.6 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N6.7 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N6.7.1 | ↳ in N6.7 | ↳ in N6.7 |
+| N6.7.2 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N6.7.3 | ↳ in N6.7 | ↳ in N6.7 |
+| N6.7.4 | ↳ in N6.7 | ↳ in N6.7 |
+| N6.7.5 | ↳ in N6.7 | ↳ in N6.7 |
+| N6.7.6 | ↳ in N6.7 | ↳ in N6.7 |
+| N6.7.7 | ↳ in N6.7 | ↳ in N6.7 |
+| N6.8 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N6.9 | ✓ 2 shots (admin) | ↳ in N6.1 |
+
+### N7
+
+| ID | desktop | mobile |
+|---|---|---|
+| N7.0 | ✓ 4 shots (member) | ✓ 4 shots (member) |
+| N7.1 | ✓ 4 shots (admin, member) | ✓ 4 shots (admin, member) |
+| N7.1.1 | ✓ 2 shots (admin) | ✓ 1 shot (admin) |
+| N7.1.2 | ↳ in N7.2 | n/a |
+| N7.2 | ✓ 4 shots (admin, member) | ✓ 4 shots (admin, member) |
+| N7.2.1 | n/a | ↳ in N7.2 |
+| N7.2.2 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.2.3 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.2.4 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.2.5 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.2.6 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.2.7 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.2.8 | ✓ 1 shot (admin) | ✓ 1 shot (admin) |
+| N7.3 | SKIPPED — locator.click: Timeout 6000ms exceeded. | SKIPPED — locator.click: Timeout 8000ms exceeded. |
+| N7.3.1 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.3.2 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.3.3 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.3.4 | ↳ in N8.1 | ↳ in N8.1 |
+| N7.3.5 | SKIPPED — Add-sub-event is the same modal as N7.3 with a parent set; the container it feeds is captured (N8.5). | SKIPPED — Add-sub-event is the same modal as N7.3 with a parent set; the container it feeds is captured (N8.5). |
+| N7.4 | ✓ 4 shots (admin, member) | ✓ 4 shots (admin, member) |
+| N7.4.1 | n/a | ↳ in N7.4 |
+| N7.4.2 | ✓ 4 shots (admin, member) | ✓ 4 shots (admin, member) |
+| N7.4.3 | ↳ in N7.4.2 | ↳ in N7.4.2 |
+| N7.4.4 | ↳ in N7.4.2 | ↳ in N7.4.2 |
+| N7.4.5 | ↳ in N7.4.2 | ↳ in N7.4.2 |
+| N7.4.6 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.4.7 | ↳ in N7.4.6 | ↳ in N7.4.6 |
+| N7.4.8 | ✓ 4 shots (admin, member) | ✓ 4 shots (admin, member) |
+| N7.4.9 | ✓ 2 shots (admin) | ✓ 1 shot (admin) |
+| N7.5 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.5.1 | ↳ in N7.5 | n/a |
+| N7.5.2 | ✓ 2 shots (admin) | n/a |
+| N7.5.3 | n/a | ✓ 2 shots (admin) |
+| N7.5.4 | n/a | ↳ in N7.5.3 |
+| N7.6 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.6.1 | ↳ in N7.6 | ↳ in N7.6 |
+| N7.6.2 | ↳ in N7.6 | ↳ in N7.6 |
+| N7.6.3 | ↳ in N7.6 | ↳ in N7.6 |
+| N7.7 | ↳ in N7.2.6 | ↳ in N7.2.6 |
+| N7.7.1 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.8 | SKIPPED — locator.click: Timeout 6000ms exceeded. | SKIPPED — locator.click: Timeout 8000ms exceeded. |
+| N7.8.1 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.8.2 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.8.3 | ✓ 1 shot (admin) | SKIPPED — Group-generator preview step: the Generate press timed out on the phone run; reviewed from the desktop capture. |
+| N7.8.4 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+| N7.9 | ↳ in N7.9.1 | ↳ in N7.9.2 |
+| N7.9.1 | ✓ 5 shots (admin, member) | n/a |
+| N7.9.2 | n/a | ✓ 5 shots (admin, member) |
+| N7.9.3 | ✓ 5 shots (admin, member) | ✓ 5 shots (admin, member) |
+| N7.9.4 | ✓ 1 shot (admin) | ✓ 1 shot (admin) |
+| N7.9.5 | SKIPPED — Delete-category confirm is destructive on seeded categories; reviewed from code + the ConfirmDialog pattern shot (N6.1.3). | SKIPPED — Delete-category confirm is destructive on seeded categories; reviewed from code + the ConfirmDialog pattern shot (N6.1.3). |
+
+### N8
+
+| ID | desktop | mobile |
+|---|---|---|
+| N8.0 | n/a | ✓ 5 shots (admin, member) |
+| N8.1 | ✓ 5 shots (admin, member) | ✓ 5 shots (admin, member) |
+| N8.2 | ✓ 8 shots (admin, member) | ✓ 3 shots (admin, member) |
+| N8.2.1 | ✓ 1 shot (admin) | SKIPPED — locator.click: Timeout 5000ms exceeded. |
+| N8.3 | ✓ 4 shots (admin, member) | ✓ 3 shots (admin, member) |
+| N8.4 | ✓ 6 shots (admin) | ✓ 4 shots (admin) |
+| N8.4.1 | SKIPPED — locator.click: Timeout 5000ms exceeded. | SKIPPED — locator.click: Timeout 5000ms exceeded. |
+| N8.5 | ✓ 1 shot (admin) | ✓ 2 shots (admin) |
+| N8.6 | ↳ in N8.6.1 | ↳ in N8.6.1 |
+| N8.6.1 | ✓ 1 shot (admin) | ✓ 1 shot (admin) |
+| N8.6.2 | ✓ 1 shot (admin) | ✓ 1 shot (admin) |
+| N8.6.3 | ✓ 1 shot (admin) | ✓ 1 shot (admin) |
+| N8.7 | ✓ 2 shots (admin) | ✓ 3 shots (admin) |
+| N8.8 | ✓ 2 shots (admin) | ✓ 3 shots (admin) |
+| N8.9 | ✓ 2 shots (admin) | ✓ 3 shots (admin) |
+| N8.10 | SKIPPED — Gov-view read-only mat needs a governance admin who is NOT a team member; captured in the empty-state lane instead if reachable. | SKIPPED — Gov-view read-only mat needs a governance admin who is NOT a team member; captured in the empty-state lane instead if reachable. |
+| N8.11 | ↳ in N8.1 | ↳ in N8.1 |
+| N8.12 | ✓ 1 shot (admin) | ✓ 1 shot (admin) |
+
+### N9
+
+| ID | desktop | mobile |
+|---|---|---|
+| N9.0 | n/a | ✓ 3 shots (admin) |
+| N9.1 | ✓ 6 shots (admin) | ✓ 3 shots (admin) |
+| N9.2 | ✓ 3 shots (admin) | ✓ 3 shots (admin) |
+| N9.3 | ✓ 3 shots (admin) | ✓ 3 shots (admin) |
+| N9.3.1 | ✓ 3 shots (admin) | ✓ 2 shots (admin) |
+| N9.3.2 | ↳ in N9.3.1 | ↳ in N9.3.1 |
+| N9.3.3 | SKIPPED — Decline dialog: the Decline control was not reachable in the detail capture; reviewed from code (finance-workspace.tsx ~806-828). | SKIPPED — Decline dialog: the Decline control was not reachable in the detail capture; reviewed from code (finance-workspace.tsx ~806-828). |
+| N9.3.4 | SKIPPED — Undo toast appears only after an approve; approve is a real write — not exercised. | SKIPPED — Undo toast appears only after an approve; approve is a real write — not exercised. |
+| N9.4 | ✓ 5 shots (member, admin) | ✓ 5 shots (member, admin) |
+| N9.5 | ↳ in N5.9 | ↳ in N5.9 |
+
+### N10
+
+| ID | desktop | mobile |
+|---|---|---|
+| N10.1 | SKIPPED — /admin is gated on the founder's email in proxy.ts; no test login can open it. Reviewed from code. | SKIPPED — /admin is gated on the founder's email in proxy.ts; no test login can open it. Reviewed from code. |
+| N10.2 | ✓ 2 shots (admin) | ✓ 2 shots (admin) |
+
+### Totals
+
+| viewport | captured | covered | skipped | n/a | missing |
+|---|---|---|---|---|---|
+| desktop | 115 | 63 | 39 | 30 | 0 |
+| mobile | 119 | 65 | 43 | 20 | 0 |
+
+Inventory IDs: 247. Manifest rows considered: 1305.
+
