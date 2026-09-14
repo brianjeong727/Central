@@ -128,7 +128,7 @@ test.describe("N4 as admin", () => {
     // Chat settings + drills
     await attempt(page, "N4.7", role, async () => {
       await openChat(page, C.dg)
-      if (mobile) await page.locator(".back-chevron").filter({ visible: true }).first().locator("xpath=..").locator("[data-monogram]").first().click({ timeout: 5_000 })
+      if (mobile) await page.locator(".back-chevron").filter({ visible: true }).first().locator("xpath=following-sibling::*[1]").click({ timeout: 5_000 })
       else await page.locator("button:has(.lucide-settings)").filter({ visible: true }).first().click({ timeout: 5_000 })
       await settle(page)
       await capture(page, "N4.7", { role, state: STATE, label: "Chat settings (my chat)" })
@@ -150,7 +150,7 @@ test.describe("N4 as admin", () => {
     })
     await attempt(page, "N4.7", role, async () => {
       await openChat(page, C.central)
-      if (mobile) await page.locator(".back-chevron").filter({ visible: true }).first().locator("xpath=..").locator("[data-monogram]").first().click({ timeout: 5_000 })
+      if (mobile) await page.locator(".back-chevron").filter({ visible: true }).first().locator("xpath=following-sibling::*[1]").click({ timeout: 5_000 })
       else await page.locator("button:has(.lucide-settings)").filter({ visible: true }).first().click({ timeout: 5_000 })
       await settle(page)
       await capture(page, "N4.7", { role, state: `${STATE}-church`, label: "Chat settings (church chat)" })
@@ -158,7 +158,7 @@ test.describe("N4 as admin", () => {
     })
     await attempt(page, "N4.7.2", role, async () => {
       await openChat(page, C.dm)
-      if (mobile) await page.locator(".back-chevron").filter({ visible: true }).first().locator("xpath=..").locator("[data-monogram]").first().click({ timeout: 5_000 })
+      if (mobile) await page.locator(".back-chevron").filter({ visible: true }).first().locator("xpath=following-sibling::*[1]").click({ timeout: 5_000 })
       else await page.locator("button:has(.lucide-settings)").filter({ visible: true }).first().click({ timeout: 5_000 })
       await settle(page)
       await capture(page, "N4.7", { role, state: `${STATE}-dm`, label: "Chat settings (DM)" })
