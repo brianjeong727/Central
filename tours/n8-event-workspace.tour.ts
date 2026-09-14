@@ -28,16 +28,20 @@ async function openEvent(page: import("@playwright/test").Page, team: string, ti
     await goHome(page, { tab: "plan", team, sotab: "Events" })
   }
   await page.getByText(title, { exact: true }).filter({ visible: true }).first().click({ timeout: 8_000 })
-  await settle(page)
+  await settle(page, isMobile(page) ? 1200 : 600)
 }
 
 async function openSection(page: import("@playwright/test").Page, section: string) {
   if (isMobile(page)) {
-    // Back to the hub if we're drilled, then tap the row.
+    // Back to the hub if we're drilled, then tap the row. Wait for the hub to
+    // paint before deciding we're drilled — a too-early "not visible" sent the
+    // tour back one screen too far.
     const row = page.getByText(SECTION_ROW[section], { exact: true }).filter({ visible: true }).first()
-    if (!(await row.isVisible().catch(() => false))) {
-      await page.locator(".back-chevron").first().click({ timeout: 4_000 }).catch(() => {})
-      await settle(page, 300)
+    const onHub = await row.waitFor({ state: "visible", timeout: 4_000 }).then(() => true).catch(() => false)
+    if (!onHub) {
+      await page.locator(".back-chevron").filter({ visible: true }).first().click({ timeout: 4_000 })
+      await settle(page, 500)
+      await row.waitFor({ state: "visible", timeout: 5_000 })
     }
     await row.click({ timeout: 6_000 })
     await settle(page)
