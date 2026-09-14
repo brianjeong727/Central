@@ -13,7 +13,7 @@ async function announcementIds() {
   const rows = data ?? []
   return {
     event: rows.find(a => a.is_event && a.status === "published")?.id,
-    ack: rows.find(a => a.requires_ack)?.id,
+    ack: rows.find(a => a.requires_ack && a.status === "published" && !a.is_event)?.id,
     plain: rows.find(a => !a.is_event && !a.requires_ack && a.status === "published")?.id,
     withForm: (await sb.client.from("announcement_forms").select("announcement_id").eq("ministry_id", sb.ministryId).not("announcement_id", "is", null).limit(1).maybeSingle()).data?.announcement_id,
   }
@@ -58,7 +58,7 @@ test.describe("N3 as admin (leader-tier)", () => {
       await settle(page)
       await capture(page, "N3.4", { role, state: STATE, label: "Create announcement" })
       // Reveal the event fields.
-      await page.getByText(/this is an event/i).filter({ visible: true }).first().click({ timeout: 4_000 }).catch(() => {})
+      await page.locator('[aria-label="This is an event"]').filter({ visible: true }).first().click({ timeout: 4_000 }).catch(() => page.getByText("This is an event", { exact: true }).filter({ visible: true }).first().click({ timeout: 4_000 }))
       await settle(page, 300)
       await capture(page, "N3.4", { role, state: `${STATE}-event-on`, label: "Create announcement · event options" })
       await page.keyboard.press("Escape")
@@ -107,7 +107,8 @@ test.describe("N3 as admin (leader-tier)", () => {
     })
     await attempt(page, "N3.8", role, async () => {
       await goHome(page, { tab: "forms" })
-      await page.getByRole("button", { name: /^edit$/i }).filter({ visible: true }).first().click({ timeout: 6_000 })
+      const card = page.locator("div").filter({ hasText: "Fall Retreat sign-up" }).filter({ has: page.getByRole("button", { name: /^edit$/i }) }).last()
+      await card.getByRole("button", { name: /^edit$/i }).first().click({ timeout: 6_000 })
       await settle(page)
       await capture(page, "N3.8", { role, state: `${STATE}-edit-locked`, label: "Form builder (edit, has responses)" })
       await page.keyboard.press("Escape")

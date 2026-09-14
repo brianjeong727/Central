@@ -35,7 +35,7 @@ test.describe("N1 signed out", () => {
     if (mobile) {
       await attempt(page, "N1.2", role, async () => {
         await page.goto("/login"); await settle(page)
-        await page.getByRole("button", { name: /email|sign in with email|continue/i }).filter({ visible: true }).first().click({ timeout: 5_000 })
+        await page.getByText("Continue with email", { exact: true }).filter({ visible: true }).first().click({ timeout: 5_000 })
         await settle(page, 300)
         await capture(page, "N1.2", { role, state: `${STATE}-form`, label: "Login · form step (mobile)" })
       })
@@ -125,11 +125,13 @@ test.describe("N1/N10 as admin", () => {
     await attempt(page, "N1.10", role, async () => {
       await page.goto("/onboarding"); await settle(page)
       await capture(page, "N1.10.1", { role, state: STATE, label: "Onboarding · 1 Basic info" })
-      await page.getByPlaceholder(/ministry name|name/i).first().fill("Riverside Campus Fellowship").catch(() => {})
-      await page.getByPlaceholder(/university|campus|school/i).first().fill("Riverside University").catch(() => {})
-      await page.keyboard.press("Enter").catch(() => {})
-      await page.getByPlaceholder(/location|city/i).first().fill("Riverside, CA").catch(() => {})
-      await page.getByText(/small|medium|large/i).filter({ visible: true }).first().click({ timeout: 3_000 }).catch(() => {})
+      await page.getByPlaceholder("e.g. Central Student Fellowship").filter({ visible: true }).first().fill("Riverside Campus Fellowship")
+      const uni = page.getByPlaceholder("e.g. University of Pittsburgh").filter({ visible: true }).first()
+      await uni.fill("Riverside University")
+      await uni.press("Enter")
+      await page.getByPlaceholder("e.g. Pittsburgh, PA").filter({ visible: true }).first().fill("Riverside, CA")
+      await page.getByText(/^small$|^medium$|^large$|students/i).filter({ visible: true }).first().click({ timeout: 3_000 }).catch(() => {})
+      await settle(page, 300)
       await page.getByRole("button", { name: /next|continue/i }).filter({ visible: true }).first().click({ timeout: 5_000 })
       await settle(page, 300)
       await capture(page, "N1.10.2", { role, state: STATE, label: "Onboarding · 2 Structure" })

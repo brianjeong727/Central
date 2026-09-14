@@ -423,12 +423,12 @@ async function upsertAnnouncement(a) {
   return { id: rec("announcements", data).id, existed: false }
 }
 const ANN = {}
-ANN.welcome = await upsertAnnouncement({ title: "Welcome back — here's how this semester works", body: "So glad you're here. Announcements land on this tab, events have RSVPs, and your small group chat is where the week actually happens. If you're new, say hi in the main chat — someone will find you a group by Friday.", is_pinned: true, created_at: new Date(Date.now() - 12 * 864e5).toISOString() })
-ANN.kickoff = await upsertAnnouncement({ title: "Fall Kickoff Night — RSVP so we get enough dessert", body: "Our first big night of the semester. Worship, a short message from Pastor Kevin, and dessert after in the lounge. Room 232 in the Cathedral — look for the balloons. Bring a friend from your floor.", is_event: true, event_date: at(kickoff.date, "19:00"), event_end_date: at(kickoff.date, "21:30"), show_attendees: true, image_url: annImg, created_by: g("Sarah Kim"), created_at: new Date(Date.now() - 5 * 864e5).toISOString() })
-ANN.retreat = await upsertAnnouncement({ title: "Fall Retreat sign-ups are open (deadline next Friday)", body: "Three days at Camp Harmony. $85 covers lodging, meals, and the bus — scholarships available, just ask. Fill out the form below so we can sort cabins and dietary needs.", is_event: true, event_date: at(retreat.date, "17:00"), event_end_date: at(ymdShift(retreat.date, 2), "12:00"), show_attendees: false, created_by: g("Hannah Choi"), created_at: new Date(Date.now() - 3 * 864e5).toISOString() })
+ANN.welcome = await upsertAnnouncement({ requires_ack: false, title: "Welcome back — here's how this semester works", body: "So glad you're here. Announcements land on this tab, events have RSVPs, and your small group chat is where the week actually happens. If you're new, say hi in the main chat — someone will find you a group by Friday.", is_pinned: true, created_at: new Date(Date.now() - 12 * 864e5).toISOString() })
+ANN.kickoff = await upsertAnnouncement({ requires_ack: false, title: "Fall Kickoff Night — RSVP so we get enough dessert", body: "Our first big night of the semester. Worship, a short message from Pastor Kevin, and dessert after in the lounge. Room 232 in the Cathedral — look for the balloons. Bring a friend from your floor.", is_event: true, event_date: at(kickoff.date, "19:00"), event_end_date: at(kickoff.date, "21:30"), show_attendees: true, image_url: annImg, created_by: g("Sarah Kim"), created_at: new Date(Date.now() - 5 * 864e5).toISOString() })
+ANN.retreat = await upsertAnnouncement({ requires_ack: false, title: "Fall Retreat sign-ups are open (deadline next Friday)", body: "Three days at Camp Harmony. $85 covers lodging, meals, and the bus — scholarships available, just ask. Fill out the form below so we can sort cabins and dietary needs.", is_event: true, event_date: at(retreat.date, "17:00"), event_end_date: at(ymdShift(retreat.date, 2), "12:00"), show_attendees: false, created_by: g("Hannah Choi"), created_at: new Date(Date.now() - 3 * 864e5).toISOString() })
 ANN.policy = await upsertAnnouncement({ title: "Please read: new building access policy", body: "Starting Monday the side door locks at 9pm. If you're staying late for setup, text a board member and we'll let you in. Tap 'Got it' below so we know everyone has seen this.", requires_ack: true, created_at: new Date(Date.now() - 2 * 864e5).toISOString() })
-ANN.seniors = await upsertAnnouncement({ title: "Seniors: grad photos after service on the 27th", body: "Wear something nice-ish. We'll do the group shot on the front steps first, then individual ones inside.", audience: "Class of 2026", created_by: g("James Park"), created_at: new Date(Date.now() - 1 * 864e5).toISOString() })
-ANN.draft = await upsertAnnouncement({ title: "Small group placements — DRAFT", body: "Placements go out this Friday. Leaders will reach out individually.", status: "draft" })
+ANN.seniors = await upsertAnnouncement({ requires_ack: false, title: "Seniors: grad photos after service on the 27th", body: "Wear something nice-ish. We'll do the group shot on the front steps first, then individual ones inside.", audience: "Class of 2026", created_by: g("James Park"), created_at: new Date(Date.now() - 1 * 864e5).toISOString() })
+ANN.draft = await upsertAnnouncement({ requires_ack: false, title: "Small group placements — DRAFT", body: "Placements go out this Friday. Leaders will reach out individually.", status: "draft" })
 {
   const rsvpers = [admin.id, member.id, ...["Grace Lee", "Daniel Cho", "Joshua Nguyen", "Rachel Yang", "Emily Wong", "David Chen", "Esther Han", "Nathan Song", "Lydia Kang", "Caleb Ryu", "Chloe Shin", "Isaac Moon"].map(g)]
   const { error } = await db.from("rsvps").upsert(rsvpers.map(user_id => ({ announcement_id: ANN.kickoff.id, user_id })), { onConflict: "announcement_id,user_id", ignoreDuplicates: true })
@@ -441,6 +441,8 @@ ANN.draft = await upsertAnnouncement({ title: "Small group placements — DRAFT"
   for (const a of Object.values(ANN)) for (const p of people.slice(0, 18)) views.push({ announcement_id: a.id, user_id: p.id })
   await db.from("announcement_views").upsert(views, { onConflict: "announcement_id,user_id", ignoreDuplicates: true })
 }
+// requires_ack defaults TRUE in the composer; only the policy notice should ask for it.
+await db.from("announcements").update({ requires_ack: false }).eq("ministry_id", mid).neq("id", ANN.policy.id)
 // Link the calendar events to their announcements (Up Next / hero).
 await db.from("calendar_events").update({ linked_announcement_id: ANN.kickoff.id }).eq("id", EV[kickoff.title].id)
 await db.from("calendar_events").update({ linked_announcement_id: ANN.retreat.id }).eq("id", EV[retreat.title].id)
@@ -709,9 +711,9 @@ const CATS = ["DG Dinner", "Events", "Retreat", "Supplies", "Outreach", "Worship
   const { count: entries } = await db.from("budget_entries").select("*", { count: "exact", head: true }).eq("ministry_id", mid)
   if (!entries) {
     const { error } = await db.from("budget_entries").insert([
-      ["Events", "church", -84.5, "Kickoff balloons + signage", -6], ["DG Dinner", "church", -62.13, "Tuesday DG groceries", -8], ["Supplies", "pitt", -45, "Tabling banner reprint", -12],
-      ["Outreach", "cmu", -120, "Activities fair booth fee", -14], ["Retreat", "church", -500, "Camp Harmony deposit", -20], ["Worship", "church", -39.99, "Cable + capo", -25],
-      ["Events", "pitt", -210, "Spring formal venue balance", -60], ["DG Dinner", "church", -58.4, "Thursday DG groceries", -30], ["Events", "church", 150, "Kickoff dessert sponsorship", -3], ["Supplies", "church", -22.75, "Name tags", -1],
+      ["Events", "church", 84.5, "Kickoff balloons + signage", -6], ["DG Dinner", "church", 62.13, "Tuesday DG groceries", -8], ["Supplies", "pitt", 45, "Tabling banner reprint", -12],
+      ["Outreach", "cmu", 120, "Activities fair booth fee", -14], ["Retreat", "church", 500, "Camp Harmony deposit", -20], ["Worship", "church", 39.99, "Cable + capo", -25],
+      ["Events", "pitt", 210, "Spring formal venue balance", -60], ["DG Dinner", "church", 58.4, "Thursday DG groceries", -30], ["Supplies", "church", 22.75, "Name tags", -1],
     ].map(([category, fund, amount, description, d]) => ({ ministry_id: mid, entry_date: ymdShift(todayYMD, d), category, fund, amount, description, source: "manual", created_by: admin.id })))
     if (error) die("entries", error)
   }
@@ -746,7 +748,7 @@ const CATS = ["DG Dinner", "Events", "Retreat", "Supplies", "Outreach", "Worship
       for (const [fund, amount, status] of r.splits) {
         const { data: a, error: e2 } = await db.from("receipt_fund_allocations").insert({ receipt_id: data.id, ministry_id: mid, fund_id: funds[fund], amount, status, requested_at: status === "requested" ? new Date().toISOString() : null, reviewed_by: status === "pending" ? null : admin.id, reviewed_at: status === "pending" ? null : new Date().toISOString(), signed_off_by: status === "reimbursed" ? admin.id : null, signed_off_at: status === "reimbursed" ? new Date().toISOString() : null, decision_reason: status === "declined" ? (r.reason ?? "Not covered by this fund") : null }).select("id").single()
         if (e2) die("allocation", e2); rec("receipt_fund_allocations", a)
-        if (status === "reimbursed") { const { error: e3 } = await db.from("budget_entries").insert({ ministry_id: mid, entry_date: ymdShift(todayYMD, r.d), category: r.cat, fund, amount: -amount, description: r.name, source: "receipt", receipt_allocation_id: a.id, created_by: admin.id }); if (e3) die("posted entry", e3) }
+        if (status === "reimbursed") { const { error: e3 } = await db.from("budget_entries").insert({ ministry_id: mid, entry_date: ymdShift(todayYMD, r.d), category: r.cat, fund, amount, description: r.name, source: "receipt", receipt_allocation_id: a.id, created_by: admin.id }); if (e3) die("posted entry", e3) }
       }
     }
   }
