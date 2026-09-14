@@ -143,7 +143,7 @@ export async function capture(page: Page, id: string, opts: CaptureOpts) {
 }
 
 /** Record a screen the tour could not reach. Visible in the coverage report. */
-export function skip(page: Page, id: string, role: Role, reason: string, state: State = "populated") {
+export function skip(page: Page, id: string, role: Role, reason: string, state: State = STATE) {
   const vp = viewportName(page)
   appendFileSync(MANIFEST, JSON.stringify({ id, viewport: vp, role, state, skipped: true, reason, ts: new Date().toISOString() }) + "\n")
 }
@@ -157,7 +157,7 @@ export function coveredBy(page: Page, ids: string[], parentId: string, role: Rol
 }
 
 /** Try a step; on failure record SKIPPED instead of killing the whole tour. */
-export async function attempt(page: Page, id: string, role: Role, fn: () => Promise<void>, state: State = "populated") {
+export async function attempt(page: Page, id: string, role: Role, fn: () => Promise<void>, state: State = STATE) {
   try {
     await fn()
   } catch (e) {

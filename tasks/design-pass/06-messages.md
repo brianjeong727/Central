@@ -1,6 +1,6 @@
 # Design pass · Batch 6 — Messages (N4)
 
-Reviewed 2026-09-14 against the seeded E2E Sandbox, both widths, as admin and member, in a 32-member church chat, a personal chat and a DM. 27 captures, 3 reviewers (desktop, mobile, information architecture). Calls could not be captured (no media device headless) and are reviewed from code. The mobile chat-settings subpage and its drills did not open for the rig — for the reason in the first finding below — and are reviewed from code plus the desktop settings capture.
+Reviewed 2026-09-14 against the seeded E2E Sandbox, both widths, as admin and member, in a 32-member church chat, a personal chat and a DM. 27 captures, 3 reviewers (desktop, mobile, information architecture). Calls could not be captured (no media device headless) and are reviewed from code. The mobile chat-settings subpage did not open for the rig on the first three runs — for the reason in the first finding below — and was captured afterwards (it is on-contract: tonal cards, one chrome row; the shot is in Batch 10); its Members / Media / Notifications drills are reviewed from code.
 
 ---
 
