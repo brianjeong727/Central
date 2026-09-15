@@ -24,7 +24,7 @@ import {
 import { updateAutomationSettings, runAnnualClassMaintenance, retroactivelyApplyToggle, archiveToggleChats, backfillTeamChats } from "@/app/actions/auto-chats"
 import { getReceiptLimits, upsertReceiptLimit, deleteReceiptLimit } from "@/app/actions/receipts"
 import type { ReceiptLimit } from "@/app/actions/receipts"
-import { getFinanceFunds, createFinanceFund, updateFinanceFund, logFundsAudit, type FinanceFund, type FundKind } from "@/app/actions/finance-funds"
+import { getFinanceFunds, createFinanceFund, updateFinanceFund, type FinanceFund, type FundKind } from "@/app/actions/finance-funds"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
 import type { HomeVerse } from "@/app/actions/home-verses"
 import { updateGovernanceSettings, updateTeamAdminAccess } from "@/app/actions/governance"
@@ -303,8 +303,8 @@ export function SettingsTab({
   //
   // `settings.funds_edit` is deliberately NOT in this union: funds may be changed
   // by a finance-capable member, and this browser insert would be refused by the
-  // leader-tier audit_logs INSERT policy. That row is written by the server action
-  // that performs the funds write (`logFundsAudit`).
+  // leader-tier audit_logs INSERT policy. Those rows are written by the server
+  // actions that perform the funds writes, from before/after DB state.
   function logSettingsChange(action: "settings.general_edit" | "settings.discovery_edit" | "settings.governance_edit" | "settings.automations_edit" | "settings.moderation_edit" | "settings.sharing_edit", section: string, changes: AuditChange[]) {
     if (changes.length === 0) return
     logAudit({ ministryId, actorId: userId, actorName: userName, action, entityType: "ministry", entityId: ministryId, entityLabel: section, metadata: { changes } })
@@ -1153,29 +1153,13 @@ export function SettingsTab({
     setPendingFunds(prev => prev.map(f => f.key === key ? { ...f, ...patch } : f))
   }
 
-  const FUND_KIND_LABEL: Record<FundKind, string> = { church: "Church", external: "External" }
-  // Funds commit with no confirm modal, so the delta is computed here against the
-  // saved list — the same {field, from, to} shape every other section logs.
-  function fundsDeltas(): AuditChange[] {
-    const d: AuditChange[] = []
-    for (const p of pendingFunds) {
-      if (!p.id) {
-        if (p.name.trim()) d.push({ field: "Fund added", from: "—", to: `${p.name.trim()} (${FUND_KIND_LABEL[p.kind].toLowerCase()})` })
-        continue
-      }
-      const orig = funds.find(f => f.id === p.id)
-      if (!orig) continue
-      if (p.name.trim() && p.name.trim() !== orig.name) d.push({ field: "Fund name", from: orig.name, to: p.name.trim() })
-      if (p.kind !== orig.kind) d.push({ field: `Fund type — ${orig.name}`, from: FUND_KIND_LABEL[orig.kind], to: FUND_KIND_LABEL[p.kind] })
-      if (p.is_active !== orig.is_active) d.push({ field: `Fund — ${orig.name}`, from: orig.is_active ? "active" : "archived", to: p.is_active ? "active" : "archived" })
-    }
-    return d
-  }
-
+  // No audit diff is computed here on purpose. `createFinanceFund` /
+  // `updateFinanceFund` write the `settings.funds_edit` row themselves, from the
+  // row they read before the write and the row the write committed — a
+  // service-role insert must never carry text the browser supplied.
   async function saveFunds() {
     // Validate: every kept (active) fund needs a name.
     if (pendingFunds.some(f => f.is_active && !f.name.trim())) { setFundsError("Every fund needs a name."); return }
-    const changes = fundsDeltas()
     setFundsError(null); setSavingFunds(true)
     // Commit each diff against the saved list.
     for (const p of pendingFunds) {
@@ -1196,9 +1180,6 @@ export function SettingsTab({
     const { data: fresh } = await getFinanceFunds(ministryId, { includeInactive: true })
     setFunds(fresh)
     setPendingFunds(toPending(fresh))
-    // Audited server-side (service role, same gate as the writes above) so a
-    // finance-capable non-admin's change is recorded too — see logFundsAudit.
-    await logFundsAudit({ ministryId, changes })
     setFundsEditing(false)
     setSavingFunds(false)
   }

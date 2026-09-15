@@ -68,6 +68,63 @@ async function authorizeFundWrite(
   return { uid: user.id, admin }
 }
 
+const FUND_KIND_LABEL: Record<FundKind, string> = { church: "Church", external: "External" }
+
+/**
+ * Write ONE `settings.funds_edit` row, from values this module read out of the
+ * database itself.
+ *
+ * Two reasons it lives here rather than in the browser:
+ *  1. Funds is the one audited settings section whose write is not admin-gated —
+ *     `authorizeFundWrite` admits any finance-capable member, while the
+ *     `audit_logs` INSERT policy is leader-tier, so the browser insert was
+ *     refused for exactly the callers who were allowed to make the change.
+ *  2. A service-role insert must never carry text the caller supplied: that
+ *     would let any finance-capable member mint arbitrary audit entries for
+ *     changes that never happened, bypassing the INSERT policy entirely. Every
+ *     caller below builds `changes` from the BEFORE row and the COMMITTED row —
+ *     the client's intent is never read.
+ *
+ * Fire-and-forget in spirit (a failed audit row must not fail the fund write),
+ * but the failure is surfaced on the server console.
+ */
+async function auditFundChange(
+  admin: ReturnType<typeof createAdminClient>,
+  ministryId: string,
+  uid: string,
+  changes: AuditChange[],
+): Promise<void> {
+  if (changes.length === 0) return
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("name")
+    .eq("id", uid)
+    .eq("ministry_id", ministryId)
+    .maybeSingle()
+
+  const { error } = await admin.from("audit_logs").insert({
+    ministry_id: ministryId,
+    actor_id: uid,
+    actor_name: (profile?.name as string | undefined) ?? "Unknown",
+    action: "settings.funds_edit",
+    entity_type: "ministry",
+    entity_id: ministryId,
+    entity_label: "Funds",
+    metadata: { changes },
+  })
+  if (error) console.warn(`[audit] settings.funds_edit was not recorded: ${error.message}`)
+}
+
+// before → after on the three fields a fund settings edit can move, in the same
+// plain-English shape every other audited settings section uses.
+function fundDeltas(before: FinanceFund, after: FinanceFund): AuditChange[] {
+  const d: AuditChange[] = []
+  if (before.name !== after.name) d.push({ field: "Fund name", from: before.name, to: after.name })
+  if (before.kind !== after.kind) d.push({ field: `Fund type — ${after.name}`, from: FUND_KIND_LABEL[before.kind], to: FUND_KIND_LABEL[after.kind] })
+  if (before.is_active !== after.is_active) d.push({ field: `Fund — ${after.name}`, from: before.is_active ? "active" : "archived", to: after.is_active ? "active" : "archived" })
+  return d
+}
+
 function kebab(name: string): string {
   return name
     .toLowerCase()
@@ -117,7 +174,13 @@ export async function createFinanceFund(params: {
     .select(FUND_SELECT)
     .single()
   if (error) return { data: null, error: error.message }
-  return { data: data as FinanceFund, error: null }
+
+  // Audited from the row the DB returned, not from `params`.
+  const created = data as FinanceFund
+  await auditFundChange(admin, params.ministryId, uid, [
+    { field: "Fund added", from: "—", to: `${created.name} (${FUND_KIND_LABEL[created.kind].toLowerCase()})` },
+  ])
+  return { data: created, error: null }
 }
 
 export async function updateFinanceFund(params: {
@@ -130,7 +193,7 @@ export async function updateFinanceFund(params: {
 }): Promise<{ error: string | null }> {
   const auth = await authorizeFundWrite(params.ministryId)
   if ("error" in auth) return { error: auth.error }
-  const { admin } = auth
+  const { admin, uid } = auth
 
   // Never change `slug` (stable key referenced by dual-written fund strings).
   const patch: Record<string, unknown> = {}
@@ -144,55 +207,27 @@ export async function updateFinanceFund(params: {
   if (params.isActive !== undefined) patch.is_active = params.isActive
   if (Object.keys(patch).length === 0) return { error: null }
 
-  const { error } = await admin
+  // Read the row BEFORE the write and take the committed row back from the
+  // write itself, so the audit entry describes what the DB actually did.
+  const { data: before } = await admin
+    .from("finance_funds")
+    .select(FUND_SELECT)
+    .eq("id", params.id)
+    .eq("ministry_id", params.ministryId)
+    .maybeSingle()
+  if (!before) return { error: "Fund not found." }
+
+  const { data: after, error } = await admin
     .from("finance_funds")
     .update(patch)
     .eq("id", params.id)
     .eq("ministry_id", params.ministryId)
-  return { error: error?.message ?? null }
-}
+    .select(FUND_SELECT)
+    .single()
+  if (error) return { error: error.message }
 
-/**
- * Record one Funds settings commit in the audit log.
- *
- * Funds is the ONE audited settings section whose write is not admin-gated:
- * `authorizeFundWrite` admits any finance-capable member, while the `audit_logs`
- * INSERT policy is leader-tier. So the browser-side audit insert was refused for
- * exactly the callers who were allowed to make the change — a real, permitted
- * settings change with no record and no error. The row is written here instead,
- * on the service-role client, behind the SAME gate that authorizes the fund
- * writes themselves, with the actor read from the caller's own profile (never
- * from the client). Called once per Save with the whole diff, so the log still
- * reads one row per commit like every other section.
- */
-export async function logFundsAudit(params: {
-  ministryId: string
-  changes: AuditChange[]
-}): Promise<{ error: string | null }> {
-  if (params.changes.length === 0) return { error: null }
-  const auth = await authorizeFundWrite(params.ministryId)
-  if ("error" in auth) return { error: auth.error }
-  const { admin, uid } = auth
-
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("name")
-    .eq("id", uid)
-    .eq("ministry_id", params.ministryId)
-    .maybeSingle()
-
-  const { error } = await admin.from("audit_logs").insert({
-    ministry_id: params.ministryId,
-    actor_id: uid,
-    actor_name: (profile?.name as string | undefined) ?? "Unknown",
-    action: "settings.funds_edit",
-    entity_type: "ministry",
-    entity_id: params.ministryId,
-    entity_label: "Funds",
-    metadata: { changes: params.changes },
-  })
-  if (error) console.warn(`[audit] settings.funds_edit was not recorded: ${error.message}`)
-  return { error: error?.message ?? null }
+  await auditFundChange(admin, params.ministryId, uid, fundDeltas(before as FinanceFund, after as FinanceFund))
+  return { error: null }
 }
 
 // SOFT delete only — funds in use are FK-referenced by allocations and must never
@@ -203,12 +238,25 @@ export async function removeFinanceFund(params: {
 }): Promise<{ error: string | null }> {
   const auth = await authorizeFundWrite(params.ministryId)
   if ("error" in auth) return { error: auth.error }
-  const { admin } = auth
+  const { admin, uid } = auth
 
-  const { error } = await admin
+  const { data: before } = await admin
+    .from("finance_funds")
+    .select(FUND_SELECT)
+    .eq("id", params.id)
+    .eq("ministry_id", params.ministryId)
+    .maybeSingle()
+  if (!before) return { error: "Fund not found." }
+
+  const { data: after, error } = await admin
     .from("finance_funds")
     .update({ is_active: false })
     .eq("id", params.id)
     .eq("ministry_id", params.ministryId)
-  return { error: error?.message ?? null }
+    .select(FUND_SELECT)
+    .single()
+  if (error) return { error: error.message }
+
+  await auditFundChange(admin, params.ministryId, uid, fundDeltas(before as FinanceFund, after as FinanceFund))
+  return { error: null }
 }
