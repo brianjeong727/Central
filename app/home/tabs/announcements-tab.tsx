@@ -1766,7 +1766,9 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                       <button onClick={() => onOpenAnnouncement(ann.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "12px", color: "var(--muted-text)", marginTop: 10, textAlign: "left" }} className="hover:text-[var(--plum)] transition-colors">See announcement →</button>
                       <div style={{ marginTop: "18px", paddingTop: "16px", borderTop: "1px solid var(--line-3)" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                          <span style={{ fontSize: "12px", color: "var(--muted-text)" }}>{ann.rsvp_count} going · {ann.view_count} views</span>
+                          {/* "n going" is RSVP state (a member's own room count);
+                              the VIEW COUNT is reach telemetry and is leader-tier. */}
+                          <span style={{ fontSize: "12px", color: "var(--muted-text)" }}>{ann.rsvp_count} going{isLeaderOrAdmin ? ` · ${ann.view_count} views` : ""}</span>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
                             <AckCardAction
                               ann={ann}
@@ -2082,6 +2084,7 @@ interface DetailAnnouncement {
   event_date: string | null
   event_end_date: string | null
   is_pinned: boolean
+  is_sub_pinned: boolean
   is_event: boolean
   image_url: string | null
   audience: string | null
@@ -2094,11 +2097,17 @@ interface DetailAnnouncement {
   form_id: string | null
   user_has_responded: boolean
   created_by: string | null
+  /** "draft" | "published" (the column is nullable/absent on old rows, which read
+   *  as published). A draft has not been sent to anyone, so every published-only
+   *  readout on this screen — Posted, views, the ack tally, RSVP — is suppressed
+   *  and the one action is Continue editing. */
+  status?: string
   // Acknowledgment (spec 2026-08-19). `requires_ack` defaults TRUE for new
-  // announcements; the author can opt out per announcement. The COUNT is public
-  // by ratified decision — members see "3 of 18" too, because seeing that others
-  // acknowledge is how the expectation is learned. The ROSTER of who has not is
-  // leader-tier only, always.
+  // announcements; the author can opt out per announcement. The COUNT is
+  // LEADER-TIER (revised 2026-09-14): "3 of 18 acknowledged" is reach telemetry,
+  // and a member seeing how many of their peers complied is a number they can do
+  // nothing with. Members keep their own "Got it" / "Acknowledged" state. The
+  // ROSTER of who has not is leader-tier only, always.
   requires_ack: boolean
   ack_count: number
   ack_total: number
@@ -2140,6 +2149,10 @@ export function AnnouncementDetailView({
   // members is shaming, and is the failure mode that would make people resent
   // the feature).
   const [rosterOpen, setRosterOpen] = useState(false)
+  // "Continue editing" on a draft — the SAME composer the feed opens (which owns
+  // Publish in its footer). It takes over the screen, exactly as it does from the
+  // list, rather than stacking a modal on top of a detail that is about to change.
+  const [editorOpen, setEditorOpen] = useState(false)
   const [roster, setRoster] = useState<{ id: string; name: string }[] | null>(null)
   const [nudging, setNudging] = useState(false)
   const [nudgeNote, setNudgeNote] = useState<string | null>(null)
@@ -2284,6 +2297,15 @@ export function AnnouncementDetailView({
 
   const isLeaderOrAdmin = isLeaderRole(userRole)
   const showAttendees = ann?.is_event && ann.rsvp_attendees.length > 0 && (isLeaderOrAdmin || ann.show_attendees)
+  // A draft has been sent to nobody. Everything this screen says about reception —
+  // "Posted 3 days ago", the view count, "3 of 18 acknowledged", the RSVP ask, the
+  // Remind roster — would be reporting on an audience that does not exist yet.
+  const isDraftAnn = ann?.status === "draft"
+  // Reach telemetry (views, the ack tally) is for the person accountable for the
+  // reach. A member has no action to take on "142 of 180" and no standing to read
+  // it; their own Got it / RSVP state is theirs and stays. (Convention #2/#3: the
+  // tier predicate, never an inline role list.)
+  const showTelemetry = isLeaderOrAdmin && !isDraftAnn
 
   // Who hasn't acknowledged: the audience (shared helper) minus the ack rows a
   // leader can read. Tombstoned accounts are excluded by the helper — a deleted
@@ -2330,9 +2352,11 @@ export function AnnouncementDetailView({
     )
     // Adaptive: an aside rail appears only when there's an event, a form, or an
     // acknowledgment ask (the "Got it" primary is an aside module like RSVP).
-    const hasAside = ann.is_event || ann.has_form || ann.requires_ack
-    // "142 of 180 acknowledged" — public by ratified decision: the aggregate is
-    // what makes the norm legible. The ROSTER behind it is leader-tier only.
+    // A DRAFT has no rail at all: RSVP, Fill out form and Got it are all asks of
+    // an audience that has not been sent anything, so the screen carries exactly
+    // one action instead — Continue editing, below the body.
+    const hasAside = !isDraftAnn && (ann.is_event || ann.has_form || ann.requires_ack)
+    // "142 of 180 acknowledged" — leader-tier (see DetailAnnouncement.ack_count).
     const ackPct = ann.ack_total > 0 ? Math.min(100, Math.round((ann.ack_count / ann.ack_total) * 100)) : 0
     const ackLine = `${ann.ack_count} of ${ann.ack_total} acknowledged`
     // The form's button takes the loud (primary) fill only when it's the lone
@@ -2344,6 +2368,10 @@ export function AnnouncementDetailView({
       <>
         {/* Mobile — pocket 10px kicker, borderless tonal chip */}
         <div className="md:hidden flex flex-wrap items-center gap-2.5">
+          {/* A LABEL, not a pill: "DRAFT" is the state of the thing you are
+              reading, and the first word of the eyebrow is where that belongs.
+              Without it the screen is indistinguishable from a published post. */}
+          {isDraftAnn && <span data-draft-eyebrow style={{ ...POCKET_KICKER_STYLE, color: "var(--ink)" }}>Draft</span>}
           <span style={POCKET_KICKER_STYLE}>{formatDate(eyebrowSrc)}</span>
           {ann.audience && ann.audience !== "all" && (
             <span style={{ ...POCKET_KICKER_STYLE, background: "var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
@@ -2352,6 +2380,7 @@ export function AnnouncementDetailView({
         </div>
         {/* Desktop — unchanged editorial eyebrow */}
         <div className="hidden md:flex flex-wrap items-center gap-2.5">
+          {isDraftAnn && <span data-draft-eyebrow style={{ ...monoStyle, color: "var(--ink)" }}>Draft</span>}
           <span style={monoStyle}>{formatDate(eyebrowSrc)}</span>
           {ann.audience && ann.audience !== "all" && (
             <span style={{ ...monoStyle, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
@@ -2426,33 +2455,40 @@ export function AnnouncementDetailView({
               Got it
             </CentralButton>
           ) : null}
-          {/* Someone the announcement does not ask — its AUTHOR, or a leader
-              outside the class it went to — still sees the progress and (if
-              leader-tier) the roster below. They just are not asked to confirm
-              receipt of a notice that does not count them. */}
-          <AckProgress pct={ackPct} />
-          {isLeaderOrAdmin ? (
-            <button
-              type="button"
-              onClick={openRoster}
-              style={{ fontSize: 13, color: "var(--body)", background: "transparent", border: "none", padding: 0, marginTop: 10, cursor: "pointer", textAlign: "center", width: "100%" }}
-            >
-              {ackLine} ›
-            </button>
-          ) : (
-            <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 10, textAlign: "center" }}>{ackLine}</div>
+          {/* The tally and its bar are REACH TELEMETRY, so they are leader-tier.
+              A member's own state ("Got it" / Acknowledged) is above and stays;
+              how many of their peers complied is not theirs to read, and there
+              is nothing they could do with it. The roster behind the line has
+              always been leader-tier. */}
+          {showTelemetry && (
+            <>
+              <AckProgress pct={ackPct} />
+              <button
+                type="button"
+                onClick={openRoster}
+                style={{ fontSize: 13, color: "var(--body)", background: "transparent", border: "none", padding: 0, marginTop: 10, cursor: "pointer", textAlign: "center", width: "100%" }}
+              >
+                {ackLine} ›
+              </button>
+            </>
           )}
         </div>
       )
     }
-    asideModules.push(
-      <div key="posted">
-        <div style={{ ...monoStyle }}>Posted</div>
-        <div style={{ fontFamily: DETAIL_SANS, fontSize: 14, color: "var(--body)", marginTop: 10, lineHeight: 1.55 }}>
-          {detailPosted(ann.created_at)}<br />{ann.view_count} {ann.view_count === 1 ? "view" : "views"}
+    // "Posted …" is a claim about publication, so a draft never gets this module
+    // (and a draft has no rail at all — see `hasAside`). The VIEW COUNT under it
+    // is leader-tier: it measures reach, which is the poster's business.
+    if (!isDraftAnn) {
+      asideModules.push(
+        <div key="posted">
+          <div style={{ ...monoStyle }}>Posted</div>
+          <div style={{ fontFamily: DETAIL_SANS, fontSize: 14, color: "var(--body)", marginTop: 10, lineHeight: 1.55 }}>
+            {detailPosted(ann.created_at)}
+            {showTelemetry && <><br />{ann.view_count} {ann.view_count === 1 ? "view" : "views"}</>}
+          </div>
         </div>
-      </div>
-    )
+      )
+    }
 
     // ── Mobile aside — each module as a tonal borderless PocketCard (§1.1),
     //    10px pocket kicker, event date scaled to the 22px stat-number tier ──
@@ -2517,29 +2553,33 @@ export function AnnouncementDetailView({
               Got it
             </CentralButton>
           ) : null}
-          <AckProgress pct={ackPct} />
-          {isLeaderOrAdmin ? (
-            <button
-              type="button"
-              onClick={openRoster}
-              style={{ fontSize: 13, color: "var(--body)", background: "transparent", border: "none", padding: 0, marginTop: 10, cursor: "pointer", textAlign: "center", width: "100%" }}
-            >
-              {ackLine} ›
-            </button>
-          ) : (
-            <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 10, textAlign: "center" }}>{ackLine}</div>
+          {/* Leader-tier, same rule as the desktop rail above. */}
+          {showTelemetry && (
+            <>
+              <AckProgress pct={ackPct} />
+              <button
+                type="button"
+                onClick={openRoster}
+                style={{ fontSize: 13, color: "var(--body)", background: "transparent", border: "none", padding: 0, marginTop: 10, cursor: "pointer", textAlign: "center", width: "100%" }}
+              >
+                {ackLine} ›
+              </button>
+            </>
           )}
         </PocketCard>
       )
     }
-    asideModulesMobile.push(
-      <PocketCard key="posted">
-        <div style={POCKET_KICKER_STYLE}>Posted</div>
-        <div style={{ fontFamily: DETAIL_SANS, fontSize: 14, color: "var(--body)", marginTop: 8, lineHeight: 1.55 }}>
-          {detailPosted(ann.created_at)}<br />{ann.view_count} {ann.view_count === 1 ? "view" : "views"}
-        </div>
-      </PocketCard>
-    )
+    if (!isDraftAnn) {
+      asideModulesMobile.push(
+        <PocketCard key="posted">
+          <div style={POCKET_KICKER_STYLE}>Posted</div>
+          <div style={{ fontFamily: DETAIL_SANS, fontSize: 14, color: "var(--body)", marginTop: 8, lineHeight: 1.55 }}>
+            {detailPosted(ann.created_at)}
+            {showTelemetry && <><br />{ann.view_count} {ann.view_count === 1 ? "view" : "views"}</>}
+          </div>
+        </PocketCard>
+      )
+    }
 
     return (
       // SubpageShell owns scroll + horizontal inset (px-5 md:px-14) + vertical
@@ -2571,12 +2611,22 @@ export function AnnouncementDetailView({
                 detail); desktop keeps its editorial sans 16 on --body (unchanged). */}
             <div className="md:hidden" style={{ fontFamily: DETAIL_SERIF, fontSize: 17, lineHeight: 1.65, color: "var(--ink)", marginTop: 20, whiteSpace: "pre-wrap" }}>{ann.body}</div>
             <div className="hidden md:block" style={{ fontFamily: DETAIL_SANS, fontSize: 16, lineHeight: 1.75, color: "var(--body)", marginTop: 26, maxWidth: 640, whiteSpace: "pre-wrap" }}>{ann.body}</div>
-            {/* No aside → posted/views anchor the bottom of the single column */}
-            {!hasAside && (
+            {/* A DRAFT's one action. It is the only thing below the body — no
+                Posted line, no views, no ack tally, no Remind — because the
+                announcement has not happened yet, and the only true next step is
+                to keep writing it. Publish lives in that editor's footer. */}
+            {isDraftAnn ? (
+              isLeaderOrAdmin && (
+                <div style={{ marginTop: 34, paddingTop: 22, borderTop: "1px solid var(--line)" }}>
+                  <CentralButton variant="primary" onClick={() => setEditorOpen(true)}>Continue editing</CentralButton>
+                </div>
+              )
+            ) : !hasAside ? (
+              /* No aside → posted (+ views, leader-tier) anchor the single column */
               <div style={{ display: "flex", alignItems: "center", gap: 9, marginTop: 34, paddingTop: 22, borderTop: "1px solid var(--line)", fontSize: 14, color: "var(--muted-text)" }}>
-                Posted {detailPosted(ann.created_at)} · {ann.view_count} {ann.view_count === 1 ? "view" : "views"}
+                Posted {detailPosted(ann.created_at)}{showTelemetry ? ` · ${ann.view_count} ${ann.view_count === 1 ? "view" : "views"}` : ""}
               </div>
-            )}
+            ) : null}
           </div>
           {/* Aside rail — event / form / posted modules. Desktop keeps the
               hairline-divided rail; mobile renders each module as a tonal
@@ -2613,6 +2663,27 @@ export function AnnouncementDetailView({
     { label: "Announcements", onClick: onGoToList },
     { label: title },
   ]
+
+  // "Continue editing" SWAPS the screen for the composer, the same way the feed
+  // does — the composer owns the whole viewport (its own back chrome, its own
+  // Save draft / Publish footer), so stacking it over the detail would give the
+  // screen two backs and two headers. Publishing from it flips this detail's copy
+  // (the DRAFT eyebrow, Posted, the telemetry) the moment it returns.
+  if (editorOpen && ann && isLeaderOrAdmin) {
+    return (
+      <CreateAnnouncementModal
+        userId={userId}
+        ministryId={ministryId}
+        existing={ann}
+        onClose={() => setEditorOpen(false)}
+        onSuccess={(saved, formMeta) => {
+          setAnn((prev) => prev ? { ...prev, ...saved, has_form: formMeta.has_form, form_id: formMeta.form_id } : prev)
+          setEditorOpen(false)
+          refreshHome()
+        }}
+      />
+    )
+  }
 
   return (
     <SubpageShell crumbs={crumbs} width="full">

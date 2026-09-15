@@ -6,7 +6,7 @@
 // the shots spec doesn't exercise. Every write is scoped to E2E::-prefixed
 // sandbox rows and cleaned up in afterAll.
 import { test, expect, type Page } from "@playwright/test"
-import { sandbox, E2E_PREFIX, memberState } from "./fixtures"
+import { sandbox, E2E_PREFIX, memberState, adminState } from "./fixtures"
 
 const DRAFT_TITLE = `${E2E_PREFIX}P4 Manual Draft Verify`
 const RSVP_EVENT_TITLE = `${E2E_PREFIX}P4 Manual RSVP Event`
@@ -101,8 +101,16 @@ test.describe.serial("P4 manual click-through — draft visibility + feed intera
     await expect(publishBtn).toBeEnabled()
     await publishBtn.click()
 
+    // It has LEFT the tray: the title now appears exactly once (in the published
+    // feed), and the row itself is published. Asserting the tray is GONE was the
+    // old check, and it only ever held because the sandbox happened to contain no
+    // other draft — the tray's presence is about every draft in the tenant, not
+    // about this one.
     await expect(vis(page, DRAFT_TITLE, false).first()).toBeVisible({ timeout: 10000 })
-    await expect(vis(page, "Drafts")).toHaveCount(0)
+    await expect(vis(page, DRAFT_TITLE, false)).toHaveCount(1)
+    const { data: row } = await sandbox().client
+      .from("announcements").select("status").eq("title", DRAFT_TITLE).single()
+    expect((row as { status: string }).status).toBe("published")
   })
 
   test("1c cleanup — leader deletes the (now published) test announcement via kebab ActionMenu", async ({ page }) => {
@@ -202,4 +210,109 @@ test.describe.serial("P4 manual click-through — draft visibility + feed intera
       await page.goBack()
     })
   })
+})
+
+
+// ── A draft never reads as published; telemetry is leader-tier ───────────────
+//
+// Two separate lies the detail screen used to tell. (1) A DRAFT rendered exactly
+// like a published post: "Posted 2 days ago", a view count, an acknowledgment
+// tally and a Remind button — readouts about an audience that had been sent
+// nothing. (2) Views and "n of m acknowledged" are REACH telemetry, and every
+// member could read them; a member can do nothing with how many of their peers
+// complied. Their own Got it / RSVP state is theirs and stays.
+test.describe("draft honesty + leader-tier telemetry", () => {
+  const DRAFT = `${E2E_PREFIX}P4 Truth Draft`
+  const LIVE = `${E2E_PREFIX}P4 Truth Published`
+  let draftId = ""
+  let liveId = ""
+
+  test.beforeAll(async () => {
+    const sb = sandbox()
+    const adminId = await sb.adminUserId()
+    const { data: d, error: dErr } = await sb.client.from("announcements").insert({
+      title: DRAFT, body: "A draft has been sent to nobody.", audience: "all",
+      status: "draft", ministry_id: sb.ministryId, created_by: adminId, requires_ack: true,
+    }).select("id").single()
+    if (dErr) throw dErr
+    draftId = (d as { id: string }).id
+
+    const { data: l, error: lErr } = await sb.client.from("announcements").insert({
+      title: LIVE, body: "A published announcement that asks for a Got it.", audience: "all",
+      status: "published", ministry_id: sb.ministryId, created_by: adminId, requires_ack: true,
+    }).select("id").single()
+    if (lErr) throw lErr
+    liveId = (l as { id: string }).id
+  })
+
+  test.afterAll(async () => {
+    const sb = sandbox()
+    await sb.deleteAnnouncementsByPrefix(`${E2E_PREFIX}P4 Truth`)
+  })
+
+  for (const width of [390, 1440] as const) {
+    test(`@${width}: a draft says DRAFT and reports nothing about reception`, async ({ browser }) => {
+      test.setTimeout(60_000)
+      const ctx = await browser.newContext({ storageState: adminState, viewport: { width, height: 844 } })
+      const page = await ctx.newPage()
+      await page.goto(`/home?tab=announcements&ann=${draftId}`)
+      await expect(vis(page, DRAFT, false).first()).toBeVisible({ timeout: 20000 })
+
+      // The state of the thing you are reading, as an eyebrow label.
+      const eyebrow = page.locator("[data-draft-eyebrow]").filter({ visible: true }).first()
+      await expect(eyebrow).toBeVisible({ timeout: 10000 })
+      await expect(eyebrow).toHaveText(/draft/i)
+
+      // …and NOTHING that claims it went out.
+      await expect(page.getByText(/^Posted/).filter({ visible: true })).toHaveCount(0)
+      await expect(page.getByText(/\bviews?\b/).filter({ visible: true })).toHaveCount(0)
+      await expect(page.getByText(/acknowledged/i).filter({ visible: true })).toHaveCount(0)
+      await expect(page.getByText(/Remind/i).filter({ visible: true })).toHaveCount(0)
+      await expect(page.getByRole("button", { name: "RSVP", exact: true }).filter({ visible: true })).toHaveCount(0)
+
+      // One action, and it is the only true next step.
+      await expect(page.getByRole("button", { name: "Continue editing" }).filter({ visible: true }).first())
+        .toBeVisible({ timeout: 10000 })
+      await ctx.close()
+    })
+  }
+
+  test("Continue editing opens the composer that owns Publish", async ({ page }) => {
+    await page.goto(`/home?tab=announcements&ann=${draftId}`)
+    await page.getByRole("button", { name: "Continue editing" }).filter({ visible: true }).first().click()
+    await expect(page.locator(`input[value="${DRAFT}"]`).filter({ visible: true }).first())
+      .toBeVisible({ timeout: 15000 })
+    await expect(page.getByRole("button", { name: "Publish", exact: true }).filter({ visible: true }).first())
+      .toBeVisible({ timeout: 10000 })
+  })
+
+  for (const width of [390, 1440] as const) {
+    test(`@${width}: a leader sees the view count and the ack tally`, async ({ browser }) => {
+      test.setTimeout(60_000)
+      const ctx = await browser.newContext({ storageState: adminState, viewport: { width, height: 844 } })
+      const page = await ctx.newPage()
+      await page.goto(`/home?tab=announcements&ann=${liveId}`)
+      await expect(vis(page, LIVE, false).first()).toBeVisible({ timeout: 20000 })
+      await expect(page.getByText(/\bviews?\b/).filter({ visible: true }).first()).toBeVisible({ timeout: 10000 })
+      await expect(page.getByText(/acknowledged/i).filter({ visible: true }).first()).toBeVisible({ timeout: 10000 })
+      await ctx.close()
+    })
+
+    test(`@${width}: a member sees neither the view count nor the ack tally`, async ({ browser }) => {
+      test.setTimeout(60_000)
+      const ctx = await browser.newContext({ storageState: memberState, viewport: { width, height: 844 } })
+      const page = await ctx.newPage()
+      await page.goto(`/home?tab=announcements&ann=${liveId}`)
+      await expect(vis(page, LIVE, false).first()).toBeVisible({ timeout: 20000 })
+      // "Posted <when>" stays — that is a fact about the announcement, not about
+      // its reach — so the absence below is the gate, not a blank screen.
+      await expect(page.getByText(/^Posted$|^Posted /).filter({ visible: true }).first()).toBeVisible({ timeout: 10000 })
+      await expect(page.getByText(/\bviews?\b/).filter({ visible: true })).toHaveCount(0)
+      await expect(page.getByText(/acknowledged/i).filter({ visible: true })).toHaveCount(0)
+      // …and their OWN control is untouched.
+      await expect(page.getByRole("button", { name: "Got it" }).filter({ visible: true }).first())
+        .toBeVisible({ timeout: 10000 })
+      await ctx.close()
+    })
+  }
 })
