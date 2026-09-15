@@ -277,6 +277,46 @@ test.describe("draft honesty + leader-tier telemetry", () => {
     })
   }
 
+  // A draft is leader-tier, and the detail is reachable by DEEP LINK — Home, a
+  // push, a pasted URL — not only from the feed. The feed filtered drafts out of
+  // its own query for non-leaders; the DETAIL did not, so `?ann=<draft id>`
+  // served a member the unpublished text in full.
+  for (const width of [390, 1440] as const) {
+    test(`@${width}: a member deep-linking to a draft gets "not found", not the draft`, async ({ browser }) => {
+      test.setTimeout(60_000)
+      const ctx = await browser.newContext({ storageState: memberState, viewport: { width, height: 844 } })
+      const page = await ctx.newPage()
+      await page.goto(`/home?tab=announcements&ann=${draftId}`)
+      await expect(vis(page, "Announcement not found.", false).first()).toBeVisible({ timeout: 20000 })
+      // Not the title, not the body, not a fragment of either.
+      await expect(vis(page, DRAFT, false)).toHaveCount(0)
+      await expect(vis(page, "A draft has been sent to nobody.", false)).toHaveCount(0)
+      await ctx.close()
+    })
+  }
+
+  // Opening a draft must not create the evidence that it went out — the author's
+  // own proofreading pass would otherwise read back to them as reach.
+  test("opening a draft records no view", async ({ page }) => {
+    const sb = sandbox()
+    await sb.client.from("announcement_views").delete().eq("announcement_id", draftId)
+    await page.goto(`/home?tab=announcements&ann=${draftId}`)
+    await expect(page.locator("[data-draft-eyebrow]").filter({ visible: true }).first())
+      .toBeVisible({ timeout: 20000 })
+    await page.waitForTimeout(2000) // the upsert is fire-and-forget; give it room to have happened
+    const { data: views } = await sb.client
+      .from("announcement_views").select("user_id").eq("announcement_id", draftId)
+    expect(views ?? []).toHaveLength(0)
+
+    // Control: a PUBLISHED announcement still records one.
+    await page.goto(`/home?tab=announcements&ann=${liveId}`)
+    await expect(vis(page, LIVE, false).first()).toBeVisible({ timeout: 20000 })
+    await expect.poll(async () => {
+      const { data } = await sb.client.from("announcement_views").select("user_id").eq("announcement_id", liveId)
+      return (data ?? []).length
+    }, { timeout: 10000 }).toBeGreaterThan(0)
+  })
+
   test("Continue editing opens the composer that owns Publish", async ({ page }) => {
     await page.goto(`/home?tab=announcements&ann=${draftId}`)
     await page.getByRole("button", { name: "Continue editing" }).filter({ visible: true }).first().click()

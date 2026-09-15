@@ -2169,21 +2169,38 @@ export function AnnouncementDetailView({
 
   useEffect(() => {
     async function load() {
-      const { data: annData } = await supabase
+      // A DRAFT is leader-tier, and this screen is reachable by DEEP LINK — Home,
+      // a push, a pasted URL — not only from the feed. The feed filters drafts out
+      // of its own query for non-leaders, which is exactly why nothing below it
+      // ever had to; the detail had no such filter, so `?ann=<draft id>` served a
+      // member the unpublished text. The predicate is the tier helper, never an
+      // inline role list (Convention #2). NOTE: the DATABASE still returns the row
+      // — this is an app-layer guard, and the RLS fix is a separate follow-up.
+      const canSeeDrafts = isLeaderRole(userRole)
+      let q = supabase
         .from("announcements")
         .select("*")
         .eq("id", announcementId)
         .eq("ministry_id", ministryId)
-        .maybeSingle()
+      if (!canSeeDrafts) q = q.eq("status", "published")
+      const { data: annData } = await q.maybeSingle()
 
+      // No row (or a draft a member asked for) → the existing "Announcement not
+      // found" state. Deliberately the same dead end for both: telling someone a
+      // draft EXISTS but is not theirs to read leaks the thing being protected.
       if (!annData) { setLoading(false); return }
+
+      // A draft has been shown to nobody, so opening one must not create the
+      // evidence that it was — a view row here would make the author's own
+      // proofreading pass read back as reach.
+      const isDraftRow = annData.status === "draft"
 
       // Counts through the SECURITY DEFINER batch functions (see
       // lib/announcement-counts.ts) — views and rsvps are no longer readable
       // ministry-wide, so counting rows here would report 0-or-1 to a member.
       // The rsvps ROW read stays for "did I RSVP" + the attendee chips.
       const [viewCounts, rsvpCounts, ackCounts, { data: rsvpRows }, { data: formData }, { data: ackRows }] = await Promise.all([
-        fetchViewCounts(supabase, [announcementId]),
+        isDraftRow ? Promise.resolve({} as Record<string, number>) : fetchViewCounts(supabase, [announcementId]),
         fetchRsvpCounts(supabase, [announcementId]),
         fetchAckCounts(supabase, [announcementId]),
         supabase.from("rsvps").select("user_id").eq("announcement_id", announcementId),
@@ -2193,9 +2210,11 @@ export function AnnouncementDetailView({
         supabase.from("announcement_acknowledgements").select("user_id").eq("announcement_id", announcementId),
       ])
 
-      supabase.from("announcement_views")
-        .upsert({ announcement_id: announcementId, user_id: userId }, { onConflict: "announcement_id,user_id", ignoreDuplicates: true })
-        .then()
+      if (!isDraftRow) {
+        supabase.from("announcement_views")
+          .upsert({ announcement_id: announcementId, user_id: userId }, { onConflict: "announcement_id,user_id", ignoreDuplicates: true })
+          .then()
+      }
 
       // Reading it takes its notification back down — same reason as a chat: a
       // push still sitting in the tray for something you have already opened is
