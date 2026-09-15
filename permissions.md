@@ -122,6 +122,7 @@ The DG-dinner `reimbursement_forms` flow is **retired** — replaced by free-for
 | Govern a team (roster/settings/delete) | ✗ | ✗ | ✗ | per matrix (view+) |
 | Domain-write a non-member team | ✗ | ✗ | ✗ | per matrix (write) |
 | Access Settings tab | ✗ | ✗ | ✗ | ✓ |
+| View audit log | ✗ | ✗ | ✗ | ✓ |
 | Edit ministry / roles / members / codes / schools | ✗ | ✗ | ✗ | ✓ |
 | View Congregation tab | ✗ | ✗ | ✗ | Pastor only |
 
