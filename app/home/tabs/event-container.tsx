@@ -31,7 +31,8 @@ import { createClient } from "@/lib/supabase"
 import { MONO_STYLE } from "@/components/central/typography"
 import { PocketKicker, PocketRow, PocketRowCard, NightDivider, InlineAddRow } from "@/components/central"
 import { eventDayHeaderLabel, formatDurationMin } from "../utils"
-import type { CalendarEvent, EventBlock, EventPlan, EventRole, EventTask } from "../types"
+import type { CalendarEvent, EventBlock, EventConfirmation, EventPlan, EventRole, EventTask } from "../types"
+import { computeEventReadiness, type EventReadiness } from "@/lib/event-readiness"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -43,8 +44,13 @@ export interface ContainerChild {
   roles: EventRole[]
   tasks: EventTask[]
   blocks: EventBlock[]
+  /** This night's role confirmations, keyed by `event_roles.id`. */
+  confirmations: Record<string, EventConfirmation>
   done: number
   total: number
+  /** Composite readiness — checklist AND confirmed roles (lib/event-readiness.ts).
+   *  The week's roll-up reports this, never a tasks-only percentage. */
+  readiness: EventReadiness
   /** This night's per-fund draws against its budget category. Empty for a night
    *  with no plan yet AND for any reader without finance/leader visibility —
    *  `event_budget_draws` SELECT is finance + admin/leader only, so an empty
@@ -67,8 +73,8 @@ export interface ContainerRollup {
 }
 
 // ── Loader ─────────────────────────────────────────────────────────────────────
-// SIX batched queries, never N+1: children → their plans → roles/tasks/blocks/draws
-// by plan id. event_roles / event_tasks / event_blocks carry no ministry_id of their
+// SEVEN batched queries, never N+1: children → their plans →
+// roles/tasks/blocks/draws/confirmations by plan id. event_roles / event_tasks / event_blocks carry no ministry_id of their
 // own (they're scoped transitively through event_plans), so the ministry scope is
 // applied on the tables that do have it.
 
@@ -106,7 +112,7 @@ export function useContainerRollup(parentEventId: string | null, ministryId: str
       const planIds = plans.map((p) => p.id)
       const planByChild = new Map(plans.map((p) => [p.calendar_event_id, p]))
 
-      const [rolesRes, tasksRes, blocksRes, drawsRes] = planIds.length
+      const [rolesRes, tasksRes, blocksRes, drawsRes, confirmsRes] = planIds.length
         ? await Promise.all([
             supabase.from("event_roles")
               .select("*, profiles!event_roles_assigned_to_fkey(name)")
@@ -129,8 +135,16 @@ export function useContainerRollup(parentEventId: string | null, ministryId: str
               .select("event_plan_id, amount")
               .in("event_plan_id", planIds)
               .eq("ministry_id", ministryId),
+            // Role confirmations, so the week's readiness can tell "assigned" from
+            // "agreed to". Batched with the rest — a per-night fetch here would be
+            // the N+1 this loader exists to avoid. ministry_id IS on this table.
+            supabase.from("event_confirmations")
+              .select("*")
+              .in("event_plan_id", planIds)
+              .eq("subject_type", "role")
+              .eq("ministry_id", ministryId),
           ])
-        : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
+        : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }]
 
       const rolesByPlan = new Map<string, EventRole[]>()
       for (const raw of (rolesRes.data ?? []) as Record<string, unknown>[]) {
@@ -179,17 +193,28 @@ export function useContainerRollup(parentEventId: string | null, ministryId: str
         drawTotalByPlan.set(raw.event_plan_id, (drawTotalByPlan.get(raw.event_plan_id) ?? 0) + Number(raw.amount))
       }
 
+      const confirmsByPlan = new Map<string, Record<string, EventConfirmation>>()
+      for (const c of (confirmsRes.data ?? []) as EventConfirmation[]) {
+        const map = confirmsByPlan.get(c.event_plan_id) ?? {}
+        map[c.subject_id] = c
+        confirmsByPlan.set(c.event_plan_id, map)
+      }
+
       const assembled: ContainerChild[] = events.map((event) => {
         const plan = planByChild.get(event.id) ?? null
         const tasks = plan ? (tasksByPlan.get(plan.id) ?? []) : []
+        const roles = plan ? (rolesByPlan.get(plan.id) ?? []) : []
+        const confirmations = plan ? (confirmsByPlan.get(plan.id) ?? {}) : {}
         return {
           event,
           plan,
-          roles: plan ? (rolesByPlan.get(plan.id) ?? []) : [],
+          roles,
           tasks,
           blocks: plan ? (blocksByPlan.get(plan.id) ?? []) : [],
+          confirmations,
           done: tasks.filter((t) => t.completed).length,
           total: tasks.length,
+          readiness: computeEventReadiness({ tasks, roles, confirmations }),
           drawTotal: plan ? (drawTotalByPlan.get(plan.id) ?? 0) : 0,
         }
       })
@@ -598,6 +623,17 @@ export function ContainerStaffing({
 // ── 3. Across-the-nights task roll-up (read-only) ──────────────────────────────
 // The week lead's answer to "are the nights on track" without eight drill-ins.
 // Open items only; completed collapse to a count so the section stays scannable.
+// A night with every task ticked is NOT automatically fine: if a role on it went
+// unconfirmed or was declined, the "All N done" line says which, so the week lead
+// isn't told a night is finished by a count that only ever looked at tasks.
+
+/** "All 6 done." only when the night is genuinely ready; otherwise it names what
+ *  is still outstanding on the roster ("All 6 tasks done · awaiting confirmations"). */
+function allDoneLine(child: ContainerChild): string {
+  const r = child.readiness
+  if (r.tone === "ready" || r.rolesTotal === 0) return `All ${r.taskTotal} done.`
+  return `All ${r.taskTotal} tasks done · ${r.label.toLowerCase()}`
+}
 
 export function ContainerTaskRollup({
   nights, isMobile, onOpenChild,
@@ -620,11 +656,11 @@ export function ContainerTaskRollup({
             <div key={child.event.id} style={{ marginBottom: 18 }}>
               <PocketKicker
                 label={child.event.title}
-                action={<span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)" }}>{child.done}/{child.total}</span>}
+                action={<span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)" }}>{child.readiness.taskDone}/{child.readiness.taskTotal}</span>}
               />
               <PocketRowCard>
                 {open.length === 0 ? (
-                  <div style={{ padding: "13px 0", fontSize: 13, color: "var(--muted-text)" }}>All {child.total} done.</div>
+                  <div style={{ padding: "13px 0", fontSize: 13, color: "var(--muted-text)" }}>{allDoneLine(child)}</div>
                 ) : open.map((t, i) => (
                   <PocketRow
                     key={t.id}
@@ -652,12 +688,12 @@ export function ContainerTaskRollup({
             <NightDivider
               name={child.event.title}
               date={nightLabel(child.event)}
-              count={`${child.done} of ${child.total} done`}
+              count={`${child.readiness.taskDone} of ${child.readiness.taskTotal} done`}
               first={gi === 0}
               onNameClick={onOpenChild ? () => onOpenChild(child.event) : undefined}
             />
             {open.length === 0 ? (
-              <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "4px 0 0" }}>All {child.total} done.</p>
+              <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "4px 0 0" }}>{allDoneLine(child)}</p>
             ) : open.map((t, i) => (
               // §4.11 — --line-3 dividers, none on the last row.
               <div key={t.id} style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "8px 0", borderBottom: i === open.length - 1 ? "none" : "1px solid var(--line-3)" }}>

@@ -42,6 +42,7 @@ import { Spinner, EmptyState, PlanLineIcon, PlanSectionHeader, AnimateIn, sideba
 import { PocketChrome, PocketChip } from "../components/pocket-header"
 import { getInitials, formatRelativeTime, eventDaySpan, eventDateRangeLabel, eventDateRangeShort, eventDayHeaderLabel, formatDurationMin, daysUntil, countdownLabel } from "../utils"
 import { useContainerRollup, ContainerWeekTimeline, ContainerStaffing, ContainerTaskRollup, SectionKicker, type ContainerRollup } from "./event-container"
+import { computeEventReadiness, isRoleCovered, rolesSummary, readinessSegments, READINESS_TONE_COLOR, type EventReadiness } from "@/lib/event-readiness"
 import { useIsMobile } from "../use-is-mobile"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
@@ -8255,6 +8256,15 @@ export function EventPlanWorkspace({
     if (!("error" in res)) await reloadConfirmations(plan.id)
   }
 
+  // THE readiness figure for this event — one computation, consumed by the mobile
+  // hub, both Overviews, the launchpad rows and (via props) the Countdown rail.
+  // Composite: checklist done AND every role confirmed by its holder; a declined
+  // role is a hole, never a covered one (lib/event-readiness.ts).
+  const readiness = useMemo(
+    () => computeEventReadiness({ tasks, roles, confirmations }),
+    [tasks, roles, confirmations],
+  )
+
   // Planning-chat button state (mobile + desktop share this):
   //   'none'   — no chat yet
   //   'synced' — chat exists and its members match the current roster assignees
@@ -9259,10 +9269,7 @@ export function EventPlanWorkspace({
                 jump-into-planning rows). Rows mirror exactly what the desktop
                 strip offers for this event type (core tabs + type extras). ── */}
             {isMobile && shownSection === null && (() => {
-              const taskTotal = tasks.length
-              const taskDone = tasks.filter(t => t.completed).length
-              const rolesTotal = roles.length
-              const rolesAssigned = roles.filter(r => r.assigned_to).length
+              const { taskTotal, taskDone, rolesTotal } = readiness
               const hubTime = eventTimeRange
               const HUB_META: Record<string, { iconKey: string; sub: string }> = {
                 overview: { iconKey: "chart", sub: "Facts, stats & planning notes" },
@@ -9276,7 +9283,10 @@ export function EventPlanWorkspace({
                 // ~30 chars is the budget. "Event-level and sub-event-level roles"
                 // clipped to "…sub-event-leve…", hiding the second half of the point;
                 // dropping the two "-level"s keeps both terms whole.
-                roles: { iconKey: "users", sub: isContainer ? "Event and sub-event roles" : rolesTotal > 0 ? `${rolesAssigned} of ${rolesTotal} assigned` : "Assign who owns each part" },
+                // Staffing states BOTH facts: covered (assigned and not declined)
+                // and confirmed. "n/m assigned" alone read as staffed on an event
+                // whose holders had never answered — or had declined.
+                roles: { iconKey: "users", sub: isContainer ? "Event and sub-event roles" : rolesTotal > 0 ? rolesSummary(readiness) : "Assign who owns each part" },
                 runsheet: { iconKey: "clock", sub: isContainer ? "The whole week, night by night" : "Day-of timing, block by block" },
                 notes: { iconKey: "book", sub: "Cross-year pain points" },
                 sub_events: { iconKey: "calendar", sub: EXTRA_TAB_META.sub_events.subtitle },
@@ -9299,11 +9309,15 @@ export function EventPlanWorkspace({
                     ...(hubTime ? [{ label: "Time", value: hubTime }] : []),
                     { label: "Location", value: calendarEvent.location?.trim() || "—" },
                   ]} />
-                  {taskTotal > 0 && (
+                  {/* Composite readiness — tasks AND confirmed roles. The bar is the
+                      same percentage the Overview and the Countdown rail report; the
+                      trailing text is the LABEL, because "22/22" next to a role nobody
+                      has agreed to fill is the half-truth this readout used to tell. */}
+                  {(taskTotal > 0 || rolesTotal > 0) && (
                     <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "0 2px 24px" }}>
                       <span style={{ ...POCKET_KICKER_STYLE, flexShrink: 0 }}>Readiness</span>
-                      <PocketProgress done={taskDone} total={taskTotal} />
-                      <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{taskDone}/{taskTotal} done</span>
+                      <PocketProgress done={readiness.taskDone + readiness.rolesConfirmed} total={taskTotal + rolesTotal} />
+                      <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{readiness.label}</span>
                     </div>
                   )}
                   <PocketKicker label="Jump into planning" style={{ margin: "0 4px 10px" }} />
@@ -9334,18 +9348,11 @@ export function EventPlanWorkspace({
             {/* ── Overview ── */}
             {shownSection === 'overview' && (() => {
               // ── Derived overview metrics ──────────────────────────────────
-              const taskTotal = tasks.length
-              const taskDone = tasks.filter(t => t.completed).length
-              const rolesTotal = roles.length
-              const rolesAssigned = roles.filter(r => r.assigned_to).length
-              const pct = taskTotal > 0 ? Math.round((taskDone / taskTotal) * 100) : 0
-              const filledSegs = taskTotal > 0 ? Math.round((taskDone / taskTotal) * 5) : 0
-              // Readiness status from checklist progress
-              const readiness = taskTotal === 0
-                ? { color: "var(--muted-text)", label: "No checklist yet" }
-                : pct === 100 ? { color: "var(--success)", label: "Ready" }
-                : pct >= 50 ? { color: "var(--sage)", label: "In progress" }
-                : { color: "var(--gold)", label: "Needs attention" }
+              // Counts come off the ONE composite readiness (lib/event-readiness.ts):
+              // the checklist AND the roster, with a declined role counted as a hole.
+              const { taskTotal, taskDone, rolesTotal, pct } = readiness
+              const filledSegs = readinessSegments(readiness, 5)
+              const readinessColor = READINESS_TONE_COLOR[readiness.tone]
               // Identity facts. Desktop states date / duration / location in the L1
               // meta line under the title (spec D5), so only the mobile branch below
               // builds a facts grid; both widths share the prose + notes values.
@@ -9416,14 +9423,19 @@ export function EventPlanWorkspace({
                       </div>
                     )}
 
-                    {/* Readiness — the bar, not a card. */}
+                    {/* Readiness — the bar, not a card. Composite (tasks + confirmed
+                        roles); the detail line states both halves, so "22/22 tasks ·
+                        no roles yet" can never pass for a staffed event. */}
                     <div style={{ marginTop: 26 }}>
                       <p style={eyebrow}>Readiness</p>
-                      {taskTotal > 0 ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <PocketProgress done={taskDone} total={taskTotal} />
-                          <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{taskDone}/{taskTotal} done</span>
-                        </div>
+                      {taskTotal > 0 || rolesTotal > 0 ? (
+                        <>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <PocketProgress done={readiness.taskDone + readiness.rolesConfirmed} total={taskTotal + rolesTotal} />
+                            <span style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0 }}>{readiness.label}</span>
+                          </div>
+                          <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "6px 0 0" }}>{readiness.detail}</p>
+                        </>
                       ) : (
                         <p style={{ fontSize: 13.5, color: "var(--muted-text)", margin: 0 }}>No checklist yet.</p>
                       )}
@@ -9455,8 +9467,11 @@ export function EventPlanWorkspace({
                       />
                       <PocketStatCard
                         kicker="Roles staffed"
-                        value={`${rolesAssigned}/${rolesTotal}`}
-                        sub={rolesTotal === 0 ? "none yet" : rolesAssigned === rolesTotal ? "all covered" : `${rolesTotal - rolesAssigned} open`}
+                        // "Staffed" = covered AND not declined; the sub carries the
+                        // confirmation half, which is the fact that decides whether
+                        // the event is actually ready.
+                        value={`${readiness.rolesAssigned}/${rolesTotal}`}
+                        sub={rolesTotal === 0 ? "none yet" : `${readiness.rolesConfirmed} confirmed${readiness.rolesDeclined > 0 ? ` · ${readiness.rolesDeclined} declined` : ""}`}
                       />
                     </div>
 
@@ -9559,7 +9574,9 @@ export function EventPlanWorkspace({
                         title="Roles"
                         subtitle={isContainer ? "Event and sub-event roles" : "Assign who owns each part"}
                         onClick={() => setActiveSectionAndUrl('roles')}
-                        right={<span style={{ fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{rolesAssigned} / {rolesTotal} assigned</span>}
+                        // Two facts, not one: how many roles have somebody who has
+                        // not declined, and how many of those have said yes.
+                        right={<span style={{ fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{rolesSummary(readiness)}</span>}
                       />
                       {extraTabs.map(t => (
                         <LaunchpadRow
@@ -9654,17 +9671,20 @@ export function EventPlanWorkspace({
                   <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
                     <p style={monoLabel}>Readiness</p>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: 99, background: readiness.color, flexShrink: 0 }} />
+                      <span style={{ width: 8, height: 8, borderRadius: 99, background: readinessColor, flexShrink: 0 }} />
                       <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{readiness.label}</span>
                     </div>
                     <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
                       {Array.from({ length: 5 }).map((_, i) => (
-                        <span key={i} style={{ flex: 1, height: 6, borderRadius: 99, background: i < filledSegs ? (pct === 100 ? "var(--success)" : "var(--plum)") : "var(--line-2)" }} />
+                        // Only a genuinely READY event earns the success fill — the
+                        // bar tracks the composite percentage, so 100% and "Ready"
+                        // can no longer disagree.
+                        <span key={i} style={{ flex: 1, height: 6, borderRadius: 99, background: i < filledSegs ? (readiness.tone === "ready" ? "var(--success)" : "var(--plum)") : "var(--line-2)" }} />
                       ))}
                     </div>
-                    {taskTotal > 0 && (
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 12 }}>
-                        <span style={{ fontSize: 12, color: "var(--body)" }}>{taskDone} of {taskTotal} done</span>
+                    {(taskTotal > 0 || rolesTotal > 0) && (
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 12, gap: 10 }}>
+                        <span style={{ fontSize: 12, color: "var(--body)" }}>{readiness.detail}</span>
                         {/* S23 — serif numerics are weight 400 (§1.3); the 600 date
                             anchor is scoped to the featured card + announcement aside. */}
                         <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 400, color: "var(--ink)" }}>{pct}%</span>
@@ -9765,6 +9785,7 @@ export function EventPlanWorkspace({
 
                 <CountdownTab
                   tasks={tasks}
+                  readiness={readiness}
                   eventStartISO={calendarEvent.start_date}
                   teamId={teamId ?? (calendarEvent as { team_id?: string | null }).team_id ?? null}
                   assigneePool={assigneePool}
@@ -9848,8 +9869,16 @@ export function EventPlanWorkspace({
 
             {/* ── Roles ── */}
             {shownSection === 'roles' && (() => {
-              const needs = roles.filter(r => !r.assigned_to)
-              const covered = roles.filter(r => r.assigned_to)
+              // COVERED means somebody is on it AND has not declined. A role whose
+              // holder said no is a hole — it groups under "Needs someone" and keeps
+              // its Declined pill there, so the list can't read as fully staffed
+              // while a job has nobody willing to do it (lib/event-readiness.ts).
+              const needs = roles.filter(r => !isRoleCovered(r, confirmations))
+              const covered = roles.filter(r => isRoleCovered(r, confirmations))
+              // Gates that are about WHO IS IN THE CHAT / who can be asked to confirm
+              // count anyone with a name on a role, declined included — you re-request
+              // from a decliner, and they stay in the planning chat until reassigned.
+              const assignedCount = roles.filter(r => !!r.assigned_to).length
               const iconBtnBase: React.CSSProperties = { background: "none", border: "none", padding: 3, borderRadius: 6, cursor: "pointer", display: "grid", placeItems: "center", color: "var(--faint)" }
 
               // ── 3-state planning-chat icon button (mobile + desktop share this) ──
@@ -9858,7 +9887,7 @@ export function EventPlanWorkspace({
               // the confirm surface. Disabled only while a chat doesn't exist and no
               // role is assigned yet (nothing to plan), or while a write is in flight.
               const pcStale = planChatState === 'stale'
-              const pcDisabled = (planChatState === 'none' && covered.length === 0) || creatingPlanChat
+              const pcDisabled = (planChatState === 'none' && assignedCount === 0) || creatingPlanChat
               const pcTip = planChatState === 'none' ? "Create planning chat"
                 : pcStale ? "Roster changed — update chat" : "Open planning chat"
               const planChatBtn = canEdit ? (
@@ -9866,7 +9895,7 @@ export function EventPlanWorkspace({
                   onClick={handlePlanChatTap}
                   disabled={pcDisabled}
                   aria-label={pcTip}
-                  title={planChatState === 'none' && covered.length === 0 ? "Assign roles first" : pcTip}
+                  title={planChatState === 'none' && assignedCount === 0 ? "Assign roles first" : pcTip}
                   style={{
                     position: "relative", width: 34, height: 34, borderRadius: 999, flexShrink: 0,
                     display: "grid", placeItems: "center", border: "none",
@@ -9976,6 +10005,11 @@ export function EventPlanWorkspace({
                     </div>
                   )
                 }
+                // ROW-level "has a name on it" — deliberately NOT the grouping
+                // predicate (isRoleCovered). A declined role sits under "Needs
+                // someone" but still renders its assignee, its Declined pill and
+                // the Re-request button: that is the state, and hiding it would
+                // lose the only affordance for fixing it.
                 const isCovered = !!role.assigned_to
                 const initials = role.assigned_name?.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase() ?? ""
 
@@ -9998,7 +10032,9 @@ export function EventPlanWorkspace({
                     requested: { label: "Awaiting", color: "var(--plum)" },
                     escalated: { label: "Escalated", color: "var(--plum)" },
                     confirmed: { label: "Confirmed", color: "var(--sage)" },
-                    declined: { label: "Declined", color: "var(--muted-text)" },
+                    // A decline is the loudest state on a role, never the quietest —
+                    // it names a hole. Tonal --danger, like every other status here.
+                    declined: { label: "Declined", color: "var(--danger)" },
                   } : null
                   const canReRequest = !!c && canEdit && (c.status === "declined" || c.status === "escalated")
                   const openEdit = () => { setShowAddRole(false); setEditingRoleId(role.id); setEditRoleName(role.role_name); setEditRoleAssignee(role.assigned_to ?? ""); setEditRoleNotes(role.notes ?? "") }
@@ -10078,7 +10114,7 @@ export function EventPlanWorkspace({
                               requested: { label: "Awaiting", color: "var(--plum)" },
                               escalated: { label: "Escalated", color: "var(--plum)" },
                               confirmed: { label: "Confirmed", color: "var(--plum)" },
-                              declined: { label: "Declined", color: "var(--muted-text)" },
+                              declined: { label: "Declined", color: "var(--danger)" },
                             }
                             const canReRequest = canEdit && (c.status === "declined" || c.status === "escalated")
                             return (
@@ -10176,7 +10212,7 @@ export function EventPlanWorkspace({
                   <EventSectionHeader
                     title={isContainer ? "Event Level" : "Roles"}
                     count={roles.length || undefined}
-                    action={canEdit && covered.length > 0 ? (
+                    action={canEdit && assignedCount > 0 ? (
                       <ContentActionButton
                         variant="ghost"
                         icon={<CheckCircle2 style={{ width: 14, height: 14 }} />}
@@ -10193,7 +10229,7 @@ export function EventPlanWorkspace({
                     sentence that used to explain it flattened the page — every line read
                     at the same weight. Mobile keeps its SectionKicker hint below (that
                     surface has no sibling section visible for contrast). */}
-                {isMobile && canEdit && covered.length > 0 && !showAddRole && !editingRoleId && (
+                {isMobile && canEdit && assignedCount > 0 && !showAddRole && !editingRoleId && (
                   <PocketButton
                     variant="quiet"
                     surface="page"
@@ -10300,7 +10336,7 @@ export function EventPlanWorkspace({
                     // Leads the pane whenever "Request confirmations" isn't above
                     // it (same condition as that button) — without this the kicker
                     // opened the screen 30px below the chrome row.
-                    first={!(canEdit && covered.length > 0 && !showAddRole && !editingRoleId)}
+                    first={!(canEdit && assignedCount > 0 && !showAddRole && !editingRoleId)}
                   />
                 )}
 
@@ -10371,12 +10407,12 @@ export function EventPlanWorkspace({
                     icon={<MessageCircle style={{ width: 18, height: 18 }} strokeWidth={1.6} />}
                     title={planChatState === 'none' ? "Start the leads group chat" : planChatState === 'stale' ? "Update the leads group chat" : "Open the leads group chat"}
                     subtitle={planChatState === 'none'
-                      ? `Creates a chat with everyone assigned above — ${covered.length} of ${roles.length} staffed so far`
+                      ? `Creates a chat with everyone assigned above — ${assignedCount} of ${roles.length} staffed so far`
                       : planChatState === 'stale'
                         ? "The roster changed since this chat was created"
                         : "Everyone assigned above is already in it"}
                     onClick={handlePlanChatTap}
-                    disabled={(planChatState === 'none' && covered.length === 0) || creatingPlanChat}
+                    disabled={(planChatState === 'none' && assignedCount === 0) || creatingPlanChat}
                     style={{ marginTop: 28 }}
                   />
                 )}
@@ -10500,16 +10536,17 @@ export function EventPlanWorkspace({
 
 // ── SubEventsTab ──────────────────────────────────────────────────────────────
 
-// Readiness status → dot color. Kept as a small LOCAL map so it's swappable when
-// the amber ramp decision lands. Deliberately compliant/neutral for now: only
-// "Ready" earns --success; everything in-flight stays neutral --muted-text
-// (no --gold / --warm-tan, which are documented off-label here).
-function subEventStatus(done: number, total: number): { label: string; color: string; empty?: boolean } {
-  if (total === 0) return { label: "No checklist", color: "var(--muted-text)", empty: true }
-  const pct = Math.round((done / total) * 100)
-  if (done === total) return { label: "Ready", color: "var(--success)" }
-  if (pct >= 50) return { label: "In progress", color: "var(--muted-text)" }
-  return { label: "Needs attention", color: "var(--muted-text)" }
+// Readiness status → dot color. The LABEL is the shared composite (tasks AND
+// confirmed roles — lib/event-readiness.ts); only the COLOUR ramp stays local, and
+// stays deliberately neutral: only "Ready" earns --success, everything in-flight is
+// --muted-text (no --gold / --warm-tan, documented off-label on this row).
+// A night whose workspace nobody has opened yet has no plan, so no tasks and no
+// roles — the same shape as "nothing planned".
+const EMPTY_READINESS: EventReadiness = computeEventReadiness({ tasks: [], roles: [] })
+
+function subEventStatus(r: EventReadiness): { label: string; color: string; empty?: boolean } {
+  if (r.tone === "empty") return { label: "Not started", color: "var(--muted-text)", empty: true }
+  return { label: r.label, color: r.tone === "ready" ? "var(--success)" : "var(--muted-text)" }
 }
 
 // Readiness fetcher (childId → checklist done/total), batched: child events →
@@ -10577,8 +10614,10 @@ function SubEventsTab({
   // already runs for its Run of Show / Roles / Countdown surfaces — this tab used to
   // repeat the same three queries for itself.
   const subEvents = rollup.children.map((c) => c.event)
-  const readiness: Record<string, { done: number; total: number }> = Object.fromEntries(
-    rollup.children.map((c) => [c.event.id, { done: c.done, total: c.total }]),
+  // Composite readiness per night (tasks AND confirmed roles), already computed by
+  // the rollup — the row never re-derives a tasks-only percentage of its own.
+  const readiness: Record<string, EventReadiness> = Object.fromEntries(
+    rollup.children.map((c) => [c.event.id, c.readiness]),
   )
   const loading = rollup.loading
 
@@ -10654,9 +10693,9 @@ function SubEventsTab({
           const dayName = formatYMD(ymd, { weekday: "long" })
           const dayDate = `${formatYMD(ymd, { month: "short" })} ${ymdDayNum(ymd)}`.toUpperCase()
 
-          const r = readiness[ev.id] ?? { done: 0, total: 0 }
-          const st = subEventStatus(r.done, r.total)
-          const filled = r.total > 0 ? Math.round((r.done / r.total) * 6) : 0
+          const r = readiness[ev.id] ?? EMPTY_READINESS
+          const st = subEventStatus(r)
+          const filled = readinessSegments(r, 6)
           const drillable = !!onOpenChild
           const outOfRange = isOutOfRange(ev)
 
@@ -10721,7 +10760,7 @@ function SubEventsTab({
                   <div className="flex sm:hidden" style={{ alignItems: "center", gap: 7, marginTop: 8 }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: st.color, flexShrink: 0 }} />
                     <span style={{ fontSize: 12, color: "var(--body)" }}>{st.label}</span>
-                    {!st.empty && <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", marginLeft: "auto" }}>{r.done}/{r.total}</span>}
+                    {!st.empty && <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--muted-text)", marginLeft: "auto" }}>{r.taskDone}/{r.taskTotal}</span>}
                   </div>
                 </div>
 
@@ -10742,7 +10781,7 @@ function SubEventsTab({
                     }}>
                       {st.label}
                     </span>
-                    {!st.empty && <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.4px", color: "var(--muted-text)" }}>{r.done}/{r.total}</span>}
+                    {!st.empty && <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.4px", color: "var(--muted-text)" }}>{r.taskDone}/{r.taskTotal}</span>}
                   </div>
                   {st.empty ? (
                     <div style={{ height: 6, borderRadius: 999, background: "var(--line-2)" }} />

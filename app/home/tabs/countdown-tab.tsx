@@ -23,6 +23,7 @@ import { CentralCard, ActionMenu, CollapsibleRail, PocketKicker, PocketProgress 
 import { addDaysYMD, daysBetweenYMD, instantToZoned, todayInZone } from "@/lib/tz"
 import { useMinistryTimezone } from "../ministry-timezone-context"
 import type { EventTask, CountdownPhaseDef } from "../types"
+import { readinessSegments, READINESS_TONE_COLOR, type EventReadiness } from "@/lib/event-readiness"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -457,24 +458,20 @@ function railCard(children: ReactNode, key?: string) {
   )
 }
 
-// Readiness — mirrors the overview Readiness render (plan-tab 8419–8437): 8px dot,
-// 14px/500 label, canonical 5-seg bar (plum / success at 100%), "X of Y done" + pct.
-function ReadinessCard({ done, total, overdue }: { done: number; total: number; overdue: number }) {
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0
-  const filledSegs = total > 0 ? Math.round((done / total) * 5) : 0
-  const readiness =
-    total === 0
-      ? { color: "var(--faint)", label: "No checklist yet" }
-      : pct === 100
-        ? { color: "var(--success)", label: "Ready" }
-        : pct >= 50
-          ? { color: "var(--sage)", label: "In progress" }
-          : { color: "var(--gold)", label: "Needs attention" }
+// Readiness — mirrors the overview Readiness render: 8px dot, 14px/500 label,
+// canonical 5-seg bar (plum, success only when genuinely Ready), detail + pct.
+// The figure itself is NOT computed here: it is the same composite the Overview
+// and the mobile hub report (lib/event-readiness.ts), passed down as a value so
+// the two cards cannot drift the way the hand-synced copies did.
+function ReadinessCard({ readiness, overdue }: { readiness: EventReadiness; overdue: number }) {
+  const { pct, taskTotal, rolesTotal } = readiness
+  const filledSegs = readinessSegments(readiness, 5)
+  const color = READINESS_TONE_COLOR[readiness.tone]
   return railCard(
     <>
       <p style={{ ...MONO_STYLE, margin: 0 }}>Readiness</p>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
-        <span style={{ width: 8, height: 8, borderRadius: 99, background: readiness.color, flexShrink: 0 }} />
+        <span style={{ width: 8, height: 8, borderRadius: 99, background: color, flexShrink: 0 }} />
         <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{readiness.label}</span>
       </div>
       <div style={{ display: "flex", gap: 6, marginTop: 14 }}>
@@ -485,15 +482,15 @@ function ReadinessCard({ done, total, overdue }: { done: number; total: number; 
               flex: 1,
               height: 6,
               borderRadius: 99,
-              background: i < filledSegs ? (pct === 100 ? "var(--success)" : "var(--plum)") : "var(--line-2)",
+              background: i < filledSegs ? (readiness.tone === "ready" ? "var(--success)" : "var(--plum)") : "var(--line-2)",
             }}
           />
         ))}
       </div>
-      {total > 0 && (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 12 }}>
-          <span style={{ fontSize: 12, color: "var(--body)" }}>{done} of {total} done</span>
-          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 600, color: "var(--ink)" }}>{pct}%</span>
+      {(taskTotal > 0 || rolesTotal > 0) && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 12, gap: 10 }}>
+          <span style={{ fontSize: 12, color: "var(--body)" }}>{readiness.detail}</span>
+          <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 18, fontWeight: 400, color: "var(--ink)" }}>{pct}%</span>
         </div>
       )}
       {overdue > 0 && (
@@ -630,6 +627,9 @@ function PhaseHead({
 
 export interface CountdownTabProps {
   tasks: EventTask[]
+  /** THE composite readiness for this event (tasks + confirmed roles), computed
+   *  once by EventPlanWorkspace. The rail reports it; it never recomputes it. */
+  readiness: EventReadiness
   eventStartISO: string
   teamId: string | null | undefined
   assigneePool: { id: string; name: string }[]
@@ -660,7 +660,7 @@ export function CountdownTab(props: CountdownTabProps) {
     // `ladder` replaces main's `hasCrunch` (the boolean only existed to pick
     // between two hardcoded phase sets). `onGoRunSheet` is NOT taken from the
     // ladder branch — main deleted that button and its prop.
-    tasks, eventStartISO, teamId, assigneePool, firedIds, canEdit, isMobile, ladder,
+    tasks, readiness, eventStartISO, teamId, assigneePool, firedIds, canEdit, isMobile, ladder,
     countdownPill, pinnedBand, renderRow, renderMobileRow, renderAddRow, onReassign,
     dragActive, dragOverPhaseKey, onPhaseDragOver, onPhaseDrop, stickyTop = 52,
   } = props
@@ -788,7 +788,7 @@ export function CountdownTab(props: CountdownTabProps) {
       className="max-md:!block"
       rail={
         <aside style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }} className="max-md:mt-8">
-          <ReadinessCard done={done} total={total} overdue={overdueCount} />
+          <ReadinessCard readiness={readiness} overdue={overdueCount} />
           <FiresNextCard queue={firesNext} />
           {teamId && loadCounts && loadCounts.length > 0 && <LoadCard loadCounts={loadCounts} nameOf={nameOf} />}
         </aside>
