@@ -13,6 +13,7 @@ import { normalizeMoneyInput } from "../utils"
 import { useIsMobile } from "../use-is-mobile"
 import { useMinistryTimezone } from "../ministry-timezone-context"
 import { todayInZone } from "@/lib/tz"
+import { statusLabel, type FundKind } from "@/lib/receipt-status"
 import { MonogramChip, FilterDropdown, FilterChip, CentralButton, SubpageShell, CentralModal, ConfirmDialog, PocketRowCard, PocketRow, Toast, MobileChromeActions, useScrollResetOn } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
@@ -69,10 +70,12 @@ export const STATUS_META: Record<string, { label: string; bg: string; text: stri
   requested:  { label: "Requested", bg: WARN_BG,         text: WARN_TEXT },
   rejected:   { label: "Rejected",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
   declined:   { label: "Declined",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
-  // DB value stays "reimbursed" (recomputeReceiptStatus, transition actions); the
-  // LABEL reads "Approved to pay" everywhere — the treasurer/president sign-off is
-  // an authorization to disburse, not a claim the money has moved yet.
-  reimbursed: { label: "Approved to pay", bg: SUCCESS_STATUS_BG, text: SUCCESS_STATUS_TEXT },
+  // DB value stays "reimbursed", but the LABEL is kind-aware (church "Approved
+  // to pay" vs external "Reimbursed" — they mean different things about whether
+  // money has moved; see lib/receipt-status.ts) and is NOT read from this map.
+  // The label here is only the kind-unknown fallback for a rollup status that
+  // spans mixed-kind splits — route every render site through `statusLabel`.
+  reimbursed: { label: "Approved", bg: SUCCESS_STATUS_BG, text: SUCCESS_STATUS_TEXT },
   // Rollup: some sources reimbursed, others terminal — neutral ivory.
   partial:    { label: "Partial",   bg: "var(--ivory)",  text: "var(--body)" },
   flagged:    { label: "Flagged",   bg: WARN_BG,         text: WARN_TEXT },
@@ -308,7 +311,11 @@ function receiptNeedsAction(r: InboxReceipt, canApprove: boolean, canSignOff: bo
   return r.allocations.some(a => allocNeedsAction(a, canApprove, canSignOff))
 }
 
-function FinanceStatusPill({ status }: { status: string }) {
+// `kind` is only meaningful for the one status ("reimbursed") whose label
+// depends on it (see lib/receipt-status.ts) — pass it when this pill is for a
+// single allocation (which has its own fund_kind); omit it for a receipt-level
+// rollup pill that may span mixed-kind splits.
+function FinanceStatusPill({ status, kind }: { status: string; kind?: FundKind }) {
   const m = STATUS_META[status] ?? STATUS_META.pending
   return (
     <span style={{
@@ -316,7 +323,7 @@ function FinanceStatusPill({ status }: { status: string }) {
       padding: "3px 9px", borderRadius: 999, background: m.bg, color: m.text,
       fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", flexShrink: 0,
     }}>
-      {m.label}
+      {statusLabel(status, kind)}
     </span>
   )
 }
@@ -611,12 +618,13 @@ function InboxDetailRow({ label, value }: { label: string; value: React.ReactNod
 }
 
 // The per-source status path — church signs off; external is grant-filed. Node
-// labels for the two status-backed steps come from STATUS_META (the single
-// receipt-status label map) so "Approved to pay" only lives in one place.
-function allocSteps(kind: "church" | "external") {
+// labels for the two status-backed steps come from `statusLabel` (the single
+// kind-aware receipt-status label function, lib/receipt-status.ts) — the
+// terminal node reads "Approved to pay" on church, "Reimbursed" on external.
+function allocSteps(kind: FundKind) {
   return kind === "church"
-    ? ["Submitted", STATUS_META.approved.label, STATUS_META.reimbursed.label]
-    : ["Submitted", STATUS_META.requested.label, STATUS_META.reimbursed.label]
+    ? ["Submitted", statusLabel("approved"), statusLabel("reimbursed", "church")]
+    : ["Submitted", statusLabel("requested"), statusLabel("reimbursed", "external")]
 }
 function allocReachedIndex(a: ReceiptAllocation): number {
   if (a.status === "reimbursed") return 2
@@ -753,13 +761,13 @@ function AllocationRow({
           </span>
           <span style={{ fontSize: 14, color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>${a.amount.toFixed(2)}</span>
         </div>
-        <FinanceStatusPill status={a.status} />
+        <FinanceStatusPill status={a.status} kind={a.fund_kind} />
       </div>
 
       {/* Per-source status path */}
       {isNegative ? (
         <div style={{ background: DANGER_ROW_BG, border: `1px solid ${DANGER_TINT_BORDER}`, borderRadius: 10, padding: "10px 12px" }}>
-          <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{STATUS_META[a.status]?.label ?? "Declined"}</p>
+          <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{statusLabel(a.status, a.fund_kind)}</p>
           {a.decision_reason && <p style={{ fontSize: 12.5, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
         </div>
       ) : (

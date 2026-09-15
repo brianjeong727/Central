@@ -10,6 +10,7 @@ import { useIsMobile } from "../use-is-mobile"
 import { parseDateLocal } from "../utils"
 import { createClient } from "@/lib/supabase"
 import { SubmitReceiptModal, STATUS_META, MobileFactsGrid } from "./finance-workspace"
+import { statusLabel, type FundKind } from "@/lib/receipt-status"
 import {
   listReceiptCategories,
   createReceiptCategory,
@@ -463,7 +464,10 @@ function CategoryContent({
   )
 }
 
-function StatusPill({ status }: { status: string }) {
+// `kind` is only meaningful for "reimbursed" (see lib/receipt-status.ts) — pass
+// it for a single allocation's own pill; omit it for a receipt-level rollup
+// that may span mixed-kind splits.
+function StatusPill({ status, kind }: { status: string; kind?: FundKind }) {
   const m = STATUS_META[status] ?? STATUS_META.pending
   return (
     <span style={{
@@ -471,7 +475,7 @@ function StatusPill({ status }: { status: string }) {
       padding: "3px 9px", borderRadius: 999, background: m.bg, color: m.text,
       fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", flexShrink: 0,
     }}>
-      {m.label}
+      {statusLabel(status, kind)}
     </span>
   )
 }
@@ -515,13 +519,13 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 }
 
 // Per-source status path — church signs off; external is grant-filed. Node
-// labels for the two status-backed steps come from STATUS_META (the single
-// receipt-status label map, imported from finance-workspace.tsx) so "Approved
-// to pay" only lives in one place.
-function memberAllocSteps(kind: "church" | "external") {
+// labels for the two status-backed steps come from `statusLabel` (the single
+// kind-aware receipt-status label function, lib/receipt-status.ts) — mirrors
+// the treasurer inbox rail (finance-workspace.tsx's allocSteps).
+function memberAllocSteps(kind: FundKind) {
   return kind === "church"
-    ? ["Submitted", STATUS_META.approved.label, STATUS_META.reimbursed.label]
-    : ["Submitted", STATUS_META.requested.label, STATUS_META.reimbursed.label]
+    ? ["Submitted", statusLabel("approved"), statusLabel("reimbursed", "church")]
+    : ["Submitted", statusLabel("requested"), statusLabel("reimbursed", "external")]
 }
 
 interface MemberAllocation {
@@ -567,11 +571,11 @@ function MemberAllocationRow({ allocation: a, submittedAt }: { allocation: Membe
           <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.04em", padding: "3px 9px", borderRadius: 999, background: "var(--plum-tint)", color: "var(--plum)", whiteSpace: "nowrap" }}>{a.fund_name}</span>
           <span style={{ fontSize: 14, color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>${a.amount.toFixed(2)}</span>
         </div>
-        <StatusPill status={a.status} />
+        <StatusPill status={a.status} kind={a.fund_kind} />
       </div>
       {isNegative ? (
         <div style={{ background: "var(--cream)", border: "1px solid color-mix(in srgb, var(--danger) 30%, var(--cream))", borderRadius: 10, padding: "10px 12px" }}>
-          <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{STATUS_META[a.status]?.label ?? "Declined"}</p>
+          <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{statusLabel(a.status, a.fund_kind)}</p>
           {a.decision_reason && <p style={{ fontSize: 12.5, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
         </div>
       ) : (

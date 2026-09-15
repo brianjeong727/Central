@@ -150,9 +150,13 @@ test.describe("finance overhaul P1 — split allocations", () => {
     if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/4-split-saved-two-sources.png` })
 
     // Scope waits per-card by the (unique) split amount — the stepper always
-    // renders "Submitted/Approved/Approved to pay" as step LABELS regardless of
-    // actual status (just dimmed), so a bare `getByText("Approved to pay")` is
-    // true even before any action runs. The one thing that's reliably absent once a row
+    // renders its 3 step LABELS regardless of actual status (just dimmed), so a
+    // bare `getByText(...)` for a step label is true even before any action
+    // runs. The terminal label is KIND-aware (lib/receipt-status.ts): church
+    // reads "Approved to pay" (an authorization — money hasn't moved), external
+    // reads "Reimbursed" (the treasurer confirms the grant funder actually paid
+    // out) — so church/cmu cards are scoped separately below and never share a
+    // terminal-label assertion. The one thing that's reliably absent once a row
     // leaves a stage is that stage's action button, scoped to its own card.
     // Scope actions per-card via the ancestor allocation-row container (3 divs up
     // from the amount span: chip+amount wrapper -> header row -> the card itself —
@@ -194,6 +198,9 @@ test.describe("finance overhaul P1 — split allocations", () => {
     await expect(cmuCard.getByRole("button", { name: "Confirm reimbursed" })).toBeVisible()
     await cmuCard.getByRole("button", { name: "Confirm reimbursed" }).click()
     await expect(cmuCard.getByRole("button", { name: "Decline" })).toHaveCount(0, { timeout: 10000 })
+    // External path: the money has actually arrived, so the terminal label —
+    // unlike the church card's "Approved to pay" — reads literally "Reimbursed".
+    await expect(cmuCard.getByText("Reimbursed", { exact: true }).first()).toBeVisible()
     // External funds don't route through the approve->post motion — U5's
     // fallback "Add to budget" affordance still shows for them.
     await expect(cmuCard.getByRole("button", { name: "Add to budget" })).toBeVisible({ timeout: 10000 })
