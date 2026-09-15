@@ -64,5 +64,11 @@ export function logAudit(payload: AuditPayload): void {
       entity_label: payload.entityLabel ?? null,
       metadata: payload.metadata ?? null,
     })
-    .then(() => {})
+    // Still fire-and-forget — an audit row must never block or fail the write it
+    // describes. But a refusal (RLS 42501) or a network failure used to vanish
+    // entirely, so "every committed change is audited" could quietly stop being
+    // true. Surface it: the console is where the next silent gap gets noticed.
+    .then(({ error }) => {
+      if (error) console.warn(`[audit] ${payload.action} was not recorded: ${error.message}`)
+    })
 }

@@ -3,6 +3,9 @@
 import { createClient } from "@/lib/supabase-server"
 import { createAdminClient } from "@/lib/supabase-admin"
 import { computeFinanceCapability } from "./finance-auth"
+// Type-only: erased at compile time, so the browser Supabase client that
+// lib/audit.ts constructs never reaches this server module.
+import type { AuditChange } from "@/lib/audit"
 
 // ─── Per-ministry configurable fund list ─────────────────────────────────────
 // Replaces the hardcoded church/cmu/pitt array. A fund is a funding source a
@@ -146,6 +149,49 @@ export async function updateFinanceFund(params: {
     .update(patch)
     .eq("id", params.id)
     .eq("ministry_id", params.ministryId)
+  return { error: error?.message ?? null }
+}
+
+/**
+ * Record one Funds settings commit in the audit log.
+ *
+ * Funds is the ONE audited settings section whose write is not admin-gated:
+ * `authorizeFundWrite` admits any finance-capable member, while the `audit_logs`
+ * INSERT policy is leader-tier. So the browser-side audit insert was refused for
+ * exactly the callers who were allowed to make the change — a real, permitted
+ * settings change with no record and no error. The row is written here instead,
+ * on the service-role client, behind the SAME gate that authorizes the fund
+ * writes themselves, with the actor read from the caller's own profile (never
+ * from the client). Called once per Save with the whole diff, so the log still
+ * reads one row per commit like every other section.
+ */
+export async function logFundsAudit(params: {
+  ministryId: string
+  changes: AuditChange[]
+}): Promise<{ error: string | null }> {
+  if (params.changes.length === 0) return { error: null }
+  const auth = await authorizeFundWrite(params.ministryId)
+  if ("error" in auth) return { error: auth.error }
+  const { admin, uid } = auth
+
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("name")
+    .eq("id", uid)
+    .eq("ministry_id", params.ministryId)
+    .maybeSingle()
+
+  const { error } = await admin.from("audit_logs").insert({
+    ministry_id: params.ministryId,
+    actor_id: uid,
+    actor_name: (profile?.name as string | undefined) ?? "Unknown",
+    action: "settings.funds_edit",
+    entity_type: "ministry",
+    entity_id: params.ministryId,
+    entity_label: "Funds",
+    metadata: { changes: params.changes },
+  })
+  if (error) console.warn(`[audit] settings.funds_edit was not recorded: ${error.message}`)
   return { error: error?.message ?? null }
 }
 

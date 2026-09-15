@@ -885,6 +885,38 @@ export async function getUserMinistries(): Promise<{
   }
 }
 
+// The zones this app offers. Only a fallback: it is consulted when a runtime
+// doesn't expose `Intl.supportedValuesOf` (pre-2023 engines), so the canonical
+// check can never degrade into "anything formattable". Mirrors the picker's list
+// in app/home/tabs/settings-tab.tsx (TIMEZONE_CHOICES).
+const CURATED_TIMEZONES = [
+  "America/New_York", "America/Chicago", "America/Denver", "America/Phoenix",
+  "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu",
+]
+
+/**
+ * A zone the DB will also accept, in canonical form.
+ *
+ * `isValidTimeZone` asks "can Intl format this?" — which is true of things the
+ * `ministries_timezone_format_chk` CHECK rejects (offset zones like "+05:00",
+ * 23514) and of denormalized ids the CHECK happily stores ("america/chicago",
+ * which then renders as a raw id in the picker). Neither guard is a superset of
+ * the other, so require membership in the runtime's CANONICAL tz list too: that
+ * is formattable, correctly cased, and always `Area/Location`. The result is a
+ * clean error message instead of a raw Postgres constraint string.
+ */
+function isCanonicalTimeZone(tz: string): boolean {
+  const supportedValuesOf = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf
+  if (typeof supportedValuesOf === "function") {
+    try {
+      return supportedValuesOf.call(Intl, "timeZone").includes(tz)
+    } catch {
+      // fall through to the curated list
+    }
+  }
+  return CURATED_TIMEZONES.includes(tz)
+}
+
 // ─── Admin: update ministry name / university / time zone ───────────────────
 // `timezone` is optional so existing callers are untouched; when present it is
 // validated against the runtime's tz database FIRST (Convention #23) — an
@@ -905,7 +937,9 @@ export async function updateMinistryInfo(data: { name: string; university: strin
     university: data.university.trim(),
   }
   if (data.timezone !== undefined) {
-    if (!isValidTimeZone(data.timezone)) return { error: "That time zone isn’t a zone we can display." }
+    if (!isValidTimeZone(data.timezone) || !isCanonicalTimeZone(data.timezone)) {
+      return { error: "That time zone isn’t a zone we can display." }
+    }
     patch.timezone = data.timezone
   }
 

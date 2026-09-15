@@ -24,7 +24,7 @@ import {
 import { updateAutomationSettings, runAnnualClassMaintenance, retroactivelyApplyToggle, archiveToggleChats, backfillTeamChats } from "@/app/actions/auto-chats"
 import { getReceiptLimits, upsertReceiptLimit, deleteReceiptLimit } from "@/app/actions/receipts"
 import type { ReceiptLimit } from "@/app/actions/receipts"
-import { getFinanceFunds, createFinanceFund, updateFinanceFund, type FinanceFund, type FundKind } from "@/app/actions/finance-funds"
+import { getFinanceFunds, createFinanceFund, updateFinanceFund, logFundsAudit, type FinanceFund, type FundKind } from "@/app/actions/finance-funds"
 import { getHomeVerses, addHomeVerse, updateHomeVerse, deleteHomeVerse, reorderHomeVerses } from "@/app/actions/home-verses"
 import type { HomeVerse } from "@/app/actions/home-verses"
 import { updateGovernanceSettings, updateTeamAdminAccess } from "@/app/actions/governance"
@@ -296,11 +296,16 @@ export function SettingsTab({
   const publishMinistryTimezone = useSetMinistryTimezone()
   const isAdmin = isAdminRole(userRole)
 
-  // Every section that COMMITS lands here, so the audit entry always carries the
-  // same shape the admin just confirmed on screen: plain-English field labels and
-  // old→new pairs. A commit with no deltas writes nothing — an audit log that
-  // records "saved (nothing changed)" is noise that hides the real entries.
-  function logSettingsChange(action: "settings.general_edit" | "settings.discovery_edit" | "settings.governance_edit" | "settings.automations_edit" | "settings.moderation_edit" | "settings.sharing_edit" | "settings.funds_edit", section: string, changes: AuditChange[]) {
+  // Every ADMIN-GATED section that commits lands here, so the audit entry always
+  // carries the same shape the admin just confirmed on screen: plain-English field
+  // labels and old→new pairs. A commit with no deltas writes nothing — an audit
+  // log that records "saved (nothing changed)" is noise that hides real entries.
+  //
+  // `settings.funds_edit` is deliberately NOT in this union: funds may be changed
+  // by a finance-capable member, and this browser insert would be refused by the
+  // leader-tier audit_logs INSERT policy. That row is written by the server action
+  // that performs the funds write (`logFundsAudit`).
+  function logSettingsChange(action: "settings.general_edit" | "settings.discovery_edit" | "settings.governance_edit" | "settings.automations_edit" | "settings.moderation_edit" | "settings.sharing_edit", section: string, changes: AuditChange[]) {
     if (changes.length === 0) return
     logAudit({ ministryId, actorId: userId, actorName: userName, action, entityType: "ministry", entityId: ministryId, entityLabel: section, metadata: { changes } })
   }
@@ -698,15 +703,19 @@ export function SettingsTab({
     const timezone = profileDraft.timezone
     if (!name) { setInfoError("Ministry name can’t be empty."); setProfileConfirmOpen(false); return }
     const changes = profileDeltas()
+    // Send the zone only when it CHANGED: a tenant sitting on an unformattable
+    // stored zone would otherwise have its name/school edits blocked by the
+    // action's zone validation.
+    const timezoneChanged = !!timezone && timezone !== ministryInfo?.timezone
     setSavingInfo(true)
     setInfoError(null)
-    const { error } = await updateMinistryInfo({ name, university, timezone })
+    const { error } = await updateMinistryInfo(timezoneChanged ? { name, university, timezone } : { name, university })
     setSavingInfo(false)
     if (error) { setInfoError(error); setProfileConfirmOpen(false); return }
-    setMinistryInfo(prev => prev ? { ...prev, name, university, timezone } : prev)
+    setMinistryInfo(prev => prev ? { ...prev, name, university, ...(timezoneChanged ? { timezone } : {}) } : prev)
     // Every event surface reads the zone from context — publish it so the app
     // reflects the new zone immediately rather than at the next reload.
-    publishMinistryTimezone(timezone)
+    if (timezoneChanged) publishMinistryTimezone(timezone)
     logSettingsChange("settings.general_edit", "General", changes)
     setProfileConfirmOpen(false)
     setProfileEditing(false)
@@ -1187,7 +1196,9 @@ export function SettingsTab({
     const { data: fresh } = await getFinanceFunds(ministryId, { includeInactive: true })
     setFunds(fresh)
     setPendingFunds(toPending(fresh))
-    logSettingsChange("settings.funds_edit", "Funds", changes)
+    // Audited server-side (service role, same gate as the writes above) so a
+    // finance-capable non-admin's change is recorded too — see logFundsAudit.
+    await logFundsAudit({ ministryId, changes })
     setFundsEditing(false)
     setSavingFunds(false)
   }
