@@ -5,3 +5,10 @@ Found by the RLS review of the settings-audit work (feat/truth-fixes). `audit_lo
 Also: any write path that is NOT admin-gated (Funds admits `can_view_finances` team members) must write its audit row **server-side** — a browser-side `logAudit` from a member is refused by the policy and, before today, swallowed silently.
 
 **Follow-up (needs a migration + rls-reviewer twice):** tighten `audit_logs` SELECT to admin-tier of the same ministry, and INSERT to admin-tier (or move all audit writes server-side and drop the client INSERT policy entirely — the cleaner end state). Not done in the truth-fixes pass because it is a policy change, and that pass was scoped to app-layer readouts.
+
+**Closed 2026-09-15** (migration `audit_logs_admin_read_tier_bound_insert`, rls-reviewer before + after).
+Live, the INSERT policy had been *no tier at all* — any member could self-attribute any action — not
+"leader-tier" as this entry said from the SQL files. Now: SELECT = admin-tier of own ministry (plus a
+leader's own `announcement.*` rows, so INSERT…RETURNING keeps working); INSERT = own ministry + self as
+actor + (admin-tier, or leader-tier for `announcement.*` only); UPDATE/DELETE/MAINTAIN revoked from
+`authenticated`, everything revoked from `anon`. See `2026-09-15-a-rule-check-inferred-the-policy-from-the-app-query.md`.

@@ -1,5 +1,13 @@
 import { createClient } from "@/lib/supabase"
 
+// Row policy (audit_logs_insert, 2026-09-15): a browser write must be
+// self-attributed and within the caller's tier — leader-tier may write
+// `announcement.*` ONLY; every other action needs admin tier from the browser.
+// A leader-tier surface that emits a non-announcement action (team.*, moderation.*,
+// finance) must write it server-side with the service role, as
+// app/actions/finance-funds.ts does for settings.funds_edit. Reads are admin-only,
+// except that a leader can read back the `announcement.*` rows they wrote
+// themselves (that is what keeps INSERT…RETURNING working for them).
 export type AuditAction =
   | "announcement.create"
   | "announcement.edit"
@@ -15,6 +23,7 @@ export type AuditAction =
   | "team.member_remove"
   | "team.member_role_change"
   | "moderation.flag_threshold"
+  | "account.self_delete" // server-side only (app/actions/delete-account.ts)
   // Church Settings — one action per section that commits. Every one of these
   // carries `metadata.changes: AuditChange[]`; a commit with no deltas is never
   // logged at all, so an empty `changes` array should not exist in the table.

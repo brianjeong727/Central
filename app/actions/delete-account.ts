@@ -311,10 +311,13 @@ export async function deleteMyAccount(emailConfirmation: string): Promise<Delete
   }
 
   // (7) Audit entry (service client — lib/audit.ts is browser-only). Insert
-  //     directly; action string is a self-delete marker.
-  await admin.from("audit_logs").insert({
+  //     directly; action string is a self-delete marker. `actor_id` is NOT NULL
+  //     and has no FK, so the user's own id is correct here and the row outlives
+  //     the auth identity deleted in (8). (Was `null` — every self-delete since
+  //     launch was refused by the column and never recorded.)
+  const { error: auditErr } = await admin.from("audit_logs").insert({
     ministry_id: ministryId,
-    actor_id: null, // actor no longer exists after this action
+    actor_id: userId,
     actor_name: "Deleted account",
     action: "account.self_delete",
     entity_type: "profile",
@@ -322,6 +325,7 @@ export async function deleteMyAccount(emailConfirmation: string): Promise<Delete
     entity_label: "Self-service account deletion",
     metadata: { role },
   })
+  if (auditErr) console.error("[deleteMyAccount] audit row:", auditErr.message)
 
   // (8) Hard-delete the auth identity LAST (App Store requirement).
   const { error: authErr } = await admin.auth.admin.deleteUser(userId)
