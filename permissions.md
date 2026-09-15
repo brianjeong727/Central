@@ -107,8 +107,9 @@ The DG-dinner `reimbursement_forms` flow is **retired** — replaced by free-for
 | View announcements / RSVP | ✓ | ✓ | ✓ | ✓ |
 | Create/edit/delete announcements | ✗ | ✗ | ✓ | ✓ |
 | View RSVP attendee list | ✗ | ✗ | ✓ | ✓ |
+| View announcement telemetry (view count, ack tally) | ✗ | ✗ | ✓ | ✓ |
 | View chats | ✓ | ✓ | ✓ | ✓ |
-| Create church chats | ✗ | ✗ | ✓ (team-based) | ✓ |
+| Create church chats | ✗ | ✗ | ✓ | ✓ |
 | Manage a church chat (members, rename, section, archive/delete, pin, moderate) | ✗ | ✗ | ✓ if a member | ✓ if a member |
 | View Plan tab | on a team | on a team | on a team | ✓ (or governance) |
 | View directory | ✓ | ✓ | ✓ | ✓ |
