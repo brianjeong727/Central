@@ -141,6 +141,21 @@ export function computeEventReadiness({ tasks, roles, confirmations }: Readiness
   return { taskDone, taskTotal, rolesTotal, rolesAssigned, rolesConfirmed, rolesDeclined, pct, label, tone, detail }
 }
 
+/** The one set of words for a confirmation's state. Every surface that shows a
+ *  role's confirmation says the same thing; only the colour ramp is local. */
+export const CONFIRMATION_LABEL: Record<ReadinessConfirmation["status"], string> = {
+  requested: "Awaiting",
+  escalated: "Escalated",
+  confirmed: "Confirmed",
+  declined: "Declined",
+}
+
+/** Tonal colour for a confirmation state. A decline is --danger: it names a hole,
+ *  so it is never quieter than a confirmation. */
+export function confirmationColor(status: ReadinessConfirmation["status"]): string {
+  return status === "declined" ? "var(--danger)" : status === "confirmed" ? "var(--sage)" : "var(--plum)"
+}
+
 /** Roles readout for the launchpad row and the mobile stat: "2/6 assigned · 1 confirmed". */
 export function rolesSummary(r: EventReadiness): string {
   if (r.rolesTotal === 0) return "no roles yet"

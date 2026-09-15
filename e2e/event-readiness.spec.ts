@@ -288,6 +288,14 @@ test.describe("Event readiness is composite (tasks + confirmed roles)", () => {
     // role was declined, so the truthful status is "Needs someone".
     await expect(page.getByText("Needs someone").filter({ visible: true }).first()).toBeVisible({ timeout: 20_000 })
     await expect(page.getByText("Ready", { exact: true }).filter({ visible: true })).toHaveCount(0)
+
+    // The week's STAFFING table is the other place a declined night lead used to
+    // read as filled: its night rule counted assignment, not coverage.
+    await page.getByRole("button", { name: "Roles", exact: true }).click()
+    await expect(page.getByText(NIGHT_TITLE, { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText("Declined").filter({ visible: true }).first()).toBeVisible()
+    await expect(page.getByText("0 / 1", { exact: true }).filter({ visible: true }).first()).toBeVisible()
+
     expect(errors, errors.join("\n")).toEqual([])
   })
 })

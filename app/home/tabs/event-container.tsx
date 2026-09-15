@@ -32,7 +32,7 @@ import { MONO_STYLE } from "@/components/central/typography"
 import { PocketKicker, PocketRow, PocketRowCard, NightDivider, InlineAddRow } from "@/components/central"
 import { eventDayHeaderLabel, formatDurationMin } from "../utils"
 import type { CalendarEvent, EventBlock, EventConfirmation, EventPlan, EventRole, EventTask } from "../types"
-import { computeEventReadiness, type EventReadiness } from "@/lib/event-readiness"
+import { computeEventReadiness, isRoleCovered, CONFIRMATION_LABEL, confirmationColor, type EventReadiness } from "@/lib/event-readiness"
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -548,7 +548,10 @@ export function ContainerStaffing({
             <NightDivider
               name={child.event.title}
               date={nightLabel(child.event)}
-              count={`${child.roles.filter(r => r.assigned_to).length} / ${child.roles.length}`}
+              // STAFFED, not merely assigned: a night whose lead declined is a
+              // hole, and the week's rule must not count it as filled (the same
+              // predicate the leaf event groups "Covered" by).
+              count={`${child.roles.filter(r => isRoleCovered(r, child.confirmations)).length} / ${child.roles.length}`}
               first={gi === 0}
               onNameClick={onOpenChild ? () => onOpenChild(child.event) : undefined}
             />
@@ -558,12 +561,23 @@ export function ContainerStaffing({
             <p style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic", margin: "0 0 6px" }}>No roles on this night yet.</p>
           )}
 
-          {child.roles.map((role, ri) => (
-            // §4.11 — row dividers are --line-3, and the LAST row carries none.
+          {child.roles.map((role, ri) => {
+            // The night's own screen shows each role's confirmation state; the
+            // week's staffing table used to show only WHO, so a "Declined" role
+            // read here exactly like a staffed one. Same words, same tonal
+            // colours as the leaf (lib/event-readiness.ts) — no Re-request here,
+            // that action lives on the night's own Roles pane.
+            const conf = child.confirmations[role.id]
+            return (
             <div key={role.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: ri === child.roles.length - 1 ? "none" : "1px solid var(--line-3)" }}>
               <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: "var(--body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {role.role_name}
               </span>
+              {conf && (
+                <span style={{ fontSize: 12.5, fontWeight: 500, color: confirmationColor(conf.status), whiteSpace: "nowrap", flexShrink: 0 }}>
+                  {CONFIRMATION_LABEL[conf.status]}
+                </span>
+              )}
               {canEdit ? (
                 <select
                   value={role.assigned_to ?? ""}
@@ -580,7 +594,8 @@ export function ContainerStaffing({
                 </span>
               )}
             </div>
-          ))}
+            )
+          })}
 
           {canEdit && (addingFor === child.event.id ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 9 }}>

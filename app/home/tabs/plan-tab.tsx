@@ -6714,7 +6714,6 @@ export function AddEventModal({
   const [extras, setExtras] = useState<EventExtraTab[]>([])
   // The traditions flag — recurring events are what "Start next season" copies forward.
   const [recurring, setRecurring] = useState<boolean>(existing?.recurring ?? false)
-  const QUICK_TYPES: EventType[] = (["social", "ministry"] as EventType[]).filter(t => !excludeTypes?.includes(t))
   // The modal body keeps its scroll position across content swaps — after
   // scrolling the chooser, the details form would otherwise open with the
   // title off-screen. Reset on path change.
@@ -7132,47 +7131,84 @@ export function AddEventModal({
       }
     >
         <div ref={bodyTopRef} style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-          {/* ── Path chooser: quick presets / free-form ── */}
-          {!isEditing && createPath === null && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          {/* ── Path chooser: every preset, then free-form ──────────────────
+              All SEVEN playbooks in event-presets-data.mjs are creatable from
+              here. The chooser used to offer two of them, so Welcome Week,
+              Coffeehouse, Turkey Bowl, Retreat and Appreciation Night were
+              plans with tasks, roles and their own extra tabs that no one could
+              start — the only way in was editing an existing event's type.
+              Everything downstream is already generic over the stored
+              `event_type` (seeding in handleSave, extraTabs at the workspace),
+              so offering the type IS the feature. */}
+          {!isEditing && createPath === null && (() => {
+            // Order is the coordinator's: the two light presets, the five
+            // playbooks, then the custom path.
+            const QUICK_START: EventType[] = ["social", "ministry"]
+            const PLAYBOOKS: EventType[] = ["welcome_week", "coffeehouse", "turkey_bowl", "retreat", "appreciation_night"]
+            // Line glyphs, never the type's emoji (emoji stay on the event-type
+            // BADGE). Each one mirrors the extra tab its playbook opens —
+            // Welcome Week's Sub-events calendar, Coffeehouse's acts, Turkey
+            // Bowl's teams, Retreat's transport — so the card previews the shape
+            // of the plan behind it.
+            const PRESET_ICON: Record<EventType, string> = {
+              social: "sparkle", ministry: "book", welcome_week: "calendar",
+              coffeehouse: "music", turkey_bowl: "users", retreat: "globe",
+              appreciation_night: "seedling",
+            }
+            // The two light presets keep their "Quick …" names; a playbook is
+            // named by the tradition it plans.
+            const CARD_TITLE: Partial<Record<EventType, string>> = { social: "Quick social", ministry: "Quick gathering" }
+            const glyph = (t: EventType) => <PlanLineIcon iconKey={PRESET_ICON[t]} size={20} radius={0} bg="transparent" fg="var(--plum)" />
+            // What the card PROMISES is only what the seed actually writes:
+            // tasks and roles. (`budgetCategory` in the preset data is never
+            // read, so no card offers to fill a budget.)
+            const presetSub = (t: EventType) => {
+              const c = EVENT_TYPE_CONFIGS[t]
+              const tasks = c.defaultPhases.reduce((n, p) => n + p.tasks.length, 0)
+              const roles = c.defaultRoles.length
+              return `${tasks} task${tasks === 1 ? "" : "s"} · ${roles} role${roles === 1 ? "" : "s"} pre-filled`
+            }
+            const allowed = (list: EventType[]) => list.filter(t => !excludeTypes?.includes(t))
+            const presetCard = (t: EventType) => (
+              <ActionCard
+                key={t}
+                icon={glyph(t)}
+                title={CARD_TITLE[t] ?? EVENT_TYPE_CONFIGS[t].label}
+                subtitle={presetSub(t)}
+                onClick={() => { setEventType(t); applyQuickPreset(t); setCreatePath("quick") }}
+              />
+            )
+            const quick = allowed(QUICK_START)
+            const books = allowed(PLAYBOOKS)
+            const group = (label: string, kids: React.ReactNode) => (
               <div>
-                <label style={labelStyle}>Start something new</label>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10, marginTop: 8 }}>
-                  {QUICK_TYPES.map(t => {
-                    const tcfg = EVENT_TYPE_CONFIGS[t]
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => { setEventType(t); applyQuickPreset(t); setCreatePath("quick") }}
-                        style={{ padding: "12px 14px", borderRadius: 12, textAlign: "left", cursor: "pointer", border: "2px solid var(--line)", background: "var(--cream-panel)", transition: "border-color 0.15s" }}
-                      >
-                        <div style={{ fontSize: 20, marginBottom: 4 }}>{tcfg.icon}</div>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>{t === "social" ? "Quick social" : "Quick gathering"}</div>
-                        <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>
-                          {t === "social" ? "Game night, hangout, picnic — light checklist" : "Prayer night, praise night, kickoff — light checklist"}
-                        </div>
-                      </button>
-                    )
-                  })}
-                  <button
-                    type="button"
+                <label style={labelStyle}>{label}</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>{kids}</div>
+              </div>
+            )
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+                {quick.length > 0 && group("Start something new", quick.map(presetCard))}
+                {books.length > 0 && group("From a playbook", books.map(presetCard))}
+                {/* No dashed border here: the collection isn't empty, so the
+                    custom path is a card like the rest — its own group label is
+                    what separates it from the playbooks. */}
+                {group("Something else", (
+                  <ActionCard
+                    icon={<PlanLineIcon iconKey="plan" size={20} radius={0} bg="transparent" fg="var(--plum)" />}
+                    title="Start from scratch"
+                    subtitle="Blank plan — pick exactly the pieces it needs"
                     onClick={() => {
                       const d = ymdOf(new Date(Date.now() + 7 * 86_400_000))
                       setEventType("social"); setTitle(""); setDescription(""); setLocation("")
                       setStartDateStr(d); setEndDateStr(d); setStartTimeStr("18:00"); setEndTimeStr("21:00"); setAllDay(false)
                       setGhost(null); setExtras([]); setCreatePath("custom")
                     }}
-                    style={{ padding: "12px 14px", borderRadius: 12, textAlign: "left", cursor: "pointer", border: "2px dashed var(--dashed)", background: "var(--cream-panel)" }}
-                  >
-                    <div style={{ fontSize: 20, marginBottom: 4 }}>✏️</div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>Start from scratch</div>
-                    <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.4 }}>Blank plan — pick exactly the pieces it needs (sub-events, acts, transport…)</div>
-                  </button>
-                </div>
+                  />
+                ))}
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* Back to the chooser from any path (new events only) */}
           {!isEditing && createPath !== null && (
