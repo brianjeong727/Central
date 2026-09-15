@@ -678,7 +678,10 @@ async function resolveReceiptDecision(admin: AdminClient, recordId: string): Pro
     case "approved":
       title = "Receipt approved"; body = `${amt} for ${what} was approved.`; break
     case "reimbursed":
-      title = "Receipt reimbursed"; body = `${amt} for ${what} has been reimbursed.`; break
+      // DB status value stays "reimbursed" — this authorizes disbursement, it
+      // doesn't claim the money has moved yet. Label matches STATUS_META.reimbursed
+      // in finance-workspace.tsx ("Approved to pay").
+      title = "Receipt approved to pay"; body = `${amt} for ${what} was approved to pay.`; break
     case "rejected":
       title = "Receipt not approved"; body = `${amt} for ${what} was not approved.`; break
     default: // declined

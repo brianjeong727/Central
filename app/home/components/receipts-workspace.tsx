@@ -514,11 +514,14 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-// Per-source status path — church signs off; external is grant-filed.
+// Per-source status path — church signs off; external is grant-filed. Node
+// labels for the two status-backed steps come from STATUS_META (the single
+// receipt-status label map, imported from finance-workspace.tsx) so "Approved
+// to pay" only lives in one place.
 function memberAllocSteps(kind: "church" | "external") {
   return kind === "church"
-    ? (["Submitted", "Approved", "Reimbursed"] as const)
-    : (["Submitted", "Requested", "Reimbursed"] as const)
+    ? ["Submitted", STATUS_META.approved.label, STATUS_META.reimbursed.label]
+    : ["Submitted", STATUS_META.requested.label, STATUS_META.reimbursed.label]
 }
 
 interface MemberAllocation {
@@ -533,14 +536,16 @@ interface MemberAllocation {
   signed_off_at: string | null
 }
 
-// Short "Jul 18" formatter + the date reached at each lifecycle node (node 1 =
-// Approved/Requested, node 2 = Reimbursed) — mirrors the treasurer inbox rail.
+// Short "Jul 18" formatter + the date reached at each lifecycle node (node 0 =
+// Submitted → the receipt's own submitted_at, node 1 = Approved/Requested,
+// node 2 = Approved to pay) — mirrors the treasurer inbox rail.
 function fmtStepDate(iso: string | null): string | null {
   if (!iso) return null
   const d = new Date(iso)
   return isNaN(d.getTime()) ? null : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
-function memberNodeDate(a: MemberAllocation, i: number): string | null {
+function memberNodeDate(a: MemberAllocation, i: number, submittedAt: string): string | null {
+  if (i === 0) return fmtStepDate(submittedAt)
   if (i === 1) return fmtStepDate(a.fund_kind === "church" ? a.reviewed_at : (a.requested_at ?? a.reviewed_at))
   if (i === 2) return fmtStepDate(a.signed_off_at)
   return null
@@ -551,7 +556,7 @@ const memberStepDateStyle: React.CSSProperties = {
 
 // A single read-only source row in the member's split view: fund chip · amount ·
 // status pill · per-source stepper. Mirrors the treasurer inbox split, no actions.
-function MemberAllocationRow({ allocation: a }: { allocation: MemberAllocation }) {
+function MemberAllocationRow({ allocation: a, submittedAt }: { allocation: MemberAllocation; submittedAt: string }) {
   const isNegative = a.status === "rejected" || a.status === "declined"
   const steps = memberAllocSteps(a.fund_kind)
   const reached = a.status === "reimbursed" ? 2 : (a.status === "approved" || a.status === "requested") ? 1 : 0
@@ -573,7 +578,7 @@ function MemberAllocationRow({ allocation: a }: { allocation: MemberAllocation }
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {steps.map((step, i) => {
             const done = i <= reached
-            const nodeDate = done ? memberNodeDate(a, i) : null
+            const nodeDate = done ? memberNodeDate(a, i, submittedAt) : null
             return (
               <div key={step} style={{ display: "flex", alignItems: "center", gap: 8, flex: i < steps.length - 1 ? 1 : 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -672,7 +677,7 @@ function ReceiptDetailOverlay({
           <div style={{ marginBottom: 24 }}>
             <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 10px" }}>Funding split</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {allocations.map(a => <MemberAllocationRow key={a.id} allocation={a} />)}
+              {allocations.map(a => <MemberAllocationRow key={a.id} allocation={a} submittedAt={receipt.submitted_at} />)}
             </div>
           </div>
         )}

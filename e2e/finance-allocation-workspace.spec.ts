@@ -199,12 +199,16 @@ test.describe("finance workspace redesign — Allocation surface + inbox gating 
     await expect(page.getByText("Church", { exact: true })).toBeVisible({ timeout: 15000 })
     await expect(page.getByText(GRANT_A_NAME, { exact: true })).toBeVisible()
     await expect(page.getByText(GRANT_B_NAME, { exact: true })).toBeVisible()
-    // Church: alloc $100, spent $130 → over by $30 (danger state).
+    // Church: alloc $100, spent $130 → over by $30 (danger state). The card leads
+    // with what's LEFT (over-by, here), the spend is a caption underneath.
     await expect(page.getByText("Over by $30")).toBeVisible()
+    await expect(page.getByText("$130 spent of $100")).toBeVisible()
     // Grant A: alloc $50, spent $20 → $30 left.
     await expect(page.getByText("$30 left")).toBeVisible()
+    await expect(page.getByText("$20 spent of $50")).toBeVisible()
     // Grant B: alloc $40, spent $0 → $40 left.
     await expect(page.getByText("$40 left")).toBeVisible()
+    await expect(page.getByText("$0 spent of $40")).toBeVisible()
     if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/1-allocation-landing-fundcards.png` })
 
     // ── TOTAL footer sums across funds: allocated 190, spent 150, remaining 40 ──
