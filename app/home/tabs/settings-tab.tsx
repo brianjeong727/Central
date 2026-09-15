@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react"
 import useSWR, { mutate } from "swr"
 import { Copy, Check, QrCode, Users, Shield, Crown, MoreHorizontal, Search, X, AlertTriangle, RefreshCw, Pencil, Calendar, ExternalLink, GripVertical, BookOpen, Building2, Zap, MessageSquare, Flag, LayoutGrid, ScrollText, ListFilter } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { logAudit } from "@/lib/audit"
+import { logAudit, type AuditChange } from "@/lib/audit"
+import { resolveMinistryTimezone } from "@/lib/tz"
 import { EYEBROW_STYLE, PlanLineIcon, EmptyState } from "../components/shared"
 import { teamIconKey } from "../workspace-presets"
 import {
@@ -37,8 +38,9 @@ import { getInitials, formatRelativeTime } from "../utils"
 import { roleLabel } from "@/app/actions/super-constants"
 import { isLinkableCode, customCodeProblem, normalizeCustomCode, CUSTOM_CODE_MAX_LEN } from "@/lib/invite-code"
 import { setCustomInviteCode, setMemberCanInvite, listJoinRequests, decideJoinRequest, type JoinRequestRow } from "@/app/actions/join-requests"
-import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, InviteShareModal, PocketKicker, PocketRowCard, PocketRow, PocketSwitch, PocketSheet, useScrollResetOn } from "@/components/central"
+import { MonogramChip, PageTitle, PlanSubTabStrip, SectionHeader, TabPageHeader, CentralButton, FilterChip, ConfirmDialog, CentralModal, ContentActionButton, ActionMenu, InviteShareModal, PocketKicker, PocketRowCard, PocketRow, PocketSwitch, PocketSheet, Select, useScrollResetOn } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
+import { useSetMinistryTimezone } from "../ministry-timezone-context"
 import { useNavState } from "../nav-state"
 import { useOpenMemberProfile } from "../member-profile-context"
 import { isAdminRole } from "@/lib/roles"
@@ -55,6 +57,31 @@ interface MinistryInfo {
   name: string
   university: string
   size: string
+  // Always a formattable IANA zone (resolved through lib/tz on load).
+  timezone: string
+}
+
+// The zones a US college ministry actually runs in, in offset order. Anything
+// else a tenant already has stays selectable (appended by `timezoneOptions`), so
+// this list can never strand a ministry on a zone it can't re-pick.
+const TIMEZONE_CHOICES: { value: string; label: string }[] = [
+  { value: "America/New_York",    label: "Eastern (New York)" },
+  { value: "America/Chicago",     label: "Central (Chicago)" },
+  { value: "America/Denver",      label: "Mountain (Denver)" },
+  { value: "America/Phoenix",     label: "Arizona (Phoenix)" },
+  { value: "America/Los_Angeles", label: "Pacific (Los Angeles)" },
+  { value: "America/Anchorage",   label: "Alaska (Anchorage)" },
+  { value: "Pacific/Honolulu",    label: "Hawaii (Honolulu)" },
+]
+
+function timezoneOptions(current: string): { value: string; label: string }[] {
+  if (!current || TIMEZONE_CHOICES.some(o => o.value === current)) return TIMEZONE_CHOICES
+  return [...TIMEZONE_CHOICES, { value: current, label: current.split("/").pop()?.replace(/_/g, " ") ?? current }]
+}
+
+/** "Eastern (New York)" for a known zone, the IANA id itself for anything else. */
+function timezoneLabel(tz: string): string {
+  return TIMEZONE_CHOICES.find(o => o.value === tz)?.label ?? tz
 }
 
 type RoleFilter = "all" | "member" | "visitor" | "leader" | "admin" | "deacon" | "elder"
@@ -266,7 +293,17 @@ export function SettingsTab({
   const supabase = createClient()
   const { setParam } = useNavState()
   const openMemberProfile = useOpenMemberProfile()
+  const publishMinistryTimezone = useSetMinistryTimezone()
   const isAdmin = isAdminRole(userRole)
+
+  // Every section that COMMITS lands here, so the audit entry always carries the
+  // same shape the admin just confirmed on screen: plain-English field labels and
+  // old→new pairs. A commit with no deltas writes nothing — an audit log that
+  // records "saved (nothing changed)" is noise that hides the real entries.
+  function logSettingsChange(action: "settings.general_edit" | "settings.discovery_edit" | "settings.governance_edit" | "settings.automations_edit" | "settings.moderation_edit" | "settings.sharing_edit" | "settings.funds_edit", section: string, changes: AuditChange[]) {
+    if (changes.length === 0) return
+    logAudit({ ministryId, actorId: userId, actorName: userName, action, entityType: "ministry", entityId: ministryId, entityLabel: section, metadata: { changes } })
+  }
 
   const [activeSettingsTab, setActiveSettingsTab] = useState<ActiveSettingsTab>(() => {
     if (typeof window === "undefined") return "general"
@@ -507,7 +544,7 @@ export function SettingsTab({
   // ── Edit → stage → confirm → feedback sessions ─────────────────────────────
   // Ministry Profile (name + university → updateMinistryInfo)
   const [profileEditing, setProfileEditing] = useState(false)
-  const [profileDraft, setProfileDraft] = useState<{ name: string; university: string }>({ name: "", university: "" })
+  const [profileDraft, setProfileDraft] = useState<{ name: string; university: string; timezone: string }>({ name: "", university: "", timezone: "" })
   const [profileConfirmOpen, setProfileConfirmOpen] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
 
@@ -543,7 +580,7 @@ export function SettingsTab({
       const [{ data: min }, { data: profiles }, { data: schoolRows }, limitsRes, fundsRes, verses, { data: teamRows }, codesRes, { data: givingRow }] = await Promise.all([
         // invite_code/staff_invite_code are column-revoked for browser clients
         // (Q2 migration) — they load via the admin-scoped getMinistryCodes action.
-        supabase.from("ministries").select("name, university, size, is_public, automation_settings, governance_settings, moderation_settings, archive_requested_by, archive_requested_at").eq("id", ministryId).maybeSingle(),
+        supabase.from("ministries").select("name, university, size, is_public, timezone, automation_settings, governance_settings, moderation_settings, archive_requested_by, archive_requested_at").eq("id", ministryId).maybeSingle(),
         supabase.from("profiles").select("id, name, email, role, graduation_year").eq("ministry_id", ministryId).is("deleted_at", null).order("name"),
         supabase.from("ministry_schools").select("id, name, abbreviation, sort_order").eq("ministry_id", ministryId).order("sort_order"),
         getReceiptLimits(ministryId),
@@ -559,7 +596,7 @@ export function SettingsTab({
       setCodeIsCustom(codesRes.inviteCodeIsCustom)
       setMemberCanInviteState(codesRes.memberCanInvite)
       if (min) {
-        setMinistryInfo({ name: min.name, university: min.university, size: min.size })
+        setMinistryInfo({ name: min.name, university: min.university, size: min.size, timezone: resolveMinistryTimezone((min as { timezone?: string | null }).timezone) })
         setIsPublic(min.is_public ?? false)
         if (min.archive_requested_by) {
           setArchiveRequest({
@@ -640,24 +677,37 @@ export function SettingsTab({
     setTimeout(() => setter(false), 1800)
   }
   function startProfileEdit() {
-    setProfileDraft({ name: ministryInfo?.name ?? ministryName, university: ministryInfo?.university ?? "" })
+    setProfileDraft({ name: ministryInfo?.name ?? ministryName, university: ministryInfo?.university ?? "", timezone: ministryInfo?.timezone ?? resolveMinistryTimezone(null) })
     setInfoError(null)
     setProfileEditing(true)
   }
-  const profileDirty = !!ministryInfo && (
-    profileDraft.name.trim() !== (ministryInfo.name ?? "") ||
-    profileDraft.university.trim() !== (ministryInfo.university ?? "")
-  )
+  // ONE delta list per section: the confirm modal renders it and the audit entry
+  // records it, so the log can never disagree with what was confirmed on screen.
+  function profileDeltas(): AuditChange[] {
+    if (!ministryInfo) return []
+    const d: AuditChange[] = []
+    if (profileDraft.name.trim() !== (ministryInfo.name ?? "")) d.push({ field: "Ministry name", from: ministryInfo.name || "—", to: profileDraft.name.trim() || "—" })
+    if (profileDraft.university.trim() !== (ministryInfo.university ?? "")) d.push({ field: "School", from: ministryInfo.university || "—", to: profileDraft.university.trim() || "—" })
+    if (profileDraft.timezone && profileDraft.timezone !== ministryInfo.timezone) d.push({ field: "Time zone", from: timezoneLabel(ministryInfo.timezone), to: timezoneLabel(profileDraft.timezone) })
+    return d
+  }
+  const profileDirty = profileDeltas().length > 0
   async function confirmProfileSave() {
     const name = profileDraft.name.trim()
     const university = profileDraft.university.trim()
+    const timezone = profileDraft.timezone
     if (!name) { setInfoError("Ministry name can’t be empty."); setProfileConfirmOpen(false); return }
+    const changes = profileDeltas()
     setSavingInfo(true)
     setInfoError(null)
-    const { error } = await updateMinistryInfo({ name, university })
+    const { error } = await updateMinistryInfo({ name, university, timezone })
     setSavingInfo(false)
     if (error) { setInfoError(error); setProfileConfirmOpen(false); return }
-    setMinistryInfo(prev => prev ? { ...prev, name, university } : prev)
+    setMinistryInfo(prev => prev ? { ...prev, name, university, timezone } : prev)
+    // Every event surface reads the zone from context — publish it so the app
+    // reflects the new zone immediately rather than at the next reload.
+    publishMinistryTimezone(timezone)
+    logSettingsChange("settings.general_edit", "General", changes)
     setProfileConfirmOpen(false)
     setProfileEditing(false)
     flashSaved(setProfileSaved)
@@ -666,13 +716,19 @@ export function SettingsTab({
   // ── Discovery edit session (public toggle) ───────────────────────────────────
   function startDiscoveryEdit() { setDiscoveryDraft(isPublic); setDiscoveryError(null); setDiscoveryEditing(true) }
   const discoveryDirty = discoveryDraft !== isPublic
+  function discoveryDeltas(): AuditChange[] {
+    if (discoveryDraft === isPublic) return []
+    return [{ field: "Ministry visibility", from: isPublic ? "public" : "private", to: discoveryDraft ? "public" : "private" }]
+  }
   async function confirmDiscoverySave() {
+    const changes = discoveryDeltas()
     setToggling(true)
     setDiscoveryError(null)
     const { error } = await updateMinistryPublic(discoveryDraft)
     setToggling(false)
     if (error) { setDiscoveryError(error); setDiscoveryConfirmOpen(false); return }
     setIsPublic(discoveryDraft); onPublicChange(discoveryDraft)
+    logSettingsChange("settings.discovery_edit", "Discovery", changes)
     setDiscoveryConfirmOpen(false)
     setDiscoveryEditing(false)
     flashSaved(setDiscoverySaved)
@@ -818,12 +874,18 @@ export function SettingsTab({
   }
   const inviteShareDirty = inviteShareDraft !== memberCanInvite
   async function saveInviteShare() {
+    // No confirm modal on this one, so the delta is built here — same shape, so
+    // the Audit Log reads identically to the confirmed sections.
+    const changes: AuditChange[] = inviteShareDraft === memberCanInvite ? [] : [
+      { field: "Members can share the invite code", from: memberCanInvite ? "on" : "off", to: inviteShareDraft ? "on" : "off" },
+    ]
     setInviteShareSaving(true)
     setInviteShareError(null)
     const { error } = await setMemberCanInvite(ministryId, inviteShareDraft)
     setInviteShareSaving(false)
     if (error) { setInviteShareError(error); return }
     setMemberCanInviteState(inviteShareDraft)
+    logSettingsChange("settings.sharing_edit", "Invite sharing", changes)
     setInviteShareEditing(false)
     flashSaved(setInviteShareSaved)
   }
@@ -923,6 +985,7 @@ export function SettingsTab({
   function cancelAutomationsEdit() { setPendingAutomationSettings(automationSettings); setAutomationsEditing(false); setAutomationSaveMsg(null) }
 
   async function commitSaveAutomations() {
+    const changes: AuditChange[] = automationDeltas().map(d => ({ field: d.label, from: d.from, to: d.to }))
     setSavingAutomations(true)
     await updateAutomationSettings(ministryId, pendingAutomationSettings)
 
@@ -944,6 +1007,7 @@ export function SettingsTab({
     }
 
     setAutomationSettings(pendingAutomationSettings)
+    logSettingsChange("settings.automations_edit", "Automations", changes)
     setSavingAutomations(false)
     setAutomationSaveMsg(null)
     setAutomationsConfirmOpen(false)
@@ -973,11 +1037,13 @@ export function SettingsTab({
     return d
   }
   async function handleSaveModeration() {
+    const changes: AuditChange[] = moderationDeltas().map(d => ({ field: d.label, from: d.from, to: d.to }))
     setSavingModeration(true)
     const res = await updateModerationSettings(ministryId, pendingModerationSettings)
     setSavingModeration(false)
     if (res?.error) { setModerationSaveMsg(`Error: ${res.error}`); setModerationConfirmOpen(false); return }
     setModerationSettings(pendingModerationSettings)
+    logSettingsChange("settings.moderation_edit", "Chat moderation", changes)
     setModerationConfirmOpen(false)
     setModerationEditing(false)
     flashSaved(setModerationSaved)
@@ -1078,9 +1144,29 @@ export function SettingsTab({
     setPendingFunds(prev => prev.map(f => f.key === key ? { ...f, ...patch } : f))
   }
 
+  const FUND_KIND_LABEL: Record<FundKind, string> = { church: "Church", external: "External" }
+  // Funds commit with no confirm modal, so the delta is computed here against the
+  // saved list — the same {field, from, to} shape every other section logs.
+  function fundsDeltas(): AuditChange[] {
+    const d: AuditChange[] = []
+    for (const p of pendingFunds) {
+      if (!p.id) {
+        if (p.name.trim()) d.push({ field: "Fund added", from: "—", to: `${p.name.trim()} (${FUND_KIND_LABEL[p.kind].toLowerCase()})` })
+        continue
+      }
+      const orig = funds.find(f => f.id === p.id)
+      if (!orig) continue
+      if (p.name.trim() && p.name.trim() !== orig.name) d.push({ field: "Fund name", from: orig.name, to: p.name.trim() })
+      if (p.kind !== orig.kind) d.push({ field: `Fund type — ${orig.name}`, from: FUND_KIND_LABEL[orig.kind], to: FUND_KIND_LABEL[p.kind] })
+      if (p.is_active !== orig.is_active) d.push({ field: `Fund — ${orig.name}`, from: orig.is_active ? "active" : "archived", to: p.is_active ? "active" : "archived" })
+    }
+    return d
+  }
+
   async function saveFunds() {
     // Validate: every kept (active) fund needs a name.
     if (pendingFunds.some(f => f.is_active && !f.name.trim())) { setFundsError("Every fund needs a name."); return }
+    const changes = fundsDeltas()
     setFundsError(null); setSavingFunds(true)
     // Commit each diff against the saved list.
     for (const p of pendingFunds) {
@@ -1101,6 +1187,7 @@ export function SettingsTab({
     const { data: fresh } = await getFinanceFunds(ministryId, { includeInactive: true })
     setFunds(fresh)
     setPendingFunds(toPending(fresh))
+    logSettingsChange("settings.funds_edit", "Funds", changes)
     setFundsEditing(false)
     setSavingFunds(false)
   }
@@ -1184,6 +1271,23 @@ export function SettingsTab({
 
   const govRosterChanged = !!govDraft && JSON.stringify([...govDraft.roster_ids].sort()) !== JSON.stringify([...governanceSettings.roster_ids].sort())
   const govAllAdminsChanged = !!govDraft && govDraft.all_admins !== governanceSettings.all_admins
+
+  // The roster half and the per-team half of the governance draft are written by
+  // two DIFFERENT actions and can fail independently, so they are two delta lists:
+  // the modal shows both, the audit entry records only what actually committed.
+  function govRosterDeltas(): AuditChange[] {
+    if (!govDraft) return []
+    if (govAllAdminsChanged) return [{
+      field: "Governance roster",
+      from: governanceSettings.all_admins ? "all admins" : `curated (${governanceSettings.roster_ids.length})`,
+      to: govDraft.all_admins ? "all admins" : `curated (${govDraft.roster_ids.length} admin${govDraft.roster_ids.length === 1 ? "" : "s"})`,
+    }]
+    if (govRosterChanged) return [{ field: "Governing roster", from: `${governanceSettings.roster_ids.length} selected`, to: `${govDraft.roster_ids.length} selected` }]
+    return []
+  }
+  function govTeamDelta(t: GovTeamRow): AuditChange {
+    return { field: `Admin access — ${t.name}`, from: t.admin_access, to: govDraft?.teamAccess[t.id] ?? t.admin_access }
+  }
   const govTeamsChanged = !!govDraft && govTeams.filter(t => govDraft.teamAccess[t.id] !== t.admin_access)
   const govDirty = !!govDraft && (govAllAdminsChanged || govRosterChanged || (Array.isArray(govTeamsChanged) && govTeamsChanged.length > 0))
 
@@ -1192,23 +1296,30 @@ export function SettingsTab({
     setGovSaving(true)
     setGovError(null)
     const failures: string[] = []
+    const committed: AuditChange[] = []
     let nextGov = governanceSettings
     let nextTeams = govTeams
 
     if (govAllAdminsChanged || govRosterChanged) {
+      const rosterChanges = govRosterDeltas()
       const payload: GovernanceSettings = { all_admins: govDraft.all_admins, roster_ids: govDraft.roster_ids }
       const { error } = await updateGovernanceSettings(payload)
-      if (error) failures.push("governance roster"); else nextGov = payload
+      if (error) failures.push("governance roster"); else { nextGov = payload; committed.push(...rosterChanges) }
     }
     const changedTeams = govTeams.filter(t => govDraft.teamAccess[t.id] !== t.admin_access)
     for (const t of changedTeams) {
+      const delta = govTeamDelta(t)
       const { error } = await updateTeamAdminAccess(t.id, govDraft.teamAccess[t.id])
       if (error) failures.push(t.name)
-      else nextTeams = nextTeams.map(x => x.id === t.id ? { ...x, admin_access: govDraft.teamAccess[t.id] } : x)
+      else {
+        nextTeams = nextTeams.map(x => x.id === t.id ? { ...x, admin_access: govDraft.teamAccess[t.id] } : x)
+        committed.push(delta)
+      }
     }
 
     setGovernanceSettings(nextGov)
     setGovTeams(nextTeams)
+    logSettingsChange("settings.governance_edit", "Governance", committed)
     setGovSaving(false)
     setGovConfirmOpen(false)
 
@@ -1350,9 +1461,10 @@ export function SettingsTab({
                     <SectionEditControls editing={profileEditing} dirty={profileDirty} saving={savingInfo} saved={profileSaved} disabled={!isAdmin}
                       onEdit={startProfileEdit} onCancel={() => { setProfileEditing(false); setInfoError(null) }} onSave={() => setProfileConfirmOpen(true)} />
                   } />
-                  <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>The name, school, and visual identity members see when they find your ministry.</p>
+                  <p style={{ marginTop: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.55 }}>The name, school, and visual identity members see when they find your ministry. Every event time and reminder is shown in this zone.</p>
                 </div>
-                <div className={CARD_CLS} style={{ ...CARD, padding: "22px 26px", display: "flex", alignItems: "center", gap: 20 }}>
+                <div className={CARD_CLS} style={{ ...CARD, padding: "22px 26px", display: "flex", flexDirection: "column", gap: 18 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
                   <MonogramChip
                     initials={(ministryInfo?.name ?? ministryName)[0]}
                     className="flex-shrink-0"
@@ -1372,6 +1484,33 @@ export function SettingsTab({
                     )}
                     {infoError && <p style={{ fontSize: "12px", color: "var(--danger)", marginTop: 8 }}>{infoError}</p>}
                   </div>
+                </div>
+                {/* Time zone — same Edit → Save session as the name/school above
+                    (#21). One render tree for desktop and phone. */}
+                <div style={{ borderTop: "1px solid var(--line-3)", paddingTop: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>Time zone</div>
+                  {profileEditing ? (
+                    <>
+                      <Select
+                        size="sm"
+                        aria-label="Time zone"
+                        value={profileDraft.timezone}
+                        onChange={e => setProfileDraft(d => ({ ...d, timezone: e.target.value }))}
+                        style={{ marginTop: 8, maxWidth: 340 }}
+                      >
+                        {timezoneOptions(profileDraft.timezone).map(o => (
+                          <option key={o.value} value={o.value}>{o.label} · {o.value}</option>
+                        ))}
+                      </Select>
+                      <div style={{ marginTop: 6, fontSize: 12, color: "var(--muted-text)" }}>{profileDraft.timezone}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div data-testid="settings-timezone" style={{ marginTop: 4, fontSize: 14, color: "var(--body)" }}>{timezoneLabel(ministryInfo?.timezone ?? resolveMinistryTimezone(null))}</div>
+                      <div style={{ marginTop: 2, fontSize: 12, color: "var(--muted-text)" }}>{ministryInfo?.timezone ?? resolveMinistryTimezone(null)}</div>
+                    </>
+                  )}
+                </div>
                 </div>
               </section>
 
@@ -2596,6 +2735,46 @@ export function SettingsTab({
                       "team.member_add": "Added team member",
                       "team.member_remove": "Removed team member",
                       "team.member_role_change": "Changed team role",
+                      "settings.general_edit": "Changed General",
+                      "settings.discovery_edit": "Changed Discovery",
+                      "settings.governance_edit": "Changed Governance",
+                      "settings.automations_edit": "Changed Automations",
+                      "settings.moderation_edit": "Changed Chat moderation",
+                      "settings.sharing_edit": "Changed Invite sharing",
+                      "settings.funds_edit": "Changed Funds",
+                      "moderation.flag_threshold": "Language filter flagged a member repeatedly",
+                    }
+                    // Nothing raw ever reaches this screen: every settings entry
+                    // carries plain-English field labels, and anything older (or
+                    // written by a path that stored a key) is humanized here.
+                    const SETTINGS_FIELD_LABEL: Record<string, string> = {
+                      name: "Ministry name",
+                      university: "School",
+                      timezone: "Time zone",
+                      is_public: "Ministry visibility",
+                      all_admins: "Governance roster",
+                      roster_ids: "Governing roster",
+                      enabled: "Language filter",
+                      behavior: "Behavior",
+                      strictness: "Strictness",
+                      scope: "Scope",
+                      reverent_caps: "Reverent capitalization",
+                      flag_threshold: "Flag threshold",
+                      member_can_invite: "Members can share the invite code",
+                    }
+                    function fieldLabel(raw: string): string {
+                      const key = raw.includes(".") ? raw.slice(raw.lastIndexOf(".") + 1) : raw
+                      if (SETTINGS_FIELD_LABEL[key]) return SETTINGS_FIELD_LABEL[key]
+                      if (/^[a-z0-9_]+$/.test(key)) return key.replace(/_/g, " ").replace(/^./, c => c.toUpperCase())
+                      return raw
+                    }
+                    function readChanges(meta: Record<string, unknown> | null): { field: string; from: string; to: string }[] {
+                      const raw = meta?.changes
+                      if (!Array.isArray(raw)) return []
+                      return raw
+                        .filter((c): c is Record<string, unknown> => !!c && typeof c === "object")
+                        .map(c => ({ field: fieldLabel(String(c.field ?? "")), from: String(c.from ?? "—"), to: String(c.to ?? "—") }))
+                        .filter(c => c.field.length > 0)
                     }
                     // Group rows by calendar day (logs arrive newest-first).
                     const groups: { key: string; label: string; logs: typeof auditLogs }[] = []
@@ -2611,15 +2790,29 @@ export function SettingsTab({
                       <div key={group.key}>
                         <div style={{ ...EYEBROW_STYLE, padding: "10px 20px 8px", borderBottom: "1px solid var(--line-3)" }}>{group.label}</div>
                         {group.logs.map((log, i) => {
-                          const label = actionLabel[log.action] ?? log.action
+                          const isSettings = log.action.startsWith("settings.")
+                          const label = actionLabel[log.action] ?? fieldLabel(log.action)
                           const meta = log.metadata
                           const roleChange = meta?.old_role && meta?.new_role ? ` (${meta.old_role} → ${meta.new_role})` : ""
+                          // A settings headline already NAMES its section, so the
+                          // entity label would just repeat it; the deltas carry
+                          // the meaning instead.
+                          const changes = isSettings ? readChanges(meta) : []
                           const ts = new Date(log.created_at)
                           const timeStr = ts.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
                           return (
                             <div key={log.id} className="central-list-row" style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "start", gap: 16, padding: "14px 20px", borderBottom: i < group.logs.length - 1 ? "1px solid var(--line-3)" : "none" }}>
                               <div>
-                                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{label}{log.entity_label ? ` "${log.entity_label}"` : ""}{roleChange}</div>
+                                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{label}{!isSettings && log.entity_label ? ` "${log.entity_label}"` : ""}{roleChange}</div>
+                                {changes.length > 0 && (
+                                  <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 2 }}>
+                                    {changes.map((c, ci) => (
+                                      <div key={ci} style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.45 }}>
+                                        {c.field}: <span style={{ color: "var(--muted-text)" }}>{c.from}</span> <span style={{ color: "var(--faint)" }}>→</span> {c.to}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                                 <div style={{ marginTop: 2, fontSize: 12, color: "var(--muted-text)" }}>by {log.actor_name}</div>
                               </div>
                               <div style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap", paddingTop: 2 }}>{timeStr}</div>
@@ -2674,8 +2867,7 @@ export function SettingsTab({
           footer={<ConfirmFooter onCancel={() => setProfileConfirmOpen(false)} onConfirm={confirmProfileSave} saving={savingInfo} />}
         >
           <ChangeSummary>
-            {profileDraft.name.trim() !== (ministryInfo.name ?? "") && <ChangeRow label="Ministry name" from={ministryInfo.name || "—"} to={profileDraft.name.trim() || "—"} />}
-            {profileDraft.university.trim() !== (ministryInfo.university ?? "") && <ChangeRow label="School" from={ministryInfo.university || "—"} to={profileDraft.university.trim() || "—"} />}
+            {profileDeltas().map(d => <ChangeRow key={d.field} label={d.field} from={d.from} to={d.to} />)}
           </ChangeSummary>
         </CentralModal>
       )}
@@ -2690,7 +2882,7 @@ export function SettingsTab({
           footer={<ConfirmFooter onCancel={() => setDiscoveryConfirmOpen(false)} onConfirm={confirmDiscoverySave} saving={toggling} />}
         >
           <ChangeSummary>
-            <ChangeRow label="Ministry visibility" from={isPublic ? "public" : "private"} to={discoveryDraft ? "public" : "private"} />
+            {discoveryDeltas().map(d => <ChangeRow key={d.field} label={d.field} from={d.from} to={d.to} />)}
             <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
               {discoveryDraft ? "Your ministry will appear in Browse — anyone can find and join without an invite code." : "Your ministry will be hidden from Browse — an invite code will be required to join."}
             </p>
@@ -2708,15 +2900,11 @@ export function SettingsTab({
           footer={<ConfirmFooter onCancel={() => setGovConfirmOpen(false)} onConfirm={confirmGovSave} saving={govSaving} />}
         >
           <ChangeSummary>
-            {govAllAdminsChanged && (
-              <ChangeRow label="Governance roster" from={governanceSettings.all_admins ? "all admins" : `curated (${governanceSettings.roster_ids.length})`} to={govDraft.all_admins ? "all admins" : `curated (${govDraft.roster_ids.length} admin${govDraft.roster_ids.length === 1 ? "" : "s"})`} />
-            )}
-            {!govAllAdminsChanged && govRosterChanged && (
-              <ChangeRow label="Governing roster" from={`${governanceSettings.roster_ids.length} selected`} to={`${govDraft.roster_ids.length} selected`} />
-            )}
-            {govTeams.filter(t => govDraft.teamAccess[t.id] !== t.admin_access).map(t => (
-              <ChangeRow key={t.id} label={`Admin access — ${t.name}`} from={t.admin_access} to={govDraft.teamAccess[t.id]} />
-            ))}
+            {govRosterDeltas().map(d => <ChangeRow key={d.field} label={d.field} from={d.from} to={d.to} />)}
+            {govTeams.filter(t => govDraft.teamAccess[t.id] !== t.admin_access).map(t => {
+              const d = govTeamDelta(t)
+              return <ChangeRow key={t.id} label={d.field} from={d.from} to={d.to} />
+            })}
           </ChangeSummary>
         </CentralModal>
       )}

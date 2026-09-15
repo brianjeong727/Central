@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase-admin"
 import { requireSameMinistry, requireMinistryAdmin, isAdminTier } from "./authz"
 import { autoAddUserToChats, ensureMinistryChats } from "./auto-chats"
 import { YOUNG_ADULT } from "@/lib/cohort"
+import { isValidTimeZone } from "@/lib/tz"
 
 /**
  * The grade to write when a user joins a ministry, or null to leave it alone.
@@ -884,8 +885,13 @@ export async function getUserMinistries(): Promise<{
   }
 }
 
-// ─── Admin: update ministry name / university ────────────────────────────────
-export async function updateMinistryInfo(data: { name: string; university: string }): Promise<{ error: string | null }> {
+// ─── Admin: update ministry name / university / time zone ───────────────────
+// `timezone` is optional so existing callers are untouched; when present it is
+// validated against the runtime's tz database FIRST (Convention #23) — an
+// unformattable zone reaching `ministries.timezone` would throw a RangeError on
+// every calendar render for the whole tenant, and the DB CHECK only guards the
+// `Area/Location` shape. The write is scoped to the caller's OWN ministry row.
+export async function updateMinistryInfo(data: { name: string; university: string; timezone?: string }): Promise<{ error: string | null }> {
   const supabase = await createClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return { error: "Not authenticated." }
@@ -894,8 +900,17 @@ export async function updateMinistryInfo(data: { name: string; university: strin
   if (!profile?.ministry_id) return { error: "No ministry found." }
   if (!isAdminRole(profile.role)) return { error: "Only admins can update ministry info." }
 
+  const patch: { name: string; university: string; timezone?: string } = {
+    name: data.name.trim(),
+    university: data.university.trim(),
+  }
+  if (data.timezone !== undefined) {
+    if (!isValidTimeZone(data.timezone)) return { error: "That time zone isn’t a zone we can display." }
+    patch.timezone = data.timezone
+  }
+
   const admin = createAdminClient()
-  const { error } = await admin.from("ministries").update({ name: data.name.trim(), university: data.university.trim() }).eq("id", profile.ministry_id)
+  const { error } = await admin.from("ministries").update(patch).eq("id", profile.ministry_id)
   return { error: error?.message ?? null }
 }
 
