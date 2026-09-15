@@ -104,10 +104,15 @@ test.describe("Create-event chooser offers every preset", () => {
       await expect(page.getByRole("button", { name: new RegExp(`^${c}\\b`) }).filter({ visible: true }).first()).toBeVisible()
     }
 
-    // Order, structurally: the chooser's own buttons in DOM order. (Matching on
-    // whole-page text would catch the agenda BEHIND the modal — it lists a "Fall
-    // Coffeehouse" of its own.)
-    const buttonTexts = await page.locator("button:visible").allInnerTexts()
+    // Order, structurally: the chooser's own buttons in DOM order, scoped to the
+    // modal panel itself (`.animate-dialog-in`, CentralModal's own dialog div).
+    // Matching on whole-page text/buttons would catch stuff BEHIND the modal —
+    // the agenda lists a "Fall Coffeehouse" of its own, and this team's Events
+    // sidebar has a real, already-created "Turkey Bowl" event whose nav button
+    // text is the bare name with no sub-line, which the old page-wide locator
+    // picked up as a false extra "card" ahead of the real chooser cards.
+    const modalPanel = page.locator(".animate-dialog-in")
+    const buttonTexts = await modalPanel.locator("button:visible").allInnerTexts()
     const cardTexts = buttonTexts.filter((t) => cards.includes(t.split("\n")[0].trim()))
     expect(cardTexts.map((t) => t.split("\n")[0].trim())).toEqual(cards)
 

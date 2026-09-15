@@ -233,21 +233,37 @@ test.describe("finance workspace redesign — Allocation surface + inbox gating 
     await expect(outerRow.locator('input[type="number"]').first()).toBeVisible({ timeout: 10000 })
     if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/3-allocation-row-expanded.png` })
 
-    // Per-fund editors in fund order (Church, Grant A, Grant B) with their
-    // "spent $X" captions.
+    // Per-fund editors, one column per ACTIVE fund the ministry currently holds —
+    // the shared sandbox has accrued funds beyond this test's own three (Church +
+    // the two Grant funds seeded above), so the column count is derived from the
+    // DB rather than assumed, and each fund's own column is found by its name
+    // label instead of position (order_index ties among funds created on
+    // different days/runs don't guarantee a stable left-to-right order).
+    const { count: activeFundCount } = await sb.client
+      .from("finance_funds")
+      .select("id", { count: "exact", head: true })
+      .eq("ministry_id", sb.ministryId)
+      .eq("is_active", true)
     const perFundInputs = outerRow.locator('input[type="number"]')
-    await expect(perFundInputs).toHaveCount(3)
+    await expect(perFundInputs).toHaveCount(activeFundCount ?? 3)
+
+    function fundColumn(name: string) {
+      return outerRow.getByText(name, { exact: true }).locator("xpath=ancestor::div[1]")
+    }
+    const churchCol = fundColumn("Church")
+    const grantACol = fundColumn(GRANT_A_NAME)
+    const grantBCol = fundColumn(GRANT_B_NAME)
     // Money inputs snap to cents at rest ("100" → "100.00").
-    await expect(perFundInputs.nth(0)).toHaveValue("100.00")
-    await expect(perFundInputs.nth(1)).toHaveValue("50.00")
-    await expect(perFundInputs.nth(2)).toHaveValue("40.00")
-    await expect(outerRow.getByText("spent $130.00")).toBeVisible()
-    await expect(outerRow.getByText("spent $20.00")).toBeVisible()
-    await expect(outerRow.getByText("spent $0.00")).toBeVisible()
+    await expect(churchCol.locator('input[type="number"]')).toHaveValue("100.00")
+    await expect(grantACol.locator('input[type="number"]')).toHaveValue("50.00")
+    await expect(grantBCol.locator('input[type="number"]')).toHaveValue("40.00")
+    await expect(churchCol.getByText("spent $130.00")).toBeVisible()
+    await expect(grantACol.getByText("spent $20.00")).toBeVisible()
+    await expect(grantBCol.getByText("spent $0.00")).toBeVisible()
 
     // ── An edit persists (DB assert on ministry_budgets) ─────────────────────
-    await perFundInputs.nth(0).fill("120")
-    await perFundInputs.nth(0).blur()
+    await churchCol.locator('input[type="number"]').fill("120")
+    await churchCol.locator('input[type="number"]').blur()
     await expect(async () => {
       const { data } = await sb.client
         .from("ministry_budgets")
