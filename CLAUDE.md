@@ -2,7 +2,7 @@
 
 > Multi-tenant church communication platform for college ministries. Mobile-first, warm-minimalist (cream surfaces, editorial serif, plum as a surgical accent), real-time messaging.
 
-**How this file works.** It holds RULES and the few FACTS you need on every task. The full reference and the reasoning behind every rule live in `REFERENCE.md` — open the named section when a rule points you there. Where a rule is machine-enforced, the check is named; trust the check and don't re-derive it.
+**How this file works.** It holds RULES and the few FACTS you need on every task. Rules that only matter in one folder live in that folder's `CLAUDE.md` and load when you work there. The full reference and the reasoning behind every rule live in `REFERENCE.md` — open the named section when a rule points you there. Where a rule is machine-enforced, the check is named; trust the check and don't re-derive it.
 
 Filing: a fact → `REFERENCE.md`; a rule about behavior → here; a mistake not to repeat → `tasks/lessons/inbox/`; a multi-step procedure → a skill. **War stories go in the commit message or the lesson, never here.** A rule that can be a check (lint, `scripts/check-*`, an e2e spec) should become one, and then shrink here to one line naming it.
 
@@ -32,7 +32,7 @@ Subagent prompts, commits, lessons and PR bodies stay precise and structured. Fu
 6. **Seed and self-test in Brian's Sandbox** (`6c68111b-0248-45ba-9ab1-169ee33f62c9`) and leave the fixtures. Procedure: testing skill.
 7. **Commit on the current feature branch; the push follows the orchestration skill's push decision.** Never commit or push to `main` (hook-enforced).
 8. **Migrations run directly via Supabase MCP**, never as files for Brian. Verify against the live DB afterward — read `pg_policy`, not `supabase/*.sql` or this file.
-9. **End of task:** if your work made a fact in `REFERENCE.md` or a rule here stale, propose the exact edit. CLAUDE.md edits are ask-then-write, approved in THAT task.
+9. **Keep the docs true.** If your work makes a FACT in `REFERENCE.md` stale, fix it in the same commit — no approval needed; it's checkable against the code. RULES (this file and the folder `CLAUDE.md` files) are ask-then-write: propose the exact text and get approval in THAT task.
 
 ## Session worktrees (#17)
 
@@ -54,30 +54,20 @@ Never do feature work or run a dev server in the shared `central` checkout (port
 - **#11 Middleware is `proxy.ts`** — never recreate `middleware.ts`.
 - **#29 Calling:** every write through `app/actions/calls.ts` (service role; start gate is the `can_start_call` RPC — never `auth_can_start_call` from an action). Membership is the read boundary. Starting ≠ joining (church chats need leader tier to start). Native-shell gating keys on the binary's `CentralCalls/<n>` marker via `callingBlockedInShell()`, never `isNativeShell()`. Read Part A #29 before touching calls.
 
-**App structure & state**
-- **#6 Shell:** `app/home/home-app.tsx` orchestrates tabs and global state; each tab is its own file in `app/home/tabs/`; shared UI in `components/central/` (a LEAF — no `app/` imports, *ESLint-enforced*). Don't add tab logic back into `home-app.tsx`.
-- **#12 Tabbed views sync to URL params** — lazy-init from `window.location.search`, write with ONE atomic `router.replace` (never sequential replaces — they race). Param map: `tasks/lessons.md` §URL State Persistence.
+**Cross-cutting**
+- **Native vs web deploys are asymmetric.** A web deploy reaches EVERY installed app binary at once; native config (Info.plist, `capacitor.config.ts`, plugins) reaches only builds made after it. The web bundle must work correctly on every binary still in the wild — gate native-dependent features on a capability marker the binary carries, never on "is native". This has broken the composer, the keyboard, and calling.
 - **"use server" files export only async functions** — shared sync helpers live elsewhere.
-- **#18 Read receipts:** chats < 30 members get live receipts; ≥ 30 get on-demand "Seen by N" and no receipts subscription. Threshold constant: `SMART_ROOM_THRESHOLD` (`lib/chat-notification.ts`).
-- **#19 Nav sections derive from `components/central/nav-sections.ts`** — never hand-code tab→section couplings.
-- **#21 Settings stage changes behind Save** (pending local state; Cancel reverts).
 - **#23 Event time goes through `lib/tz.ts`**, rendered in the MINISTRY's zone (`useMinistryTimezone()` / `lib/ministry-timezone.ts`) — never `toLocale*` on a raw instant, never ISO slicing, never a hardcoded zone. All-day events use `start_day`/`end_day` (end INCLUSIVE). DATE columns (`due_date`, `week_date`, `entry_date`, …) stay plain `YYYY-MM-DD` strings — never through `Date` or a zone. Chat timestamps stay device-local.
 - **#24 Lessons are inbox files** (`tasks/lessons/inbox/<YYYY-MM-DD>-<slug>.md`), never appended to `lessons.md`. Only `/lessons-gc` edits the canon.
 
 **UI**
 - **Tokens, not literals.** Consume `app/globals.css` tokens; generalize into a shared component so decisions propagate. *Enforced: `check-hex.sh`.*
-- **#7 Chat bubble gestures:** < 400ms tap = emoji picker, ≥ 400ms = context menu, rightward drag ≥ 56px = reply. They share one press timer — the swipe must cancel the press explicitly.
-- **#13 Shell-migrated tabs** put `md:flex md:flex-col md:h-full md:overflow-hidden` on the tab's OWN root div (match `DirectoryTab`).
 - **#14 "Register your ministry" CTAs route to `/register-ministry`** — never `/signup?intent=register` or `/onboarding`.
-- **#15 Desktop header-right = object config only** (gear/kebab). Every create is a plum primary in the collection's BODY header (`ContentHeader` + `ContentActionButton`), never the title row. Canonical: `StudentOrgTeamHome`.
-- **#16 `PlanSubTabStrip` sits at the component root beside `TabPageHeader`**, never inside a padded wrapper; inside one, pass `flush`.
-- **#20 Every dropdown/kebab uses `ActionMenu`.** Sole exception: the chat message menu in `message-row.tsx`.
-- **#22 Mobile back = `BackChevron` OR left-edge swipe**, the same action. `SubpageShell` gets swipe for free; a standalone overlay wires `useEdgeSwipeBack(onClose)`. Never hand-roll swipe handling.
-- **#25 Mobile chrome-row actions render through `<MobileChromeActions>`** — never a rail of your own under the chrome.
-- **#26 Mobile subpages own ONE 20px gutter** — never wrap `SubpageShell` in padding or pad inside it. *Guarded: `e2e/mobile-subpage-gutter.mobile.spec.ts`.*
-- **#27 One mobile chrome rhythm:** chrome rows use `POCKET_CHROME_PAD_Y`/`PAD_X` and title type `POCKET_CHROME_TITLE` (serif 22/600 ink, back-labels included) from `components/central/pocket.tsx` — never hand-typed. The title lands at y ∈ [12, 19]; body content starts at ≤ 92px. If a screen fails, fix the screen or the detector — **never widen the band.** *Enforced: `check-chrome-title.sh`, `e2e/mobile-chrome-rhythm.mobile.spec.ts`, `e2e/mobile-screen-sweep.mobile.spec.ts`.* Detector rules: Part A #27.
-- **#28 Keyboard layout reads `--kb-inset` / `[data-kb-open]`** from `lib/keyboard-inset.ts` via `.kb-lift` / `.kb-safe-bottom` / `.kb-hide`, and JS via `subscribeKeyboard` (not a hook). Never `resize: "native"`, never a raw listener. Native config needs a new binary; the web bundle must work on every installed binary. *Guarded: `e2e/chat-keyboard-inset.mobile.spec.ts`.* Read Part A #28 before touching it.
-- **Layout:** shell-escaping overlays (`fixed inset-0`) add their own top safe area via `POCKET_OVERLAY_PAD_TOP_CLS` / `POCKET_OVERLAY_INSET_CLS` — never a hardcoded floor. Pages never add bottom padding for the nav (`.shell-scroll` owns `--nav-clearance`). Z-index tiers: `REFERENCE.md` Part B §Z-Index.
+- **Folder-scoped conventions** load automatically when you work in that folder — don't restate them here:
+  - `components/central/CLAUDE.md` — #7, #13, #15, #16, #20, #22, #25, #26, #27, layout rules.
+  - `app/home/CLAUDE.md` — imports the above, plus #6, #12, #18, #19, #21, frozen worship code.
+  - **Building UI outside those folders?** Read `components/central/CLAUDE.md` first.
+- **#28 Keyboard layout reads `--kb-inset` / `[data-kb-open]`** from `lib/keyboard-inset.ts` via `.kb-lift` / `.kb-safe-bottom` / `.kb-hide`, and JS via `subscribeKeyboard` (not a hook). Never `resize: "native"`, never a raw listener. *Guarded: `e2e/chat-keyboard-inset.mobile.spec.ts`.* Read Part A #28 before touching it.
 
 ## Skills to load
 

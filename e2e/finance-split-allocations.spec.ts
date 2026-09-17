@@ -150,9 +150,13 @@ test.describe("finance overhaul P1 — split allocations", () => {
     if (SHOT_DIR) await page.screenshot({ path: `${SHOT_DIR}/4-split-saved-two-sources.png` })
 
     // Scope waits per-card by the (unique) split amount — the stepper always
-    // renders "Submitted/Approved/Reimbursed" as step LABELS regardless of actual
-    // status (just dimmed), so a bare `getByText("Reimbursed")` is true even
-    // before any action runs. The one thing that's reliably absent once a row
+    // renders its 3 step LABELS regardless of actual status (just dimmed), so a
+    // bare `getByText(...)` for a step label is true even before any action
+    // runs. The terminal label is KIND-aware (lib/receipt-status.ts): church
+    // reads "Approved to pay" (an authorization — money hasn't moved), external
+    // reads "Reimbursed" (the treasurer confirms the grant funder actually paid
+    // out) — so church/cmu cards are scoped separately below and never share a
+    // terminal-label assertion. The one thing that's reliably absent once a row
     // leaves a stage is that stage's action button, scoped to its own card.
     // Scope actions per-card via the ancestor allocation-row container (3 divs up
     // from the amount span: chip+amount wrapper -> header row -> the card itself —
@@ -162,6 +166,12 @@ test.describe("finance overhaul P1 — split allocations", () => {
     const cmuAmount = page.getByText("$40.00", { exact: true })
     const churchCard = churchAmount.locator("xpath=ancestor::div[3]")
     const cmuCard = cmuAmount.locator("xpath=ancestor::div[3]")
+
+    // Node 0 (Submitted) always carries a date — the receipt's own submitted_at,
+    // not a reviewed/signed-off timestamp — before any transition has run.
+    const submittedDate = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    await expect(churchCard.getByText(submittedDate, { exact: true }).first()).toBeVisible()
+    await expect(cmuCard.getByText(submittedDate, { exact: true }).first()).toBeVisible()
 
     // ── Approve the Church allocation: one motion (U1) — a category confirm
     //    (pre-matched, then explicitly set) -> approve + post to the ledger. ───
@@ -175,7 +185,7 @@ test.describe("finance overhaul P1 — split allocations", () => {
     await expect(churchCard.getByRole("button", { name: "Sign off" })).toBeVisible({ timeout: 15000 })
     await churchCard.getByRole("button", { name: "Sign off" }).click()
     await expect(churchCard.getByRole("button", { name: "Decline" })).toHaveCount(0, { timeout: 10000 })
-    await expect(churchCard.getByText("Reimbursed", { exact: true }).first()).toBeVisible()
+    await expect(churchCard.getByText("Approved to pay", { exact: true }).first()).toBeVisible()
     // U5: a fresh church approval posts at approve-time — no fallback "Add to
     // budget" ghost affordance ever shows for it; it's already "In budget".
     await expect(churchCard.getByText("In budget")).toBeVisible({ timeout: 10000 })
@@ -188,6 +198,9 @@ test.describe("finance overhaul P1 — split allocations", () => {
     await expect(cmuCard.getByRole("button", { name: "Confirm reimbursed" })).toBeVisible()
     await cmuCard.getByRole("button", { name: "Confirm reimbursed" }).click()
     await expect(cmuCard.getByRole("button", { name: "Decline" })).toHaveCount(0, { timeout: 10000 })
+    // External path: the money has actually arrived, so the terminal label —
+    // unlike the church card's "Approved to pay" — reads literally "Reimbursed".
+    await expect(cmuCard.getByText("Reimbursed", { exact: true }).first()).toBeVisible()
     // External funds don't route through the approve->post motion — U5's
     // fallback "Add to budget" affordance still shows for them.
     await expect(cmuCard.getByRole("button", { name: "Add to budget" })).toBeVisible({ timeout: 10000 })

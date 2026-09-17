@@ -13,6 +13,7 @@ import { normalizeMoneyInput } from "../utils"
 import { useIsMobile } from "../use-is-mobile"
 import { useMinistryTimezone } from "../ministry-timezone-context"
 import { todayInZone } from "@/lib/tz"
+import { statusLabel, type FundKind } from "@/lib/receipt-status"
 import { MonogramChip, FilterDropdown, FilterChip, CentralButton, SubpageShell, CentralModal, ConfirmDialog, PocketRowCard, PocketRow, Toast, MobileChromeActions, useScrollResetOn } from "@/components/central"
 import {
   submitReceipt, getReceiptLimits,
@@ -69,7 +70,12 @@ export const STATUS_META: Record<string, { label: string; bg: string; text: stri
   requested:  { label: "Requested", bg: WARN_BG,         text: WARN_TEXT },
   rejected:   { label: "Rejected",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
   declined:   { label: "Declined",  bg: "color-mix(in srgb, var(--danger) 8%, transparent)", text: "var(--danger)" },
-  reimbursed: { label: "Reimbursed",bg: SUCCESS_STATUS_BG, text: SUCCESS_STATUS_TEXT },
+  // DB value stays "reimbursed", but the LABEL is kind-aware (church "Approved
+  // to pay" vs external "Reimbursed" — they mean different things about whether
+  // money has moved; see lib/receipt-status.ts) and is NOT read from this map.
+  // The label here is only the kind-unknown fallback for a rollup status that
+  // spans mixed-kind splits — route every render site through `statusLabel`.
+  reimbursed: { label: "Approved", bg: SUCCESS_STATUS_BG, text: SUCCESS_STATUS_TEXT },
   // Rollup: some sources reimbursed, others terminal — neutral ivory.
   partial:    { label: "Partial",   bg: "var(--ivory)",  text: "var(--body)" },
   flagged:    { label: "Flagged",   bg: WARN_BG,         text: WARN_TEXT },
@@ -305,7 +311,11 @@ function receiptNeedsAction(r: InboxReceipt, canApprove: boolean, canSignOff: bo
   return r.allocations.some(a => allocNeedsAction(a, canApprove, canSignOff))
 }
 
-function FinanceStatusPill({ status }: { status: string }) {
+// `kind` is only meaningful for the one status ("reimbursed") whose label
+// depends on it (see lib/receipt-status.ts) — pass it when this pill is for a
+// single allocation (which has its own fund_kind); omit it for a receipt-level
+// rollup pill that may span mixed-kind splits.
+function FinanceStatusPill({ status, kind }: { status: string; kind?: FundKind }) {
   const m = STATUS_META[status] ?? STATUS_META.pending
   return (
     <span style={{
@@ -313,7 +323,7 @@ function FinanceStatusPill({ status }: { status: string }) {
       padding: "3px 9px", borderRadius: 999, background: m.bg, color: m.text,
       fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", flexShrink: 0,
     }}>
-      {m.label}
+      {statusLabel(status, kind)}
     </span>
   )
 }
@@ -607,11 +617,14 @@ function InboxDetailRow({ label, value }: { label: string; value: React.ReactNod
   )
 }
 
-// The per-source status path — church signs off; external is grant-filed.
-function allocSteps(kind: "church" | "external") {
+// The per-source status path — church signs off; external is grant-filed. Node
+// labels for the two status-backed steps come from `statusLabel` (the single
+// kind-aware receipt-status label function, lib/receipt-status.ts) — the
+// terminal node reads "Approved to pay" on church, "Reimbursed" on external.
+function allocSteps(kind: FundKind) {
   return kind === "church"
-    ? (["Submitted", "Approved", "Reimbursed"] as const)
-    : (["Submitted", "Requested", "Reimbursed"] as const)
+    ? ["Submitted", statusLabel("approved"), statusLabel("reimbursed", "church")]
+    : ["Submitted", statusLabel("requested"), statusLabel("reimbursed", "external")]
 }
 function allocReachedIndex(a: ReceiptAllocation): number {
   if (a.status === "reimbursed") return 2
@@ -625,9 +638,11 @@ function fmtStepDate(iso: string | null): string | null {
   const d = new Date(iso)
   return isNaN(d.getTime()) ? null : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
-// The date reached at each lifecycle node: node 1 = Approved (church → reviewed_at)
-// / Requested (external → requested_at), node 2 = Reimbursed (signed_off_at).
-function allocNodeDate(a: ReceiptAllocation, i: number): string | null {
+// The date reached at each lifecycle node: node 0 = Submitted (the receipt's own
+// created_at, passed in as `submittedAt`), node 1 = Approved (church → reviewed_at)
+// / Requested (external → requested_at), node 2 = Approved to pay (signed_off_at).
+function allocNodeDate(a: ReceiptAllocation, i: number, submittedAt: string): string | null {
+  if (i === 0) return fmtStepDate(submittedAt)
   if (i === 1) return fmtStepDate(a.fund_kind === "church" ? a.reviewed_at : (a.requested_at ?? a.reviewed_at))
   if (i === 2) return fmtStepDate(a.signed_off_at)
   return null
@@ -641,12 +656,13 @@ const stepDateStyle: React.CSSProperties = {
 // plus the per-allocation actions this caller may take (gated by fund kind +
 // status + capability). Optimistic-ish: parent refetches on every completed action.
 function AllocationRow({
-  allocation: a, ministryId, categories, eventName, canApprove, canSignOff, onActed, onApproveAndPost,
+  allocation: a, ministryId, categories, eventName, submittedAt, canApprove, canSignOff, onActed, onApproveAndPost,
 }: {
   allocation: ReceiptAllocation
   ministryId: string
   categories: DynamicCategory[]
   eventName: string | null
+  submittedAt: string
   canApprove: boolean
   canSignOff: boolean
   onActed: () => void
@@ -745,20 +761,20 @@ function AllocationRow({
           </span>
           <span style={{ fontSize: 14, color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>${a.amount.toFixed(2)}</span>
         </div>
-        <FinanceStatusPill status={a.status} />
+        <FinanceStatusPill status={a.status} kind={a.fund_kind} />
       </div>
 
       {/* Per-source status path */}
       {isNegative ? (
         <div style={{ background: DANGER_ROW_BG, border: `1px solid ${DANGER_TINT_BORDER}`, borderRadius: 10, padding: "10px 12px" }}>
-          <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{STATUS_META[a.status]?.label ?? "Declined"}</p>
+          <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{statusLabel(a.status, a.fund_kind)}</p>
           {a.decision_reason && <p style={{ fontSize: 12.5, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
         </div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {steps.map((step, i) => {
             const done = i <= reached
-            const nodeDate = done ? allocNodeDate(a, i) : null
+            const nodeDate = done ? allocNodeDate(a, i, submittedAt) : null
             return (
               <div key={step} style={{ display: "flex", alignItems: "center", gap: 8, flex: i < steps.length - 1 ? 1 : 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1009,6 +1025,7 @@ function InboxDetailOverlay({
                   ministryId={ministryId}
                   categories={categories}
                   eventName={r.event_name}
+                  submittedAt={r.submitted_at}
                   canApprove={canApprove && !canView}
                   canSignOff={canSignOff && !canView}
                   onActed={onActed}
@@ -1511,12 +1528,15 @@ export function FinanceWorkspace({
 
 // ── AllocationSection ──────────────────────────────────────────────────────────
 
-// Per-fund summary card (deliverable 3): eyebrow fund name, right "…left"/"Over
-// by …" caption, serif-400 spent figure, "of $X allocated", 5px progress bar.
+// Per-fund summary card: eyebrow fund name, serif-400 "…left"/"Over by …" lead
+// figure (danger when over), spent caption ("$X spent of $Y" / "$X credit" when
+// net spend is negative), 5px progress bar (empty on credit, clamped [0,1]
+// otherwise — what's LEFT is the number that answers "can I still spend?").
 function FundCard({ label, alloc, spent, isMobile }: { label: string; alloc: number; spent: number; isMobile: boolean }) {
   const remaining = alloc - spent
   const over = remaining < 0
-  const pct = alloc > 0 ? Math.min(spent / alloc, 1) : 0
+  const credit = spent < 0
+  const pct = alloc > 0 ? Math.min(Math.max(spent / alloc, 0), 1) : 0
   const money = (n: number) => `$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
   return (
     <div style={{
@@ -1525,18 +1545,15 @@ function FundCard({ label, alloc, spent, isMobile }: { label: string; alloc: num
       background: isMobile ? "var(--ivory)" : "var(--cream)",
       border: `1px solid ${isMobile ? "transparent" : "var(--line)"}`,
     }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-        <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{label}</span>
-        <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: over ? "var(--danger)" : "var(--muted-text)" }}>
-          {over ? `Over by ${money(remaining)}` : `${money(remaining)} left`}
-        </span>
-      </div>
-      <p style={{ fontFamily: "var(--serif)", fontSize: 28, fontWeight: 400, letterSpacing: -0.4, color: "var(--ink)", margin: "10px 0 2px", fontVariantNumeric: "tabular-nums" }}>
-        {money(spent)}
+      <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)" }}>{label}</span>
+      <p style={{ fontFamily: "var(--serif)", fontSize: 28, fontWeight: 400, letterSpacing: -0.4, color: over ? "var(--danger)" : "var(--ink)", margin: "10px 0 2px", fontVariantNumeric: "tabular-nums" }}>
+        {over ? `Over by ${money(remaining)}` : `${money(remaining)} left`}
       </p>
-      <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 12px" }}>of {money(alloc)} allocated</p>
+      <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 12px" }}>
+        {credit ? `${money(spent)} credit` : `${money(spent)} spent of ${money(alloc)}`}
+      </p>
       <div style={{ height: 5, borderRadius: 3, background: "var(--line)", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${pct * 100}%`, background: over ? "var(--danger)" : "var(--plum)", borderRadius: 3, transition: "width 0.3s ease" }} />
+        <div style={{ height: "100%", width: `${credit ? 0 : pct * 100}%`, background: over ? "var(--danger)" : "var(--plum)", borderRadius: 3, transition: "width 0.3s ease" }} />
       </div>
     </div>
   )

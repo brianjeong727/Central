@@ -1440,13 +1440,14 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
   // the events they're staffed on, or a "nothing assigned yet" state that says what
   // the tab is FOR. See app/home/components/volunteer-workspace.tsx.
   const showPlanTab = true
-  // Church chat creation: admins/leaders + users with planning, member, or small-group permissions.
-  const canCreateChurchChat = isAdmin ||
-    userTeams.some(t => {
-      const label = t.teamName.toLowerCase()
-      return /\b(small group|discipleship|student org|board|leadership)\b/.test(label) ||
-        t.permissions.some(p => ["can_create_dgs", "can_view_dgs", "can_manage_members", "can_plan_events"].includes(p))
-    })
+  // Church chat creation = leader-tier, the SAME predicate the server enforces
+  // (app/actions/create-group.ts: `isLeaderRole(profile.role)`). This used to be a
+  // team-name regex plus a team-permission scan, which both over- and under-shot:
+  // a member on a team called "Student Org Board" was offered a create that the
+  // action then refused, and a leader on no team was denied a create the server
+  // would have allowed. Role tiers are the encoding (Convention #2) — never a team
+  // name. `isLeaderOrAdmin` is isLeaderRole(role); see permissions.md L111.
+  const canCreateChurchChat = isLeaderOrAdmin
 
   return (
     // Mobile column owns the status-bar safe area for EVERY tab it hosts (cover +

@@ -10,7 +10,9 @@ root for the current, maintained guidance: stack, architecture, key files,
 conventions, permissions, and workflow.
 
 Related canonical docs (each owns its domain, all referenced from CLAUDE.md):
-- `CLAUDE.md` — project context, standing rules, facts, key files
+- `CLAUDE.md` — project rules that apply everywhere
+- `components/central/CLAUDE.md`, `app/home/CLAUDE.md` — folder-scoped conventions; read the one for the folder you're editing (Claude loads these automatically; other agents must open them)
+- `REFERENCE.md` — full convention text, key files, architecture, schema index
 - `web_design_system.md` (`.claude/skills/design-system/`) — the desktop (≥768px) design contract
 - `mobile_design_system.md` (`.claude/skills/design-system/`) — the phone-width (`md:hidden`, ≤430px) design contract
 - `permissions.md` — role/access source of truth

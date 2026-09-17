@@ -97,6 +97,26 @@ async function reanchorFixture(sb: ReturnType<typeof sandbox>) {
   }
 }
 
+/** The team's open-task load, straight from the RPC the rail reads — so the spec
+ *  asserts the RULE (heaviest first / lightest offered first) and never a seed number. */
+async function teamLoad() {
+  const sb = sandbox()
+  const { data, error } = await sb.client.rpc("member_open_counts", { p_team_id: TEAM_ID })
+  if (error) throw error
+  const rows = (data ?? []) as { user_id: string; open_tasks: number }[]
+  const { data: profiles, error: pe } = await sb.client
+    .from("profiles").select("id, name").in("id", rows.map((r) => r.user_id))
+  if (pe) throw pe
+  const nameOf = (id: string) =>
+    ((profiles ?? []) as { id: string; name: string }[]).find((p) => p.id === id)?.name ?? "Member"
+  const desc = [...rows].sort((a, b) => b.open_tasks - a.open_tasks)
+  const asc = [...rows].sort((a, b) => a.open_tasks - b.open_tasks)
+  return {
+    heaviest: { name: nameOf(desc[0].user_id), open: desc[0].open_tasks },
+    lightest: { name: nameOf(asc[0].user_id), open: asc[0].open_tasks },
+  }
+}
+
 test.describe("Countdown tab (feat/run-sheet-countdown)", () => {
   test.use({ storageState: adminState, viewport: { width: 1440, height: 900 } })
 
@@ -154,8 +174,10 @@ test.describe("Countdown tab (feat/run-sheet-countdown)", () => {
   async function openCountdown(page: Page) {
     await page.goto(`/home?tab=plan&team=${TEAM_ID}`)
     // Desktop student-org landing is the Events agenda; click the agenda CARD
-    // (its heading) to open the plan — not the sidebar nav item of the same name.
-    const eventCard = page.getByRole("heading", { name: EVENT_TITLE }).first()
+    // (its title) to open the plan — not the sidebar nav item of the same name.
+    // The row title is a <p>, not a heading (only the "Up next" card is a heading),
+    // so this matches on TEXT — a role-based locator silently stopped matching.
+    const eventCard = page.getByText(EVENT_TITLE, { exact: true }).filter({ visible: true }).first()
     await expect(eventCard).toBeVisible({ timeout: 20_000 })
     await eventCard.click()
     // Plan workspace opens (Overview). The underline sub-tab strip carries the
@@ -219,12 +241,22 @@ test.describe("Countdown tab (feat/run-sheet-countdown)", () => {
     await foldedTab.click()
     const rail = page.getByRole("complementary")
     await expect(rail.getByText("Readiness")).toBeVisible()
-    await expect(rail.getByText("2 of 8 done")).toBeVisible()
+    // Readiness is COMPOSITE (T1): tasks AND confirmed roles, stated in one line.
+    // The seeded retreat has 2/8 tasks done and six roles, none confirmed yet —
+    // so it can never read "Ready" off the checklist alone.
+    await expect(rail.getByText("2/8 tasks · 0/6 roles confirmed")).toBeVisible()
+    await expect(rail.getByText("Ready", { exact: true })).toHaveCount(0)
     await expect(rail.getByText(/Reminder schedule/)).toBeVisible()
     const loadCard = rail.locator("div").filter({ hasText: /^Load this month/ }).last()
     await expect(loadCard).toBeVisible()
-    await expect(loadCard.getByText("E2E Admin").first()).toBeVisible() // sole load row → top
-    await expect(loadCard.getByText("6", { exact: true })).toBeVisible() // its open-task count
+    // The load readout is DERIVED, not hardcoded: the sandbox roster and its task
+    // spread have grown several times since this spec was written, and "E2E Admin
+    // with 6 open" stopped being true for reasons that have nothing to do with the
+    // Countdown tab. Assert the ORDERING rule instead — heaviest member on top,
+    // with their own count — against the same RPC the rail reads.
+    const load = await teamLoad()
+    await expect(loadCard.getByText(load.heaviest.name).first()).toBeVisible()
+    await expect(loadCard.getByText(String(load.heaviest.open), { exact: true }).first()).toBeVisible()
 
     // ── Screenshots (evidence for Brian) — captured pre-mutation for clean shots ──
     await page.screenshot({ path: ".claude/task-context/countdown/shots/countdown-desktop-1440.png", fullPage: true })
@@ -250,8 +282,9 @@ test.describe("Countdown tab (feat/run-sheet-countdown)", () => {
     await expect(reassignBtn).toBeVisible() // anchored in the row (proves it's not a detached button)
     await reassignBtn.click()
     await expect(page.getByText("Lightest load first")).toBeVisible()
-    await expect(page.getByText("E2E Member", { exact: true }).first()).toBeVisible() // low-load suggestion
-    await expect(page.getByText("0 open").first()).toBeVisible()                       // E2E Member = 0
+    // Same derivation as the load card: whoever is genuinely lightest is offered first.
+    await expect(page.getByText(load.lightest.name, { exact: true }).first()).toBeVisible()
+    await expect(page.getByText(`${load.lightest.open} open`).first()).toBeVisible()
     await page.keyboard.press("Escape")
     await expect(page.getByText("Lightest load first")).toHaveCount(0)
 
@@ -267,21 +300,21 @@ test.describe("Countdown tab (feat/run-sheet-countdown)", () => {
     const refoldedTab = page.getByRole("button", { name: /show readiness/i })
     if (await refoldedTab.count()) await refoldedTab.click()
     const rail2 = page.getByRole("complementary") // desktop-only <aside>
-    await expect(rail2.getByText("2 of 8 done")).toBeVisible() // baseline before the toggle
+    await expect(rail2.getByText("2/8 tasks · 0/6 roles confirmed")).toBeVisible() // baseline before the toggle
 
     // ── Reused CRUD #1: toggle a task complete (optimistic + persisted), then restore ──
     const toggleTitle = page.getByText(TOGGLE_TITLE, { exact: true }).filter({ visible: true }).first()
     const toggleCheckbox = toggleTitle.locator("xpath=ancestor::div[1]/button[1]")
     await expect(toggleCheckbox).toBeEnabled()
     await toggleCheckbox.click()
-    await expect(rail2.getByText("3 of 8 done")).toBeVisible()            // readiness updated
+    await expect(rail2.getByText("3/8 tasks · 0/6 roles confirmed")).toBeVisible() // readiness updated
     await expect.poll(async () => {                                        // persisted to DB
       const sb = sandbox()
       const { data } = await sb.client.from("event_tasks").select("completed").eq("id", toggleTaskId).single()
       return (data as { completed: boolean } | null)?.completed
     }, { timeout: 10_000 }).toBe(true)
     await toggleCheckbox.click()                                          // restore
-    await expect(rail2.getByText("2 of 8 done")).toBeVisible()
+    await expect(rail2.getByText("2/8 tasks · 0/6 roles confirmed")).toBeVisible()
 
     // ── Reused CRUD #2: inline add-row per phase → new row appears ──
     const addInput = page.getByPlaceholder(/^Add to/).filter({ visible: true }).first()

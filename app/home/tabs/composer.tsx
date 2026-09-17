@@ -19,6 +19,7 @@ import { useSwipeDownToDismissKeyboard } from "@/lib/keyboard-inset"
 function ComposerImpl({
   groupArchived,
   displayName,
+  isDm,
   mentionMembers,
   replyingTo,
   sending,
@@ -458,7 +459,12 @@ function ComposerImpl({
           </div>
           <div className="hidden md:flex justify-between mt-2 text-[11px] text-[var(--muted-text)]">
             <span>Press <span style={{ fontFamily: "ui-monospace,monospace" }}>↵</span> to send · <span style={{ fontFamily: "ui-monospace,monospace" }}>⇧↵</span> for new line</span>
-            <span>End-to-end visible to {displayName} members</span>
+            {/* Says who can actually read this. Messages are NOT end-to-end
+                encrypted — they are rows in Postgres that a ministry admin's
+                tooling can reach — so the old "End-to-end" line claimed a
+                guarantee the product does not make. A DM is two people; a group
+                is everyone in the room. */}
+            <span>{isDm ? `Only you and ${displayName} can see this` : `Visible to everyone in ${displayName}`}</span>
           </div>
         </div>
       )}

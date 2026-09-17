@@ -4,7 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, use
 import type { ReactNode } from "react"
 import { createPortal } from "react-dom"
 import useSWR, { useSWRConfig } from "swr"
-import { Bell, BellOff, Camera, Check, CornerUpLeft, FileDown, Flag, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Phone, Pin, Plus, Search, Trash2, User, Users, Video, X } from "lucide-react"
+import { Bell, BellOff, Camera, Check, Copy, CornerUpLeft, FileDown, Flag, Folder, Forward, Globe, ImageIcon, LinkIcon, Paperclip, Pencil, Phone, Pin, Plus, Search, Trash2, User, Users, Video, X } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { createGroup } from "@/app/actions/create-group"
 import { deleteGroup } from "@/app/actions/chat"
@@ -44,6 +44,7 @@ import { fetchOpenGroups, openGroupsKey } from "@/app/home/open-groups"
 import { subscribeKeyboard, useSwipeDownToDismissKeyboard, dismissKeyboard } from "@/lib/keyboard-inset"
 import { storagePathFromPublicUrl, removeStorageObject } from "@/lib/storage-cleanup"
 import { useBackIntent } from "@/lib/back-intent"
+import { copyText } from "@/lib/clipboard"
 import { attachmentStillReferenced } from "@/app/actions/attachment-refs"
 // Hoisted out of this file so the server-rendered list module (./chat-list-view)
 // can reach them without importing this ~3,900-line thread chunk.
@@ -2341,6 +2342,8 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
   const [messages, setMessages] = useState<Message[]>(() => cachedThread?.messages ?? [])
   const [threadLoading, setLoading] = useState(!cachedThread)
   const [sending, setSending] = useState(false)
+  // One-line confirmations from the transcript (today: "Copied"). Null = nothing up.
+  const [chatToast, setChatToast] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState(groupName)
   // Re-seed the header name whenever the groupName prop changes (chat switch through
   // a path that reuses this instance, or the async name backfill in home-app). The
@@ -4526,6 +4529,7 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
       <Composer
         groupArchived={groupArchived}
         displayName={displayName}
+        isDm={isDmThread}
         mentionMembers={mentionMembers}
         replyingTo={replyingTo}
         sending={sending}
@@ -4866,6 +4870,19 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         if (!m || m.deleted) return null
         const own = m.sender_id === userId
         const acts: MessageMenuAction[] = []
+        // Copy leads: it is the one action that never changes anything, and the
+        // text is what the long-press was most likely about. Only for a message
+        // that HAS text — a bare attachment or GIF has nothing to put on the
+        // clipboard, and an action that silently no-ops is worse than absent.
+        const copyable = m.content?.trim() ? m.content : null
+        if (copyable) {
+          acts.push({
+            key: "copy",
+            label: "Copy",
+            icon: <Copy className="w-4 h-4" />,
+            onSelect: () => { void copyText(copyable).then((ok) => { if (ok) setChatToast("Copied") }) },
+          })
+        }
         acts.push({ key: "reply", label: "Reply", icon: <CornerUpLeft className="w-4 h-4" />, onSelect: () => setReplyingTo(m) })
         acts.push({ key: "forward", label: "Forward", icon: <Forward className="w-4 h-4" />, onSelect: () => openForwardSheet(m) })
         if (!own) acts.push({ key: "report", label: "Report", icon: <Flag className="w-4 h-4" />, onSelect: () => setReportingMsg(m) })
@@ -4924,6 +4941,10 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
         />
       </div>
     )}
+
+    {/* Transcript-level confirmation (Copy). Portals to the body, so it clears the
+        immersive menu's overlay and the lightbox alike. */}
+    {chatToast && <Toast message={chatToast} onDismiss={() => setChatToast(null)} />}
     </>
   )
 }
