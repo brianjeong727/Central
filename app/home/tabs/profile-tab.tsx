@@ -5,7 +5,7 @@ import Image from "next/image"
 import dynamic from "next/dynamic"
 import useSWR from "swr"
 import { useRouter } from "next/navigation"
-import { ChevronRight, ChevronDown, X, Check, Camera, Pencil, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings, LogOut, User as UserIcon, Bell, LifeBuoy, ShieldAlert } from "lucide-react"
+import { ChevronRight, ChevronDown, X, Check, Camera, Pencil, BookOpen, Search, ImageIcon, MoreHorizontal, Plus, Trash2, Settings, LogOut, User as UserIcon, Bell, ALargeSmall, LifeBuoy, ShieldAlert } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { MONO_STYLE, EmptyState } from "../components/shared"
 import { getInitials } from "../utils"
@@ -22,10 +22,12 @@ import { PocketChrome } from "../components/pocket-header"
 import { dismissKeyboard, subscribeKeyboard, useSwipeDownToDismissKeyboard } from "@/lib/keyboard-inset"
 import { useNavState } from "../nav-state"
 import { NotificationsSection } from "../components/notifications"
+import { TextSizeSection } from "../components/text-size-section"
 import { getPushStateUnified } from "@/lib/native-push"
 import { iosNeedsInstallForPush } from "@/lib/push"
 import { downscaleToJpeg } from "@/lib/downscale-image"
-import type { Profile, Devotional, Prayer, Verse, NotificationSettings } from "../types"
+import type { Profile, Devotional, Prayer, Verse, NotificationSettings, ChatTextSize } from "../types"
+import { CHAT_TEXT_SIZE_LABELS } from "../types"
 import { cohortLabel, isYoungAdult } from "@/lib/cohort"
 import { setYoungAdult, changeClassChat } from "@/app/actions/auto-chats"
 
@@ -1135,10 +1137,11 @@ function DeleteAccountSection({ email, onDeleted, mobile = false }: { email: str
 
 // Mobile settings hub. The gear on the profile chrome opens a sections list;
 // each row drills into its detail (mirrors the Church-Settings hub, settings-tab.tsx).
-type ProfileSettingsView = "hub" | "notifications" | "account" | "danger"
+type ProfileSettingsView = "hub" | "notifications" | "textsize" | "account" | "danger"
 const SETTINGS_LABELS: Record<ProfileSettingsView, string> = {
   hub: "Settings",
   notifications: "Notifications",
+  textsize: "Text size",
   account: "Account & support",
   danger: "Danger zone",
 }
@@ -1162,6 +1165,8 @@ export function ProfileTab({
   onAvatarChange,
   activeSection,
   onSectionChange,
+  chatTextSize = "md",
+  onChatTextSizeChange,
 }: {
   userId: string
   initialProfile: Profile
@@ -1174,6 +1179,10 @@ export function ProfileTab({
   onAvatarChange?: (url: string | null) => void
   activeSection: "spiritual-profile" | "journal"
   onSectionChange: (s: "spiritual-profile" | "journal") => void
+  /** The shell owns the applied size (it sets html[data-chat-text]); this tab
+   *  only offers the control. */
+  chatTextSize?: ChatTextSize
+  onChatTextSizeChange?: (s: ChatTextSize) => void
 }) {
   const supabase = createClient()
   const router = useRouter()
@@ -1195,7 +1204,7 @@ export function ProfileTab({
   const [settingsView, setSettingsView] = useState<ProfileSettingsView | null>(() => {
     if (typeof window === "undefined") return null
     const p = new URLSearchParams(window.location.search).get("pset")
-    return (["hub", "notifications", "account", "danger"] as const).includes(p as ProfileSettingsView) ? (p as ProfileSettingsView) : null
+    return (["hub", "notifications", "textsize", "account", "danger"] as const).includes(p as ProfileSettingsView) ? (p as ProfileSettingsView) : null
   })
   const openSettings = (v: ProfileSettingsView) => { setSettingsView(v); setNavParam("pset", v) }
   const closeSettings = () => { setSettingsView(null); setNavParam("pset", null) }
@@ -2204,6 +2213,7 @@ export function ProfileTab({
                 <PocketKicker label="Settings" />
                 <PocketRowCard>
                   <PocketRow leading={<SettingsIconChip icon={<Bell size={17} strokeWidth={2} />} />} title="Notifications" meta={pushOnHere === null ? undefined : pushOnHere ? "On" : "Off"} chevron onClick={() => openSettings("notifications")} />
+                  <PocketRow leading={<SettingsIconChip icon={<ALargeSmall size={17} strokeWidth={2} />} />} title="Text size" meta={CHAT_TEXT_SIZE_LABELS[chatTextSize]} chevron onClick={() => openSettings("textsize")} />
                   <PocketRow leading={<SettingsIconChip icon={<LifeBuoy size={17} strokeWidth={2} />} />} title="Account & support" chevron onClick={() => openSettings("account")} />
                   <PocketRow leading={<SettingsIconChip icon={<ShieldAlert size={17} strokeWidth={2} />} />} title="Danger zone" chevron isLast onClick={() => openSettings("danger")} />
                 </PocketRowCard>
@@ -2220,6 +2230,15 @@ export function ProfileTab({
                     ministryId={initialProfile.ministry_id ?? ""}
                     notificationSettings={profile.notification_settings}
                     onSettingsChange={(s: NotificationSettings) => setProfile(p => ({ ...p, notification_settings: s }))}
+                    mobile
+                  />
+                )}
+                {settingsView === "textsize" && (
+                  <TextSizeSection
+                    userId={userId}
+                    ministryId={initialProfile.ministry_id ?? ""}
+                    value={chatTextSize}
+                    onChange={(s) => onChatTextSizeChange?.(s)}
                     mobile
                   />
                 )}
@@ -2319,6 +2338,14 @@ export function ProfileTab({
               ministryId={initialProfile.ministry_id ?? ""}
               notificationSettings={profile.notification_settings}
               onSettingsChange={(s: NotificationSettings) => setProfile(p => ({ ...p, notification_settings: s }))}
+            />
+          </div>
+          <div style={{ marginTop: 24 }}>
+            <TextSizeSection
+              userId={userId}
+              ministryId={initialProfile.ministry_id ?? ""}
+              value={chatTextSize}
+              onChange={(s) => onChatTextSizeChange?.(s)}
             />
           </div>
           <div style={{ marginTop: 24 }}>

@@ -402,8 +402,10 @@ function ComposerImpl({
                 onKeyDown={handleKeyDown}
                 placeholder={`Message ${displayName}`}
                 rows={1}
-                className="w-full resize-none bg-transparent text-[14px] text-[var(--ink)] placeholder:text-[var(--muted-text)] focus:outline-none border-none max-h-36 overflow-y-auto block"
-                style={{ lineHeight: "1.5", paddingTop: 0, paddingBottom: 0, height: "auto" }}
+                className="w-full resize-none bg-transparent text-[var(--ink)] placeholder:text-[var(--muted-text)] focus:outline-none border-none max-h-36 overflow-y-auto block"
+                // Same token as the bubbles: what you type is the size it will
+                // land at. (At 16px+ iOS also stops zooming the page on focus.)
+                style={{ fontSize: "var(--chat-msg-size)", lineHeight: "1.5", paddingTop: 0, paddingBottom: 0, height: "auto" }}
               />
             </div>
             {/* Right icons — outside the bubble. Desktop only: the phone keyboard

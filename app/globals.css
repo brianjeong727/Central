@@ -184,8 +184,10 @@
      compact list rather than people talking (iMessage is 17, WhatsApp and
      Messenger 16). Desktop stays at 14 deliberately: there the transcript is a
      narrow column beside the shell, not the whole screen, and 16 overruns it.
-     Only the mobile value is user-adjustable — the complaint, and the contract
-     range, are both about phone width. */
+     Both widths carry the user's preference (profiles.chat_text_size, applied
+     as html[data-chat-text] by the shell): the phone scale is 14/16/18/20 and
+     the desktop scale 13/14/16/18, so "Large" means one step up wherever you
+     are rather than a phone number pasted onto a desktop column. */
   --chat-msg-size: 16px;
   --chat-msg-lh: 1.35;
   --r-check: 7px;    /* mobile Pocket checklist checkbox (ratified Daybreak) */
@@ -319,6 +321,20 @@ html[data-kb-open] .kb-hide {
    Unlayered and after :root so it wins without !important. */
 @media (min-width: 768px) {
   :root { --chat-msg-size: 14px; --chat-msg-lh: 1.4; }
+}
+
+/* The user's text-size step. html[attr] outranks :root, inside and outside the
+   media query, so each block only has to name the steps that differ from its
+   own default. */
+html[data-chat-text="sm"], [data-chat-text-preview="sm"] { --chat-msg-size: 14px; }
+html[data-chat-text="md"], [data-chat-text-preview="md"] { --chat-msg-size: 16px; }
+html[data-chat-text="lg"], [data-chat-text-preview="lg"] { --chat-msg-size: 18px; }
+html[data-chat-text="xl"], [data-chat-text-preview="xl"] { --chat-msg-size: 20px; }
+@media (min-width: 768px) {
+  html[data-chat-text="sm"], [data-chat-text-preview="sm"] { --chat-msg-size: 13px; }
+  html[data-chat-text="md"], [data-chat-text-preview="md"] { --chat-msg-size: 14px; }
+  html[data-chat-text="lg"], [data-chat-text-preview="lg"] { --chat-msg-size: 16px; }
+  html[data-chat-text="xl"], [data-chat-text-preview="xl"] { --chat-msg-size: 18px; }
 }
 
 .kb-lift {
