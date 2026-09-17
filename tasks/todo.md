@@ -12,8 +12,11 @@ configurable and raise the default.
 - [x] Shell applies the pref on `<html>` (home-app), optimistic state.
 - [x] Profile → Settings → "Text size" (mobile hub row + view; desktop section),
       staged behind Save with a live preview (`TextSizeSection`).
-- [ ] Migration: `profiles.chat_text_size text not null default 'md' check in (sm,md,lg,xl)`
-      — BLOCKED on a fresh Supabase access token; verify the UPDATE grant covers it.
-- [ ] e2e `chat-text-size.mobile.spec.ts` — default 16px; pref → bubble size; preview.
-- [ ] verify.sh --port 3002 --e2e; screenshots at 390 + desktop; sandbox self-test.
-- [ ] Commit, push decision.
+- [x] Migration `profiles_chat_text_size` applied live 2026-09-16 (rls-reviewer BEFORE +
+      AFTER, both clean; grants are table-level on profiles so nothing else needed).
+- [x] Save chains `.select().single()` so a zero-row RLS/filter miss errors instead of
+      reading as success (reviewer warn, proven live).
+- [x] Mobile picker is a four-cell track (the loose fchips wrapped to two lines at 390 and
+      the ivory-off chips vanished on the ivory card).
+- [x] e2e `chat-text-size.mobile.spec.ts` — 4/4 green on :3002; screenshots 390 + 1440 reviewed.
+- [x] verify.sh --port 3002 PASS. Part 1 shipped separately as PR #409.

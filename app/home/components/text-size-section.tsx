@@ -10,7 +10,7 @@
 // inherits the right one for free.
 import { useState } from "react"
 import { createClient } from "@/lib/supabase"
-import { CentralButton, SegmentedControl, PocketFilterChip, POCKET_KICKER_STYLE, MONO_STYLE } from "@/components/central"
+import { CentralButton, SegmentedControl, POCKET_KICKER_STYLE, MONO_STYLE } from "@/components/central"
 import { CHAT_TEXT_SIZES, CHAT_TEXT_SIZE_LABELS, type ChatTextSize } from "../types"
 
 export function TextSizeSection({
@@ -37,11 +37,15 @@ export function TextSizeSection({
     setSaving(true)
     setError(null)
     const supabase = createClient()
+    // .select().single(): without RETURNING, PostgREST answers 204 for one row
+    // OR zero, so an RLS/filter miss would read as a successful save.
     const { error: err } = await supabase
       .from("profiles")
       .update({ chat_text_size: pending })
       .eq("id", userId)
       .eq("ministry_id", ministryId)
+      .select("chat_text_size")
+      .single()
     setSaving(false)
     if (err) {
       setError("Couldn't save your text size — try again")
@@ -68,10 +72,39 @@ export function TextSizeSection({
             How big messages read in a conversation. Follows you to every device.
           </div>
           {mobile ? (
-            <div role="radiogroup" aria-label="Text size" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {options.map((o) => (
-                <PocketFilterChip key={o.id} label={o.label} active={pending === o.id} onClick={() => setPending(o.id)} />
-              ))}
+            // Four steps is one past the fchip-rail ceiling (mobile §3: ≤3 in a
+            // row, 4+ become screens) and a screen for a text size is absurd —
+            // so this is the Governance per-team TRACK instead: one pill on the
+            // --pocket-track fill, four equal cells, the active cell solid plum.
+            // Loose fchips were tried: they wrapped to two lines at 390 and the
+            // ivory-off chips vanished against the ivory card.
+            <div
+              role="radiogroup"
+              aria-label="Text size"
+              style={{ display: "flex", padding: 3, borderRadius: 999, background: "var(--pocket-track)" }}
+            >
+              {options.map((o) => {
+                const active = pending === o.id
+                return (
+                  <button
+                    key={o.id}
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setPending(o.id)}
+                    style={{
+                      flex: "1 1 0", minWidth: 0, minHeight: 38, padding: "0 4px",
+                      border: "none", borderRadius: 999, whiteSpace: "nowrap",
+                      fontFamily: "var(--serif)", fontSize: 12, fontWeight: active ? 600 : 500,
+                      background: active ? "var(--plum)" : "transparent",
+                      color: active ? "var(--cream-on-dark)" : "var(--body)",
+                      cursor: "pointer",
+                      transition: "background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)",
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                )
+              })}
             </div>
           ) : (
             <SegmentedControl options={options} value={pending} onChange={setPending} aria-label="Text size" />
