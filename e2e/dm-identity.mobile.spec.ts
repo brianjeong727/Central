@@ -140,6 +140,44 @@ test.describe("DM identity — per-viewer name + one thread per pair", () => {
     await expect(page.locator("h2", { hasText: memberName }).filter({ visible: true }).first()).toBeVisible()
   })
 
+  // A DM is two people, and the composer footer is the only place the app says
+  // so. It used to say "End-to-end visible to X members" in every thread —
+  // untrue (there is no end-to-end encryption) and, in a DM, meaningless.
+  // Desktop-only line, so this widens the viewport rather than skipping it.
+  test("a DM's composer footer names the two people, never 'end-to-end'", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto(`/home?tab=chats&chat=${dmId}`)
+    await expect(vis(page, MSG)).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText(`Only you and ${memberName} can see this`).filter({ visible: true }).first())
+      .toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/end-to-end/i)).toHaveCount(0)
+  })
+
+  // Church-chat creation is leader-tier on the server (create-group.ts), but the
+  // UI used to offer it on a team-NAME regex — and this member sits on "Student
+  // Org Board", which the regex matched. They were shown a create the action
+  // then refused. The gate is now the same predicate on both sides.
+  test.describe("church-chat creation as a member", () => {
+    test.use({ storageState: memberState })
+
+    test("a member is offered no church-chat create, even on a leaderish-sounding team", async ({ page }) => {
+      await page.goto("/home?tab=chats&chats=church")
+      // Wait for the church list itself, not just the shell — an empty list would
+      // make the "no +" assertion pass for the wrong reason.
+      await expect(page.getByText("General", { exact: true }).filter({ visible: true }).first())
+        .toBeVisible({ timeout: 20000 })
+      await expect(page.locator('button[aria-label^="New "][aria-label$=" chat"]')).toHaveCount(0)
+    })
+  })
+
+  test("an admin still gets the church-chat create", async ({ page }) => {
+    await page.goto("/home?tab=chats&chats=church")
+    await expect(page.getByText("General", { exact: true }).filter({ visible: true }).first())
+      .toBeVisible({ timeout: 20000 })
+    await expect(page.locator('button[aria-label^="New "][aria-label$=" chat"]').first())
+      .toBeVisible({ timeout: 10000 })
+  })
+
   // The bug: this side rendered the stored name, so the recipient saw THEMSELVES
   // as the conversation title.
   test.describe("as the recipient", () => {

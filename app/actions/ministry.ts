@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase-admin"
 import { requireSameMinistry, requireMinistryAdmin, isAdminTier } from "./authz"
 import { autoAddUserToChats, ensureMinistryChats } from "./auto-chats"
 import { YOUNG_ADULT } from "@/lib/cohort"
+import { isValidTimeZone } from "@/lib/tz"
 
 /**
  * The grade to write when a user joins a ministry, or null to leave it alone.
@@ -884,8 +885,45 @@ export async function getUserMinistries(): Promise<{
   }
 }
 
-// ─── Admin: update ministry name / university ────────────────────────────────
-export async function updateMinistryInfo(data: { name: string; university: string }): Promise<{ error: string | null }> {
+// The zones this app offers. Only a fallback: it is consulted when a runtime
+// doesn't expose `Intl.supportedValuesOf` (pre-2023 engines), so the canonical
+// check can never degrade into "anything formattable". Mirrors the picker's list
+// in app/home/tabs/settings-tab.tsx (TIMEZONE_CHOICES).
+const CURATED_TIMEZONES = [
+  "America/New_York", "America/Chicago", "America/Denver", "America/Phoenix",
+  "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu",
+]
+
+/**
+ * A zone the DB will also accept, in canonical form.
+ *
+ * `isValidTimeZone` asks "can Intl format this?" — which is true of things the
+ * `ministries_timezone_format_chk` CHECK rejects (offset zones like "+05:00",
+ * 23514) and of denormalized ids the CHECK happily stores ("america/chicago",
+ * which then renders as a raw id in the picker). Neither guard is a superset of
+ * the other, so require membership in the runtime's CANONICAL tz list too: that
+ * is formattable, correctly cased, and always `Area/Location`. The result is a
+ * clean error message instead of a raw Postgres constraint string.
+ */
+function isCanonicalTimeZone(tz: string): boolean {
+  const supportedValuesOf = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf
+  if (typeof supportedValuesOf === "function") {
+    try {
+      return supportedValuesOf.call(Intl, "timeZone").includes(tz)
+    } catch {
+      // fall through to the curated list
+    }
+  }
+  return CURATED_TIMEZONES.includes(tz)
+}
+
+// ─── Admin: update ministry name / university / time zone ───────────────────
+// `timezone` is optional so existing callers are untouched; when present it is
+// validated against the runtime's tz database FIRST (Convention #23) — an
+// unformattable zone reaching `ministries.timezone` would throw a RangeError on
+// every calendar render for the whole tenant, and the DB CHECK only guards the
+// `Area/Location` shape. The write is scoped to the caller's OWN ministry row.
+export async function updateMinistryInfo(data: { name: string; university: string; timezone?: string }): Promise<{ error: string | null }> {
   const supabase = await createClient()
   const { data: { user }, error: authErr } = await supabase.auth.getUser()
   if (authErr || !user) return { error: "Not authenticated." }
@@ -894,8 +932,19 @@ export async function updateMinistryInfo(data: { name: string; university: strin
   if (!profile?.ministry_id) return { error: "No ministry found." }
   if (!isAdminRole(profile.role)) return { error: "Only admins can update ministry info." }
 
+  const patch: { name: string; university: string; timezone?: string } = {
+    name: data.name.trim(),
+    university: data.university.trim(),
+  }
+  if (data.timezone !== undefined) {
+    if (!isValidTimeZone(data.timezone) || !isCanonicalTimeZone(data.timezone)) {
+      return { error: "That time zone isn’t a zone we can display." }
+    }
+    patch.timezone = data.timezone
+  }
+
   const admin = createAdminClient()
-  const { error } = await admin.from("ministries").update({ name: data.name.trim(), university: data.university.trim() }).eq("id", profile.ministry_id)
+  const { error } = await admin.from("ministries").update(patch).eq("id", profile.ministry_id)
   return { error: error?.message ?? null }
 }
 

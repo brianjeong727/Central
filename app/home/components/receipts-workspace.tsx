@@ -10,6 +10,7 @@ import { useIsMobile } from "../use-is-mobile"
 import { parseDateLocal } from "../utils"
 import { createClient } from "@/lib/supabase"
 import { SubmitReceiptModal, STATUS_META, MobileFactsGrid } from "./finance-workspace"
+import { statusLabel, type FundKind } from "@/lib/receipt-status"
 import {
   listReceiptCategories,
   createReceiptCategory,
@@ -463,7 +464,10 @@ function CategoryContent({
   )
 }
 
-function StatusPill({ status }: { status: string }) {
+// `kind` is only meaningful for "reimbursed" (see lib/receipt-status.ts) — pass
+// it for a single allocation's own pill; omit it for a receipt-level rollup
+// that may span mixed-kind splits.
+function StatusPill({ status, kind }: { status: string; kind?: FundKind }) {
   const m = STATUS_META[status] ?? STATUS_META.pending
   return (
     <span style={{
@@ -471,7 +475,7 @@ function StatusPill({ status }: { status: string }) {
       padding: "3px 9px", borderRadius: 999, background: m.bg, color: m.text,
       fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", flexShrink: 0,
     }}>
-      {m.label}
+      {statusLabel(status, kind)}
     </span>
   )
 }
@@ -514,11 +518,14 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   )
 }
 
-// Per-source status path — church signs off; external is grant-filed.
-function memberAllocSteps(kind: "church" | "external") {
+// Per-source status path — church signs off; external is grant-filed. Node
+// labels for the two status-backed steps come from `statusLabel` (the single
+// kind-aware receipt-status label function, lib/receipt-status.ts) — mirrors
+// the treasurer inbox rail (finance-workspace.tsx's allocSteps).
+function memberAllocSteps(kind: FundKind) {
   return kind === "church"
-    ? (["Submitted", "Approved", "Reimbursed"] as const)
-    : (["Submitted", "Requested", "Reimbursed"] as const)
+    ? ["Submitted", statusLabel("approved"), statusLabel("reimbursed", "church")]
+    : ["Submitted", statusLabel("requested"), statusLabel("reimbursed", "external")]
 }
 
 interface MemberAllocation {
@@ -533,14 +540,16 @@ interface MemberAllocation {
   signed_off_at: string | null
 }
 
-// Short "Jul 18" formatter + the date reached at each lifecycle node (node 1 =
-// Approved/Requested, node 2 = Reimbursed) — mirrors the treasurer inbox rail.
+// Short "Jul 18" formatter + the date reached at each lifecycle node (node 0 =
+// Submitted → the receipt's own submitted_at, node 1 = Approved/Requested,
+// node 2 = Approved to pay) — mirrors the treasurer inbox rail.
 function fmtStepDate(iso: string | null): string | null {
   if (!iso) return null
   const d = new Date(iso)
   return isNaN(d.getTime()) ? null : d.toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
-function memberNodeDate(a: MemberAllocation, i: number): string | null {
+function memberNodeDate(a: MemberAllocation, i: number, submittedAt: string): string | null {
+  if (i === 0) return fmtStepDate(submittedAt)
   if (i === 1) return fmtStepDate(a.fund_kind === "church" ? a.reviewed_at : (a.requested_at ?? a.reviewed_at))
   if (i === 2) return fmtStepDate(a.signed_off_at)
   return null
@@ -551,7 +560,7 @@ const memberStepDateStyle: React.CSSProperties = {
 
 // A single read-only source row in the member's split view: fund chip · amount ·
 // status pill · per-source stepper. Mirrors the treasurer inbox split, no actions.
-function MemberAllocationRow({ allocation: a }: { allocation: MemberAllocation }) {
+function MemberAllocationRow({ allocation: a, submittedAt }: { allocation: MemberAllocation; submittedAt: string }) {
   const isNegative = a.status === "rejected" || a.status === "declined"
   const steps = memberAllocSteps(a.fund_kind)
   const reached = a.status === "reimbursed" ? 2 : (a.status === "approved" || a.status === "requested") ? 1 : 0
@@ -562,18 +571,18 @@ function MemberAllocationRow({ allocation: a }: { allocation: MemberAllocation }
           <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.04em", padding: "3px 9px", borderRadius: 999, background: "var(--plum-tint)", color: "var(--plum)", whiteSpace: "nowrap" }}>{a.fund_name}</span>
           <span style={{ fontSize: 14, color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>${a.amount.toFixed(2)}</span>
         </div>
-        <StatusPill status={a.status} />
+        <StatusPill status={a.status} kind={a.fund_kind} />
       </div>
       {isNegative ? (
         <div style={{ background: "var(--cream)", border: "1px solid color-mix(in srgb, var(--danger) 30%, var(--cream))", borderRadius: 10, padding: "10px 12px" }}>
-          <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{STATUS_META[a.status]?.label ?? "Declined"}</p>
+          <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{statusLabel(a.status, a.fund_kind)}</p>
           {a.decision_reason && <p style={{ fontSize: 12.5, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
         </div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {steps.map((step, i) => {
             const done = i <= reached
-            const nodeDate = done ? memberNodeDate(a, i) : null
+            const nodeDate = done ? memberNodeDate(a, i, submittedAt) : null
             return (
               <div key={step} style={{ display: "flex", alignItems: "center", gap: 8, flex: i < steps.length - 1 ? 1 : 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -672,7 +681,7 @@ function ReceiptDetailOverlay({
           <div style={{ marginBottom: 24 }}>
             <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 10px" }}>Funding split</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {allocations.map(a => <MemberAllocationRow key={a.id} allocation={a} />)}
+              {allocations.map(a => <MemberAllocationRow key={a.id} allocation={a} submittedAt={receipt.submitted_at} />)}
             </div>
           </div>
         )}

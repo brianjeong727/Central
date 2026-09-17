@@ -12,6 +12,7 @@ import { audienceScope } from "@/lib/announcement-audience"
 // banner while the app is foregrounded, so the two are one feature seen from two
 // places; a second copy of the rule here would mean muting a chat silenced only one.
 import { chatNotifyCopy, chatNotifyReason, mentionToken, mentionTokensIn } from "@/lib/chat-notification"
+import { statusLabel, type FundKind } from "@/lib/receipt-status"
 import type { NotificationSettings, ChatNotifyMode } from "@/app/home/types"
 
 export const runtime = "nodejs"
@@ -677,8 +678,28 @@ async function resolveReceiptDecision(admin: AdminClient, recordId: string): Pro
   switch (r.status) {
     case "approved":
       title = "Receipt approved"; body = `${amt} for ${what} was approved.`; break
-    case "reimbursed":
-      title = "Receipt reimbursed"; body = `${amt} for ${what} has been reimbursed.`; break
+    case "reimbursed": {
+      // `reimbursed` means two different things by fund kind (lib/receipt-status.ts):
+      // church = the president's sign-off, an authorization to disburse (money has
+      // NOT moved yet); external = the treasurer's confirmation that the grant
+      // funder actually paid out. Resolve the kind from this receipt's own splits —
+      // only when every split shares one kind; a receipt split across BOTH a church
+      // and an external fund has no single true kind, so it falls through to
+      // statusLabel's "Approved" fallback (true under either reading).
+      const { data: allocs } = await admin
+        .from("receipt_fund_allocations")
+        .select("fund_id")
+        .eq("receipt_id", recordId)
+      const fundIds = Array.from(new Set((allocs ?? []).map(a => a.fund_id)))
+      let kind: FundKind | undefined
+      if (fundIds.length > 0) {
+        const { data: funds } = await admin.from("finance_funds").select("id, kind").in("id", fundIds)
+        const kinds = Array.from(new Set((funds ?? []).map(f => f.kind)))
+        if (kinds.length === 1 && (kinds[0] === "church" || kinds[0] === "external")) kind = kinds[0]
+      }
+      const label = statusLabel("reimbursed", kind).toLowerCase()
+      title = `Receipt ${label}`; body = `${amt} for ${what} was ${label}.`; break
+    }
     case "rejected":
       title = "Receipt not approved"; body = `${amt} for ${what} was not approved.`; break
     default: // declined

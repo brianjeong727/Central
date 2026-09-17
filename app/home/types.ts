@@ -564,6 +564,9 @@ export interface ComposerProps {
   onOpenInvitePicker?: () => void
   groupArchived: boolean
   displayName: string
+  /** A two-person thread (incl. a draft DM). Drives the footer's audience line:
+   *  a DM is visible to two people, a group to everyone in the room. */
+  isDm: boolean
   // Roster (self already excluded) for @mention autocomplete. Structural type — the
   // richer roster objects pass fine.
   mentionMembers: { id: string; name: string; displayName: string }[]

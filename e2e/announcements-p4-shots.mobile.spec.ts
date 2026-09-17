@@ -8,6 +8,7 @@
 // build-report-p4.md). Evidence + assertions; shots guarded on ANN_SHOT_DIR.
 import { test, expect, type Page } from "@playwright/test"
 import { createClient } from "@supabase/supabase-js"
+import ws from "ws"
 import { sandbox, E2E_PREFIX, memberState } from "./fixtures"
 
 const SHOT_DIR = process.env.ANN_SHOT_DIR
@@ -127,23 +128,21 @@ test.describe("mobile Announcements family (P4) screenshots", () => {
       await shot(page, "member-home")
     })
 
-    test("RLS still returns the draft to a member — app-code is the sole gate", async () => {
-      // Proves the announcements SELECT policy is ministry-scoped only (does NOT
-      // gate on status): a member-authed query DOES return the draft row. The UI
-      // never surfaces it because every app read path filters status. Documented
-      // as a defense-in-depth gap for the rls-reviewer in build-report-p4.md.
+    test("RLS refuses the draft to a member — the row policy is the gate, not only the app", async () => {
+      // Proves the live announcements SELECT policy excludes drafts for
+      // non-leaders (status IS NULL / published / own row / leader-tier). A
+      // member-authed query returns NO row, so the app's status filters are
+      // defense in depth, not the only wall. Verified against pg_policy 2026-09-15.
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
       const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       const email = process.env.E2E_MEMBER_EMAIL!
       const password = process.env.E2E_PASSWORD!
-      const c = createClient(url, anon)
+      const c = createClient(url, anon, { auth: { persistSession: false }, realtime: { transport: ws as never } })
       const { error: signErr } = await c.auth.signInWithPassword({ email, password })
       expect(signErr).toBeNull()
       const { data, error } = await c.from("announcements").select("id, status").eq("id", draftId).maybeSingle()
       expect(error).toBeNull()
-      // The row IS readable at the DB level (RLS is status-agnostic) — confirming
-      // the app WHERE clauses are load-bearing, not redundant.
-      expect(data?.status).toBe("draft")
+      expect(data).toBeNull()
       await c.auth.signOut()
     })
   })

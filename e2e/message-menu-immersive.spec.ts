@@ -171,10 +171,63 @@ test.describe("immersive long-press menu", () => {
 
     await longPress(page, ownId!)
     const labels = await page.locator('[data-msg-menu="actions"] button').allInnerTexts()
+    // Copy LEADS the list: it is the only action that changes nothing, and the
+    // text is what a long-press is most often about. Its absence was the gap —
+    // there was no way at all to get a message's words out of the app.
+    expect(labels, "Copy is offered for a message with text").toContain("Copy")
+    expect(labels[0], "Copy sits first, above Reply").toBe("Copy")
     expect(labels).toContain("Reply")
     expect(labels).toContain("Forward")
     expect(labels).toContain("Edit")
     expect(labels, "the last row must not be cut off by the height cap").toContain("Delete")
+    await ctx.close()
+  })
+
+  // Copy has to actually COPY. `navigator.clipboard.writeText` REJECTS rather
+  // than throwing when the document isn't focused or the origin isn't trusted,
+  // which is exactly how a copy can look successful and put nothing anywhere —
+  // so lib/clipboard.ts resolves a boolean and the toast is shown only on true.
+  test("Copy puts the message text on the clipboard and says so", async ({ browser }) => {
+    const ctx = await browser.newContext({ storageState: adminState, viewport: { width: 390, height: 844 } })
+    await ctx.grantPermissions(["clipboard-read", "clipboard-write"])
+    const page = await ctx.newPage()
+    await page.goto(`/home?tab=chats&chat=${groupId}`)
+    await expect(page.locator("[data-message-bubble]").first()).toBeVisible({ timeout: 20000 })
+    await page.waitForTimeout(1500)
+
+    const pick = await page.evaluate(() => {
+      const els = Array.from(document.querySelectorAll("[data-message-bubble]"))
+        .filter((el) => { const r = el.getBoundingClientRect(); return r.top > 90 && r.bottom < window.innerHeight - 150 })
+      const el = els[els.length - 1]
+      return el ? { id: el.getAttribute("data-message-bubble")!, text: (el.textContent ?? "").trim() } : null
+    })
+    expect(pick, "need a pressable message").toBeTruthy()
+
+    await longPress(page, pick!.id)
+    await page.getByRole("button", { name: "Copy", exact: true }).click()
+
+    await expect(page.getByText("Copied", { exact: true }).filter({ visible: true }).first())
+      .toBeVisible({ timeout: 5000 })
+    const clip = await page.evaluate(() => navigator.clipboard.readText())
+    expect(pick!.text).toContain(clip.trim())
+    expect(clip.trim().length).toBeGreaterThan(0)
+    await ctx.close()
+  })
+
+  // The composer's desktop footer used to read "End-to-end visible to X members"
+  // on EVERY thread. Central does not do end-to-end encryption — messages are
+  // rows in Postgres — so the line promised a guarantee the product does not
+  // make. It now states the audience, which is the true and useful fact.
+  test("the composer footer names the audience and never claims end-to-end", async ({ browser }) => {
+    const ctx = await browser.newContext({ storageState: adminState, viewport: { width: 1440, height: 900 } })
+    const page = await ctx.newPage()
+    await page.goto(`/home?tab=chats&chat=${groupId}`)
+    await expect(page.locator("[data-message-bubble]").first()).toBeVisible({ timeout: 20000 })
+
+    await expect(page.getByText(`Visible to everyone in ${PREFIX}thread`).filter({ visible: true }).first())
+      .toBeVisible({ timeout: 10000 })
+    // The words themselves, anywhere on the screen.
+    await expect(page.getByText(/end-to-end/i)).toHaveCount(0)
     await ctx.close()
   })
 

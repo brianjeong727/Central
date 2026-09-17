@@ -392,6 +392,8 @@ The push dispatch route (`app/api/push/dispatch/route.ts`) gained 3 cron/action-
 **Ministry admin**
 `user_ministries`, `ministry_schools`, `ministry_bans`, `ministry_departures`, `audit_logs`
 
+- `audit_logs` RLS (verified 2026-09-15): SELECT = own ministry AND `auth_is_admin()`, plus a leader's own `announcement.*` rows (so INSERT…RETURNING works for the browser writer). INSERT = own ministry AND `actor_id = auth.uid()` AND (`auth_is_admin()` OR leader-tier writing `action LIKE 'announcement.%'`). No UPDATE/DELETE policy and no such grant: `authenticated` holds SELECT,INSERT only; `anon` holds nothing. Any other action from a leader-tier surface must be written server-side with the service role (`finance-funds.ts`, `moderation.ts`, `delete-account.ts` do). `announcements` SELECT already excludes drafts for non-leaders (`status IS NULL OR 'published' OR own row OR leader-tier`).
+
 **Profile trigger:** `handle_new_user()` fires `AFTER INSERT ON auth.users` and auto-creates a `profiles` row. `ministry_id` is NULL until the user joins a ministry via `/ministries`.
 
 **Ministry approval:** `approveMinistry` (founder-email-gated, in `app/actions/ministry.ts`) activates the ministry, creates the onboarding workspaces, seeds `ministry_schools`, and seeds starter content — a pinned welcome announcement + a "Leaders" church chat with the founder (idempotent; seeding failure never blocks approval).
