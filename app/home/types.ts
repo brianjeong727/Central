@@ -35,7 +35,17 @@ export interface Profile {
   seen_workspace_nav_hint?: boolean
   grad_prompt_dismissed?: boolean
   compact_sidebar?: boolean
+  // Chat text size — the ONE user-facing type control in the app. Four steps
+  // that the shell applies as html[data-chat-text]; the pixel scale lives in
+  // app/globals.css next to --chat-msg-size, not here.
+  chat_text_size?: ChatTextSize
   notification_settings?: NotificationSettings
+}
+
+export type ChatTextSize = "sm" | "md" | "lg" | "xl"
+export const CHAT_TEXT_SIZES: readonly ChatTextSize[] = ["sm", "md", "lg", "xl"]
+export const CHAT_TEXT_SIZE_LABELS: Record<ChatTextSize, string> = {
+  sm: "Small", md: "Default", lg: "Large", xl: "Extra large",
 }
 
 // ── Web Push v1 — per-user notification preferences (profiles.notification_settings jsonb) ──

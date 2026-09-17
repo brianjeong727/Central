@@ -11,7 +11,7 @@ import { EntrySplash } from "@/app/home/components/entry-splash"
 import type { ChatPreview } from "@/components/central/chat-strip"
 
 // Types
-import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings, ChatGroup, ChatNotifyMode, NotificationSettings, Crumb } from "./types"
+import type { Tab, Profile, UserTeam, Team, HomeAppProps, CongregationQuestion, GovernanceSettings, ChatGroup, ChatNotifyMode, NotificationSettings, Crumb, ChatTextSize } from "./types"
 import { formatChatListTime, getInitials, chatPreviewLabel, rowsToChatPreviews, type ChatPreviewRow } from "./utils"
 import { usePullToRefresh, PullToRefreshIndicator, MessageBanner, type MessageBannerContent } from "@/components/central"
 import { chatNotifyCopy, chatNotifyReason, mentionToken, mentionTokensIn } from "@/lib/chat-notification"
@@ -508,6 +508,17 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     setCompactSidebar(next)
     supabase.from("profiles").update({ compact_sidebar: next }).eq("id", userId).eq("ministry_id", ministryId).then(() => {})
   }
+  // Chat text size — persisted per-user pref (profiles.chat_text_size). Applied
+  // on <html>, not the shell root: the chat screen is fixed inset-0 and the
+  // long-press menu clones a bubble into a body portal, and both must inherit
+  // the same size as the transcript. The scale itself is in globals.css.
+  const [chatTextSize, setChatTextSize] = useState<ChatTextSize>(initialProfile.chat_text_size ?? "md")
+  useEffect(() => {
+    const el = document.documentElement
+    if (chatTextSize === "md") delete el.dataset.chatText
+    else el.dataset.chatText = chatTextSize
+    return () => { delete el.dataset.chatText }
+  }, [chatTextSize])
   const hideSidePanel = activeTab === "plan" && !activeTeamId
   // shell-compact applies on the EFFECTIVE hidden state so the --shell-offset
   // override also fixes overlay alignment on the full-width plan picker.
@@ -1747,6 +1758,8 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
                 onAvatarChange={(url) => setAvatarUrl(url)}
                 activeSection={profileSection}
                 onSectionChange={handleProfileSectionChange}
+                chatTextSize={chatTextSize}
+                onChatTextSizeChange={setChatTextSize}
               />
             </div>
           )}

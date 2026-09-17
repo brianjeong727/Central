@@ -53,7 +53,7 @@ export default async function HomePage({
   // exactly what happened.) They are short text columns; the fat ones stay out.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id, name, email, graduation_year, grade, needs_grad_check, role, ministry_id, avatar_url, school_id, major, hometown, favorite_verse, bible_verse, favorite_worship_song, show_journal_entries, show_journal_streak, seen_workspace_nav_hint, grad_prompt_dismissed, compact_sidebar, open_groups_card_dismissed, notification_settings")
+    .select("id, name, email, graduation_year, grade, needs_grad_check, role, ministry_id, avatar_url, school_id, major, hometown, favorite_verse, bible_verse, favorite_worship_song, show_journal_entries, show_journal_streak, seen_workspace_nav_hint, grad_prompt_dismissed, compact_sidebar, chat_text_size, open_groups_card_dismissed, notification_settings")
     .eq("id", user.id)
     .single()
 
@@ -193,6 +193,7 @@ export default async function HomePage({
         school_id: null,
         grad_prompt_dismissed: false,
         compact_sidebar: false,
+        chat_text_size: "md" as const,
         open_groups_card_dismissed: false,
       }
 
