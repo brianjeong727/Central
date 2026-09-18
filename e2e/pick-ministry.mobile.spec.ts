@@ -158,6 +158,11 @@ test("phone switcher renders both sections and switching restamps recency", asyn
   // correct behaviour.
   await screen.getByText(TEMP_MINISTRY_NAME, { exact: true }).click()
   await page.waitForURL(/\/(home|complete-profile)/, { timeout: 30_000 })
+  // Let the destination finish loading before navigating away again. /home boots
+  // and then re-routes client-side; a goto issued mid-flight aborts with
+  // net::ERR_ABORTED — a harness race, not a product failure.
+  await page.waitForLoadState("load")
+  await page.waitForTimeout(750)
 
   // The stamp landed on the RIGHT row: the switched-to membership moved forward, and
   // the other membership's planted instant is untouched (a ministry_id-only filter
