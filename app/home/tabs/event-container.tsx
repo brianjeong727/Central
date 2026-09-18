@@ -29,7 +29,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ChevronRight, Plus } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { MONO_STYLE } from "@/components/central/typography"
-import { PocketKicker, PocketRow, PocketRowCard, NightDivider, InlineAddRow } from "@/components/central"
+import { PocketKicker, PocketRow, PocketRowCard, NightDivider, InlineAddRow, Select } from "@/components/central"
 import { eventDayHeaderLabel, formatDurationMin } from "../utils"
 import type { CalendarEvent, EventBlock, EventConfirmation, EventPlan, EventRole, EventTask } from "../types"
 import { computeEventReadiness, isRoleCovered, CONFIRMATION_LABEL, confirmationColor, type EventReadiness } from "@/lib/event-readiness"
@@ -579,15 +579,14 @@ export function ContainerStaffing({
                 </span>
               )}
               {canEdit ? (
-                <select
+                <Select size="sm"
                   value={role.assigned_to ?? ""}
                   disabled={busyId === role.id}
                   onChange={(e) => assign(role, e.target.value)}
-                  style={selectStyle}
                 >
                   <option value="">Unassigned</option>
                   {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
+                </Select>
               ) : (
                 <span style={{ fontSize: 13, color: role.assigned_name ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>
                   {role.assigned_name ?? "Unassigned"}

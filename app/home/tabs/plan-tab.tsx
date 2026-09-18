@@ -9836,14 +9836,13 @@ export function EventPlanWorkspace({
                     />
                     {active && newTaskTitle.trim() && (
                       <>
-                        <select
+                        <Select size="sm"
                           value={newTaskAssignee}
                           onChange={(e) => setNewTaskAssignee(e.target.value)}
-                          style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
                         >
                           <option value="">Unassigned</option>
                           {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                        </select>
+                        </Select>
                         <input
                           type="date"
                           value={newTaskDue}
@@ -10238,10 +10237,10 @@ export function EventPlanWorkspace({
                         </>
                       ) : canEdit ? (
                         assigningRoleId === role.id ? (
-                          <select autoFocus defaultValue="" onChange={(e) => handleAssignRole(role.id, e.target.value)} onBlur={() => setAssigningRoleId(null)} style={{ border: "1px solid var(--plum)", borderRadius: 10, padding: "8px 11px", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)", background: "var(--cream)", outline: "none" }}>
+                          <Select size="sm" autoFocus defaultValue="" onChange={(e) => handleAssignRole(role.id, e.target.value)} onBlur={() => setAssigningRoleId(null)}>
                             <option value="">Choose someone…</option>
                             {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                          </select>
+                          </Select>
                         ) : (
                           // S35/S36 — the dashed add control is 1.5px (§11.13); radius is a token, never raw px.
                           <button className="assignbtn" onClick={() => setAssigningRoleId(role.id)} style={{ border: "1.5px dashed var(--dashed)", borderRadius: "var(--r-chip)", padding: "8px 14px", color: "var(--plum)", background: "transparent", fontSize: 13, fontFamily: "var(--font-inter)", whiteSpace: "nowrap", cursor: "pointer" }}>+ Assign someone</button>
@@ -11051,9 +11050,9 @@ function ActsTab({
               <span style={{ fontSize: 14, color: "var(--ink)" }}>{act.performer || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>—</span>}</span>
             )}
             {canEdit ? (
-              <select value={act.type} onChange={e => updateAct(act.id, "type", e.target.value)} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
+              <Select size="sm" value={act.type} onChange={e => updateAct(act.id, "type", e.target.value)}>
                 {["Music", "Spoken Word", "Comedy", "Dance", "Other"].map(t => <option key={t}>{t}</option>)}
-              </select>
+              </Select>
             ) : <span style={{ fontSize: 12, color: "var(--body)" }}>{act.type}</span>}
             {canEdit ? (
               <input value={act.duration} onChange={e => updateAct(act.id, "duration", e.target.value)} placeholder="8 min" style={{ background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
@@ -11152,10 +11151,10 @@ function TeamsTab({
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{ fontSize: 14, color: "var(--body)", whiteSpace: "nowrap" }}>Commissioner:</span>
         {canEdit ? (
-          <select value={teamsData.commissioner} onChange={e => save({ ...teamsData, commissioner: e.target.value })} style={{ padding: isMobile ? "12px 12px" : "6px 12px", minHeight: isMobile ? 44 : undefined, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--plum-2)", fontSize: 13, cursor: "pointer" }}>
+          <Select size="sm" value={teamsData.commissioner} onChange={e => save({ ...teamsData, commissioner: e.target.value })}>
             <option value="">Unassigned</option>
             {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
+          </Select>
         ) : (
           <span style={{ fontSize: 14, color: "var(--plum-2)" }}>{members.find(m => m.id === teamsData.commissioner)?.name ?? "—"}</span>
         )}
@@ -11248,10 +11247,10 @@ function TransportTab({
             <CentralCard key={car.id} variant="standard" radius={isMobile ? "var(--r-pocket)" : "var(--r-callout)"} padding="18px 22px" style={isMobile ? { border: "none", background: "var(--ivory)" } : undefined}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: isMobile ? "wrap" : undefined }}>
                 {canEdit ? (
-                  <select value={car.driver_id} onChange={e => updateCar(car.id, { driver_id: e.target.value })} style={{ padding: isMobile ? "12px 10px" : "6px 10px", minHeight: isMobile ? 44 : undefined, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--plum-2)", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
+                  <Select size="sm" value={car.driver_id} onChange={e => updateCar(car.id, { driver_id: e.target.value })}>
                     <option value="">Driver…</option>
                     {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
+                  </Select>
                 ) : (
                   <span style={{ fontSize: 14, fontWeight: 500, color: "var(--plum-2)" }}>{driver?.name ?? "No driver"}</span>
                 )}
@@ -11446,10 +11445,10 @@ function RunSheetTab({
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "100px 1fr 160px", gap: 10, alignItems: "center" }}>
               <input value={draft.time} onChange={e => setDraft(d => ({ ...d, time: e.target.value }))} placeholder="7:00 PM" style={ctrlInput} />
               <input value={draft.title} autoFocus onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="Block title…" style={ctrlInput} />
-              <select value={draft.owner} onChange={e => setDraft(d => ({ ...d, owner: e.target.value }))} style={ctrlSelect}>
+              <Select size="sm" value={draft.owner} onChange={e => setDraft(d => ({ ...d, owner: e.target.value }))}>
                 <option value="">No owner</option>
                 {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
+              </Select>
             </div>
             <input value={draft.brief} onChange={e => setDraft(d => ({ ...d, brief: e.target.value }))} placeholder="Brief — what this block needs, the gotcha…" style={{ ...ctrlInput, marginTop: 8, fontSize: 12.5 }} />
             <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
