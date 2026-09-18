@@ -47,7 +47,7 @@ import { useIsMobile } from "../use-is-mobile"
 import { roleLabel } from "@/app/actions/super-constants"
 import { TabPageHeader } from "@/components/central/tab-page-header"
 import { PageTitle } from "@/components/central/page-title"
-import { MonogramChip, PlanSubTabStrip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, EventSectionHeader, EventMetaLine, NightDivider, InlineAddRow, InlineAddCard, ActionCard, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketRoundButton, PocketButton, PocketFactsGrid, PocketStatCard, PocketSheet, PocketSearchField, PocketSwitch, PocketTag, PocketFilterChipRow, MobileChromeActions, POCKET_KICKER_STYLE, MONO_METRIC_STYLE, useScrollResetOn } from "@/components/central"
+import { MonogramChip, PlanSubTabStrip, SubpageShell, SubpageChromeActions, ContentHeader, ContentActionButton, EventSectionHeader, EventMetaLine, NightDivider, InlineAddRow, InlineAddCard, ActionCard, CentralButton, IconButton, Input, Select, Textarea, SerifInput, AddInlineSelect, FormField, CentralCard, ListRow, FilterChip, SegmentedControl, CentralModal, ConfirmDialog, ReadOnlyMat, ReadOnlyPill, PocketKicker, PocketRow, PocketRowCard, PocketCard, PocketProgress, PocketFilterChip, PocketDashedButton, PocketRoundButton, PocketButton, PocketFactsGrid, PocketStatCard, PocketSheet, PocketSearchField, PocketSwitch, PocketTag, PocketFilterChipRow, MobileChromeActions, POCKET_KICKER_STYLE, MONO_METRIC_STYLE, useScrollResetOn } from "@/components/central"
 import { FinanceWorkspace, MobileFactsGrid, type FinanceSection } from "../components/finance-workspace"
 import { MobilePocketHub, PocketHubChrome } from "../components/mobile-pocket-hub"
 import { teamIconKey } from "../workspace-presets"
@@ -8078,6 +8078,12 @@ export function EventPlanWorkspace({
 
   // Core data state
   const [plan, setPlan] = useState<EventPlan | null>(null)
+  // Member tier (design pass B2 §3.8 / decision 6a, 2026-09-17): a viewer who
+  // can't edit the plan lands on "Yours" — their own tasks and roles — with the
+  // whole plan one tap away. null = not chosen yet, resolved below once the plan
+  // has loaded (a member with nothing assigned lands on All; an empty "Yours" is
+  // a dead end, not a default).
+  const [planScope, setPlanScope] = useState<"yours" | "all" | null>(null)
 
   // Extra tabs = the type's built-in modules ∪ the plan's free-form modules
   // (type_data.extras, chosen in the Start-from-scratch creator).
@@ -8950,6 +8956,42 @@ export function EventPlanWorkspace({
   const childrenOf = (id: string) => tasks.filter((t) => t.parent_id === id).sort((a, b) => a.sort_order - b.sort_order)
   const pinnedTop = tasks.filter((t) => t.parent_id === null && t.pinned)
 
+  // ── Member tier: "Yours" scope ─────────────────────────────────────────────
+  // A top-level task is yours if it, or any of its subtasks, is assigned to you;
+  // the tree keeps its shape (renderTaskTree draws subtasks from the full list).
+  const memberView = !canEdit
+  const mineTopIds = new Set(
+    tasks
+      .filter((t) => t.parent_id === null && (t.assigned_to === userId || childrenOf(t.id).some((c) => c.assigned_to === userId)))
+      .map((t) => t.id),
+  )
+  const yoursTasks = tasks.filter((t) => mineTopIds.has(t.parent_id ?? t.id))
+  const myRoles = roles.filter((r) => r.assigned_to === userId)
+  const hasMine = mineTopIds.size > 0 || myRoles.length > 0
+  const planScopeEffective: "yours" | "all" = planScope ?? (memberView && hasMine ? "yours" : "all")
+  const scopedTasks = planScopeEffective === "yours" ? yoursTasks : tasks
+  const scopedPinned = planScopeEffective === "yours" ? pinnedTop.filter((t) => mineTopIds.has(t.id)) : pinnedTop
+  const scopedRoles = planScopeEffective === "yours" ? myRoles : roles
+  // The switch renders only where it means something: a member with something
+  // of their own on this event. Leaders always see the whole plan.
+  const scopeOptions = [
+    { id: "yours" as const, label: "Yours" },
+    { id: "all" as const, label: "All" },
+  ]
+  const scopeSwitch = memberView && hasMine ? (
+    isMobile ? (
+      <PocketFilterChipRow style={{ marginBottom: 12 }}>
+        {scopeOptions.map((o) => (
+          <PocketFilterChip key={o.id} label={o.label} active={planScopeEffective === o.id} onClick={() => setPlanScope(o.id)} />
+        ))}
+      </PocketFilterChipRow>
+    ) : (
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <SegmentedControl options={scopeOptions} value={planScopeEffective} onChange={setPlanScope} aria-label="Show" />
+      </div>
+    )
+  ) : null
+
   // The roomy inline editor card that replaces a row while it's being edited.
   function renderTaskEditor(task: EventTask) {
     const isTop = task.parent_id === null
@@ -9309,7 +9351,12 @@ export function EventPlanWorkspace({
               const hubTime = eventTimeRange
               const HUB_META: Record<string, { iconKey: string; sub: string }> = {
                 overview: { iconKey: "chart", sub: "Facts, stats & planning notes" },
-                checklist: { iconKey: "plan", sub: taskTotal > 0 ? `${taskDone} of ${taskTotal} done` : "The T-minus plan — tasks by phase" },
+                checklist: {
+                  iconKey: "plan",
+                  sub: memberView && mineTopIds.size > 0
+                    ? `${yoursTasks.filter((t) => t.parent_id === null && t.completed).length} of ${mineTopIds.size} of yours done`
+                    : taskTotal > 0 ? `${taskDone} of ${taskTotal} done` : "The T-minus plan — tasks by phase",
+                },
                 // A container's spokes are views onto its sub-events, so they say so.
                 // Vocabulary tracks the Roles pane's two L3 labels ("Event Level" /
                 // "Sub-event Level", renamed 2026-08-02) — the row is a doorway into
@@ -9322,7 +9369,12 @@ export function EventPlanWorkspace({
                 // Staffing states BOTH facts: covered (assigned and not declined)
                 // and confirmed. "n/m assigned" alone read as staffed on an event
                 // whose holders had never answered — or had declined.
-                roles: { iconKey: "users", sub: isContainer ? "Event and sub-event roles" : rolesTotal > 0 ? rolesSummary(readiness) : "Assign who owns each part" },
+                roles: {
+                  iconKey: "users",
+                  sub: memberView && myRoles.length > 0
+                    ? `You're on ${myRoles.length === 1 ? myRoles[0].role_name : `${myRoles.length} roles`}`
+                    : isContainer ? "Event and sub-event roles" : rolesTotal > 0 ? rolesSummary(readiness) : "Assign who owns each part",
+                },
                 runsheet: { iconKey: "clock", sub: isContainer ? "The whole week, night by night" : "Day-of timing, block by block" },
                 notes: { iconKey: "book", sub: "Cross-year pain points" },
                 sub_events: { iconKey: "calendar", sub: EXTRA_TAB_META.sub_events.subtitle },
@@ -9513,6 +9565,9 @@ export function EventPlanWorkspace({
 
                     {/* Budget keeps its own full-width card — it carries a category
                         selector and per-fund draws, not a single figure. */}
+                    {/* Members don't get a redacted "Treasurer only" money card — a
+                        card you can neither read nor act on is noise (B2 §3.8). */}
+                    {(canEdit || canEditBudget) && (
                     <div style={{ marginTop: 10 }}>
                       <EventBudgetCard
                         ministryId={ministryId}
@@ -9527,6 +9582,7 @@ export function EventPlanWorkspace({
                         bigNumber={bigNumber}
                       />
                     </div>
+                    )}
 
                     {/* Planning notes */}
                     <div style={{ marginTop: 26 }}>
@@ -9690,6 +9746,7 @@ export function EventPlanWorkspace({
                   {/* Budget — "ceiling + draws" (see EventBudgetCard). Replaces the old
                       free-text budget_allocated stat and the title-keyed ministry-allocation
                       panel that used to sit under it. */}
+                  {(canEdit || canEditBudget) && (
                   <EventBudgetCard
                     ministryId={ministryId}
                     plan={plan}
@@ -9702,6 +9759,7 @@ export function EventPlanWorkspace({
                     monoLabel={monoLabel}
                     bigNumber={bigNumber}
                   />
+                  )}
 
                   {/* Readiness */}
                   <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
@@ -9793,13 +9851,13 @@ export function EventPlanWorkspace({
                 )
               }
               // Pinned band — reuses the existing top-level pinned tasks + renderTaskTree.
-              const pinnedBand = pinnedTop.length > 0 ? (
+              const pinnedBand = scopedPinned.length > 0 ? (
                 <CentralCard variant="inset" radius="var(--r-callout)" padding="6px 14px 8px" style={{ marginBottom: 24 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0 6px" }}>
                     <Star style={{ width: 12, height: 12, color: "var(--plum)", fill: "currentColor" }} />
                     <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 500 }}>Pinned</span>
                   </div>
-                  {pinnedTop.map((task) => isMobile ? renderMobileTaskRow(task) : renderTaskTree(task))}
+                  {scopedPinned.map((task) => isMobile ? renderMobileTaskRow(task) : renderTaskTree(task))}
                 </CentralCard>
               ) : null
 
@@ -9813,14 +9871,15 @@ export function EventPlanWorkspace({
                 {!isMobile && (
                   <EventSectionHeader
                     title="Countdown"
-                    count={tasks.length > 0 ? tasks.length : undefined}
-                    trailing={tasks.length > 0 ? `${incompleteTasks.length} of ${tasks.length} remaining` : undefined}
+                    count={scopedTasks.length > 0 ? scopedTasks.length : undefined}
+                    trailing={scopedTasks.length > 0 ? `${scopedTasks.filter((t) => !t.completed).length} of ${scopedTasks.length} remaining` : undefined}
                     action={pillNode ?? undefined}
                   />
                 )}
 
+                {scopeSwitch}
                 <CountdownTab
-                  tasks={tasks}
+                  tasks={scopedTasks}
                   readiness={readiness}
                   eventStartISO={calendarEvent.start_date}
                   teamId={teamId ?? (calendarEvent as { team_id?: string | null }).team_id ?? null}
@@ -9909,8 +9968,8 @@ export function EventPlanWorkspace({
               // holder said no is a hole — it groups under "Needs someone" and keeps
               // its Declined pill there, so the list can't read as fully staffed
               // while a job has nobody willing to do it (lib/event-readiness.ts).
-              const needs = roles.filter(r => !isRoleCovered(r, confirmations))
-              const covered = roles.filter(r => isRoleCovered(r, confirmations))
+              const needs = scopedRoles.filter(r => !isRoleCovered(r, confirmations))
+              const covered = scopedRoles.filter(r => isRoleCovered(r, confirmations))
               // Gates that are about WHO IS IN THE CHAT / who can be asked to confirm
               // count anyone with a name on a role, declined included — you re-request
               // from a decliner, and they stay in the planning chat until reassigned.
@@ -10265,6 +10324,7 @@ export function EventPlanWorkspace({
                     sentence that used to explain it flattened the page — every line read
                     at the same weight. Mobile keeps its SectionKicker hint below (that
                     surface has no sibling section visible for contrast). */}
+                {scopeSwitch}
                 {isMobile && canEdit && assignedCount > 0 && !showAddRole && !editingRoleId && (
                   <PocketButton
                     variant="quiet"
