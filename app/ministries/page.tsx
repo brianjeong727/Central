@@ -375,7 +375,7 @@ function MinistriesContent() {
           title={staffMinistryName ? `Join ${staffMinistryName}` : "Join ministry"}
           maxWidth={360}
         >
-          <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 20px", lineHeight: 1.5 }}>
+          <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 20px", lineHeight: 2 }}>
             Select your staff role to continue.
           </p>
           {staffRoleError && (
@@ -809,7 +809,7 @@ function MinistriesContent() {
                 </p>
               )}
 
-              <div style={{ fontSize: 13, color: "var(--muted-text)", margin: "26px 4px 0", lineHeight: 1.5 }}>
+              <div style={{ fontSize: 13, color: "var(--muted-text)", margin: "26px 4px 0", lineHeight: 2 }}>
                 Registering a new ministry?{" "}
                 <button type="button" onClick={() => router.push("/register-ministry")} style={{ background: "none", border: "none", padding: 0, color: "var(--plum)", fontWeight: 500, cursor: "pointer", fontFamily: SANS, fontSize: 13 }}>
                   That works best on desktop.

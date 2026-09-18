@@ -20,6 +20,7 @@
 import { ReactNode, useEffect, useState } from "react"
 import { X } from "lucide-react"
 import { useBackIntent } from "@/lib/back-intent"
+import { markOverlayOpen } from "./overlay-open"
 
 export function CentralModal({
   onClose,
@@ -67,6 +68,8 @@ export function CentralModal({
   // unsaved work. Topmost-wins comes free from the LIFO stack, so a modal opened
   // over a subpage closes before the subpage pops.
   useBackIntent(requestClose)
+  // N8: the pill nav hides while this is open (html[data-overlay-open]).
+  useEffect(() => markOverlayOpen(), [])
 
   // Escape closes — standard across every modal (guarded when dirty).
   useEffect(() => {
@@ -87,7 +90,7 @@ export function CentralModal({
       // invisible. Padding the backdrop by `--kb-inset` moves the flex end-edge up
       // to the top of the keys. No-op on desktop (the class resets at md) and when
       // nothing is focused (`--kb-inset` is 0).
-      className={`animate-backdrop-in kb-lift ${sheet ? "flex items-end md:items-center" : "flex items-center"} justify-center`}
+      className="animate-backdrop-in kb-lift flex items-end md:items-center justify-center px-0 md:px-5"
       style={{
         position: "fixed",
         inset: 0,
@@ -98,17 +101,16 @@ export function CentralModal({
         // here silently beat `.kb-lift`'s padding-bottom and the sheet stayed
         // flush with the bottom of the screen, behind the keyboard, exactly as
         // before the fix. Same trap globals.css calls out for `.kb-lift` itself.
-        paddingLeft: sheet ? 0 : 20,
-        paddingRight: sheet ? 0 : 20,
       }}
       onClick={requestClose}
     >
       <div
-        className={`animate-dialog-in kb-modal-h ${sheet ? "rounded-t-[var(--r-callout)] md:rounded-[var(--r-callout)]" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        className="animate-dialog-in kb-modal-h central-modal-panel rounded-t-[var(--r-pocket)] rounded-b-none md:rounded-[var(--r-callout)]"
         style={{
           position: "relative",
           background: "var(--cream-2)",
-          ...(sheet ? {} : { borderRadius: "var(--r-callout)" }),
           width: "100%",
           maxWidth,
           // maxHeight lives in `.kb-modal-h` (globals.css) so it resets at md
@@ -219,7 +221,7 @@ export function CentralModal({
               <h3 style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 400, color: "var(--ink)", margin: 0 }}>
                 Discard changes?
               </h3>
-              <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5, margin: "8px 0 0" }}>
+              <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 2, margin: "8px 0 0" }}>
                 Your changes haven&apos;t been saved. If you leave now, they&apos;ll be lost.
               </p>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>

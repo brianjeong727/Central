@@ -1963,7 +1963,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
               })}
             </div>
             {isChurch && canManage && (
-              <p style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 10, lineHeight: 1.5 }}>Member changes sync to the small group home page if this chat is linked to a group.</p>
+              <p style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 10, lineHeight: 2 }}>Member changes sync to the small group home page if this chat is linked to a group.</p>
             )}
 
             {isCentralChat && (
@@ -2020,7 +2020,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             </>
           }
         >
-          <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+          <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 2, margin: 0 }}>
             {confirmAction === "archive" ? "Members won't be able to send new messages." : confirmAction === "unarchive" ? "Members will be able to send messages again." : confirmAction === "leave" ? "You'll stop receiving its messages." : "This chat and all its messages will be permanently removed. This can't be undone."}
           </p>
         </CentralModal>,
@@ -2055,7 +2055,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
             maxLength={MAX_NICKNAME_LEN}
             style={{ width: "100%", height: 44, padding: "0 14px", borderRadius: 12, border: "1px solid var(--line)", background: "var(--cream)", color: "var(--ink)", fontSize: 15, outline: "none" }}
           />
-          <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "10px 0 0", lineHeight: 1.5 }}>
+          <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "10px 0 0", lineHeight: 2 }}>
             Everyone in this chat sees this in place of {nicknameEditor.name}. {nicknameInput.length}/{MAX_NICKNAME_LEN}
           </p>
           {nicknameError && <p style={{ fontSize: 13, color: "var(--danger)", margin: "8px 0 0" }}>{nicknameError}</p>}

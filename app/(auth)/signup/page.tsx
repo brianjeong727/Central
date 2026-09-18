@@ -154,7 +154,7 @@ function PathRow({ icon, iconBg, iconFg, title, body, onClick }: {
       }}>{icon}</span>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "block", fontFamily: SANS, fontSize: 19, fontWeight: 500, color: "var(--ink)", lineHeight: 1.2 }}>{title}</span>
-        <span style={{ display: "block", fontSize: 14, color: "var(--body)", marginTop: 3, lineHeight: 1.5 }}>{body}</span>
+        <span style={{ display: "block", fontSize: 14, color: "var(--body)", marginTop: 3, lineHeight: 2 }}>{body}</span>
       </span>
       <Icon d="M9 6l6 6-6 6" size={18} style={{ color: "var(--faint)" }}/>
     </button>
@@ -628,7 +628,7 @@ function SignupContent() {
             {verifyLoading ? "Verifying…" : "Verify & continue"}
           </PocketSubmit>
         </form>
-        <div style={{ fontSize: 14, color: "var(--body)", marginTop: 18, textAlign: "center", lineHeight: 1.5 }}>
+        <div style={{ fontSize: 14, color: "var(--body)", marginTop: 18, textAlign: "center", lineHeight: 2 }}>
           Didn&apos;t get it? Check spam, or{" "}
           <button type="button" onClick={handleResend} disabled={resendLoading}
             style={{ color: "var(--plum)", fontWeight: 600, background: "none", border: "none", cursor: resendLoading ? "default" : "pointer", padding: 0, fontFamily: SERIF, fontSize: 14, opacity: resendLoading ? 0.7 : 1 }}>
@@ -775,7 +775,7 @@ function SignupContent() {
             Select your role to continue.
           </div>
         )}
-        <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5, textAlign: "center", margin: "-4px 0 0" }}>
+        <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 2, textAlign: "center", margin: "-4px 0 0" }}>
           By creating an account you agree to our{" "}
           <Link href="/terms" style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">Terms of Service</Link>
           {" "}and{" "}
@@ -836,7 +836,7 @@ function SignupContent() {
           {!founderRole && !adminLoading && (
             <div style={{ fontSize: 13, color: "var(--muted-text)", textAlign: "center", marginTop: -8 }}>Select your role to continue.</div>
           )}
-          <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5, textAlign: "center", margin: "-4px 0 0" }}>
+          <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 2, textAlign: "center", margin: "-4px 0 0" }}>
             By creating an account you agree to our{" "}
             <Link href="/terms" style={{ color: "var(--plum)", fontWeight: 500, textDecoration: "none" }}>Terms of Service</Link>
             {" "}and{" "}
@@ -920,7 +920,7 @@ function SignupContent() {
             {!gender ? "Select your gender to continue." : "Select your graduation year, or tick \u201cI\u2019m a young adult\u201d."}
           </div>
         )}
-        <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5, textAlign: "center", margin: "-4px 0 0" }}>
+        <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 2, textAlign: "center", margin: "-4px 0 0" }}>
           By creating an account you agree to our{" "}
           <Link href="/terms" style={{ color: "var(--plum-2)", fontWeight: 500, textDecoration: "none" }} className="hover:underline underline-offset-2">Terms of Service</Link>
           {" "}and{" "}
@@ -985,7 +985,7 @@ function SignupContent() {
               {!gender ? "Select your gender to continue." : "Select your graduation year, or tick \u201cI\u2019m a young adult\u201d."}
             </div>
           )}
-          <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5, textAlign: "center", margin: "-4px 0 0" }}>
+          <p style={{ fontSize: 12, color: "var(--muted-text)", lineHeight: 2, textAlign: "center", margin: "-4px 0 0" }}>
             By creating an account you agree to our{" "}
             <Link href="/terms" style={{ color: "var(--plum)", fontWeight: 500, textDecoration: "none" }}>Terms of Service</Link>
             {" "}and{" "}

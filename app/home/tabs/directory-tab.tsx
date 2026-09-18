@@ -452,7 +452,7 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
           if (detailLoading) {
             return (
               <div style={{ padding: "14px 0", borderBottom: "1px solid var(--line)" }}>
-                <span style={{ fontSize: 14, color: "var(--muted-text)", opacity: 0.5 }}>…</span>
+                <span style={{ fontSize: 14, color: "var(--muted-text)", opacity: 1 }}>…</span>
               </div>
             )
           }

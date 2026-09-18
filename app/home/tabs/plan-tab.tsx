@@ -7263,7 +7263,7 @@ export function AddEventModal({
           <>
           {/* What the playbook brings — said as an outcome, not "Pre-seeded:". */}
           {!isEditing && createPath === "quick" && (cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
-            <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
+            <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 13, color: "var(--body)", lineHeight: 2 }}>
               We&apos;ll set up the checklist{cfg.defaultRoles.length > 0 ? ", the roles" : ""} and the reminders for a {cfg.label.toLowerCase()}. Adjust any of it inside the event.
             </div>
           )}
@@ -7361,7 +7361,7 @@ export function AddEventModal({
                   )
                 })}
               </div>
-              <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 8, lineHeight: 1.5 }}>
+              <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 8, lineHeight: 2 }}>
                 Starts with a blank checklist — you compose the plan. Modules add their own tabs to the event.
               </p>
             </div>
@@ -9157,7 +9157,7 @@ export function EventPlanWorkspace({
         </button>
         {/* title + optional playbook brief (Run Sheet P2) */}
         <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ fontSize: isChild ? 14.5 : 15.5, color: task.completed ? "var(--muted-text)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
+          <span style={{ fontSize: isChild ? 15 : 16, color: task.completed ? "var(--muted-text)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
           {/* Countdown sub-line (mock's tk-sub): assignee + trigger badge live INSIDE the
               body column, under the title — so the flex:1 body keeps full width and the
               title/whisper never get starved by right-side siblings (matches the mobile row). */}
@@ -9858,7 +9858,7 @@ export function EventPlanWorkspace({
                   {canEdit && plan && new Date(calendarEvent.start_date).getTime() < Date.now() && (
                     <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
                       <p style={monoLabel}>Playbook</p>
-                      <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5, margin: "10px 0 14px" }}>
+                      <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 2, margin: "10px 0 14px" }}>
                         Save this event&apos;s tasks, roles, and timing as a reusable playbook — next year&apos;s team can &ldquo;Run it back.&rdquo;
                       </p>
                       <CentralButton variant="secondary" size="sm" onClick={() => setCompileOpen(true)}>Compile playbook</CentralButton>
@@ -10020,7 +10020,7 @@ export function EventPlanWorkspace({
                       </>
                     }
                   >
-                    <p style={{ fontSize: 15, lineHeight: 1.5, color: "var(--ink)", margin: 0 }}>
+                    <p style={{ fontSize: 15, lineHeight: 2, color: "var(--ink)", margin: 0 }}>
                       This will change this task&rsquo;s date to fit the {sectionDefs.find((s) => s.key === pendingSectionMove.sectionKey)?.label ?? "section"} window. Continue?
                     </p>
                   </CentralModal>
@@ -10231,7 +10231,7 @@ export function EventPlanWorkspace({
                         {role.notes && (
                           // 5px when it follows the assignee line (a grouped pair),
                           // 2px when it IS the sub-line (matches the Row grammar).
-                          <div style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, marginTop: whoText ? 5 : 2, overflowWrap: "anywhere" }}>{role.notes}</div>
+                          <div style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 2, marginTop: whoText ? 5 : 2, overflowWrap: "anywhere" }}>{role.notes}</div>
                         )}
                       </div>
                       {cMeta && (
@@ -10470,7 +10470,7 @@ export function EventPlanWorkspace({
                         </>
                       }
                     >
-                      <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>{body}</p>
+                      <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 2, margin: 0 }}>{body}</p>
                       {memberBlocks}
                     </CentralModal>,
                     document.body,
@@ -10853,7 +10853,7 @@ function SubEventsTab({
       )}
 
       {outOfRangeCount > 0 && (
-        <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 18px" }}>
+        <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 2, margin: "0 0 18px" }}>
           {outOfRangeCount === 1 ? "One sub-event falls" : `${outOfRangeCount} sub-events fall`} outside {parentEvent.title}&rsquo;s dates
           ({formatYMD(parentFromYMD, { month: "short", day: "numeric" })} – {formatYMD(parentToYMD, { month: "short", day: "numeric" })}). Extend the event, or move {outOfRangeCount === 1 ? "it" : "them"} inside the range.
         </p>
@@ -11653,7 +11653,7 @@ function RunSheetTab({
       {orphanBlocks.length > 0 && (
         <div style={{ marginBottom: 36 }}>
           <p style={{ ...dayHeadStyle("var(--gold)"), marginBottom: 6 }}>Outside the event dates</p>
-          <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 12px" }}>
+          <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 2, margin: "0 0 12px" }}>
             {orphanBlocks.length === 1 ? "This block sits" : `These ${orphanBlocks.length} blocks sit`} past {event.title}&rsquo;s end date
             ({eventDateRangeShort(new Date(event.start_date), new Date(event.end_date))}). Extend the event, or move {orphanBlocks.length === 1 ? "it" : "them"} onto a day.
           </p>
@@ -11847,7 +11847,7 @@ function GroupsTab({
                     <button
                       onClick={() => setConfirmDeleteId(session.id)}
                       disabled={deletingId === session.id}
-                      style={{ padding: "6px 14px", border: "1px solid var(--danger)", borderRadius: 8, background: "transparent", color: "var(--danger)", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: deletingId === session.id ? 0.5 : 1, fontFamily: "inherit" }}
+                      style={{ padding: "6px 14px", border: "1px solid var(--danger)", borderRadius: 8, background: "transparent", color: "var(--danger)", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: deletingId === session.id ? 1 : 1, fontFamily: "inherit" }}
                     >
                       {deletingId === session.id ? "Deleting…" : "Delete"}
                     </button>
@@ -14383,7 +14383,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
               </>
             }
           >
-            <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+            <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 2, margin: 0 }}>
               <span style={{ fontWeight: 500, color: "var(--ink)" }}>{localTeamName}</span> and its roles will be permanently removed. This can&apos;t be undone.
             </p>
           </CentralModal>
@@ -14410,7 +14410,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
           >
             {isCoPres ? (
               <>
-                <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: "0 0 16px" }}>
+                <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 2, margin: "0 0 16px" }}>
                   There are 2 co-presidents. Which one is{" "}
                   <span style={{ fontWeight: 500, color: "var(--ink)" }}>{replaceCtx.targetName}</span> replacing?
                 </p>
@@ -14434,7 +14434,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                 </div>
               </>
             ) : (
-              <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 2, margin: 0 }}>
                 <span style={{ fontWeight: 500, color: "var(--ink)" }}>{presidentMembers[0]?.name}</span> is the {presLabel.toLowerCase()}. Replace them with{" "}
                 <span style={{ fontWeight: 500, color: "var(--ink)" }}>{replaceCtx.targetName}</span>?
               </p>
@@ -15487,7 +15487,7 @@ function SmallGroupLeadersTab({
                 {isEditing && (
                   <div style={{ marginTop: 10 }}>
                     {editError && <div style={{ marginBottom: 8, padding: "8px 12px", background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: 10, fontSize: 12, color: "var(--danger)" }}>{editError}</div>}
-                    <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8, lineHeight: 1.5 }}>Changes sync to your group chat and will reflect immediately.</p>
+                    <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8, lineHeight: 2 }}>Changes sync to your group chat and will reflect immediately.</p>
                     <div className="flex gap-2">
                       <button onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }} style={{ flex: 1, padding: "9px 0", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 999, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
                       <CentralButton variant="primary" size="sm" onClick={() => handleSgEditSave(group.id)} disabled={editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0)} style={{ flex: 1 }}>{editSaving ? "Saving…" : "Save changes"}</CentralButton>

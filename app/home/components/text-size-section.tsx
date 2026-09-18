@@ -67,8 +67,8 @@ export function TextSizeSection({
       <p style={{ ...(mobile ? POCKET_KICKER_STYLE : MONO_STYLE), marginBottom: 10, marginTop: 0 }}>Text size</p>
       <div style={card}>
         <div style={{ padding: pad }}>
-          <div style={{ fontSize: mobile ? 14.5 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>Messages</div>
-          <div style={{ marginTop: mobile ? 2 : 4, marginBottom: 12, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 1.5 }}>
+          <div style={{ fontSize: mobile ? 15 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>Messages</div>
+          <div style={{ marginTop: mobile ? 2 : 4, marginBottom: 12, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 2 }}>
             How big messages read in a conversation. Follows you to every device.
           </div>
           {mobile ? (

@@ -665,7 +665,7 @@ export function MeetingNoteDetail({
                     readOnly={!canWrite}
                     onChange={e => { patchAgendaItem(item.id, { text: e.target.value }, true) }}
                     placeholder="Agenda item…"
-                    style={{ width: "100%", background: "none", border: "none", outline: "none", fontSize: 15, lineHeight: 1.5, color: item.done ? "var(--body)" : "var(--ink)", fontFamily: "var(--sans)", padding: 0 }}
+                    style={{ width: "100%", background: "none", border: "none", outline: "none", fontSize: 15, lineHeight: 2, color: item.done ? "var(--body)" : "var(--ink)", fontFamily: "var(--sans)", padding: 0 }}
                   />
                   {/* The detail line reveals on hover OR on focus. Focus is
                       what makes it reachable on a phone, where there is no
@@ -735,7 +735,7 @@ export function MeetingNoteDetail({
               onMouseLeave={() => setHoveredDecision(null)}
               style={{ display: "flex", gap: 13, alignItems: "flex-start", background: "var(--cream-3)", border: "1px solid var(--line)", borderRadius: 12, padding: "14px 18px", marginBottom: 9 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold)", flexShrink: 0, marginTop: 7 }} />
-              <div style={{ flex: 1, minWidth: 0, fontSize: 15, lineHeight: 1.5 }}>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 15, lineHeight: 2 }}>
                 {/* Editable in place — the only correction path used to be
                     delete-and-retype. Mirrors the agenda item input. */}
                 {canWrite ? (
@@ -743,7 +743,7 @@ export function MeetingNoteDetail({
                     value={d.text}
                     onChange={v => { patchDecision(d.id, { text: v }, true) }}
                     placeholder="Decision…"
-                    style={{ fontSize: 15, lineHeight: 1.5, color: "var(--ink)" }}
+                    style={{ fontSize: 15, lineHeight: 2, color: "var(--ink)" }}
                   />
                 ) : d.text}
                 <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 4 }}>

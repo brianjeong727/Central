@@ -271,7 +271,7 @@ export function SectionKicker({ label, hint, isMobile, first }: {
         {!isMobile && <span style={{ flex: 1, height: 1, background: "var(--line)" }} />}
       </div>
       {hint && (
-        <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: "6px 0 12px" }}>{hint}</p>
+        <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 2, margin: "6px 0 12px" }}>{hint}</p>
       )}
     </div>
   )

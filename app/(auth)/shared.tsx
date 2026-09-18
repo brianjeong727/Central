@@ -38,7 +38,7 @@ export function AuthPhotoPanel() {
           Your ministry,<br/>all in one place.
         </div>
         <div style={{ marginTop: 26, maxWidth: 360 }}>
-          <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, lineHeight: 1.5, color: "color-mix(in srgb, var(--cream) 92%, transparent)" }}>
+          <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, lineHeight: 2, color: "color-mix(in srgb, var(--cream) 92%, transparent)" }}>
             &ldquo;And let us consider how to stir up one another to love and good works.&rdquo;
           </div>
           <div style={{ ...mono, marginTop: 12, color: "color-mix(in srgb, var(--cream) 60%, transparent)", letterSpacing: "1.4px" }}>Hebrews 10 : 24</div>
@@ -393,7 +393,7 @@ export function YoungAdultCheck({ on, onToggle, compact = false }: { on: boolean
       >{on ? "✓" : ""}</span>
       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
         <span style={{
-          fontSize: compact ? 14.5 : 14,
+          fontSize: compact ? 15 : 14,
           fontWeight: 600,
           color: (!compact && on) ? "var(--cream-panel)" : "var(--ink)",
         }}>I&apos;m a young adult</span>

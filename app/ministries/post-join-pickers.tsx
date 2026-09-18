@@ -160,7 +160,7 @@ export function PostJoinPickerModals({ pickers }: { pickers: PostJoinPickers }) 
           still run, so onClose maps to skipSchool, not a plain close. */}
       {pickers.schoolOpen && (
         <CentralModal onClose={pickers.skipSchool} eyebrow="One more thing" title="Which school?" maxWidth={360}>
-            <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 20px", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 20px", lineHeight: 2 }}>
               This helps us organize groups and events by campus.
             </p>
             {pickers.schoolError && (
@@ -214,7 +214,7 @@ export function PostJoinPickerModals({ pickers }: { pickers: PostJoinPickers }) 
       {/* ── Gender picker modal (CentralModal shell, §4.17) ── */}
       {pickers.genderOpen && (
         <CentralModal onClose={pickers.cancelGender} eyebrow="One more thing" title="What&#39;s your gender?" maxWidth={360}>
-            <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 20px", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 20px", lineHeight: 2 }}>
               Helps us place you in the right small group.
             </p>
             {pickers.genderError && (

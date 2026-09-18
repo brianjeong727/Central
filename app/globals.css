@@ -294,8 +294,44 @@
    super-switcher chip is fixed at bottom:80 — with the keyboard up that is
    exactly the input pill. Hidden, not moved: there is nowhere above the composer
    for it to go that isn't the transcript. */
-html[data-kb-open] .kb-hide {
+html[data-kb-open] .kb-hide,
+html[data-overlay-open] .kb-hide {
   display: none;
+}
+
+/* ── Phone width: the shared field and button primitives take the Pocket look ──
+   K1 (design pass, ratified 2026-09-17). The desktop primitives were mounted at
+   phone width on ~20 surfaces — create sheets, Settings drills, Curate/Share, the
+   form builder, People screens, Finance's submit sheet, the entry network. Their
+   inline styles are the desktop grammar, so this is the ONE place the phone
+   grammar overrides them (mobile §4 Forms / Buttons): ivory borderless fields at
+   --r-pocket-sm with 14×16 padding and 16px type (which also stops iOS zooming on
+   focus); pill buttons at ≥42px. `!important` because the primitives carry their
+   desktop values inline. Unlayered on purpose, like .kb-lift. */
+@media (max-width: 767px) {
+  .central-field {
+    background: var(--ivory) !important;
+    border: none !important;
+    border-radius: var(--r-pocket-sm) !important;
+    padding: 14px 16px !important;
+    font-size: 16px !important;
+    line-height: 1.35;
+  }
+  .central-field:focus { outline: 2px solid var(--plum) !important; outline-offset: -2px; }
+  .central-btn:not([data-variant="ghost"]):not([data-variant="quiet"]):not([data-variant="soft-pill"]) {
+    border-radius: 999px !important;
+    min-height: 42px;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+  .central-btn[data-variant="secondary"] {
+    background: var(--ivory) !important;
+    border: none !important;
+    color: var(--plum) !important;
+  }
+  .central-modal-panel { max-height: 88vh; }
 }
 
 /* Make room for the keyboard inside a `fixed inset-0` surface, so its content

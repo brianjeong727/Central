@@ -219,7 +219,7 @@ export default function PendingPage() {
               </button>
             )}
 
-            <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 14, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 14, lineHeight: 2 }}>
               Share these once you&apos;re approved — codes work as soon as your ministry is active.
             </div>
           </div>

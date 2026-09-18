@@ -91,7 +91,7 @@ function ToggleRow({ title, desc, on, onClick }: {
       <Toggle on={on} onClick={onClick}/>
       <div>
         <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{title}</div>
-        <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 3, lineHeight: 1.5 }}>{desc}</div>
+        <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 3, lineHeight: 2 }}>{desc}</div>
       </div>
     </div>
   )
@@ -528,7 +528,7 @@ export default function OnboardingPage() {
                   desc="On: students find your ministry on the Ministries page and join instantly. Off: your ministry stays private and only people with your invite code can enter."
                   on={isPublic} onClick={() => setIsPublic(v => !v)}
                 />
-                <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 12, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 12, lineHeight: 2 }}>
                   You&apos;ll get your invite codes to share once your ministry is approved.
                 </div>
               </div>
@@ -561,7 +561,7 @@ export default function OnboardingPage() {
                 ))}
               </div>
 
-              <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4, marginBottom: 4, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 4, marginBottom: 4, lineHeight: 2 }}>
                 {selectedWorkspaces.length === 0
                   ? "No workspaces selected — that's fine. You can add your first one once your ministry is live."
                   : `${selectedWorkspaces.length} workspace${selectedWorkspaces.length === 1 ? "" : "s"} selected.`}

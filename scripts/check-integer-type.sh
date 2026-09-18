@@ -15,7 +15,7 @@
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 2
 
-hits="$(grep -rnE 'fontSize: *"?[0-9]+\.[0-9]+|text-\[[0-9]+\.[0-9]+px\]' --include='*.tsx' --include='*.ts' app components 2>/dev/null || true)"
+hits="$(grep -rnE 'fontSize: *"?[0-9]+\.[0-9]+|fontSize:[^,}]*[?:] *[0-9]+\.[0-9]+|text-\[[0-9]+\.[0-9]+px\]' --include='*.tsx' --include='*.ts' app components 2>/dev/null || true)"
 if [ -n "$hits" ]; then
   echo "✗ integer-type: fractional font sizes are retired (N22) — round to the nearest integer:"
   echo "$hits" | sed 's/^/    /'

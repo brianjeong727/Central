@@ -280,7 +280,7 @@ function VolunteerEventDetail({ event, userId, crumbs, dayLabel, timeLabel }: {
               <div key={r.name} style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)" }}>{r.name}</div>
                 {r.notes && (
-                  <div style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, marginTop: 3, overflowWrap: "anywhere" }}>{r.notes}</div>
+                  <div style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 2, marginTop: 3, overflowWrap: "anywhere" }}>{r.notes}</div>
                 )}
               </div>
             ))}

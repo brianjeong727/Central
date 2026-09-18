@@ -454,7 +454,7 @@ export function FormBuilder({ ministryId, userId, formId, onDone }: {
             )}
 
             {locked && (
-              <div style={{ background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
+              <div style={{ background: "var(--ivory)", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", fontSize: 13, color: "var(--body)", lineHeight: 2 }}>
                 This form has responses — its questions are locked. You can still rename it or archive it.
               </div>
             )}
@@ -729,7 +729,7 @@ export function FormResponsesView({ formId, title, onClose }: {
                             return (
                               <div key={f.id}>
                                 <p style={{ fontSize: 10, color: 'var(--muted-text)', marginBottom: 3, letterSpacing: '0.8px', textTransform: 'uppercase' }}>{f.label}</p>
-                                <p style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.5, margin: 0 }}>{display}</p>
+                                <p style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 2, margin: 0 }}>{display}</p>
                               </div>
                             )
                           })}
@@ -753,7 +753,7 @@ export function FormResponsesView({ formId, title, onClose }: {
                     {textAnswers.length === 0 ? (
                       <p style={{ fontSize: 13, color: 'var(--muted-text)' }}>No text responses</p>
                     ) : textAnswers.map((ans, i) => (
-                      <div key={i} style={{ padding: '8px 12px', background: 'var(--body-bg)', borderRadius: 8, fontSize: 13, color: 'var(--body)', lineHeight: 1.5 }}>{ans}</div>
+                      <div key={i} style={{ padding: '8px 12px', background: 'var(--body-bg)', borderRadius: 8, fontSize: 13, color: 'var(--body)', lineHeight: 2 }}>{ans}</div>
                     ))}
                   </div>
                 ) : (

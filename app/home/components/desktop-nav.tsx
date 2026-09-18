@@ -220,7 +220,7 @@ export function DesktopSidebar({
     if (activeTab === "network") {
       return (
         <div className="flex-1 overflow-y-auto px-2 pt-2 pb-3">
-          <p style={{ fontSize: 12, color: MUTED, padding: "4px 8px", lineHeight: 1.5 }}>
+          <p style={{ fontSize: 12, color: MUTED, padding: "4px 8px", lineHeight: 2 }}>
             Cross-ministry — coming soon
           </p>
         </div>

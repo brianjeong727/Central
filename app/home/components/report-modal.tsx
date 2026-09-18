@@ -114,7 +114,7 @@ export function ReportModal({
       </p>
 
       {submitError && (
-        <div style={{ margin: "0 0 16px", padding: "10px 14px", borderRadius: 10, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 30%, transparent)", fontSize: 13, color: "var(--danger)", lineHeight: 1.5 }} role="alert">
+        <div style={{ margin: "0 0 16px", padding: "10px 14px", borderRadius: 10, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 30%, transparent)", fontSize: 13, color: "var(--danger)", lineHeight: 2 }} role="alert">
           {submitError}
         </div>
       )}

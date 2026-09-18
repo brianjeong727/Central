@@ -209,7 +209,7 @@ export function MemberSheet({
                 </div>
               </div>
             </div>
-            <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: "12px 0 0" }}>
+            <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 2, margin: "12px 0 0" }}>
               Shared profile details are visible to members in this ministry.
             </p>
             {!isOwnProfile && (
