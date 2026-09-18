@@ -958,12 +958,12 @@ export function ChatGroupCard({ group, onClick, isActive, locked }: { group: Cha
             {group.muted && <BellOff style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0, alignSelf: "center" }} aria-label="Muted" />}
             {showLock && <Lock style={{ width: 11, height: 11, color: "var(--muted-text)", flexShrink: 0, alignSelf: "center" }} aria-label="Members only" />}
             {time && (
-              <span style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.04em", color: "var(--muted-text)", flexShrink: 0 }}>
+              <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.04em", color: "var(--muted-text)", flexShrink: 0 }}>
                 {time}
               </span>
             )}
           </div>
-          <p className="text-[11.5px] truncate leading-tight" style={{ color: group.unread_count ? "var(--body)" : "var(--muted-text)" }}>
+          <p className="text-[12px] truncate leading-tight" style={{ color: group.unread_count ? "var(--body)" : "var(--muted-text)" }}>
             {group.last_message
               ? (group.last_sender ? `${group.last_sender}: ${group.last_message}` : group.last_message)
               : <span style={{ fontStyle: "italic" }}>No messages yet</span>}
@@ -1108,7 +1108,7 @@ export function ChatListPanel({ userId, ministryId, ministryName, activeGroupId,
             onFocus={() => setSearchOpen(true)}
             onKeyDown={(e) => { if (e.key === "Escape") closePanelSearch() }}
             placeholder="Search chats and people"
-            className="w-full pl-9 pr-9 py-2 rounded-lg border text-[12.5px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20"
+            className="w-full pl-9 pr-9 py-2 rounded-lg border text-[13px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20"
             style={{ background: "var(--cream)", borderColor: "var(--line-2)", color: "var(--ink)" }}
           />
           {searchOpen && (

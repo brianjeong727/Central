@@ -166,18 +166,18 @@ export function MessageBanner({
           surface="var(--ivory)"
         />
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontFamily: "var(--serif)", fontSize: 14.5, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {content.title}
           </div>
           {content.subtitle && (
-            <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {content.subtitle}
             </div>
           )}
           {/* Two lines, then ellipsis — a banner is a summons, not the message. */}
           <div
             style={{
-              fontSize: 13.5, color: "var(--body)", lineHeight: 1.35, marginTop: 3,
+              fontSize: 14, color: "var(--body)", lineHeight: 1.35, marginTop: 3,
               display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
             }}
           >

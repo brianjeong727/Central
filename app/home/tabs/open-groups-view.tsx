@@ -191,8 +191,8 @@ export function OpenGroupsBody({
                 surface quietly drawing the old solo chip. */}
             <ChatAvatar size={30} title={g.name} avatarUrl={g.avatarUrl} members={g.clusterMembers} otherCount={otherMemberCount(g)} surface="var(--cream)" />
             <div style={{ minWidth: 0, flex: 1 }}>
-              <div className="text-[13.5px] truncate" style={{ color: "var(--ink)", fontWeight: 500 }}>{g.name}</div>
-              <div className="text-[11.5px] truncate" style={{ color: "var(--muted-text)" }}>{memberLabel(g)}</div>
+              <div className="text-[14px] truncate" style={{ color: "var(--ink)", fontWeight: 500 }}>{g.name}</div>
+              <div className="text-[12px] truncate" style={{ color: "var(--muted-text)" }}>{memberLabel(g)}</div>
             </div>
             {g.isMember ? (
               <span className="text-[11px] flex-shrink-0" style={{ color: "var(--muted-text)" }}>Joined</span>
@@ -223,7 +223,7 @@ export function OpenGroupsBody({
           (Convention #26: exactly ONE 20px inset, never stacked). Mobile mounts
           this inside the chat list's own `px-5`; desktop inside the panel. */}
       <p
-        className="md:pt-6 text-[14.5px] md:text-[15px] leading-[1.6] md:leading-[1.55] md:max-w-[56ch] md:text-pretty"
+        className="md:pt-6 text-[15px] md:text-[15px] leading-[1.6] md:leading-[1.55] md:max-w-[56ch] md:text-pretty"
         style={{ color: "var(--body)", margin: "0 0 18px" }}
       >
         Chats anyone in the ministry can join.

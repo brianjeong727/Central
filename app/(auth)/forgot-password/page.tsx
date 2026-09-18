@@ -142,7 +142,7 @@ export default function ForgotPasswordPage() {
             <PocketSubmit loading={loading} disabled={loading}>
               {loading ? "Sending…" : "Send reset link"}
             </PocketSubmit>
-            <p style={{ textAlign: "center", fontSize: 13.5, color: "var(--muted-text)", marginTop: 16 }}>
+            <p style={{ textAlign: "center", fontSize: 14, color: "var(--muted-text)", marginTop: 16 }}>
               Remember your password?{" "}
               <Link href="/login" style={{ fontWeight: 600, color: "var(--plum)", textDecoration: "none" }}>Sign in</Link>
             </p>

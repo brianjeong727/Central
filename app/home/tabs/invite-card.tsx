@@ -57,7 +57,7 @@ export function InviteCard({
   if (!data) {
     return (
       <div style={{ ...shell, display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 13.5, color: "var(--muted-text)", fontStyle: "italic" }}>
+        <span style={{ fontSize: 14, color: "var(--muted-text)", fontStyle: "italic" }}>
           This invitation is no longer available.
         </span>
       </div>
@@ -88,7 +88,7 @@ export function InviteCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           <p
             style={{
-              fontSize: 14.5,
+              fontSize: 15,
               fontWeight: 500,
               color: "var(--ink)",
               letterSpacing: "-0.01em",
@@ -100,7 +100,7 @@ export function InviteCard({
           >
             {data.name}
           </p>
-          <p style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "2px 0 0", display: "flex", alignItems: "center", gap: 5 }}>
+          <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "2px 0 0", display: "flex", alignItems: "center", gap: 5 }}>
             <Users style={{ width: 12, height: 12 }} strokeWidth={1.8} />
             {data.memberCount} member{data.memberCount === 1 ? "" : "s"}
           </p>

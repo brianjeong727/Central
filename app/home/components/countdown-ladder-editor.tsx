@@ -109,7 +109,7 @@ export function CountdownLadderEditor({
         aria-label="Countdown planning structure"
       />
 
-      <p style={{ fontSize: 11.5, color: "var(--muted-text)", margin: "8px 0 0" }}>{activeHint}</p>
+      <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "8px 0 0" }}>{activeHint}</p>
 
       <div style={{ marginTop: 14, border: "1px solid var(--line-2)", borderRadius: 12, overflow: "hidden" }}>
         {phases.map((p, i) => {
@@ -142,7 +142,7 @@ export function CountdownLadderEditor({
                 // bucketer never reads it (it swallows everything below the rung
                 // above). Rendering a number here — "−1" for AFTER — would invite
                 // edits that change nothing, so say what it actually does.
-                <span style={{ fontSize: 11.5, color: "var(--faint)", textAlign: "center" }}>
+                <span style={{ fontSize: 12, color: "var(--faint)", textAlign: "center" }}>
                   everything after
                 </span>
               ) : (

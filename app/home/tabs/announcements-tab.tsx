@@ -463,7 +463,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           <textarea
             value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write the full announcement here…" required rows={7}
             className="placeholder:text-[var(--faint)]"
-            style={{ fontFamily: "var(--serif)", fontSize: 15.5, lineHeight: 1.6, color: "var(--ink)", background: "transparent", border: "none", outline: "none", resize: "none", width: "100%" }}
+            style={{ fontFamily: "var(--serif)", fontSize: 16, lineHeight: 1.6, color: "var(--ink)", background: "transparent", border: "none", outline: "none", resize: "none", width: "100%" }}
           />
         </div>
 
@@ -493,14 +493,14 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           <div className="flex items-center gap-3">
             <PocketSwitch checked={isEvent} onChange={setIsEvent} ariaLabel="This is an event" />
             <div>
-              <p className="text-[14.5px] font-semibold text-[var(--ink)]">This is an event</p>
+              <p className="text-[15px] font-semibold text-[var(--ink)]">This is an event</p>
               <p className="text-[13px] text-[var(--muted-text)] mt-0.5">Adds RSVP button + calendar marker</p>
             </div>
           </div>
           {isEvent && (
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-1.5">
-                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Starts</p>
+                <p className="text-[15px] font-semibold text-[var(--ink)]">Starts</p>
                 {/* minWidth:0 + maxWidth:100% + border-box are all load-bearing.
                     `width:100%` alone does NOT shrink a native datetime-local below
                     its INTRINSIC width, which is wider than the ~350px a 390px phone
@@ -510,11 +510,11 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                     rather than adding to it. */}
                 <input
                   type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required
-                  style={{ fontSize: 15.5, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", fontFamily: "var(--serif)" }}
+                  style={{ fontSize: 16, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", fontFamily: "var(--serif)" }}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Ends <span className="font-normal text-[var(--muted-text)]">· optional</span></p>
+                <p className="text-[15px] font-semibold text-[var(--ink)]">Ends <span className="font-normal text-[var(--muted-text)]">· optional</span></p>
                 {/* Not `required`: "starts at 7, ends whenever" is a real event.
                     `min` keeps the picker from offering an end before the start —
                     the DB CHECK rejects it anyway, and being told at write time
@@ -522,13 +522,13 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                 <input
                   type="datetime-local" value={eventEndDate} min={eventDate || undefined}
                   onChange={(e) => setEventEndDate(e.target.value)}
-                  style={{ fontSize: 15.5, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", fontFamily: "var(--serif)" }}
+                  style={{ fontSize: 16, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", fontFamily: "var(--serif)" }}
                 />
               </div>
               <div className="flex items-center gap-3">
                 <PocketSwitch checked={showAttendees} onChange={setShowAttendees} ariaLabel="Show attendees publicly" />
                 <div>
-                  <p className="text-[14.5px] font-semibold text-[var(--ink)]">Show attendees publicly</p>
+                  <p className="text-[15px] font-semibold text-[var(--ink)]">Show attendees publicly</p>
                   <p className="text-[13px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
                 </div>
               </div>
@@ -542,7 +542,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             <div className="flex items-center gap-3">
               <PocketSwitch checked={featureOnHome} onChange={setFeatureOnHome} ariaLabel="Feature on Home" />
               <div>
-                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Feature on Home</p>
+                <p className="text-[15px] font-semibold text-[var(--ink)]">Feature on Home</p>
                 <p className="text-[13px] text-[var(--muted-text)] mt-0.5">Shows in the Featured carousel</p>
               </div>
             </div>
@@ -553,7 +553,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           <div className="flex items-center gap-3">
             <PocketSwitch checked={requiresAck} onChange={setRequiresAck} ariaLabel="Ask for acknowledgment" />
             <div>
-              <p className="text-[14.5px] font-semibold text-[var(--ink)]">Ask for acknowledgment</p>
+              <p className="text-[15px] font-semibold text-[var(--ink)]">Ask for acknowledgment</p>
               <p className="text-[13px] text-[var(--muted-text)] mt-0.5">People tap &ldquo;Got it&rdquo; so you can see who&apos;s seen it</p>
             </div>
           </div>
@@ -573,7 +573,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           ) : (
             <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full flex flex-col items-center justify-center gap-2.5" style={{ padding: 34, border: "1.5px dashed var(--dashed)", borderRadius: "var(--r-pocket)", background: "transparent", cursor: "pointer" }}>
               <ImageIcon style={{ width: 22, height: 22, color: "var(--body)" }} strokeWidth={1.6} />
-              <span style={{ fontFamily: "var(--serif)", fontSize: 14.5, fontWeight: 600, color: "var(--plum)" }}>Add image or file</span>
+              <span style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, color: "var(--plum)" }}>Add image or file</span>
             </button>
           )}
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
@@ -1979,7 +1979,7 @@ export function AnnouncementCard({ announcement, userId, userGradYear, ministryI
                 onClick={(e) => { e.stopPropagation(); handleRsvp() }}
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 6, minHeight: 38, padding: "0 20px",
-                  borderRadius: 999, border: "none", fontFamily: "var(--serif)", fontSize: 13.5, fontWeight: 600, cursor: "pointer",
+                  borderRadius: 999, border: "none", fontFamily: "var(--serif)", fontSize: 14, fontWeight: 600, cursor: "pointer",
                   background: announcement.user_has_rsvped ? "var(--line-2)" : "var(--plum)",
                   color: announcement.user_has_rsvped ? "var(--body)" : "var(--cream-on-dark)",
                 }}
@@ -2732,7 +2732,7 @@ export function AnnouncementDetailView({
           sheet
           footer={
             <div className="flex items-center gap-3">
-              {nudgeNote && <span style={{ fontSize: 12.5, color: "var(--muted-text)" }}>{nudgeNote}</span>}
+              {nudgeNote && <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{nudgeNote}</span>}
               <CentralButton
                 variant="primary"
                 onClick={handleNudge}
@@ -2750,7 +2750,7 @@ export function AnnouncementDetailView({
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {roster.map((p) => (
-                <span key={p.id} style={{ fontSize: 12.5, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{p.name}</span>
+                <span key={p.id} style={{ fontSize: 13, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{p.name}</span>
               ))}
             </div>
           )}

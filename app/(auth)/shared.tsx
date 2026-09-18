@@ -220,7 +220,7 @@ export function OrDivider({ label = "or" }: { label?: string }) {
 
 export const pocketPillBase: React.CSSProperties = {
   display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
-  borderRadius: 999, fontSize: 14.5, fontWeight: 600, border: "none",
+  borderRadius: 999, fontSize: 15, fontWeight: 600, border: "none",
   minHeight: 50, padding: "0 22px", width: "100%", cursor: "pointer", fontFamily: "var(--serif)",
 }
 export const pocketPillPrimary: React.CSSProperties = { ...pocketPillBase, background: "var(--plum)", color: "var(--cream)" }
@@ -241,7 +241,7 @@ export const pocketH1: React.CSSProperties = {
   fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.025em",
   lineHeight: 1.08, color: "var(--ink)", margin: 0,
 }
-export const pocketSub: React.CSSProperties = { fontSize: 14.5, color: "var(--body)", lineHeight: 1.55 }
+export const pocketSub: React.CSSProperties = { fontSize: 15, color: "var(--body)", lineHeight: 1.55 }
 
 // Full-viewport scroll container matching login's md:hidden form step (exact-fit
 // height:100dvh + overflowY:auto so short forms fit with no scroll, tall ones scroll).
@@ -287,7 +287,7 @@ export function PocketField({ label, trailing, hint, ...input }: {
         <input {...input} style={pocketFieldInput} />
         {trailing}
       </div>
-      {hint && <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 7, paddingLeft: 4 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 7, paddingLeft: 4 }}>{hint}</div>}
     </label>
   )
 }
@@ -311,7 +311,7 @@ export function PocketSelect({ label, hint, children, ...select }: {
         </select>
         <ChevronDown size={17} style={{ flexShrink: 0, color: "var(--faint)", pointerEvents: "none" }} aria-hidden />
       </div>
-      {hint && <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 7, paddingLeft: 4 }}>{hint}</div>}
+      {hint && <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 7, paddingLeft: 4 }}>{hint}</div>}
     </label>
   )
 }
@@ -398,7 +398,7 @@ export function YoungAdultCheck({ on, onToggle, compact = false }: { on: boolean
           color: (!compact && on) ? "var(--cream-panel)" : "var(--ink)",
         }}>I&apos;m a young adult</span>
         <span style={{
-          fontSize: 12.5,
+          fontSize: 13,
           color: (!compact && on) ? "var(--cream-panel)" : "var(--muted-text)",
           opacity: (!compact && on) ? 0.85 : 1,
         }}>No graduation year &mdash; you&rsquo;ll join the Young Adults chat.</span>

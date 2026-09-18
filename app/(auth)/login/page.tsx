@@ -203,7 +203,7 @@ function LoginContent() {
   // ── Mobile-only styles (Pocket idiom — KEEP per ratified reconciliation) ──
   const pillBase: React.CSSProperties = {
     display: "flex", alignItems: "center", justifyContent: "center", gap: 9,
-    borderRadius: 999, fontSize: 14.5, fontWeight: 600, border: "none",
+    borderRadius: 999, fontSize: 15, fontWeight: 600, border: "none",
     minHeight: 50, padding: "0 22px", width: "100%", cursor: "pointer", fontFamily: "var(--serif)",
   }
   const pillPrimary: React.CSSProperties = { ...pillBase, background: "var(--plum)", color: "var(--cream)" }
@@ -224,9 +224,9 @@ function LoginContent() {
     fontFamily: "var(--serif)", fontSize: 30, fontWeight: 600, letterSpacing: "-0.025em",
     lineHeight: 1.08, color: "var(--ink)", margin: 0,
   }
-  const mSub: React.CSSProperties = { fontSize: 14.5, color: "var(--body)", lineHeight: 1.55 }
+  const mSub: React.CSSProperties = { fontSize: 15, color: "var(--body)", lineHeight: 1.55 }
   const createAccount = (
-    <div style={{ textAlign: "center", fontSize: 13.5, color: "var(--muted-text)", marginTop: 6 }}>
+    <div style={{ textAlign: "center", fontSize: 14, color: "var(--muted-text)", marginTop: 6 }}>
       New here? <Link href={signupHref} style={{ color: "var(--plum)", fontWeight: 500, textDecoration: "none" }}>Create an account</Link>
     </div>
   )
@@ -291,7 +291,7 @@ function LoginContent() {
               display: "inline-flex", alignItems: "center", justifyContent: "center",
               height: 42, padding: "0 20px", borderRadius: 999,
               background: "var(--plum)", color: "var(--cream)",
-              fontSize: 13.5, fontWeight: 600, textDecoration: "none",
+              fontSize: 14, fontWeight: 600, textDecoration: "none",
             }}
           >
             Create an account
@@ -430,7 +430,7 @@ function LoginContent() {
                   display: "flex", alignItems: "center", justifyContent: "center",
                   minHeight: 42, borderRadius: 999,
                   background: "var(--plum)", color: "var(--cream)",
-                  fontSize: 13.5, fontWeight: 600, textDecoration: "none",
+                  fontSize: 14, fontWeight: 600, textDecoration: "none",
                 }}
               >
                 Create an account

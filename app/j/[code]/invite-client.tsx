@@ -35,7 +35,7 @@ const H1: React.CSSProperties = {
 }
 
 const SUB: React.CSSProperties = {
-  fontSize: 15.5,
+  fontSize: 16,
   lineHeight: 1.6,
   color: "var(--body)",
   margin: "14px 0 0",

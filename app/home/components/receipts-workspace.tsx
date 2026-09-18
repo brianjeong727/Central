@@ -555,7 +555,7 @@ function memberNodeDate(a: MemberAllocation, i: number, submittedAt: string): st
   return null
 }
 const memberStepDateStyle: React.CSSProperties = {
-  fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.04em", color: "var(--muted-text)", whiteSpace: "nowrap",
+  fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.04em", color: "var(--muted-text)", whiteSpace: "nowrap",
 }
 
 // A single read-only source row in the member's split view: fund chip · amount ·
@@ -575,8 +575,8 @@ function MemberAllocationRow({ allocation: a, submittedAt }: { allocation: Membe
       </div>
       {isNegative ? (
         <div style={{ background: "var(--cream)", border: "1px solid color-mix(in srgb, var(--danger) 30%, var(--cream))", borderRadius: 10, padding: "10px 12px" }}>
-          <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{statusLabel(a.status, a.fund_kind)}</p>
-          {a.decision_reason && <p style={{ fontSize: 12.5, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
+          <p style={{ fontSize: 13, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{statusLabel(a.status, a.fund_kind)}</p>
+          {a.decision_reason && <p style={{ fontSize: 13, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
         </div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -588,7 +588,7 @@ function MemberAllocationRow({ allocation: a, submittedAt }: { allocation: Membe
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ width: 7, height: 7, borderRadius: "50%", background: done ? "var(--plum)" : "var(--line-2)", flexShrink: 0 }} />
                   <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    <span style={{ fontSize: 11.5, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
+                    <span style={{ fontSize: 12, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
                     {nodeDate && <span style={memberStepDateStyle}>{nodeDate}</span>}
                   </div>
                 </div>

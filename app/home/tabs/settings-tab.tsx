@@ -240,7 +240,7 @@ function SectionEditControls({ editing, dirty, saving, saved, disabled, onEdit, 
 // One line in a confirm modal's change summary — "Label: old → new".
 function ChangeRow({ label, from, to }: { label: string; from?: string; to: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 13.5, color: "var(--body)", lineHeight: 1.5 }}>
+    <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.5 }}>
       <span style={{ fontWeight: 500, color: "var(--ink)", flexShrink: 0 }}>{label}</span>
       <span style={{ minWidth: 0 }}>
         {from !== undefined && <><span style={{ color: "var(--muted-text)" }}>{from}</span> <span style={{ color: "var(--faint)" }}>→</span> </>}
@@ -2037,7 +2037,7 @@ export function SettingsTab({
                       ["View", "See and administer the team — roster and settings."],
                       ["Write", "Everything in View, plus acting on the team’s work."],
                     ].map(([k, d]) => (
-                      <p key={k} style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5, margin: 0 }}>
+                      <p key={k} style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: 0 }}>
                         <span style={{ fontWeight: 500, color: "var(--body)" }}>{k}</span> — {d}
                       </p>
                     ))}
@@ -2334,7 +2334,7 @@ export function SettingsTab({
                         <QrCode style={{ width: 13, height: 13 }} /> Share link or QR
                       </button>
                     ) : inviteCode ? (
-                      <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5 }}>
+                      <div style={{ marginTop: 12, fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5 }}>
                         {isAdmin ? "Regenerate this code to get a shareable link and QR." : "Ask an admin to regenerate this code to get a shareable link."}
                       </div>
                     ) : null}
@@ -2472,7 +2472,7 @@ export function SettingsTab({
                             {/* The consequence depends on which KIND of code is live, and
                                 the two are not close: a custom code produces requests you
                                 approve, a generated one hands out membership. */}
-                            <div style={{ marginTop: 8, fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5 }}>
+                            <div style={{ marginTop: 8, fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5 }}>
                               {codeIsCustom
                                 ? "Your code is a custom one, so anyone they share it with asks to join and you approve them."
                                 : "Your code is a random one, so anyone they share it with joins straight away. Choose your own code above if you'd rather approve people first."}
@@ -2494,7 +2494,7 @@ export function SettingsTab({
                   <div style={{ marginTop: 26 }}>
                     <SectionHeader eyebrow="Requests" title="Waiting to join" titleSize={20} hideTitleOnMobile />
                     {joinRequests.length === 0 ? (
-                      <p style={{ marginTop: 8, fontSize: 13.5, color: "var(--muted-text)", lineHeight: 1.55 }}>
+                      <p style={{ marginTop: 8, fontSize: 14, color: "var(--muted-text)", lineHeight: 1.55 }}>
                         {codeIsCustom
                           ? "Nobody's waiting. People who enter your code will show up here."
                           : "Your code lets people join straight away, so there's nothing to approve. Choose your own code above to review people first."}
@@ -2519,7 +2519,7 @@ export function SettingsTab({
                               <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                 {r.name ?? "Someone"}
                               </div>
-                              <div style={{ fontSize: 12.5, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              <div style={{ fontSize: 13, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                 {r.email ?? "\u2014"}
                               </div>
                             </div>
@@ -2595,7 +2595,7 @@ export function SettingsTab({
                             placeholder="Fund name"
                             value={f.name}
                             onChange={e => patchPendingFund(f.key, { name: e.target.value })}
-                            style={{ padding: "6px 10px", border: "1px solid var(--line-2)", borderRadius: 8, fontSize: 13.5, fontFamily: "inherit", background: "var(--cream)", outline: "none", width: "100%" }}
+                            style={{ padding: "6px 10px", border: "1px solid var(--line-2)", borderRadius: 8, fontSize: 14, fontFamily: "inherit", background: "var(--cream)", outline: "none", width: "100%" }}
                           />
                         ) : (
                           <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{f.name}{!f.is_active && <span style={{ marginLeft: 8, fontSize: 12, color: "var(--muted-text)", fontWeight: 400 }}>· Archived</span>}</div>
@@ -2616,7 +2616,7 @@ export function SettingsTab({
                       </div>
                     ))}
                   </div>
-                  {fundsError && <p style={{ marginTop: 10, fontSize: 12.5, color: "var(--danger)" }}>{fundsError}</p>}
+                  {fundsError && <p style={{ marginTop: 10, fontSize: 13, color: "var(--danger)" }}>{fundsError}</p>}
                   {fundsEditing && (
                     <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
                       <button onClick={cancelEditFunds} disabled={savingFunds} style={{ padding: "8px 16px", background: "transparent", border: "1px solid var(--line-2)", borderRadius: 10, fontSize: 13, fontWeight: 500, color: "var(--body)", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>

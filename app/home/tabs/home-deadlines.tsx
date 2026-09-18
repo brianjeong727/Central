@@ -555,13 +555,13 @@ function MobileConfirmationCard({ item, onRespond }: { item: DeadlineItem & { ki
         <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
           <button
             onClick={() => onRespond(item.id, "confirmed")}
-            style={{ flex: 1, minHeight: 44, borderRadius: 999, border: "none", background: "var(--plum)", color: "var(--cream)", fontSize: 13.5, fontWeight: 600, fontFamily: "var(--sans)", cursor: "pointer" }}
+            style={{ flex: 1, minHeight: 44, borderRadius: 999, border: "none", background: "var(--plum)", color: "var(--cream)", fontSize: 14, fontWeight: 600, fontFamily: "var(--sans)", cursor: "pointer" }}
           >
             Confirm
           </button>
           <button
             onClick={() => onRespond(item.id, "declined")}
-            style={{ flex: 1, minHeight: 44, borderRadius: 999, border: "none", background: "var(--cream-panel)", color: "var(--plum)", fontSize: 13.5, fontWeight: 600, fontFamily: "var(--sans)", cursor: "pointer" }}
+            style={{ flex: 1, minHeight: 44, borderRadius: 999, border: "none", background: "var(--cream-panel)", color: "var(--plum)", fontSize: 14, fontWeight: 600, fontFamily: "var(--sans)", cursor: "pointer" }}
           >
             Decline
           </button>

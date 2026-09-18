@@ -271,7 +271,7 @@ export function SectionKicker({ label, hint, isMobile, first }: {
         {!isMobile && <span style={{ flex: 1, height: 1, background: "var(--line)" }} />}
       </div>
       {hint && (
-        <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5, margin: "6px 0 12px" }}>{hint}</p>
+        <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: "6px 0 12px" }}>{hint}</p>
       )}
     </div>
   )
@@ -521,7 +521,7 @@ export function ContainerStaffing({
     border: "1px solid var(--line-2)",
     background: "var(--cream)",
     color: "var(--body)",
-    fontSize: 12.5,
+    fontSize: 13,
     cursor: "pointer",
     maxWidth: isMobile ? 150 : 190,
   }
@@ -574,7 +574,7 @@ export function ContainerStaffing({
                 {role.role_name}
               </span>
               {conf && (
-                <span style={{ fontSize: 12.5, fontWeight: 500, color: confirmationColor(conf.status), whiteSpace: "nowrap", flexShrink: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: confirmationColor(conf.status), whiteSpace: "nowrap", flexShrink: 0 }}>
                   {CONFIRMATION_LABEL[conf.status]}
                 </span>
               )}

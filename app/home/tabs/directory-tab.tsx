@@ -85,7 +85,7 @@ export function DirectoryMemberListPanel({
             placeholder="Search members"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 rounded-lg border text-[12.5px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20"
+            className="w-full pl-9 pr-3 py-2 rounded-lg border text-[13px] placeholder:text-[var(--muted-text)] focus:outline-none focus:ring-2 focus:ring-[var(--plum)]/20"
             style={{
               background: "var(--cream)",
               borderColor: "var(--line-2)",
@@ -393,7 +393,7 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
       </h2>
 
       {/* Subtitle */}
-      <p style={{ fontSize: 13.5, color: "var(--muted-text)", margin: "0 0 28px", textAlign: "center" }}>
+      <p style={{ fontSize: 14, color: "var(--muted-text)", margin: "0 0 28px", textAlign: "center" }}>
         {[
           cohortLabel(member.grade, member.graduation_year),
           roleLabel(member.role, member.id) || null,
@@ -413,7 +413,7 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
               display: "flex", alignItems: "center", gap: 7,
               padding: "10px 22px", borderRadius: 9999,
               background: "var(--plum)", color: "var(--cream)",
-              border: "none", fontSize: 13.5, fontWeight: 500,
+              border: "none", fontSize: 14, fontWeight: 500,
               cursor: dmLoading ? "not-allowed" : "pointer",
               opacity: dmLoading ? 0.6 : 1,
             }}
@@ -429,7 +429,7 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
               background: prayingFor ? "var(--ivory)" : "var(--cream)",
               color: prayingFor ? "var(--plum)" : "var(--body)",
               border: "1.5px solid var(--line)",
-              fontSize: 13.5, fontWeight: 500, cursor: "pointer",
+              fontSize: 14, fontWeight: 500, cursor: "pointer",
             }}
           >
             <Heart style={{ width: 15, height: 15, fill: prayingFor ? "var(--plum)" : "none" }} />

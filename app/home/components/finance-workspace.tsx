@@ -251,7 +251,7 @@ export function SubmitReceiptModal({
           {overLimit && (
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: WARN_BG, border: `1px solid ${WARN_BORDER}`, borderRadius: 10, padding: "10px 12px" }}>
               <AlertTriangle size={14} color={WARN_TEXT} style={{ flexShrink: 0, marginTop: 1 }} />
-              <p style={{ fontSize: 12.5, color: WARN_TEXT, lineHeight: 1.5 }}>This exceeds the ${limit!.max_amount} limit for {categories.find(c => c.value === category)?.label ?? category}. You can still submit.</p>
+              <p style={{ fontSize: 13, color: WARN_TEXT, lineHeight: 1.5 }}>This exceeds the ${limit!.max_amount} limit for {categories.find(c => c.value === category)?.label ?? category}. You can still submit.</p>
             </div>
           )}
           <div><label style={labelStyle}>Event name (optional)</label><input type="text" placeholder="e.g. Week 3 DG Dinner" value={eventName} onChange={e => setEventName(e.target.value)} style={inputStyle} /></div>
@@ -337,7 +337,7 @@ export function MobileFactsGrid({ facts }: { facts: { label: string; value: stri
         const unset = !f.value || f.value === "—"
         return (
           <div key={f.label} style={{ display: "contents" }}>
-            <span style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", alignSelf: "center" }}>{f.label}</span>
+            <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", alignSelf: "center" }}>{f.label}</span>
             <span style={{ fontSize: 14, fontWeight: 500, color: unset ? "var(--faint)" : "var(--ink)", textAlign: "right" }}>{unset ? "—" : f.value}</span>
           </div>
         )
@@ -438,7 +438,7 @@ function InboxRow({ receipt: r, first, categories, canApprove, onApproveAndPost,
             {r.team_name && <span style={{ color: "var(--muted-text)", fontWeight: 400 }}>{` · ${r.team_name}`}</span>}
           </span>
           {sub && (
-            <span style={{ fontSize: 12.5, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>
+            <span style={{ fontSize: 13, color: "var(--muted-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>
           )}
         </div>
         {fundNames.length > 0 && (
@@ -649,7 +649,7 @@ function allocNodeDate(a: ReceiptAllocation, i: number, submittedAt: string): st
 }
 // Small mono date rendered beneath a lifecycle-node label.
 const stepDateStyle: React.CSSProperties = {
-  fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.04em", color: "var(--muted-text)", whiteSpace: "nowrap",
+  fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.04em", color: "var(--muted-text)", whiteSpace: "nowrap",
 }
 
 // One funding-source row inside the split: fund chip · amount · status stepper,
@@ -742,11 +742,11 @@ function AllocationRow({
 
   const primaryBtn: React.CSSProperties = {
     flex: 1, height: 40, background: "var(--plum)", color: "var(--cream)", borderRadius: isMobile ? 999 : 10,
-    border: "none", fontSize: 13.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)",
+    border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)",
   }
   const secondaryBtn: React.CSSProperties = {
     flex: 1, height: 40, background: "var(--ivory)", color: "var(--danger)", borderRadius: isMobile ? 999 : 10,
-    border: "1px solid var(--line)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)",
+    border: "1px solid var(--line)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)",
   }
 
   const steps = allocSteps(a.fund_kind)
@@ -767,8 +767,8 @@ function AllocationRow({
       {/* Per-source status path */}
       {isNegative ? (
         <div style={{ background: DANGER_ROW_BG, border: `1px solid ${DANGER_TINT_BORDER}`, borderRadius: 10, padding: "10px 12px" }}>
-          <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{statusLabel(a.status, a.fund_kind)}</p>
-          {a.decision_reason && <p style={{ fontSize: 12.5, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
+          <p style={{ fontSize: 13, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{statusLabel(a.status, a.fund_kind)}</p>
+          {a.decision_reason && <p style={{ fontSize: 13, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
         </div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -780,7 +780,7 @@ function AllocationRow({
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ width: 7, height: 7, borderRadius: "50%", background: done ? "var(--plum)" : "var(--line-2)", flexShrink: 0 }} />
                   <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    <span style={{ fontSize: 11.5, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
+                    <span style={{ fontSize: 12, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
                     {nodeDate && <span style={stepDateStyle}>{nodeDate}</span>}
                   </div>
                 </div>
@@ -803,7 +803,7 @@ function AllocationRow({
                 {categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => { setMode("idle"); setPostError(null) }} disabled={postBusy} style={{ flex: 1, height: 40, background: "var(--ivory)", color: "var(--body)", borderRadius: isMobile ? 999 : 10, border: "1px solid var(--line)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>Cancel</button>
+                <button onClick={() => { setMode("idle"); setPostError(null) }} disabled={postBusy} style={{ flex: 1, height: 40, background: "var(--ivory)", color: "var(--body)", borderRadius: isMobile ? 999 : 10, border: "1px solid var(--line)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>Cancel</button>
                 <button onClick={confirmApprove} disabled={postBusy || !postCategory} style={{ ...primaryBtn, opacity: postBusy || !postCategory ? 0.6 : 1 }}>{postBusy ? "Approving…" : "Approve & post"}</button>
               </div>
             </div>
@@ -811,7 +811,7 @@ function AllocationRow({
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <textarea autoFocus placeholder="Reason (optional)" value={reason} onChange={e => setReason(e.target.value)} rows={2} style={{ ...inputStyle, resize: "none" }} />
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => { setMode("idle"); setReason("") }} disabled={busy} style={{ flex: 1, height: 40, background: "var(--ivory)", color: "var(--body)", borderRadius: isMobile ? 999 : 10, border: "1px solid var(--line)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>Cancel</button>
+                <button onClick={() => { setMode("idle"); setReason("") }} disabled={busy} style={{ flex: 1, height: 40, background: "var(--ivory)", color: "var(--body)", borderRadius: isMobile ? 999 : 10, border: "1px solid var(--line)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>Cancel</button>
                 <button onClick={() => reasonAction && run(reasonAction)} disabled={busy} style={{ ...secondaryBtn, opacity: busy ? 0.6 : 1 }}>{busy ? "Saving…" : reasonLabel}</button>
               </div>
             </div>
@@ -852,7 +852,7 @@ function AllocationRow({
       {a.status === "reimbursed" && (isPosted || canPostToBudget) && (
         <div style={{ marginTop: 12 }}>
           {isPosted ? (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 500, color: SUCCESS_STATUS_TEXT }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: SUCCESS_STATUS_TEXT }}>
               <Check size={13} /> In budget
             </span>
           ) : mode === "post" ? (
@@ -862,12 +862,12 @@ function AllocationRow({
                 {categories.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => { setMode("idle"); setPostError(null) }} disabled={postBusy} style={{ flex: 1, height: 40, background: "var(--ivory)", color: "var(--body)", borderRadius: isMobile ? 999 : 10, border: "1px solid var(--line)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>Cancel</button>
+                <button onClick={() => { setMode("idle"); setPostError(null) }} disabled={postBusy} style={{ flex: 1, height: 40, background: "var(--ivory)", color: "var(--body)", borderRadius: isMobile ? 999 : 10, border: "1px solid var(--line)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>Cancel</button>
                 <button onClick={confirmPost} disabled={postBusy || !postCategory} style={{ ...primaryBtn, opacity: postBusy || !postCategory ? 0.6 : 1 }}>{postBusy ? "Adding…" : "Add to budget"}</button>
               </div>
             </div>
           ) : (
-            <button onClick={startPost} style={{ fontSize: 12.5, fontWeight: 500, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)", padding: 0 }}>
+            <button onClick={startPost} style={{ fontSize: 13, fontWeight: 500, color: "var(--plum)", background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)", padding: 0 }}>
               Add to budget
             </button>
           )}
@@ -933,20 +933,20 @@ function SplitEditor({
       ))}
       <button
         onClick={() => setRows(prev => [...prev, { fundId: funds[0]?.id ?? "", amount: "" }])}
-        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 10px", border: "1px dashed var(--dashed)", borderRadius: 10, background: "transparent", color: "var(--muted-text)", fontSize: 12.5, cursor: "pointer", alignSelf: "flex-start", fontFamily: "var(--sans)" }}
+        style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 10px", border: "1px dashed var(--dashed)", borderRadius: 10, background: "transparent", color: "var(--muted-text)", fontSize: 13, cursor: "pointer", alignSelf: "flex-start", fontFamily: "var(--sans)" }}
       >
         <Plus size={12} /> Add funding source
       </button>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12.5 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13 }}>
         <span style={{ color: "var(--muted-text)" }}>Split total</span>
         <span style={{ color: balanced ? "var(--ink)" : "var(--danger)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
           ${sum.toFixed(2)} / ${total.toFixed(2)}
         </span>
       </div>
-      {error && <p style={{ fontSize: 12.5, color: "var(--danger)", margin: 0 }}>{error}</p>}
+      {error && <p style={{ fontSize: 13, color: "var(--danger)", margin: 0 }}>{error}</p>}
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={onCancel} disabled={saving} style={{ flex: 1, height: 40, background: "var(--ivory)", color: "var(--body)", borderRadius: 10, border: "1px solid var(--line)", fontSize: 13.5, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>Cancel</button>
-        <button onClick={save} disabled={saving || !balanced} style={{ flex: 1, height: 40, background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13.5, fontWeight: 500, cursor: "pointer", opacity: saving || !balanced ? 0.6 : 1, fontFamily: "var(--sans)" }}>{saving ? "Saving…" : "Save split"}</button>
+        <button onClick={onCancel} disabled={saving} style={{ flex: 1, height: 40, background: "var(--ivory)", color: "var(--body)", borderRadius: 10, border: "1px solid var(--line)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>Cancel</button>
+        <button onClick={save} disabled={saving || !balanced} style={{ flex: 1, height: 40, background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer", opacity: saving || !balanced ? 0.6 : 1, fontFamily: "var(--sans)" }}>{saving ? "Saving…" : "Save split"}</button>
       </div>
     </div>
   )
@@ -999,7 +999,7 @@ function InboxDetailOverlay({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
             <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: 0 }}>Funding split</p>
             {canEditSplit && !editSplit && (
-              <button onClick={() => setEditSplit(true)} style={{ fontSize: 12.5, color: "var(--plum)", fontWeight: 500, background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}>Edit split</button>
+              <button onClick={() => setEditSplit(true)} style={{ fontSize: 13, color: "var(--plum)", fontWeight: 500, background: "none", border: "none", cursor: "pointer", fontFamily: "var(--sans)" }}>Edit split</button>
             )}
           </div>
           {editSplit ? (
@@ -1492,9 +1492,9 @@ export function FinanceWorkspace({
                 const fName = fundNameFor(e.fund)
                 return (
                 <div key={e.id} style={{ display: "grid", gridTemplateColumns: "90px 1fr 120px 96px 84px 96px", gap: 8, padding: "12px 16px", borderTop: i > 0 ? "1px solid var(--line-3)" : "none", alignItems: "center" }}>
-                  <span style={{ fontSize: 12.5, color: "var(--body)", whiteSpace: "nowrap" }}>{new Date(e.entry_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                  <span style={{ fontSize: 13, color: "var(--body)", whiteSpace: "nowrap" }}>{new Date(e.entry_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
                   <span style={{ fontSize: 13, color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.description ?? "—"}</span>
-                  <span style={{ fontSize: 12.5, color: "var(--body)" }}>{e.category}</span>
+                  <span style={{ fontSize: 13, color: "var(--body)" }}>{e.category}</span>
                   <span>
                     {fName ? (
                       <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 999, background: "var(--ivory)", color: "var(--body)", display: "inline-block", maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fName}</span>
@@ -1867,7 +1867,7 @@ function AllocationSection({
           </div>
           {/* Legacy null-fund spend, surfaced once as a quiet caption when nonzero. */}
           {unattributedSpent > 0.005 && (
-            <p style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "0 0 28px" }}>
+            <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 28px" }}>
               Unattributed spend this year: {money(unattributedSpent)}
             </p>
           )}
@@ -2048,10 +2048,10 @@ function AllocationSection({
                                   {displayAmt > 0 ? `$${displayAmt.toFixed(2)}` : "—"}
                                 </span>
                               )}
-                              <span style={{ fontSize: 12.5, fontVariantNumeric: "tabular-nums", color: fundOverCommitted ? "var(--danger)" : "var(--muted-text)" }}>
+                              <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: fundOverCommitted ? "var(--danger)" : "var(--muted-text)" }}>
                                 committed ${fundCommitted.toFixed(2)}
                               </span>
-                              <span style={{ fontSize: 12.5, fontVariantNumeric: "tabular-nums", color: fundOver ? "var(--danger)" : "var(--muted-text)" }}>
+                              <span style={{ fontSize: 13, fontVariantNumeric: "tabular-nums", color: fundOver ? "var(--danger)" : "var(--muted-text)" }}>
                                 spent ${fundSpent.toFixed(2)}
                               </span>
                             </div>

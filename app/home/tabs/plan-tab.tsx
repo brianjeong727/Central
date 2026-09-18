@@ -532,7 +532,7 @@ export function StudentOrgRoleTabContent({
                       {link.title}
                     </span>
                     {link.description && (
-                      <span style={{ display: "block", fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--body)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <span style={{ display: "block", fontFamily: "var(--sans)", fontSize: 13, color: "var(--body)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {link.description}
                       </span>
                     )}
@@ -1012,7 +1012,7 @@ function EventsAgendaList({
         >
           <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)", flexShrink: 0 }} />
-            <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.15em", color: "var(--plum)" }}>Up next · Starts {(cd?.label ?? "soon").toLowerCase()}</span>
+            <span style={{ ...monoBase, fontSize: 11, letterSpacing: "0.15em", color: "var(--plum)" }}>Up next · Starts {(cd?.label ?? "soon").toLowerCase()}</span>
             <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
               {renderPlannedCheck(isPlanned)}
               {renderDeleteBtn(ev.id, isHovered)}
@@ -1051,7 +1051,7 @@ function EventsAgendaList({
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             {!isPast && cd && (
-              <span style={{ fontFamily: "var(--sans)", fontSize: 12.5, borderRadius: 999, padding: "5px 12px", whiteSpace: "nowrap", border: "1px solid var(--line-2)", background: cd.soon ? "var(--ivory)" : "var(--cream-2)", color: cd.soon ? "var(--plum)" : "var(--body)", fontWeight: cd.soon ? 500 : 400 }}>{cd.label}</span>
+              <span style={{ fontFamily: "var(--sans)", fontSize: 13, borderRadius: 999, padding: "5px 12px", whiteSpace: "nowrap", border: "1px solid var(--line-2)", background: cd.soon ? "var(--ivory)" : "var(--cream-2)", color: cd.soon ? "var(--plum)" : "var(--body)", fontWeight: cd.soon ? 500 : 400 }}>{cd.label}</span>
             )}
             {renderPlannedCheck(isPlanned)}
             {renderDeleteBtn(ev.id, isHovered)}
@@ -1067,7 +1067,7 @@ function EventsAgendaList({
           variant="quiet"
           size="sm"
           onClick={() => toggleSubs(ev.id)}
-          style={{ fontSize: 12.5, gap: 7 }}
+          style={{ fontSize: 13, gap: 7 }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: subsOpen ? "rotate(90deg)" : "none", transition: "transform 160ms ease" }}>
             <path d="M9 6l6 6-6 6" />
@@ -1158,7 +1158,7 @@ function EventsAgendaList({
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.08em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>{endedAgoLabel(eventEndYMD(ev, timeZone), now, timeZone)}</span>
+          <span style={{ ...monoBase, fontSize: 11, letterSpacing: "0.08em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>{endedAgoLabel(eventEndYMD(ev, timeZone), now, timeZone)}</span>
           {renderPlannedCheck(isPlanned)}
           {renderDeleteBtn(ev.id, isHovered)}
         </div>
@@ -1922,7 +1922,7 @@ export function StudentOrgTeamHome({
                   </>
                 }
               >
-                <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.6, margin: 0 }}>
+                <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.6, margin: 0 }}>
                   Carries <span style={{ fontWeight: 600, color: "var(--ink)" }}>{rolloverSource.count} recurring {rolloverSource.count === 1 ? "event" : "events"}</span> from {rolloverSource.season ?? activeSeason} into
                   next season — an exact copy of that year&apos;s plans (checklists, roles, run of show, sub-events) dated to
                   matching weekdays, with completion reset and every lead unassigned. One-off events stay in their season,
@@ -2125,7 +2125,7 @@ function RotationAvatar({ name, mine }: { name: string; mine: boolean }) {
     return (
       <MonogramChip
         initials={getInitials(name)}
-        style={{ width: 22, height: 22, fontSize: 9.5, fontWeight: 500, letterSpacing: "0.02em" }}
+        style={{ width: 22, height: 22, fontSize: 10, fontWeight: 500, letterSpacing: "0.02em" }}
       />
     )
   }
@@ -2134,7 +2134,7 @@ function RotationAvatar({ name, mine }: { name: string; mine: boolean }) {
       style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center",
         width: 22, height: 22, borderRadius: 999, flexShrink: 0,
-        fontFamily: "var(--sans)", fontSize: 9.5, fontWeight: 500, letterSpacing: "0.02em",
+        fontFamily: "var(--sans)", fontSize: 10, fontWeight: 500, letterSpacing: "0.02em",
         background: "var(--ivory)",
         color: "var(--body)",
         border: "1px solid var(--line-2)",
@@ -2283,7 +2283,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
                   }}
                 >
                   <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: active ? "var(--plum)" : "var(--body)" }}>{sem.name}</span>
-                  <span style={{ fontSize: 10.5, color: "var(--muted-text)" }}>{shortMonthDay(sem.start_date)} – {shortMonthDay(sem.end_date)}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted-text)" }}>{shortMonthDay(sem.start_date)} – {shortMonthDay(sem.end_date)}</span>
                 </FilterChip>
               )
             })}
@@ -2378,7 +2378,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
               </span>
               <div style={{ minWidth: 0 }}>
                 <p style={{ fontFamily: "var(--sans)", fontSize: 14, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{label}</p>
-                <p style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--body)", margin: "2px 0 0" }}>{dateLine}</p>
+                <p style={{ fontFamily: "var(--sans)", fontSize: 13, color: "var(--body)", margin: "2px 0 0" }}>{dateLine}</p>
               </div>
             </div>
           </CentralModal>
@@ -2434,23 +2434,23 @@ function RotationSlotCell({ slot, userId, onClick }: {
       {/* date */}
       <div style={{ display: "flex", flexDirection: "column", gap: 1, flexShrink: 0 }}>
         <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)" }}>{shortDow(slot.week_date)}</span>
-        <span style={{ fontFamily: "var(--sans)", fontSize: 13.5, fontWeight: 500, color: "var(--ink)" }}>{shortMonthDay(slot.week_date)}</span>
+        <span style={{ fontFamily: "var(--sans)", fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{shortMonthDay(slot.week_date)}</span>
       </div>
       {/* status */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
         {isOpen ? (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 500, color: "var(--plum)" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--plum)" }}>
             <PlusCircle className="w-4 h-4" /> Open
           </span>
         ) : isMine ? (
           <>
             <RotationAvatar name="You" mine />
-            <span style={{ fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 500, color: "var(--plum)" }}>You</span>
+            <span style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--plum)" }}>You</span>
           </>
         ) : (
           <>
             <RotationAvatar name={slot.assigned_name ?? "?"} mine={false} />
-            <span style={{ fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 500, color: "var(--body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{slot.assigned_name ?? "Assigned"}</span>
+            <span style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{slot.assigned_name ?? "Assigned"}</span>
           </>
         )}
       </div>
@@ -2482,7 +2482,7 @@ function NewSemesterModal({ onClose, onCreate }: {
     setBusy(false)
   }
 
-  const labelStyle: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }
+  const labelStyle: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }
 
   return (
     <CentralModal
@@ -6314,7 +6314,7 @@ function MonthGridMobile({
         ) : (
           <EmptyState variant="quiet" icon={<Calendar style={{ width: 22, height: 22 }} />} title="Nothing scheduled" subtitle="Tap a marked day to see its events." />
         )}
-        <p style={{ marginTop: 16, fontSize: 12.5, color: "var(--muted-text)", textAlign: "center" }}>
+        <p style={{ marginTop: 16, fontSize: 13, color: "var(--muted-text)", textAlign: "center" }}>
           Tap any event to open its plan — no modal in between.
         </p>
       </div>
@@ -7194,7 +7194,7 @@ export function AddEventModal({
             <button
               type="button"
               onClick={() => { setCreatePath(null); setError(null) }}
-              style={{ alignSelf: "flex-start", background: "none", border: "none", padding: 0, fontSize: 12.5, color: "var(--muted-text)", cursor: "pointer" }}
+              style={{ alignSelf: "flex-start", background: "none", border: "none", padding: 0, fontSize: 13, color: "var(--muted-text)", cursor: "pointer" }}
             >
               ← All options
             </button>
@@ -7203,7 +7203,7 @@ export function AddEventModal({
           <>
           {/* What the playbook brings — said as an outcome, not "Pre-seeded:". */}
           {!isEditing && createPath === "quick" && (cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
-            <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 12.5, color: "var(--body)", lineHeight: 1.5 }}>
+            <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
               We&apos;ll set up the checklist{cfg.defaultRoles.length > 0 ? ", the roles" : ""} and the reminders for a {cfg.label.toLowerCase()}. Adjust any of it inside the event.
             </div>
           )}
@@ -7244,7 +7244,7 @@ export function AddEventModal({
               <input type="checkbox" id="recurringEv" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--plum)", cursor: "pointer", marginTop: 2 }} />
               <label htmlFor="recurringEv" style={{ fontSize: 14, color: "var(--body)", cursor: "pointer", lineHeight: 1.45 }}>
                 Recurring every year
-                <span style={{ display: "block", fontSize: 11.5, color: "var(--muted-text)" }}>Traditions carry into next season when a leader starts it — plan copied, dates matched, leads reset.</span>
+                <span style={{ display: "block", fontSize: 12, color: "var(--muted-text)" }}>Traditions carry into next season when a leader starts it — plan copied, dates matched, leads reset.</span>
               </label>
             </div>
           )}
@@ -7289,7 +7289,7 @@ export function AddEventModal({
                       type="button"
                       onClick={() => setExtras(cur => on ? cur.filter(k => k !== m.key) : [...cur, m.key])}
                       style={{
-                        padding: "8px 12px", borderRadius: 9999, fontSize: 12.5, cursor: "pointer",
+                        padding: "8px 12px", borderRadius: 9999, fontSize: 13, cursor: "pointer",
                         border: on ? "1.5px solid var(--plum)" : "1.5px solid var(--line)",
                         background: on ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--cream-panel)",
                         color: on ? "var(--plum)" : "var(--body)", fontWeight: on ? 500 : 400,
@@ -7301,7 +7301,7 @@ export function AddEventModal({
                   )
                 })}
               </div>
-              <p style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 8, lineHeight: 1.5 }}>
+              <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 8, lineHeight: 1.5 }}>
                 Starts with a blank checklist — you compose the plan. Modules add their own tabs to the event.
               </p>
             </div>
@@ -7576,7 +7576,7 @@ export function MinistryCalendar({
                live congregation. Narrowing the rail to upcoming-only would have made
                it appear far more often (any team whose events are all in the past),
                so it goes now rather than later. */
-            <p style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "6px 0 0", lineHeight: 1.45 }}>
+            <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "6px 0 0", lineHeight: 1.45 }}>
               Nothing coming up.
             </p>
           ) : (
@@ -7871,7 +7871,7 @@ function EventBudgetCard({
 
   const ceilingRow = (label: string, value: string, tone?: "danger" | "quiet") => (
     <div key={label} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginTop: 6 }}>
-      <span style={{ fontSize: 12.5, color: "var(--body)" }}>{label}</span>
+      <span style={{ fontSize: 13, color: "var(--body)" }}>{label}</span>
       <span style={{
         fontSize: 13, fontVariantNumeric: "tabular-nums",
         color: tone === "danger" ? "var(--danger)" : tone === "quiet" ? "var(--muted-text)" : "var(--ink)",
@@ -7933,13 +7933,13 @@ function EventBudgetCard({
         <div style={{ marginTop: 18 }}>
           <p style={{ ...monoLabel, marginBottom: 4 }}>Draw by fund</p>
           {funds.length === 0 ? (
-            <p style={{ fontSize: 12.5, color: "var(--muted-text)", fontStyle: "italic", marginTop: 6 }}>No funds set up yet.</p>
+            <p style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic", marginTop: 6 }}>No funds set up yet.</p>
           ) : funds.map(f => {
             const amt = drawsByFund[f.slug] ?? 0
             const draft = drafts[f.slug]
             return (
               <div key={f.slug} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minHeight: isMobile ? 48 : 40 }}>
-                <span style={{ fontSize: 13.5, color: "var(--body)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                <span style={{ fontSize: 14, color: "var(--body)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
                 {canEditBudget ? (
                   <Input
                     size={isMobile ? "md" : "sm"}
@@ -9113,7 +9113,7 @@ export function EventPlanWorkspace({
           {task.brief && (
             aug?.countdown
               ? <CountdownWhisper text={task.brief} />
-              : <span style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{task.brief}</span>
+              : <span style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{task.brief}</span>
           )}
         </span>
         {/* Countdown trigger badge (nudge state) — non-Countdown callers only; in
@@ -9514,7 +9514,7 @@ export function EventPlanWorkspace({
                     {descVal && (
                       <div style={{ marginTop: 26 }}>
                         <p style={eyebrow}>About</p>
-                        <p style={{ fontFamily: "var(--serif)", fontSize: 15.5, lineHeight: 1.6, color: "var(--body)", margin: 0, overflowWrap: "anywhere" }}>{descVal}</p>
+                        <p style={{ fontFamily: "var(--serif)", fontSize: 16, lineHeight: 1.6, color: "var(--body)", margin: 0, overflowWrap: "anywhere" }}>{descVal}</p>
                       </div>
                     )}
 
@@ -9532,7 +9532,7 @@ export function EventPlanWorkspace({
                           <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "6px 0 0" }}>{readiness.detail}</p>
                         </>
                       ) : (
-                        <p style={{ fontSize: 13.5, color: "var(--muted-text)", margin: 0 }}>No checklist yet.</p>
+                        <p style={{ fontSize: 14, color: "var(--muted-text)", margin: 0 }}>No checklist yet.</p>
                       )}
                     </div>
 
@@ -9862,7 +9862,7 @@ export function EventPlanWorkspace({
                 <CentralCard variant="inset" radius="var(--r-callout)" padding="6px 14px 8px" style={{ marginBottom: 24 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0 6px" }}>
                     <Star style={{ width: 12, height: 12, color: "var(--plum)", fill: "currentColor" }} />
-                    <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 500 }}>Pinned</span>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 500 }}>Pinned</span>
                   </div>
                   {scopedPinned.map((task) => isMobile ? renderMobileTaskRow(task) : renderTaskTree(task))}
                 </CentralCard>
@@ -10360,7 +10360,7 @@ export function EventPlanWorkspace({
 
                   const chip = (m: { id: string; name: string }, sign?: "+" | "−") => (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--ivory)", borderRadius: 999, padding: "6px 14px 6px 6px" }}>
-                      <div style={{ width: 26, height: 26, borderRadius: 999, background: "var(--plum)", color: "var(--cream-on-dark)", display: "grid", placeItems: "center", fontSize: 10.5, fontWeight: 600 }}>{ini(m.name)}</div>
+                      <div style={{ width: 26, height: 26, borderRadius: 999, background: "var(--plum)", color: "var(--cream-on-dark)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 600 }}>{ini(m.name)}</div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{sign ? `${sign} ` : ""}{m.name}</div>
                     </div>
                   )
@@ -10389,7 +10389,7 @@ export function EventPlanWorkspace({
                   if (isMobile) {
                     return (
                       <PocketSheet title={title} onClose={() => setPlanChatConfirmOpen(false)}>
-                        <p style={{ fontSize: 14.5, lineHeight: 1.6, color: "var(--body)", margin: 0 }}>{body}</p>
+                        <p style={{ fontSize: 15, lineHeight: 1.6, color: "var(--body)", margin: 0 }}>{body}</p>
                         {memberBlocks}
                         <PocketButton onClick={run} disabled={creatingPlanChat} style={{ width: "100%", marginTop: 22 }}>
                           {creatingPlanChat ? "…" : cta}
@@ -11450,7 +11450,7 @@ function RunSheetTab({
                 {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </Select>
             </div>
-            <input value={draft.brief} onChange={e => setDraft(d => ({ ...d, brief: e.target.value }))} placeholder="Brief — what this block needs, the gotcha…" style={{ ...ctrlInput, marginTop: 8, fontSize: 12.5 }} />
+            <input value={draft.brief} onChange={e => setDraft(d => ({ ...d, brief: e.target.value }))} placeholder="Brief — what this block needs, the gotcha…" style={{ ...ctrlInput, marginTop: 8, fontSize: 13 }} />
             <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
               <CentralButton variant="secondary" size="sm" onClick={() => setEditingId(null)}>Cancel</CentralButton>
               <CentralButton variant="primary" size="sm" onClick={() => saveEdit(block)}>Save</CentralButton>
@@ -11473,7 +11473,7 @@ function RunSheetTab({
                 ) : <span />}
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: done ? "var(--muted-text)" : "var(--ink)", textDecoration: done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{block.title || <span style={{ color: "var(--muted-text)", fontStyle: "italic" }}>Untitled block</span>}</div>
-                  <div style={{ fontSize: 12.5, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ fontSize: 13, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.5px", color: done ? "var(--muted-text)" : "var(--plum)" }}>{block.time_label || "—"}</span>
                     {ownerName && <span style={{ color: "var(--muted-text)" }}> · {ownerName}</span>}
                   </div>
@@ -11513,7 +11513,7 @@ function RunSheetTab({
               </div>
             )}
             {block.brief && (
-              <p style={{ marginTop: 4, marginLeft: 38, fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{block.brief}</p>
+              <p style={{ marginTop: 4, marginLeft: 38, fontSize: 13, color: "var(--muted-text)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{block.brief}</p>
             )}
           </>
         )}
@@ -11593,7 +11593,7 @@ function RunSheetTab({
       {orphanBlocks.length > 0 && (
         <div style={{ marginBottom: 36 }}>
           <p style={{ ...dayHeadStyle("var(--gold)"), marginBottom: 6 }}>Outside the event dates</p>
-          <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 12px" }}>
+          <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 12px" }}>
             {orphanBlocks.length === 1 ? "This block sits" : `These ${orphanBlocks.length} blocks sit`} past {event.title}&rsquo;s end date
             ({eventDateRangeShort(new Date(event.start_date), new Date(event.end_date))}). Extend the event, or move {orphanBlocks.length === 1 ? "it" : "them"} onto a day.
           </p>
@@ -14024,7 +14024,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                   {!isRoleConfirming && (
-                                    <span style={{ fontSize: 11.5, color: "var(--muted-text)" }}>{roleCount} {roleCount === 1 ? "person" : "people"}</span>
+                                    <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{roleCount} {roleCount === 1 ? "person" : "people"}</span>
                                   )}
                                   {canManageTeam && (
                                     isRoleConfirming ? (
@@ -14084,7 +14084,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                           ) : (
                             <div
                               onClick={() => { setAddingRole(true); setNewRoleName("") }}
-                              style={{ padding: "13px 20px", color: "var(--plum)", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", borderTop: roles.length > 0 ? "1px solid var(--line)" : "none" }}
+                              style={{ padding: "13px 20px", color: "var(--plum)", fontSize: 14, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", borderTop: roles.length > 0 ? "1px solid var(--line)" : "none" }}
                             >
                               <Plus style={{ width: 14, height: 14 }} /> Add role
                             </div>
@@ -14116,7 +14116,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                                   {canManageTeam && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />}
                                 </div>
                               )}
-                              <p style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 2 }}>
+                              <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 2 }}>
                                 {roles[activeRole].permissions.filter(p => visiblePerms.includes(p)).length} of {visiblePerms.length} permissions enabled
                               </p>
                             </div>
@@ -14216,7 +14216,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         <span onClick={() => openMemberProfile(m.user_id)} style={{ cursor: "pointer", display: "inline-flex" }}>
                           <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-medium" />
                         </span>
-                        <span onClick={() => openMemberProfile(m.user_id)} style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500, cursor: "pointer" }}>{m.name}</span>
+                        <span onClick={() => openMemberProfile(m.user_id)} style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500, cursor: "pointer" }}>{m.name}</span>
                         {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
                           <select
                             // Controlled for a roleless member — see the mobile twin above.

@@ -226,7 +226,7 @@ export function FormFillView({ formId, userId, ministryId, announcementId, title
                 return (
                   <button key={opt} type="button" onClick={() => setSingleAnswer(field.id, opt)} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10,
-                    cursor: 'pointer', textAlign: 'left', fontSize: 14.5, transition: 'all 0.12s',
+                    cursor: 'pointer', textAlign: 'left', fontSize: 15, transition: 'all 0.12s',
                     border: `1px solid ${selected ? 'var(--plum)' : 'var(--line-2)'}`,
                     background: selected ? 'var(--ivory)' : 'var(--cream)',
                     color: 'var(--ink)', fontWeight: selected ? 500 : 400,
@@ -251,7 +251,7 @@ export function FormFillView({ formId, userId, ministryId, announcementId, title
                 return (
                   <button key={opt} type="button" onClick={() => toggleCheckbox(field.id, opt)} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 10,
-                    cursor: 'pointer', textAlign: 'left', fontSize: 14.5, transition: 'all 0.12s',
+                    cursor: 'pointer', textAlign: 'left', fontSize: 15, transition: 'all 0.12s',
                     border: `1px solid ${checked ? 'var(--plum)' : 'var(--line-2)'}`,
                     background: checked ? 'var(--ivory)' : 'var(--cream)',
                     color: 'var(--ink)', fontWeight: checked ? 500 : 400,

@@ -304,7 +304,7 @@ function MinistriesContent() {
 
   // ── Mobile (Pocket) styles — KEEP form per ratified reconciliation ──
   const mSerif = "var(--serif)"
-  const mSub: React.CSSProperties = { fontSize: 14.5, color: "var(--body)", lineHeight: 1.55 }
+  const mSub: React.CSSProperties = { fontSize: 15, color: "var(--body)", lineHeight: 1.55 }
   const mEyebrow: React.CSSProperties = { ...mono, margin: "24px 4px 4px" }
   const mRow: React.CSSProperties = {
     display: "flex", alignItems: "center", gap: 12, width: "100%", background: "var(--ivory)",
@@ -320,11 +320,11 @@ function MinistriesContent() {
     borderRadius: 999, padding: "10px 18px", fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", fontFamily: SANS,
   })
   const mOpenPill: React.CSSProperties = {
-    background: "var(--plum)", color: "var(--cream)", borderRadius: 999, minHeight: 38, fontSize: 12.5,
+    background: "var(--plum)", color: "var(--cream)", borderRadius: 999, minHeight: 38, fontSize: 13,
     fontWeight: 600, padding: "0 18px", border: "none", cursor: "pointer", flexShrink: 0, fontFamily: SANS,
   }
   const mJoinPill: React.CSSProperties = {
-    background: "var(--cream)", color: "var(--ink)", borderRadius: 999, minHeight: 38, fontSize: 12.5,
+    background: "var(--cream)", color: "var(--ink)", borderRadius: 999, minHeight: 38, fontSize: 13,
     fontWeight: 600, padding: "0 18px", border: "1px solid var(--line-2)", cursor: "pointer", flexShrink: 0, fontFamily: SANS,
   }
   const mTitle: React.CSSProperties = {
@@ -332,7 +332,7 @@ function MinistriesContent() {
     lineHeight: 1.08, margin: "8px 0 0", color: "var(--ink)",
   }
   const mRowName: React.CSSProperties = {
-    display: "block", fontSize: 15.5, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)",
+    display: "block", fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)",
     overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
   }
   const mRowSub: React.CSSProperties = { display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2 }
@@ -653,7 +653,7 @@ function MinistriesContent() {
             </p>
 
             {requestedName && (
-              <div style={{ marginBottom: 16, borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "12px 16px", fontSize: 13.5, color: "var(--body)", lineHeight: 1.55 }} role="status">
+              <div style={{ marginBottom: 16, borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "12px 16px", fontSize: 14, color: "var(--body)", lineHeight: 1.55 }} role="status">
                 You&apos;ve asked to join <strong style={{ color: "var(--ink)" }}>{requestedName}</strong>. An admin will let you in — nothing else to do.
               </div>
             )}
@@ -732,7 +732,7 @@ function MinistriesContent() {
               ) : <span/>}
               <button type="button" onClick={handleSignOut} style={{
                 background: "none", border: "none", padding: "0 2px", cursor: "pointer",
-                fontFamily: SANS, fontSize: 13.5, color: "var(--muted-text)", whiteSpace: "nowrap",
+                fontFamily: SANS, fontSize: 14, color: "var(--muted-text)", whiteSpace: "nowrap",
               }}>
                 Sign out
               </button>
@@ -809,9 +809,9 @@ function MinistriesContent() {
                 </p>
               )}
 
-              <div style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "26px 4px 0", lineHeight: 1.5 }}>
+              <div style={{ fontSize: 13, color: "var(--muted-text)", margin: "26px 4px 0", lineHeight: 1.5 }}>
                 Registering a new ministry?{" "}
-                <button type="button" onClick={() => router.push("/register-ministry")} style={{ background: "none", border: "none", padding: 0, color: "var(--plum)", fontWeight: 500, cursor: "pointer", fontFamily: SANS, fontSize: 12.5 }}>
+                <button type="button" onClick={() => router.push("/register-ministry")} style={{ background: "none", border: "none", padding: 0, color: "var(--plum)", fontWeight: 500, cursor: "pointer", fontFamily: SANS, fontSize: 13 }}>
                   That works best on desktop.
                 </button>
               </div>
@@ -839,13 +839,13 @@ function MinistriesContent() {
                 <button type="submit" disabled={joiningCode || inviteCode.trim().length < 4} style={{
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 9, width: "100%",
                   background: "var(--plum)", color: "var(--cream)", borderRadius: 999, minHeight: 50,
-                  fontSize: 14.5, fontWeight: 600, border: "none", marginTop: 18, fontFamily: mSerif,
+                  fontSize: 15, fontWeight: 600, border: "none", marginTop: 18, fontFamily: mSerif,
                   cursor: (joiningCode || inviteCode.trim().length < 4) ? "not-allowed" : "pointer",
                   opacity: (joiningCode || inviteCode.trim().length < 4) ? 0.6 : 1,
                 }}>
                   {joiningCode ? "Joining…" : "Join ministry"}
                 </button>
-                <p style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 14 }}>
+                <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 14 }}>
                   Codes are case-insensitive. Ask your ministry&apos;s admin or leader if you don&apos;t have one.
                 </p>
               </form>

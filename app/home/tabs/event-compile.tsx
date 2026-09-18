@@ -204,7 +204,7 @@ export function EventCompileModal({
         </div>
       }
     >
-      <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.5, margin: "0 0 18px", maxWidth: 480 }}>
+      <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: "0 0 18px", maxWidth: 480 }}>
         Save this event as {PHASE_LABEL[calendarEvent.event_type] ? "" : ""}<span style={{ fontWeight: 500 }}>{calendarEvent.event_type}</span>&apos;s reusable playbook. Next
         time you run this event, &ldquo;Run it back&rdquo; recreates these tasks and roles with dates recomputed from the offsets below.
       </p>
@@ -247,7 +247,7 @@ export function EventCompileModal({
                   </FilterChip>
                 ))}
               </div>
-              <p style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 8 }}>
+              <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 8 }}>
                 Unattached notes are archived on the playbook as reference.
               </p>
             </div>
@@ -264,11 +264,11 @@ export function EventCompileModal({
                 return (
                   <div key={r.task.id} style={{ padding: "13px 14px", borderBottom: i === rows.length - 1 ? "none" : "1px solid var(--line-3)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, color: "var(--ink)", lineHeight: 1.35 }}>{r.task.title}</span>
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--muted-text)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap" }}>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 15, color: "var(--ink)", lineHeight: 1.35 }}>{r.task.title}</span>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--muted-text)", background: "var(--ivory)", borderRadius: 999, padding: "2px 8px", whiteSpace: "nowrap" }}>
                         {PHASE_LABEL[r.task.phase ?? "pre_event"] ?? r.task.phase}
                       </span>
-                      <span style={{ fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--body)", whiteSpace: "nowrap" }}>
+                      <span style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>
                         planned {fmtOffset(r.planned)} · done {fmtOffset(r.actual)}
                       </span>
                       <button
@@ -277,7 +277,7 @@ export function EventCompileModal({
                         disabled={!hasActual}
                         title={hasActual ? "Adopt the actual timing as next year's plan" : "No completion date to adopt"}
                         style={{
-                          fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.04em", textTransform: "uppercase",
+                          fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.04em", textTransform: "uppercase",
                           border: "1px solid " + (r.useActual ? "var(--plum)" : "var(--line-2)"),
                           background: r.useActual ? "color-mix(in srgb, var(--plum) 10%, transparent)" : "var(--cream)",
                           color: r.useActual ? "var(--plum)" : hasActual ? "var(--body)" : "var(--faint)",
@@ -294,7 +294,7 @@ export function EventCompileModal({
                         onFocus={() => setFocusedTaskId(r.task.id)}
                         rows={2}
                         placeholder="Brief — what the next class should know about this task…"
-                        style={{ minHeight: 46, fontSize: 13.5, borderColor: focusedTaskId === r.task.id ? "var(--plum)" : undefined }}
+                        style={{ minHeight: 46, fontSize: 14, borderColor: focusedTaskId === r.task.id ? "var(--plum)" : undefined }}
                       />
                     </div>
                   </div>

@@ -204,12 +204,12 @@ export function MemberSheet({
                   {member.role && <MobileRoleTag role={member.role} userId={member.id} />}
                   {isOwnProfile && <MobileYouTag />}
                   {cohortLabel(member.grade, member.graduation_year) && (
-                    <span style={{ fontSize: 12.5, color: "var(--muted-text)" }}>{cohortLabel(member.grade, member.graduation_year)}</span>
+                    <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{cohortLabel(member.grade, member.graduation_year)}</span>
                   )}
                 </div>
               </div>
             </div>
-            <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5, margin: "12px 0 0" }}>
+            <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: "12px 0 0" }}>
               Shared profile details are visible to members in this ministry.
             </p>
             {!isOwnProfile && (
@@ -218,7 +218,7 @@ export function MemberSheet({
                   onClick={handleSendMessage}
                   disabled={dmLoading}
                   className="active:scale-[0.97] transition-transform duration-150 disabled:opacity-50"
-                  style={{ flex: 1, minHeight: 44, borderRadius: 999, background: "var(--plum)", color: "var(--cream)", border: "none", fontSize: 13.5, fontWeight: 600, letterSpacing: "0.01em", cursor: dmLoading ? "not-allowed" : "pointer" }}
+                  style={{ flex: 1, minHeight: 44, borderRadius: 999, background: "var(--plum)", color: "var(--cream)", border: "none", fontSize: 14, fontWeight: 600, letterSpacing: "0.01em", cursor: dmLoading ? "not-allowed" : "pointer" }}
                 >
                   {dmLoading ? "Opening chat…" : "Send Message"}
                 </button>

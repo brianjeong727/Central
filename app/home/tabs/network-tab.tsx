@@ -29,7 +29,7 @@ export function NetworkTab({ onBack }: { onBack?: () => void }) {
           <h2 style={{ fontFamily: "var(--serif)", fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, margin: "10px 0 0" }}>
             Beyond your walls
           </h2>
-          <p style={{ fontSize: 14.5, color: "var(--body)", lineHeight: 1.65, margin: "12px 0 0" }}>
+          <p style={{ fontSize: 15, color: "var(--body)", lineHeight: 1.65, margin: "12px 0 0" }}>
             Plan and communicate with other churches in your local network — coordinate
             events, share resources, and reach your city together, and eventually any
             church on Central. We&apos;re building it.
@@ -86,7 +86,7 @@ export function NetworkTab({ onBack }: { onBack?: () => void }) {
 
           <p
             style={{
-              fontSize: 14.5,
+              fontSize: 15,
               color: "var(--body)",
               lineHeight: 1.6,
               margin: "14px 0 0",

@@ -981,7 +981,7 @@ function DangerZone({
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "18px 20px" }}>
-          <p style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>Leave {ministryName}</p>
+          <p style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>Leave {ministryName}</p>
           <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 16px", lineHeight: 1.5 }}>
             Your messages remain visible until an admin runs cleanup. You can rejoin with an invite code.
           </p>
@@ -1062,7 +1062,7 @@ function DeleteAccountSection({ email, onDeleted, mobile = false }: { email: str
     if (mobile) {
       return (
         <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "18px 20px" }}>
-          <p style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>Delete your account</p>
+          <p style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>Delete your account</p>
           <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 16px", lineHeight: 1.5 }}>
             Permanently deletes your login and personal data — profile, journal, RSVPs, and form responses. Messages you sent stay in their chats, shown as “Deleted account.” This can’t be undone.
           </p>
@@ -1086,7 +1086,7 @@ function DeleteAccountSection({ email, onDeleted, mobile = false }: { email: str
   if (mobile) {
     return (
       <div style={{ background: "var(--ivory)", border: "1.5px solid var(--danger)", borderRadius: "var(--r-pocket)", padding: "18px 20px" }}>
-        <p style={{ fontSize: 15.5, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>Delete your account?</p>
+        <p style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>Delete your account?</p>
         <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 14px", lineHeight: 1.5 }}>
           This can’t be undone. Type your email <strong style={{ color: "var(--ink)" }}>{email}</strong> to confirm.
         </p>
@@ -2045,7 +2045,7 @@ export function ProfileTab({
                 <Pencil style={{ width: 14, height: 14, color: "var(--faint)", flex: "none" }} />
               </button>
             )}
-            {inlineError && <p style={{ fontSize: 12.5, color: "var(--danger)", margin: "6px 0 0" }}>{inlineError}</p>}
+            {inlineError && <p style={{ fontSize: 13, color: "var(--danger)", margin: "6px 0 0" }}>{inlineError}</p>}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 9, minWidth: 0 }}>
               <PocketTag label={roleLabel(profile.role, null)} variant="role" />
             </div>
@@ -2063,7 +2063,7 @@ export function ProfileTab({
             </div>
             <div style={{ fontSize: 12, color: "var(--muted-text)", flex: "none" }}>{filledCount} of {PROFILE_V2_FIELD_COUNT} filled</div>
           </div>
-          <div style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 8 }}>Everything here is visible to your ministry.</div>
+          <div style={{ fontSize: 13, color: "var(--faint)", marginTop: 8 }}>Everything here is visible to your ministry.</div>
         </div>
 
         {/* ── Mobile: Journal. Ratified 2026-08-22 — it STAYS on the profile rather
@@ -2097,13 +2097,13 @@ export function ProfileTab({
           {/* CLASS — filled at onboarding for everyone, and the one row whose edit
               reaches past this table: changing it moves class-chat membership. */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "15px 0", borderTop: "1px solid var(--line-3)", minHeight: 24, opacity: cohortSaving ? 0.5 : 1 }}>
-            <div style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "1.2px", color: "var(--muted-text)", flex: "none" }}>CLASS</div>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.2px", color: "var(--muted-text)", flex: "none" }}>CLASS</div>
             <select
               value={isYoungAdult(profile.grade) ? YOUNG_ADULT_OPTION : String(profile.graduation_year ?? "")}
               onChange={e => { if (!cohortSaving) void commitCohort(e.target.value) }}
               aria-label="Class"
               disabled={cohortSaving}
-              style={{ border: "none", background: "transparent", fontSize: 14.5, fontWeight: cohortLabel(profile.grade, profile.graduation_year) ? 500 : 600, color: cohortLabel(profile.grade, profile.graduation_year) ? "var(--ink)" : "var(--plum)", textAlign: "right", outline: "none", padding: 0, cursor: "pointer", maxWidth: "70%" }}
+              style={{ border: "none", background: "transparent", fontSize: 15, fontWeight: cohortLabel(profile.grade, profile.graduation_year) ? 500 : 600, color: cohortLabel(profile.grade, profile.graduation_year) ? "var(--ink)" : "var(--plum)", textAlign: "right", outline: "none", padding: 0, cursor: "pointer", maxWidth: "70%" }}
             >
               <option value="">Add</option>
               {cohortYearOptions().map(y => <option key={y} value={String(y)}>Class of {y}</option>)}
@@ -2116,19 +2116,19 @@ export function ProfileTab({
               loaded, so an onboarding answer never reads back as blank. */}
           {(schoolOptions.length > 0 || currentSchoolId) && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "15px 0", borderTop: "1px solid var(--line-3)", minHeight: 24 }}>
-              <div style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "1.2px", color: "var(--muted-text)", flex: "none" }}>SCHOOL</div>
+              <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.2px", color: "var(--muted-text)", flex: "none" }}>SCHOOL</div>
               {schoolOptions.length > 0 ? (
                 <select
                   value={currentSchoolId ?? ""}
                   onChange={e => handleSchoolChange(e.target.value)}
                   aria-label="School"
-                  style={{ border: "none", background: "transparent", fontSize: 14.5, fontWeight: currentSchoolId ? 500 : 600, color: currentSchoolId ? "var(--ink)" : "var(--plum)", textAlign: "right", outline: "none", padding: 0, cursor: "pointer", maxWidth: "70%" }}
+                  style={{ border: "none", background: "transparent", fontSize: 15, fontWeight: currentSchoolId ? 500 : 600, color: currentSchoolId ? "var(--ink)" : "var(--plum)", textAlign: "right", outline: "none", padding: 0, cursor: "pointer", maxWidth: "70%" }}
                 >
                   <option value="">Add</option>
                   {schoolOptions.map(sc => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
                 </select>
               ) : (
-                <div style={{ fontSize: 14.5, fontWeight: 500, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {schoolOptions.find(sc => sc.id === currentSchoolId)?.name ?? "—"}
                 </div>
               )}
@@ -2145,7 +2145,7 @@ export function ProfileTab({
                 onClick={r.readOnly ? undefined : () => beginInline(r.key as ProfileDraftField)}
                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: "15px 0", borderTop: "1px solid var(--line-3)", cursor: r.readOnly ? "default" : "text", minHeight: 24 }}
               >
-                <div style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "1.2px", color: "var(--muted-text)", flex: "none" }}>{r.label}</div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1.2px", color: "var(--muted-text)", flex: "none" }}>{r.label}</div>
                 {editingThis ? (
                   <input
                     value={inlineDraft}
@@ -2159,10 +2159,10 @@ export function ProfileTab({
                     // press that lands INSIDE the field, and on a ~36px strip
                     // under a fingertip it mostly does not — you get the page's
                     // selection and nothing to paste into.
-                    style={{ flex: 1, minWidth: 0, minHeight: 44, boxSizing: "border-box", border: "none", background: "var(--ivory)", borderRadius: 10, padding: "8px 11px", fontSize: 14.5, color: "var(--ink)", textAlign: "right", outline: "none" }}
+                    style={{ flex: 1, minWidth: 0, minHeight: 44, boxSizing: "border-box", border: "none", background: "var(--ivory)", borderRadius: 10, padding: "8px 11px", fontSize: 15, color: "var(--ink)", textAlign: "right", outline: "none" }}
                   />
                 ) : (
-                  <div style={{ fontSize: 14.5, fontWeight: filled ? 500 : 600, color: filled ? "var(--ink)" : "var(--plum)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <div style={{ fontSize: 15, fontWeight: filled ? 500 : 600, color: filled ? "var(--ink)" : "var(--plum)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {filled ? raw : (r.readOnly ? "—" : "Add")}
                   </div>
                 )}

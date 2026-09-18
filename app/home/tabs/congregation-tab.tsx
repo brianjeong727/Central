@@ -278,7 +278,7 @@ export function CongregationTab({ userId, ministryId, onViewChange, onBack }: Co
         {view === "list" && (
           <>
             {/* Mobile: one calm sentence + a Questions kicker (create is the chrome "+") */}
-            <p className="md:hidden" style={{ fontSize: 15.5, color: "var(--body)", margin: "0 0 18px" }}>
+            <p className="md:hidden" style={{ fontSize: 16, color: "var(--body)", margin: "0 0 18px" }}>
               Ask your congregation — responses are anonymous.
             </p>
             <div className="md:hidden">

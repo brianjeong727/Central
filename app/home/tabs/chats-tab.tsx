@@ -395,7 +395,7 @@ function PrefToggleRow({ label, sub, on, onToggle, divider = false }: {
       style={{ display: "flex", alignItems: "center", width: "100%", textAlign: "left", padding: "16px 20px", background: "none", border: "none", cursor: "pointer", borderBottom: divider ? "1px solid var(--line-3)" : "none" }}
     >
       <div style={{ flex: 1 }}>
-        <p style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500 }}>{label}</p>
+        <p style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500 }}>{label}</p>
         <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 2 }}>{sub}</p>
       </div>
       <span aria-hidden style={{ display: "block", width: 38, height: 22, borderRadius: 999, background: on ? "var(--plum)" : "var(--dashed)", position: "relative", flexShrink: 0, transition: "background 0.15s" }}>
@@ -1064,7 +1064,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
         // danger tone here would outrank the actual danger zone further down.
         // 12.5 tracks the 13.5px meta line it sits under — the phone hero's own
         // ramp; the integer-size rule is web_design_system's and desktop-only.
-        color: "var(--plum)", fontSize: 12.5, fontWeight: 600, fontFamily: "var(--serif)",
+        color: "var(--plum)", fontSize: 13, fontWeight: 600, fontFamily: "var(--serif)",
       }}
     >
       Remove photo
@@ -1617,7 +1617,7 @@ export function ChatSettings({ groupId, groupName, groupType, groupArchived = fa
                 </div>
               )}
               {/* A DM has no meaningful member count — it is always the two of you. */}
-              <p className="text-[13.5px] mt-0.5" style={{ color: "var(--muted-text)" }}>
+              <p className="text-[14px] mt-0.5" style={{ color: "var(--muted-text)" }}>
                 {isDM ? typeLabel : `${typeLabel} · ${members.length} member${members.length !== 1 ? "s" : ""}`}
               </p>
               {removeChatPhotoMobile && <div className="mt-1">{removeChatPhotoMobile}</div>}
@@ -4501,11 +4501,11 @@ export function ChatScreen({ groupId, groupName, userId, userName, ministryId, m
 
       {invitePickerOpen && (
         <PocketSheet title="Invite to a group" onClose={() => setInvitePickerOpen(false)} zIndex={210}>
-          <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.55, margin: "0 0 14px" }}>
+          <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.55, margin: "0 0 14px" }}>
             Posts a card anyone here can tap to join.
           </p>
           {invitableGroups.length === 0 ? (
-            <p style={{ fontSize: 13.5, color: "var(--muted-text)", margin: 0 }}>
+            <p style={{ fontSize: 14, color: "var(--muted-text)", margin: 0 }}>
               No open groups yet. Open a group chat to the ministry from its settings first.
             </p>
           ) : (
