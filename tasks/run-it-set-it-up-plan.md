@@ -1,6 +1,11 @@
 # Run it / Set it up — the plan (design pass R3, remaining two items)
 
-> **Status: NOT STARTED — plan only (written 2026-09-17, approved in principle by Brian the same day).**
+> **Status (2026-09-18): Phases 1, 2 and 3 are BUILT on `feat/quick-create` (stacked on
+> `feat/home-doing-plane`), with the sweeps K2 K3 K6 K7(36px) K8 K9 K10 and N22 (+ its
+> BLOCKING lint). K11 is DECIDED (Brian, 2026-09-18: §8.5 (a) — a "Create your first team"
+> landing for leader tier) and in progress. Still open: K1 (phone primitives, ~20 surfaces),
+> C8 (the flat-row pass), K7's PocketBackRow deletion (Congregation ×2), the
+> Small-Group-Leaders set-up (its own pass).**
 > A plan is a CLAIM, never evidence (lessons inbox 2026-08-17). Before acting on any
 > box below, grep the code. Delete this file when the last phase ships.
 
@@ -18,7 +23,7 @@ foot of the hub it configures. Never a second tab strip, never a settings gear t
 duplicates Church Settings. Doing = what someone does this week; set-up = what someone
 does once a season.
 
-## Phase 1 — Quick-path event creation (≈2 days)
+## Phase 1 — Quick-path event creation (≈2 days) — DONE 2026-09-17
 
 **Intent.** "New event → Quick social" is sold as light and delivers a 59-control modal
 ending in an editable T-minus table (`01-plan-workspaces.md` §5). A quick path creates
@@ -50,7 +55,7 @@ The ladder is stored on `event_plans` (see `refreshSignal` comment ~8060).
 **Decisions already made:** B2 §6.3 (a) keep the ladder, plain-window labels later, editor
 out of create. `01` §7.5 (b) — hidden behind "we'll remind you… change".
 
-## Phase 2 — "Set it up" on the EVENT workspace (≈2 days)
+## Phase 2 — "Set it up" on the EVENT workspace (≈2 days) — DONE 2026-09-17
 
 **Intent.** The event's set-up (ladder editor, extras chips, budget category, Compile /
 Run-it-back, planning-chat config) leaves the doing plane. B2 §3.1/§3.6.
@@ -79,7 +84,7 @@ mobile hub `HUB_META` rows (~9307). Compile card on past events (grep `Compile`,
 **Decisions:** B2 §6.5 (b) keep two levels for containers, fix roll-ups later; §6.4
 (announce) NOT in scope — separate feature.
 
-## Phase 3 — "Set it up" on the TEAM workspace hubs (≈3 days)
+## Phase 3 — "Set it up" on the TEAM workspace hubs (≈3 days) — DONE for the board + finance hubs 2026-09-17; SGL open
 
 **Intent.** `01` §3 C. Roster confirm, roles & permissions, receipt categories, fund
 allocation, group generation, season rollover go behind one row per workspace hub.
@@ -108,16 +113,16 @@ rollover ~1909), `RotationsTab` `newSemesterTrigger` (~2138), groups `generateTr
 | Sweep | Size | Note |
 |---|---|---|
 | K1 desktop primitives at phone width (~20 surfaces) | 1 wk | Phase 1 does the create sheets |
-| K2 solid plum as selection → tint (9 sites) | ½ day | N6/N9 |
-| K3 `--line-2` as fill → `--pocket-track` (7) | ½ day | |
-| K4 600 → 500 on 15px list rows (3 comps) | ½ day | |
-| K6 ghost creates → plum in the collection slot | ½ day | |
-| K7 retired tiers (36px, PocketBackRow, 15/plum back-label) | ½ day | |
-| K8 22 raw `<select>`s in the event workspace + native date masks | 1–2 days | shared `Select` exists |
-| K9 off-palette values | ½ day | hex ratchet already blocks new ones |
-| K10 chrome-rhythm escapes (Receipts, compose) | ½ day | extend the sweep, never the band |
-| K11 Plan zero-team landing for leader tier | 1 day | needs §8.5 decision |
-| N22 integer type sizes (196 sites) + lint | 1 day | ratified; mechanical |
+| DONE — K2 solid plum as selection → tint (9 sites) | ½ day | N6/N9 |
+| DONE — K3 `--line-2` as fill → `--pocket-track` (7) | ½ day | |
+| K4 600 → 500 on 15px list rows | — | no desktop sites; the phone rows are ratified 15/600 |
+| DONE — K6 ghost creates → plum in the collection slot | ½ day | |
+| K7 retired tiers — 36px DONE; PocketBackRow (Congregation ×2) OPEN | ½ day | |
+| DONE — K8 22 raw `<select>`s in the event workspace + native date masks | 1–2 days | shared `Select` exists |
+| DONE — K9 off-palette values | ½ day | hex ratchet already blocks new ones |
+| DONE — K10 chrome-rhythm escapes (Receipts, compose) | ½ day | extend the sweep, never the band |
+| K11 Plan zero-team landing for leader tier | 1 day | DECIDED 2026-09-18: (a) Create your first team |
+| DONE — N22 integer type sizes (196 sites) + lint | 1 day | ratified; mechanical |
 | C8 flat-row pass across Plan/Receipts | 2 days | ratified as "commit as one task" |
 
 **Order:** Phase 1 → Phase 2 → K8 (the event workspace is open anyway) → Phase 3 → the
