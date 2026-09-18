@@ -426,6 +426,7 @@ Permission tiers:
 | Member profile overlay (global) | 130 |
 | Emoji dismiss overlay | 155 |
 | Emoji picker | 160 |
+| Lifted message material (chat long-press blur scrim) | 170 |
 | Action menus (`ActionMenu` portal) | 200 |
 | Modals (`CentralModal`) | 200 (override e.g. 210 only to stack above another overlay) |
 | In-app message banner (`MessageBanner`) | 240 |

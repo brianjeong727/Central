@@ -38,7 +38,7 @@ Reconciled for adoption from the cdesign source ("Pocket Daybreak v2") against t
 ### Terminology
 
 - **"serif"** in this doc ≡ `var(--serif)`, which resolves to **Bricolage Grotesque** in its display role (`app/globals.css`). There is NO second typeface on mobile — "serif" names the display voice (larger sizes, tighter tracking, 600 weight), never an actual serif font.
-- **muted text** ≡ `var(--muted-text)` (`#8A8497`). Never `var(--muted)` — that is the shadcn ivory **surface** alias.
+- **muted text** ≡ `var(--muted-text)` (`#6E687B`, the post-AA value — C1, 2026-09-17). Never `var(--muted)` — that is the shadcn ivory **surface** alias.
 
 ### Tokens (all live in `app/globals.css` — never inline a hex on mobile)
 
@@ -53,8 +53,9 @@ Reconciled for adoption from the cdesign source ("Pocket Daybreak v2") against t
 | `--plum-2` | `#2D0F2E` | floating nav pill |
 | `--ink` | `#13101A` | primary text, reading bodies |
 | `--body` | `#474251` | secondary text |
-| `--muted-text` | `#8A8497` | meta, kickers |
-| `--faint` | `#A09A8C` | stamps, placeholders, unset `—` |
+| `--muted-text` | `#6E687B` | meta, kickers (WCAG AA on `--cream`; retuned 2026-08-01, doc moved 2026-09-17) |
+| `--faint` | `#8E8777` | stamps, placeholders, unset `—` (non-text token; never prose) |
+| `--success` | `#7FA67F` | "ok" status accent (was missing from this table — C1) |
 | `--danger` | `#9F3030` | destructive **text/outline only**, never a fill (shipped value kept; v2's `#A03B2E` amended down) |
 | `--sage` | `#5B7A6C` | "online" presence dot (shipped value kept; v2's `#5F7A5A` amended) |
 | `--gold` | `#D4A45C` | readiness "needs-attention" dot (desktop readiness parity) |
@@ -183,3 +184,24 @@ All mobile primitives are named `Pocket*` and live in `components/central/pocket
 - Bottom sheets are `PocketSheet` (z 200); dropdowns/kebabs stay `ActionMenu` (Convention #20).
 - All mobile primitives are `Pocket*` in `components/central/pocket.tsx` (leaf) — no `components/central/mobile/` dir, no `Mobile*` family.
 </content>
+
+---
+
+## 7. Ratified amendments — design pass, 2026-09-17
+
+Ratified by Brian as a block from `tasks/design-pass/10-the-system.md` §5. Each line names the section it amends; fold it in when that section is next rewritten.
+
+- **N3 — Phone chrome creates (amends §3).** The round "+" is the unlabelled create for a screen with one obvious collection; a labelled plum pill is required when the verb isn't obvious ("+ Generate", "+ New semester"). Never two plum creates in one chrome/body.
+- **N4 — The mono kicker is a section header (amends §3/§4).** On hubs and identity/settings/form pages a standalone 10px mono kicker with no H2 under it *is* the L3 section header. A kicker names a section, never the screen; a screen with one section has no kicker.
+- **N6 — One selection grammar (amends §4 fchip).** A selected item is `--plum-tint` ground + plum text + plum hairline, never solid plum. "Pick one of N" is a segmented control for ≤3 options and a picker (or a track, e.g. the text-size control) for 4+; never clickable stat tiles.
+- **N8 — A mobile overlay or sheet hides the pill nav (amends §0/§3).** Bound to `PocketSheet` and `CentralModal` at phone width, not prose.
+- **N9 — Status is tonal; plum is role-only.** Status tags (draft, submitted, confirmed, declined, reimbursed) use the tonal default; plum marks *you* / *yours* / participation. Declined is never quieter than Confirmed.
+- **N17 — The chrome names the object when the section is deep-linkable (amends §3).** A spoke reached from a push shows which event/receipt/person it belongs to — in the chrome or as the first body line — never a bare section name.
+- **N18 — Editorial fields (amends §4 Forms).** Long-form phone inputs (compose headline/body, form-builder labels, option rows) are borderless-on-page with a hairline rule; the ivory input stays for short fields.
+- **N19 — Own-profile screens commit on blur (amends §5 Profile).** No edit mode at phone width; staged-Save applies to settings that affect other people.
+- **N23 / N24 — Empty states and zero-valued chrome:** as in `web_design_system.md` §16; the phone already suppresses zero chrome in three of six sites — make it six.
+- **C4 — Profile v2 is the recipe (amends §5 Profile):** identity on page, 88px avatar, tap-to-edit, completeness meter, verse band; migrate the member sheet to it; keep the name at 21.
+- **C6 — Automations (amends §5 Church Settings):** single-column switch cards with a one-line explanation, not two columns.
+- **C7 — Ministry / Operations / Records** is the canonical Settings taxonomy on both widths.
+- **N21 — The lifted-message material** (blur scrim, z 170) is recorded in the Z-index table (`REFERENCE.md`) and here: it sits between the chat screen (100–110) and action menus/modals (200).
+

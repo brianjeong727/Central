@@ -280,19 +280,17 @@ The home "Up Next" slot is a manually-advanced carousel of curated slides sharin
 
 Mobile: see mobile_design_system.md.
 
-### 4.1c Pastor Pulse slide — flat-plum lead slide (scoped exception)
+### 4.1c Pastor Pulse card — a quiet section under the hero (was: flat-plum lead slide)
 
-The Pastor Pulse question rides **inside** the home hero carousel as a hosted **lead slide** (index 0), not as a standalone card elsewhere on Home. It renders only for a **non-pastor** viewer with an **active, unanswered** question. It is the one sanctioned plum surface in the shell (see §4.1 Status exception).
+**Retired 2026-09-17 (design pass B4, decision 1a).** The pulse no longer rides inside the hero carousel. It made "Featured" not actually curated (it displaced the leader's first slide for every non-pastor), put two purples side by side, and its absolutely-positioned tag overprinted the eyebrow at phone width. `HomeHeroCarousel` has no lead-slide prop any more.
 
-- **Card:** flat `--plum-2` fill, `1px solid --plum-deep`, radius `--r-hero`, fills the carousel frame. All text is cream. No gradient, no dot texture, no drop shadow.
-- **Header:** mono eyebrow `Pastor Pulse · {type}` in translucent cream with a solid cream lead dot; a small top-right **`Anonymous`** mono tag (translucent cream). Serif question, 24px/600, cream.
-- **Translucent-cream controls (new control treatment — plum-card only):** interactive controls on the plum card are cream-at-low-opacity **at rest** and **solid `--cream` when chosen** (chosen text flips to `--plum-2`). Express every translucency as `color-mix(in srgb, var(--cream) N%, transparent)` — **never** a raw `rgba()` and never a translucent *plum* fill. This is the only place this treatment is used; it does not replace the standard §4.3 button roles anywhere in cream space.
-  - **Poll** — auto-layout by option length: short options (≤24 chars) → wrapping **chips**; long/sentence options → **stacked rows** with a leading radio dot.
-  - **Scale** — a **1–10 drag slider**: cream track-fill + cream thumb, a value bubble above the thumb, a 1–10 tick row and low/high word anchors. The value is **unset until the user interacts** (thumb rests at mid, bubble hidden, submit dim).
-  - **Open / Prayer** — a translucent-cream textarea; **Prayer** adds a small lock + "Shared privately with the prayer team" privacy line.
-- **Submit:** the §4.3 **hero-invert** primary (cream bg / `--plum-2` text), label "Submit anonymously"; dims to `opacity 0.35` (stays cream — do NOT swap to the cream-2/faint disabled treatment on this dark card) and disables until the answer is valid.
-- **Answered state:** on submit the interior collapses to a centered cream check + "Thanks for sharing." / "Your response was received anonymously.", then the slide **drops out of the carousel** (~2s later) so content slides take the lead.
-- **Gating (peek-past):** the pulse holds the lead and the carousel does **not** auto-rotate away from it, but the viewer **may** manually page to other slides; it stays first until answered, then leaves. (Not a hard block.)
+It is now **`PulseCard`** (`components/central/pulse-card.tsx`), its own section directly under the hero, rendered only for a **non-pastor** viewer with an **active, unanswered** question. **Featured is purely curated.**
+
+- **Card:** the host page's tonal grammar — `--cream-panel` + `1px solid --line`, radius `--r-card` on desktop; `--ivory`, borderless, `--r-pocket` at phone width. Ink text. No plum surface.
+- **Header:** one flex row — mono eyebrow `Pastor Pulse · {type}` with a plum lead dot on the left, the mono `Anonymous` tag on the right (inline, never absolute). Serif question 24/600 (21 on the phone), `--ink`.
+- **Controls follow the ordinary grammar:** poll chips/rows are cream with a `--line-2` hairline and take the §4.4 selection state when chosen (`--plum-tint` ground + plum text + plum hairline); the scale slider is a `--pocket-track` track with a plum fill, thumb and value bubble; the textarea is a cream `--r-input` field with a plum focus ring.
+- **Submit:** the ordinary §4.3 plum primary — the one plum moment on the card. Disabled while the answer is empty.
+- **Answered state:** a centered plum-ringed check + "Thanks for sharing." / "Your response was received anonymously."; the section then unmounts.
 
 ### 4.2 Tabs (underline)
 - Container: `display: flex; gap: 32; border-bottom: 1px solid #E8E2D2;`
@@ -1135,3 +1133,30 @@ Props: `open, title, message?, confirmLabel="Delete", cancelLabel="Cancel", dang
 ## 15. Final principle
 
 When a decision isn't covered above, default to **less**. Less color, less weight, less border, less iconography. The Central app earns its character from *restraint* — every time the original screens went wrong, it was by adding (a gradient, a red, a bold sans, a modal, a tab, an icon). The corrections were almost always subtractive. Build that way.
+
+---
+
+## 16. Ratified amendments — design pass, 2026-09-17
+
+Ratified by Brian as a block from `tasks/design-pass/10-the-system.md` §5 (the nine-network audit of 2026-09-13/14). Each line is a rule; the section it amends is named so the body text above can be rewritten in place as those sections are next touched. Where a line names a component that does not exist yet, building it is the K/C sweep in `tasks/run-it-set-it-up-plan.md`.
+
+- **N1 — The section content-header tier (amends §3.2, §7.5).** A body section opens with a **19/500 sans title**, an optional mono eyebrow above, optional 13px meta, and hosts the collection's create at its right. It is the L2 tier between the page title and the H2. Snap the 21/19/15 (Finance) and 20-with-overrides (Settings) instances.
+- **N2 — What the context panel holds (amends §2.1/§4).** It is one of four things — a *section nav* (Home, Settings), a *workspace switcher* (Plan), a *scope filter* (Receipts), an *object list* (Messages, People) — and says which. The master/detail row is ONE component (`PanelRow`), not four implementations.
+- **N7 — No section on Home is an unbounded list (amends §7 Home).** Each shows at most N rows and a "See all" into its owning tab. (Deadlines: 5.)
+- **N10 — The detail aside module (amends §4).** Kicker → anchor → action → meta, stacked; at most one plum primary per aside, chosen by what is still owed.
+- **N12 — One `formatMoney()` (amends §1.4).** Always grouped, one sign convention, never `$-`, tabular numerals, never truncated.
+- **N14 — `AuthHeader` (amends §7.6/§7.8).** The split-shell title block (eyebrow → 44 serif ending in a period → 16 subtitle) is one component; pre-shell phone screens use the Pocket ground rules even without a chrome row.
+- **N15 — The "choice row" card is one component.** Icon tile · title · sub · chevron · whole card tappable.
+- **N16 — Named meters (amends §4).** The segmented progress meter and the launchpad row are named components, one instance each per screen — never a segmented meter 200px from a continuous bar.
+- **N20 — The plum-dot section label (amends §1.3).** Either retired or given a constant; it is not a third eyebrow grammar by accident. **Text-shadow** on cream-over-photo captions is allowed as a legibility device and nowhere else.
+- **N23 — The empty-state contract (amends §4.19).** Icon tile · a title naming what's missing · one sentence that teaches what this screen becomes · one action the *current role* can take, as a button *inside* the state. Never name a control in empty copy; role branches the copy, not just the button; filtered-zero names the filter and offers a reset; "You're all caught up" is only for someone who once had something.
+- **N24 — Zero-valued chrome doesn't render.** Counters, stat tiles, filter chips, sub-tab strips and eyebrows reading 0 / None are suppressed while the collection is empty.
+- **C2 — `PageTitle` is 44 and every tab root uses it; the 44px Home greeting is the front-door exemption** to the two-tier rule (§1.3).
+- **C3 — Chat surfaces (rewrites §4.15/§4.16 when next touched).** `--ivory` is chat's inset surface (bubble, composer pill, reaction bar/pill, "Seen by", poll). A chat's chip is the member-derived avatar cluster, not "every chat is the same plum monogram".
+- **C5 — §7.8 describes a landing page that no longer exists**; rewrite from the shipped landing and declare that it runs its own display scale.
+- **C7 — The Settings taxonomy is Ministry / Operations / Records on both widths** (the phone hub's grouping is canonical; amends §7.5).
+- **C9 — Grouped-list creates (§11.13):** every group gets its own add row (Countdown and Run of Show do this right). A section-rule create for date-derived groups (Sub-events) is NOT an exception; fix Roles and Sub-events to match.
+- **C10 — Settings-section empty states** converge on one grammar — mat + sentence + in-mat plum action — and a section's header "+ Add X" is hidden while the section is empty.
+- **C8 (ratified as "commit it as one task")** — the flat-row pass across Plan/Receipts: tap-through rows lose their cards. Scheduled in `tasks/run-it-set-it-up-plan.md`.
+- **N22 (ratified)** — type sizes are integers; the 196 half-pixel sites are rounded once and a lint keeps them out. The half-step scale alternative is rejected.
+
