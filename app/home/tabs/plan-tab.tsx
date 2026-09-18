@@ -1704,6 +1704,13 @@ export function StudentOrgTeamHome({
                 { iconKey: "users", title: "Groups", subtitle: "Split the ministry into balanced small groups", onClick: () => setTeamTabAndUrl("Groups") },
                 { iconKey: "set", title: "Rotations", subtitle: "Semester sign-up slots", onClick: () => setTeamTabAndUrl("Rotations") },
               ] },
+              // Set-up — what configures the rows above, once a season, behind one
+              // group at the foot (design pass R3). Leaders only. The season
+              // rollover used to be a pill in the Events header, beside New Event.
+              ...(canEdit ? [{ label: "Set-up", rows: [
+                ...(onTeamSettings ? [{ iconKey: "sliders", title: "Team settings", subtitle: "Roster, roles & permissions", onClick: onTeamSettings }] : []),
+                { iconKey: "plan", title: "Season", subtitle: rolloverSource.count > 0 ? `Start next season · carries ${rolloverSource.count} ${rolloverSource.count === 1 ? "tradition" : "traditions"}` : "Start next season", onClick: () => setShowSeasonConfirm(true) },
+              ] }] : []),
             ]}
           />
         )}
@@ -1818,11 +1825,7 @@ export function StudentOrgTeamHome({
                         )}
                       />
                     )}
-                    {canEdit && (
-                      <PocketButton variant="quiet" surface="page" onClick={() => setShowSeasonConfirm(true)}>
-                        <Repeat style={{ width: 14, height: 14 }} /> Start next season
-                      </PocketButton>
-                    )}
+                    {/* "Start next season" lives in the hub's Set-up group now (R3). */}
                   </div>
                 )}
               </>
@@ -1860,20 +1863,27 @@ export function StudentOrgTeamHome({
                       )}
                     />
                   )}
+                  {/* Set it up — the ONE door to the workspace's configuration on
+                      desktop (R3): team settings and the season rollover, which
+                      used to be a ghost pill in this row. Shared ActionMenu
+                      (Convention #20), ghost to the create's left (#15). */}
                   {canEdit && (
-                    <button
-                      type="button"
-                      onClick={() => setShowSeasonConfirm(true)}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 6,
-                        padding: "6px 13px", borderRadius: 9999, cursor: "pointer",
-                        border: "1.5px solid var(--line)", background: "var(--cream-panel)",
-                        fontSize: 12.5, fontWeight: 500, color: "var(--plum)", whiteSpace: "nowrap",
-                      }}
-                    >
-                      <Repeat style={{ width: 13, height: 13 }} />
-                      Start next season
-                    </button>
+                    <ActionMenu
+                      items={[
+                        ...(onTeamSettings ? [{ key: "settings", label: "Team settings — roster, roles & permissions", onSelect: onTeamSettings }] : []),
+                        { key: "season", label: rolloverSource.count > 0 ? `Start next season — carries ${rolloverSource.count} ${rolloverSource.count === 1 ? "tradition" : "traditions"}` : "Start next season", onSelect: () => setShowSeasonConfirm(true) },
+                      ]}
+                      renderTrigger={({ toggle }) => (
+                        <button
+                          type="button"
+                          onClick={toggle}
+                          aria-label="Set it up"
+                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 999, cursor: "pointer", border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 13, fontFamily: "var(--sans)" }}
+                        >
+                          <Settings style={{ width: 13, height: 13 }} /> Set it up
+                        </button>
+                      )}
+                    />
                   )}
                   {canEdit && (
                     <ContentActionButton
@@ -3495,14 +3505,23 @@ export function PlanTab({
                 teamName={activeTeamName}
                 onBack={(userTeams.length >= 2 || govTeams.length > 0) ? onExitTeam : undefined}
                 onSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
-                groups={[{
-                  label: "Sections",
-                  rows: [
-                    { iconKey: "sliders", title: FINANCE_SECTION_LABELS.allocation, subtitle: "Plan the fiscal year's budget", onClick: () => setFinanceMobileSectionAndUrl("allocation") },
-                    { iconKey: "dollar", title: FINANCE_SECTION_LABELS.budget, subtitle: "Expense ledger & category totals", onClick: () => setFinanceMobileSectionAndUrl("budget") },
-                    { iconKey: "clipboard", title: FINANCE_SECTION_LABELS.reimbursements, subtitle: financeReimbSub, onClick: () => setFinanceMobileSectionAndUrl("reimbursements") },
-                  ],
-                }]}
+                groups={[
+                  {
+                    label: "Sections",
+                    rows: [
+                      { iconKey: "dollar", title: FINANCE_SECTION_LABELS.budget, subtitle: "Expense ledger & category totals", onClick: () => setFinanceMobileSectionAndUrl("budget") },
+                      { iconKey: "clipboard", title: FINANCE_SECTION_LABELS.reimbursements, subtitle: financeReimbSub, onClick: () => setFinanceMobileSectionAndUrl("reimbursements") },
+                    ],
+                  },
+                  // Allocation is set-up — the once-a-year plan behind the two doing rows
+                  // above (design pass R3 / B8). Same door, its own group.
+                  {
+                    label: "Set-up",
+                    rows: [
+                      { iconKey: "sliders", title: FINANCE_SECTION_LABELS.allocation, subtitle: "Plan the fiscal year's budget", onClick: () => setFinanceMobileSectionAndUrl("allocation") },
+                    ],
+                  },
+                ]}
               />
             </div>
           ) : (
