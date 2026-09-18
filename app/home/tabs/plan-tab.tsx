@@ -53,7 +53,7 @@ import { MobilePocketHub, PocketHubChrome } from "../components/mobile-pocket-hu
 import { teamIconKey } from "../workspace-presets"
 import { getReimbursementInbox, getPendingReceiptCount } from "@/app/actions/receipts"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
-import { CountdownLadderEditor } from "../components/countdown-ladder-editor"
+import { EventSetupSurface } from "../components/event-setup"
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
 import { EVENT_TYPE_CONFIGS, nextAnchorYMD, ymdOf, lineageKeyOf, seasonLabelOf,
@@ -6711,6 +6711,10 @@ export function AddEventModal({
   // via the Events page's "Start next season".)
   type CreatePath = "quick" | "custom"
   const [createPath, setCreatePath] = useState<CreatePath | null>(isEditing ? "quick" : null)
+  // The QUICK path (a social or a gathering) asks for title, date and place and
+  // nothing else — a single-day event whose end date follows its start date.
+  // Playbooks and Start-from-scratch keep the full form (retreats span days).
+  const isQuickPath = !isEditing && createPath === "quick" && (eventType === "social" || eventType === "ministry")
   const [extras, setExtras] = useState<EventExtraTab[]>([])
   // The traditions flag — recurring events are what "Start next season" copies forward.
   const [recurring, setRecurring] = useState<boolean>(existing?.recurring ?? false)
@@ -6722,18 +6726,11 @@ export function AddEventModal({
     const scroller = bodyTopRef.current?.parentElement
     if (scroller) scroller.scrollTop = 0
   }, [createPath])
-  // The event's T-minus countdown ladder, stored on its event_plans row. In
-  // CREATE mode this is the preset the new plan is seeded with; in EDIT mode it
-  // is loaded from the plan and written back on Save. There are no dates here by
-  // design — every rung is a RELATIVE offset, which is what let the old
-  // plan_start_date / crunch_date pair (and their date-shift dance) go away.
-  const [countdownPhases, setCountdownPhases] = useState<CountdownPhaseDef[]>(
-    () => countdownPresetPhases(DEFAULT_COUNTDOWN_PRESET),
-  )
-  // False until the async ladder load resolves (edit mode only — create mode has
-  // nothing to wait for). Gates the WRITE so a Save that beats the fetch never
-  // stamps the default ladder over a customized one.
-  const [ladderLoaded, setLadderLoaded] = useState(!isEditing)
+  // The countdown ladder is no longer edited here (design pass R3, 2026-09-17):
+  // a create picks it from the horizon at save, and an existing event adjusts it
+  // inside the event behind "Set it up" (EventSetupSurface). The create modal used
+  // to end in an editable T-minus table that most leads scrolled past — and got
+  // the four-week ladder for a three-week event.
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
@@ -6766,28 +6763,6 @@ export function AddEventModal({
     ref.current?.focus({ preventScroll: true })
   }
 
-  // Load the plan's ladder when editing an existing event. ASYNC, and Save does
-  // not wait for it — `ladderLoaded` records whether it landed (see the write).
-  // Unlike the plan/crunch dates this replaced, nothing here is derived from the
-  // event's calendar day, so there is no ministry-zone hazard to guard against:
-  // the ladder means the same thing in every timezone.
-  useEffect(() => {
-    if (!isEditing || !existing) return
-    let cancelled = false
-    ;(async () => {
-      const { data } = await supabase
-        .from("event_plans")
-        .select("countdown_phases")
-        .eq("calendar_event_id", existing.id)
-        .eq("ministry_id", ministryId)
-        .maybeSingle()
-      if (cancelled) return
-      setCountdownPhases(ladderOf((data?.countdown_phases as CountdownPhaseDef[] | null) ?? null))
-      setLadderLoaded(true)
-    })()
-    return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   // Run Sheet P2 — look up a matching playbook for NEW events (re-runs on type change).
   useEffect(() => {
@@ -6958,30 +6933,11 @@ export function AddEventModal({
         // move the tasks and not the anchors and every task collapsed into Crunch.
         // The ladder is RELATIVE offsets, so it rides a date move untouched and
         // that whole stopgap is gone.
-        const planLadder = ladderLoaded ? { countdown_phases: countdownPhases } : null
-
+        // The ladder is owned by the event's Set-it-up surface now; an edit here
+        // never rewrites it (it used to write back whatever it had loaded). The
+        // plan row is only looked up so a moved date can shift its tasks.
         let planId: string | null = null
-        if (planLadder) {
-          // Update first; if no plan exists yet (0 rows), insert one.
-          const { data: planUpd } = await supabase
-            .from("event_plans")
-            .update(planLadder)
-            .eq("calendar_event_id", existing.id)
-            .eq("ministry_id", ministryId)
-            .select("id")
-          if (!planUpd || planUpd.length === 0) {
-            await supabase.from("event_plans").insert({
-              ministry_id: ministryId,
-              calendar_event_id: existing.id,
-              created_by: userId,
-              ...planLadder,
-            })
-          } else {
-            planId = (planUpd[0] as { id: string }).id
-          }
-        } else {
-          // Load still in flight: touch no plan column, just resolve the plan id
-          // so the task shift can still run.
+        {
           const { data: planRow } = await supabase
             .from("event_plans")
             .select("id")
@@ -7049,7 +7005,11 @@ export function AddEventModal({
             // The countdown ladder chosen in the modal. Seeded HERE so a plan is
             // never created without one — a phase-less plan would bucket every
             // task into UNSCHEDULED.
-            countdown_phases: countdownPhases,
+            // Ladder by HORIZON: three weeks or less gets the short (days) ladder,
+            // further out gets the four-week one. The old create-time editor
+            // defaulted to long, so a game night three weeks away opened with
+            // a "T−4 WEEKS" window that had already passed.
+            countdown_phases: countdownPresetPhases(daysBetweenYMD(todayInZone(timeZone), startDateStr) <= 21 ? "short" : "long"),
             ...(createPath === "custom" && extras.length > 0 ? { type_data: { extras } } : {}),
           })
           .select("id")
@@ -7222,13 +7182,10 @@ export function AddEventModal({
           )}
           {createPath !== null && (
           <>
-          {/* Quick-preset hint */}
+          {/* What the playbook brings — said as an outcome, not "Pre-seeded:". */}
           {!isEditing && createPath === "quick" && (cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
-            <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 12, color: "var(--body)" }}>
-              <span style={{ fontWeight: 500, color: "var(--plum)" }}>Pre-seeded: </span>
-              {cfg.defaultRoles.map(r => r.name).join(", ")}
-              {cfg.defaultRoles.length > 0 && cfg.defaultPhases.length > 0 && " · "}
-              {cfg.defaultPhases.reduce((n, p) => n + p.tasks.length, 0)} checklist tasks
+            <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 12.5, color: "var(--body)", lineHeight: 1.5 }}>
+              We&apos;ll set up the checklist{cfg.defaultRoles.length > 0 ? ", the roles" : ""} and the reminders for a {cfg.label.toLowerCase()}. Adjust any of it inside the event.
             </div>
           )}
 
@@ -7239,12 +7196,15 @@ export function AddEventModal({
               placeholder={createPath === "quick" && ghost ? ghost.title : "Event name"} />
           </FormField>
 
-          {/* Description */}
+          {/* Description — not on the quick path: title, date, place is the whole ask.
+              Everything else is adjustable inside the event. */}
+          {!isQuickPath && (
           <FormField label="Description">
             <Textarea style={{ minHeight: 80 }} value={description} onChange={(e) => { touchedRef.current.description = true; setDescription(e.target.value) }}
               onKeyDown={(e) => ghostTabFill(e, description, ghost?.description, setDescription)}
               placeholder={createPath === "quick" && ghost ? ghost.description : "Optional details…"} />
           </FormField>
+          )}
 
           {/* Location */}
           <FormField label="Location">
@@ -7260,7 +7220,7 @@ export function AddEventModal({
           </div>
 
           {/* Recurring toggle — the traditions flag; sub-events roll with their parent */}
-          {!parentEventId && (
+          {!parentEventId && !isQuickPath && (
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
               <input type="checkbox" id="recurringEv" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--plum)", cursor: "pointer", marginTop: 2 }} />
               <label htmlFor="recurringEv" style={{ fontSize: 14, color: "var(--body)", cursor: "pointer", lineHeight: 1.45 }}>
@@ -7273,27 +7233,21 @@ export function AddEventModal({
           {/* Dates + times */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <FormField label="Start date *">
-              <Input ref={startDateInputRef} type="date" value={startDateStr} onChange={(e) => { touchedRef.current.dates = true; setStartDateStr(e.target.value) }} />
+              <Input ref={startDateInputRef} type="date" value={startDateStr} onChange={(e) => { touchedRef.current.dates = true; setStartDateStr(e.target.value); if (isQuickPath) setEndDateStr(e.target.value) }} />
             </FormField>
             <FormField label="Start time">
               <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={startTimeStr} onChange={(e) => { touchedRef.current.dates = true; setStartTimeStr(e.target.value) }} disabled={allDay} />
             </FormField>
+            {!isQuickPath && (
             <FormField label="End date *">
               <Input ref={endDateInputRef} type="date" value={endDateStr} onChange={(e) => { touchedRef.current.dates = true; setEndDateStr(e.target.value) }} />
             </FormField>
+            )}
             <FormField label="End time">
               <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={endTimeStr} onChange={(e) => { touchedRef.current.dates = true; setEndTimeStr(e.target.value) }} disabled={allDay} />
             </FormField>
           </div>
 
-          {/* Countdown planning structure — persisted to the event's plan row.
-              Shown on CREATE too (it seeds the new plan's ladder), unlike the
-              plan-start/crunch pair it replaced, which was edit-only. */}
-          <CountdownLadderEditor
-            phases={countdownPhases}
-            onChange={setCountdownPhases}
-            disabled={!ladderLoaded}
-          />
 
           {/* Free-form capability modules — persisted to the plan's type_data.extras */}
           {!isEditing && createPath === "custom" && (
@@ -8084,6 +8038,9 @@ export function EventPlanWorkspace({
   // has loaded (a member with nothing assigned lands on All; an empty "Yours" is
   // a dead end, not a default).
   const [planScope, setPlanScope] = useState<"yours" | "all" | null>(null)
+  // "Set it up" — the event's configuration surface (ladder, optional modules,
+  // Compile). One row at the foot of the hub / one entry on Overview; leaders only.
+  const [setupOpen, setSetupOpen] = useState(false)
 
   // Extra tabs = the type's built-in modules ∪ the plan's free-form modules
   // (type_data.extras, chosen in the Start-from-scratch creator).
@@ -8092,6 +8049,20 @@ export function EventPlanWorkspace({
   // type_data.extras would show a blank tab. Filtered out rather than migrated; the
   // union member and its label/meta entries stay so a stored value can't crash a render.
   const extraTabs: EventExtraTab[] = [...new Set([...typeCfg.extraTabs, ...planExtras])].filter(t => t !== "program")
+
+  async function handleSetupSave(next: { phases: CountdownPhaseDef[]; extras: EventExtraTab[] }) {
+    if (!plan) return
+    const { data, error } = await supabase
+      .from("event_plans")
+      .update({ countdown_phases: next.phases, type_data: { ...(plan.type_data ?? {}), extras: next.extras } })
+      .eq("id", plan.id)
+      .eq("ministry_id", ministryId)
+      .select("*")
+      .single()
+    if (error || !data) throw new Error(error?.message ?? "Couldn't save the set-up.")
+    setPlan(data as EventPlan)
+    setCountdownPhases(ladderOf(next.phases))
+  }
 
   // ── Container vs leaf (see app/home/tabs/event-container.tsx) ────────────────
   // A CONTAINER is an event whose content is really its sub-events (Welcome Week and
@@ -9425,6 +9396,23 @@ export function EventPlanWorkspace({
                       )
                     })}
                   </PocketRowCard>
+                  {/* ── Set-up — everything that configures the doing plane above,
+                      behind ONE row (design pass R3). Leaders only. ── */}
+                  {canEdit && (
+                    <>
+                      <PocketKicker label="Set-up" style={{ margin: "24px 4px 10px" }} />
+                      <PocketRowCard>
+                        <PocketRow
+                          leading={<PlanLineIcon iconKey="sliders" size={40} radius={14} bg="var(--line-2)" fg="var(--plum)" />}
+                          title="Set it up"
+                          sub="Planning schedule, optional modules, playbook"
+                          chevron
+                          isLast
+                          onClick={() => setSetupOpen(true)}
+                        />
+                      </PocketRowCard>
+                    </>
+                  )}
                 </div>
               )
             })()}
@@ -9602,18 +9590,7 @@ export function EventPlanWorkspace({
                       )}
                     </div>
 
-                    {/* Run Sheet P2 — Compile playbook (leader-only, once passed) */}
-                    {canEdit && plan && new Date(calendarEvent.start_date).getTime() < Date.now() && (
-                      <div style={{ marginTop: 26 }}>
-                        <p style={eyebrow}>Playbook</p>
-                        <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.55, margin: "0 0 12px" }}>
-                          Save this event&apos;s tasks, roles, and timing as a reusable playbook — next year&apos;s team can &ldquo;Run it back.&rdquo;
-                        </p>
-                        <PocketButton variant="quiet" surface="page" onClick={() => setCompileOpen(true)} style={{ width: "100%" }}>
-                          Compile playbook
-                        </PocketButton>
-                      </div>
-                    )}
+                    {/* Compile playbook lives behind "Set it up" now (R3). */}
                   </div>
                 )
               }
@@ -9746,6 +9723,18 @@ export function EventPlanWorkspace({
                   {/* Budget — "ceiling + draws" (see EventBudgetCard). Replaces the old
                       free-text budget_allocated stat and the title-keyed ministry-allocation
                       panel that used to sit under it. */}
+                  {/* "Set it up" — the ONE door to the event's configuration
+                      (design pass R3): ladder, optional modules, Compile. */}
+                  {canEdit && (
+                    <div style={{ marginBottom: 16 }}>
+                      <ActionCard
+                        icon={<PlanLineIcon iconKey="sliders" size={20} radius={0} bg="transparent" fg="var(--plum)" />}
+                        title="Set it up"
+                        subtitle="Planning schedule, optional modules, playbook"
+                        onClick={() => setSetupOpen(true)}
+                      />
+                    </div>
+                  )}
                   {(canEdit || canEditBudget) && (
                   <EventBudgetCard
                     ministryId={ministryId}
@@ -10617,6 +10606,20 @@ export function EventPlanWorkspace({
         onConfirm={() => { confirm?.onConfirm(); setConfirm(null) }}
         onClose={() => setConfirm(null)}
       />
+      {setupOpen && plan && (
+        <EventSetupSurface
+          mobile={isMobile}
+          phases={ladderOf(countdownPhases)}
+          extras={planExtras.filter(t => t !== "program")}
+          builtInExtras={typeCfg.extraTabs}
+          isContainer={isContainer}
+          isChild={!!calendarEvent.parent_event_id}
+          isPast={new Date(calendarEvent.start_date).getTime() < Date.now()}
+          onClose={() => setSetupOpen(false)}
+          onSave={handleSetupSave}
+          onCompile={() => { setSetupOpen(false); setCompileOpen(true) }}
+        />
+      )}
       {compileOpen && plan && (
         <EventCompileModal
           eventPlanId={plan.id}
