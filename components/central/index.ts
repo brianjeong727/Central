@@ -74,7 +74,6 @@ export {
   PocketProgress,
   PocketHeroCard,
   PocketDashedButton,
-  PocketBackRow,
   PocketChip,
   PocketRoundButton,
   PocketSheet,

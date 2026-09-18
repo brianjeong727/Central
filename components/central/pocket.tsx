@@ -23,7 +23,6 @@ import { useBackIntent } from "@/lib/back-intent"
 //   PocketHeroCard    the ≤1-per-screen plum hero
 //   PocketProgress    4px progress bar (ivory or plum colorway)
 //   PocketDashedButton dashed add-affordance
-//   PocketBackRow     "← Section" return row inside drilled-in screens
 //   PocketChip        40px squircle letter monogram
 //   PocketRoundButton 34px round chrome action (ghost | plum create)
 
@@ -344,15 +343,6 @@ export function PocketDashedButton({ label, onClick, icon }: { label: string; on
   )
 }
 
-// "← Section" return row for screens drilled into from a hub — sits above the
-// section content when the chrome row can't carry the back (single-file swaps).
-export function PocketBackRow({ label, onBack, style }: { label: string; onBack: () => void; style?: CSSProperties }) {
-  return (
-    <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 12px 0 6px", marginBottom: 18, background: "transparent", border: "none", color: "var(--body)", fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, cursor: "pointer", ...style }}>
-      <ChevronLeft style={{ width: 18, height: 18 }} strokeWidth={1.7} /> {label}
-    </button>
-  )
-}
 
 // 40px squircle chip (mockup `.chip`): --pocket-track tonal holding a plum
 // letter OR a plum stroked icon (§4 Row contract — "plum stroke icon or

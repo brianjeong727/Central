@@ -5,7 +5,7 @@ import { useNavState } from "../nav-state"
 import { Plus, X, BarChart2, ChevronLeft } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { Spinner, MONO_STYLE, EmptyState } from "../components/shared"
-import { TabPageHeader, PageTitle, CentralButton, ContentActionButton, ContentHeader, PocketBackRow, PocketRoundButton, PocketKicker } from "@/components/central"
+import { TabPageHeader, PageTitle, CentralButton, ContentActionButton, ContentHeader, PocketRoundButton, PocketKicker } from "@/components/central"
 import { PocketChrome } from "../components/pocket-header"
 import type { CongregationTabProps, CongregationQuestion } from "../types"
 
@@ -348,11 +348,9 @@ export function CongregationTab({ userId, ministryId, onViewChange, onBack }: Co
         {view === "create" && (
           <div>
             {/* Mobile: single back affordance + one chrome-like title row */}
+            {/* One chrome row names the screen; its chevron is the single back (§0.3). */}
             <div className="md:hidden">
-              <PocketBackRow label="Congregation" onBack={() => goTo("list")} />
-              <h1 style={{ fontFamily: "var(--serif)", fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", lineHeight: 1.1, margin: "0 0 16px" }}>
-                New question
-              </h1>
+              <PocketChrome title="New question" back={() => goTo("list")} />
             </div>
             {/* Desktop: ghost back (shell owns the crumb; title is TabPageHeader) */}
             <div className="hidden md:block">
@@ -457,8 +455,10 @@ export function CongregationTab({ userId, ministryId, onViewChange, onBack }: Co
         {view === "detail" && (
           <div>
             {/* Mobile: single back affordance up one level to the list */}
+            {/* The body headlines itself with the question, so the chrome names the
+                SECTION (Convention #27's second grammar). */}
             <div className="md:hidden">
-              <PocketBackRow label="Congregation" onBack={() => goTo("list")} />
+              <PocketChrome title="Congregation" back={() => goTo("list")} />
             </div>
             {/* Desktop: ghost back */}
             <div className="hidden md:block">
