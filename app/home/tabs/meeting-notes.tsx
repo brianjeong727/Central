@@ -1117,7 +1117,10 @@ export function MeetingNotesSection({
   if (isMobile) {
     return (
       <>
-      <PocketRowCard>
+      {/* FLAT ROWS (C8, ratified 2026-09-17): notes are tapped through, so the
+          list is a full-bleed immersive run, not a card; -mx-5 cancels the host's
+          inset because each row owns its own 20px gutter. */}
+      <div className="-mx-5">
         {filtered.map((note, i) => {
           const decs = decisionsOf(note)
           const d = new Date(note.date + "T12:00:00")
@@ -1134,7 +1137,8 @@ export function MeetingNotesSection({
               title={note.title || "(Untitled)"}
               sub={sub}
               chevron
-              isLast={i === filtered.length - 1}
+              immersive
+              isFirst={i === 0}
               onClick={() => onOpenNote(note.id)}
               // Readers get the row exactly as it has always been — no trailing
               // element, so PocketRow renders its original single <button>.
@@ -1142,7 +1146,7 @@ export function MeetingNotesSection({
             />
           )
         })}
-      </PocketRowCard>
+      </div>
       {deleteDialog}
       </>
     )
