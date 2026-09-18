@@ -2626,6 +2626,75 @@ function WsTile({ initials, badge, name, sub, onClick }: {
   )
 }
 
+// ── First-team landing (K11, Brian 2026-09-18: §8.5 (a)) ───────────────────────
+// A leader-tier viewer of a ministry with NO teams used to be auto-entered into
+// Receipts and told "No teams yet. Join or govern a team" — the one person who
+// can create a team, told to join one, under a heading about expense receipts.
+// This is Plan's real day-one screen: what a workspace is, the three presets as
+// choice rows (N15), one plum create. Members keep the quieter "not on a team".
+function FirstTeamLanding({ mobile, ministryName, onCreate }: { mobile: boolean; ministryName: string; onCreate: () => void }) {
+  const presets = WORKSPACE_PRESETS.filter((p) => !p.comingSoon).slice(0, 3)
+  if (mobile) {
+    return (
+      <div className="flex flex-col" style={{ paddingTop: 8 }}>
+        {/* No kicker: the chrome already says "Workspace", and a screen with one
+            section carries no section label (N4). */}
+        <h2 style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 4px 6px" }}>
+          Set up your first team
+        </h2>
+        <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.55, margin: "0 4px 18px" }}>
+          A workspace is a team&apos;s home: its events, roles, notes and money in one place. Start with the one your leaders already run.
+        </p>
+        <PocketRowCard>
+          {presets.map((p, i) => (
+            <PocketRow
+              key={p.name}
+              leading={<PlanLineIcon iconKey={teamIconKey({ team_type: p.teamType, name: p.name })} size={40} radius={14} bg="var(--pocket-track)" fg="var(--plum)" />}
+              title={p.name}
+              sub={p.description}
+              chevron
+              isLast={i === presets.length - 1}
+              onClick={onCreate}
+            />
+          ))}
+        </PocketRowCard>
+        <PocketButton variant="primary" onClick={onCreate} style={{ width: "100%", marginTop: 18 }}>
+          <Plus style={{ width: 15, height: 15 }} /> Create your first team
+        </PocketButton>
+      </div>
+    )
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "44px 48px 64px" }}>
+      <div style={{ width: "100%", maxWidth: 560 }}>
+        <p style={{ ...MONO_STYLE, margin: "0 0 14px", textAlign: "center" }}>WORKSPACE · {ministryName.toUpperCase()}</p>
+        <h1 style={{ fontFamily: "var(--serif)", fontSize: 25, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.15, margin: "0 0 10px", textAlign: "center" }}>
+          Set up your first team
+        </h1>
+        <p style={{ fontSize: 15, color: "var(--body)", margin: "0 0 28px", lineHeight: 1.6, textAlign: "center" }}>
+          A workspace is a team&apos;s home: its events, roles, notes and money in one place. Start with the one your leaders already run.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {presets.map((p) => (
+            <ActionCard
+              key={p.name}
+              icon={<PlanLineIcon iconKey={teamIconKey({ team_type: p.teamType, name: p.name })} size={20} radius={0} bg="transparent" fg="var(--plum)" />}
+              title={p.name}
+              subtitle={p.description}
+              onClick={onCreate}
+            />
+          ))}
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 28 }}>
+          <CentralButton variant="primary" size="md" onClick={onCreate}>
+            <Plus style={{ width: 14, height: 14 }} /> Create your first team
+          </CentralButton>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Dashed "Add workspace" tile (admin only) — last in the Your-workspaces grid.
 function WsAddTile({ onClick }: { onClick: () => void }) {
   const [hover, setHover] = useState(false)
@@ -3243,30 +3312,23 @@ export function PlanTab({
               </div>
             </div>
           ) : (
-            /* EMPTY STATE — strictly 0 teams */
+            /* EMPTY STATE — strictly 0 teams. An admin gets the first-team landing
+               (K11); a member is told, quietly, that a leader adds them. */
+            isAdmin ? (
+              <FirstTeamLanding mobile={false} ministryName={ministryName} onCreate={() => setShowCreateTeam(true)} />
+            ) : (
             <div className="px-14 py-7">
               <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div style={{ ...MONO_STYLE, marginBottom: 12 }}>
-                  {isAdmin ? "YOUR TEAMS · 0" : "NO TEAM YET"}
-                </div>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
-                  {isAdmin ? "Add your first workspace." : "You're not on a team yet."}
+                <div style={{ ...MONO_STYLE, marginBottom: 12 }}>NO TEAM YET</div>
+                <h2 style={{ fontFamily: "var(--serif)", fontSize: 25, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
+                  You&apos;re not on a team yet.
                 </h2>
-                <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 380, lineHeight: 1.6, margin: "0 0 28px" }}>
-                  {isAdmin
-                    ? "Workspaces keep your ministry organized — Small Group Leaders, Student Org Board, Finance, and more."
-                    : "Ask a leader to add you to a team."}
+                <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 380, lineHeight: 1.6, margin: 0 }}>
+                  When a leader puts you on one, it shows up here with your role, your tasks, and the plan for the day.
                 </p>
-                {isGovernanceAdmin && (
-                  <CentralButton
-                    variant="primary" size="md"
-                    onClick={() => setShowCreateTeam(true)}
-                  >
-                    <Plus style={{ width: 14, height: 14 }} /> Add a workspace
-                  </CentralButton>
-                )}
               </div>
             </div>
+            )
           )
         ) : activeTeamId === "receipts" ? (
           <ReceiptsWorkspace
@@ -3456,22 +3518,17 @@ export function PlanTab({
                 </>
               )}
             </>
+          ) : isAdmin ? (
+            <FirstTeamLanding mobile ministryName={ministryName} onCreate={() => setShowCreateTeam(true)} />
           ) : (
             <div className="flex flex-col items-center justify-center text-center" style={{ paddingTop: 64 }}>
-              <div style={{ ...MONO_STYLE, marginBottom: 12 }}>{isAdmin ? "YOUR TEAMS · 0" : "NO TEAM YET"}</div>
-              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
-                {isAdmin ? "Add your first workspace." : "You're not on a team yet."}
+              <div style={{ ...POCKET_KICKER_STYLE, marginBottom: 12 }}>No team yet</div>
+              <h2 style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.01em", margin: "0 0 10px" }}>
+                You&apos;re not on a team yet.
               </h2>
-              <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 320, lineHeight: 1.6, margin: "0 0 24px" }}>
-                {isAdmin
-                  ? "Workspaces keep your ministry organized — Small Group Leaders, Student Org Board, Finance, and more."
-                  : "Ask a leader to add you to a team."}
+              <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 320, lineHeight: 1.6, margin: 0 }}>
+                When a leader puts you on one, it shows up here with your role, your tasks, and the plan for the day.
               </p>
-              {isGovernanceAdmin && (
-                <CentralButton variant="primary" size="md" onClick={() => setShowCreateTeam(true)}>
-                  <Plus style={{ width: 14, height: 14 }} /> Add a workspace
-                </CentralButton>
-              )}
             </div>
           )}
         </div>

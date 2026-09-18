@@ -528,7 +528,10 @@ function HomeAppInner({ userId, initialProfile, ministryId, ministryName, initia
     if (userTeams.length === 1 && govTeamCount === 0) {
       didAutoEnterRef.current = true
       handleTeamChange(userTeams[0].teamId)
-    } else if (userTeams.length === 0 && govTeamCount === 0 && canUseReceipts) {
+    } else if (userTeams.length === 0 && govTeamCount === 0 && canUseReceipts && !isAdmin) {
+      // An admin with no teams lands on the picker's first-team landing (K11,
+      // 2026-09-18) — never in Receipts, whose empty state told the one person
+      // who can create a team to "join or govern" one instead.
       didAutoEnterRef.current = true
       handleTeamChange("receipts")
     }
