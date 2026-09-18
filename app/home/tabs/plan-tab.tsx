@@ -14557,6 +14557,12 @@ function SmallGroupLeadersTab({
   const channelInstanceId = useRef(Math.random().toString(36).slice(2)).current
   type SGLTab = "home" | "schedule" | "bible_study"
   const validTabs: SGLTab[] = isPastor ? ["bible_study", "schedule"] : ["home", "schedule", "bible_study"]
+  // Set-up (design pass R3, SGL pass 2026-09-18): the president's team-availability
+  // summary and the rotation assigner are configuration, not the week's work. They
+  // sit behind one "Set it up" row on Schedule, and the hub's SET-UP group opens
+  // Schedule with that row already expanded. Everyone else's Schedule is just
+  // "my availability" + the published rotation.
+  const [sglSetupOpen, setSglSetupOpen] = useState(false)
   const defaultTab: SGLTab = isPastor ? "bible_study" : "home"
   const [activeSubTab, setActiveSubTab] = useState<SGLTab>(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sgltab") : null
@@ -15131,15 +15137,25 @@ function SmallGroupLeadersTab({
           teamName={teamName}
           onBack={onExitTeam}
           onSettings={onTeamSettings}
-          groups={[{
-            label: "Sections",
-            rows: validTabs.map(k => ({
-              iconKey: k === "home" ? "clipboard" : k === "schedule" ? "calendar" : "book",
-              title: k === "home" ? "Home" : k === "schedule" ? "Schedule" : "Bible Study",
-              subtitle: k === "home" ? "Your assignments & groups" : k === "schedule" ? "Weekly DGL rotation" : "Study sheets & progress",
-              onClick: () => setMobileDrillAndUrl(k),
-            })),
-          }]}
+          groups={[
+            {
+              label: "Sections",
+              rows: validTabs.map(k => ({
+                iconKey: k === "home" ? "clipboard" : k === "schedule" ? "calendar" : "book",
+                title: k === "home" ? "Home" : k === "schedule" ? "Schedule" : "Bible Study",
+                subtitle: k === "home" ? "Your assignments & groups" : k === "schedule" ? "Weekly DGL rotation" : "Study sheets & progress",
+                onClick: () => { setSglSetupOpen(false); setMobileDrillAndUrl(k) },
+              })),
+            },
+            // Set-up (R3): the president's once-a-semester work, behind one group.
+            ...(isPresident && !isPastor ? [{
+              label: "Set-up",
+              rows: [
+                { iconKey: "sliders", title: "Rotation & availability", subtitle: "Team availability, rotation assigner", onClick: () => { setSglSetupOpen(true); setMobileDrillAndUrl("schedule") } },
+                { iconKey: "users", title: "Roster", subtitle: "Confirm who's leading this semester", onClick: () => setMobileDrillAndUrl("home") },
+              ],
+            }] : []),
+          ]}
         />
       )}
       {/* ── Bible Study Tab ─────────────────────────────────────────────── */}
@@ -15619,8 +15635,8 @@ function SmallGroupLeadersTab({
                         )}
                       </div>
                     )}
-                    {/* President: read-only team summary (matrix stays desktop) */}
-                    {isPresident && scheduleRosterMembers.length > 0 && (
+                    {/* President: read-only team summary — behind Set it up */}
+                    {isPresident && sglSetupOpen && scheduleRosterMembers.length > 0 && (
                       <div className="mt-6">
                         <PocketKicker label="Team availability" />
                         <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "0 18px" }}>
@@ -15761,8 +15777,38 @@ function SmallGroupLeadersTab({
             </div>
           )}
 
-          {/* Rotation Assigner (president only) */}
-          {isPresident && !isPastor && (() => {
+          {/* Set it up — the ONE door to the president's configuration on this screen:
+              team availability + the rotation assigner (R3). A disclosure rather than a
+              sheet because the assigner is a working surface, not a form. */}
+          {isPresident && !isPastor && (
+            isDesktopView ? (
+              <div style={{ marginTop: 28 }}>
+                <ActionCard
+                  icon={<PlanLineIcon iconKey="sliders" size={20} radius={0} bg="transparent" fg="var(--plum)" />}
+                  title="Set it up"
+                  subtitle={sglSetupOpen ? "Team availability and the rotation assigner — tap to hide" : "Team availability and the rotation assigner"}
+                  onClick={() => setSglSetupOpen((v) => !v)}
+                />
+              </div>
+            ) : (
+              <div style={{ marginTop: 28 }}>
+                <PocketKicker label="Set-up" style={{ margin: "0 4px 10px" }} />
+                <PocketRowCard>
+                  <PocketRow
+                    leading={<PlanLineIcon iconKey="sliders" size={40} radius={14} bg="var(--pocket-track)" fg="var(--plum)" />}
+                    title="Set it up"
+                    sub="Team availability, rotation assigner"
+                    meta={sglSetupOpen ? "Hide" : "Show"}
+                    isLast
+                    onClick={() => setSglSetupOpen((v) => !v)}
+                  />
+                </PocketRowCard>
+              </div>
+            )
+          )}
+
+          {/* Rotation Assigner (president only, behind Set it up) */}
+          {isPresident && !isPastor && sglSetupOpen && (() => {
             const btnRadius = isDesktopView ? 8 : 999
             const rotationActions = (rotationPhase === "saved" || rotationPhase === "published") ? (
               <div className="flex items-center gap-2 flex-wrap">
