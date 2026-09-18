@@ -80,6 +80,10 @@ interface GettingStartedCardProps {
   // Daybreak reskin (ivory borderless, mono kickers, 24px checkboxes). Same data
   // + handlers — a skin switch, not a second data flow.
   variant?: "desktop" | "mobile"
+  // Phone width only: show just the steps still to do. The full card owned the
+  // entire first phone viewport, permanently, until dismissed (design pass B4,
+  // decision 3a) — below the hero it earns its space by shrinking as work lands.
+  compact?: boolean
   style?: CSSProperties
 }
 
@@ -92,11 +96,13 @@ export function GettingStartedCard({
   onDismiss,
   onNavigate,
   variant = "desktop",
+  compact = false,
   style,
 }: GettingStartedCardProps) {
   const [copied, setCopied] = useState(false)
 
   const doneCount = data.items.filter((i) => i.done).length
+  const rows = compact ? data.items.filter((i) => !i.done) : data.items
 
   async function handleCopy() {
     if (!data.inviteCode) return
@@ -124,7 +130,7 @@ export function GettingStartedCard({
           Getting started
         </div>
 
-        {data.items.map((item) => {
+        {rows.map((item) => {
           if (item.key === "invite_leaders") {
             return (
               <div key={item.key} style={{ display: "flex", gap: 14, padding: "14px 0", borderBottom: "1px solid var(--line-3)", alignItems: "flex-start" }}>

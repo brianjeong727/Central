@@ -173,7 +173,7 @@ function chipDate(detail: UpNextEventDetail, timeZone: string): string {
 // HeroFrame for announcement / event-without-photo reference slides and the home-tab
 // pinned/latest fallback. Owns its own radius/overflow/plum fill (no HeroFrame border
 // on the plum interior — the light hairline fights the deep plum, dropped per spec).
-// Photo slides and the §4.1c pulse slide keep their own distinct treatments.
+// Photo slides keep their own distinct treatment.
 interface FeaturedHeroCardProps {
   // Slide's contextual label (e.g. "Up next" / "Latest"). "Featured" is NOT repeated
   // here — the HeroSectionLabel above the frame already carries the constant accent.
@@ -841,9 +841,6 @@ interface HomeHeroCarouselProps {
   // reason: this LEAF cannot reach app/home's provider, and an optional zone would
   // let a caller silently render event times in the viewer's device zone.
   timeZone: string
-  // Optional Pastor Pulse lead slide — rides as slide index 0 when present (NOT a
-  // HeroSlide; the interactive card is built by HomeTab and passed in whole).
-  pulseNode?: ReactNode
   mobile?: boolean
   // RSVP state keyed by announcement_id — reuses the existing announcement RSVP wiring.
   rsvpedIds: Set<string>
@@ -860,7 +857,6 @@ interface HomeHeroCarouselProps {
 export function HomeHeroCarousel({
   slides,
   timeZone,
-  pulseNode,
   mobile = false,
   rsvpedIds,
   rsvpCounts,
@@ -890,9 +886,7 @@ export function HomeHeroCarousel({
   const trackRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
 
-  // Pulse lead slide: index 0 when present; data slides fill indices lead..total-1.
-  const lead = pulseNode ? 1 : 0
-  const total = lead + slides.length
+  const total = slides.length
 
   const safeIdx = Math.min(idx, Math.max(0, total - 1))
 
@@ -915,15 +909,14 @@ export function HomeHeroCarousel({
   // resting index AND `anim`, so it never fires mid-transition and resets after every
   // change (auto OR manual). Pauses on hover/focus, skipped under reduced motion. The
   // wrap (last → first) is a normal forward move, so it slides forward — never rewinds.
-  // NEVER auto-advances off the pulse lead slide — the user may be mid-drag on the
-  // scale slider or typing an answer (manual prev/next still work: "can peek past").
+  // (The Pastor Pulse used to ride as an un-auto-advanceable lead slide here; it is
+  // its own section under the hero now — see PulseCard.)
   useEffect(() => {
     if (total <= 1 || paused || anim) return
-    if (lead && safeIdx === 0) return
     if (prefersReducedMotion()) return
     const t = setTimeout(() => go((safeIdx + 1) % total, "fwd"), AUTOPLAY_MS)
     return () => clearTimeout(t)
-  }, [safeIdx, paused, total, lead, anim])
+  }, [safeIdx, paused, total, anim])
 
   // Drive the start→end transform: render at the start position (no transition),
   // then flip `started` on the next frame so the transition runs. Safety timeout
@@ -1024,18 +1017,12 @@ export function HomeHeroCarousel({
     return { interior, usePhoto }
   }
 
-  // One slide cell by carousel index. Index 0 is the pulse lead slide when present
-  // — rendered full-bleed (bare frame on desktop: the plum card owns its own
-  // border/radius, no UpNextCard wrapper). Data slides shift up by `lead`.
-  // Desktop wraps interiors in their own HeroFrame (border/radius/clip are
-  // per-slide — bare for photos); mobile renders the interior directly (it carries
-  // its own chrome), matching the previous mobile render.
-  const keyAt = (i: number): string => (lead && i === 0 ? "__pulse__" : slides[i - lead].key)
+  // One slide cell by carousel index. Desktop wraps interiors in their own
+  // HeroFrame (border/radius/clip are per-slide — bare for photos); mobile renders
+  // the interior directly (it carries its own chrome).
+  const keyAt = (i: number): string => slides[i].key
   const cellContentAt = (i: number): ReactNode => {
-    if (lead && i === 0) {
-      return mobile ? pulseNode : <HeroFrame bare style={{ height: "100%" }}>{pulseNode}</HeroFrame>
-    }
-    const { interior } = renderSlide(slides[i - lead])
+    const { interior } = renderSlide(slides[i])
     // Both data-slide interiors (photo + featured) own their own border/radius/clip,
     // so the frame is always `bare` here (no HeroFrame hairline over the plum fill).
     return mobile ? interior : (
