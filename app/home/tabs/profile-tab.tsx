@@ -1149,7 +1149,7 @@ const SETTINGS_LABELS: Record<ProfileSettingsView, string> = {
 // (mirrors settings-tab.tsx SettingsIconChip).
 function SettingsIconChip({ icon }: { icon: React.ReactNode }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 14, background: "var(--line-2)", color: "var(--plum)", flexShrink: 0 }}>
+    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 14, background: "var(--pocket-track)", color: "var(--plum)", flexShrink: 0 }}>
       {icon}
     </span>
   )

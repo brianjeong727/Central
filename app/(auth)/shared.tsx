@@ -20,13 +20,13 @@ export function AuthPhotoPanel() {
       <img src="/chapel.jpg" alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
       <div aria-hidden style={{
         position: "absolute", inset: 0, pointerEvents: "none",
-        background: "linear-gradient(155deg, rgba(27,10,30,0.58) 0%, rgba(45,15,46,0.76) 58%, rgba(27,10,30,0.93) 100%)",
+        background: "linear-gradient(155deg, color-mix(in srgb, var(--plum-deep) 58%, transparent) 0%, color-mix(in srgb, var(--plum-2) 76%, transparent) 58%, color-mix(in srgb, var(--plum-deep) 93%, transparent) 100%)",
       }}/>
       {/* Brand */}
       <Link href="/" aria-label="Central — home" className="transition-opacity hover:opacity-70" style={{ position: "relative", display: "flex", alignItems: "center", gap: 11, textDecoration: "none", color: "inherit" }}>
         <span style={{
           width: 36, height: 36, borderRadius: 10, display: "grid", placeItems: "center", flexShrink: 0,
-          background: "rgba(253,252,248,0.12)", border: "1px solid rgba(253,252,248,0.22)",
+          background: "color-mix(in srgb, var(--cream) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--cream) 22%, transparent)",
         }}>
           <RingCrossLogo size={20} color="var(--ivory)" />
         </span>
@@ -38,10 +38,10 @@ export function AuthPhotoPanel() {
           Your ministry,<br/>all in one place.
         </div>
         <div style={{ marginTop: 26, maxWidth: 360 }}>
-          <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, lineHeight: 1.5, color: "rgba(253,252,248,0.92)" }}>
+          <div style={{ fontFamily: SERIF, fontStyle: "italic", fontSize: 18, lineHeight: 1.5, color: "color-mix(in srgb, var(--cream) 92%, transparent)" }}>
             &ldquo;And let us consider how to stir up one another to love and good works.&rdquo;
           </div>
-          <div style={{ ...mono, marginTop: 12, color: "rgba(253,252,248,0.60)", letterSpacing: "1.4px" }}>Hebrews 10 : 24</div>
+          <div style={{ ...mono, marginTop: 12, color: "color-mix(in srgb, var(--cream) 60%, transparent)", letterSpacing: "1.4px" }}>Hebrews 10 : 24</div>
         </div>
       </div>
     </div>

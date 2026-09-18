@@ -164,7 +164,7 @@ export function PostJoinPickerModals({ pickers }: { pickers: PostJoinPickers }) 
               This helps us organize groups and events by campus.
             </p>
             {pickers.schoolError && (
-              <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "var(--plum)", marginBottom: 14 }}>
+              <div style={{ borderRadius: 10, background: "color-mix(in srgb, var(--plum) 8%, transparent)", padding: "8px 12px", fontSize: 13, color: "var(--plum)", marginBottom: 14 }}>
                 {pickers.schoolError}
               </div>
             )}
@@ -183,7 +183,7 @@ export function PostJoinPickerModals({ pickers }: { pickers: PostJoinPickers }) 
                       {s.name}
                     </span>
                     {s.abbreviation && (
-                    <span style={{ fontSize: 12, color: active ? "rgba(251,248,242,0.65)" : "var(--muted-text)" }}>
+                    <span style={{ fontSize: 12, color: active ? "color-mix(in srgb, var(--cream-panel) 65%, transparent)" : "var(--muted-text)" }}>
                       {s.abbreviation}
                     </span>
                     )}
@@ -218,7 +218,7 @@ export function PostJoinPickerModals({ pickers }: { pickers: PostJoinPickers }) 
               Helps us place you in the right small group.
             </p>
             {pickers.genderError && (
-              <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "var(--plum)", marginBottom: 14 }}>
+              <div style={{ borderRadius: 10, background: "color-mix(in srgb, var(--plum) 8%, transparent)", padding: "8px 12px", fontSize: 13, color: "var(--plum)", marginBottom: 14 }}>
                 {pickers.genderError}
               </div>
             )}

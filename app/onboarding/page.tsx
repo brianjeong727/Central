@@ -501,7 +501,7 @@ export default function OnboardingPage() {
                         <div className="max-md:!text-[19px]" style={{
                           fontFamily: SERIF, fontSize: 24, color: size === opt.value ? "var(--cream)" : "var(--ink)",
                         }}>{opt.label}</div>
-                        <div style={{ fontSize: 12.5, marginTop: 5, color: size === opt.value ? "rgba(253,252,248,0.72)" : "var(--body)" }}>{opt.sub}</div>
+                        <div style={{ fontSize: 12.5, marginTop: 5, color: size === opt.value ? "color-mix(in srgb, var(--cream) 72%, transparent)" : "var(--body)" }}>{opt.sub}</div>
                       </button>
                     ))}
                   </div>

@@ -558,7 +558,7 @@ function LoadCard({
               <span style={{ width: 74, fontSize: 12.5, color: "var(--body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 }}>
                 {nameOf(r.user_id)}
               </span>
-              <span style={{ flex: 1, height: 6, borderRadius: 99, background: "var(--line-2)", overflow: "hidden" }}>
+              <span style={{ flex: 1, height: 6, borderRadius: 99, background: "var(--pocket-track)", overflow: "hidden" }}>
                 <span style={{ display: "block", height: "100%", width: `${(r.open_tasks / max) * 100}%`, background: "var(--plum)", borderRadius: 99 }} />
               </span>
               <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: overloaded ? "var(--danger)" : "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0, fontWeight: overloaded ? 500 : 400 }}>

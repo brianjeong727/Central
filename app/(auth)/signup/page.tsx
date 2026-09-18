@@ -130,7 +130,7 @@ function SelectTile({ title, sub, on, onClick }: {
       <div style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 20, letterSpacing: "-0.01em", lineHeight: 1.1, color: on ? "var(--cream-panel)" : "var(--ink)" }}>
         {title}
       </div>
-      {sub && <div style={{ fontSize: 13, marginTop: 4, color: on ? "rgba(251,248,242,0.72)" : "var(--muted-text)" }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 13, marginTop: 4, color: on ? "color-mix(in srgb, var(--cream-panel) 72%, transparent)" : "var(--muted-text)" }}>{sub}</div>}
     </button>
   )
 }

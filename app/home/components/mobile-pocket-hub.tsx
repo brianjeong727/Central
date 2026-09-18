@@ -98,7 +98,7 @@ export function MobilePocketHub({ teamName, onBack, onSettings, hero, groups }: 
             {g.rows.map((r, ri) => (
               <PocketRow
                 key={r.title}
-                leading={r.leading ?? <PlanLineIcon iconKey={r.iconKey ?? "clipboard"} size={40} radius={14} bg="var(--line-2)" fg="var(--plum)" />}
+                leading={r.leading ?? <PlanLineIcon iconKey={r.iconKey ?? "clipboard"} size={40} radius={14} bg="var(--pocket-track)" fg="var(--plum)" />}
                 title={r.title}
                 sub={r.subtitle}
                 meta={r.meta}

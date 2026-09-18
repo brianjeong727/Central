@@ -150,7 +150,7 @@ const SETTINGS_BODY_CLS = "px-5 md:px-14 mt-2 md:mt-10"
 // mobile hub rows.
 function SettingsIconChip({ icon }: { icon: React.ReactNode }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 14, background: "var(--line-2)", color: "var(--plum)", flexShrink: 0 }}>
+    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 14, background: "var(--pocket-track)", color: "var(--plum)", flexShrink: 0 }}>
       {icon}
     </span>
   )

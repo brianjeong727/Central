@@ -388,7 +388,7 @@ function MemberDetailPanel({ member, ministryId, currentUserId, currentUserName,
       />
 
       {/* Member name — prominent heading in the detail body */}
-      <h2 style={{ fontFamily: "var(--serif)", fontSize: 36, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", margin: "28px 0 10px", lineHeight: 1.1, textAlign: "center" }}>
+      <h2 style={{ fontFamily: "var(--serif)", fontSize: 25, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", margin: "28px 0 10px", lineHeight: 1.15, textAlign: "center" }}>
         {member.name}
       </h2>
 

@@ -379,7 +379,7 @@ function MinistriesContent() {
             Select your staff role to continue.
           </p>
           {staffRoleError && (
-            <div style={{ borderRadius: 10, background: "rgba(62,21,64,0.08)", padding: "8px 12px", fontSize: 13, color: "var(--plum)", marginBottom: 14 }}>
+            <div style={{ borderRadius: 10, background: "color-mix(in srgb, var(--plum) 8%, transparent)", padding: "8px 12px", fontSize: 13, color: "var(--plum)", marginBottom: 14 }}>
               {staffRoleError}
             </div>
           )}
@@ -398,7 +398,7 @@ function MinistriesContent() {
                   transition: "all .12s ease",
                 }}>
                   <div style={{ fontFamily: SERIF, fontSize: 20, color: active ? "var(--cream-panel)" : "var(--ink)" }}>{label}</div>
-                  <div style={{ fontSize: 13, color: active ? "rgba(251,248,242,0.72)" : "var(--muted-text)", marginTop: 4 }}>{desc}</div>
+                  <div style={{ fontSize: 13, color: active ? "color-mix(in srgb, var(--cream-panel) 72%, transparent)" : "var(--muted-text)", marginTop: 4 }}>{desc}</div>
                 </button>
               )
             })}

@@ -181,7 +181,7 @@ export function ReceiptsWorkspace({
            chrome + one row per team you can file receipts for; drilling a row
            selects that team (?rteam). Replaces the retired team-selector chips.
            px-5: workspace is mounted full-bleed, so it supplies its own inset. */
-        <div className="md:hidden px-5" style={{ paddingTop: 12 }}>
+        <div className="md:hidden px-5">
           <MobilePocketHub
             teamName="Receipts"
             onBack={onExitTeam}
@@ -205,7 +205,7 @@ export function ReceiptsWorkspace({
           hub + gear (§2.1 one header per screen). Desktop selects teams from the
           sidebar and never renders this. */}
       {activeTeam && (
-        <div className="md:hidden px-5" style={{ paddingTop: 12 }}>
+        <div className="md:hidden px-5">
           <PocketHubChrome
             title={activeTeam.name}
             onBack={() => onReceiptsTeamChange(null)}
@@ -222,7 +222,7 @@ export function ReceiptsWorkspace({
           {/* Desktop categories header (serif title + ghost create). */}
           <div className="hidden md:flex items-center justify-between gap-3 px-14 pt-7 pb-3">
             <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--ink)" }}>Categories</span>
-            <ContentActionButton label="Add category" variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => setShowAddCategory(true)} />
+            <ContentActionButton label="Add category" variant="primary" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => setShowAddCategory(true)} />
           </div>
           {/* Mobile categories header: Pocket kicker + plum round create (the one
               plum-filled create on this screen). Top gap comes from the drilled
