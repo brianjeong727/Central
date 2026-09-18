@@ -4,8 +4,7 @@
 > `feat/home-doing-plane`), with the sweeps K2 K3 K6 K7(36px) K8 K9 K10 and N22 (+ its
 > BLOCKING lint). K11 is DECIDED (Brian, 2026-09-18: §8.5 (a) — a "Create your first team"
 > landing for leader tier) and in progress. Still open: K1 (phone primitives, ~20 surfaces),
-> C8 (the flat-row pass), K7's PocketBackRow deletion (Congregation ×2), the
-> Small-Group-Leaders set-up (its own pass).**
+> C8 (the flat-row pass), the Small-Group-Leaders set-up (in progress 2026-09-18). K7's PocketBackRow deletion is DONE.**
 > A plan is a CLAIM, never evidence (lessons inbox 2026-08-17). Before acting on any
 > box below, grep the code. Delete this file when the last phase ships.
 
@@ -123,7 +122,7 @@ rollover ~1909), `RotationsTab` `newSemesterTrigger` (~2138), groups `generateTr
 | DONE — K10 chrome-rhythm escapes (Receipts, compose) | ½ day | extend the sweep, never the band |
 | K11 Plan zero-team landing for leader tier | 1 day | DECIDED 2026-09-18: (a) Create your first team |
 | DONE — N22 integer type sizes (196 sites) + lint | 1 day | ratified; mechanical |
-| C8 flat-row pass across Plan/Receipts | 2 days | ratified as "commit as one task" |
+| DONE 2026-09-18 — C8 flat-row pass (workspace picker, events, meeting notes, rotations; hubs untouched by design) | 2 days | |
 
 **Order:** Phase 1 → Phase 2 → K8 (the event workspace is open anyway) → Phase 3 → the
 half-day sweeps in one batch → K1 → C8 → K11 after Brian's §8.5 call.
