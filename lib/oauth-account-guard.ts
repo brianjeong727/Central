@@ -114,7 +114,11 @@ export async function enforceOAuthAccountPolicy(
   // mint's created_at is the same second as the exchange; ten minutes is a wide
   // margin for clock skew and a slow round trip, and still a tiny fraction of
   // the day that used to be at risk.
-  const predatesThisRequest = new Date(user.created_at).getTime() < Date.now() - MINT_WINDOW_MS
+  // An unparseable created_at would compare as NaN → false → the DESTRUCTIVE
+  // branch. Treat "can't tell how old" as "not fresh": a wrongful admit costs
+  // nothing, a wrongful teardown costs someone their provider identity.
+  const createdMs = new Date(user.created_at).getTime()
+  const predatesThisRequest = !Number.isFinite(createdMs) || createdMs < Date.now() - MINT_WINDOW_MS
   let legitimate = hasMarker || predatesThisRequest
 
   if (!legitimate) {
