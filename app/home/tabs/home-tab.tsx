@@ -14,7 +14,7 @@ import { formatInZone, startOfTodayInstantISO } from "@/lib/tz"
 import { respondToGradCheck } from "@/app/actions/auto-chats"
 import { roleLabel } from "@/app/actions/super-constants"
 import { getSetupChecklist, setLeadersInvited, dismissSetupChecklist } from "@/app/actions/setup-checklist"
-import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseSlideCard, ContentActionButton, GettingStartedCard, MonogramChip, PocketCard, PocketRowCard, PocketRow, PocketButton, PocketRoundButton, POCKET_KICKER_STYLE } from "@/components/central"
+import { CentralCard, SectionHeader, CentralButton, FeaturedHeroCard, PageTitle, CardTitle, ChatStrip, InsetHairline, TabPageHeader, HomeHeroCarousel, HeroFrame, HeroSectionLabel, HomeHeroSkeleton, PulseCard, ContentActionButton, GettingStartedCard, MonogramChip, PocketCard, PocketRowCard, PocketRow, PocketButton, PocketRoundButton, POCKET_KICKER_STYLE } from "@/components/central"
 import { useIsNativeShell } from "@/lib/native-auth"
 import type { HeroSlide, SetupChecklistData, UpNextEventDetail } from "@/components/central"
 // Lazy — the 649-line hero-curation overlay is leader-only and opens on demand,
@@ -835,9 +835,11 @@ export function HomeTab({
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  // Pastor Pulse rides as the LEAD slide of the hero carousel (PulseSlideCard);
-  // all answer state stays here, the card is purely prop-driven. One node per
-  // breakpoint (both trees are mounted; only CSS hides one).
+  // Pastor Pulse is its OWN quiet section under the hero (PulseCard) — it used
+  // to ride as the carousel's lead slide, which made "Featured" not actually
+  // curated for four of five roles (design pass B4, decision 1a). All answer
+  // state stays here, the card is purely prop-driven. One node per breakpoint
+  // (both trees are mounted; only CSS hides one).
   const showPulse = !!activeQuestion && !hasResponded && !isPastorRole
   const pulseCardProps = showPulse && activeQuestion
     ? {
@@ -853,8 +855,8 @@ export function HomeTab({
         onSubmit: handlePulseSubmit,
       }
     : null
-  const pulseNodeDesktop = pulseCardProps ? <PulseSlideCard {...pulseCardProps} /> : null
-  const pulseNodeMobile = pulseCardProps ? <PulseSlideCard {...pulseCardProps} mobile /> : null
+  const pulseNodeDesktop = pulseCardProps ? <PulseCard {...pulseCardProps} /> : null
+  const pulseNodeMobile = pulseCardProps ? <PulseCard {...pulseCardProps} mobile /> : null
 
   // ── Mobile "Pocket" up-next carousel cards ──
   // Reuses the SAME data source as the desktop hero (curated home_slides → else the
@@ -866,7 +868,6 @@ export function HomeTab({
     (s): s is Extract<HeroSlide, { kind: "announcement" } | { kind: "event" }> => s.kind !== "photo"
   )
   const pocketCards: UpNextCard[] = []
-  if (pulseNodeMobile) pocketCards.push({ key: "__pulse__", node: pulseNodeMobile })
 
   if (pocketSlides.length > 0) {
     const s = pocketSlides[0]
@@ -1063,11 +1064,10 @@ export function HomeTab({
               : undefined}
           />
         )}
-        {!loading && (slides.length > 0 || pulseNodeDesktop ? (
+        {!loading && (slides.length > 0 ? (
           <HomeHeroCarousel
             timeZone={timeZone}
             slides={slides}
-            pulseNode={pulseNodeDesktop}
             rsvpedIds={slideRsvpedIds}
             rsvpCounts={slideRsvpCounts}
             rsvpAttendees={slideRsvpAttendees}
@@ -1135,6 +1135,11 @@ export function HomeTab({
           </HeroFrame>
         ))}
 
+        {/* ── Pastor Pulse — its own quiet section under the hero (desktop) ── */}
+        {!loading && pulseNodeDesktop && (
+          <div style={{ marginTop: "var(--space-8)" }}>{pulseNodeDesktop}</div>
+        )}
+
         {/* Your chats — horizontal strip below hero */}
         <ChatStrip
           chats={top3}
@@ -1145,7 +1150,7 @@ export function HomeTab({
         />
 
         {/* ── My Deadlines — desktop (own SWR key; between chats and For You) ── */}
-        <HomeDeadlines ministryId={ministryId} profileId={profile.id} variant="desktop" />
+        <HomeDeadlines ministryId={ministryId} profileId={profile.id} variant="desktop" onSeeAll={() => onGoToTab?.("plan")} />
 
         {/* ── For You section — desktop ── */}
         {forYouItems.length > 0 && (
@@ -1305,17 +1310,6 @@ export function HomeTab({
 
         <div className="flex flex-col" style={{ gap: "var(--space-9)" }}>
 
-          {/* ── Getting started — mobile (above Up Next, mirrors desktop) ── */}
-          {checklistData && !nativeShell && (
-            <GettingStartedCard
-              data={checklistData}
-              variant="mobile"
-              onToggleLeadersInvited={handleChecklistToggle}
-              onDismiss={handleChecklistDismiss}
-              onNavigate={handleChecklistNavigate}
-            />
-          )}
-
           {/* ── Up Next — mobile (Pocket scroll-snap carousel) ── */}
           <section>
             {/* §4.1b constant "Featured" eyebrow above the carousel.
@@ -1345,6 +1339,22 @@ export function HomeTab({
               </PocketCard>
             )}
           </section>
+
+          {/* ── Pastor Pulse — its own quiet card under Featured (mobile) ── */}
+          {!loading && pulseNodeMobile && <section>{pulseNodeMobile}</section>}
+
+          {/* ── Getting started — mobile, BELOW the hero and only the steps left.
+              It used to own the whole first phone viewport until dismissed. ── */}
+          {checklistData && !nativeShell && (
+            <GettingStartedCard
+              data={checklistData}
+              variant="mobile"
+              compact
+              onToggleLeadersInvited={handleChecklistToggle}
+              onDismiss={handleChecklistDismiss}
+              onNavigate={handleChecklistNavigate}
+            />
+          )}
 
           {/* ── My Deadlines — mobile (between Up Next and Announcements) ── */}
           <HomeDeadlines ministryId={ministryId} profileId={profile.id} variant="mobile" onSeeAll={() => onGoToTab?.("plan")} />

@@ -10,11 +10,11 @@
 // single SWR cache keyed ["my-deadlines", ministryId, profileId], so a tap in either
 // viewport revalidates both and the fetch runs once.
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import useSWR from "swr"
-import { Check, Circle, CheckCircle2, CalendarCheck } from "lucide-react"
+import { Check, Circle, CalendarCheck } from "lucide-react"
 import { createClient } from "@/lib/supabase"
-import { SectionHeader, ListRow, CentralButton, MONO_STYLE } from "@/components/central"
+import { SectionHeader, ListRow, CentralButton, MONO_STYLE, Toast } from "@/components/central"
 import { PocketCard, PocketRowCard } from "@/components/central"
 import { EmptyState } from "../components/shared"
 import { completeTaskAction } from "@/app/actions/event-confirmations"
@@ -110,6 +110,14 @@ function sortItems(items: DeadlineItem[]): DeadlineItem[] {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
+// Home is a front door, not a backlog: it shows the next few things you owe and
+// hands the rest to the Workspace tab. Before this cap the section rendered every
+// open task AND a done tail — 29 rows for a behind member, ~3,600px of Home, 70%
+// backlog (design pass B4, decision 2a). Done items no longer appear here at all;
+// a just-checked task leaves the list with an Undo toast instead of sinking into
+// a struck-through tail.
+const HOME_DEADLINE_CAP = 5
+
 export function HomeDeadlines({
   ministryId,
   profileId,
@@ -230,8 +238,12 @@ export function HomeDeadlines({
   const { data, mutate } = useSWR(["my-deadlines", ministryId, profileId], loadDeadlines)
   const items = useMemo(() => sortItems(data ?? []), [data])
 
-  const openCount = items.filter((it) => rankOf(it) < 3).length
-  const doneCount = items.filter((it) => rankOf(it) === 3).length
+  const openItems = items.filter((it) => rankOf(it) < 3)
+  const openCount = openItems.length
+  const shown = openItems.slice(0, HOME_DEADLINE_CAP)
+  const hiddenCount = openCount - shown.length
+  // The task just marked done — its row is gone, so the toast is the undo.
+  const [undoTask, setUndoTask] = useState<string | null>(null)
 
   // ── Optimistic taps ─────────────────────────────────────────────────────────
   async function toggleTask(id: string, completed: boolean) {
@@ -249,6 +261,7 @@ export function HomeDeadlines({
       },
       { optimisticData: optimistic, rollbackOnError: true, revalidate: false },
     )
+    setUndoTask(completed ? id : null)
   }
 
   async function respondConfirmation(id: string, status: "confirmed" | "declined") {
@@ -276,8 +289,17 @@ export function HomeDeadlines({
 
   if (!data) return null // parent home payload shows its own skeleton; stay quiet until ready
 
-  const empty = items.length === 0
-  const countMeta = `${openCount} open · ${doneCount} done`
+  const empty = openItems.length === 0
+  const countMeta = `${openCount} open`
+  const seeAllLabel = hiddenCount > 0 ? `See all ${openCount} →` : "See all →"
+  const undoToast = undoTask ? (
+    <Toast
+      message="Marked done"
+      actionLabel="Undo"
+      onAction={() => { const id = undoTask; setUndoTask(null); void toggleTask(id, false) }}
+      onDismiss={() => setUndoTask(null)}
+    />
+  ) : null
 
   // ══════════════════════════════════════════════════════════════ DESKTOP ══
   if (variant === "desktop") {
@@ -301,24 +323,31 @@ export function HomeDeadlines({
           />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {items.map((it, i) => (
+            {shown.map((it, i) => (
               <DesktopRow
                 key={`${it.kind}-${it.id}`}
                 item={it}
-                last={i === items.length - 1}
+                last={i === shown.length - 1}
                 onToggleTask={toggleTask}
                 onRespond={respondConfirmation}
               />
             ))}
           </div>
         )}
+        {!empty && onSeeAll && (
+          <button
+            onClick={onSeeAll}
+            style={{ display: "inline-block", marginTop: 12, padding: 0, background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "var(--plum)", fontFamily: "var(--sans)" }}
+          >
+            {seeAllLabel}
+          </button>
+        )}
+        {undoToast}
       </div>
     )
   }
 
   // ══════════════════════════════════════════════════════════════ MOBILE ══
-  const openItems = items.filter((it) => rankOf(it) < 3)
-  const doneItems = items.filter((it) => rankOf(it) === 3)
   return (
     <section>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
@@ -340,8 +369,8 @@ export function HomeDeadlines({
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {/* Task rows grouped in one tonal card; confirmation rows are their own cards. */}
           {(() => {
-            const openTaskItems = openItems.filter((it) => it.kind === "task")
-            const openConfItems = openItems.filter((it) => it.kind === "confirmation")
+            const openTaskItems = shown.filter((it) => it.kind === "task")
+            const openConfItems = shown.filter((it) => it.kind === "confirmation")
             return (
               <>
                 {openTaskItems.length > 0 && (
@@ -354,18 +383,20 @@ export function HomeDeadlines({
                 {openConfItems.map((it) => (
                   <MobileConfirmationCard key={it.id} item={it} onRespond={respondConfirmation} />
                 ))}
-                {doneItems.length > 0 && (
-                  <PocketRowCard>
-                    {doneItems.map((it, i) => (
-                      <MobileDoneRow key={`${it.kind}-${it.id}`} item={it} last={i === doneItems.length - 1} />
-                    ))}
-                  </PocketRowCard>
-                )}
               </>
             )
           })()}
         </div>
       )}
+      {!empty && onSeeAll && (
+        <button
+          onClick={onSeeAll}
+          style={{ display: "inline-flex", alignItems: "center", minHeight: 44, marginTop: 4, padding: 0, background: "none", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 600, color: "var(--plum)", fontFamily: "var(--sans)" }}
+        >
+          {seeAllLabel}
+        </button>
+      )}
+      {undoToast}
     </section>
   )
 }
@@ -544,16 +575,3 @@ function MobileConfirmationCard({ item, onRespond }: { item: DeadlineItem & { ki
   )
 }
 
-function MobileDoneRow({ item, last }: { item: DeadlineItem; last: boolean }) {
-  const title = item.kind === "task" ? item.title : item.roleName
-  const sub = item.kind === "task" ? item.context : STATUS_TEXT[item.status].label
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: last ? "none" : "1px solid var(--line-3)" }}>
-      <CheckCircle2 style={{ width: 18, height: 18, color: "var(--muted-text)", flexShrink: 0 }} strokeWidth={1.8} />
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span className="line-clamp-1" style={{ display: "block", fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--body)" }}>{title}</span>
-        {sub && <span className="line-clamp-1" style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2 }}>{sub}</span>}
-      </span>
-    </div>
-  )
-}

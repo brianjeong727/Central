@@ -6,14 +6,21 @@ import { CentralButton } from "./button"
 // eslint-disable-next-line no-restricted-imports -- pre-existing LEAF debt (app/ type import); flagged Phase 2, refactor pending
 import type { CongregationQuestion } from "@/app/home/types"
 
-// ── Pastor Pulse hero slide ────────────────────────────────────────────────────
-// A flat-plum interactive card hosted as the LEAD slide of the home hero carousel
-// (via HomeHeroCarousel's `pulseNode` prop). Purely presentational + interactive —
-// all answer state lives in HomeTab and flows in through props.
+// ── Pastor Pulse card ─────────────────────────────────────────────────────────
+// The congregation's answer surface for a live pulse question. It used to ride as
+// the LEAD slide of the home hero carousel, styled as a second plum hero: that put
+// two purples side by side, made "Featured" not actually curated (the pulse
+// displaced the leader's first slide for every non-pastor), and on a phone its
+// absolutely-positioned ANONYMOUS tag overprinted the eyebrow. Since 2026-09-17 it
+// is its own QUIET section under the hero (design pass B4, decision 1a): a tonal
+// card in the page's own grammar — ivory borderless at phone width, cream-panel
+// with a hairline on desktop — with plum reserved for the selected answer and the
+// one primary. Purely presentational + interactive — all answer state lives in
+// HomeTab and flows in through props.
 //
-// Translucent cream on the plum surface is ALWAYS expressed as
-// color-mix(in srgb, var(--cream) N%, transparent) — never raw rgba hex.
-const cream = (pct: number) => `color-mix(in srgb, var(--cream) ${pct}%, transparent)`
+// Translucent ink on the light surface is ALWAYS expressed as
+// color-mix(in srgb, var(--ink) N%, transparent) — never raw rgba hex.
+const ink = (pct: number) => `color-mix(in srgb, var(--ink) ${pct}%, transparent)`
 
 function pulseTypeLabel(type: CongregationQuestion["question_type"]): string {
   if (type === "poll") return "Poll"
@@ -27,7 +34,7 @@ const CHIP_MAX_CHARS = 24
 const SCALE_MIN = 1
 const SCALE_MAX = 10
 
-export interface PulseSlideCardProps {
+export interface PulseCardProps {
   question: CongregationQuestion
   pulseOption: string | null
   setPulseOption: (opt: string | null) => void
@@ -113,8 +120,8 @@ function ScaleSlider({ value, onChange }: { value: number | null; onChange: (n: 
               top: 0,
               left: `${pct}%`,
               transform: "translateX(-50%)",
-              background: "var(--cream)",
-              color: "var(--plum-2)",
+              background: "var(--plum)",
+              color: "var(--cream-on-dark)",
               fontFamily: "var(--sans)",
               fontSize: 12,
               fontWeight: 500,
@@ -130,7 +137,7 @@ function ScaleSlider({ value, onChange }: { value: number | null; onChange: (n: 
         {/* track */}
         <div
           ref={trackRef}
-          style={{ position: "relative", height: 6, borderRadius: 999, background: cream(20) }}
+          style={{ position: "relative", height: 6, borderRadius: 999, background: "var(--pocket-track)" }}
         >
           {/* cream fill from left to the value — only once touched */}
           {value != null && (
@@ -142,7 +149,7 @@ function ScaleSlider({ value, onChange }: { value: number | null; onChange: (n: 
                 bottom: 0,
                 width: `${pct}%`,
                 borderRadius: 999,
-                background: "var(--cream)",
+                background: "var(--plum)",
               }}
             />
           )}
@@ -156,7 +163,7 @@ function ScaleSlider({ value, onChange }: { value: number | null; onChange: (n: 
               width: 26,
               height: 26,
               borderRadius: 999,
-              background: "var(--cream)",
+              background: "var(--plum)",
               pointerEvents: "none",
             }}
           />
@@ -165,17 +172,17 @@ function ScaleSlider({ value, onChange }: { value: number | null; onChange: (n: 
       {/* ticks 1..10 */}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         {Array.from({ length: SCALE_MAX }, (_, i) => (
-          <span key={i} style={{ fontFamily: "var(--mono)", fontSize: 10, color: cream(42) }}>
+          <span key={i} style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--muted-text)" }}>
             {i + 1}
           </span>
         ))}
       </div>
       {/* word anchors */}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <span style={{ fontFamily: "var(--mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", color: cream(50) }}>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", color: "var(--muted-text)" }}>
           Struggling
         </span>
-        <span style={{ fontFamily: "var(--mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", color: cream(50) }}>
+        <span style={{ fontFamily: "var(--mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", color: "var(--muted-text)" }}>
           Thriving
         </span>
       </div>
@@ -183,7 +190,7 @@ function ScaleSlider({ value, onChange }: { value: number | null; onChange: (n: 
   )
 }
 
-export function PulseSlideCard({
+export function PulseCard({
   question,
   pulseOption,
   setPulseOption,
@@ -195,7 +202,7 @@ export function PulseSlideCard({
   submitted,
   onSubmit,
   mobile = false,
-}: PulseSlideCardProps) {
+}: PulseCardProps) {
   const [inputFocused, setInputFocused] = useState(false)
 
   const type = question.question_type
@@ -210,45 +217,40 @@ export function PulseSlideCard({
   const options = question.options ?? []
   const useChips = options.every((o) => o.length <= CHIP_MAX_CHARS)
 
+  // Tonal card in the host page's grammar: ivory + borderless at phone width
+  // (mobile_design_system §4), cream-panel + hairline on desktop (§4.4).
   const shell: CSSProperties = {
-    position: "relative",
     boxSizing: "border-box",
     width: "100%",
-    height: "100%",
-    minHeight: mobile ? 280 : 300,
     display: "flex",
     flexDirection: "column",
-    background: "var(--plum-2)",
-    border: "1px solid var(--plum-deep)",
-    borderRadius: "var(--r-hero)",
-    padding: "var(--space-9) 30px", // 30px horizontal is a one-off inside this card
-    color: "var(--cream)",
+    background: mobile ? "var(--ivory)" : "var(--cream-panel)",
+    border: mobile ? "none" : "1px solid var(--line)",
+    borderRadius: mobile ? "var(--r-pocket)" : "var(--r-card)",
+    padding: mobile ? "20px 18px" : "22px 24px",
+    color: "var(--ink)",
   }
 
   const anonTag = (
-    <div
-      style={{
-        position: "absolute",
-        top: "var(--space-9)",
-        right: 30,
-        display: "flex",
-        alignItems: "center",
-        gap: "var(--space-2)",
-      }}
-    >
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: cream(50), flexShrink: 0 }} />
-      <span style={{ fontFamily: "var(--mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "1.1px", color: cream(50) }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)", flexShrink: 0 }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--faint)", flexShrink: 0 }} />
+      <span style={{ fontFamily: "var(--mono)", fontSize: 9, textTransform: "uppercase", letterSpacing: "1.1px", color: "var(--muted-text)" }}>
         Anonymous
       </span>
-    </div>
+    </span>
   )
 
+  // Eyebrow and the anonymous tag share ONE flex row — the tag used to be
+  // absolutely positioned and overprinted the eyebrow at 390px.
   const eyebrow = (text: string) => (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-      <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--cream)", flexShrink: 0 }} />
-      <span style={{ fontFamily: "var(--mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "1.4px", color: cream(70) }}>
-        {text}
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-3)", minWidth: 0 }}>
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)", flexShrink: 0 }} />
+        <span style={{ fontFamily: "var(--mono)", fontSize: 10, textTransform: "uppercase", letterSpacing: "1.4px", color: "var(--muted-text)" }}>
+          {text}
+        </span>
       </span>
+      {anonTag}
     </div>
   )
 
@@ -257,16 +259,15 @@ export function PulseSlideCard({
     return (
       <div style={shell}>
         {eyebrow("Pastor Pulse")}
-        {anonTag}
         <div
           style={{
-            flex: 1,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
             textAlign: "center",
             gap: "var(--space-5)",
+            padding: "var(--space-8) 0 var(--space-4)",
           }}
         >
           <div
@@ -274,17 +275,17 @@ export function PulseSlideCard({
               width: 46,
               height: 46,
               borderRadius: "50%",
-              border: `1.5px solid ${cream(40)}`,
+              border: "1.5px solid var(--plum)",
               display: "grid",
               placeItems: "center",
             }}
           >
-            <Check style={{ width: 20, height: 20, color: "var(--cream)" }} />
+            <Check style={{ width: 20, height: 20, color: "var(--plum)" }} />
           </div>
-          <div style={{ fontFamily: "var(--serif)", fontSize: 23, fontWeight: 600, color: "var(--cream)" }}>
+          <div style={{ fontFamily: "var(--serif)", fontSize: 23, fontWeight: 600, color: "var(--ink)" }}>
             Thanks for sharing.
           </div>
-          <div style={{ fontSize: 13, color: cream(65) }}>
+          <div style={{ fontSize: 13, color: "var(--muted-text)" }}>
             Your response was received anonymously.
           </div>
         </div>
@@ -295,17 +296,16 @@ export function PulseSlideCard({
   return (
     <div style={shell}>
       {eyebrow(`Pastor Pulse · ${pulseTypeLabel(type)}`)}
-      {anonTag}
 
-      {/* question */}
+      {/* question — the card headline tier (mobile 21/600; desktop 24/600) */}
       <div
         style={{
           fontFamily: "var(--serif)",
-          fontSize: 24,
+          fontSize: mobile ? 21 : 24,
           fontWeight: 600,
           letterSpacing: "-0.02em",
-          lineHeight: 1.14,
-          color: "var(--cream)",
+          lineHeight: 1.18,
+          color: "var(--ink)",
           maxWidth: 480,
           marginTop: "var(--space-5)",
         }}
@@ -313,9 +313,8 @@ export function PulseSlideCard({
         {question.question_text}
       </div>
 
-      {/* answer area — grows to fill the fixed-height card so the free-text
-          submit can pin to the bottom (see marginTop:auto on the button) */}
-      <div style={{ flex: 1, marginTop: "var(--space-8)", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+      {/* answer area */}
+      <div style={{ marginTop: "var(--space-7)", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
         {type === "poll" && options.length > 0 && (
           useChips ? (
             <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
@@ -329,9 +328,9 @@ export function PulseSlideCard({
                     style={{
                       padding: "var(--space-4) var(--space-6)",
                       borderRadius: "var(--r-input)",
-                      background: sel ? "var(--cream)" : cream(9),
-                      border: `1px solid ${sel ? "var(--cream)" : cream(26)}`,
-                      color: sel ? "var(--plum-2)" : "var(--cream)",
+                      background: sel ? "var(--plum-tint)" : (mobile ? "var(--cream)" : "var(--cream)"),
+                      border: `1px solid ${sel ? "var(--plum)" : "var(--line-2)"}`,
+                      color: sel ? "var(--plum)" : "var(--body)",
                       fontSize: 13,
                       fontWeight: sel ? 500 : 400,
                       fontFamily: "var(--sans)",
@@ -357,10 +356,10 @@ export function PulseSlideCard({
                       alignItems: "center",
                       gap: "var(--space-5)",
                       padding: "var(--space-5) var(--space-6)",
-                      borderRadius: 11,
-                      background: sel ? "var(--cream)" : cream(7),
-                      border: `1px solid ${sel ? "var(--cream)" : cream(22)}`,
-                      color: sel ? "var(--plum-2)" : "var(--cream)",
+                      borderRadius: "var(--r-input)",
+                      background: sel ? "var(--plum-tint)" : "var(--cream)",
+                      border: `1px solid ${sel ? "var(--plum)" : "var(--line-2)"}`,
+                      color: sel ? "var(--plum)" : "var(--body)",
                       textAlign: "left",
                       cursor: "pointer",
                     }}
@@ -371,8 +370,8 @@ export function PulseSlideCard({
                         height: 16,
                         borderRadius: "50%",
                         flexShrink: 0,
-                        border: `1.5px solid ${sel ? "var(--plum-2)" : cream(50)}`,
-                        background: sel ? "radial-gradient(var(--plum-2) 42%, transparent 46%)" : "transparent",
+                        border: `1.5px solid ${sel ? "var(--plum)" : "var(--dashed)"}`,
+                        background: sel ? "radial-gradient(var(--plum) 42%, transparent 46%)" : "transparent",
                       }}
                     />
                     <span style={{ fontSize: 14, fontFamily: "var(--sans)", fontWeight: sel ? 500 : 400 }}>{opt}</span>
@@ -398,13 +397,13 @@ export function PulseSlideCard({
                 width: "100%",
                 minHeight: 74,
                 boxSizing: "border-box",
-                background: inputFocused ? cream(12) : cream(8),
-                border: `1px solid ${inputFocused ? "var(--cream)" : cream(24)}`,
-                borderRadius: 11,
+                background: "var(--cream)",
+                border: `1px solid ${inputFocused ? "var(--plum)" : "var(--line-2)"}`,
+                borderRadius: "var(--r-input)",
                 padding: "var(--space-5) var(--space-6)",
                 fontSize: 14,
                 lineHeight: 1.5,
-                color: "var(--cream)",
+                color: "var(--ink)",
                 fontFamily: "var(--sans)",
                 resize: "none",
                 outline: "none",
@@ -412,8 +411,8 @@ export function PulseSlideCard({
             />
             {type === "prayer" && (
               <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginTop: "calc(var(--space-3) * -1)" }}>
-                <Lock style={{ width: 13, height: 13, color: cream(55), flexShrink: 0 }} />
-                <span style={{ fontSize: 11, color: cream(55), fontFamily: "var(--sans)" }}>
+                <Lock style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />
+                <span style={{ fontSize: 11, color: "var(--muted-text)", fontFamily: "var(--sans)" }}>
                   Shared privately with the prayer team
                 </span>
               </div>
@@ -421,30 +420,14 @@ export function PulseSlideCard({
           </>
         )}
 
-        {/* Hero-invert primary — per §4.3 the cream-on-plum invert is a call-site
-            override on CentralButton. Background/color/opacity are forced here even
-            while disabled, so the not-yet-answerable state stays DIM-CREAM (0.35)
-            instead of CentralButton's default cream-2/faint disabled treatment. */}
+        {/* The one plum moment on the card: the ordinary primary, no invert. */}
         <CentralButton
           type="button"
           variant="primary"
+          size="sm"
           onClick={onSubmit}
           disabled={!canSubmit || pulseSubmitting}
-          style={{
-            alignSelf: "flex-start",
-            // Free-text types (open/prayer) have a short textarea, so pin the
-            // submit to the bottom of the card instead of leaving dead space
-            // below it. Poll/scale keep the button directly under their content.
-            marginTop: type === "open" || type === "prayer" ? "auto" : undefined,
-            background: "var(--cream)",
-            color: "var(--plum-2)",
-            border: "none",
-            padding: "10px 18px",
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: !canSubmit || pulseSubmitting ? "default" : "pointer",
-            opacity: !canSubmit ? 0.35 : 1,
-          }}
+          style={{ alignSelf: "flex-start" }}
         >
           {pulseSubmitting ? "Submitting…" : "Submit anonymously"}
         </CentralButton>

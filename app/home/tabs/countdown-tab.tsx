@@ -685,7 +685,10 @@ export function CountdownTab(props: CountdownTabProps) {
     .sort((a, b) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999"))[0]?.id
 
   const augFor = (task: EventTask): RowAug => {
-    const badge = badgeFor(task, firedIds, todayYMD)
+    // Chase state (auto-DM armed/sent, "Nudged 2× — no reply", confirm-taps) is
+    // the planner's console; a member reads the task, not the machinery behind
+    // it (design pass B2 §3.8).
+    const badge = canEdit ? badgeFor(task, firedIds, todayYMD) : null
     // Overdue = incomplete + has a due date in the past (PT), regardless of assignee.
     const overdue = !task.completed && !!task.due_date && task.due_date < todayYMD
     const variant = overdue ? "risk" : task.id === nowTaskId ? "now" : null
@@ -738,7 +741,7 @@ export function CountdownTab(props: CountdownTabProps) {
             <span style={{ fontFamily: "var(--mono)", fontSize: 11, fontWeight: 600, letterSpacing: "0.03em", color: "var(--danger)", background: "color-mix(in srgb, var(--danger) 10%, transparent)", borderRadius: 999, padding: "3px 9px", whiteSpace: "nowrap" }}>{overdueCount} OVERDUE</span>
           )}
         </div>
-        {firesNext.length > 0 && (
+        {canEdit && firesNext.length > 0 && (
           <div style={{ background: "var(--ivory)", borderRadius: 16, padding: "12px 16px", margin: "0 0 20px" }}>
             <p style={{ ...MONO_STYLE, margin: 0 }}>Reminder schedule</p>
             <p style={{ fontSize: 13, color: "var(--ink)", marginTop: 6 }}>
@@ -789,7 +792,7 @@ export function CountdownTab(props: CountdownTabProps) {
       rail={
         <aside style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }} className="max-md:mt-8">
           <ReadinessCard readiness={readiness} overdue={overdueCount} />
-          <FiresNextCard queue={firesNext} />
+          {canEdit && <FiresNextCard queue={firesNext} />}
           {teamId && loadCounts && loadCounts.length > 0 && <LoadCard loadCounts={loadCounts} nameOf={nameOf} />}
         </aside>
       }
