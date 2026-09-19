@@ -75,6 +75,13 @@ The object header (by the page title) carries **only object config**: normally t
 11. No hand-rolled dropdown/kebab menus — shared `ActionMenu` only (Convention #20).
 12. Verse callout in the sidebar is permanent brand — never remove it.
 13. No fixed-width column stranded in a wide content area — cap width only for reading measure (§7.0).
+14. **No solid plum as a selected or status fill** — selection is `--plum-tint` ground + plum text + plum hairline; status tags are tonal, and plum marks *you / yours / participation* only. Declined is never quieter than Confirmed. (N6/N9, ratified 2026-09-17.)
+15. **No one-click permanent delete on a row** — `ConfirmDialog` or an undo toast. Destructive actions are text or outline, sized to the label, never sharing a width class with the primary. (N11)
+16. **No disabled primary by opacity** — a tokenised 50% plum fill with a one-line reason beneath; a danger ring never appears without its own message. (N13)
+17. **No empty state without the contract** — icon tile · what's missing · one teaching sentence · one action the current role can take, inside the state. Never name a control in empty copy. (N23)
+18. **No half-pixel font sizes** — integers only (N22; the ratchet lint follows).
+
+Full amendment list from the 2026-09-17 design pass: `web_design_system.md` §16 and `mobile_design_system.md` §7.
 
 ## Pre-ship checklist ("is this Central?")
 

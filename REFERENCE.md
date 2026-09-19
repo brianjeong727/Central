@@ -330,7 +330,7 @@ The push dispatch route (`app/api/push/dispatch/route.ts`) gained 3 cron/action-
 | Table | Key Columns |
 |-------|-------------|
 | `ministries` | `id`, `name`, `university`, `universities` (jsonb), `invite_code`, `staff_invite_code` (both **column-revoked** from `authenticated`/`anon` — read only via the admin-scoped `getMinistryCodes` action), `status` (`active`/`pending`/`rejected`/`archived`), `is_public`, `location`, `automation_settings` (jsonb), `governance_settings` (jsonb `{all_admins, roster_ids}`), `moderation_settings` (jsonb `{enabled, behavior, strictness, scope, photo_enabled}` — chat filter config), `archive_requested_by`/`archive_requested_at` (two-step archive), `is_sandbox` (super write-as allowed; Central = true), `hidden_from_discovery` (excludes test tenants from `/ministries` public discovery — distinct from `is_sandbox`, which only grants super write-as; Central is sandbox **and** discoverable), `setup_checklist` (jsonb `{leaders_invited, dismissed, active}` — getting-started state; progress itself is derived), `timezone` (IANA, NOT NULL default `America/New_York` — authoritative for rendering AND scheduling every event time; **column-granted** `SELECT` to `authenticated`: this table has no table-level grant, so a new column lands UNGRANTED and PostgREST 403s the *entire* query that names it), `created_by` |
-| `profiles` | `id`, `ministry_id`, `name`, `email`, `role`, `graduation_year`, `grade`, `needs_grad_check`, `gender`, `avatar_url`, `about_me`, `bible_verse`, `prayer_request`, `pray_for_me`, `phone`, `bio`, `testimony`, `favorite_worship_song`, `favorite_verse`, `favorite_book_of_bible`, `show_journal_entries`, `show_journal_streak`, `school_id`, `saved_signature`, `sidebar_note`, `compact_sidebar` (desktop UI pref — rail-only shell toggle) |
+| `profiles` | `id`, `ministry_id`, `name`, `email`, `role`, `graduation_year`, `grade`, `needs_grad_check`, `gender`, `avatar_url`, `about_me`, `bible_verse`, `prayer_request`, `pray_for_me`, `phone`, `bio`, `testimony`, `favorite_worship_song`, `favorite_verse`, `favorite_book_of_bible`, `show_journal_entries`, `show_journal_streak`, `school_id`, `saved_signature`, `sidebar_note`, `compact_sidebar` (desktop UI pref — rail-only shell toggle), `chat_text_size` (text, NOT NULL default `md`, CHECK in `sm`/`md`/`lg`/`xl` — per-user chat text-size step; the shell applies it as `html[data-chat-text]`, the pixel scale lives in `app/globals.css`) |
 | `groups` | `id`, `ministry_id`, `name`, `type` (`church`/`my`/`dm`), `created_by`, `archived`, `pinned_message_id` |
 | `group_members` | `group_id`, `user_id`, `last_read_at` |
 | `messages` | `id`, `group_id`, `sender_id`, `content`, `created_at`, `reply_to_id`, `message_type`, `is_edited`, `edited_at`, `attachment_url`, `attachment_type`, `attachment_name`, `attachment_size`, `poll_id` |
@@ -426,6 +426,7 @@ Permission tiers:
 | Member profile overlay (global) | 130 |
 | Emoji dismiss overlay | 155 |
 | Emoji picker | 160 |
+| Lifted message material (chat long-press blur scrim) | 170 |
 | Action menus (`ActionMenu` portal) | 200 |
 | Modals (`CentralModal`) | 200 (override e.g. 210 only to stack above another overlay) |
 | In-app message banner (`MessageBanner`) | 240 |

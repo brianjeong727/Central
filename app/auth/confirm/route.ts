@@ -23,7 +23,10 @@ export async function GET(request: NextRequest) {
   // `next` is a server-controlled relative path; reject absolute/external values to
   // avoid an open-redirect. Default to the password-reset screen.
   const nextParam = searchParams.get("next")
-  const next = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+  // Same predicate as native-auth's isSafeDestination: "/\\evil.com" passes a
+  // "//" check and `new URL()` normalises the backslash to "//evil.com" — an open
+  // redirect on a public, post-verification route (found in review 2026-09-17).
+  const next = nextParam && nextParam.startsWith("/") && nextParam[1] !== "/" && nextParam[1] !== "\\"
     ? nextParam
     : "/update-password"
 

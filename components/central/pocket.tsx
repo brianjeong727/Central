@@ -152,8 +152,9 @@ export function PocketRowCard({ children, style }: { children: ReactNode; style?
 }
 
 // The universal mobile list row: optional leading chip, 15/600 title (+ inline
-// accessory icons), 13px muted one-line sub, and a right column that is either
-// meta text, a time-over-unread-dot stack, or a drill-in chevron.
+// accessory icons), 13px muted one-line sub, an optional 11px --faint third line
+// (`stamp` — a recency/status footnote such as "Last opened July 12"), and a right
+// column that is either meta text, a time-over-unread-dot stack, or a drill-in chevron.
 //
 // `titleDim` de-emphasises the TITLE for a row that is still real and still
 // tappable but no longer live (today: a DM whose counterpart deleted their
@@ -188,7 +189,7 @@ export function PocketRowCard({ children, style }: { children: ReactNode; style?
 // hoisting it to the wrapper would silently delete a whole class of coverage
 // while every assertion still passed.
 export function PocketRow({
-  leading, title, titleAccessory, titleDim = false, sub, time, showDot = false, meta, chevron = false,
+  leading, title, titleAccessory, titleDim = false, sub, stamp, time, showDot = false, meta, chevron = false,
   isLast = false, immersive = false, isFirst = false, ariaLabel, trailing, onClick, onPointerDown,
 }: {
   leading?: ReactNode
@@ -200,6 +201,7 @@ export function PocketRow({
   titleAccessory?: ReactNode
   titleDim?: boolean
   sub?: string
+  stamp?: string
   time?: string
   showDot?: boolean
   meta?: string
@@ -255,6 +257,9 @@ export function PocketRow({
         </span>
         {sub && (
           <span style={{ display: "block", fontSize: immersive ? 14 : 13, color: "var(--muted-text)", marginTop: immersive ? 3 : 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>
+        )}
+        {stamp && (
+          <span style={{ display: "block", fontSize: 11, color: "var(--faint)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{stamp}</span>
         )}
       </span>
       {(time || showDot) ? (

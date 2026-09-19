@@ -80,12 +80,20 @@ export type NativeAppleResult =
 // decision for every case (register / join / ministry count / profile fallback).
 export type NativeSignInOpts = { intent?: string | null }
 
-// TEMP DIAGNOSTIC (Apple sign-in triage): the coarse error enum hides WHY the
-// native flow failed. This surfaces the raw reason to the sign-in UI (native
-// shell only — see the handlers) so a real-device failure is legible without a
-// debuggable build. Safe to keep: better errors than a generic string.
-export function nativeAuthDebugMessage(res: Extract<NativeAppleResult, { ok: false }>): string {
-  return `Sign-in failed (${res.error})${res.detail ? `: ${res.detail}` : ""}`
+/**
+ * Copy for a FAILED native Apple attempt — the Apple twin of
+ * googleNativeFailureMessage below, same rules: never call it for `canceled`
+ * (a deliberate dismissal stays silent), and `unavailable` / `not-entitled`
+ * are handled by the caller's web fallback before this is reached. The raw
+ * reason rides along in parentheses so a field report is still diagnosable;
+ * this replaced a "TEMP DIAGNOSTIC" that printed `Sign-in failed (canceled)`
+ * at a user who had just tapped Cancel.
+ */
+export function appleNativeFailureMessage(res: Extract<NativeAppleResult, { ok: false }>): string {
+  if (res.error === "no-account") {
+    return `We couldn't finish setting up your account — please try again.${res.detail ? ` (${res.detail})` : ""}`
+  }
+  return `Apple sign-in didn't complete — please try again.${res.detail ? ` (${res.detail})` : ""}`
 }
 
 /**
