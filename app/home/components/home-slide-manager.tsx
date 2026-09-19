@@ -269,7 +269,7 @@ export function HomeSlideManager({
               >
                 <ImageIcon style={{ width: 18, height: 18, color: "var(--muted-text)" }} />
                 <span style={MONO}>Coming soon</span>
-                <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: 0, fontFamily: "var(--sans)" }}>
+                <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 2, margin: 0, fontFamily: "var(--sans)" }}>
                   Photo slides are coming soon. For now, feature upcoming events and announcements below.
                 </p>
               </div>

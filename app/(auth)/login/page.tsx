@@ -281,7 +281,7 @@ function LoginContent() {
           <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ink)", margin: "0 0 6px" }}>
             No Central account yet
           </p>
-          <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 14px", lineHeight: 1.5 }}>
+          <p style={{ fontSize: 13, color: "var(--body)", margin: "0 0 14px", lineHeight: 2 }}>
             That {noAccountProvider} account isn&apos;t linked to a Central account. Signing in
             can&apos;t create one — create your account first and you&apos;ll be able to use
             {" "}{noAccountProvider} from then on.
@@ -420,7 +420,7 @@ function LoginContent() {
               <p style={{ fontSize: 15, fontWeight: 600, color: "var(--ink)", margin: "0 0 6px", letterSpacing: "-0.01em" }}>
                 No Central account yet
               </p>
-              <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 14px", lineHeight: 1.5 }}>
+              <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 14px", lineHeight: 2 }}>
                 That {noAccountProvider} account isn&apos;t linked to a Central account. Signing in
                 can&apos;t create one — create your account first and you&apos;ll be able to use
                 {" "}{noAccountProvider} from then on.

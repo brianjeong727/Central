@@ -109,7 +109,7 @@ export function DuplicateAccountDialog({
         </div>
       </div>
 
-      <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: "14px 0 0" }}>
+      <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 2, margin: "14px 0 0" }}>
         Can&apos;t get into that address any more? Ask a leader in {ministryName ?? "the ministry"} —
         they can sort it out from their side.
       </p>

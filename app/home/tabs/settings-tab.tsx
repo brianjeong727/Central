@@ -240,7 +240,7 @@ function SectionEditControls({ editing, dirty, saving, saved, disabled, onEdit, 
 // One line in a confirm modal's change summary — "Label: old → new".
 function ChangeRow({ label, from, to }: { label: string; from?: string; to: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 14, color: "var(--body)", lineHeight: 1.5 }}>
+    <div style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 14, color: "var(--body)", lineHeight: 2 }}>
       <span style={{ fontWeight: 500, color: "var(--ink)", flexShrink: 0 }}>{label}</span>
       <span style={{ minWidth: 0 }}>
         {from !== undefined && <><span style={{ color: "var(--muted-text)" }}>{from}</span> <span style={{ color: "var(--faint)" }}>→</span> </>}
@@ -1526,7 +1526,7 @@ export function SettingsTab({
                           <InCardToggle on={shown} locked={locked} onToggle={() => setDiscoveryDraft(v => !v)} />
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Public discovery</div>
-                            <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>{shown ? "Anyone can find and join without an invite code." : "Invite-only — code required to join."}</div>
+                            <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 2 }}>{shown ? "Anyone can find and join without an invite code." : "Invite-only — code required to join."}</div>
                             {discoveryError && <div style={{ marginTop: 6, fontSize: 12, color: "var(--danger)" }}>{discoveryError}</div>}
                           </div>
                         </div>
@@ -1997,7 +1997,7 @@ export function SettingsTab({
                   <InCardToggle on={gAllAdmins} locked={!govEditing} onToggle={draftToggleAllAdmins} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>All admins can govern teams</div>
-                    <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>{gAllAdmins ? "Every admin-tier member governs teams per the access matrix below." : "Only the people you select below govern teams."}</div>
+                    <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 2 }}>{gAllAdmins ? "Every admin-tier member governs teams per the access matrix below." : "Only the people you select below govern teams."}</div>
                   </div>
                 </div>
 
@@ -2037,7 +2037,7 @@ export function SettingsTab({
                       ["View", "See and administer the team — roster and settings."],
                       ["Write", "Everything in View, plus acting on the team’s work."],
                     ].map(([k, d]) => (
-                      <p key={k} style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: 0 }}>
+                      <p key={k} style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 2, margin: 0 }}>
                         <span style={{ fontWeight: 500, color: "var(--body)" }}>{k}</span> — {d}
                       </p>
                     ))}
@@ -2190,7 +2190,7 @@ export function SettingsTab({
                         <FilterChip key={o.v} tone="ivory" selected={pendingModerationSettings.behavior === o.v} disabled={!moderationEditing || !isAdmin} onClick={() => setModField("behavior", o.v)}>{o.l}</FilterChip>
                       ))}
                     </div>
-                    <p style={{ marginTop: 8, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>How flagged words are handled. Block prevents the message from sending at all.</p>
+                    <p style={{ marginTop: 8, fontSize: 13, color: "var(--body)", lineHeight: 2 }}>How flagged words are handled. Block prevents the message from sending at all.</p>
                   </div>
 
                   {/* Strictness */}
@@ -2201,7 +2201,7 @@ export function SettingsTab({
                         <FilterChip key={o.v} tone="ivory" selected={pendingModerationSettings.strictness === o.v} disabled={!moderationEditing || !isAdmin} onClick={() => setModField("strictness", o.v)}>{o.l}</FilterChip>
                       ))}
                     </div>
-                    <p style={{ marginTop: 8, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Lenient flags only slurs and hate terms; Moderate adds strong profanity; Strict adds crude and borderline words.</p>
+                    <p style={{ marginTop: 8, fontSize: 13, color: "var(--body)", lineHeight: 2 }}>Lenient flags only slurs and hate terms; Moderate adds strong profanity; Strict adds crude and borderline words.</p>
                   </div>
 
                   {/* Scope */}
@@ -2212,7 +2212,7 @@ export function SettingsTab({
                         <FilterChip key={o.v} tone="ivory" selected={pendingModerationSettings.scope === o.v} disabled={!moderationEditing || !isAdmin} onClick={() => setModField("scope", o.v)}>{o.l}</FilterChip>
                       ))}
                     </div>
-                    <p style={{ marginTop: 8, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>Which conversations the filter covers. Ministry chat = the default chat everyone&apos;s in.</p>
+                    <p style={{ marginTop: 8, fontSize: 13, color: "var(--body)", lineHeight: 2 }}>Which conversations the filter covers. Ministry chat = the default chat everyone&apos;s in.</p>
                   </div>
                 </div>
               )}
@@ -2277,7 +2277,7 @@ export function SettingsTab({
                               <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{reasonLabel}</span>
                               <span style={{ fontSize: 10, letterSpacing: "0.8px", padding: "2px 8px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line-2)", textTransform: "uppercase", fontWeight: 500, color: "var(--muted-text)" }}>{targetLabel}</span>
                             </div>
-                            <p style={{ fontSize: 13, color: "var(--body)", marginTop: 6, lineHeight: 1.5 }}>
+                            <p style={{ fontSize: 13, color: "var(--body)", marginTop: 6, lineHeight: 2 }}>
                               Reported by {reporter?.name ?? "A member"}
                               {reported?.name ? ` · about ${reported.name}` : ""}
                               {" · "}{formatRelativeTime(r.created_at)}
@@ -2313,7 +2313,7 @@ export function SettingsTab({
                   {/* Invite code */}
                   <div className={CARD_CLS} style={{ ...CARD, padding: 22 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Invite code</div>
-                    <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
+                    <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 2 }}>
                       {codeIsCustom
                         ? "A code you chose, so it's memorable — people who enter it ask to join, and you approve them below."
                         : "Share with members to let them join directly."}
@@ -2334,7 +2334,7 @@ export function SettingsTab({
                         <QrCode style={{ width: 13, height: 13 }} /> Share link or QR
                       </button>
                     ) : inviteCode ? (
-                      <div style={{ marginTop: 12, fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5 }}>
+                      <div style={{ marginTop: 12, fontSize: 13, color: "var(--muted-text)", lineHeight: 2 }}>
                         {isAdmin ? "Regenerate this code to get a shareable link and QR." : "Ask an admin to regenerate this code to get a shareable link."}
                       </div>
                     ) : null}
@@ -2358,7 +2358,7 @@ export function SettingsTab({
                           autoComplete="off"
                           spellCheck={false}
                           placeholder="GRACEPGH"
-                          style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${codeError ? "var(--danger)" : "var(--line-2)"}`, background: "var(--cream)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 15, letterSpacing: 1.5, color: "var(--ink)" }}
+                          style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${codeError ? "var(--danger)" : "var(--line-2)"}`, background: "var(--cream)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 15, letterSpacing: 2, color: "var(--ink)" }}
                         />
                         {codeError && (
                           <p role="alert" style={{ marginTop: 6, fontSize: 12, color: "var(--danger)" }}>{codeError}</p>
@@ -2417,7 +2417,7 @@ export function SettingsTab({
                   {isAdmin && staffCode && (
                     <div className={CARD_CLS} style={{ ...CARD, padding: 22 }}>
                       <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Staff code</div>
-                      <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>For pastors, deacons, and elders. Joining with this code assigns an admin-tier role.</div>
+                      <div style={{ marginTop: 6, fontSize: 13, color: "var(--body)", lineHeight: 2 }}>For pastors, deacons, and elders. Joining with this code assigns an admin-tier role.</div>
                       <div style={{ marginTop: 16, display: "flex", alignItems: "center", gap: 10 }}>
                         <span style={{ flex: 1, padding: "10px 14px", borderRadius: 10, background: "var(--ivory)", border: "1px solid var(--line-2)", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 16, letterSpacing: 2, color: "var(--ink)", fontWeight: 500, textAlign: "center", display: "block" }}>{staffCode}</span>
                         <button onClick={copyStaffCode} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--line-2)", background: "transparent", color: "var(--body)", fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
@@ -2464,7 +2464,7 @@ export function SettingsTab({
                           <InCardToggle on={shown} locked={!inviteShareEditing} onToggle={() => setInviteShareDraft(v => !v)} />
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>Anyone can invite</div>
-                            <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
+                            <div style={{ marginTop: 4, fontSize: 13, color: "var(--body)", lineHeight: 2 }}>
                               {shown
                                 ? "Every member can share the join code, link and QR from their Home tab."
                                 : "Only leaders can share the join code. Members won't see it."}
@@ -2472,7 +2472,7 @@ export function SettingsTab({
                             {/* The consequence depends on which KIND of code is live, and
                                 the two are not close: a custom code produces requests you
                                 approve, a generated one hands out membership. */}
-                            <div style={{ marginTop: 8, fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5 }}>
+                            <div style={{ marginTop: 8, fontSize: 13, color: "var(--muted-text)", lineHeight: 2 }}>
                               {codeIsCustom
                                 ? "Your code is a custom one, so anyone they share it with asks to join and you approve them."
                                 : "Your code is a random one, so anyone they share it with joins straight away. Choose your own code above if you'd rather approve people first."}
@@ -2565,7 +2565,7 @@ export function SettingsTab({
                       <Calendar style={{ width: 13, height: 13 }} /> Add to Google Calendar
                     </CentralButton>
                   </div>
-                  <p style={{ marginTop: 14, fontSize: 12, color: "var(--muted-text)", lineHeight: 1.5 }}>Clicking the button copies the URL and opens Google Calendar — paste it in the &quot;From URL&quot; field. For Apple Calendar or Outlook, use the Copy button.</p>
+                  <p style={{ marginTop: 14, fontSize: 12, color: "var(--muted-text)", lineHeight: 2 }}>Clicking the button copies the URL and opens Google Calendar — paste it in the &quot;From URL&quot; field. For Apple Calendar or Outlook, use the Copy button.</p>
                 </div>
               </section>
 
@@ -2659,7 +2659,7 @@ export function SettingsTab({
                               <button
                                 onClick={() => handleSaveLimitEdit(l.id, l.category, l.fund)}
                                 disabled={savingLimitEdit || !editingLimitAmount}
-                                style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--plum)", color: "var(--cream-on-dark)", fontSize: 12, fontWeight: 500, cursor: savingLimitEdit ? "not-allowed" : "pointer", opacity: savingLimitEdit || !editingLimitAmount ? 0.5 : 1, whiteSpace: "nowrap" }}
+                                style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--plum)", color: "var(--cream-on-dark)", fontSize: 12, fontWeight: 500, cursor: savingLimitEdit ? "not-allowed" : "pointer", opacity: savingLimitEdit || !editingLimitAmount ? 1 : 1, whiteSpace: "nowrap" }}
                               >{savingLimitEdit ? "…" : "Save"}</button>
                               <button
                                 onClick={() => { setEditingLimitId(null); setEditingLimitAmount("") }}
@@ -2875,7 +2875,7 @@ export function SettingsTab({
         >
           <ChangeSummary>
             {discoveryDeltas().map(d => <ChangeRow key={d.field} label={d.field} from={d.from} to={d.to} />)}
-            <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+            <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 2, margin: 0 }}>
               {discoveryDraft ? "Your ministry will appear in Browse — anyone can find and join without an invite code." : "Your ministry will be hidden from Browse — an invite code will be required to join."}
             </p>
           </ChangeSummary>
@@ -2915,7 +2915,7 @@ export function SettingsTab({
             {automationArchiveLabels().length > 0 && (
               <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 4, padding: "12px 14px", borderRadius: 10, border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", background: "color-mix(in srgb, var(--danger) 8%, transparent)" }}>
                 <AlertTriangle style={{ width: 16, height: 16, color: "var(--danger)", flexShrink: 0, marginTop: 1 }} />
-                <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
+                <div style={{ fontSize: 13, color: "var(--body)", lineHeight: 2 }}>
                   This will archive: <strong style={{ color: "var(--ink)" }}>{automationArchiveLabels().join(", ")}</strong>. Members will lose access from their active list.
                 </div>
               </div>

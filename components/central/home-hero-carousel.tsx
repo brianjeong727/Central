@@ -247,7 +247,7 @@ export function FeaturedHeroCard({
           borderRadius: mobile ? 999 : "var(--r-input)",
           padding: mobile ? "11px 18px" : "var(--space-4) var(--space-7)",
           fontFamily: mobile ? "var(--serif)" : "var(--sans)",
-          fontSize: mobile ? 13.5 : 14,
+          fontSize: mobile ? 14 : 14,
           fontWeight: mobile ? 600 : 500,
           cursor: rsvping ? "default" : "pointer",
           opacity: rsvping ? 0.5 : 1,
@@ -272,7 +272,7 @@ export function FeaturedHeroCard({
         borderRadius: mobile ? 999 : "var(--r-input)",
         padding: mobile ? "11px 18px" : "var(--space-4) var(--space-7)",
         fontFamily: mobile ? "var(--serif)" : "var(--sans)",
-        fontSize: mobile ? 13.5 : 14,
+        fontSize: mobile ? 14 : 14,
         fontWeight: mobile ? 600 : 500,
         cursor: "pointer",
         whiteSpace: "nowrap",
@@ -693,7 +693,7 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
           {title}
         </div>
         {body && (
-          <p className="line-clamp-2" style={{ fontSize: 15, color: "var(--cream)", opacity: 0.72, marginTop: "var(--space-5)", lineHeight: 1.5, maxWidth: "92%" }}>
+          <p className="line-clamp-2" style={{ fontSize: 15, color: "var(--cream)", opacity: 0.72, marginTop: "var(--space-5)", lineHeight: 2, maxWidth: "92%" }}>
             {body}
           </p>
         )}

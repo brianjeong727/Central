@@ -251,7 +251,7 @@ export function SubmitReceiptModal({
           {overLimit && (
             <div style={{ display: "flex", gap: 8, alignItems: "flex-start", background: WARN_BG, border: `1px solid ${WARN_BORDER}`, borderRadius: 10, padding: "10px 12px" }}>
               <AlertTriangle size={14} color={WARN_TEXT} style={{ flexShrink: 0, marginTop: 1 }} />
-              <p style={{ fontSize: 13, color: WARN_TEXT, lineHeight: 1.5 }}>This exceeds the ${limit!.max_amount} limit for {categories.find(c => c.value === category)?.label ?? category}. You can still submit.</p>
+              <p style={{ fontSize: 13, color: WARN_TEXT, lineHeight: 2 }}>This exceeds the ${limit!.max_amount} limit for {categories.find(c => c.value === category)?.label ?? category}. You can still submit.</p>
             </div>
           )}
           <div><label style={labelStyle}>Event name (optional)</label><input type="text" placeholder="e.g. Week 3 DG Dinner" value={eventName} onChange={e => setEventName(e.target.value)} style={inputStyle} /></div>
@@ -612,7 +612,7 @@ function InboxDetailRow({ label, value }: { label: string; value: React.ReactNod
   return (
     <div>
       <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 4px" }}>{label}</p>
-      <p style={{ fontSize: 14, color: "var(--ink)", margin: 0, lineHeight: 1.5 }}>{value}</p>
+      <p style={{ fontSize: 14, color: "var(--ink)", margin: 0, lineHeight: 2 }}>{value}</p>
     </div>
   )
 }
@@ -768,7 +768,7 @@ function AllocationRow({
       {isNegative ? (
         <div style={{ background: DANGER_ROW_BG, border: `1px solid ${DANGER_TINT_BORDER}`, borderRadius: 10, padding: "10px 12px" }}>
           <p style={{ fontSize: 13, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{statusLabel(a.status, a.fund_kind)}</p>
-          {a.decision_reason && <p style={{ fontSize: 13, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
+          {a.decision_reason && <p style={{ fontSize: 13, color: "var(--body)", margin: "5px 0 0", lineHeight: 2 }}>{a.decision_reason}</p>}
         </div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1414,7 +1414,7 @@ export function FinanceWorkspace({
             <p style={{ fontSize: 15, fontWeight: 500, color: "var(--ink)" }}>Expense ledger</p>
             {canManage && (
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={handleExportBudget} disabled={budgetExporting} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "1px solid var(--line)", borderRadius: 9, background: "var(--ivory)", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: budgetExporting ? "default" : "pointer", fontFamily: "var(--sans)", opacity: budgetExporting ? 0.5 : 1 }}>
+                <button onClick={handleExportBudget} disabled={budgetExporting} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", border: "1px solid var(--line)", borderRadius: 9, background: "var(--ivory)", color: "var(--body)", fontSize: 13, fontWeight: 500, cursor: budgetExporting ? "default" : "pointer", fontFamily: "var(--sans)", opacity: budgetExporting ? 1 : 1 }}>
                   <Download style={{ width: 13, height: 13 }} />{budgetExporting ? "…" : "Export"}
                 </button>
                 <button onClick={() => setShowAddEntry(v => !v)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 9, border: "none", background: showAddEntry ? "var(--ivory)" : "var(--plum)", color: showAddEntry ? "var(--ink)" : "var(--cream)", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "var(--sans)" }}>
@@ -2092,7 +2092,7 @@ function AllocationSection({
                             placeholder="Add context for this category (e.g. 'Church provides full retreat budget, CMU covers supplies')"
                             onBlur={e => handleNotesBlur(cat.value, e.target.value)}
                             rows={2}
-                            style={{ width: "100%", background: "transparent", border: "none", outline: "none", resize: "vertical", fontSize: 13, fontFamily: "var(--sans)", fontStyle: notes ? "normal" : "italic", color: "var(--body)", lineHeight: 1.5, boxSizing: "border-box" }}
+                            style={{ width: "100%", background: "transparent", border: "none", outline: "none", resize: "vertical", fontSize: 13, fontFamily: "var(--sans)", fontStyle: notes ? "normal" : "italic", color: "var(--body)", lineHeight: 2, boxSizing: "border-box" }}
                           />
                         ) : (
                           <p style={{ fontSize: 13, color: notes ? "var(--body)" : "var(--muted-text)", fontStyle: !notes ? "italic" : "normal", margin: 0 }}>
@@ -2159,7 +2159,7 @@ function AllocationSection({
                       setSavingCategory(false)
                     }}
                     disabled={savingCategory || !newCategoryName.trim()}
-                    style={{ padding: "8px 14px", background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: savingCategory || !newCategoryName.trim() ? 0.5 : 1 }}
+                    style={{ padding: "8px 14px", background: "var(--plum)", color: "var(--cream)", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: savingCategory || !newCategoryName.trim() ? 1 : 1 }}
                   >
                     {savingCategory ? "Adding…" : "Add"}
                   </button>

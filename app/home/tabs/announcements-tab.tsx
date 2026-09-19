@@ -1598,7 +1598,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                   </PocketFilterChipRow>
                   <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16 }}>
                     {mobileFiltered.length === 0 ? (
-                      <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "8px 4px", lineHeight: 1.5 }}>
+                      <p style={{ fontSize: 13, color: "var(--muted-text)", padding: "8px 4px", lineHeight: 2 }}>
                         {mobileFilter === "events" ? "No events posted yet — event announcements show up here." : mobileFilter === "updates" ? "No updates yet — non-event posts show up here." : "No announcements yet."}
                       </p>
                     ) : mobileFiltered.map((ann) => (
@@ -1968,7 +1968,7 @@ export function AnnouncementCard({ announcement, userId, userGradYear, ministryI
             <ClampedText
               text={previewBody(announcement.body)}
               className="line-clamp-3"
-              style={{ fontSize: 13, lineHeight: 1.5, color: "var(--body)", margin: "6px 0 0" }}
+              style={{ fontSize: 13, lineHeight: 2, color: "var(--body)", margin: "6px 0 0" }}
               onClampChange={setBodyClipped}
             />
           )}

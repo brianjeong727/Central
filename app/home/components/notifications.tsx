@@ -248,8 +248,8 @@ function ToggleRow({
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: mobile ? 14.5 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>{title}</div>
-        <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 1.5 }}>{sub}</div>
+        <div style={{ fontSize: mobile ? 15 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>{title}</div>
+        <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 2 }}>{sub}</div>
       </div>
       <Toggle on={on} onToggle={onToggle} label={title} mobile={mobile} />
     </div>
@@ -400,10 +400,10 @@ export function NotificationsSection({
       <div style={{ ...cardBorder, marginBottom: mobile ? 12 : 16 }}>
         <div style={{ display: "flex", alignItems: mobile ? "center" : "flex-start", gap: mobile ? 14 : 16, padding: rowPad }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: mobile ? 14.5 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>{permissionLabel}</div>
-            <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 1.5 }}>{permissionSub}</div>
+            <div style={{ fontSize: mobile ? 15 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>{permissionLabel}</div>
+            <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 2 }}>{permissionSub}</div>
             {enableError && (
-              <div style={{ marginTop: 6, fontSize: 13, color: "var(--danger)", lineHeight: 1.5 }}>{enableError}</div>
+              <div style={{ marginTop: 6, fontSize: 13, color: "var(--danger)", lineHeight: 2 }}>{enableError}</div>
             )}
             {permission === "unsupported" && needsAppForPush && (
               <a
@@ -435,8 +435,8 @@ export function NotificationsSection({
         {/* first row has no top border */}
         <div style={{ display: "flex", alignItems: mobile ? "center" : "flex-start", gap: mobile ? 14 : 16, padding: mobile ? "14px 0" : rowPadTight }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: mobile ? 14.5 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>Direct messages</div>
-            <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 1.5 }}>Someone sends you a direct message.</div>
+            <div style={{ fontSize: mobile ? 15 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>Direct messages</div>
+            <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 2 }}>Someone sends you a direct message.</div>
           </div>
           <Toggle on={pending.dms} onToggle={() => set("dms", !pending.dms)} label="Direct messages" mobile={mobile} />
         </div>
@@ -451,8 +451,8 @@ export function NotificationsSection({
         {/* Group chat mode */}
         <div style={{ display: "flex", alignItems: "center", gap: mobile ? 14 : 16, padding: mobile ? "14px 0" : "14px 18px", borderTop: `1px solid ${groupDivider}` }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: mobile ? 14.5 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>Group chats</div>
-            <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 1.5 }}>
+            <div style={{ fontSize: mobile ? 15 : 14, fontWeight: mobile ? 600 : 500, color: "var(--ink)" }}>Group chats</div>
+            <div style={{ marginTop: mobile ? 2 : 4, fontSize: 13, color: mobile ? "var(--muted-text)" : "var(--body)", lineHeight: 2 }}>
               Smart notifies you for every message in smaller chats and only mentions in large ones.
             </div>
           </div>

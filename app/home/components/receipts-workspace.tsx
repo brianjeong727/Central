@@ -513,7 +513,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   return (
     <div>
       <p style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 4px" }}>{label}</p>
-      <p style={{ fontSize: 14, color: "var(--ink)", margin: 0, lineHeight: 1.5 }}>{value}</p>
+      <p style={{ fontSize: 14, color: "var(--ink)", margin: 0, lineHeight: 2 }}>{value}</p>
     </div>
   )
 }
@@ -576,7 +576,7 @@ function MemberAllocationRow({ allocation: a, submittedAt }: { allocation: Membe
       {isNegative ? (
         <div style={{ background: "var(--cream)", border: "1px solid color-mix(in srgb, var(--danger) 30%, var(--cream))", borderRadius: 10, padding: "10px 12px" }}>
           <p style={{ fontSize: 13, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{statusLabel(a.status, a.fund_kind)}</p>
-          {a.decision_reason && <p style={{ fontSize: 13, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
+          {a.decision_reason && <p style={{ fontSize: 13, color: "var(--body)", margin: "5px 0 0", lineHeight: 2 }}>{a.decision_reason}</p>}
         </div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

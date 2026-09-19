@@ -51,7 +51,7 @@ export function FilterChip({
         cursor: "pointer",
         whiteSpace: "nowrap",
         padding: size === "sm" ? "6px 14px" : "8px 18px",
-        fontSize: size === "sm" ? 12.5 : 13.5,
+        fontSize: size === "sm" ? 13 : 14,
         transition: "background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out)",
         ...toneStyle,
         ...style,

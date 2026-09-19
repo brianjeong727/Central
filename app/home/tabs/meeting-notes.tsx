@@ -665,7 +665,7 @@ export function MeetingNoteDetail({
                     readOnly={!canWrite}
                     onChange={e => { patchAgendaItem(item.id, { text: e.target.value }, true) }}
                     placeholder="Agenda item…"
-                    style={{ width: "100%", background: "none", border: "none", outline: "none", fontSize: 15, lineHeight: 1.5, color: item.done ? "var(--body)" : "var(--ink)", fontFamily: "var(--sans)", padding: 0 }}
+                    style={{ width: "100%", background: "none", border: "none", outline: "none", fontSize: 15, lineHeight: 2, color: item.done ? "var(--body)" : "var(--ink)", fontFamily: "var(--sans)", padding: 0 }}
                   />
                   {/* The detail line reveals on hover OR on focus. Focus is
                       what makes it reachable on a phone, where there is no
@@ -735,7 +735,7 @@ export function MeetingNoteDetail({
               onMouseLeave={() => setHoveredDecision(null)}
               style={{ display: "flex", gap: 13, alignItems: "flex-start", background: "var(--cream-3)", border: "1px solid var(--line)", borderRadius: 12, padding: "14px 18px", marginBottom: 9 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--gold)", flexShrink: 0, marginTop: 7 }} />
-              <div style={{ flex: 1, minWidth: 0, fontSize: 15, lineHeight: 1.5 }}>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 15, lineHeight: 2 }}>
                 {/* Editable in place — the only correction path used to be
                     delete-and-retype. Mirrors the agenda item input. */}
                 {canWrite ? (
@@ -743,7 +743,7 @@ export function MeetingNoteDetail({
                     value={d.text}
                     onChange={v => { patchDecision(d.id, { text: v }, true) }}
                     placeholder="Decision…"
-                    style={{ fontSize: 15, lineHeight: 1.5, color: "var(--ink)" }}
+                    style={{ fontSize: 15, lineHeight: 2, color: "var(--ink)" }}
                   />
                 ) : d.text}
                 <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 4 }}>
@@ -1117,7 +1117,10 @@ export function MeetingNotesSection({
   if (isMobile) {
     return (
       <>
-      <PocketRowCard>
+      {/* FLAT ROWS (C8, ratified 2026-09-17): notes are tapped through, so the
+          list is a full-bleed immersive run, not a card; -mx-5 cancels the host's
+          inset because each row owns its own 20px gutter. */}
+      <div className="-mx-5">
         {filtered.map((note, i) => {
           const decs = decisionsOf(note)
           const d = new Date(note.date + "T12:00:00")
@@ -1134,7 +1137,8 @@ export function MeetingNotesSection({
               title={note.title || "(Untitled)"}
               sub={sub}
               chevron
-              isLast={i === filtered.length - 1}
+              immersive
+              isFirst={i === 0}
               onClick={() => onOpenNote(note.id)}
               // Readers get the row exactly as it has always been — no trailing
               // element, so PocketRow renders its original single <button>.
@@ -1142,7 +1146,7 @@ export function MeetingNotesSection({
             />
           )
         })}
-      </PocketRowCard>
+      </div>
       {deleteDialog}
       </>
     )

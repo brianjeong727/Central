@@ -245,7 +245,7 @@ export function CongregationTab({ userId, ministryId, onViewChange, onBack }: Co
     return (
       <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
         {texts.map((t, i) => (
-          <div key={i} style={{ padding: "10px 12px", borderRadius: "var(--r-chip)", background: "var(--cream-2)", border: "1px solid var(--line)", fontSize: 13, color: "var(--ink)", lineHeight: 1.5 }}>{t}</div>
+          <div key={i} style={{ padding: "10px 12px", borderRadius: "var(--r-chip)", background: "var(--cream-2)", border: "1px solid var(--line)", fontSize: 13, color: "var(--ink)", lineHeight: 2 }}>{t}</div>
         ))}
       </div>
     )

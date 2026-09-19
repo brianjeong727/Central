@@ -184,7 +184,7 @@ export function GiveView({
                   <ExternalLink style={{ width: 16, height: 16 }} />Open Zelle · ${displayAmount}
                 </CentralButton>
               </div>
-              {zelleFallback && <p style={{ fontSize: 13, color: "var(--body)", textAlign: "center", lineHeight: 1.5, marginBottom: 10 }}>Open Zelle on your phone and send to <strong style={{ color: "var(--ink)" }}>{zelleName ? `${zelleName} (${zelleInfo})` : zelleInfo}</strong></p>}
+              {zelleFallback && <p style={{ fontSize: 13, color: "var(--body)", textAlign: "center", lineHeight: 2, marginBottom: 10 }}>Open Zelle on your phone and send to <strong style={{ color: "var(--ink)" }}>{zelleName ? `${zelleName} (${zelleInfo})` : zelleInfo}</strong></p>}
               <button onClick={handleCopy} className="border-0 md:border md:border-[var(--line)]" style={{ width: "100%", height: 38, background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", borderRadius: 10, fontSize: 13, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
                 {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}
                 {copied ? "Copied!" : `Copy info · ${zelleInfo}`}

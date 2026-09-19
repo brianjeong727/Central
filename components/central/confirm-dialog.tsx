@@ -62,7 +62,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+      <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 2, margin: 0 }}>
         {message ?? "This can't be undone."}
       </p>
     </CentralModal>,

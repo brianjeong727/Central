@@ -84,7 +84,7 @@ export function EventSetupSurface({
     <div style={{ display: "flex", flexDirection: "column", gap: mobile ? 26 : 28 }}>
       <section>
         <p style={{ ...kicker, margin: "0 0 4px" }}>Planning schedule</p>
-        <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 12px", lineHeight: 1.5 }}>
+        <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 12px", lineHeight: 2 }}>
           When the reminders fire and how the checklist is grouped. Picked for you from how far out the event was; change it here.
         </p>
         <CountdownLadderEditor phases={pendingPhases} onChange={setPendingPhases} />
@@ -92,7 +92,7 @@ export function EventSetupSurface({
 
       <section>
         <p style={{ ...kicker, margin: "0 0 4px" }}>Optional modules</p>
-        <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 10px", lineHeight: 1.5 }}>
+        <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 10px", lineHeight: 2 }}>
           Each one adds its own door to the event. Off means it isn&apos;t on anyone&apos;s screen.
         </p>
         <div style={{ borderRadius: mobile ? "var(--r-pocket)" : "var(--r-card)", background: mobile ? "var(--ivory)" : "var(--cream-panel)", border: mobile ? "none" : "1px solid var(--line)", overflow: "hidden" }}>
@@ -121,7 +121,7 @@ export function EventSetupSurface({
       {isPast && onCompile && (
         <section>
           <p style={{ ...kicker, margin: "0 0 4px" }}>Playbook</p>
-          <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 12px", lineHeight: 1.5 }}>
+          <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 12px", lineHeight: 2 }}>
             Save this event&apos;s tasks, roles and timing so next year&apos;s team can run it back.
           </p>
           {mobile ? (

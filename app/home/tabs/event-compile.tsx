@@ -204,7 +204,7 @@ export function EventCompileModal({
         </div>
       }
     >
-      <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: "0 0 18px", maxWidth: 480 }}>
+      <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 2, margin: "0 0 18px", maxWidth: 480 }}>
         Save this event as {PHASE_LABEL[calendarEvent.event_type] ? "" : ""}<span style={{ fontWeight: 500 }}>{calendarEvent.event_type}</span>&apos;s reusable playbook. Next
         time you run this event, &ldquo;Run it back&rdquo; recreates these tasks and roles with dates recomputed from the offsets below.
       </p>

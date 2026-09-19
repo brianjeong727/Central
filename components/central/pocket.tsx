@@ -6,6 +6,7 @@ import { createPortal } from "react-dom"
 import Image from "next/image"
 import { ChevronLeft, ChevronRight, Plus, Search, X } from "lucide-react"
 import { useBackIntent } from "@/lib/back-intent"
+import { markOverlayOpen } from "./overlay-open"
 
 // ── Pocket primitives (mobile design system) ──────────────────────────────────
 // The shared building blocks of every phone-width (`md:hidden`) surface, per
@@ -437,6 +438,7 @@ export function PocketSheet({ title, onClose, children, zIndex = 200 }: {
   // Android hardware/gesture back dismisses the sheet, same as Escape and the
   // backdrop. Topmost-wins comes free from the LIFO stack.
   useBackIntent(onClose)
+  useEffect(() => markOverlayOpen(), []) // N8: the pill nav hides under a sheet
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }

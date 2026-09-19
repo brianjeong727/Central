@@ -535,7 +535,7 @@ export function JournalVersesTab({ userId, ministryId, mobile = false }: { userI
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontFamily: "var(--serif)", fontSize: isExpanded ? 18 : 15, fontWeight: 400, color: "var(--plum)", letterSpacing: "-0.01em", margin: 0, marginBottom: !isExpanded ? 3 : 0 }}>{entry.reference}</p>
-                      {!isExpanded && <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 13, color: "var(--body)", lineHeight: 1.5, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview}</p>}
+                      {!isExpanded && <p style={{ fontFamily: "var(--serif)", fontStyle: "italic", fontSize: 13, color: "var(--body)", lineHeight: 2, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{preview}</p>}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
                       <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "var(--muted-text)", letterSpacing: "0.04em", whiteSpace: "nowrap" }}>{fmtJournalDate(entry.created_at)}</span>
@@ -982,7 +982,7 @@ function DangerZone({
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "18px 20px" }}>
           <p style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>Leave {ministryName}</p>
-          <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 16px", lineHeight: 1.5 }}>
+          <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 16px", lineHeight: 2 }}>
             Your messages remain visible until an admin runs cleanup. You can rejoin with an invite code.
           </p>
           {leaveError && <p style={{ fontSize: 12, color: "var(--danger)", margin: "0 0 12px" }}>{leaveError}</p>}
@@ -1063,7 +1063,7 @@ function DeleteAccountSection({ email, onDeleted, mobile = false }: { email: str
       return (
         <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "18px 20px" }}>
           <p style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>Delete your account</p>
-          <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 16px", lineHeight: 1.5 }}>
+          <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 16px", lineHeight: 2 }}>
             Permanently deletes your login and personal data — profile, journal, RSVPs, and form responses. Messages you sent stay in their chats, shown as “Deleted account.” This can’t be undone.
           </p>
           <PocketButton variant="destructiveOutline" onClick={() => setPhase("confirm")} style={{ width: "100%" }}>Delete account</PocketButton>
@@ -1087,7 +1087,7 @@ function DeleteAccountSection({ email, onDeleted, mobile = false }: { email: str
     return (
       <div style={{ background: "var(--ivory)", border: "1.5px solid var(--danger)", borderRadius: "var(--r-pocket)", padding: "18px 20px" }}>
         <p style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 0 6px" }}>Delete your account?</p>
-        <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 14px", lineHeight: 1.5 }}>
+        <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "0 0 14px", lineHeight: 2 }}>
           This can’t be undone. Type your email <strong style={{ color: "var(--ink)" }}>{email}</strong> to confirm.
         </p>
         <Input
@@ -1777,7 +1777,7 @@ export function ProfileTab({
         disabled={uploadingAvatar}
         style={{
           background: "none", border: "none", padding: 0, marginTop: 6,
-          color: "var(--muted-text)", fontSize: compact ? 12 : 12.5,
+          color: "var(--muted-text)", fontSize: compact ? 12 : 13,
           cursor: uploadingAvatar ? "not-allowed" : "pointer",
           WebkitTapHighlightColor: "transparent",
         }}
@@ -2190,10 +2190,10 @@ export function ProfileTab({
               onChange={e => setInlineDraft(e.target.value)}
               onBlur={commitInline}
               aria-label="Verse text"
-              style={{ width: "100%", marginTop: 10, border: "none", background: "var(--cream)", borderRadius: 12, padding: 12, fontSize: 17, lineHeight: 1.5, color: "var(--ink)", resize: "none", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }}
+              style={{ width: "100%", marginTop: 10, border: "none", background: "var(--cream)", borderRadius: 12, padding: 12, fontSize: 17, lineHeight: 2, color: "var(--ink)", resize: "none", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }}
             />
           ) : (
-            <div style={{ fontStyle: "italic", fontSize: 18, lineHeight: 1.5, color: profile.bible_verse ? "var(--ink)" : "var(--muted-text)", marginTop: 10 }}>
+            <div style={{ fontStyle: "italic", fontSize: 18, lineHeight: 2, color: profile.bible_verse ? "var(--ink)" : "var(--muted-text)", marginTop: 10 }}>
               {profile.bible_verse || "Add the words, so people see why it stayed with you."}
             </div>
           )}

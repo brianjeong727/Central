@@ -48,14 +48,18 @@ test.describe("mobile subpage gutter contract (20px, never doubled)", () => {
 
   test.beforeAll(async () => {
     const sb = sandbox()
-    // Any team with at least one event is enough — the contract is structural.
+    // A BOARD-kind team: its phone hub has an Events door that lists titles. A
+    // plain team's hub only has Calendar, where a title is a dot on a grid.
     const { data: ev } = await sb.client
       .from("calendar_events")
-      .select("title, team_id")
+      .select("title, team_id, teams!inner(name)")
       .eq("ministry_id", sb.ministryId)
-      .not("team_id", "is", null)
+      .ilike("teams.name", "%board%")
       .is("parent_event_id", null)
-      .order("start_date", { ascending: false })
+      // The NEXT upcoming event: it sits in the current season's list, above the
+      // fold, not behind the season filter or the collapsed Past events.
+      .gte("start_date", new Date().toISOString())
+      .order("start_date", { ascending: true })
       .limit(1)
       .maybeSingle()
     if (ev) { teamId = (ev as { team_id: string }).team_id; eventTitle = (ev as { title: string }).title }
@@ -67,6 +71,9 @@ test.describe("mobile subpage gutter contract (20px, never doubled)", () => {
     // screen with no event in it at all.
     test.skip(!teamId, "no team-owned event in this lane's sandbox")
     await page.goto(`/home?tab=plan&team=${teamId}`)
+    // Phone width: the team is a hub and the list sits behind its Events door.
+    const door = page.getByText("Events", { exact: true }).filter({ visible: true }).first()
+    if (await door.count()) await door.click()
     const card = page.getByText(eventTitle, { exact: true }).filter({ visible: true }).first()
     await card.waitFor({ state: "visible", timeout: 30_000 })
     await card.click()

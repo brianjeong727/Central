@@ -870,7 +870,7 @@ function EventsAgendaList({
         <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", marginTop: 1 }}>{formatYMD(ymd, { month: "short" })}</span>
       </span>
     )
-    const agendaRow = (ev: CalendarEvent, dim: boolean, isLast: boolean) => {
+    const agendaRow = (ev: CalendarEvent, dim: boolean, isFirst: boolean) => {
       const ymd = eventStartYMD(ev, timeZone)
       const timeStr = ev.all_day ? "All day" : eventTimeLabel(ev.start_date, timeZone)
       const sub = ev.location ? `${timeStr} · ${ev.location}` : timeStr
@@ -881,24 +881,28 @@ function EventsAgendaList({
           title={ev.title}
           sub={sub}
           chevron
-          isLast={isLast}
+          immersive
+          isFirst={isFirst}
           onClick={() => onOpenEvent(ev)}
         />
       )
     }
     const archiveViewM = upcoming.length === 0 && past.length > 0
     const pastDescM = archiveViewM ? [...past] : [...past].reverse()
+    // FLAT ROWS (C8, ratified 2026-09-17): rows you tap through sit directly on
+    // the page — cards are for things you read. The run is full-bleed and owns
+    // its own 20px gutter (`immersive`), so `-mx-5` cancels the host's inset.
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         {upcoming.length > 0 && (
-          <PocketRowCard>
-            {upcoming.map((ev, i) => agendaRow(ev, false, i === upcoming.length - 1))}
-          </PocketRowCard>
+          <div className="-mx-5">
+            {upcoming.map((ev, i) => agendaRow(ev, false, i === 0))}
+          </div>
         )}
         {archiveViewM ? (
-          <PocketRowCard>
-            {pastDescM.map((ev, i) => agendaRow(ev, true, i === pastDescM.length - 1))}
-          </PocketRowCard>
+          <div className="-mx-5">
+            {pastDescM.map((ev, i) => agendaRow(ev, true, i === 0))}
+          </div>
         ) : past.length > 0 && (
           <>
             <button
@@ -909,9 +913,9 @@ function EventsAgendaList({
               <ChevronDown style={{ width: 15, height: 15, color: "var(--faint)", transform: showPast ? "rotate(180deg)" : "none", transition: "transform 200ms ease" }} />
             </button>
             {showPast && (
-              <PocketRowCard>
-                {pastDescM.map((ev, i) => agendaRow(ev, true, i === pastDescM.length - 1))}
-              </PocketRowCard>
+              <div className="-mx-5">
+                {pastDescM.map((ev, i) => agendaRow(ev, true, i === 0))}
+              </div>
             )}
           </>
         )}
@@ -2333,7 +2337,8 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
                   </div>
                 </div>
                 {/* slot grid */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }} className="max-md:!grid-cols-1">
+                {/* FLAT ROWS at phone width (C8): one full-bleed run, no card per Friday. */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }} className="max-md:!grid-cols-1 max-md:!gap-0 max-md:-mx-5">
                   {group.slots.map(slot => (
                     <RotationSlotCell key={slot.id} slot={slot} userId={userId} onClick={() => setConfirmSlot(slot)} />
                   ))}
@@ -2414,7 +2419,6 @@ function RotationSlotCell({ slot, userId, onClick }: {
   const bg = isMine ? "var(--cream-3)" : isOpen ? "var(--cream-2)" : "var(--cream)"
   // Mobile: borderless tonal (Pocket). Keep the plum outline only for your own
   // claimed slot as a status affordance; open/others go flat ivory.
-  const mobileBorder = isMine ? "1px solid var(--plum)" : "1px solid transparent"
 
   return (
     <button
@@ -2424,9 +2428,12 @@ function RotationSlotCell({ slot, userId, onClick }: {
       disabled={!claimable}
       style={{
         display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
-        padding: "11px 14px", borderRadius: isMobile ? "var(--r-pocket-sm)" : 11,
-        background: isMobile ? "var(--ivory)" : bg,
-        border: isMobile ? mobileBorder : (claimable && hover && !isMine ? "1px solid var(--dashed)" : border),
+        padding: isMobile ? "13px 20px" : "11px 14px", borderRadius: isMobile ? 0 : 11,
+        background: isMobile ? "transparent" : bg,
+        border: isMobile ? "none" : (claimable && hover && !isMine ? "1px solid var(--dashed)" : border),
+        // Phone: a flat row with a top hairline; "mine" is the 3px plum left bar
+        // the contract reserves for the active row (C8, 2026-09-17).
+        ...(isMobile ? { borderTop: "1px solid var(--line-3)", borderLeft: isMine ? "3px solid var(--plum)" : "3px solid transparent" } : {}),
         cursor: claimable ? "pointer" : "default",
         transition: "border-color 150ms, background-color 150ms",
       }}
@@ -2762,45 +2769,36 @@ const FINANCE_SECTION_LABELS: Record<FinanceSection, string> = {
 // monogram + name (18/600) + role·members meta, and (ruling #3) a real progress
 // bar for the team's next upcoming event. Whole body taps to enter the workspace;
 // the quiet gear (kept from 6e6a01c) opens team settings for those who can manage.
-function MobileWsRow({ letter, iconKey, name, sub, progress, onEnter, onManage }: {
+function MobileWsRow({ letter, iconKey, name, sub, progress, onEnter, onManage, isFirst = false }: {
   letter: string
-  // Preferred: a PlanLineIcon glyph key (via teamIconKey) — NEVER raw teams.icon
-  // emoji (ruling #7). Falls back to the letter monogram when absent (Receipts).
   iconKey?: string
   name: string
   sub?: string
   progress?: { done: number; total: number; nextDate: string }
   onEnter: () => void
   onManage?: () => void
+  isFirst?: boolean
 }) {
   const timeZone = useMinistryTimezone()
+  // FLAT ROW (C8, ratified 2026-09-17): a workspace is something you tap through,
+  // so it is an immersive row, not a card. The progress line folds into the
+  // sub; Manage rides as the row's trailing control.
+  const progressLabel = progress
+    ? (progress.total > 0 ? `${progress.done}/${progress.total} · next ${monthDay(progress.nextDate, timeZone)}` : `next ${monthDay(progress.nextDate, timeZone)}`)
+    : null
   return (
-    <PocketCard>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-        <button onClick={onEnter} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 14, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
-            {iconKey
-              ? <PlanLineIcon iconKey={iconKey} size={40} radius={14} bg="var(--pocket-track)" fg="var(--plum)" />
-              : <PocketChip letter={letter} />}
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: "block", fontFamily: "var(--serif)", fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
-              {sub && <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2 }}>{sub}</span>}
-            </span>
-          </div>
-          {progress && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%" }}>
-              <PocketProgress done={progress.done} total={progress.total} />
-              <span style={{ whiteSpace: "nowrap", fontSize: 12, color: "var(--muted-text)" }}>
-                {progress.total > 0 ? `${progress.done}/${progress.total} · next ${monthDay(progress.nextDate, timeZone)}` : `next ${monthDay(progress.nextDate, timeZone)}`}
-              </span>
-            </div>
-          )}
-        </button>
-        {onManage && (
-          <IconButton dim={34} onClick={onManage} title="Team settings"><Settings className="w-4 h-4" /></IconButton>
-        )}
-      </div>
-    </PocketCard>
+    <PocketRow
+      immersive
+      isFirst={isFirst}
+      leading={iconKey
+        ? <PlanLineIcon iconKey={iconKey} size={40} radius={14} bg="var(--pocket-track)" fg="var(--plum)" />
+        : <PocketChip letter={letter} />}
+      title={name}
+      sub={[sub, progressLabel].filter(Boolean).join(" · ") || undefined}
+      chevron
+      onClick={onEnter}
+      trailing={onManage ? <IconButton dim={34} onClick={onManage} title="Team settings"><Settings className="w-4 h-4" /></IconButton> : undefined}
+    />
   )
 }
 
@@ -3469,13 +3467,15 @@ export function PlanTab({
           {(userTeams.length >= 2 || govTeams.length > 0) ? (
             <>
               <PocketKicker label="Your workspaces" style={{ margin: "6px 4px 0" }} />
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 14 }}>
-                {userTeams.map(t => {
+              {/* FLAT ROWS (C8): full-bleed immersive run; -mx-5 cancels the host's px-5. */}
+              <div className="-mx-5" style={{ marginTop: 10 }}>
+                {userTeams.map((t, i) => {
                   const role = t.isPresident ? "President" : t.roleName
                   const members = t.memberCount != null ? `${t.memberCount} member${t.memberCount === 1 ? "" : "s"}` : null
                   return (
                     <MobileWsRow
                       key={t.teamId}
+                      isFirst={i === 0}
                       letter={t.teamName.charAt(0).toUpperCase()}
                       iconKey={teamIconKey({ team_type: t.teamType, name: t.teamName })}
                       name={t.teamName}
@@ -3494,17 +3494,20 @@ export function PlanTab({
                   sub={`${receiptsTeams.length} team${receiptsTeams.length === 1 ? "" : "s"}`}
                   onEnter={() => onTeamSelect?.("receipts")}
                 />
-                {isGovernanceAdmin && (
-                  <PocketDashedButton label="Add workspace" onClick={() => setShowCreateTeam(true)} />
-                )}
               </div>
+              {isGovernanceAdmin && (
+                <div style={{ marginTop: 14 }}>
+                  <PocketDashedButton label="Add workspace" onClick={() => setShowCreateTeam(true)} />
+                </div>
+              )}
               {govTeams.length > 0 && (
                 <>
                   <PocketKicker label="View only" style={{ margin: "26px 4px 0" }} />
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 14 }}>
-                    {govTeams.map(t => (
+                  <div className="-mx-5" style={{ marginTop: 10 }}>
+                    {govTeams.map((t, i) => (
                       <MobileWsRow
                         key={t.id}
+                        isFirst={i === 0}
                         letter={t.name.charAt(0).toUpperCase()}
                         iconKey={teamIconKey({ team_type: t.team_type, name: t.name })}
                         name={t.name}
@@ -7260,7 +7263,7 @@ export function AddEventModal({
           <>
           {/* What the playbook brings — said as an outcome, not "Pre-seeded:". */}
           {!isEditing && createPath === "quick" && (cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
-            <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
+            <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 13, color: "var(--body)", lineHeight: 2 }}>
               We&apos;ll set up the checklist{cfg.defaultRoles.length > 0 ? ", the roles" : ""} and the reminders for a {cfg.label.toLowerCase()}. Adjust any of it inside the event.
             </div>
           )}
@@ -7358,7 +7361,7 @@ export function AddEventModal({
                   )
                 })}
               </div>
-              <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 8, lineHeight: 1.5 }}>
+              <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 8, lineHeight: 2 }}>
                 Starts with a blank checklist — you compose the plan. Modules add their own tabs to the event.
               </p>
             </div>
@@ -9154,7 +9157,7 @@ export function EventPlanWorkspace({
         </button>
         {/* title + optional playbook brief (Run Sheet P2) */}
         <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-          <span style={{ fontSize: isChild ? 14.5 : 15.5, color: task.completed ? "var(--muted-text)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
+          <span style={{ fontSize: isChild ? 15 : 16, color: task.completed ? "var(--muted-text)" : "var(--ink)", textDecoration: task.completed ? "line-through" : "none", lineHeight: 1.4 }}>{task.title}</span>
           {/* Countdown sub-line (mock's tk-sub): assignee + trigger badge live INSIDE the
               body column, under the title — so the flex:1 body keeps full width and the
               title/whisper never get starved by right-side siblings (matches the mobile row). */}
@@ -9855,7 +9858,7 @@ export function EventPlanWorkspace({
                   {canEdit && plan && new Date(calendarEvent.start_date).getTime() < Date.now() && (
                     <CentralCard variant="callout" radius="var(--r-callout)" padding={22}>
                       <p style={monoLabel}>Playbook</p>
-                      <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.5, margin: "10px 0 14px" }}>
+                      <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 2, margin: "10px 0 14px" }}>
                         Save this event&apos;s tasks, roles, and timing as a reusable playbook — next year&apos;s team can &ldquo;Run it back.&rdquo;
                       </p>
                       <CentralButton variant="secondary" size="sm" onClick={() => setCompileOpen(true)}>Compile playbook</CentralButton>
@@ -10017,7 +10020,7 @@ export function EventPlanWorkspace({
                       </>
                     }
                   >
-                    <p style={{ fontSize: 15, lineHeight: 1.5, color: "var(--ink)", margin: 0 }}>
+                    <p style={{ fontSize: 15, lineHeight: 2, color: "var(--ink)", margin: 0 }}>
                       This will change this task&rsquo;s date to fit the {sectionDefs.find((s) => s.key === pendingSectionMove.sectionKey)?.label ?? "section"} window. Continue?
                     </p>
                   </CentralModal>
@@ -10228,7 +10231,7 @@ export function EventPlanWorkspace({
                         {role.notes && (
                           // 5px when it follows the assignee line (a grouped pair),
                           // 2px when it IS the sub-line (matches the Row grammar).
-                          <div style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, marginTop: whoText ? 5 : 2, overflowWrap: "anywhere" }}>{role.notes}</div>
+                          <div style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 2, marginTop: whoText ? 5 : 2, overflowWrap: "anywhere" }}>{role.notes}</div>
                         )}
                       </div>
                       {cMeta && (
@@ -10467,7 +10470,7 @@ export function EventPlanWorkspace({
                         </>
                       }
                     >
-                      <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>{body}</p>
+                      <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 2, margin: 0 }}>{body}</p>
                       {memberBlocks}
                     </CentralModal>,
                     document.body,
@@ -10850,7 +10853,7 @@ function SubEventsTab({
       )}
 
       {outOfRangeCount > 0 && (
-        <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 18px" }}>
+        <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 2, margin: "0 0 18px" }}>
           {outOfRangeCount === 1 ? "One sub-event falls" : `${outOfRangeCount} sub-events fall`} outside {parentEvent.title}&rsquo;s dates
           ({formatYMD(parentFromYMD, { month: "short", day: "numeric" })} – {formatYMD(parentToYMD, { month: "short", day: "numeric" })}). Extend the event, or move {outOfRangeCount === 1 ? "it" : "them"} inside the range.
         </p>
@@ -11650,7 +11653,7 @@ function RunSheetTab({
       {orphanBlocks.length > 0 && (
         <div style={{ marginBottom: 36 }}>
           <p style={{ ...dayHeadStyle("var(--gold)"), marginBottom: 6 }}>Outside the event dates</p>
-          <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 12px" }}>
+          <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 2, margin: "0 0 12px" }}>
             {orphanBlocks.length === 1 ? "This block sits" : `These ${orphanBlocks.length} blocks sit`} past {event.title}&rsquo;s end date
             ({eventDateRangeShort(new Date(event.start_date), new Date(event.end_date))}). Extend the event, or move {orphanBlocks.length === 1 ? "it" : "them"} onto a day.
           </p>
@@ -11844,7 +11847,7 @@ function GroupsTab({
                     <button
                       onClick={() => setConfirmDeleteId(session.id)}
                       disabled={deletingId === session.id}
-                      style={{ padding: "6px 14px", border: "1px solid var(--danger)", borderRadius: 8, background: "transparent", color: "var(--danger)", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: deletingId === session.id ? 0.5 : 1, fontFamily: "inherit" }}
+                      style={{ padding: "6px 14px", border: "1px solid var(--danger)", borderRadius: 8, background: "transparent", color: "var(--danger)", fontSize: 13, fontWeight: 500, cursor: "pointer", opacity: deletingId === session.id ? 1 : 1, fontFamily: "inherit" }}
                     >
                       {deletingId === session.id ? "Deleting…" : "Delete"}
                     </button>
@@ -14380,7 +14383,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
               </>
             }
           >
-            <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+            <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 2, margin: 0 }}>
               <span style={{ fontWeight: 500, color: "var(--ink)" }}>{localTeamName}</span> and its roles will be permanently removed. This can&apos;t be undone.
             </p>
           </CentralModal>
@@ -14407,7 +14410,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
           >
             {isCoPres ? (
               <>
-                <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: "0 0 16px" }}>
+                <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 2, margin: "0 0 16px" }}>
                   There are 2 co-presidents. Which one is{" "}
                   <span style={{ fontWeight: 500, color: "var(--ink)" }}>{replaceCtx.targetName}</span> replacing?
                 </p>
@@ -14431,7 +14434,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                 </div>
               </>
             ) : (
-              <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.5, margin: 0 }}>
+              <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 2, margin: 0 }}>
                 <span style={{ fontWeight: 500, color: "var(--ink)" }}>{presidentMembers[0]?.name}</span> is the {presLabel.toLowerCase()}. Replace them with{" "}
                 <span style={{ fontWeight: 500, color: "var(--ink)" }}>{replaceCtx.targetName}</span>?
               </p>
@@ -14554,6 +14557,12 @@ function SmallGroupLeadersTab({
   const channelInstanceId = useRef(Math.random().toString(36).slice(2)).current
   type SGLTab = "home" | "schedule" | "bible_study"
   const validTabs: SGLTab[] = isPastor ? ["bible_study", "schedule"] : ["home", "schedule", "bible_study"]
+  // Set-up (design pass R3, SGL pass 2026-09-18): the president's team-availability
+  // summary and the rotation assigner are configuration, not the week's work. They
+  // sit behind one "Set it up" row on Schedule, and the hub's SET-UP group opens
+  // Schedule with that row already expanded. Everyone else's Schedule is just
+  // "my availability" + the published rotation.
+  const [sglSetupOpen, setSglSetupOpen] = useState(false)
   const defaultTab: SGLTab = isPastor ? "bible_study" : "home"
   const [activeSubTab, setActiveSubTab] = useState<SGLTab>(() => {
     const p = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("sgltab") : null
@@ -15128,15 +15137,25 @@ function SmallGroupLeadersTab({
           teamName={teamName}
           onBack={onExitTeam}
           onSettings={onTeamSettings}
-          groups={[{
-            label: "Sections",
-            rows: validTabs.map(k => ({
-              iconKey: k === "home" ? "clipboard" : k === "schedule" ? "calendar" : "book",
-              title: k === "home" ? "Home" : k === "schedule" ? "Schedule" : "Bible Study",
-              subtitle: k === "home" ? "Your assignments & groups" : k === "schedule" ? "Weekly DGL rotation" : "Study sheets & progress",
-              onClick: () => setMobileDrillAndUrl(k),
-            })),
-          }]}
+          groups={[
+            {
+              label: "Sections",
+              rows: validTabs.map(k => ({
+                iconKey: k === "home" ? "clipboard" : k === "schedule" ? "calendar" : "book",
+                title: k === "home" ? "Home" : k === "schedule" ? "Schedule" : "Bible Study",
+                subtitle: k === "home" ? "Your assignments & groups" : k === "schedule" ? "Weekly DGL rotation" : "Study sheets & progress",
+                onClick: () => { setSglSetupOpen(false); setMobileDrillAndUrl(k) },
+              })),
+            },
+            // Set-up (R3): the president's once-a-semester work, behind one group.
+            ...(isPresident && !isPastor ? [{
+              label: "Set-up",
+              rows: [
+                { iconKey: "sliders", title: "Rotation & availability", subtitle: "Team availability, rotation assigner", onClick: () => { setSglSetupOpen(true); setMobileDrillAndUrl("schedule") } },
+                { iconKey: "users", title: "Roster", subtitle: "Confirm who's leading this semester", onClick: () => setMobileDrillAndUrl("home") },
+              ],
+            }] : []),
+          ]}
         />
       )}
       {/* ── Bible Study Tab ─────────────────────────────────────────────── */}
@@ -15468,7 +15487,7 @@ function SmallGroupLeadersTab({
                 {isEditing && (
                   <div style={{ marginTop: 10 }}>
                     {editError && <div style={{ marginBottom: 8, padding: "8px 12px", background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)", borderRadius: 10, fontSize: 12, color: "var(--danger)" }}>{editError}</div>}
-                    <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8, lineHeight: 1.5 }}>Changes sync to your group chat and will reflect immediately.</p>
+                    <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8, lineHeight: 2 }}>Changes sync to your group chat and will reflect immediately.</p>
                     <div className="flex gap-2">
                       <button onClick={() => { setEditingGroupId(null); setPendingAddMemberIds(new Set()); setPendingRemoveMemberIds(new Set()); setConfirmRemoveSgMemberId(null); setShowSgAddPicker(false); setSgAddPickerSearch(""); setEditError(null) }} style={{ flex: 1, padding: "9px 0", background: "transparent", color: "var(--body)", border: "1px solid var(--line-2)", borderRadius: 999, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
                       <CentralButton variant="primary" size="sm" onClick={() => handleSgEditSave(group.id)} disabled={editSaving || (pendingAddMemberIds.size === 0 && pendingRemoveMemberIds.size === 0)} style={{ flex: 1 }}>{editSaving ? "Saving…" : "Save changes"}</CentralButton>
@@ -15616,8 +15635,8 @@ function SmallGroupLeadersTab({
                         )}
                       </div>
                     )}
-                    {/* President: read-only team summary (matrix stays desktop) */}
-                    {isPresident && scheduleRosterMembers.length > 0 && (
+                    {/* President: read-only team summary — behind Set it up */}
+                    {isPresident && sglSetupOpen && scheduleRosterMembers.length > 0 && (
                       <div className="mt-6">
                         <PocketKicker label="Team availability" />
                         <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket)", padding: "0 18px" }}>
@@ -15758,8 +15777,38 @@ function SmallGroupLeadersTab({
             </div>
           )}
 
-          {/* Rotation Assigner (president only) */}
-          {isPresident && !isPastor && (() => {
+          {/* Set it up — the ONE door to the president's configuration on this screen:
+              team availability + the rotation assigner (R3). A disclosure rather than a
+              sheet because the assigner is a working surface, not a form. */}
+          {isPresident && !isPastor && (
+            isDesktopView ? (
+              <div style={{ marginTop: 28 }}>
+                <ActionCard
+                  icon={<PlanLineIcon iconKey="sliders" size={20} radius={0} bg="transparent" fg="var(--plum)" />}
+                  title="Set it up"
+                  subtitle={sglSetupOpen ? "Team availability and the rotation assigner — tap to hide" : "Team availability and the rotation assigner"}
+                  onClick={() => setSglSetupOpen((v) => !v)}
+                />
+              </div>
+            ) : (
+              <div style={{ marginTop: 28 }}>
+                <PocketKicker label="Set-up" style={{ margin: "0 4px 10px" }} />
+                <PocketRowCard>
+                  <PocketRow
+                    leading={<PlanLineIcon iconKey="sliders" size={40} radius={14} bg="var(--pocket-track)" fg="var(--plum)" />}
+                    title="Set it up"
+                    sub="Team availability, rotation assigner"
+                    meta={sglSetupOpen ? "Hide" : "Show"}
+                    isLast
+                    onClick={() => setSglSetupOpen((v) => !v)}
+                  />
+                </PocketRowCard>
+              </div>
+            )
+          )}
+
+          {/* Rotation Assigner (president only, behind Set it up) */}
+          {isPresident && !isPastor && sglSetupOpen && (() => {
             const btnRadius = isDesktopView ? 8 : 999
             const rotationActions = (rotationPhase === "saved" || rotationPhase === "published") ? (
               <div className="flex items-center gap-2 flex-wrap">
