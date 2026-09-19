@@ -6,10 +6,22 @@
 // brand-new Supabase user for an unknown identity, so a SIGN-IN that mints one
 // has to undo it. A LEGITIMATE returning user has at least one durable proof of
 // a real prior account: the central_signup marker, a profiles row with a
-// ministry, any user_ministries membership, or an account older than 24h
-// (which grandfathers every pre-marker account). A sign-in with none of those
-// is a fresh unknown mint and gets torn down. Marker-based, not a 60s age
-// heuristic — a retry after 60s used to sail straight through.
+// ministry, any user_ministries membership, or an account that is simply too
+// OLD to have been minted by this request (MINT_WINDOW_MS). A sign-in with none
+// of those is a fresh unknown mint and gets torn down.
+//
+// The age proof was 24h until 2026-09-17. That window was the whole exposure
+// of the marker path: a signup whose central_signup stamp failed (a second
+// network call after the mint — it failed for two real people during a
+// four-minute Supabase 504 on launch night, lessons inbox 2026-08-19) was an
+// admitted account with NO durable proof, and any explicit sign-in inside the
+// next 24h deleted it. The only thing the age proof has to establish is "this
+// account was not created by the exchange that is running right now", and a
+// mint is seconds old at that point — so the window is minutes, not a day. The
+// case the old 60s heuristic got wrong (a retry after 60s "sailed through") was
+// a FAILED delete leaving a zombie behind; that failure is now logged CRITICAL
+// below and is the delete's problem, not a reason to keep a day-long window in
+// which a real signup can be destroyed.
 //
 // The teardown fires ONLY on an explicit flow=signin. Every other value —
 // signup, stranded, or a flow we simply lost — takes the permissive branch; see
@@ -23,6 +35,10 @@
 // half-account.
 
 import type { SupabaseClient, User } from "@supabase/supabase-js"
+
+/** An account created more than this long ago cannot have been minted by the
+ *  exchange currently running, so an explicit sign-in may never tear it down. */
+export const MINT_WINDOW_MS = 10 * 60 * 1000
 
 /**
  * Enforce the mint policy for an authenticated OAuth user.
@@ -71,7 +87,7 @@ export async function enforceOAuthAccountPolicy(
     // The stamp is RETRIED once before giving up, and a failure still allows. Allowing
     // is right — a metadata write must not cost someone their signup — but an admitted
     // account that went UNMARKED is exactly the input the strict branch tears down: a
-    // later explicit sign-in inside 24h, before they have joined a ministry, finds no
+    // later explicit sign-in inside the mint window, before they have joined a ministry, finds no
     // marker, no membership and no ministry_id, and deletes them. That is the failure
     // this whole file now exists to prevent, surviving in one corner. The corner also
     // grew: stranded and missing-flow mints route through here too, so a best-effort
@@ -86,15 +102,24 @@ export async function enforceOAuthAccountPolicy(
         console.warn("[oauth-guard] central_signup stamp failed, retrying once for", user.id, stampErr)
         ;({ error: stampErr } = await stamp())
       }
-      // Loud, because an unmarked account is a future wrongful teardown.
-      if (stampErr) console.error("[oauth-guard] CRITICAL: central_signup stamp failed twice — account admitted UNMARKED and is deletable by a signin within 24h:", user.id, stampErr)
+      // Loud, because an unmarked account is a future wrongful teardown — but the
+      // exposure is now MINT_WINDOW_MS, not a day (see the header note).
+      if (stampErr) console.error("[oauth-guard] CRITICAL: central_signup stamp failed twice — account admitted UNMARKED and is deletable by a signin within the mint window:", user.id, stampErr)
     }
     return { allowed: true }
   }
 
   const hasMarker = user.user_metadata?.central_signup === true
-  const olderThan24h = new Date(user.created_at).getTime() < Date.now() - 24 * 60 * 60 * 1000
-  let legitimate = hasMarker || olderThan24h
+  // Older than the mint window ⇒ this exchange cannot have created it. A fresh
+  // mint's created_at is the same second as the exchange; ten minutes is a wide
+  // margin for clock skew and a slow round trip, and still a tiny fraction of
+  // the day that used to be at risk.
+  // An unparseable created_at would compare as NaN → false → the DESTRUCTIVE
+  // branch. Treat "can't tell how old" as "not fresh": a wrongful admit costs
+  // nothing, a wrongful teardown costs someone their provider identity.
+  const createdMs = new Date(user.created_at).getTime()
+  const predatesThisRequest = !Number.isFinite(createdMs) || createdMs < Date.now() - MINT_WINDOW_MS
+  let legitimate = hasMarker || predatesThisRequest
 
   if (!legitimate) {
     const { data: um } = await admin

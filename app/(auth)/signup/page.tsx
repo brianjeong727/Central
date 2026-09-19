@@ -10,7 +10,7 @@ import { SplitShell, GoogleButton, AppleButton, AppleGlyph, GoogleGlyph, OrDivid
   PocketAuthScreen, PocketBack, PocketField, PocketSelect, PocketSubmit, PocketError,
   AuthSelect, AuthPendingVeil, gradYearOptions,
   pocketPillCard, pocketFieldLabel, pocketFieldBox, pocketH1, pocketSub } from "@/app/(auth)/shared"
-import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn, nativeAuthDebugMessage, googleNativeFailureMessage } from "@/lib/native-auth"
+import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn, appleNativeFailureMessage, googleNativeFailureMessage } from "@/lib/native-auth"
 import { EYEBROW_STYLE as mono } from "@/components/central/typography"
 import { CentralButton } from "@/components/central"
 import { inviteReturnPath, codeFromReturnPath } from "@/lib/invite-code"
@@ -357,10 +357,12 @@ function SignupContent() {
       setAdminError(null); setPending(SETTING_UP)
       const res = await signInWithAppleNative("signup")
       if (res.ok) { window.location.assign("/onboarding"); return }
-      // TEMP DIAGNOSTIC: show the raw reason for EVERY non-unavailable failure
-      // (previously no-account/canceled returned silently — the "frozen" bug).
-      if (res.error !== "unavailable") { setPending(null); setAdminError(nativeAuthDebugMessage(res)); return }
-      // plugin missing from this binary — fall through to the web flow (veil stays up)
+      // `unavailable` / `not-entitled`: this binary can't do it natively but the
+      // web flow can — fall through (veil stays up, it goes straight to a redirect).
+      // Everything else says something, except a deliberate Cancel; silence on a
+      // real failure is the "frozen button" bug from 2026-08-19.
+      if (res.error === "unavailable" || res.error === "not-entitled") { /* fall through */ }
+      else { setPending(null); if (res.error !== "canceled") setAdminError(appleNativeFailureMessage(res)); return }
     }
     setPending(SETTING_UP)
     const supabase = createClient()
@@ -448,10 +450,12 @@ function SignupContent() {
       // Mirrors the web callback's intent=join landing — a fresh member goes to
       // the join flow, never the marketing landing (hidden in the shell anyway).
       if (res.ok) { window.location.assign(invitePath ?? "/ministries?tab=code"); return }
-      // TEMP DIAGNOSTIC: show the raw reason for EVERY non-unavailable failure
-      // (previously no-account/canceled returned silently — the "frozen" bug).
-      if (res.error !== "unavailable") { setPending(null); setMemberError(nativeAuthDebugMessage(res)); return }
-      // plugin missing from this binary — fall through to the web flow (veil stays up)
+      // `unavailable` / `not-entitled`: this binary can't do it natively but the
+      // web flow can — fall through (veil stays up, it goes straight to a redirect).
+      // Everything else says something, except a deliberate Cancel; silence on a
+      // real failure is the "frozen button" bug from 2026-08-19.
+      if (res.error === "unavailable" || res.error === "not-entitled") { /* fall through */ }
+      else { setPending(null); if (res.error !== "canceled") setMemberError(appleNativeFailureMessage(res)); return }
     }
     setPending(SETTING_UP)
     const supabase = createClient()

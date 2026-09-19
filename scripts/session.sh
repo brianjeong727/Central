@@ -92,7 +92,91 @@ else
   echo "→ $subdir is a detached copy of $BASE — branch (git checkout -b feat/<task>) before committing"
 fi
 
-# --- ensure deps + env (first-run install; refresh when package.json changed since last install) ---
+# --- free the slot's port BEFORE touching deps ---
+# Ordering matters: this used to run AFTER the install, which left a leftover `next dev`
+# from an earlier session watching this worktree's node_modules for the whole install.
+# npm's reify RETIRES and moves hundreds of directories under node_modules; a live watcher
+# (plus iCloud's FileProvider, which syncs the Desktop these worktrees live in) turns that
+# into a failed rename — and arborist then CRASHES inside its own rollback
+# (rollbackMoveBackRetiredUnchanged), leaving node_modules half-retired. Kill first.
+if port_listening "$port"; then
+  echo "→ clearing leftover process on port $port"
+  port_pids "$port" | xargs -r kill -9 2>/dev/null || true
+fi
+
+# --- deps install: serialized, logged, time-boxed ---
+DEPS_TIMEOUT="${DEPS_TIMEOUT:-900}"   # seconds — a wedged install must fail loudly, never hang a pane
+installlog() { echo "$LOCK_DIR/$1.install.log"; }
+
+# Serialize installs across slots. `cgrid` claims every free slot at once and npm's
+# ~/.npm/_cacache is SHARED, so concurrent reifies race on it. mkdir is the only atomic
+# lock primitive available here (macOS ships no flock). A lock older than the install
+# budget is stale and gets reaped.
+npm_lock_acquire() {
+  local lock="$LOCK_DIR/npm-install.lock" waited=0 announced=0
+  while ! mkdir "$lock" 2>/dev/null; do
+    if [ -n "$(find "$lock" -maxdepth 0 -mmin "+$(( DEPS_TIMEOUT / 60 + 2 ))" 2>/dev/null)" ]; then
+      echo "→ reaping stale npm-install lock"
+      rm -rf "$lock" 2>/dev/null || true
+      continue
+    fi
+    [ "$announced" = 0 ] && { echo "→ another slot is installing deps — waiting"; announced=1; }
+    sleep 5; waited=$(( waited + 5 ))
+    [ "$waited" -ge "$(( DEPS_TIMEOUT + 120 ))" ] && { echo "✗ timed out waiting for the npm-install lock" >&2; return 1; }
+  done
+  echo "$$" >"$lock/owner"
+}
+npm_lock_release() { rm -rf "$LOCK_DIR/npm-install.lock" 2>/dev/null || true; }
+
+# Run npm install with its output CAPTURED (not discarded) and a watchdog. The old form
+# was `( cd "$dir" && npm install … ) >/dev/null 2>&1` under `set -e`: a failed install
+# killed the script having printed NOTHING, so a cgrid pane just dropped to a bare prompt
+# with no clue why. Everything here exists to make that failure legible.
+install_deps() {
+  local d="$1" sub="$2" why="$3" stamp="$4" hash="$5"
+  local log; log="$(installlog "$pick")"
+  echo "→ $why — installing deps in $sub"
+  echo "  install log: $log"
+  npm_lock_acquire || return 1
+
+  rm -f "$log.timeout"
+  ( cd "$d" && exec npm install --legacy-peer-deps ) >"$log" 2>&1 &
+  local pid=$! rc=0
+  # Watchdog: no `timeout`/`gtimeout` on this box, so poll-and-kill. Children first — the
+  # npm wrapper spawns lifecycle installs that would otherwise outlive it.
+  ( sleep "$DEPS_TIMEOUT"
+    if kill -0 "$pid" 2>/dev/null; then
+      : >"$log.timeout"
+      pkill -9 -P "$pid" 2>/dev/null || true
+      kill -9 "$pid" 2>/dev/null || true
+    fi ) >/dev/null 2>&1 &
+  local watchdog=$!
+  # Group-redirect stderr: when the watchdog SIGKILLs the install, bash otherwise prints
+  # its own "Killed: 9" job notice ahead of our message.
+  { wait "$pid"; rc=$?; } 2>/dev/null
+  # Reap the watchdog quietly (its sleep first, so no stray process lingers). The
+  # redirect swallows bash's "Terminated: 15" job notice on the success path.
+  { pkill -P "$watchdog" 2>/dev/null || true
+    kill "$watchdog" 2>/dev/null || true
+    wait "$watchdog" 2>/dev/null || true; } 2>/dev/null
+  npm_lock_release
+
+  if [ "$rc" != 0 ]; then
+    if [ -e "$log.timeout" ]; then
+      echo "✗ npm install in $sub exceeded ${DEPS_TIMEOUT}s and was killed" >&2
+    else
+      echo "✗ npm install failed in $sub (exit $rc)" >&2
+    fi
+    echo "  ── last 25 lines of $log ──" >&2
+    tail -25 "$log" >&2
+    echo "  ───────────────────────────" >&2
+    echo "  Slot NOT started. If node_modules looks gutted (a crashed reify leaves it" >&2
+    echo "  half-retired): rm -rf '$d/node_modules' and re-run this script." >&2
+    return 1
+  fi
+  echo "$hash" >"$stamp"
+}
+
 # Stamp lives inside node_modules so wiping deps also wipes the stamp. Hash package.json
 # (not a lockfile — pnpm-lock.yaml is the authoritative one Vercel installs from, and
 # package-lock.json is now gitignored/local-only because it silently drifted while
@@ -100,23 +184,15 @@ fi
 pkg_hash="$(git -C "$dir" hash-object package.json)"
 deps_stamp="$dir/node_modules/.package-json-hash"
 if [ ! -e "$dir/node_modules" ]; then
-  echo "→ installing deps in $subdir (first time)"
-  ( cd "$dir" && npm install --legacy-peer-deps >/dev/null 2>&1 )
-  echo "$pkg_hash" >"$deps_stamp"
+  install_deps "$dir" "$subdir" "first time" "$deps_stamp" "$pkg_hash" || exit 1
 elif [ "$(cat "$deps_stamp" 2>/dev/null || true)" != "$pkg_hash" ]; then
-  echo "→ package.json changed since last install — refreshing deps in $subdir"
-  ( cd "$dir" && npm install --legacy-peer-deps >/dev/null 2>&1 )
-  echo "$pkg_hash" >"$deps_stamp"
+  install_deps "$dir" "$subdir" "package.json changed since last install" "$deps_stamp" "$pkg_hash" || exit 1
 fi
 for f in .env.local .env; do
   [ -e "$MAIN_WT/$f" ] && [ ! -e "$dir/$f" ] && ln -s "$MAIN_WT/$f" "$dir/$f"
 done
 
-# --- boot the dev server on the slot's fixed port (kill any leftover first) ---
-if port_listening "$port"; then
-  echo "→ clearing leftover process on port $port"
-  port_pids "$port" | xargs -r kill -9 2>/dev/null || true
-fi
+# --- boot the dev server on the slot's fixed port ---
 echo "→ starting dev server on http://localhost:$port"
 ( cd "$dir" && exec npm run dev -- -p "$port" ) >"$(devlog "$pick")" 2>&1 &
 DEV_PID=$!

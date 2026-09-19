@@ -6,7 +6,7 @@ import Link from "next/link"
 import { AlertCircle } from "lucide-react"
 import { createClient, siteOrigin } from "@/lib/supabase"
 import { SplitShell, GoogleButton, GoogleGlyph, AppleButton, AppleGlyph, OrDivider, EyeButton, AuthPendingVeil } from "@/app/(auth)/shared"
-import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn, nativeAuthDebugMessage } from "@/lib/native-auth"
+import { isNativeShell, useIsNativeShell, signInWithAppleNative, signInWithGoogleNative, googleNativeConfigured, routeAfterNativeSignIn, appleNativeFailureMessage } from "@/lib/native-auth"
 import { useBackIntent } from "@/lib/back-intent"
 import { RingCrossLogo } from "@/app/home/components/shared"
 import { EntrySplash } from "@/app/home/components/entry-splash"
@@ -166,7 +166,8 @@ function LoginContent() {
         if (res.error === "unavailable" || res.error === "not-entitled") { await webAppleOAuth(); return }
         setPending(null)
         if (res.error === "no-account") { setNoAccountProvider("Apple"); setMobileStep("form"); return }
-        setError(nativeAuthDebugMessage(res))
+        if (res.error === "canceled") return // a deliberate dismissal stays silent
+        setError(appleNativeFailureMessage(res))
         // The mobile welcome step has no error banner — surface it on the form step.
         setMobileStep("form")
         return
