@@ -321,7 +321,7 @@ export function ImageCropper({
           />
         </label>
 
-        <p style={{ margin: 0, fontSize: 12.5, color: "var(--muted-text)", textAlign: "center" }}>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--muted-text)", textAlign: "center" }}>
           Drag to reposition · scroll or pinch to zoom
         </p>
       </div>

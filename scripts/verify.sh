@@ -101,6 +101,7 @@ HEX_STATUS="n/a"
 DEDUP_STATUS="n/a"
 COPIES_STATUS="n/a"
 CHROME_STATUS="n/a"
+TYPE_STATUS="n/a"
 ROLE_STATUS="n/a"
 SERVER_STATUS="fail"
 E2E_STATUS="n/a"
@@ -245,6 +246,24 @@ else
   exit 1
 fi
 
+# ── (c5b) integer type sizes (BLOCKING) ───────────────────────────────────────
+# Design pass N22 (ratified 2026-09-17): 210 half-pixel font sizes were rounded
+# once; a new fractional size regrows the private type ramp one exception at a
+# time, so it fails here rather than in a review.
+echo "▶ scripts/check-integer-type.sh"
+TYPE_LOG="$(mktemp)"
+if bash scripts/check-integer-type.sh >"$TYPE_LOG" 2>&1; then
+  TYPE_STATUS="pass"
+  tail -n 1 "$TYPE_LOG"
+else
+  TYPE_STATUS="fail"
+  echo "── integer-type FAILED (BLOCKING) ───────────────────"
+  cat "$TYPE_LOG"
+  echo "─────────────────────────────────────────────────────"
+  echo "════════ VERIFY RESULT: FAIL (integer-type) ════════"
+  exit 1
+fi
+
 # A chat's chip image must resolve through chatChipAvatar() alone. A DM's
 # groups.avatar_url is writable by either participant through the API (RLS is
 # wider than the app gate there) and is inert ONLY because no render path reads
@@ -349,6 +368,7 @@ printf '  %-8s %s\n' "hex"    "$HEX_STATUS"
 printf '  %-8s %s\n' "dedup"  "$DEDUP_STATUS"
 printf '  %-8s %s\n' "copies" "$COPIES_STATUS"
 printf '  %-8s %s\n' "chrome" "$CHROME_STATUS"
+printf '  %-8s %s\n' "type" "$TYPE_STATUS"
 printf '  %-8s %s\n' "avatar" "$AVATAR_STATUS"
 printf '  %-8s %s\n' "roles"  "$ROLE_STATUS"
 printf '  %-8s %s (:%s)\n' "server" "$SERVER_STATUS" "$PORT"

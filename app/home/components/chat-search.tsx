@@ -131,7 +131,7 @@ export function ChatSearchView({
         {avatar}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p className="text-[13px] truncate leading-tight" style={{ color: "var(--ink)", fontWeight: 500 }}>{title}</p>
-          {sub && <p className="text-[11.5px] truncate leading-tight" style={{ color: "var(--muted-text)", marginTop: 2 }}>{sub}</p>}
+          {sub && <p className="text-[12px] truncate leading-tight" style={{ color: "var(--muted-text)", marginTop: 2 }}>{sub}</p>}
         </div>
         {dot && <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--plum)", flexShrink: 0 }} />}
       </button>

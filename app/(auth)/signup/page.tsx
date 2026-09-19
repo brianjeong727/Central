@@ -130,7 +130,7 @@ function SelectTile({ title, sub, on, onClick }: {
       <div style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 20, letterSpacing: "-0.01em", lineHeight: 1.1, color: on ? "var(--cream-panel)" : "var(--ink)" }}>
         {title}
       </div>
-      {sub && <div style={{ fontSize: 13, marginTop: 4, color: on ? "rgba(251,248,242,0.72)" : "var(--muted-text)" }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 13, marginTop: 4, color: on ? "color-mix(in srgb, var(--cream-panel) 72%, transparent)" : "var(--muted-text)" }}>{sub}</div>}
     </button>
   )
 }
@@ -183,7 +183,7 @@ function MPathTile({ icon, title, body, onClick }: {
       <span style={{ width: 44, height: 44, borderRadius: 12, background: "var(--line-2)", color: "var(--plum)", display: "grid", placeItems: "center", flexShrink: 0 }}>{icon}</span>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "block", fontFamily: SERIF, fontSize: 17, fontWeight: 600, color: "var(--ink)", lineHeight: 1.2 }}>{title}</span>
-        <span style={{ display: "block", fontSize: 13.5, color: "var(--body)", marginTop: 3, lineHeight: 1.45 }}>{body}</span>
+        <span style={{ display: "block", fontSize: 14, color: "var(--body)", marginTop: 3, lineHeight: 1.45 }}>{body}</span>
       </span>
       <Icon d="M9 6l6 6-6 6" size={18} style={{ color: "var(--faint)" }}/>
     </button>
@@ -211,7 +211,7 @@ function MGenderPill({ label, on, onClick }: { label: string; on: boolean; onCli
     <button type="button" onClick={onClick} style={{
       flex: 1, padding: "12px 16px", borderRadius: 999, border: "none", minHeight: 44,
       background: on ? "var(--plum)" : "var(--ivory)", color: on ? "var(--cream)" : "var(--body)",
-      fontSize: 14.5, fontWeight: 600, fontFamily: SERIF, cursor: "pointer",
+      fontSize: 15, fontWeight: 600, fontFamily: SERIF, cursor: "pointer",
     }}>{label}</button>
   )
 }
@@ -632,10 +632,10 @@ function SignupContent() {
             {verifyLoading ? "Verifying…" : "Verify & continue"}
           </PocketSubmit>
         </form>
-        <div style={{ fontSize: 13.5, color: "var(--body)", marginTop: 18, textAlign: "center", lineHeight: 1.5 }}>
+        <div style={{ fontSize: 14, color: "var(--body)", marginTop: 18, textAlign: "center", lineHeight: 1.5 }}>
           Didn&apos;t get it? Check spam, or{" "}
           <button type="button" onClick={handleResend} disabled={resendLoading}
-            style={{ color: "var(--plum)", fontWeight: 600, background: "none", border: "none", cursor: resendLoading ? "default" : "pointer", padding: 0, fontFamily: SERIF, fontSize: 13.5, opacity: resendLoading ? 0.7 : 1 }}>
+            style={{ color: "var(--plum)", fontWeight: 600, background: "none", border: "none", cursor: resendLoading ? "default" : "pointer", padding: 0, fontFamily: SERIF, fontSize: 14, opacity: resendLoading ? 0.7 : 1 }}>
             {resendLoading ? "sending…" : "resend the code"}
           </button>.
         </div>
@@ -644,10 +644,10 @@ function SignupContent() {
             {resendStatus.msg}
           </div>
         )}
-        <div style={{ marginTop: 22, paddingTop: 20, borderTop: "1px solid var(--line-3)", fontSize: 13.5, color: "var(--body)", textAlign: "center" }}>
+        <div style={{ marginTop: 22, paddingTop: 20, borderTop: "1px solid var(--line-3)", fontSize: 14, color: "var(--body)", textAlign: "center" }}>
           Wrong address?{" "}
           <button type="button" onClick={() => { setResendStatus(null); setVerifyError(null); setView(pendingView) }}
-            style={{ color: "var(--plum)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: SERIF, fontSize: 13.5 }}>
+            style={{ color: "var(--plum)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: SERIF, fontSize: 14 }}>
             Go back
           </button>
         </div>
@@ -847,10 +847,10 @@ function SignupContent() {
             <Link href="/privacy" style={{ color: "var(--plum)", fontWeight: 500, textDecoration: "none" }}>Privacy Policy</Link>.
           </p>
         </form>
-        <div style={{ marginTop: 22, paddingTop: 20, borderTop: "1px solid var(--line-3)", fontSize: 13.5, color: "var(--body)", textAlign: "center" }}>
+        <div style={{ marginTop: 22, paddingTop: 20, borderTop: "1px solid var(--line-3)", fontSize: 14, color: "var(--body)", textAlign: "center" }}>
           Not a pastor, deacon, or elder?{" "}
           <button type="button" onClick={() => setView("member")}
-            style={{ color: "var(--plum)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: SERIF, fontSize: 13.5 }}>
+            style={{ color: "var(--plum)", fontWeight: 600, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: SERIF, fontSize: 14 }}>
             Join instead →
           </button>
         </div>
@@ -963,7 +963,7 @@ function SignupContent() {
           <PocketField label="Full name" placeholder="Brian Jeong" value={memberName} onChange={(e) => setMemberName(e.target.value)} required autoComplete="name"/>
           <div>
             <span style={pocketFieldLabel}>Gender</span>
-            <div style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "-2px 0 8px", paddingLeft: 4 }}>Helps us place you in the right small group.</div>
+            <div style={{ fontSize: 13, color: "var(--muted-text)", margin: "-2px 0 8px", paddingLeft: 4 }}>Helps us place you in the right small group.</div>
             <div style={{ display: "flex", gap: 8 }}>
               {["Male", "Female"].map(g => (
                 <MGenderPill key={g} label={g} on={gender === g.toLowerCase()} onClick={() => setGender(g.toLowerCase())}/>

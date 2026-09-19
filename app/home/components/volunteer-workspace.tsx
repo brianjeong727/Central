@@ -195,7 +195,7 @@ export function VolunteerWorkspace({ ministryId, userId }: {
       width="full"
     >
       {isLoading ? (
-        <p style={{ fontSize: 13.5, color: "var(--muted-text)", padding: "24px 0" }}>Loading…</p>
+        <p style={{ fontSize: 14, color: "var(--muted-text)", padding: "24px 0" }}>Loading…</p>
       ) : events.length === 0 ? (
         // The whole point of showing this tab to an unassigned member: tell them
         // what the tab is FOR, so it reads as "not yet" rather than "broken".
@@ -327,13 +327,13 @@ function VolunteerEventDetail({ event, userId, crumbs, dayLabel, timeLabel }: {
             <p style={{ ...POCKET_KICKER_STYLE, marginBottom: 10 }}>Run of show</p>
             {blocks.map((b, i) => (
               <div key={b.id} style={{ display: "flex", gap: 12, padding: "11px 0", borderBottom: i === blocks.length - 1 ? "none" : "1px solid var(--line-3)" }}>
-                <span style={{ fontFamily: "var(--mono)", fontSize: 11.5, color: "var(--muted-text)", width: 62, flexShrink: 0, paddingTop: 2 }}>
+                <span style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--muted-text)", width: 62, flexShrink: 0, paddingTop: 2 }}>
                   {b.time_label || "—"}
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14.5, color: "var(--ink)", lineHeight: 1.35, overflowWrap: "anywhere" }}>{b.title}</div>
+                  <div style={{ fontSize: 15, color: "var(--ink)", lineHeight: 1.35, overflowWrap: "anywhere" }}>{b.title}</div>
                   {b.owner_name && (
-                    <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 2 }}>{b.owner_name}</div>
+                    <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 2 }}>{b.owner_name}</div>
                   )}
                 </div>
               </div>
@@ -351,8 +351,8 @@ function VolunteerEventDetail({ event, userId, crumbs, dayLabel, timeLabel }: {
             {staffed.map((s, i) => (
               <div key={`${s.name}-${s.role}-${i}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i === staffed.length - 1 ? "none" : "1px solid var(--line-3)" }}>
                 <MonogramChip initials={getInitials(s.name)} style={{ width: 32, height: 32, fontSize: 11, fontWeight: 500, flexShrink: 0 }} />
-                <span style={{ flex: 1, minWidth: 0, fontSize: 14.5, color: "var(--ink)" }}>{s.name}</span>
-                <span style={{ fontSize: 12.5, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{s.role}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 15, color: "var(--ink)" }}>{s.name}</span>
+                <span style={{ fontSize: 13, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{s.role}</span>
               </div>
             ))}
           </div>

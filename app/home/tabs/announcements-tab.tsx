@@ -69,21 +69,21 @@ function AttachFormSection({ attachedFormId, setAttachedFormId, availableForms, 
                   display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10,
                   cursor: "pointer", textAlign: "left", width: "100%",
                   border: `1px solid ${selected ? "var(--plum)" : "var(--line-2)"}`,
-                  background: selected ? "var(--plum)" : "var(--ivory)",
-                  color: selected ? "var(--cream-on-dark)" : "var(--ink)",
-                  transition: "all 0.12s",
+                  background: selected ? "var(--plum-tint)" : "var(--ivory)",
+                  color: selected ? "var(--plum)" : "var(--ink)",
+                  transition: "background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out)",
                 }}
               >
                 <span style={{
                   width: 16, height: 16, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                  border: `2px solid ${selected ? "var(--cream-on-dark)" : "var(--dashed)"}`,
-                  background: selected ? "rgba(246,244,239,0.25)" : "transparent",
+                  border: `2px solid ${selected ? "var(--plum)" : "var(--dashed)"}`,
+                  background: selected ? "var(--plum)" : "transparent",
                 }}>
                   {selected && <Check style={{ width: 9, height: 9, color: "var(--cream-on-dark)" }} />}
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span className="line-clamp-1" style={{ fontSize: 13, fontWeight: 500 }}>{f.title}</span>
-                  <span style={{ display: "block", fontSize: 11, color: selected ? "rgba(246,244,239,0.7)" : "var(--muted-text)", marginTop: 1 }}>{f.field_count} question{f.field_count !== 1 ? "s" : ""}</span>
+                  <span style={{ display: "block", fontSize: 11, color: selected ? "var(--plum)" : "var(--muted-text)", marginTop: 1 }}>{f.field_count} question{f.field_count !== 1 ? "s" : ""}</span>
                 </span>
               </button>
             )
@@ -449,7 +449,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
 
       {/* ── Mobile: scrollable single column on cream ── */}
       <div className="md:hidden flex-1 overflow-y-auto min-h-0 px-5 py-5 flex flex-col gap-5">
-        {error && <div className="rounded-xl px-4 py-3 text-[13px] text-[var(--plum)] font-medium" style={{ background: "rgba(62,21,64,0.08)" }}>{error}</div>}
+        {error && <div className="rounded-xl px-4 py-3 text-[13px] text-[var(--plum)] font-medium" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)" }}>{error}</div>}
         {/* Writing surface — mono kickers over a borderless serif headline + body,
             on the page bg (v2 §4 forms; prototype s.annCompose). */}
         <div className="flex flex-col">
@@ -463,7 +463,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           <textarea
             value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write the full announcement here…" required rows={7}
             className="placeholder:text-[var(--faint)]"
-            style={{ fontFamily: "var(--serif)", fontSize: 15.5, lineHeight: 1.6, color: "var(--ink)", background: "transparent", border: "none", outline: "none", resize: "none", width: "100%" }}
+            style={{ fontFamily: "var(--serif)", fontSize: 16, lineHeight: 1.6, color: "var(--ink)", background: "transparent", border: "none", outline: "none", resize: "none", width: "100%" }}
           />
         </div>
 
@@ -493,14 +493,14 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           <div className="flex items-center gap-3">
             <PocketSwitch checked={isEvent} onChange={setIsEvent} ariaLabel="This is an event" />
             <div>
-              <p className="text-[14.5px] font-semibold text-[var(--ink)]">This is an event</p>
+              <p className="text-[15px] font-semibold text-[var(--ink)]">This is an event</p>
               <p className="text-[13px] text-[var(--muted-text)] mt-0.5">Adds RSVP button + calendar marker</p>
             </div>
           </div>
           {isEvent && (
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-1.5">
-                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Starts</p>
+                <p className="text-[15px] font-semibold text-[var(--ink)]">Starts</p>
                 {/* minWidth:0 + maxWidth:100% + border-box are all load-bearing.
                     `width:100%` alone does NOT shrink a native datetime-local below
                     its INTRINSIC width, which is wider than the ~350px a 390px phone
@@ -510,11 +510,11 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                     rather than adding to it. */}
                 <input
                   type="datetime-local" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required
-                  style={{ fontSize: 15.5, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", fontFamily: "var(--serif)" }}
+                  style={{ fontSize: 16, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", fontFamily: "var(--serif)" }}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Ends <span className="font-normal text-[var(--muted-text)]">· optional</span></p>
+                <p className="text-[15px] font-semibold text-[var(--ink)]">Ends <span className="font-normal text-[var(--muted-text)]">· optional</span></p>
                 {/* Not `required`: "starts at 7, ends whenever" is a real event.
                     `min` keeps the picker from offering an end before the start —
                     the DB CHECK rejects it anyway, and being told at write time
@@ -522,13 +522,13 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
                 <input
                   type="datetime-local" value={eventEndDate} min={eventDate || undefined}
                   onChange={(e) => setEventEndDate(e.target.value)}
-                  style={{ fontSize: 15.5, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", fontFamily: "var(--serif)" }}
+                  style={{ fontSize: 16, color: "var(--ink)", background: "var(--ivory)", border: "none", borderRadius: "var(--r-pocket-sm)", padding: "14px 16px", outline: "none", width: "100%", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", fontFamily: "var(--serif)" }}
                 />
               </div>
               <div className="flex items-center gap-3">
                 <PocketSwitch checked={showAttendees} onChange={setShowAttendees} ariaLabel="Show attendees publicly" />
                 <div>
-                  <p className="text-[14.5px] font-semibold text-[var(--ink)]">Show attendees publicly</p>
+                  <p className="text-[15px] font-semibold text-[var(--ink)]">Show attendees publicly</p>
                   <p className="text-[13px] text-[var(--muted-text)] mt-0.5">Members can see who&apos;s going</p>
                 </div>
               </div>
@@ -542,7 +542,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
             <div className="flex items-center gap-3">
               <PocketSwitch checked={featureOnHome} onChange={setFeatureOnHome} ariaLabel="Feature on Home" />
               <div>
-                <p className="text-[14.5px] font-semibold text-[var(--ink)]">Feature on Home</p>
+                <p className="text-[15px] font-semibold text-[var(--ink)]">Feature on Home</p>
                 <p className="text-[13px] text-[var(--muted-text)] mt-0.5">Shows in the Featured carousel</p>
               </div>
             </div>
@@ -553,7 +553,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           <div className="flex items-center gap-3">
             <PocketSwitch checked={requiresAck} onChange={setRequiresAck} ariaLabel="Ask for acknowledgment" />
             <div>
-              <p className="text-[14.5px] font-semibold text-[var(--ink)]">Ask for acknowledgment</p>
+              <p className="text-[15px] font-semibold text-[var(--ink)]">Ask for acknowledgment</p>
               <p className="text-[13px] text-[var(--muted-text)] mt-0.5">People tap &ldquo;Got it&rdquo; so you can see who&apos;s seen it</p>
             </div>
           </div>
@@ -573,7 +573,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
           ) : (
             <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full flex flex-col items-center justify-center gap-2.5" style={{ padding: 34, border: "1.5px dashed var(--dashed)", borderRadius: "var(--r-pocket)", background: "transparent", cursor: "pointer" }}>
               <ImageIcon style={{ width: 22, height: 22, color: "var(--body)" }} strokeWidth={1.6} />
-              <span style={{ fontFamily: "var(--serif)", fontSize: 14.5, fontWeight: 600, color: "var(--plum)" }}>Add image or file</span>
+              <span style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, color: "var(--plum)" }}>Add image or file</span>
             </button>
           )}
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
@@ -597,7 +597,7 @@ export function CreateAnnouncementModal({ userId, ministryId, existing, onClose,
         {/* Writing surface */}
         <div className="flex-1 flex flex-col overflow-hidden min-h-0" style={{ borderRight: "1px solid var(--line)" }}>
           <div className="flex-1 overflow-y-auto min-h-0 flex flex-col px-14 pt-5 pb-6">
-            {error && <div className="mb-6 rounded-xl px-4 py-3 text-[13px] text-[var(--plum)] font-medium" style={{ background: "rgba(62,21,64,0.08)" }}>{error}</div>}
+            {error && <div className="mb-6 rounded-xl px-4 py-3 text-[13px] text-[var(--plum)] font-medium" style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)" }}>{error}</div>}
             {/* Inline serif title — §4.4 */}
             <input
               type="text"
@@ -801,14 +801,14 @@ function InlineEditFields({
   saving: boolean; dark?: boolean
 }) {
   const fg = dark ? "var(--cream-on-dark)" : "var(--ink)"
-  const fgMuted = dark ? "rgba(246,244,239,0.55)" : "var(--muted-text)"
-  const fgBody = dark ? "rgba(246,244,239,0.78)" : "var(--body)"
-  const borderColor = dark ? "rgba(246,244,239,0.18)" : "var(--line)"
-  const chipSel = dark ? "rgba(246,244,239,0.22)" : "var(--plum)"
+  const fgMuted = dark ? "color-mix(in srgb, var(--cream-on-dark) 55%, transparent)" : "var(--muted-text)"
+  const fgBody = dark ? "color-mix(in srgb, var(--cream-on-dark) 78%, transparent)" : "var(--body)"
+  const borderColor = dark ? "color-mix(in srgb, var(--cream-on-dark) 18%, transparent)" : "var(--line)"
+  const chipSel = dark ? "color-mix(in srgb, var(--cream-on-dark) 22%, transparent)" : "var(--plum)"
   const chipSelText = dark ? "var(--cream-on-dark)" : "var(--cream)"
   const chipUnsel = dark ? "transparent" : "transparent"
-  const chipUnselText = dark ? "rgba(246,244,239,0.45)" : "var(--body)"
-  const chipBorder = dark ? "rgba(246,244,239,0.2)" : "var(--line)"
+  const chipUnselText = dark ? "color-mix(in srgb, var(--cream-on-dark) 45%, transparent)" : "var(--body)"
+  const chipBorder = dark ? "color-mix(in srgb, var(--cream-on-dark) 20%, transparent)" : "var(--line)"
 
   return (
     <div className="flex flex-col gap-3">
@@ -858,7 +858,7 @@ function InlineEditFields({
           onClick={() => onIsEvent(!isEvent)}
           style={{
             width: 36, height: 20, borderRadius: 999, position: "relative", border: "none", cursor: "pointer",
-            background: isEvent ? (dark ? "rgba(246,244,239,0.4)" : "var(--plum)") : (dark ? "rgba(246,244,239,0.15)" : "var(--line)"),
+            background: isEvent ? (dark ? "color-mix(in srgb, var(--cream-on-dark) 40%, transparent)" : "var(--plum)") : (dark ? "color-mix(in srgb, var(--cream-on-dark) 15%, transparent)" : "var(--line)"),
           }}
         >
           <span style={{
@@ -885,7 +885,7 @@ function InlineEditFields({
             onClick={() => onShowAttendees(!showAttendees)}
             style={{
               width: 36, height: 20, borderRadius: 999, position: "relative", border: "none", cursor: "pointer",
-              background: showAttendees ? (dark ? "rgba(246,244,239,0.4)" : "var(--plum)") : (dark ? "rgba(246,244,239,0.15)" : "var(--line)"),
+              background: showAttendees ? (dark ? "color-mix(in srgb, var(--cream-on-dark) 40%, transparent)" : "var(--plum)") : (dark ? "color-mix(in srgb, var(--cream-on-dark) 15%, transparent)" : "var(--line)"),
             }}
           >
             <span style={{
@@ -908,7 +908,7 @@ function InlineEditFields({
           disabled={saving || !title.trim() || !body.trim()}
           style={{
             padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer",
-            background: dark ? "rgba(246,244,239,0.22)" : "var(--plum)",
+            background: dark ? "color-mix(in srgb, var(--cream-on-dark) 22%, transparent)" : "var(--plum)",
             color: dark ? "var(--cream-on-dark)" : "var(--cream)",
             border: "none", opacity: saving || !title.trim() || !body.trim() ? 0.5 : 1,
           }}
@@ -1780,7 +1780,7 @@ export function AnnouncementsTab({ userId, userName, userRole, userGradYear, min
                             />
                             {ann.has_form && (
                               ann.user_has_responded
-                                ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}><FileText style={{ width: 12, height: 12 }} />Form submitted</span>
+                                ? <span style={{ fontSize: 12, color: "var(--success)", fontWeight: 500, display: "flex", alignItems: "center", gap: 4 }}><FileText style={{ width: 12, height: 12 }} />Form submitted</span>
                                 : <button onClick={() => setFormFillState({ formId: ann.form_id!, announcementId: ann.id, title: ann.title })} style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}><FileText style={{ width: 11, height: 11 }} />Fill out form</button>
                             )}
                             {ann.is_event && (
@@ -1979,7 +1979,7 @@ export function AnnouncementCard({ announcement, userId, userGradYear, ministryI
                 onClick={(e) => { e.stopPropagation(); handleRsvp() }}
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 6, minHeight: 38, padding: "0 20px",
-                  borderRadius: 999, border: "none", fontFamily: "var(--serif)", fontSize: 13.5, fontWeight: 600, cursor: "pointer",
+                  borderRadius: 999, border: "none", fontFamily: "var(--serif)", fontSize: 14, fontWeight: 600, cursor: "pointer",
                   background: announcement.user_has_rsvped ? "var(--line-2)" : "var(--plum)",
                   color: announcement.user_has_rsvped ? "var(--body)" : "var(--cream-on-dark)",
                 }}
@@ -1992,7 +1992,7 @@ export function AnnouncementCard({ announcement, userId, userGradYear, ministryI
           {!isDraft && announcement.has_form && (
             <div style={{ marginTop: 14 }} onClick={(e) => e.stopPropagation()}>
               {announcement.user_has_responded
-                ? <span style={{ fontSize: 12, color: "#2E7D32", fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
+                ? <span style={{ fontSize: 12, color: "var(--success)", fontWeight: 500, display: "flex", alignItems: "center", gap: 5 }}><Check style={{ width: 12, height: 12 }} />Form submitted</span>
                 : <button onClick={() => announcement.form_id && onOpenForm(announcement.form_id, announcement.id, announcement.title)} style={{ padding: "8px 16px", borderRadius: 999, border: "1px solid var(--plum)", background: "transparent", color: "var(--plum)", fontSize: 13, fontWeight: 500, cursor: "pointer" }}>Fill out form →</button>
               }
             </div>
@@ -2070,7 +2070,7 @@ function detailPosted(dateStr: string): string {
 // is never a red/amber "you're behind" signal.
 function AckProgress({ pct }: { pct: number }) {
   return (
-    <div style={{ height: 4, borderRadius: 999, background: "var(--line-2)", marginTop: 14, overflow: "hidden" }}>
+    <div style={{ height: 4, borderRadius: 999, background: "var(--pocket-track)", marginTop: 14, overflow: "hidden" }}>
       <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: "var(--plum)", transition: "width 0.24s ease-out" }} />
     </div>
   )
@@ -2393,7 +2393,7 @@ export function AnnouncementDetailView({
           {isDraftAnn && <span data-draft-eyebrow style={{ ...POCKET_KICKER_STYLE, color: "var(--ink)" }}>Draft</span>}
           <span style={POCKET_KICKER_STYLE}>{formatDate(eyebrowSrc)}</span>
           {ann.audience && ann.audience !== "all" && (
-            <span style={{ ...POCKET_KICKER_STYLE, background: "var(--line-2)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
+            <span style={{ ...POCKET_KICKER_STYLE, background: "var(--pocket-track)", padding: "2px 8px", borderRadius: 999 }}>{audienceLabel(ann.audience)}</span>
           )}
           {ann.is_pinned && <span style={{ ...POCKET_KICKER_STYLE, color: "var(--plum)" }}>📌 Pinned</span>}
         </div>
@@ -2732,7 +2732,7 @@ export function AnnouncementDetailView({
           sheet
           footer={
             <div className="flex items-center gap-3">
-              {nudgeNote && <span style={{ fontSize: 12.5, color: "var(--muted-text)" }}>{nudgeNote}</span>}
+              {nudgeNote && <span style={{ fontSize: 13, color: "var(--muted-text)" }}>{nudgeNote}</span>}
               <CentralButton
                 variant="primary"
                 onClick={handleNudge}
@@ -2750,7 +2750,7 @@ export function AnnouncementDetailView({
           ) : (
             <div className="flex flex-wrap gap-1.5">
               {roster.map((p) => (
-                <span key={p.id} style={{ fontSize: 12.5, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{p.name}</span>
+                <span key={p.id} style={{ fontSize: 13, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", padding: "4px 10px", borderRadius: 999 }}>{p.name}</span>
               ))}
             </div>
           )}

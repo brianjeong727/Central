@@ -68,7 +68,7 @@ export default function UpdatePasswordPage() {
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 22, marginTop: 30 }}>
         {error && (
           <div style={{
-            borderRadius: 10, background: "rgba(159,48,48,0.08)", border: "1px solid rgba(159,48,48,0.15)",
+            borderRadius: 10, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 15%, transparent)",
             padding: "10px 14px", fontSize: 13, color: "var(--danger)", fontWeight: 500,
             display: "flex", alignItems: "center", gap: 8,
           }} role="alert">

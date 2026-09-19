@@ -26,7 +26,7 @@ const LINE3  = "var(--line-3)"
 const PLUM   = "var(--plum)"
 const PLUM2  = "var(--plum-2)"
 const PLUM_TINT = "var(--plum-tint)"
-const TOGGLE_OFF = "#D6D0C0" // §4.9 toggle-off track (no token exists — value fixed by spec)
+const TOGGLE_OFF = "var(--dashed)" // §4.9 toggle-off track — the same non-text neutral the shell's switches use (K9, 2026-09-17)
 
 const SERIF = "var(--font-instrument-serif)"
 const SANS  = "var(--font-inter)"

@@ -23,7 +23,6 @@ import { useBackIntent } from "@/lib/back-intent"
 //   PocketHeroCard    the ≤1-per-screen plum hero
 //   PocketProgress    4px progress bar (ivory or plum colorway)
 //   PocketDashedButton dashed add-affordance
-//   PocketBackRow     "← Section" return row inside drilled-in screens
 //   PocketChip        40px squircle letter monogram
 //   PocketRoundButton 34px round chrome action (ghost | plum create)
 
@@ -349,15 +348,6 @@ export function PocketDashedButton({ label, onClick, icon }: { label: string; on
   )
 }
 
-// "← Section" return row for screens drilled into from a hub — sits above the
-// section content when the chrome row can't carry the back (single-file swaps).
-export function PocketBackRow({ label, onBack, style }: { label: string; onBack: () => void; style?: CSSProperties }) {
-  return (
-    <button onClick={onBack} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 34, padding: "0 12px 0 6px", marginBottom: 18, background: "transparent", border: "none", color: "var(--body)", fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, cursor: "pointer", ...style }}>
-      <ChevronLeft style={{ width: 18, height: 18 }} strokeWidth={1.7} /> {label}
-    </button>
-  )
-}
 
 // 40px squircle chip (mockup `.chip`): --pocket-track tonal holding a plum
 // letter OR a plum stroked icon (§4 Row contract — "plum stroke icon or
@@ -527,7 +517,7 @@ export function PocketButton({
   const base: CSSProperties = {
     display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
     borderRadius: 999, minHeight: compact ? 36 : 42, padding: "0 18px",
-    fontFamily: "var(--serif)", fontSize: 13.5, fontWeight: 600,
+    fontFamily: "var(--serif)", fontSize: 14, fontWeight: 600,
     cursor: disabled ? "not-allowed" : "pointer", border: "none",
     // No inline `transition` — `.press-scale` (app/globals.css) owns both the
     // timing and the press, and it restates the exact background/opacity
@@ -564,7 +554,7 @@ export function PocketFactsGrid({ items, style }: {
     <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 16, rowGap: 12, alignItems: "baseline", ...style }}>
       {items.map((item, i) => (
         <Fragment key={i}>
-          <span style={{ fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "1px", textTransform: "uppercase", color: "var(--muted-text)", whiteSpace: "nowrap" }}>{item.key}</span>
+          <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "1px", textTransform: "uppercase", color: "var(--muted-text)", whiteSpace: "nowrap" }}>{item.key}</span>
           <span style={{ fontSize: 14, fontWeight: 500, color: item.value ? "var(--ink)" : "var(--faint)" }}>{item.value || "—"}</span>
         </Fragment>
       ))}
@@ -584,7 +574,7 @@ export function PocketStatCard({ kicker, value, sub, style }: {
     <div style={{ background: "var(--ivory)", borderRadius: "var(--r-pocket-sm)", padding: 16, ...style }}>
       <div style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase", color: "var(--muted-text)" }}>{kicker}</div>
       <div style={{ fontFamily: "var(--serif)", fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--ink)", marginTop: 6 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 3 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 3 }}>{sub}</div>}
     </div>
   )
 }
@@ -634,7 +624,7 @@ export function PocketSearchField({ value, onChange, placeholder = "Search", sty
         autoFocus={autoFocus}
         placeholder={placeholder}
         className="pocket-search-input"
-        style={{ flex: 1, minWidth: 0, border: "none", background: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 15.5, color: "var(--ink)" }}
+        style={{ flex: 1, minWidth: 0, border: "none", background: "none", outline: "none", fontFamily: "var(--serif)", fontSize: 16, color: "var(--ink)" }}
       />
       {trailing}
       <style>{`.pocket-search-input::placeholder{color:var(--faint)}`}</style>

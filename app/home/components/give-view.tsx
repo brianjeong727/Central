@@ -33,14 +33,14 @@ function GivingTrustPanel({ zelleName, zelleInfo, onCopy, copied }: { zelleName:
       <p className="md:hidden" style={{ ...POCKET_KICKER_STYLE, marginBottom: 12 }}>Giving destination</p>
       <div className="border-0 md:border md:border-[var(--line)]" style={{ padding: "12px 14px", background: "var(--cream)", borderRadius: 12, marginBottom: 12 }}>
         {zelleName && <p style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500, lineHeight: 1.3, marginBottom: 4 }}>{zelleName}</p>}
-        <p style={{ fontSize: 13.5, color: zelleName ? "var(--body)" : "var(--ink)", fontWeight: 400, lineHeight: 1.2 }}>{zelleInfo}</p>
+        <p style={{ fontSize: 14, color: zelleName ? "var(--body)" : "var(--ink)", fontWeight: 400, lineHeight: 1.2 }}>{zelleInfo}</p>
         <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 4 }}>{zelleName ? "Zelle recipient · confirm this name before sending" : "Zelle email or phone"}</p>
       </div>
       <button onClick={onCopy} className="border-0 md:border md:border-[var(--line)]" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 7, width: "100%", height: 38, borderRadius: 10, background: "var(--cream)", color: copied ? "var(--plum)" : "var(--body)", fontSize: 13, fontWeight: 500, cursor: "pointer", marginBottom: 14 }}>
         {copied ? <Check style={{ width: 13, height: 13 }} /> : <Copy style={{ width: 13, height: 13 }} />}
         {copied ? "Copied" : "Copy Zelle info"}
       </button>
-      <p style={{ fontSize: 12.5, color: "var(--body)", lineHeight: 1.55 }}>
+      <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>
         Central only stores your ministry&apos;s Zelle destination. Gifts, receipts, statements, and tax records stay with your ministry.
       </p>
     </div>
@@ -129,7 +129,7 @@ export function GiveView({
       {/* Mobile: verse kicker + one calm sentence */}
       <div className="md:hidden px-5">
         <p style={{ ...POCKET_KICKER_STYLE, letterSpacing: "1.6px" }}>2 Corinthians 9 : 7</p>
-        <p style={{ fontSize: 15.5, color: "var(--body)", marginTop: 10 }}>Give directly to your ministry through Zelle.</p>
+        <p style={{ fontSize: 16, color: "var(--body)", marginTop: 10 }}>Give directly to your ministry through Zelle.</p>
       </div>
 
       <div className="px-5 md:px-14 pt-6 md:pt-5 md:flex-1 md:overflow-y-auto">
@@ -200,7 +200,7 @@ export function GiveView({
                   <p className="md:hidden" style={{ ...POCKET_KICKER_STYLE }}>Card &amp; Apple Pay</p>
                   <span style={{ fontSize: 10, letterSpacing: "0.08em", padding: "2px 8px", borderRadius: 999, background: "var(--ivory)", border: "1px solid var(--line-2)", textTransform: "uppercase", fontWeight: 500, color: "var(--muted-text)" }}>Coming soon</span>
                 </div>
-                <p style={{ fontSize: 12.5, color: "var(--body)", lineHeight: 1.55 }}>Giving in-app with a card or Apple Pay is coming soon. For now, give through Zelle above.</p>
+                <p style={{ fontSize: 13, color: "var(--body)", lineHeight: 1.55 }}>Giving in-app with a card or Apple Pay is coming soon. For now, give through Zelle above.</p>
               </div>
             </div>
           </div>

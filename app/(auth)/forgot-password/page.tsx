@@ -65,7 +65,7 @@ export default function ForgotPasswordPage() {
 
       {sent ? (
         <div style={{ marginTop: 30, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 12 }}>
-          <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(127,166,127,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 44, height: 44, borderRadius: "50%", background: "color-mix(in srgb, var(--success) 15%, transparent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <CheckCircle2 size={22} color="var(--success)" />
           </div>
           <p style={{ fontSize: 16, fontWeight: 500, color: "var(--ink)", margin: 0 }}>Check your inbox</p>
@@ -77,7 +77,7 @@ export default function ForgotPasswordPage() {
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 22, marginTop: 30 }}>
           {error && (
             <div style={{
-              borderRadius: 10, background: "rgba(159,48,48,0.08)", border: "1px solid rgba(159,48,48,0.15)",
+              borderRadius: 10, background: "color-mix(in srgb, var(--danger) 8%, transparent)", border: "1px solid color-mix(in srgb, var(--danger) 15%, transparent)",
               padding: "10px 14px", fontSize: 13, color: "var(--danger)", fontWeight: 500,
               display: "flex", alignItems: "center", gap: 8,
             }} role="alert">
@@ -125,7 +125,7 @@ export default function ForgotPasswordPage() {
 
         {sent ? (
           <div style={{ marginTop: 28, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 12 }}>
-            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(127,166,127,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "color-mix(in srgb, var(--success) 15%, transparent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <CheckCircle2 size={22} color="var(--success)" />
             </div>
             <p style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)", margin: 0, fontFamily: SERIF }}>Check your inbox</p>
@@ -142,7 +142,7 @@ export default function ForgotPasswordPage() {
             <PocketSubmit loading={loading} disabled={loading}>
               {loading ? "Sending…" : "Send reset link"}
             </PocketSubmit>
-            <p style={{ textAlign: "center", fontSize: 13.5, color: "var(--muted-text)", marginTop: 16 }}>
+            <p style={{ textAlign: "center", fontSize: 14, color: "var(--muted-text)", marginTop: 16 }}>
               Remember your password?{" "}
               <Link href="/login" style={{ fontWeight: 600, color: "var(--plum)", textDecoration: "none" }}>Sign in</Link>
             </p>

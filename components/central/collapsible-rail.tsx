@@ -190,7 +190,7 @@ export function CollapsibleRail({
                 padding: "2px 2px 2px 6px",
                 cursor: "pointer",
                 color: "var(--muted-text)",
-                fontSize: 12.5,
+                fontSize: 13,
                 fontWeight: 500,
                 fontFamily: "var(--sans)",
               }}

@@ -95,7 +95,7 @@ function MGenderPill({ label, on, onClick }: { label: string; on: boolean; onCli
     <button type="button" onClick={onClick} style={{
       flex: 1, padding: "12px 16px", borderRadius: 999, border: "none", minHeight: 44,
       background: on ? "var(--plum)" : "var(--ivory)", color: on ? "var(--cream)" : "var(--body)",
-      fontSize: 14.5, fontWeight: 600, fontFamily: SERIF, cursor: "pointer",
+      fontSize: 15, fontWeight: 600, fontFamily: SERIF, cursor: "pointer",
     }}>{label}</button>
   )
 }
@@ -400,7 +400,7 @@ function CompleteProfileContent() {
           )}
           <div>
             <span style={pocketFieldLabel}>Gender</span>
-            <div style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "-2px 0 8px", paddingLeft: 4 }}>Helps us place you in the right small group.</div>
+            <div style={{ fontSize: 13, color: "var(--muted-text)", margin: "-2px 0 8px", paddingLeft: 4 }}>Helps us place you in the right small group.</div>
             <div style={{ display: "flex", gap: 8 }}>
               {["Male", "Female"].map(g => (
                 <MGenderPill key={g} label={g} on={gender === g.toLowerCase()} onClick={() => setGender(g.toLowerCase())}/>
@@ -426,7 +426,7 @@ function CompleteProfileContent() {
         </form>
         <button type="button" onClick={signOut} style={{
           marginTop: 22, background: "none", border: "none", cursor: "pointer",
-          fontFamily: SERIF, fontSize: 13.5, fontWeight: 600, color: "var(--muted-text)", alignSelf: "center",
+          fontFamily: SERIF, fontSize: 14, fontWeight: 600, color: "var(--muted-text)", alignSelf: "center",
         }}>
           Sign out
         </button>

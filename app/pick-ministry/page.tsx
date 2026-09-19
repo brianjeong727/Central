@@ -151,7 +151,7 @@ export default function PickMinistryPage() {
         </p>
 
         {error && (
-          <div style={{ background: "rgba(62,21,64,0.08)", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "var(--plum)", fontWeight: 500, marginBottom: 16 }}>
+          <div style={{ background: "color-mix(in srgb, var(--plum) 8%, transparent)", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "var(--plum)", fontWeight: 500, marginBottom: 16 }}>
             {error}
           </div>
         )}
@@ -178,7 +178,7 @@ export default function PickMinistryPage() {
             >
               <div style={{
                 width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                background: selecting === m.id ? "rgba(246,244,239,0.15)" : "var(--plum)",
+                background: selecting === m.id ? "color-mix(in srgb, var(--cream-on-dark) 15%, transparent)" : "var(--plum)",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 <span style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 20, color: "var(--cream-on-dark)" }}>
@@ -189,7 +189,7 @@ export default function PickMinistryPage() {
                 <p style={{ fontSize: 15, fontWeight: 600, color: selecting === m.id ? "var(--cream-on-dark)" : "var(--ink)", margin: 0, marginBottom: 2 }}>
                   {selecting === m.id ? "Opening…" : m.name}
                 </p>
-                <p style={{ fontSize: 12, color: selecting === m.id ? "rgba(246,244,239,0.65)" : "var(--muted-text)", margin: 0 }}>
+                <p style={{ fontSize: 12, color: selecting === m.id ? "color-mix(in srgb, var(--cream-on-dark) 65%, transparent)" : "var(--muted-text)", margin: 0 }}>
                   {m.university} · {ROLE_LABEL[m.role] ?? m.role}
                 </p>
               </div>

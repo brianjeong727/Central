@@ -53,7 +53,7 @@ import { MobilePocketHub, PocketHubChrome } from "../components/mobile-pocket-hu
 import { teamIconKey } from "../workspace-presets"
 import { getReimbursementInbox, getPendingReceiptCount } from "@/app/actions/receipts"
 import { ReceiptsWorkspace, type ReceiptsTeamRef } from "../components/receipts-workspace"
-import { CountdownLadderEditor } from "../components/countdown-ladder-editor"
+import { EventSetupSurface } from "../components/event-setup"
 import { classifyTeam } from "../team-type"
 import { WORKSPACE_PRESETS, AVAILABLE_PRESETS, ownedPresetKeys } from "../workspace-presets"
 import { EVENT_TYPE_CONFIGS, nextAnchorYMD, ymdOf, lineageKeyOf, seasonLabelOf,
@@ -532,7 +532,7 @@ export function StudentOrgRoleTabContent({
                       {link.title}
                     </span>
                     {link.description && (
-                      <span style={{ display: "block", fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--body)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <span style={{ display: "block", fontFamily: "var(--sans)", fontSize: 13, color: "var(--body)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {link.description}
                       </span>
                     )}
@@ -865,7 +865,7 @@ function EventsAgendaList({
   // delete folds into the event detail (edit modal) where it already lives.
   if (isMobile) {
     const dateChip = (ymd: string, dim: boolean) => (
-      <span style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, display: "grid", placeItems: "center", background: "var(--line-2)", lineHeight: 1 }}>
+      <span style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, display: "grid", placeItems: "center", background: "var(--pocket-track)", lineHeight: 1 }}>
         <span style={{ fontFamily: "var(--serif)", fontSize: 15, fontWeight: 600, color: dim ? "var(--muted-text)" : "var(--ink)" }}>{ymdDayNum(ymd)}</span>
         <span style={{ fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--muted-text)", marginTop: 1 }}>{formatYMD(ymd, { month: "short" })}</span>
       </span>
@@ -1012,7 +1012,7 @@ function EventsAgendaList({
         >
           <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--plum)", flexShrink: 0 }} />
-            <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.15em", color: "var(--plum)" }}>Up next · Starts {(cd?.label ?? "soon").toLowerCase()}</span>
+            <span style={{ ...monoBase, fontSize: 11, letterSpacing: "0.15em", color: "var(--plum)" }}>Up next · Starts {(cd?.label ?? "soon").toLowerCase()}</span>
             <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
               {renderPlannedCheck(isPlanned)}
               {renderDeleteBtn(ev.id, isHovered)}
@@ -1051,7 +1051,7 @@ function EventsAgendaList({
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             {!isPast && cd && (
-              <span style={{ fontFamily: "var(--sans)", fontSize: 12.5, borderRadius: 999, padding: "5px 12px", whiteSpace: "nowrap", border: "1px solid var(--line-2)", background: cd.soon ? "var(--ivory)" : "var(--cream-2)", color: cd.soon ? "var(--plum)" : "var(--body)", fontWeight: cd.soon ? 500 : 400 }}>{cd.label}</span>
+              <span style={{ fontFamily: "var(--sans)", fontSize: 13, borderRadius: 999, padding: "5px 12px", whiteSpace: "nowrap", border: "1px solid var(--line-2)", background: cd.soon ? "var(--ivory)" : "var(--cream-2)", color: cd.soon ? "var(--plum)" : "var(--body)", fontWeight: cd.soon ? 500 : 400 }}>{cd.label}</span>
             )}
             {renderPlannedCheck(isPlanned)}
             {renderDeleteBtn(ev.id, isHovered)}
@@ -1067,7 +1067,7 @@ function EventsAgendaList({
           variant="quiet"
           size="sm"
           onClick={() => toggleSubs(ev.id)}
-          style={{ fontSize: 12.5, gap: 7 }}
+          style={{ fontSize: 13, gap: 7 }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: subsOpen ? "rotate(90deg)" : "none", transition: "transform 160ms ease" }}>
             <path d="M9 6l6 6-6 6" />
@@ -1158,7 +1158,7 @@ function EventsAgendaList({
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <span style={{ ...monoBase, fontSize: 10.5, letterSpacing: "0.08em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>{endedAgoLabel(eventEndYMD(ev, timeZone), now, timeZone)}</span>
+          <span style={{ ...monoBase, fontSize: 11, letterSpacing: "0.08em", color: "var(--muted-text)", whiteSpace: "nowrap" }}>{endedAgoLabel(eventEndYMD(ev, timeZone), now, timeZone)}</span>
           {renderPlannedCheck(isPlanned)}
           {renderDeleteBtn(ev.id, isHovered)}
         </div>
@@ -1704,6 +1704,13 @@ export function StudentOrgTeamHome({
                 { iconKey: "users", title: "Groups", subtitle: "Split the ministry into balanced small groups", onClick: () => setTeamTabAndUrl("Groups") },
                 { iconKey: "set", title: "Rotations", subtitle: "Semester sign-up slots", onClick: () => setTeamTabAndUrl("Rotations") },
               ] },
+              // Set-up — what configures the rows above, once a season, behind one
+              // group at the foot (design pass R3). Leaders only. The season
+              // rollover used to be a pill in the Events header, beside New Event.
+              ...(canEdit ? [{ label: "Set-up", rows: [
+                ...(onTeamSettings ? [{ iconKey: "sliders", title: "Team settings", subtitle: "Roster, roles & permissions", onClick: onTeamSettings }] : []),
+                { iconKey: "plan", title: "Season", subtitle: rolloverSource.count > 0 ? `Start next season · carries ${rolloverSource.count} ${rolloverSource.count === 1 ? "tradition" : "traditions"}` : "Start next season", onClick: () => setShowSeasonConfirm(true) },
+              ] }] : []),
             ]}
           />
         )}
@@ -1818,11 +1825,7 @@ export function StudentOrgTeamHome({
                         )}
                       />
                     )}
-                    {canEdit && (
-                      <PocketButton variant="quiet" surface="page" onClick={() => setShowSeasonConfirm(true)}>
-                        <Repeat style={{ width: 14, height: 14 }} /> Start next season
-                      </PocketButton>
-                    )}
+                    {/* "Start next season" lives in the hub's Set-up group now (R3). */}
                   </div>
                 )}
               </>
@@ -1860,20 +1863,27 @@ export function StudentOrgTeamHome({
                       )}
                     />
                   )}
+                  {/* Set it up — the ONE door to the workspace's configuration on
+                      desktop (R3): team settings and the season rollover, which
+                      used to be a ghost pill in this row. Shared ActionMenu
+                      (Convention #20), ghost to the create's left (#15). */}
                   {canEdit && (
-                    <button
-                      type="button"
-                      onClick={() => setShowSeasonConfirm(true)}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 6,
-                        padding: "6px 13px", borderRadius: 9999, cursor: "pointer",
-                        border: "1.5px solid var(--line)", background: "var(--cream-panel)",
-                        fontSize: 12.5, fontWeight: 500, color: "var(--plum)", whiteSpace: "nowrap",
-                      }}
-                    >
-                      <Repeat style={{ width: 13, height: 13 }} />
-                      Start next season
-                    </button>
+                    <ActionMenu
+                      items={[
+                        ...(onTeamSettings ? [{ key: "settings", label: "Team settings — roster, roles & permissions", onSelect: onTeamSettings }] : []),
+                        { key: "season", label: rolloverSource.count > 0 ? `Start next season — carries ${rolloverSource.count} ${rolloverSource.count === 1 ? "tradition" : "traditions"}` : "Start next season", onSelect: () => setShowSeasonConfirm(true) },
+                      ]}
+                      renderTrigger={({ toggle }) => (
+                        <button
+                          type="button"
+                          onClick={toggle}
+                          aria-label="Set it up"
+                          style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 999, cursor: "pointer", border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 13, fontFamily: "var(--sans)" }}
+                        >
+                          <Settings style={{ width: 13, height: 13 }} /> Set it up
+                        </button>
+                      )}
+                    />
                   )}
                   {canEdit && (
                     <ContentActionButton
@@ -1912,7 +1922,7 @@ export function StudentOrgTeamHome({
                   </>
                 }
               >
-                <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.6, margin: 0 }}>
+                <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.6, margin: 0 }}>
                   Carries <span style={{ fontWeight: 600, color: "var(--ink)" }}>{rolloverSource.count} recurring {rolloverSource.count === 1 ? "event" : "events"}</span> from {rolloverSource.season ?? activeSeason} into
                   next season — an exact copy of that year&apos;s plans (checklists, roles, run of show, sub-events) dated to
                   matching weekdays, with completion reset and every lead unassigned. One-off events stay in their season,
@@ -2115,7 +2125,7 @@ function RotationAvatar({ name, mine }: { name: string; mine: boolean }) {
     return (
       <MonogramChip
         initials={getInitials(name)}
-        style={{ width: 22, height: 22, fontSize: 9.5, fontWeight: 500, letterSpacing: "0.02em" }}
+        style={{ width: 22, height: 22, fontSize: 10, fontWeight: 500, letterSpacing: "0.02em" }}
       />
     )
   }
@@ -2124,7 +2134,7 @@ function RotationAvatar({ name, mine }: { name: string; mine: boolean }) {
       style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center",
         width: 22, height: 22, borderRadius: 999, flexShrink: 0,
-        fontFamily: "var(--sans)", fontSize: 9.5, fontWeight: 500, letterSpacing: "0.02em",
+        fontFamily: "var(--sans)", fontSize: 10, fontWeight: 500, letterSpacing: "0.02em",
         background: "var(--ivory)",
         color: "var(--body)",
         border: "1px solid var(--line-2)",
@@ -2273,7 +2283,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
                   }}
                 >
                   <span style={{ fontSize: 13, fontWeight: active ? 600 : 500, color: active ? "var(--plum)" : "var(--body)" }}>{sem.name}</span>
-                  <span style={{ fontSize: 10.5, color: "var(--muted-text)" }}>{shortMonthDay(sem.start_date)} – {shortMonthDay(sem.end_date)}</span>
+                  <span style={{ fontSize: 11, color: "var(--muted-text)" }}>{shortMonthDay(sem.start_date)} – {shortMonthDay(sem.end_date)}</span>
                 </FilterChip>
               )
             })}
@@ -2318,7 +2328,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
                   <span style={{ fontFamily: "var(--sans)", fontSize: 11, fontWeight: 500, color: "var(--body)", background: "var(--ivory)", border: "1px solid var(--line-2)", borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" }}>
                     {filled} of {total} filled
                   </span>
-                  <div style={{ flex: 1, minWidth: 80, height: 5, borderRadius: 999, background: "var(--line-2)", overflow: "hidden" }}>
+                  <div style={{ flex: 1, minWidth: 80, height: 5, borderRadius: 999, background: "var(--pocket-track)", overflow: "hidden" }}>
                     <div style={{ width: `${pct}%`, height: "100%", background: "var(--plum)", borderRadius: 999, transition: "width 200ms" }} />
                   </div>
                 </div>
@@ -2368,7 +2378,7 @@ function RotationsTab({ teamId, ministryId, userId, canEdit, newSemesterTrigger 
               </span>
               <div style={{ minWidth: 0 }}>
                 <p style={{ fontFamily: "var(--sans)", fontSize: 14, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{label}</p>
-                <p style={{ fontFamily: "var(--sans)", fontSize: 12.5, color: "var(--body)", margin: "2px 0 0" }}>{dateLine}</p>
+                <p style={{ fontFamily: "var(--sans)", fontSize: 13, color: "var(--body)", margin: "2px 0 0" }}>{dateLine}</p>
               </div>
             </div>
           </CentralModal>
@@ -2424,23 +2434,23 @@ function RotationSlotCell({ slot, userId, onClick }: {
       {/* date */}
       <div style={{ display: "flex", flexDirection: "column", gap: 1, flexShrink: 0 }}>
         <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 400, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted-text)" }}>{shortDow(slot.week_date)}</span>
-        <span style={{ fontFamily: "var(--sans)", fontSize: 13.5, fontWeight: 500, color: "var(--ink)" }}>{shortMonthDay(slot.week_date)}</span>
+        <span style={{ fontFamily: "var(--sans)", fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{shortMonthDay(slot.week_date)}</span>
       </div>
       {/* status */}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
         {isOpen ? (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 500, color: "var(--plum)" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--plum)" }}>
             <PlusCircle className="w-4 h-4" /> Open
           </span>
         ) : isMine ? (
           <>
             <RotationAvatar name="You" mine />
-            <span style={{ fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 500, color: "var(--plum)" }}>You</span>
+            <span style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--plum)" }}>You</span>
           </>
         ) : (
           <>
             <RotationAvatar name={slot.assigned_name ?? "?"} mine={false} />
-            <span style={{ fontFamily: "var(--sans)", fontSize: 12.5, fontWeight: 500, color: "var(--body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{slot.assigned_name ?? "Assigned"}</span>
+            <span style={{ fontFamily: "var(--sans)", fontSize: 13, fontWeight: 500, color: "var(--body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{slot.assigned_name ?? "Assigned"}</span>
           </>
         )}
       </div>
@@ -2472,7 +2482,7 @@ function NewSemesterModal({ onClose, onCreate }: {
     setBusy(false)
   }
 
-  const labelStyle: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }
+  const labelStyle: React.CSSProperties = { fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--muted-text)" }
 
   return (
     <CentralModal
@@ -2613,6 +2623,75 @@ function WsTile({ initials, badge, name, sub, onClick }: {
         {sub && <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "2px 0 0" }}>{sub}</p>}
       </div>
     </button>
+  )
+}
+
+// ── First-team landing (K11, Brian 2026-09-18: §8.5 (a)) ───────────────────────
+// A leader-tier viewer of a ministry with NO teams used to be auto-entered into
+// Receipts and told "No teams yet. Join or govern a team" — the one person who
+// can create a team, told to join one, under a heading about expense receipts.
+// This is Plan's real day-one screen: what a workspace is, the three presets as
+// choice rows (N15), one plum create. Members keep the quieter "not on a team".
+function FirstTeamLanding({ mobile, ministryName, onCreate }: { mobile: boolean; ministryName: string; onCreate: () => void }) {
+  const presets = WORKSPACE_PRESETS.filter((p) => !p.comingSoon).slice(0, 3)
+  if (mobile) {
+    return (
+      <div className="flex flex-col" style={{ paddingTop: 8 }}>
+        {/* No kicker: the chrome already says "Workspace", and a screen with one
+            section carries no section label (N4). */}
+        <h2 style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", margin: "0 4px 6px" }}>
+          Set up your first team
+        </h2>
+        <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.55, margin: "0 4px 18px" }}>
+          A workspace is a team&apos;s home: its events, roles, notes and money in one place. Start with the one your leaders already run.
+        </p>
+        <PocketRowCard>
+          {presets.map((p, i) => (
+            <PocketRow
+              key={p.name}
+              leading={<PlanLineIcon iconKey={teamIconKey({ team_type: p.teamType, name: p.name })} size={40} radius={14} bg="var(--pocket-track)" fg="var(--plum)" />}
+              title={p.name}
+              sub={p.description}
+              chevron
+              isLast={i === presets.length - 1}
+              onClick={onCreate}
+            />
+          ))}
+        </PocketRowCard>
+        <PocketButton variant="primary" onClick={onCreate} style={{ width: "100%", marginTop: 18 }}>
+          <Plus style={{ width: 15, height: 15 }} /> Create your first team
+        </PocketButton>
+      </div>
+    )
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "44px 48px 64px" }}>
+      <div style={{ width: "100%", maxWidth: 560 }}>
+        <p style={{ ...MONO_STYLE, margin: "0 0 14px", textAlign: "center" }}>WORKSPACE · {ministryName.toUpperCase()}</p>
+        <h1 style={{ fontFamily: "var(--serif)", fontSize: 25, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.15, margin: "0 0 10px", textAlign: "center" }}>
+          Set up your first team
+        </h1>
+        <p style={{ fontSize: 15, color: "var(--body)", margin: "0 0 28px", lineHeight: 1.6, textAlign: "center" }}>
+          A workspace is a team&apos;s home: its events, roles, notes and money in one place. Start with the one your leaders already run.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {presets.map((p) => (
+            <ActionCard
+              key={p.name}
+              icon={<PlanLineIcon iconKey={teamIconKey({ team_type: p.teamType, name: p.name })} size={20} radius={0} bg="transparent" fg="var(--plum)" />}
+              title={p.name}
+              subtitle={p.description}
+              onClick={onCreate}
+            />
+          ))}
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 28 }}>
+          <CentralButton variant="primary" size="md" onClick={onCreate}>
+            <Plus style={{ width: 14, height: 14 }} /> Create your first team
+          </CentralButton>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -3151,7 +3230,7 @@ export function PlanTab({
                 <p style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "1.4px", textTransform: "uppercase", color: "var(--muted-text)", margin: "0 0 14px", textAlign: "center" }}>
                   WORKSPACE · {ministryName.toUpperCase()}
                 </p>
-                <h1 style={{ fontFamily: "var(--serif)", fontSize: 36, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.05, margin: "0 0 10px", textAlign: "center" }}>
+                <h1 style={{ fontFamily: "var(--serif)", fontSize: 25, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1.15, margin: "0 0 10px", textAlign: "center" }}>
                   Which workspace are you entering?
                 </h1>
                 <p style={{ fontSize: 15, color: "var(--body)", margin: "0 0 32px", lineHeight: 1.6, textAlign: "center" }}>
@@ -3233,30 +3312,23 @@ export function PlanTab({
               </div>
             </div>
           ) : (
-            /* EMPTY STATE — strictly 0 teams */
+            /* EMPTY STATE — strictly 0 teams. An admin gets the first-team landing
+               (K11); a member is told, quietly, that a leader adds them. */
+            isAdmin ? (
+              <FirstTeamLanding mobile={false} ministryName={ministryName} onCreate={() => setShowCreateTeam(true)} />
+            ) : (
             <div className="px-14 py-7">
               <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div style={{ ...MONO_STYLE, marginBottom: 12 }}>
-                  {isAdmin ? "YOUR TEAMS · 0" : "NO TEAM YET"}
-                </div>
-                <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 40, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
-                  {isAdmin ? "Add your first workspace." : "You're not on a team yet."}
+                <div style={{ ...MONO_STYLE, marginBottom: 12 }}>NO TEAM YET</div>
+                <h2 style={{ fontFamily: "var(--serif)", fontSize: 25, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
+                  You&apos;re not on a team yet.
                 </h2>
-                <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 380, lineHeight: 1.6, margin: "0 0 28px" }}>
-                  {isAdmin
-                    ? "Workspaces keep your ministry organized — Small Group Leaders, Student Org Board, Finance, and more."
-                    : "Ask a leader to add you to a team."}
+                <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 380, lineHeight: 1.6, margin: 0 }}>
+                  When a leader puts you on one, it shows up here with your role, your tasks, and the plan for the day.
                 </p>
-                {isGovernanceAdmin && (
-                  <CentralButton
-                    variant="primary" size="md"
-                    onClick={() => setShowCreateTeam(true)}
-                  >
-                    <Plus style={{ width: 14, height: 14 }} /> Add a workspace
-                  </CentralButton>
-                )}
               </div>
             </div>
+            )
           )
         ) : activeTeamId === "receipts" ? (
           <ReceiptsWorkspace
@@ -3446,22 +3518,17 @@ export function PlanTab({
                 </>
               )}
             </>
+          ) : isAdmin ? (
+            <FirstTeamLanding mobile ministryName={ministryName} onCreate={() => setShowCreateTeam(true)} />
           ) : (
             <div className="flex flex-col items-center justify-center text-center" style={{ paddingTop: 64 }}>
-              <div style={{ ...MONO_STYLE, marginBottom: 12 }}>{isAdmin ? "YOUR TEAMS · 0" : "NO TEAM YET"}</div>
-              <h2 style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 32, fontWeight: 400, color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
-                {isAdmin ? "Add your first workspace." : "You're not on a team yet."}
+              <div style={{ ...POCKET_KICKER_STYLE, marginBottom: 12 }}>No team yet</div>
+              <h2 style={{ fontFamily: "var(--serif)", fontSize: 21, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.01em", margin: "0 0 10px" }}>
+                You&apos;re not on a team yet.
               </h2>
-              <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 320, lineHeight: 1.6, margin: "0 0 24px" }}>
-                {isAdmin
-                  ? "Workspaces keep your ministry organized — Small Group Leaders, Student Org Board, Finance, and more."
-                  : "Ask a leader to add you to a team."}
+              <p style={{ fontSize: 14, color: "var(--body)", maxWidth: 320, lineHeight: 1.6, margin: 0 }}>
+                When a leader puts you on one, it shows up here with your role, your tasks, and the plan for the day.
               </p>
-              {isGovernanceAdmin && (
-                <CentralButton variant="primary" size="md" onClick={() => setShowCreateTeam(true)}>
-                  <Plus style={{ width: 14, height: 14 }} /> Add a workspace
-                </CentralButton>
-              )}
             </div>
           )}
         </div>
@@ -3495,14 +3562,23 @@ export function PlanTab({
                 teamName={activeTeamName}
                 onBack={(userTeams.length >= 2 || govTeams.length > 0) ? onExitTeam : undefined}
                 onSettings={activeTeamFull && canOpenTeamSettings ? () => openSettings(activeTeamFull) : undefined}
-                groups={[{
-                  label: "Sections",
-                  rows: [
-                    { iconKey: "sliders", title: FINANCE_SECTION_LABELS.allocation, subtitle: "Plan the fiscal year's budget", onClick: () => setFinanceMobileSectionAndUrl("allocation") },
-                    { iconKey: "dollar", title: FINANCE_SECTION_LABELS.budget, subtitle: "Expense ledger & category totals", onClick: () => setFinanceMobileSectionAndUrl("budget") },
-                    { iconKey: "clipboard", title: FINANCE_SECTION_LABELS.reimbursements, subtitle: financeReimbSub, onClick: () => setFinanceMobileSectionAndUrl("reimbursements") },
-                  ],
-                }]}
+                groups={[
+                  {
+                    label: "Sections",
+                    rows: [
+                      { iconKey: "dollar", title: FINANCE_SECTION_LABELS.budget, subtitle: "Expense ledger & category totals", onClick: () => setFinanceMobileSectionAndUrl("budget") },
+                      { iconKey: "clipboard", title: FINANCE_SECTION_LABELS.reimbursements, subtitle: financeReimbSub, onClick: () => setFinanceMobileSectionAndUrl("reimbursements") },
+                    ],
+                  },
+                  // Allocation is set-up — the once-a-year plan behind the two doing rows
+                  // above (design pass R3 / B8). Same door, its own group.
+                  {
+                    label: "Set-up",
+                    rows: [
+                      { iconKey: "sliders", title: FINANCE_SECTION_LABELS.allocation, subtitle: "Plan the fiscal year's budget", onClick: () => setFinanceMobileSectionAndUrl("allocation") },
+                    ],
+                  },
+                ]}
               />
             </div>
           ) : (
@@ -4407,9 +4483,9 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                           onClick={() => { if (!alreadyExists) { setNewDate(date); setAddWeekError(null) } }}
                           style={{
                             padding: "5px 11px", borderRadius: 20,
-                            border: isSelected ? "1.5px solid var(--plum)" : "1px solid var(--line-2)",
-                            background: isSelected ? "var(--plum)" : alreadyExists ? "#F4F1EA" : "var(--cream)",
-                            color: isSelected ? "var(--cream-on-dark)" : alreadyExists ? "#C5C0CC" : "var(--ink)",
+                            border: isSelected ? "1px solid var(--plum)" : "1px solid var(--line-2)",
+                            background: isSelected ? "var(--plum-tint)" : alreadyExists ? "var(--cream-2)" : "var(--cream)",
+                            color: isSelected ? "var(--plum)" : alreadyExists ? "var(--faint)" : "var(--ink)",
                             fontSize: 12, fontWeight: isSelected ? 600 : 400,
                             cursor: alreadyExists ? "default" : "pointer",
                             fontFamily: "inherit",
@@ -4574,7 +4650,7 @@ export function PraiseTeamTab({ teamId, ministryId, userId, canManage, canManage
                               onBlur={() => setTimeout(() => setAddMemberFocused(false), 150)}
                               style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", fontSize: 13, color: "var(--ink)", outline: "none", boxSizing: "border-box" as const }} />
                             {addMemberFocused && !addMemberUserId && filteredMembers.length > 0 && (
-                              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream)", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                              <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream)", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px color-mix(in srgb, var(--ink) 8%, transparent)" }}>
                                 {filteredMembers.map(m => (
                                   <button key={m.user_id}
                                     onMouseDown={e => { e.preventDefault(); setAddMemberUserId(m.user_id); setAddMemberSearch(m.name); setAddMemberFocused(false) }}
@@ -5093,7 +5169,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                 onBlur={() => setTimeout(() => setAddMemberFocused(false), 150)}
                 style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
               {addMemberFocused && filteredForAdd.length > 0 && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream)", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream)", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px color-mix(in srgb, var(--ink) 8%, transparent)" }}>
                   {filteredForAdd.map(m => (
                     <button key={m.id} onMouseDown={e => { e.preventDefault(); setAddMemberId(m.id); setAddMemberSearch(m.name); setAddMemberFocused(false) }}
                       style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: addMemberId === m.id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
@@ -5189,7 +5265,7 @@ function DgPraiseTeamTab({ teamId, ministryId, userId, canManage }: { teamId: st
                           onFocus={() => setAddRoleFocused(true)} onBlur={() => setTimeout(() => setAddRoleFocused(false), 150)}
                           style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
                         {addRoleFocused && !addRoleUserId && availableMembers.length > 0 && (
-                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream)", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream)", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px color-mix(in srgb, var(--ink) 8%, transparent)" }}>
                             {availableMembers.map(m => (
                               <button key={m.user_id} onMouseDown={e => { e.preventDefault(); setAddRoleUserId(m.user_id); setAddRoleSearch(m.name); setAddRoleFocused(false) }}
                                 style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: addRoleUserId === m.user_id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
@@ -5558,7 +5634,7 @@ function OneTimeTeamTab({ teamId, ministryId, userId, canManage }: { teamId: str
                           onFocus={() => setAddRoleFocused(true)} onBlur={() => setTimeout(() => setAddRoleFocused(false), 150)}
                           style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream)", fontSize: 13, outline: "none", boxSizing: "border-box" as const }} />
                         {addRoleFocused && !addRoleUserId && availableForRole.length > 0 && (
-                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream)", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}>
+                          <div style={{ position: "absolute", top: "100%", left: 0, right: 0, border: "1px solid var(--line-2)", borderRadius: 8, background: "var(--cream)", maxHeight: 160, overflowY: "auto", zIndex: 10, boxShadow: "0 4px 12px color-mix(in srgb, var(--ink) 8%, transparent)" }}>
                             {availableForRole.map(m => (
                               <button key={m.id} onMouseDown={e => { e.preventDefault(); setAddRoleUserId(m.id); setAddRoleSearch(m.name); setAddRoleFocused(false) }}
                                 style={{ display: "block", width: "100%", textAlign: "left", padding: "8px 12px", fontSize: 13, color: "var(--ink)", background: addRoleUserId === m.id ? "#F4F0F8" : "transparent", border: "none", cursor: "pointer" }}>
@@ -5752,7 +5828,7 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
 
   function handleExportSlides(songs: WorshipSong[]) {
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Worship Slides</title><style>*{box-sizing:border-box;margin:0;padding:0}body{background:#1a0a1c;font-family:Georgia,serif}.slide{width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--plum);page-break-after:always}.title{font-size:clamp(48px,8vw,96px);color:var(--cream-on-dark);text-align:center;font-weight:400;line-height:1.15;padding:0 10vw}.key{margin-top:28px;font-family:monospace;font-size:clamp(18px,2.5vw,28px);color:rgba(246,244,239,.55);letter-spacing:.2em;text-transform:uppercase}@media print{.slide{page-break-after:always}}</style></head><body>${songs.map(s => `<div class="slide"><p class="title">${esc(s.title)}</p><p class="key">${esc(s.key)}</p></div>`).join("")}</body></html>`
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Worship Slides</title><style>*{box-sizing:border-box;margin:0;padding:0}body{background:#1a0a1c;font-family:Georgia,serif}.slide{width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--plum);page-break-after:always}.title{font-size:clamp(48px,8vw,96px);color:var(--cream-on-dark);text-align:center;font-weight:400;line-height:1.15;padding:0 10vw}.key{margin-top:28px;font-family:monospace;font-size:clamp(18px,2.5vw,28px);color:color-mix(in srgb, var(--cream-on-dark) 55%, transparent);letter-spacing:.2em;text-transform:uppercase}@media print{.slide{page-break-after:always}}</style></head><body>${songs.map(s => `<div class="slide"><p class="title">${esc(s.title)}</p><p class="key">${esc(s.key)}</p></div>`).join("")}</body></html>`
     const blob = new Blob([html], { type: "text/html" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a"); a.href = url; a.download = "worship-slides.html"
@@ -5853,8 +5929,8 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
         const slide = slidesDeck[slidesActiveIndex]
         return (
           <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "var(--plum)", display: "flex", flexDirection: "column" }}>
-            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 55%, rgba(246,244,239,0.12) 0%, transparent 65%)", pointerEvents: "none" }} />
-            <button onClick={() => setSlidesOverlayOpen(false)} style={{ position: "absolute", top: "max(env(safe-area-inset-top), 20px)", right: 20, zIndex: 10, width: 36, height: 36, borderRadius: "50%", background: "rgba(246,244,239,0.12)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--cream-on-dark)" }}>
+            <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 55%, color-mix(in srgb, var(--cream-on-dark) 12%, transparent) 0%, transparent 65%)", pointerEvents: "none" }} />
+            <button onClick={() => setSlidesOverlayOpen(false)} style={{ position: "absolute", top: "max(env(safe-area-inset-top), 20px)", right: 20, zIndex: 10, width: 36, height: 36, borderRadius: "50%", background: "color-mix(in srgb, var(--cream-on-dark) 12%, transparent)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--cream-on-dark)" }}>
               <X className="w-5 h-5" />
             </button>
             <div onClick={() => setSlidesActiveIndex(i => Math.max(i - 1, 0))} style={{ position: "absolute", left: 0, top: 0, width: "33%", height: "100%", zIndex: 5, cursor: slidesActiveIndex > 0 ? "pointer" : "default" }} />
@@ -5862,20 +5938,20 @@ function TechTeamTab({ ministryId, userId, canManage }: { ministryId: string; us
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "72px 40px 80px", textAlign: "center", position: "relative", zIndex: 6 }}>
               {slide.isTitle ? (
                 <>
-                  <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase" as const, color: "rgba(246,244,239,0.62)", marginBottom: 20 }}>{slide.songKey ? `Key of ${slide.songKey}` : ""}</p>
+                  <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase" as const, color: "color-mix(in srgb, var(--cream-on-dark) 62%, transparent)", marginBottom: 20 }}>{slide.songKey ? `Key of ${slide.songKey}` : ""}</p>
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(36px,7vw,72px)", color: "var(--cream-on-dark)", lineHeight: 1.15, fontWeight: 400 }}>{slide.songTitle}</p>
-                  <div style={{ width: 40, height: 1.5, background: "rgba(246,244,239,0.32)", margin: "28px auto 0" }} />
+                  <div style={{ width: 40, height: 1.5, background: "color-mix(in srgb, var(--cream-on-dark) 32%, transparent)", margin: "28px auto 0" }} />
                 </>
               ) : (
                 <>
-                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, color: "rgba(246,244,239,0.45)", marginBottom: 6 }}>{slide.songTitle}</p>
-                  {slide.section && <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "rgba(246,244,239,0.35)", marginBottom: 28 }}>{slide.section}</p>}
+                  <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: 15, color: "color-mix(in srgb, var(--cream-on-dark) 45%, transparent)", marginBottom: 6 }}>{slide.songTitle}</p>
+                  {slide.section && <p style={{ fontFamily: "var(--font-inter)", fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase" as const, color: "color-mix(in srgb, var(--cream-on-dark) 35%, transparent)", marginBottom: 28 }}>{slide.section}</p>}
                   <p style={{ fontFamily: "var(--font-instrument-serif)", fontSize: "clamp(26px,5.5vw,52px)", color: "var(--cream-on-dark)", lineHeight: 1.35, fontWeight: 400, whiteSpace: "pre-line" as const }}>{slide.lyrics}</p>
                 </>
               )}
             </div>
             <div style={{ position: "absolute", bottom: 28, left: 0, right: 0, textAlign: "center", zIndex: 6 }}>
-              <span style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "rgba(246,244,239,0.4)" }}>{slidesActiveIndex + 1} / {slidesDeck.length}</span>
+              <span style={{ fontFamily: "var(--font-inter)", fontSize: 13, color: "color-mix(in srgb, var(--cream-on-dark) 40%, transparent)" }}>{slidesActiveIndex + 1} / {slidesDeck.length}</span>
             </div>
           </div>
         )
@@ -6036,7 +6112,7 @@ function SetListPdfViewer({
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "var(--ink)", display: "flex", flexDirection: "column" }}>
       {/* Toolbar */}
-      <div style={{ background: "#1E1825", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "14px 16px", paddingTop: "max(env(safe-area-inset-top), 52px)", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+      <div style={{ background: "#1E1825", borderBottom: "1px solid color-mix(in srgb, var(--cream-on-dark) 8%, transparent)", padding: "14px 16px", paddingTop: "max(env(safe-area-inset-top), 52px)", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
         <button onClick={onClose} style={{ padding: 6, background: "transparent", border: "none", cursor: "pointer", color: "var(--muted-text)", display: "flex", alignItems: "center", flexShrink: 0 }}>
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -6048,7 +6124,7 @@ function SetListPdfViewer({
               onChange={e => setEditValue(e.target.value)}
               onBlur={handleSaveFieldEdit}
               onKeyDown={e => { if (e.key === "Enter") handleSaveFieldEdit(); if (e.key === "Escape") setEditingField(null) }}
-              style={{ width: "100%", background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--cream-on-dark)", padding: "2px 0" }}
+              style={{ width: "100%", background: "transparent", border: "none", borderBottom: "1px solid color-mix(in srgb, var(--cream-on-dark) 20%, transparent)", outline: "none", fontFamily: "var(--font-instrument-serif)", fontSize: 18, color: "var(--cream-on-dark)", padding: "2px 0" }}
             />
           ) : (
             <button onClick={canManage ? () => { setEditingField("title"); setEditValue(song.title) } : undefined}
@@ -6063,7 +6139,7 @@ function SetListPdfViewer({
               onChange={e => setEditValue(e.target.value)}
               onBlur={handleSaveFieldEdit}
               onKeyDown={e => { if (e.key === "Enter") handleSaveFieldEdit(); if (e.key === "Escape") setEditingField(null) }}
-              style={{ background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.2)", outline: "none", ...monoStyle, color: "var(--cream-on-dark)", padding: "2px 0", width: 60 }}
+              style={{ background: "transparent", border: "none", borderBottom: "1px solid color-mix(in srgb, var(--cream-on-dark) 20%, transparent)", outline: "none", ...monoStyle, color: "var(--cream-on-dark)", padding: "2px 0", width: 60 }}
             />
           ) : (
             <button onClick={canManage ? () => { setEditingField("key"); setEditValue(song.key) } : undefined}
@@ -6096,7 +6172,7 @@ function SetListPdfViewer({
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted-text)", fontSize: 14 }}>No chart uploaded for this song.</div>
         ) : (
           <div style={{ position: "relative", display: "inline-block" }}>
-            <canvas ref={canvasRef} style={{ display: "block", borderRadius: 6, boxShadow: "0 4px 24px rgba(0,0,0,0.5)" }} />
+            <canvas ref={canvasRef} style={{ display: "block", borderRadius: 6, boxShadow: "0 4px 24px color-mix(in srgb, var(--ink) 50%, transparent)" }} />
 
             {/* Saved annotations */}
             {annotations.map(ann => (
@@ -6108,7 +6184,7 @@ function SetListPdfViewer({
                   transform: "translate(-50%, -50%)",
                   background: ann.color, borderRadius: 6, padding: "4px 8px",
                   fontSize: 11, fontWeight: 600, color: "var(--ink)",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
+                  boxShadow: "0 2px 8px color-mix(in srgb, var(--ink) 35%, transparent)",
                   maxWidth: 160, wordBreak: "break-word" as const,
                   cursor: canManage ? "pointer" : "default",
                   zIndex: 10, pointerEvents: "auto",
@@ -6125,7 +6201,7 @@ function SetListPdfViewer({
                   position: "absolute", left: `${pendingAnnotation.x}%`, top: `${pendingAnnotation.y}%`,
                   transform: "translate(-50%, -50%)",
                   background: "var(--cream)", borderRadius: 10, padding: 12,
-                  boxShadow: "0 4px 24px rgba(0,0,0,0.5)", zIndex: 20, width: 190,
+                  boxShadow: "0 4px 24px color-mix(in srgb, var(--ink) 50%, transparent)", zIndex: 20, width: 190,
                 }}>
                 <input
                   autoFocus
@@ -6153,7 +6229,7 @@ function SetListPdfViewer({
 
       {/* Hint bar */}
       {canManage && !loading && song.chart_url && (
-        <div style={{ padding: "10px 16px", background: "#1E1825", borderTop: "1px solid rgba(255,255,255,0.06)", flexShrink: 0, textAlign: "center" }}>
+        <div style={{ padding: "10px 16px", background: "#1E1825", borderTop: "1px solid color-mix(in srgb, var(--cream-on-dark) 6%, transparent)", flexShrink: 0, textAlign: "center" }}>
           <p style={{ fontSize: 11, color: "var(--body)" }}>Tap anywhere on the chart to add a note · tap a note to delete it</p>
         </div>
       )}
@@ -6295,7 +6371,7 @@ function MonthGridMobile({
         ) : (
           <EmptyState variant="quiet" icon={<Calendar style={{ width: 22, height: 22 }} />} title="Nothing scheduled" subtitle="Tap a marked day to see its events." />
         )}
-        <p style={{ marginTop: 16, fontSize: 12.5, color: "var(--muted-text)", textAlign: "center" }}>
+        <p style={{ marginTop: 16, fontSize: 13, color: "var(--muted-text)", textAlign: "center" }}>
           Tap any event to open its plan — no modal in between.
         </p>
       </div>
@@ -6711,6 +6787,10 @@ export function AddEventModal({
   // via the Events page's "Start next season".)
   type CreatePath = "quick" | "custom"
   const [createPath, setCreatePath] = useState<CreatePath | null>(isEditing ? "quick" : null)
+  // The QUICK path (a social or a gathering) asks for title, date and place and
+  // nothing else — a single-day event whose end date follows its start date.
+  // Playbooks and Start-from-scratch keep the full form (retreats span days).
+  const isQuickPath = !isEditing && createPath === "quick" && (eventType === "social" || eventType === "ministry")
   const [extras, setExtras] = useState<EventExtraTab[]>([])
   // The traditions flag — recurring events are what "Start next season" copies forward.
   const [recurring, setRecurring] = useState<boolean>(existing?.recurring ?? false)
@@ -6722,18 +6802,11 @@ export function AddEventModal({
     const scroller = bodyTopRef.current?.parentElement
     if (scroller) scroller.scrollTop = 0
   }, [createPath])
-  // The event's T-minus countdown ladder, stored on its event_plans row. In
-  // CREATE mode this is the preset the new plan is seeded with; in EDIT mode it
-  // is loaded from the plan and written back on Save. There are no dates here by
-  // design — every rung is a RELATIVE offset, which is what let the old
-  // plan_start_date / crunch_date pair (and their date-shift dance) go away.
-  const [countdownPhases, setCountdownPhases] = useState<CountdownPhaseDef[]>(
-    () => countdownPresetPhases(DEFAULT_COUNTDOWN_PRESET),
-  )
-  // False until the async ladder load resolves (edit mode only — create mode has
-  // nothing to wait for). Gates the WRITE so a Save that beats the fetch never
-  // stamps the default ladder over a customized one.
-  const [ladderLoaded, setLadderLoaded] = useState(!isEditing)
+  // The countdown ladder is no longer edited here (design pass R3, 2026-09-17):
+  // a create picks it from the horizon at save, and an existing event adjusts it
+  // inside the event behind "Set it up" (EventSetupSurface). The create modal used
+  // to end in an editable T-minus table that most leads scrolled past — and got
+  // the four-week ladder for a three-week event.
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
@@ -6766,28 +6839,6 @@ export function AddEventModal({
     ref.current?.focus({ preventScroll: true })
   }
 
-  // Load the plan's ladder when editing an existing event. ASYNC, and Save does
-  // not wait for it — `ladderLoaded` records whether it landed (see the write).
-  // Unlike the plan/crunch dates this replaced, nothing here is derived from the
-  // event's calendar day, so there is no ministry-zone hazard to guard against:
-  // the ladder means the same thing in every timezone.
-  useEffect(() => {
-    if (!isEditing || !existing) return
-    let cancelled = false
-    ;(async () => {
-      const { data } = await supabase
-        .from("event_plans")
-        .select("countdown_phases")
-        .eq("calendar_event_id", existing.id)
-        .eq("ministry_id", ministryId)
-        .maybeSingle()
-      if (cancelled) return
-      setCountdownPhases(ladderOf((data?.countdown_phases as CountdownPhaseDef[] | null) ?? null))
-      setLadderLoaded(true)
-    })()
-    return () => { cancelled = true }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   // Run Sheet P2 — look up a matching playbook for NEW events (re-runs on type change).
   useEffect(() => {
@@ -6958,30 +7009,11 @@ export function AddEventModal({
         // move the tasks and not the anchors and every task collapsed into Crunch.
         // The ladder is RELATIVE offsets, so it rides a date move untouched and
         // that whole stopgap is gone.
-        const planLadder = ladderLoaded ? { countdown_phases: countdownPhases } : null
-
+        // The ladder is owned by the event's Set-it-up surface now; an edit here
+        // never rewrites it (it used to write back whatever it had loaded). The
+        // plan row is only looked up so a moved date can shift its tasks.
         let planId: string | null = null
-        if (planLadder) {
-          // Update first; if no plan exists yet (0 rows), insert one.
-          const { data: planUpd } = await supabase
-            .from("event_plans")
-            .update(planLadder)
-            .eq("calendar_event_id", existing.id)
-            .eq("ministry_id", ministryId)
-            .select("id")
-          if (!planUpd || planUpd.length === 0) {
-            await supabase.from("event_plans").insert({
-              ministry_id: ministryId,
-              calendar_event_id: existing.id,
-              created_by: userId,
-              ...planLadder,
-            })
-          } else {
-            planId = (planUpd[0] as { id: string }).id
-          }
-        } else {
-          // Load still in flight: touch no plan column, just resolve the plan id
-          // so the task shift can still run.
+        {
           const { data: planRow } = await supabase
             .from("event_plans")
             .select("id")
@@ -7049,7 +7081,11 @@ export function AddEventModal({
             // The countdown ladder chosen in the modal. Seeded HERE so a plan is
             // never created without one — a phase-less plan would bucket every
             // task into UNSCHEDULED.
-            countdown_phases: countdownPhases,
+            // Ladder by HORIZON: three weeks or less gets the short (days) ladder,
+            // further out gets the four-week one. The old create-time editor
+            // defaulted to long, so a game night three weeks away opened with
+            // a "T−4 WEEKS" window that had already passed.
+            countdown_phases: countdownPresetPhases(daysBetweenYMD(todayInZone(timeZone), startDateStr) <= 21 ? "short" : "long"),
             ...(createPath === "custom" && extras.length > 0 ? { type_data: { extras } } : {}),
           })
           .select("id")
@@ -7215,20 +7251,17 @@ export function AddEventModal({
             <button
               type="button"
               onClick={() => { setCreatePath(null); setError(null) }}
-              style={{ alignSelf: "flex-start", background: "none", border: "none", padding: 0, fontSize: 12.5, color: "var(--muted-text)", cursor: "pointer" }}
+              style={{ alignSelf: "flex-start", background: "none", border: "none", padding: 0, fontSize: 13, color: "var(--muted-text)", cursor: "pointer" }}
             >
               ← All options
             </button>
           )}
           {createPath !== null && (
           <>
-          {/* Quick-preset hint */}
+          {/* What the playbook brings — said as an outcome, not "Pre-seeded:". */}
           {!isEditing && createPath === "quick" && (cfg.defaultRoles.length > 0 || cfg.defaultPhases.length > 0) && (
-            <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 12, color: "var(--body)" }}>
-              <span style={{ fontWeight: 500, color: "var(--plum)" }}>Pre-seeded: </span>
-              {cfg.defaultRoles.map(r => r.name).join(", ")}
-              {cfg.defaultRoles.length > 0 && cfg.defaultPhases.length > 0 && " · "}
-              {cfg.defaultPhases.reduce((n, p) => n + p.tasks.length, 0)} checklist tasks
+            <div style={{ padding: "12px 14px", background: "var(--ivory)", borderRadius: 10, fontSize: 13, color: "var(--body)", lineHeight: 1.5 }}>
+              We&apos;ll set up the checklist{cfg.defaultRoles.length > 0 ? ", the roles" : ""} and the reminders for a {cfg.label.toLowerCase()}. Adjust any of it inside the event.
             </div>
           )}
 
@@ -7239,12 +7272,15 @@ export function AddEventModal({
               placeholder={createPath === "quick" && ghost ? ghost.title : "Event name"} />
           </FormField>
 
-          {/* Description */}
+          {/* Description — not on the quick path: title, date, place is the whole ask.
+              Everything else is adjustable inside the event. */}
+          {!isQuickPath && (
           <FormField label="Description">
             <Textarea style={{ minHeight: 80 }} value={description} onChange={(e) => { touchedRef.current.description = true; setDescription(e.target.value) }}
               onKeyDown={(e) => ghostTabFill(e, description, ghost?.description, setDescription)}
               placeholder={createPath === "quick" && ghost ? ghost.description : "Optional details…"} />
           </FormField>
+          )}
 
           {/* Location */}
           <FormField label="Location">
@@ -7260,12 +7296,12 @@ export function AddEventModal({
           </div>
 
           {/* Recurring toggle — the traditions flag; sub-events roll with their parent */}
-          {!parentEventId && (
+          {!parentEventId && !isQuickPath && (
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
               <input type="checkbox" id="recurringEv" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--plum)", cursor: "pointer", marginTop: 2 }} />
               <label htmlFor="recurringEv" style={{ fontSize: 14, color: "var(--body)", cursor: "pointer", lineHeight: 1.45 }}>
                 Recurring every year
-                <span style={{ display: "block", fontSize: 11.5, color: "var(--muted-text)" }}>Traditions carry into next season when a leader starts it — plan copied, dates matched, leads reset.</span>
+                <span style={{ display: "block", fontSize: 12, color: "var(--muted-text)" }}>Traditions carry into next season when a leader starts it — plan copied, dates matched, leads reset.</span>
               </label>
             </div>
           )}
@@ -7273,27 +7309,21 @@ export function AddEventModal({
           {/* Dates + times */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <FormField label="Start date *">
-              <Input ref={startDateInputRef} type="date" value={startDateStr} onChange={(e) => { touchedRef.current.dates = true; setStartDateStr(e.target.value) }} />
+              <Input ref={startDateInputRef} type="date" value={startDateStr} onChange={(e) => { touchedRef.current.dates = true; setStartDateStr(e.target.value); if (isQuickPath) setEndDateStr(e.target.value) }} />
             </FormField>
             <FormField label="Start time">
               <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={startTimeStr} onChange={(e) => { touchedRef.current.dates = true; setStartTimeStr(e.target.value) }} disabled={allDay} />
             </FormField>
+            {!isQuickPath && (
             <FormField label="End date *">
               <Input ref={endDateInputRef} type="date" value={endDateStr} onChange={(e) => { touchedRef.current.dates = true; setEndDateStr(e.target.value) }} />
             </FormField>
+            )}
             <FormField label="End time">
               <Input type="time" style={{ opacity: allDay ? 0.4 : 1 }} value={endTimeStr} onChange={(e) => { touchedRef.current.dates = true; setEndTimeStr(e.target.value) }} disabled={allDay} />
             </FormField>
           </div>
 
-          {/* Countdown planning structure — persisted to the event's plan row.
-              Shown on CREATE too (it seeds the new plan's ladder), unlike the
-              plan-start/crunch pair it replaced, which was edit-only. */}
-          <CountdownLadderEditor
-            phases={countdownPhases}
-            onChange={setCountdownPhases}
-            disabled={!ladderLoaded}
-          />
 
           {/* Free-form capability modules — persisted to the plan's type_data.extras */}
           {!isEditing && createPath === "custom" && (
@@ -7316,7 +7346,7 @@ export function AddEventModal({
                       type="button"
                       onClick={() => setExtras(cur => on ? cur.filter(k => k !== m.key) : [...cur, m.key])}
                       style={{
-                        padding: "8px 12px", borderRadius: 9999, fontSize: 12.5, cursor: "pointer",
+                        padding: "8px 12px", borderRadius: 9999, fontSize: 13, cursor: "pointer",
                         border: on ? "1.5px solid var(--plum)" : "1.5px solid var(--line)",
                         background: on ? "color-mix(in srgb, var(--plum) 8%, transparent)" : "var(--cream-panel)",
                         color: on ? "var(--plum)" : "var(--body)", fontWeight: on ? 500 : 400,
@@ -7328,7 +7358,7 @@ export function AddEventModal({
                   )
                 })}
               </div>
-              <p style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 8, lineHeight: 1.5 }}>
+              <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 8, lineHeight: 1.5 }}>
                 Starts with a blank checklist — you compose the plan. Modules add their own tabs to the event.
               </p>
             </div>
@@ -7603,7 +7633,7 @@ export function MinistryCalendar({
                live congregation. Narrowing the rail to upcoming-only would have made
                it appear far more often (any team whose events are all in the past),
                so it goes now rather than later. */
-            <p style={{ fontSize: 12.5, color: "var(--muted-text)", margin: "6px 0 0", lineHeight: 1.45 }}>
+            <p style={{ fontSize: 13, color: "var(--muted-text)", margin: "6px 0 0", lineHeight: 1.45 }}>
               Nothing coming up.
             </p>
           ) : (
@@ -7898,7 +7928,7 @@ function EventBudgetCard({
 
   const ceilingRow = (label: string, value: string, tone?: "danger" | "quiet") => (
     <div key={label} style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginTop: 6 }}>
-      <span style={{ fontSize: 12.5, color: "var(--body)" }}>{label}</span>
+      <span style={{ fontSize: 13, color: "var(--body)" }}>{label}</span>
       <span style={{
         fontSize: 13, fontVariantNumeric: "tabular-nums",
         color: tone === "danger" ? "var(--danger)" : tone === "quiet" ? "var(--muted-text)" : "var(--ink)",
@@ -7960,13 +7990,13 @@ function EventBudgetCard({
         <div style={{ marginTop: 18 }}>
           <p style={{ ...monoLabel, marginBottom: 4 }}>Draw by fund</p>
           {funds.length === 0 ? (
-            <p style={{ fontSize: 12.5, color: "var(--muted-text)", fontStyle: "italic", marginTop: 6 }}>No funds set up yet.</p>
+            <p style={{ fontSize: 13, color: "var(--muted-text)", fontStyle: "italic", marginTop: 6 }}>No funds set up yet.</p>
           ) : funds.map(f => {
             const amt = drawsByFund[f.slug] ?? 0
             const draft = drafts[f.slug]
             return (
               <div key={f.slug} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minHeight: isMobile ? 48 : 40 }}>
-                <span style={{ fontSize: 13.5, color: "var(--body)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+                <span style={{ fontSize: 14, color: "var(--body)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
                 {canEditBudget ? (
                   <Input
                     size={isMobile ? "md" : "sm"}
@@ -8084,6 +8114,9 @@ export function EventPlanWorkspace({
   // has loaded (a member with nothing assigned lands on All; an empty "Yours" is
   // a dead end, not a default).
   const [planScope, setPlanScope] = useState<"yours" | "all" | null>(null)
+  // "Set it up" — the event's configuration surface (ladder, optional modules,
+  // Compile). One row at the foot of the hub / one entry on Overview; leaders only.
+  const [setupOpen, setSetupOpen] = useState(false)
 
   // Extra tabs = the type's built-in modules ∪ the plan's free-form modules
   // (type_data.extras, chosen in the Start-from-scratch creator).
@@ -8092,6 +8125,20 @@ export function EventPlanWorkspace({
   // type_data.extras would show a blank tab. Filtered out rather than migrated; the
   // union member and its label/meta entries stay so a stored value can't crash a render.
   const extraTabs: EventExtraTab[] = [...new Set([...typeCfg.extraTabs, ...planExtras])].filter(t => t !== "program")
+
+  async function handleSetupSave(next: { phases: CountdownPhaseDef[]; extras: EventExtraTab[] }) {
+    if (!plan) return
+    const { data, error } = await supabase
+      .from("event_plans")
+      .update({ countdown_phases: next.phases, type_data: { ...(plan.type_data ?? {}), extras: next.extras } })
+      .eq("id", plan.id)
+      .eq("ministry_id", ministryId)
+      .select("*")
+      .single()
+    if (error || !data) throw new Error(error?.message ?? "Couldn't save the set-up.")
+    setPlan(data as EventPlan)
+    setCountdownPhases(ladderOf(next.phases))
+  }
 
   // ── Container vs leaf (see app/home/tabs/event-container.tsx) ────────────────
   // A CONTAINER is an event whose content is really its sub-events (Welcome Week and
@@ -9123,7 +9170,7 @@ export function EventPlanWorkspace({
           {task.brief && (
             aug?.countdown
               ? <CountdownWhisper text={task.brief} />
-              : <span style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{task.brief}</span>
+              : <span style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{task.brief}</span>
           )}
         </span>
         {/* Countdown trigger badge (nudge state) — non-Countdown callers only; in
@@ -9415,7 +9462,7 @@ export function EventPlanWorkspace({
                       return (
                         <PocketRow
                           key={s.key}
-                          leading={<PlanLineIcon iconKey={meta.iconKey} size={40} radius={14} bg="var(--line-2)" fg="var(--plum)" />}
+                          leading={<PlanLineIcon iconKey={meta.iconKey} size={40} radius={14} bg="var(--pocket-track)" fg="var(--plum)" />}
                           title={s.label}
                           sub={meta.sub || undefined}
                           chevron
@@ -9425,6 +9472,23 @@ export function EventPlanWorkspace({
                       )
                     })}
                   </PocketRowCard>
+                  {/* ── Set-up — everything that configures the doing plane above,
+                      behind ONE row (design pass R3). Leaders only. ── */}
+                  {canEdit && (
+                    <>
+                      <PocketKicker label="Set-up" style={{ margin: "24px 4px 10px" }} />
+                      <PocketRowCard>
+                        <PocketRow
+                          leading={<PlanLineIcon iconKey="sliders" size={40} radius={14} bg="var(--pocket-track)" fg="var(--plum)" />}
+                          title="Set it up"
+                          sub="Planning schedule, optional modules, playbook"
+                          chevron
+                          isLast
+                          onClick={() => setSetupOpen(true)}
+                        />
+                      </PocketRowCard>
+                    </>
+                  )}
                 </div>
               )
             })()}
@@ -9507,7 +9571,7 @@ export function EventPlanWorkspace({
                     {descVal && (
                       <div style={{ marginTop: 26 }}>
                         <p style={eyebrow}>About</p>
-                        <p style={{ fontFamily: "var(--serif)", fontSize: 15.5, lineHeight: 1.6, color: "var(--body)", margin: 0, overflowWrap: "anywhere" }}>{descVal}</p>
+                        <p style={{ fontFamily: "var(--serif)", fontSize: 16, lineHeight: 1.6, color: "var(--body)", margin: 0, overflowWrap: "anywhere" }}>{descVal}</p>
                       </div>
                     )}
 
@@ -9525,7 +9589,7 @@ export function EventPlanWorkspace({
                           <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "6px 0 0" }}>{readiness.detail}</p>
                         </>
                       ) : (
-                        <p style={{ fontSize: 13.5, color: "var(--muted-text)", margin: 0 }}>No checklist yet.</p>
+                        <p style={{ fontSize: 14, color: "var(--muted-text)", margin: 0 }}>No checklist yet.</p>
                       )}
                     </div>
 
@@ -9602,18 +9666,7 @@ export function EventPlanWorkspace({
                       )}
                     </div>
 
-                    {/* Run Sheet P2 — Compile playbook (leader-only, once passed) */}
-                    {canEdit && plan && new Date(calendarEvent.start_date).getTime() < Date.now() && (
-                      <div style={{ marginTop: 26 }}>
-                        <p style={eyebrow}>Playbook</p>
-                        <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.55, margin: "0 0 12px" }}>
-                          Save this event&apos;s tasks, roles, and timing as a reusable playbook — next year&apos;s team can &ldquo;Run it back.&rdquo;
-                        </p>
-                        <PocketButton variant="quiet" surface="page" onClick={() => setCompileOpen(true)} style={{ width: "100%" }}>
-                          Compile playbook
-                        </PocketButton>
-                      </div>
-                    )}
+                    {/* Compile playbook lives behind "Set it up" now (R3). */}
                   </div>
                 )
               }
@@ -9646,7 +9699,7 @@ export function EventPlanWorkspace({
                         onClick={() => setActiveSectionAndUrl('checklist')}
                         right={
                           <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ width: 90, height: 5, borderRadius: 99, background: "var(--line-2)", overflow: "hidden" }}>
+                            <span style={{ width: 90, height: 5, borderRadius: 99, background: "var(--pocket-track)", overflow: "hidden" }}>
                               <span style={{ display: "block", height: "100%", width: `${taskTotal > 0 ? (taskDone / taskTotal) * 100 : 0}%`, background: "var(--plum)" }} />
                             </span>
                             <span style={{ fontSize: 12, color: "var(--body)", whiteSpace: "nowrap" }}>{taskDone} / {taskTotal}</span>
@@ -9746,6 +9799,18 @@ export function EventPlanWorkspace({
                   {/* Budget — "ceiling + draws" (see EventBudgetCard). Replaces the old
                       free-text budget_allocated stat and the title-keyed ministry-allocation
                       panel that used to sit under it. */}
+                  {/* "Set it up" — the ONE door to the event's configuration
+                      (design pass R3): ladder, optional modules, Compile. */}
+                  {canEdit && (
+                    <div style={{ marginBottom: 16 }}>
+                      <ActionCard
+                        icon={<PlanLineIcon iconKey="sliders" size={20} radius={0} bg="transparent" fg="var(--plum)" />}
+                        title="Set it up"
+                        subtitle="Planning schedule, optional modules, playbook"
+                        onClick={() => setSetupOpen(true)}
+                      />
+                    </div>
+                  )}
                   {(canEdit || canEditBudget) && (
                   <EventBudgetCard
                     ministryId={ministryId}
@@ -9828,14 +9893,13 @@ export function EventPlanWorkspace({
                     />
                     {active && newTaskTitle.trim() && (
                       <>
-                        <select
+                        <Select size="sm"
                           value={newTaskAssignee}
                           onChange={(e) => setNewTaskAssignee(e.target.value)}
-                          style={{ padding: "4px 10px", borderRadius: 999, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 11, cursor: "pointer", fontFamily: "var(--font-inter)" }}
                         >
                           <option value="">Unassigned</option>
                           {assigneePool.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                        </select>
+                        </Select>
                         <input
                           type="date"
                           value={newTaskDue}
@@ -9855,7 +9919,7 @@ export function EventPlanWorkspace({
                 <CentralCard variant="inset" radius="var(--r-callout)" padding="6px 14px 8px" style={{ marginBottom: 24 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 0 6px" }}>
                     <Star style={{ width: 12, height: 12, color: "var(--plum)", fill: "currentColor" }} />
-                    <span style={{ fontFamily: "var(--mono)", fontSize: 10.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 500 }}>Pinned</span>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--plum)", fontWeight: 500 }}>Pinned</span>
                   </div>
                   {scopedPinned.map((task) => isMobile ? renderMobileTaskRow(task) : renderTaskTree(task))}
                 </CentralCard>
@@ -10230,10 +10294,10 @@ export function EventPlanWorkspace({
                         </>
                       ) : canEdit ? (
                         assigningRoleId === role.id ? (
-                          <select autoFocus defaultValue="" onChange={(e) => handleAssignRole(role.id, e.target.value)} onBlur={() => setAssigningRoleId(null)} style={{ border: "1px solid var(--plum)", borderRadius: 10, padding: "8px 11px", fontSize: 15, fontFamily: "var(--font-inter)", color: "var(--ink)", background: "var(--cream)", outline: "none" }}>
+                          <Select size="sm" autoFocus defaultValue="" onChange={(e) => handleAssignRole(role.id, e.target.value)} onBlur={() => setAssigningRoleId(null)}>
                             <option value="">Choose someone…</option>
                             {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                          </select>
+                          </Select>
                         ) : (
                           // S35/S36 — the dashed add control is 1.5px (§11.13); radius is a token, never raw px.
                           <button className="assignbtn" onClick={() => setAssigningRoleId(role.id)} style={{ border: "1.5px dashed var(--dashed)", borderRadius: "var(--r-chip)", padding: "8px 14px", color: "var(--plum)", background: "transparent", fontSize: 13, fontFamily: "var(--font-inter)", whiteSpace: "nowrap", cursor: "pointer" }}>+ Assign someone</button>
@@ -10353,7 +10417,7 @@ export function EventPlanWorkspace({
 
                   const chip = (m: { id: string; name: string }, sign?: "+" | "−") => (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "var(--ivory)", borderRadius: 999, padding: "6px 14px 6px 6px" }}>
-                      <div style={{ width: 26, height: 26, borderRadius: 999, background: "var(--plum)", color: "var(--cream-on-dark)", display: "grid", placeItems: "center", fontSize: 10.5, fontWeight: 600 }}>{ini(m.name)}</div>
+                      <div style={{ width: 26, height: 26, borderRadius: 999, background: "var(--plum)", color: "var(--cream-on-dark)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 600 }}>{ini(m.name)}</div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{sign ? `${sign} ` : ""}{m.name}</div>
                     </div>
                   )
@@ -10382,7 +10446,7 @@ export function EventPlanWorkspace({
                   if (isMobile) {
                     return (
                       <PocketSheet title={title} onClose={() => setPlanChatConfirmOpen(false)}>
-                        <p style={{ fontSize: 14.5, lineHeight: 1.6, color: "var(--body)", margin: 0 }}>{body}</p>
+                        <p style={{ fontSize: 15, lineHeight: 1.6, color: "var(--body)", margin: 0 }}>{body}</p>
                         {memberBlocks}
                         <PocketButton onClick={run} disabled={creatingPlanChat} style={{ width: "100%", marginTop: 22 }}>
                           {creatingPlanChat ? "…" : cta}
@@ -10617,6 +10681,20 @@ export function EventPlanWorkspace({
         onConfirm={() => { confirm?.onConfirm(); setConfirm(null) }}
         onClose={() => setConfirm(null)}
       />
+      {setupOpen && plan && (
+        <EventSetupSurface
+          mobile={isMobile}
+          phases={ladderOf(countdownPhases)}
+          extras={planExtras.filter(t => t !== "program")}
+          builtInExtras={typeCfg.extraTabs}
+          isContainer={isContainer}
+          isChild={!!calendarEvent.parent_event_id}
+          isPast={new Date(calendarEvent.start_date).getTime() < Date.now()}
+          onClose={() => setSetupOpen(false)}
+          onSave={handleSetupSave}
+          onCompile={() => { setSetupOpen(false); setCompileOpen(true) }}
+        />
+      )}
       {compileOpen && plan && (
         <EventCompileModal
           eventPlanId={plan.id}
@@ -10880,7 +10958,7 @@ function SubEventsTab({
                     {!st.empty && <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.4px", color: "var(--muted-text)" }}>{r.taskDone}/{r.taskTotal}</span>}
                   </div>
                   {st.empty ? (
-                    <div style={{ height: 6, borderRadius: 999, background: "var(--line-2)" }} />
+                    <div style={{ height: 6, borderRadius: 999, background: "var(--pocket-track)" }} />
                   ) : (
                     <div style={{ display: "flex", gap: 4 }}>
                       {Array.from({ length: 6 }).map((_, i) => (
@@ -11029,9 +11107,9 @@ function ActsTab({
               <span style={{ fontSize: 14, color: "var(--ink)" }}>{act.performer || <span style={{ color: "var(--faint)", fontStyle: "italic" }}>—</span>}</span>
             )}
             {canEdit ? (
-              <select value={act.type} onChange={e => updateAct(act.id, "type", e.target.value)} style={{ padding: "4px 8px", borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--body)", fontSize: 12, cursor: "pointer" }}>
+              <Select size="sm" value={act.type} onChange={e => updateAct(act.id, "type", e.target.value)}>
                 {["Music", "Spoken Word", "Comedy", "Dance", "Other"].map(t => <option key={t}>{t}</option>)}
-              </select>
+              </Select>
             ) : <span style={{ fontSize: 12, color: "var(--body)" }}>{act.type}</span>}
             {canEdit ? (
               <input value={act.duration} onChange={e => updateAct(act.id, "duration", e.target.value)} placeholder="8 min" style={{ background: "none", border: "1px solid var(--line-2)", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "var(--font-inter)", color: "var(--body)", padding: "4px 8px", width: "100%", boxSizing: "border-box" }} />
@@ -11130,10 +11208,10 @@ function TeamsTab({
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <span style={{ fontSize: 14, color: "var(--body)", whiteSpace: "nowrap" }}>Commissioner:</span>
         {canEdit ? (
-          <select value={teamsData.commissioner} onChange={e => save({ ...teamsData, commissioner: e.target.value })} style={{ padding: isMobile ? "12px 12px" : "6px 12px", minHeight: isMobile ? 44 : undefined, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--plum-2)", fontSize: 13, cursor: "pointer" }}>
+          <Select size="sm" value={teamsData.commissioner} onChange={e => save({ ...teamsData, commissioner: e.target.value })}>
             <option value="">Unassigned</option>
             {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
+          </Select>
         ) : (
           <span style={{ fontSize: 14, color: "var(--plum-2)" }}>{members.find(m => m.id === teamsData.commissioner)?.name ?? "—"}</span>
         )}
@@ -11226,10 +11304,10 @@ function TransportTab({
             <CentralCard key={car.id} variant="standard" radius={isMobile ? "var(--r-pocket)" : "var(--r-callout)"} padding="18px 22px" style={isMobile ? { border: "none", background: "var(--ivory)" } : undefined}>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: isMobile ? "wrap" : undefined }}>
                 {canEdit ? (
-                  <select value={car.driver_id} onChange={e => updateCar(car.id, { driver_id: e.target.value })} style={{ padding: isMobile ? "12px 10px" : "6px 10px", minHeight: isMobile ? 44 : undefined, borderRadius: 8, border: "1px solid var(--line-2)", background: "var(--cream-panel)", color: "var(--plum-2)", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
+                  <Select size="sm" value={car.driver_id} onChange={e => updateCar(car.id, { driver_id: e.target.value })}>
                     <option value="">Driver…</option>
                     {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
+                  </Select>
                 ) : (
                   <span style={{ fontSize: 14, fontWeight: 500, color: "var(--plum-2)" }}>{driver?.name ?? "No driver"}</span>
                 )}
@@ -11424,12 +11502,12 @@ function RunSheetTab({
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "100px 1fr 160px", gap: 10, alignItems: "center" }}>
               <input value={draft.time} onChange={e => setDraft(d => ({ ...d, time: e.target.value }))} placeholder="7:00 PM" style={ctrlInput} />
               <input value={draft.title} autoFocus onChange={e => setDraft(d => ({ ...d, title: e.target.value }))} placeholder="Block title…" style={ctrlInput} />
-              <select value={draft.owner} onChange={e => setDraft(d => ({ ...d, owner: e.target.value }))} style={ctrlSelect}>
+              <Select size="sm" value={draft.owner} onChange={e => setDraft(d => ({ ...d, owner: e.target.value }))}>
                 <option value="">No owner</option>
                 {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
+              </Select>
             </div>
-            <input value={draft.brief} onChange={e => setDraft(d => ({ ...d, brief: e.target.value }))} placeholder="Brief — what this block needs, the gotcha…" style={{ ...ctrlInput, marginTop: 8, fontSize: 12.5 }} />
+            <input value={draft.brief} onChange={e => setDraft(d => ({ ...d, brief: e.target.value }))} placeholder="Brief — what this block needs, the gotcha…" style={{ ...ctrlInput, marginTop: 8, fontSize: 13 }} />
             <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
               <CentralButton variant="secondary" size="sm" onClick={() => setEditingId(null)}>Cancel</CentralButton>
               <CentralButton variant="primary" size="sm" onClick={() => saveEdit(block)}>Save</CentralButton>
@@ -11452,7 +11530,7 @@ function RunSheetTab({
                 ) : <span />}
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: done ? "var(--muted-text)" : "var(--ink)", textDecoration: done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{block.title || <span style={{ color: "var(--muted-text)", fontStyle: "italic" }}>Untitled block</span>}</div>
-                  <div style={{ fontSize: 12.5, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ fontSize: 13, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     <span style={{ fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.5px", color: done ? "var(--muted-text)" : "var(--plum)" }}>{block.time_label || "—"}</span>
                     {ownerName && <span style={{ color: "var(--muted-text)" }}> · {ownerName}</span>}
                   </div>
@@ -11492,7 +11570,7 @@ function RunSheetTab({
               </div>
             )}
             {block.brief && (
-              <p style={{ marginTop: 4, marginLeft: 38, fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{block.brief}</p>
+              <p style={{ marginTop: 4, marginLeft: 38, fontSize: 13, color: "var(--muted-text)", lineHeight: 1.4, whiteSpace: "pre-wrap" }}>{block.brief}</p>
             )}
           </>
         )}
@@ -11572,7 +11650,7 @@ function RunSheetTab({
       {orphanBlocks.length > 0 && (
         <div style={{ marginBottom: 36 }}>
           <p style={{ ...dayHeadStyle("var(--gold)"), marginBottom: 6 }}>Outside the event dates</p>
-          <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 12px" }}>
+          <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: "0 0 12px" }}>
             {orphanBlocks.length === 1 ? "This block sits" : `These ${orphanBlocks.length} blocks sit`} past {event.title}&rsquo;s end date
             ({eventDateRangeShort(new Date(event.start_date), new Date(event.end_date))}). Extend the event, or move {orphanBlocks.length === 1 ? "it" : "them"} onto a day.
           </p>
@@ -12666,7 +12744,7 @@ function GroupGeneratorWizard({
 
             {/* Success message after SG confirm */}
             {sgConfirmResult && (
-              <div style={{ marginBottom: 20, padding: "12px 16px", background: "color-mix(in srgb, var(--plum) 6%, transparent)", border: "1px solid rgba(62,21,64,0.2)", borderRadius: 10 }}>
+              <div style={{ marginBottom: 20, padding: "12px 16px", background: "color-mix(in srgb, var(--plum) 6%, transparent)", border: "1px solid color-mix(in srgb, var(--plum) 20%, transparent)", borderRadius: 10 }}>
                 <p style={{ fontSize: 13, color: "var(--plum)", fontWeight: 500, margin: 0 }}>{sgConfirmResult}</p>
                 <button onClick={onSaved} style={{ fontSize: 12, color: "var(--plum)", background: "none", border: "none", padding: 0, marginTop: 8, cursor: "pointer", fontWeight: 500 }}>Done →</button>
               </div>
@@ -12886,7 +12964,7 @@ function GgToggle({ checked, onChange, label, desc, disabled, tooltip }: {
         onClick={() => !disabled && onChange(!checked)}
         style={{
           width: 36, height: 20, borderRadius: 999, flexShrink: 0,
-          background: checked ? "var(--plum)" : "#D6D0C0",
+          background: checked ? "var(--plum)" : "var(--dashed)",
           border: "none", cursor: disabled ? "not-allowed" : "pointer", position: "relative", transition: "background 0.15s", marginTop: 2,
         }}
       >
@@ -14003,7 +14081,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                   {!isRoleConfirming && (
-                                    <span style={{ fontSize: 11.5, color: "var(--muted-text)" }}>{roleCount} {roleCount === 1 ? "person" : "people"}</span>
+                                    <span style={{ fontSize: 12, color: "var(--muted-text)" }}>{roleCount} {roleCount === 1 ? "person" : "people"}</span>
                                   )}
                                   {canManageTeam && (
                                     isRoleConfirming ? (
@@ -14063,7 +14141,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                           ) : (
                             <div
                               onClick={() => { setAddingRole(true); setNewRoleName("") }}
-                              style={{ padding: "13px 20px", color: "var(--plum)", fontSize: 13.5, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", borderTop: roles.length > 0 ? "1px solid var(--line)" : "none" }}
+                              style={{ padding: "13px 20px", color: "var(--plum)", fontSize: 14, display: "flex", alignItems: "center", gap: 8, cursor: "pointer", borderTop: roles.length > 0 ? "1px solid var(--line)" : "none" }}
                             >
                               <Plus style={{ width: 14, height: 14 }} /> Add role
                             </div>
@@ -14095,7 +14173,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                                   {canManageTeam && <Pencil className="opacity-0 group-hover:opacity-100 transition-opacity duration-150" style={{ width: 13, height: 13, color: "var(--muted-text)", flexShrink: 0 }} />}
                                 </div>
                               )}
-                              <p style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 2 }}>
+                              <p style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 2 }}>
                                 {roles[activeRole].permissions.filter(p => visiblePerms.includes(p)).length} of {visiblePerms.length} permissions enabled
                               </p>
                             </div>
@@ -14160,7 +14238,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                           <ContentActionButton variant="ghost" icon={<MessageCircle style={{ width: 14, height: 14 }} />} label={creatingChat ? "Creating…" : "Group chat"} onClick={handleCreateGroupChat} disabled={creatingChat} />
                         ))}
                         {canManageTeam && (
-                          <ContentActionButton variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} label="Add member" onClick={() => setShowAddMember(true)} />
+                          <ContentActionButton variant="primary" icon={<Plus style={{ width: 14, height: 14 }} />} label="Add member" onClick={() => setShowAddMember(true)} />
                         )}
                       </>
                     }
@@ -14195,7 +14273,7 @@ export function TeamDetailOverlay({ team, userId, ministryId, isAdmin, isGoverna
                         <span onClick={() => openMemberProfile(m.user_id)} style={{ cursor: "pointer", display: "inline-flex" }}>
                           <MonogramChip initials={getInitials(m.name)} className="w-8 h-8 text-[12px] font-medium" />
                         </span>
-                        <span onClick={() => openMemberProfile(m.user_id)} style={{ fontSize: 13.5, color: "var(--ink)", fontWeight: 500, cursor: "pointer" }}>{m.name}</span>
+                        <span onClick={() => openMemberProfile(m.user_id)} style={{ fontSize: 14, color: "var(--ink)", fontWeight: 500, cursor: "pointer" }}>{m.name}</span>
                         {canManageTeam && roles.length > 1 && m.user_id !== userId ? (
                           <select
                             // Controlled for a roleless member — see the mobile twin above.
@@ -16360,9 +16438,9 @@ function BibleStudySubTab({
                     style={{
                       padding: "6px 14px", borderRadius: 20, fontSize: 13,
                       fontWeight: isActive ? 600 : 400,
-                      border: isActive ? "1.5px solid var(--plum)" : "1.5px solid var(--line)",
-                      background: isActive ? "var(--plum)" : "transparent",
-                      color: isActive ? "var(--cream-on-dark)" : "var(--body)",
+                      border: isActive ? "1px solid var(--plum)" : "1px solid var(--line)",
+                      background: isActive ? "var(--plum-tint)" : "transparent",
+                      color: isActive ? "var(--plum)" : "var(--body)",
                       cursor: "pointer", whiteSpace: "nowrap" as const, fontFamily: "inherit",
                     }}
                   >

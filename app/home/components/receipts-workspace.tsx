@@ -181,7 +181,7 @@ export function ReceiptsWorkspace({
            chrome + one row per team you can file receipts for; drilling a row
            selects that team (?rteam). Replaces the retired team-selector chips.
            px-5: workspace is mounted full-bleed, so it supplies its own inset. */
-        <div className="md:hidden px-5" style={{ paddingTop: 12 }}>
+        <div className="md:hidden px-5">
           <MobilePocketHub
             teamName="Receipts"
             onBack={onExitTeam}
@@ -205,7 +205,7 @@ export function ReceiptsWorkspace({
           hub + gear (§2.1 one header per screen). Desktop selects teams from the
           sidebar and never renders this. */}
       {activeTeam && (
-        <div className="md:hidden px-5" style={{ paddingTop: 12 }}>
+        <div className="md:hidden px-5">
           <PocketHubChrome
             title={activeTeam.name}
             onBack={() => onReceiptsTeamChange(null)}
@@ -222,7 +222,7 @@ export function ReceiptsWorkspace({
           {/* Desktop categories header (serif title + ghost create). */}
           <div className="hidden md:flex items-center justify-between gap-3 px-14 pt-7 pb-3">
             <span style={{ fontFamily: "var(--serif)", fontSize: 19, fontWeight: 500, color: "var(--ink)" }}>Categories</span>
-            <ContentActionButton label="Add category" variant="ghost" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => setShowAddCategory(true)} />
+            <ContentActionButton label="Add category" variant="primary" icon={<Plus style={{ width: 14, height: 14 }} />} onClick={() => setShowAddCategory(true)} />
           </div>
           {/* Mobile categories header: Pocket kicker + plum round create (the one
               plum-filled create on this screen). Top gap comes from the drilled
@@ -555,7 +555,7 @@ function memberNodeDate(a: MemberAllocation, i: number, submittedAt: string): st
   return null
 }
 const memberStepDateStyle: React.CSSProperties = {
-  fontFamily: "var(--mono)", fontSize: 9.5, letterSpacing: "0.04em", color: "var(--muted-text)", whiteSpace: "nowrap",
+  fontFamily: "var(--mono)", fontSize: 10, letterSpacing: "0.04em", color: "var(--muted-text)", whiteSpace: "nowrap",
 }
 
 // A single read-only source row in the member's split view: fund chip · amount ·
@@ -575,8 +575,8 @@ function MemberAllocationRow({ allocation: a, submittedAt }: { allocation: Membe
       </div>
       {isNegative ? (
         <div style={{ background: "var(--cream)", border: "1px solid color-mix(in srgb, var(--danger) 30%, var(--cream))", borderRadius: 10, padding: "10px 12px" }}>
-          <p style={{ fontSize: 12.5, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{statusLabel(a.status, a.fund_kind)}</p>
-          {a.decision_reason && <p style={{ fontSize: 12.5, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
+          <p style={{ fontSize: 13, fontWeight: 500, color: "var(--danger)", margin: 0 }}>{statusLabel(a.status, a.fund_kind)}</p>
+          {a.decision_reason && <p style={{ fontSize: 13, color: "var(--body)", margin: "5px 0 0", lineHeight: 1.5 }}>{a.decision_reason}</p>}
         </div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -588,7 +588,7 @@ function MemberAllocationRow({ allocation: a, submittedAt }: { allocation: Membe
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ width: 7, height: 7, borderRadius: "50%", background: done ? "var(--plum)" : "var(--line-2)", flexShrink: 0 }} />
                   <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                    <span style={{ fontSize: 11.5, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
+                    <span style={{ fontSize: 12, fontWeight: done ? 500 : 400, color: done ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>{step}</span>
                     {nodeDate && <span style={memberStepDateStyle}>{nodeDate}</span>}
                   </div>
                 </div>

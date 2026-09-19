@@ -611,7 +611,7 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
           style={{
             position: "absolute",
             inset: 0,
-            background: "linear-gradient(180deg, rgba(19,16,26,0.10) 35%, rgba(19,16,26,0.66) 100%)",
+            background: "linear-gradient(180deg, color-mix(in srgb, var(--ink) 10%, transparent) 35%, color-mix(in srgb, var(--ink) 66%, transparent) 100%)",
           }}
         />
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "var(--space-7)", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -709,10 +709,10 @@ function PhotoSlide({ imageUrl, panelColor, eyebrow, title, body, meta, event, m
             right: "var(--space-8)",
             bottom: "var(--space-8)",
             zIndex: 2,
-            background: "rgba(253,252,248,0.16)",
+            background: "color-mix(in srgb, var(--cream) 16%, transparent)",
             backdropFilter: "blur(16px)",
             WebkitBackdropFilter: "blur(16px)",
-            border: "1px solid rgba(253,252,248,0.22)",
+            border: "1px solid color-mix(in srgb, var(--cream) 22%, transparent)",
             borderRadius: "var(--r-card)",
             padding: "var(--space-5) var(--space-6)",
             display: "flex",

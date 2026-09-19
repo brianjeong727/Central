@@ -29,7 +29,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ChevronRight, Plus } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { MONO_STYLE } from "@/components/central/typography"
-import { PocketKicker, PocketRow, PocketRowCard, NightDivider, InlineAddRow } from "@/components/central"
+import { PocketKicker, PocketRow, PocketRowCard, NightDivider, InlineAddRow, Select } from "@/components/central"
 import { eventDayHeaderLabel, formatDurationMin } from "../utils"
 import type { CalendarEvent, EventBlock, EventConfirmation, EventPlan, EventRole, EventTask } from "../types"
 import { computeEventReadiness, isRoleCovered, CONFIRMATION_LABEL, confirmationColor, type EventReadiness } from "@/lib/event-readiness"
@@ -271,7 +271,7 @@ export function SectionKicker({ label, hint, isMobile, first }: {
         {!isMobile && <span style={{ flex: 1, height: 1, background: "var(--line)" }} />}
       </div>
       {hint && (
-        <p style={{ fontSize: 12.5, color: "var(--muted-text)", lineHeight: 1.5, margin: "6px 0 12px" }}>{hint}</p>
+        <p style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.5, margin: "6px 0 12px" }}>{hint}</p>
       )}
     </div>
   )
@@ -521,7 +521,7 @@ export function ContainerStaffing({
     border: "1px solid var(--line-2)",
     background: "var(--cream)",
     color: "var(--body)",
-    fontSize: 12.5,
+    fontSize: 13,
     cursor: "pointer",
     maxWidth: isMobile ? 150 : 190,
   }
@@ -574,20 +574,19 @@ export function ContainerStaffing({
                 {role.role_name}
               </span>
               {conf && (
-                <span style={{ fontSize: 12.5, fontWeight: 500, color: confirmationColor(conf.status), whiteSpace: "nowrap", flexShrink: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 500, color: confirmationColor(conf.status), whiteSpace: "nowrap", flexShrink: 0 }}>
                   {CONFIRMATION_LABEL[conf.status]}
                 </span>
               )}
               {canEdit ? (
-                <select
+                <Select size="sm"
                   value={role.assigned_to ?? ""}
                   disabled={busyId === role.id}
                   onChange={(e) => assign(role, e.target.value)}
-                  style={selectStyle}
                 >
                   <option value="">Unassigned</option>
                   {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
+                </Select>
               ) : (
                 <span style={{ fontSize: 13, color: role.assigned_name ? "var(--ink)" : "var(--muted-text)", whiteSpace: "nowrap" }}>
                   {role.assigned_name ?? "Unassigned"}

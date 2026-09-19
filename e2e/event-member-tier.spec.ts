@@ -97,6 +97,8 @@ test.describe("event member tier", () => {
     await expect(p.getByText(/You're on /).filter({ visible: true }).first()).toBeVisible({ timeout: 15_000 })
     await expect(p.getByText(/of yours done/).filter({ visible: true }).first()).toBeVisible()
     await expect(p.getByText("Treasurer only").filter({ visible: true })).toHaveCount(0)
+    // …and no "Set it up" row: configuration is the planner's (R3).
+    await expect(p.getByText("Set it up", { exact: true }).filter({ visible: true })).toHaveCount(0)
     if (SHOT) await p.screenshot({ path: `${SHOT}/mobile-hub.png` })
     await p.getByText("Countdown", { exact: true }).filter({ visible: true }).first().click()
     const yoursChip = p.getByRole("button", { name: "Yours", exact: true }).filter({ visible: true })

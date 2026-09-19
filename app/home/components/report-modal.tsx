@@ -108,7 +108,7 @@ export function ReportModal({
         </>
       }
     >
-      <p style={{ fontSize: 13.5, color: "var(--body)", lineHeight: 1.55, margin: "0 0 18px" }}>
+      <p style={{ fontSize: 14, color: "var(--body)", lineHeight: 1.55, margin: "0 0 18px" }}>
         Why are you reporting this{targetType === "profile" ? " person" : targetType === "announcement" ? " announcement" : " message"}?
         Reports are private and reviewed by your ministry&apos;s admins.
       </p>
@@ -143,7 +143,7 @@ export function ReportModal({
               </span>
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: "block", fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>{r.label}</span>
-                <span style={{ display: "block", fontSize: 12.5, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.45 }}>{r.sub}</span>
+                <span style={{ display: "block", fontSize: 13, color: "var(--muted-text)", marginTop: 2, lineHeight: 1.45 }}>{r.sub}</span>
               </span>
             </button>
           )

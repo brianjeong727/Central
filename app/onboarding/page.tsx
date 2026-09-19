@@ -133,12 +133,12 @@ function WorkspacePickCard({ iconKey, name, desc, selected, comingSoon, onToggle
           <span className={selected && !comingSoon ? "max-md:!text-[var(--cream)]" : ""} style={{ fontSize: 15, color: "var(--ink)" }}>{name}</span>
           {comingSoon && (
             <span style={{
-              ...mono, fontSize: 9.5, letterSpacing: "0.1em", color: "var(--muted-text)",
+              ...mono, fontSize: 10, letterSpacing: "0.1em", color: "var(--muted-text)",
               border: "1px solid var(--line-2)", borderRadius: 99, padding: "2px 7px",
             }}>Coming soon</span>
           )}
         </div>
-        <div className={selected && !comingSoon ? "max-md:!text-[var(--cream-on-dark)]" : ""} style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 2 }}>{desc}</div>
+        <div className={selected && !comingSoon ? "max-md:!text-[var(--cream-on-dark)]" : ""} style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 2 }}>{desc}</div>
       </div>
       {!comingSoon && (
         <span
@@ -501,7 +501,7 @@ export default function OnboardingPage() {
                         <div className="max-md:!text-[19px]" style={{
                           fontFamily: SERIF, fontSize: 24, color: size === opt.value ? "var(--cream)" : "var(--ink)",
                         }}>{opt.label}</div>
-                        <div style={{ fontSize: 12.5, marginTop: 5, color: size === opt.value ? "rgba(253,252,248,0.72)" : "var(--body)" }}>{opt.sub}</div>
+                        <div style={{ fontSize: 13, marginTop: 5, color: size === opt.value ? "color-mix(in srgb, var(--cream) 72%, transparent)" : "var(--body)" }}>{opt.sub}</div>
                       </button>
                     ))}
                   </div>
@@ -528,7 +528,7 @@ export default function OnboardingPage() {
                   desc="On: students find your ministry on the Ministries page and join instantly. Off: your ministry stays private and only people with your invite code can enter."
                   on={isPublic} onClick={() => setIsPublic(v => !v)}
                 />
-                <div style={{ fontSize: 12.5, color: "var(--muted-text)", marginTop: 12, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 13, color: "var(--muted-text)", marginTop: 12, lineHeight: 1.5 }}>
                   You&apos;ll get your invite codes to share once your ministry is approved.
                 </div>
               </div>
@@ -603,7 +603,7 @@ export default function OnboardingPage() {
               {/* Approval notice */}
               <div className="max-md:!border-transparent max-md:!bg-[var(--ivory)] max-md:!rounded-[var(--r-pocket)]" style={{
                 display: "flex", alignItems: "center", gap: 10,
-                marginTop: 22, fontSize: 13.5, color: "var(--body)",
+                marginTop: 22, fontSize: 14, color: "var(--body)",
                 background: "var(--cream-3)", border: "1px solid var(--line)", borderRadius: 10, padding: "14px 16px",
               }}>
                 <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>

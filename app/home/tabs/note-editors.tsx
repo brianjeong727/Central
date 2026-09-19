@@ -176,7 +176,7 @@ export function TiptapToolbar({ editor, flush = false }: { editor: Editor | null
                 style={{
                   width: 18, height: 18, borderRadius: 4,
                   background: c,
-                  border: currentColor === c ? "2px solid var(--plum)" : "1.5px solid rgba(0,0,0,0.10)",
+                  border: currentColor === c ? "2px solid var(--plum)" : "1.5px solid color-mix(in srgb, var(--ink) 10%, transparent)",
                   cursor: "pointer", padding: 0,
                 }}
               />

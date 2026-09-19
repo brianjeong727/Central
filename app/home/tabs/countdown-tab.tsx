@@ -296,7 +296,7 @@ export function TriggerBadge({ kind, copy }: { kind: TriggerKind; copy: string }
     padding: "2px 9px",
     borderRadius: 999,
     fontFamily: "var(--mono)",
-    fontSize: 10.5,
+    fontSize: 11,
     lineHeight: 1.4,
     whiteSpace: "nowrap" as const,
     flexShrink: 0,
@@ -334,7 +334,7 @@ export function CountdownWhisper({ text }: { text: string }) {
         borderRadius: "var(--r-chip)",
         padding: "8px 11px",
         fontFamily: "var(--sans)",
-        fontSize: 12.5,
+        fontSize: 13,
         lineHeight: 1.5,
         color: "var(--body)",
         whiteSpace: "pre-wrap",
@@ -428,7 +428,7 @@ export function ReassignControl({
                   <span
                     style={{
                       fontFamily: "var(--mono)",
-                      fontSize: 10.5,
+                      fontSize: 11,
                       padding: "2px 8px",
                       borderRadius: 999,
                       background: tone.chipBg,
@@ -555,10 +555,10 @@ function LoadCard({
           const overloaded = r.open_tasks === max && max >= 5
           return (
             <div key={r.user_id} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ width: 74, fontSize: 12.5, color: "var(--body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 }}>
+              <span style={{ width: 74, fontSize: 13, color: "var(--body)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flexShrink: 0 }}>
                 {nameOf(r.user_id)}
               </span>
-              <span style={{ flex: 1, height: 6, borderRadius: 99, background: "var(--line-2)", overflow: "hidden" }}>
+              <span style={{ flex: 1, height: 6, borderRadius: 99, background: "var(--pocket-track)", overflow: "hidden" }}>
                 <span style={{ display: "block", height: "100%", width: `${(r.open_tasks / max) * 100}%`, background: "var(--plum)", borderRadius: 99 }} />
               </span>
               <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: overloaded ? "var(--danger)" : "var(--muted-text)", whiteSpace: "nowrap", flexShrink: 0, fontWeight: overloaded ? 500 : 400 }}>
@@ -569,7 +569,7 @@ function LoadCard({
         })}
       </div>
       {lowestTwo.length > 0 && (
-        <p style={{ fontSize: 11.5, color: "var(--muted-text)", marginTop: 14, lineHeight: 1.4 }}>
+        <p style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 14, lineHeight: 1.4 }}>
           Reassign surfaces {lowestTwo.join(" & ")} first.
         </p>
       )}

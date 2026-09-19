@@ -135,7 +135,7 @@ export function InviteShareModal({
   return (
     <CentralModal onClose={onClose} eyebrow="Invite" title="Share Central">
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-        <p style={{ fontSize: 14.5, lineHeight: 1.6, color: "var(--body)", margin: "0 0 20px", maxWidth: 380 }}>
+        <p style={{ fontSize: 15, lineHeight: 1.6, color: "var(--body)", margin: "0 0 20px", maxWidth: 380 }}>
           {isCustomCode ? (
             <>Anyone who scans this or opens the link can ask to join {ministryName ?? "your ministry"} — an admin lets them in.</>
           ) : (
