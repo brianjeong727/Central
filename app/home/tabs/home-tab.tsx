@@ -386,6 +386,7 @@ export function HomeTab({
   // first name; all others (admin, member, visitor) get the name alone. The real role
   // is used (roleLabel with a null id bypasses the "Super" alias) so "Super" never
   // surfaces in the greeting — that stays impersonation chrome.
+  // eslint-disable-next-line central/no-inline-role-array -- honorific subset, not a gate (documented #2 nonconformer)
   const honorific = ["pastor", "deacon", "elder", "leader"].includes(userRole.toLowerCase())
     ? roleLabel(userRole, null)
     : null

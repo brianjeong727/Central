@@ -8,6 +8,7 @@
 export const SUPER_UUID = "54080bf6-22b3-46fd-b6ce-51736f42a59d"
 export const CENTRAL_MINISTRY_ID = "20f8790e-0cb0-411b-8374-41621c6bd78a"
 export const HOME_ROLE = "pastor"
+// eslint-disable-next-line central/no-inline-role-array -- the full role enum (documented #2 nonconformer)
 export const MINISTRY_ROLES = ["visitor", "member", "leader", "admin", "deacon", "elder", "pastor"] as const
 
 export type MinistryRole = (typeof MINISTRY_ROLES)[number]

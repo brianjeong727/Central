@@ -5,7 +5,7 @@
 # it would kill the Vercel deploy (ERR_PNPM_OUTDATED_LOCKFILE, see lessons.md).
 #
 # Two jobs:
-#   core — build + lint + hex ratchet. Needs only the two NEXT_PUBLIC_* values
+#   core — build + lint + the static check-* scripts. Needs only the two NEXT_PUBLIC_* values
 #          (public by design — they ship to every browser).
 #   e2e  — full Playwright suite against the E2E sandbox tenant. Requires
 #          SUPABASE_SERVICE_ROLE_KEY in repo secrets; skips cleanly (neutral, not
@@ -73,6 +73,27 @@ jobs:
 
       - name: Hex ratchet
         run: bash scripts/check-hex.sh
+
+      # The rest of verify.sh's static checks. Each is a CLAUDE.md convention
+      # made mechanical; running them only locally meant a session that skipped
+      # verify.sh could merge a violation.
+      - name: Archived-chat dedup
+        run: node scripts/check-archived-dedup.mjs
+
+      - name: Conflict copies
+        run: bash scripts/check-conflict-copies.sh
+
+      - name: Chrome title (#27)
+        run: bash scripts/check-chrome-title.sh
+
+      - name: Integer type sizes
+        run: bash scripts/check-integer-type.sh
+
+      - name: Chat avatar
+        run: bash scripts/check-chat-avatar.sh
+
+      - name: Repo shape (#11, #24)
+        run: bash scripts/check-repo-shape.sh
 
       # DB role domain == lib/roles.ts. The live half needs the service key and
       # skips loudly without it (fork PRs get no secrets); the static

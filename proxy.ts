@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { resolveUser } from '@/lib/auth-claims'
 import { memberProfileIncomplete } from '@/lib/profile-name'
+import { isAdminRole } from '@/lib/roles'
 
 const ADMIN_EMAIL = 'brianjeong13@gmail.com'
 
@@ -425,7 +426,7 @@ export async function proxy(request: NextRequest) {
   // ministry-status branches so pending/rejected FOUNDERS (who hold admin-tier
   // roles) keep their ability to reach /onboarding.
   if (pathname.startsWith('/onboarding')) {
-    if (['admin', 'deacon', 'elder', 'pastor'].includes(role.toLowerCase())) {
+    if (isAdminRole(role)) {
       return supabaseResponse
     }
     return NextResponse.redirect(new URL('/register-ministry', request.url))

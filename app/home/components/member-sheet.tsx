@@ -22,11 +22,12 @@ import { useBlocks } from "../use-blocks"
 import { blockUser, unblockUser } from "@/app/actions/blocks"
 import type { DirectoryMember, DirectoryMemberDetail } from "../types"
 import { cohortLabel, isYoungAdult } from "@/lib/cohort"
+import { isLeaderRole } from "@/lib/roles"
 
 // Borderless tonal role tag for phone-width surfaces (mobile spec §3.7): elevated
 // roles carry the plum fill; member/visitor get a --line-2 tonal pill. No borders.
 export function MobileRoleTag({ role, userId }: { role: string; userId: string }) {
-  const elevated = ["admin", "leader", "deacon", "elder", "pastor"].includes(role.toLowerCase())
+  const elevated = isLeaderRole(role)
   return (
     <span style={{ fontFamily: "var(--mono)", fontSize: 9, letterSpacing: "1px", textTransform: "uppercase", borderRadius: 999, padding: "2px 7px", flexShrink: 0, background: elevated ? "var(--plum)" : "var(--line-2)", color: elevated ? "var(--cream-on-dark)" : "var(--body)" }}>
       {roleLabel(role, userId)}

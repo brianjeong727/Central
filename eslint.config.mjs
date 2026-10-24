@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import central from "./eslint/central-rules.mjs";
 
 const WEB_STORAGE_MSG =
   "Convention #1: Supabase session only — never web storage.";
@@ -47,6 +48,39 @@ const eslintConfig = defineConfig([
     rules: {
       "@typescript-eslint/no-require-imports": "off",
     },
+  },
+  // ── CLAUDE.md conventions as lint rules (eslint/central-rules.mjs) ───────────
+  // Each rule is one numbered convention. Sanctioned exceptions are listed here
+  // by file; a one-off nonconformer is disabled at its site with a reason.
+  {
+    files: ["app/**", "components/**", "lib/**", "proxy.ts", "capacitor.config.ts"],
+    plugins: { central },
+    rules: {
+      "central/no-inline-role-array": "error",
+      "central/visitor-parity": "error",
+      "central/register-cta": "error",
+      "central/action-menu-only": "error",
+      "central/keyboard-inset": "error",
+      "central/call-start-gate": "error",
+    },
+  },
+  {
+    // lib/roles.ts IS the role encoding (#2, #3).
+    files: ["lib/roles.ts"],
+    rules: {
+      "central/no-inline-role-array": "off",
+      "central/visitor-parity": "off",
+    },
+  },
+  {
+    // #20's sole exceptions: ActionMenu itself, and the frozen chat message menu.
+    files: ["components/central/action-menu.tsx", "app/home/tabs/message-row.tsx"],
+    rules: { "central/action-menu-only": "off" },
+  },
+  {
+    // /register-ministry is the router #14 points everyone at; it alone links onward.
+    files: ["app/register-ministry/**"],
+    rules: { "central/register-cta": "off" },
   },
   // ── LEAF rule: components/central must not import from app/ ──────────────────
   // Mechanizes the CLAUDE.md Key Files invariant (central is a design-system
