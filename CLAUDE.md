@@ -31,7 +31,7 @@ Subagent prompts, commits, lessons and PR bodies stay precise and structured. Fu
 5. **User-facing work gets a click-through and a look.** Run or write the covering `e2e/` spec; if it renders, screenshot it and iterate until nothing looks off. Brian is never the first eyes on a layout bug. Taste sign-off is his.
 6. **Seed and self-test in Brian's Sandbox** (`6c68111b-0248-45ba-9ab1-169ee33f62c9`) and leave the fixtures. Procedure: testing skill.
 7. **Commit on the current feature branch; the push follows the orchestration skill's push decision.** Never commit or push to `main` (hook-enforced).
-8. **Migrations run directly via Supabase MCP**, never as files for Brian. Verify against the live DB afterward — read `pg_policy`, not `supabase/*.sql` or this file.
+8. **Migrations run directly via Supabase MCP**, never as files for Brian. Verify against the live DB afterward — read `pg_policy`, not `supabase/*.sql` or this file. If an `mcp__supabase__*` call fails on auth, ask Brian to run `/mcp` to reconnect — never ask for a token. If no Supabase MCP tool is loaded, author the `.sql`, run the rls-reviewer BEFORE pass statically, and hand off as migration pending; never route around it.
 9. **Keep the docs true.** If your work makes a FACT in `REFERENCE.md` stale, fix it in the same commit — no approval needed; it's checkable against the code. RULES (this file and the folder `CLAUDE.md` files) are ask-then-write: propose the exact text and get approval in THAT task.
 
 ## Session worktrees (#17)
@@ -50,6 +50,7 @@ Never do feature work or run a dev server in the shared `central` checkout (port
 - **#5 DB writes** go through the browser Supabase client or server actions — no raw fetch.
 - **#8 `ministry_id` on every write** (`.eq("ministry_id", …)`) — EXCEPT tables without the column: `event_tasks` (scope via `event_plan_id`), `messages` (scope via `group_id`). Verify the column exists; PostgREST fails the whole statement silently on a nonexistent column.
 - **#9 RLS uses the SECURITY DEFINER helpers** (`auth_ministry_id()`, `auth_is_admin_or_leader()`, `is_group_member()`, `auth_can_plan_events()`, `event_plan_ministry_id()`) — never query `profiles` inside another table's policy. Every helper pins `search_path = public, pg_temp` (Part B §Multi-tenant model).
+- **Functions in `public` are born anon-executable.** `revoke … from public` doesn't remove Supabase's direct `anon` grant, and DROP+CREATE resets the ACL. Revoke from `public, anon` (and any role the call site doesn't need) and assert `has_function_privilege('anon', …) = false` in the AFTER pass.
 - **#10 RSVP is a toggle** — one row per (user, announcement).
 - **#11 Middleware is `proxy.ts`** — never recreate `middleware.ts`.
 - **#29 Calling:** every write through `app/actions/calls.ts` (service role; start gate is the `can_start_call` RPC — never `auth_can_start_call` from an action). Membership is the read boundary. Starting ≠ joining (church chats need leader tier to start). Native-shell gating keys on the binary's `CentralCalls/<n>` marker via `callingBlockedInShell()`, never `isNativeShell()`. Read Part A #29 before touching calls.
@@ -57,7 +58,7 @@ Never do feature work or run a dev server in the shared `central` checkout (port
 **Cross-cutting**
 - **Native vs web deploys are asymmetric.** A web deploy reaches EVERY installed app binary at once; native config (Info.plist, `capacitor.config.ts`, plugins) reaches only builds made after it. The web bundle must work correctly on every binary still in the wild — gate native-dependent features on a capability marker the binary carries, never on "is native". This has broken the composer, the keyboard, and calling.
 - **"use server" files export only async functions** — shared sync helpers live elsewhere.
-- **#23 Event time goes through `lib/tz.ts`**, rendered in the MINISTRY's zone (`useMinistryTimezone()` / `lib/ministry-timezone.ts`) — never `toLocale*` on a raw instant, never ISO slicing, never a hardcoded zone. All-day events use `start_day`/`end_day` (end INCLUSIVE). DATE columns (`due_date`, `week_date`, `entry_date`, …) stay plain `YYYY-MM-DD` strings — never through `Date` or a zone. Chat timestamps stay device-local.
+- **#23 Event time goes through `lib/tz.ts`**, rendered in the MINISTRY's zone (`useMinistryTimezone()` / `lib/ministry-timezone.ts`) — never `toLocale*` on a raw instant, never ISO slicing, never a hardcoded zone. All-day events use `start_day`/`end_day` (end INCLUSIVE). DATE columns (`due_date`, `week_date`, `entry_date`, …) stay plain `YYYY-MM-DD` strings — never through `Date` or a zone. `time without time zone` columns (e.g. `event_blocks.start_time`) are wall clocks like DATE — render verbatim. Check the column type before converting. Chat timestamps stay device-local.
 - **#24 Lessons are inbox files** (`tasks/lessons/inbox/<YYYY-MM-DD>-<slug>.md`), never appended to `lessons.md`. Only `/lessons-gc` edits the canon.
 
 **UI**

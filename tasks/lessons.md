@@ -82,6 +82,7 @@ The `dev` script is `rm -rf .next && next dev`, and `npm run build` also wipes/w
 - **Recovery:** kill ALL listeners (`lsof -ti:<port> | xargs kill -9` — a half-killed process causes EADDRINUSE), `rm -rf .next node_modules/.cache`, relaunch ONE `next dev` **with `-p <port>`** for slots.
 - **Verify against a route that renders a 200** (`/`, `/login`) — `/home` 307-redirects before rendering, so a render-time 500 is invisible behind it. The global Stop hook (`~/.claude/hooks/check-dev-500.sh`) backstops this by scanning dev ports for a 500 on `/`.
 - After `git worktree move`, always `rm -rf .next` — a moved cache carries stale absolute paths.
+- **The symptom never points at the cause** (folded 2026-10-24 from 2026-08-08): a build under a live dev server showed up as `auth.setup.ts` failing both logins (55 tests never ran) and as a 500 caught by the Stop hook. When a suite dies in `auth.setup` or every route 500s right after a build, `curl localhost:<port>/` and suspect `.next` before the app. Never hand-roll a build in a slot — `scripts/verify.sh --port <slot port>` already frees the port, builds, restarts and polls.
 
 ## Visual changes — a passing build is not verification
 Date: 2026-06-27
@@ -177,7 +178,7 @@ Native push failed silently twice on first real-device run, with zero errors any
 1. **Origin mismatch disables the bridge.** `server.url` was the apex domain; prod 307s apex→www; Capacitor's bridge self-disables when the page origin ≠ configured origin → `window.Capacitor` absent → app falls back to web path → "notifications not supported." Rule: `server.url` must be the CANONICAL final origin (curl -sI the domain and follow the redirect before configuring).
 2. **AppDelegate must forward APNs callbacks.** @capacitor/push-notifications requires manually adding `didRegisterForRemoteNotificationsWithDeviceToken` / `didFailToRegister...` forwarding to AppDelegate.swift (NotificationCenter posts). Without them, register() resolves fine, Apple issues the token, and it dies in the AppDelegate — no JS event, no error. The scaffold template does NOT include them.
 Debug technique that found both: Safari Web Inspector on the Debug-build webview (Develop → device → app) + pasting probe JS against `Capacitor.Plugins.*` in the live console — no deploy cycle needed.
-Also: dev builds carry SANDBOX APNs tokens; prod carries production tokens. APNS_ENV=sandbox on Vercel while the only users are dev builds; flip to production at TestFlight.
+Also: dev builds carry SANDBOX APNs tokens; prod carries production tokens. APNS_ENV=sandbox on Vercel while the only users are dev builds; flip to production at TestFlight. **Superseded 2026-08-15:** it was still `sandbox` in production and every TestFlight token was pruned — see "Never delete a registration on an error the server might be causing" below.
 
 ## Auth guards: never gate on a timing heuristic with an unchecked cleanup (2026-07-12)
 The "Google sign-in can't mint accounts" guard deleted fresh mints only when created_at < 60s, and never checked the deleteUser result. Real incident: mint at 23:03, silent delete failure, retry at 23:05 → older than 60s → admitted; the account then joined a real ministry via invite code. **Rules:** (1) auth legitimacy = durable markers (user_metadata stamp at signup, ministry linkage), never age heuristics — retries beat timers every time; (2) every service-role cleanup call gets its result checked and its failure logged loudly; (3) when an FK cascade is removed (profiles→auth.users, tombstone migration), audit every code path that relied on it (deleteUser stopped cascading the trigger-created profile → orphan per rejection).
@@ -224,9 +225,11 @@ Replacing a standalone single-column FK (`fund_id → finance_funds(id)`) with a
 
 ## Filtered realtime DELETE events need REPLICA IDENTITY FULL (2026-07-19)
 A `postgres_changes` subscription with a column filter (`group_id=eq.X`) only matches DELETE events if the filter column is in the old-row WAL image — and default replica identity ships ONLY the PK. Symptom: INSERTs arrive live, DELETEs silently vanish for filtered subscribers (reaction removal, run-sheet block deletion). Bit twice in one migration (message_reactions, event_blocks). Rule: any table whose realtime consumer filters on a non-PK column AND deletes rows needs `ALTER TABLE … REPLICA IDENTITY FULL` (cheap for small rows; weigh WAL volume for fat/hot-update tables).
+**Contested 2026-08-18** (folded 2026-10-24): a live probe on `group_members` (already `REPLICA IDENTITY FULL`) got a PK-only DELETE payload AND a `user_id`-filtered subscription still received it. See "Realtime DELETE payloads are PK-only" in the inbox fold below; re-probe before relying on either entry.
 
 ## Explorer agents cannot write their findings files (2026-07-19)
 The `explorer` subagent is Read/Grep/Glob only — a dispatch prompt telling it to "write findings to X.md" fails silently; the content comes back only in its final return message. Either ask explorers for inline-return findings explicitly, or dispatch a general-purpose agent when a findings FILE is the deliverable. (The rls-reviewer/tester have Bash and can write; the reconciler/enforcer cannot.)
+**2026-08-01 (folded 2026-10-24):** this contradicts `orchestration/orchestrated.md` §Artifact protocol, which tells EVERY agent to write its output file — a `reconciler` told to write `manifest.md` dumped the whole manifest into its reply instead. Promoted 2026-10-24 to orchestrated.md §Artifact protocol: dispatch read-only agents (`explorer`, `reconciler`, `enforcer`) for an inline return and persist the file yourself. (Alternative considered: a Write grant scoped to `.claude/task-context/**`, which weakens the read-only guarantee.)
 
 ## Verify "already fixed" claims against the live publication, not migration greps (2026-07-19)
 The realtime-egress explorer flagged small_groups/dgl_assignments as "probably not published" from grepping migration .sql files — but the live `pg_publication_tables` showed they WERE (added via MCP, no local file). The same live check exposed the real gap: event_blocks subscribed in code but absent from the publication. Publication/trigger/function state applied via MCP leaves no repo artifact — always query the live DB.
@@ -416,3 +419,638 @@ Seven SECURITY DEFINER cron functions (`run_sheet_tick`, `grade_bump_all_ministr
 
 ## Date-only columns are not timezone problems — converting them creates one (2026-07-31)
 A cluster of "previous day" bugs all came from `new Date(ymd)` or `localDate.toISOString().split("T")[0]` applied to DATE columns (`purchase_date`, `entry_date`, `meeting_notes.date`, `due_date`). A DATE holds a calendar day with no instant and no zone; the bug is code round-tripping it through a `Date` and picking up an offset. The fix is to keep it a plain YMD string — **not** to convert it through a timezone, which would introduce the same bug in the opposite direction. Only `timestamptz` gets zone conversion. Two directional traps worth knowing: `new Date("2026-07-15")` parses as UTC midnight and renders as the PREVIOUS day west of UTC, while `new Date().toISOString()` yields TOMORROW's date east of ~8pm local — and a bug that fires ahead of UTC (a month-range query in Tokyo) may not reproduce in Eastern at all, so verify the direction before claiming a mechanism.
+
+---
+
+# Folded from `tasks/lessons/inbox/` (2026-10-24)
+
+115 inbox lessons (2026-07-31 → 2026-09-16), grouped by subsystem rather than strictly by
+date, compressed to the rule + the one-line why + the specifics a fresh session needs.
+Duplicates were merged into one entry (sources listed as dates); lessons that extend an
+older canon entry were merged into that entry above instead. The full war stories are in
+git history (`git log --diff-filter=D -- tasks/lessons/inbox/`).
+
+## Database — grants and function ACLs
+
+### Supabase grants EXECUTE to `anon` directly — `revoke … from public` removes nothing (2026-08-15, 08-14, 08-19)
+`ALTER DEFAULT PRIVILEGES` gives every new function in `public` direct grants to `anon`,
+`authenticated`, `service_role`; PUBLIC is a separate grantee. So `revoke … from public`
+leaves `anon=X` in place and raises no error. Same for any **DROP + CREATE** (needed to change
+a return type or add a param): the ACL resets to the default, re-granting `anon` even if you
+restored the grants you saw. Rule: revoke from the NAMED roles
+(`revoke all on function f(...) from public, anon, authenticated, service_role;` then grant
+only what a call site needs), capture `proacl` before, and assert
+`has_function_privilege('anon', …) = false` after. A revoke that removes nothing is silent, so
+the assertion is the only evidence. Look at a nearby hardened function (`get_chat_list`:
+`{postgres, authenticated, service_role}`) for the target shape. Granting an `auth.uid()`-keyed
+INVOKER function to `service_role` turns a loud 42501 into a silent empty result.
+- **Dangerous shape:** SECURITY DEFINER + an argument naming the tenant. `create_ministry_auto_chats(uuid,…)`
+  was an anon-callable cross-tenant write; revoked to `{postgres, service_role}`.
+- **Still open (2026-08-15):** ~12 read-only DEFINER helpers (`is_group_member`, `is_ministry_member`,
+  `group_ministry_id`, …) are anon-executable — an unauthenticated membership oracle. Some may be
+  needed by public surfaces; needs its own task with an rls-reviewer pass, not a bulk revoke.
+
+### Adding a defaulted param needs DROP + CREATE, in one transaction (2026-08-14)
+`CREATE OR REPLACE f(a,b,c DEFAULT …)` doesn't replace `f(a,b)` — it overloads it, and a
+2-arg named call then matches both → `function is not unique` (this broke iOS push).
+`DROP FUNCTION f(text,text); CREATE …` in one transaction, then fix the ACL (entry above).
+Also grep `pg_constraint` for enum-ish values when adding one: `push_subscriptions_*_check`
+hard-coded `ios-native` and only a live INSERT probe found them.
+
+### A column-level REVOKE is a no-op under a table-level grant (2026-08-03)
+`REVOKE UPDATE (col) ON t` can't subtract from a table-level UPDATE grant (Supabase's default).
+Check `information_schema.role_table_grants` first; if UPDATE is there, revoke table-level and
+`GRANT UPDATE (<every column that stays writable>)`. Any column added later must join that
+list or it becomes silently unwritable. Verify with `has_column_privilege`, never by the DDL
+succeeding. (Same mechanism as the `ministries`/`group_members` column-grant trap in CLAUDE.md.)
+
+### `search_path` on SECURITY DEFINER helpers: `public, pg_temp` — not `''`, not bare `public` (2026-08-06)
+CLAUDE.md #9 carries the rule; the two traps behind it: (1) a callee with no pin of its own
+inherits the CALLER's path, so pinning a new helper to `''` broke an unpinned
+`auth_is_admin_or_leader()` (`42P01 profiles does not exist`) — check callees' `proconfig`
+first; (2) bare `public` still lets a planted `pg_temp.profiles` shadow the real table (proven
+live; worst case is tenant relocation via `auth_ministry_id()`). `''` is fine only with a fully
+qualified body that calls nothing (`event_plan_ministry_id()`). Pinning a previously unpinned
+function can drop `extensions` → use `public, extensions, pg_temp`. The path also flows into
+unpinned triggers your writes fire. Test a helper inside a real policy evaluation, with a
+negative control that shows the attack working first.
+
+## Database — RLS policy shapes
+
+### An UPDATE policy without WITH CHECK lets a row be turned into anything (2026-08-06)
+Missing WITH CHECK defaults to USING. `group_members` UPDATE pinned only `user_id`, so a
+member could `SET group_id = <any group>` and read that chat (6,198 cross-ministry messages
+proven readable). On any `FOR UPDATE`, ask what the row can become: pin the access-granting
+FK (`group_id`, `event_plan_id`, `team_id`, `ministry_id`) in WITH CHECK AND restrict UPDATE
+with a column grant. See also the `RETURNING` entry above. **Open (2026-08-06):** `event_tasks`,
+`event_roles`, `event_blocks`, `event_notes` UPDATE policies had no tenant predicate — held only
+by PostgREST rejecting unfiltered UPDATEs.
+
+### A storage policy whose only predicate is `bucket_id` allows anyone signed in (2026-08-16)
+`bucket_id` is a namespace selector, not an authorization check (`worship_charts_delete` let any
+user of any ministry delete every chart). Permissive policies OR, so the fix must `DROP POLICY`
+the old one by name. An inline subquery in a storage policy runs as the caller under the other
+table's RLS — an invisible coupling; use a SECURITY DEFINER helper that takes the EXTRACTED
+path segment as text (a pinned path can't resolve `storage.foldername` → 42883). Any bucket
+policy that doesn't mention `auth_ministry_id()` or an ownership lookup is worth opening.
+(2026-08-19 live read: `chat-attachments` and `devotionals` INSERT were already scoped;
+`bible-study` was the open one.)
+
+### AND does not short-circuit in a policy — guard a cast with CASE (2026-08-16)
+Postgres doesn't define AND evaluation order, so `seg ~ '<uuid re>' AND f(seg::uuid)` can raise
+22P02 → a 500 instead of a clean denial. Write `f((CASE WHEN <guard> THEN seg END)::uuid, …)`.
+Applies to any `::uuid`/`::int`/`::timestamptz` in a policy or CHECK. A denial that arrives as a
+500 is not a working policy. **Open:** `chat_topic_members_read` on `messages` used the
+unguarded form.
+
+### Widening a CHECK can disarm a guard in a function you never touched (2026-08-15)
+Relaxing `push_subscriptions_keys_check` for `android-native` let the WEB claim
+(`claim_push_endpoint`) write forged native rows. A CHECK that enumerates one domain
+(`platform`) while gating columns of another is an authorization rule in disguise. Before
+widening or dropping a CHECK, grep every WRITER of the table and probe each against the new
+constraint; move the invariant into the function that owns it. When two lanes share a table,
+partition the key namespace too (`^https://` for web endpoints), not just the discriminator.
+
+### A CHECK the deployed code would violate is a live outage the moment it applies (2026-08-06)
+Migrations apply immediately; code lands at deploy. A two-column CHECK on `group_members`
+(`muted` vs `notify_mode`) failed every mute toggle in production (23514) until deploy. Ask
+"would the code running in prod right now pass this?" Prefer a BEFORE trigger that derives the
+invariant so both code versions are correct. (Sibling of the `NOT VALID` entry above.)
+
+### `upsert({onConflict})` needs an UPDATE policy and grant (2026-08-19)
+It compiles to `INSERT … ON CONFLICT DO UPDATE`. For insert-only tables (a row records that
+something HAPPENED) use `ignoreDuplicates: true` and treat `[]` as success. Found on all five
+`rsvps` upserts and `announcement_views`. A PostgREST verb names the client's intent, not the SQL.
+
+### Viewer-scoped RPCs ignore the `p_user_id` you pass (2026-08-24)
+`get_chat_list` / `get_chat_previews` read `auth.uid()`; the argument is kept only for signature
+compatibility. From a service-role client they return empty, whatever you pass. Read
+`pg_get_functiondef` for where the viewer comes from; call viewer-scoped RPCs in specs with a
+real session token (`asAdmin`-style shared helper).
+
+### An app-side filter is not evidence about the policy, either way (2026-09-15, 09-14, 08-19)
+Extends the 2026-07-27 live-policy entry and CLAUDE.md Workflow #8. Three times in a month the
+"known gap" was wrong: a reviewer inferred an open draft-announcement policy from the feed's
+query filter (live policy was already closed, and a spec had frozen the wrong inference); a
+lesson called `audit_logs` INSERT "leader-tier" from SQL files when live it had no tier at all
+(closed 2026-09-15, migration `audit_logs_admin_read_tier_bound_insert`); two of three
+"unscoped bucket" TODOs in CLAUDE.md were already fixed. A security finding isn't a finding
+until it quotes `pg_get_expr(polqual/polwithcheck)` from the live DB; a security TODO is a
+hypothesis — fixing an imagined predicate can remove protection added later. Prefer the gate
+that matches the real rule (`is_group_member` over a `ministry_id` check: 14 legitimate
+multi-ministry users). Any write path not admin-gated must write its audit row server-side.
+
+## Database — data shape and writes
+
+### A nullable boolean filter must admit NULL (2026-07-31)
+`groups.archived` NULL means active, so `.eq("archived", false)` drops every active row
+(`.neq` drops NULLs too). Use `.or("archived.is.null,archived.eq.false")`. Apply a dedup filter
+to convergence READS only, never to the write that sets the flag; say in the commit why each
+write path is excluded. (`scripts/check-archived-dedup.mjs` now guards the archived reads.)
+
+### Destructive cleanup is bounded by the window it owns, never by name alone (2026-08-01)
+`seed-ccsf-events.mjs` deleted by `ministry_id + team_id + title`, and "Start next season"
+reuses titles — a re-seed wiped Central's live 2026–27 season unrecoverably. Bound deletes by a
+window derived from the fixture data, print what was SPARED (`LEFT ALONE:`), and ask what else
+could carry the same natural key. Sandbox allowlists stop writes into real congregations; they
+don't protect real work inside a sandbox (Central is one).
+
+### Store the relationship, not the derived value (2026-08-01)
+Absolute `plan_start_date`/`crunch_date` anchors needed a date-shift stopgap, timezone-sensitive
+seeding, and rollover re-basing; one relative ladder (`event_plans.countdown_phases`) deleted
+all three. A test that only proves two stored values track each other is evidence one shouldn't
+be stored. Two models for one concept bridged by a translation function is the real defect.
+When replacing a model, rewrite the old tests to assert the new, stronger property.
+
+### `time without time zone` is a wall clock, like DATE (2026-08-02)
+`event_blocks.start_time` must render verbatim — routing it through `useMinistryTimezone()`
+applies an offset to a value that never had one. Read the column type before applying
+Convention #23 (`information_schema.columns`; "start_time" reads like an instant and isn't).
+Integer durations need a shared formatter, not tz math.
+
+### Normalizing input must match the alphabet already stored (2026-08-18)
+Crockford folding (`I/L→1`, `O→0`) on lookups unmatched ~40% of legacy base36 invite codes.
+When changing normalization, check stored values; rotate them in the same change or keep a
+labelled legacy retry (`legacyLookupVariant` in `lib/invite-code.ts`) with a delete-me condition.
+
+### A DM is a pair, not a room — key it on the participants (2026-08-08)
+Discovering a DM by walking membership rows broke when a member "left" a DM and created
+duplicates (and an apparent push bug: the leaver wasn't a recipient). `groups.dm_key =
+least:greatest`, unique per ministry, created only via `get_or_create_dm()` (idempotent,
+re-asserts both memberships). A partial unique index is only as strong as NOT NULL on its
+predicate column — a CHECK (`type <> 'dm' or dm_key is not null`) closes the escape hatch.
+When "X doesn't notify", first check the recipient is still a member.
+
+### Account deletion scrubs identity, it doesn't sever it (2026-08-08)
+Deleting `group_members` on account deletion made DMs title themselves with the survivor's
+OWN name. Delete the personal columns, keep the anchor row. And run any step that can hard-fail
+before anything destructive: `NO ACTION` FKs to `auth.users` (`finance_funds.created_by`, …)
+failed the final delete after data was gone (now `ON DELETE SET NULL`). Audit new
+`created_by`/`reviewed_by` FKs for `NO ACTION`.
+
+### The DB role CHECK and `lib/roles.ts` drifted for months (2026-08-19)
+`profiles_role_check` lacked `deacon`/`elder` while every app layer offered them; signup failed
+late with 23514. Layers written from the same assumption agreeing is not evidence. A migration
+that lists a whole domain becomes a second source of truth. Guarded now by
+`scripts/check-role-domain.mjs` (blocking in verify.sh), which probes behaviour (23505 vs
+23514) rather than parsing constraint text.
+
+### Messages: no `ministry_id`, five homes for a new column, and `void` never sends (2026-08-25, 08-19)
+- CLAUDE.md #8 now lists `messages` (scoped via `group_id`). The incident that found it was a
+  `messages` insert that failed 100% of the time with no destructured `error`: a write whose
+  failure changes nothing else must read its error, and assert on the ROW, not the render.
+- A new `messages` column lands in five places: migration, `MESSAGE_SELECT`, **`enrichMessageRows`**
+  (an explicit object mapper — a silent allowlist), the `Message` type, and every consumer (row,
+  list preview, link-preview scan, push body). Realtime INSERT spreads `...raw`, so it can work
+  live and break on reload. Test both.
+- `void supabase.from(…)…` never runs: PostgREST builders are lazy thenables that send in
+  `.then()`. Always `await`. `grep -rn "void supabase" app components lib` after moving writes
+  into a closure (found a second live instance in `plan-tab.tsx`). Only a reload or DB read
+  catches it.
+
+### Fix a derived display value at EVERY producer (2026-08-08)
+DM titles come from two twin RPCs: `get_chat_list` (SWR list) and `get_chat_previews` (SSR/boot,
+backfills the header on a `?chat=<id>` restore). Grep every producer and prove it on the
+deep-link path, not just the list.
+
+## Auth, OAuth and onboarding
+
+### A missing signal must never authorize a destructive action (2026-08-20, 08-19)
+Extends the 2026-07-12 auth-guard entry. Web OAuth signup was broken from launch: the Supabase
+redirect allowlist held only the apex, GoTrue silently substitutes the Site URL for an
+unrecognized `redirect_to` (our `www` host treated like an attacker's), `flow=signup` was lost,
+and `enforceOAuthAccountPolicy` deleted every fresh mint as a "sign-in". It looked like users
+preferring email. Rules:
+- Only an EXPLICIT sign-in may tear down a mint; absence of a flow marker is our bug. A wrong
+  teardown unlinks the provider permanently; an extra admitted mint costs nothing.
+- A durability marker is written in the same operation as what it attests. The OAuth
+  `central_signup` stamp was a separate, swallowed write that failed during a 504 window and got
+  two real accounts deleted. A best-effort write that a destructive branch later reads isn't
+  best-effort (now retries once and screams).
+- Prove config agrees with code: hit `/auth/v1/authorize` with your `redirect_to` and read the
+  `referer` field in `auth_logs` (it's the redirect GoTrue validated down to).
+- When a funnel branch shows ~zero conversion, first prove the branch can succeed.
+- Re-check log labels that partition branches when the branches move; delete comments that argue
+  for behaviour you just removed.
+- When telemetry and the affected user disagree, ask the user — three confident wrong causes
+  were asserted before simply asking.
+
+### OAuth recovery paths must carry the flow forward, and every failure must say something (2026-08-19)
+The no-account redirect dropped `intent`/`invite`, landing invite users on a context-free
+`/signup`; the Google handlers returned silently on `no-account` (the Apple "frozen" bug, fixed
+there but not in its sibling). A failed `signInWithOAuth` leaves NO server trace, so "never
+tried" and "button did nothing" look identical. Fix every sibling sharing a failure shape. Vercel
+logs: scope to a `deploymentId` and a <30 min window; same-second GET bursts to `/login`,
+`/signup`, `/` are Link prefetches, not visits. The terminal redirect is part of the flow: a new
+OAuth signup with no invite now goes to `/ministries`, not `/landing`.
+
+### An OAuth display name is written once, at mint (2026-08-15)
+`handle_new_user()` sets `profiles.name` once; `raw_user_meta_data` is overwritten every sign-in.
+Never diagnose a name bug from metadata — join `profiles`. `reconcileProfileName()` runs on
+sign-in as well as sign-up, so old accounts self-repair. `raw_app_meta_data.provider` is the
+FIRST provider; `iss` in user metadata is the latest. The "name === email local part" predicate
+is safe generally only when the name is a lone token.
+
+### Probe the external service; don't derive its semantics from our calling code (2026-08-18)
+`admin.auth.admin.updateUserById` MERGES top-level `user_metadata` keys (only explicit `null`
+deletes); a wrong "it replaces" claim briefly went into an auth comment as fact. A throwaway
+probe beats reasoning. Comments asserting external behaviour say how they were established
+("Probed 2026-08-18: …").
+
+### Every screen the middleware can park a user on needs a sign-out (2026-08-19)
+`/ministries` had none and its back chevron looped, trapping new signups (total in the shell).
+"Has a ministry" has two answers: `proxy.ts` reads `profiles.ministry_id`, `getUserMinistries()`
+reads `user_ministries` — decide routing from the column the middleware reads, and when a fix
+turns an affordance off for one cohort, test the cohort it stays on for.
+
+### A shared predicate must hold every clause (2026-08-24)
+The completeness gate asked a pastor mid-registration for a graduation year: `handle_new_user`
+makes everyone `member` until the wizard ends, and the member-tier check lived only in
+`proxy.ts`, not in the shared `memberProfileIncomplete`. A caller-side `X && shared(...)` is a
+private clause with a public name. The gate now also waits for a ministry (`mid &&`).
+
+### Every writer of a cohort field moves the cohort chat (2026-08-24)
+`/complete-profile` wrote `graduation_year` without calling `changeClassChat`, so pre-gate OAuth
+members never got their class chat; re-picking the same year is a no-op, so no self-service
+escape. Any surface writing `profiles.graduation_year`/`grade` moves the chat in the same action
+(four writers now). **Data repair owed (2026-08-24):** Abraham Noh and Alex Kang (2027) were
+not seated.
+
+### A link that joins must never write on GET (2026-08-18)
+`joinMinistryByCode` MOVES the caller's tenant and resets role, so a join-on-load `/j/<CODE>`
+would have let any opened link relocate a member. URL-reachable state changes need an explicit
+tap, naming what gets replaced. Ask of every route: if someone sent this URL to a user who didn't
+want it, do they only see a page? Guarded by `e2e/invite-join-link.spec.ts`.
+
+### A defaulted flag param swallows React's click event (2026-08-24)
+`doJoin(confirmedNotDuplicate = false)` passed bare to `onClick` received a truthy MouseEvent and
+skipped the duplicate check; `tsc` caught one of three sites. Never pass a flag-taking handler
+bare (`() => doJoin()`), grep every reference when adding a trailing param, and default flags to
+the safe direction.
+
+## Push notifications
+
+### Never delete a registration on an error the server might be causing (2026-08-15)
+APNs `BadDeviceToken` means wrong host/topic (server config), not a dead device; pruning on it
+deleted live TestFlight tokens, and every later dispatch reported a clean `sent:0, failed:0` —
+the cleanup concealed itself. Delete only on the device's own verdict (`Unregistered`/410).
+Log the provider's reason code (never the token). `recipients:N` with zero attempts is a
+contradiction, not a pass. Diagnostic: re-fire dispatch for an already-sent message via
+`net.http_post` with the url/secret from `app_config`. One deployment serves sandbox AND
+production tokens; point `APNS_ENV` at the larger population (it was wrongly `sandbox` in prod).
+
+### `last_seen_at` measures app launches, not reachability (2026-08-15)
+A time-based reaper deletes exactly the dormant users push exists to reach (a 32-day-stale token
+accepted a real notification). `push_subscriptions` has no device identity, so "superseded by a
+newer row" is wrong too, and a failure counter would delete the whole fleet when the server
+breaks. Deletion needs positive evidence from the counterparty; when one direction fails
+silently (over-reaping), bias hard against it.
+
+### Push opt-outs: snooze, never permanent; "unsupported" needs a next step (2026-08-24)
+The chat-list card's X wrote `prompt_dismissed: true` forever, and iOS lists an app under
+Settings → Notifications only after it has called `requestAuthorization` — so the user's own
+fix dead-ended too. Now `prompt_snooze_until` (14 days; legacy boolean treated as expired) and an
+On/Off value on the mobile settings row. Any new `NotificationSettings` key must join
+`normalize()`'s `Omit<>` or Save overwrites it. Mobile Safari has no `PushManager`, so ~49 of 63
+Central members could never get push and were told only "This browser doesn't support push": an
+unsupported state for a core channel must carry the one action that fixes it. App Store listing
+(resolved via `itunes.apple.com/lookup?bundleId=app.joincentral`):
+`https://apps.apple.com/us/app/central-os/id6791196078`.
+
+## Native shell (Capacitor)
+
+### Web deploys reach every old binary — gate on the capability, not the button (2026-08-25, 08-14)
+The rule is CLAUDE.md §Cross-cutting. Two refinements: (1) gate where the capability is reached
+(`CallProvider`, which can touch the mic via a realtime ring), not just where the button
+renders — touching a TCC resource without its usage string terminates the iOS app; (2) a native
+plugin throw on its own thread (`FATAL EXCEPTION: CapacitorPlugins`, no JS frames) is
+uncatchable from JS — probe natively first (`FirebaseReadyPlugin.java`, `FirebaseApp.getApps`,
+written with reflection, failing closed), never a bundle-time env flag.
+
+### The shipped artifact embeds capacitor.config — verify the artifact (2026-08-14)
+`cap sync` copies the config into gitignored `android/app/src/main/assets/capacitor.config.json`;
+reverting the `.ts` changes nothing, and Gradle may say UP-TO-DATE and re-emit the old AAB. Use
+`./gradlew clean bundleRelease` and assert with
+`unzip -p app-release.aab base/assets/capacitor.config.json` (production URL, no `cleartext`)
+after every release build. `cap add`/`cap sync` also touches `ios/` — check `git status ios/`.
+
+### OS integrations need Associated Domains, not markup (2026-08-02)
+Password autofill (and passkeys, Universal Links) in the WKWebView shell need the entitlement
+plus an `apple-app-site-association`. Serve AASA from a route handler (Vercel serves
+extensionless `public/` files as octet-stream), exclude `.well-known` from `proxy.ts` (Apple
+follows no redirects), claim `www` not the apex, deploy AASA before installing a build with the
+entitlement (iOS caches a 404), and enable the capability on the App ID.
+
+### Keyboard layout: shrink the surface; `.kb-lift` replaces padding (2026-08-08, 08-24)
+CLAUDE.md #28 carries the contract. Background: `fixed inset-0` anchors to the layout viewport,
+which the keyboard doesn't shrink; occluded height (`--kb-inset`) and "keyboard open"
+(`[data-kb-open]`) are separate facts because the native shell's inset is 0. `.kb-lift` is
+`padding-bottom: var(--kb-inset)` (0 at rest) and REPLACES any padding on its element — put it on
+its own spacer div (`data-kb-spacer`). To scroll a field clear, compute overflow against the real
+visible bottom (`min(visualViewport.offsetTop + height, innerHeight - --kb-inset)`) and scroll
+instantly; `scrollIntoView` centres in the layout viewport and smooth scroll gets clobbered by iOS.
+
+### A native splash released from a React effect hides SSR until hydration (2026-08-16)
+Release it from an inline `<script>` at the end of `<body>` via `window.Capacitor.Plugins`
+directly (importing the plugin IS the bundle you're avoiding), keeping the React release as a
+backstop. Min launch 3.4s → 2.7s. A/B a remote-URL shell by pointing the installed binary at a
+local `next start` build, never `next dev`.
+
+### Uninstalling the sim app is a logout (2026-08-17)
+It wipes the container that holds the Supabase session, and re-signing-in needs Brian. Prefer a
+reload or `cap run` (keeps the container); say out loud before uninstalling. Re-derive a repeat
+symptom from the server side (`curl -A "…CentralShell"`, devlog) before retrying a remedy.
+
+## Chat, caching and client data
+
+### A client-side cache of tenant data is an access boundary (2026-08-18)
+RLS reports "no access" as an empty array, so `if (server.length === 0) return local` kept
+painting a room to someone just removed. Decide what an empty response means (server wins for
+its time range); evict on every access-loss path (admin removal and group deletion have no
+local signal — diff against the refreshed membership list); guard writes with an epoch so an
+in-flight fetch can't refill after eviction; never cache optimistic rows; settle safety filters
+(blocked senders) before instant paint. Gate on settled (`data !== undefined || error !==
+undefined`), and only if the fetcher actually throws.
+
+### Seeded SWR: loading means "no rows to show", not "request in flight" (2026-08-15)
+Extends the SWR bullets in §Performance. `isLoading` ignores `fallbackData`, so an
+`isLoading`-led spinner covered SSR-seeded rows. Use `rows.length === 0 && (isLoading || !!error)`;
+an errored fetch with no rows shows the spinner, never the empty state.
+
+### A guard gated on unresolved SWR silently doesn't run (2026-08-16)
+`if (modSettings?.enabled)` skipped the display-name profanity filter whenever the cache was
+cold — the normal case for a one-shot save. The same code has different safety properties on a
+high-frequency surface. Resolve at the point of use (`await mutate()`), fall back to the safe
+default. `x?.enabled` in a safety position is a smell. A reviewer's note about a race is worth
+one test run.
+
+### Realtime DELETE payloads are PK-only — measure, don't infer (2026-08-18)
+Probed live: a `group_members` DELETE carried only `{id}` even though the table is
+`REPLICA IDENTITY FULL`, and a subscription filtered on `user_id=eq.<uid>` still received it.
+Unfiltered subscriptions receive DELETEs too (bare ids, no RLS). Anything that depends on this
+needs an e2e test. **This contradicts the 2026-07-19 "Filtered realtime DELETE events need
+REPLICA IDENTITY FULL" entry above** — re-probe before relying on either.
+
+### Anchored menus need a measured box, not a flip (2026-08-22)
+The chat menus' "flip below if above clips" missed the bottom edge, the keyboard shrinking the
+container after open, width (emoji-mart is a fixed 352px), and neither side fitting. Measure the
+CONTAINER (`.kb-lift` tracks the keyboard), pick the side with room, clamp `maxHeight`, observe
+container and menu. Read content `scrollHeight`, not the clamped height; no `Math.max` floor.
+emoji-mart `dynamicWidth` races its container; derive `perLine` instead.
+
+## UI and design
+
+### Design a repeating pattern against its worst realistic density (2026-08-02)
+A dashed "add the first block" card looked right at n=1 and stacked five deep with real data.
+Seed the worst case and look; empty states are the riskiest because mockups are drawn with data.
+Sharpen the rule's principle (dashed = the whole collection is empty) over a count threshold.
+
+### A restyle can drop semantics; diff the element names (2026-08-02)
+`EventSectionHeader` went from `<h2>` to `<span>` and erased the workspace's headings; only a
+`getByRole('heading')` spec caught it. Diff tags (`git show <commit>^:path`), prove visual-only
+changes by computed style, and give shared-component rewrites a role-based runtime pass. Audit
+siblings built in the same pass.
+
+### Text tokens: tune against the darkest surface and the neighbouring tiers (2026-08-02, 08-03)
+`--muted-text` had to pass AA on `--ivory` (darkest of seven creams), which flattened body↔muted
+to 1.36:1; the fix was darkening `--body`, not walking muted back. Compute every surface AND the
+tiers above/below; budget a product-wide sweep; alias copies (`var(--token)`); grep `/40`-style
+opacity modifiers. A group header may be smaller than its rows, never fainter (`14/600/--ink`,
+not `14/500/--muted-text`) — size reads as level, colour as importance.
+
+### Tokenize shared boxes, and let shared shells enforce their contract (2026-08-05)
+Hand-typed `12px 20px 10px` chrome padding drifted four ways and only showed in transitions
+between screens; now `POCKET_CHROME_PAD_Y`/`PAD_X` (split by axis). A mount-dependent contract
+written as a call-site comment is a request: `SubpageShell` now cancels symmetric ancestor
+padding in a layout effect (CLAUDE.md #26). Measure ancestors' padding with `getComputedStyle`
+before theorizing. Assert the box, not the glyph position.
+
+### In hub-and-spoke, the hub owns navigation (2026-08-05)
+The mobile event Overview re-rendered the hub's "Jump into planning" list. When a desktop tab
+becomes a mobile spoke, delete what the hub already provides. Prose never goes in a facts-grid
+value. When viewports disagree on structure, give mobile its own early return. Chrome-row actions
+go through `<MobileChromeActions>` (alias `SubpageChromeActions`; CLAUDE.md #25) — a portal
+published as state, not a ref.
+
+### "Desktop" is not a width (2026-08-08)
+An iPhone in landscape is 874–956px. Predicate: `(min-width: 768px) and ((hover: hover) or
+(min-width: 1024px))`, defined once in `lib/breakpoints.ts` plus `@custom-variant md` AND
+`max-md` in `globals.css`; custom CSS uses `@variant md`. Grep every hand-written copy before
+changing a breakpoint. Test traps: CSS-uppercased text doesn't match `getByText`; presence isn't
+visibility (`.filter({ visible: true })`).
+
+### Fixed-overlay clearance belongs to the scroll container, once (2026-08-07)
+`pb-28` on the shell AND 18 tab roots stacked to ~260px of dead scroll. Derive the value from the
+overlay's geometry (`--nav-clearance`) and apply it as a class (inline padding beats the desktop
+reset). Measure against the bottom-most leaf, with a short viewport (390×520) to force overflow.
+(The rule is in `components/central/CLAUDE.md` §Layout.)
+
+### `.shell-scroll` isn't the scroller at phone width (2026-08-15)
+Its height constraints are all `md:`-prefixed, so on mobile the document scrolls and
+`node.scrollTop` is a permanent 0 (pull-to-refresh armed mid-page). Use an
+`effectiveScrollTop()` that falls back to `window.scrollY` when `scrollHeight <= clientHeight`.
+
+### State-driven properties don't go inline (2026-08-24, 08-16)
+Extends §Two CSS footguns. An inline declaration beats every stylesheet state rule
+(`[data-armed]`, `:hover`, media), so a swipe tile's inline border and colour silently ignored
+the armed state — twice in one task. Put any property that will vary by state in
+`globals.css` from the start (`.a + .a` beats an index check). Adjacent tiles at DPR>1 leak the
+backdrop through sub-pixel gaps: paint the container the same fill. Before deleting a wrapper,
+grep its subtree for its own fill token: hardcoded backdrop matches (`SwipeActionRow`'s
+foreground, `MonogramChip`'s `dotRing`) silently break; make them explicit params.
+
+### Order is volume (2026-08-20)
+Open groups was "too loud" because it sat first on three surfaces, not because of its styling.
+Mobile has no pinned footer, so "last" means "below the fold forever". The fit was a third scope
+in the existing switch ("Church / Mine / Open", measured to fit 375px). Demoting an entry point
+must not cost taps. A parent that opens a child's surface owns that state (no trigger-counter
+effect). When a fix keeps growing plumbing, the shape is wrong.
+
+### A scope switcher must show which scope holds the unread (2026-08-24)
+The scope dots partition exactly what the nav badge counts (`unreadByScope` in chat-shared.ts);
+assert absence on the empty and muted scopes. Phone width renders scopes as the `PocketChrome`
+title, so test both viewports. Check a primitive's API before widening it (`SegmentedControl.label`
+was already a ReactNode).
+
+### A raw control inside a design-system consumer is drift (2026-08-24)
+The poll composer predated `Input`/`FormField`/`IconButton`/`CentralButton` and stopped
+receiving the system's decisions (its `--cream-panel` inputs vanished into the sheet). Grep files
+that import `@/components/central` for hand-styled `<input>`/`<button>` classNames. Write
+redesign specs against behaviour (placeholders, roles, persisted rows), not markup.
+
+### A cdesign KEEP can't overrule a doc rule; re-fetch the source before building (2026-08-19, 08-02)
+A 720px centred column was KEPT by quoting half of `web_design_system.md` §7.0; the other half
+says collection content fills the content area. Quote the whole clause and name which case
+applies; a handoff/doc conflict goes to Brian as a question. A cdesign file is live — re-fetch
+immediately before dispatching a build, `SendMessage` an in-flight reconciler with deltas, and
+ask for the design conversation when the artifact's structure looks arbitrary.
+
+## E2E and verification
+
+### Restart the dev server before believing any result after an edit (2026-08-15, 08-20, 08-20, 08-24)
+`next dev` (Turbopack) repeatedly served stale modules after an edit: a missing barrel export
+500ing `/home`, unchanged screenshots, and — the dangerous case — a false PASS when proving a
+spec fails without the fix. Warming routes with curl doesn't help (`/home` 307s; tab chunks are
+`next/dynamic`). When a visual change seems not to apply, read `getComputedStyle` before editing
+again; when e2e disagrees with a careful reading of the code, suspect the bundle. Restart, then
+measure. An A/B that changes two things (your file AND the server) proves nothing. `verify.sh`
+restarts for you; ad-hoc `npx playwright test` doesn't.
+
+### iCloud and `.next`: conflicted copies and pre-deletes 404 every route but `/` (2026-08-24)
+Routes that compile and then 404 mean `.next 2` exists (`ls -d .next*`; remove it) or you
+pre-deleted `.next` before `npm run dev`, which already deletes it — two deletes race on the
+synced path. Kill the port and let the dev script own the delete. For a fast clear, use
+`mv .next .next-stale-$$ && (rm -rf .next-stale-$$ &)`.
+
+### A shifting failure set means the environment, not your diff (2026-08-05, 08-15, 08-16, 08-17)
+Same tests failing every time is a regression; a different subset each run is infrastructure.
+Known causes: Supabase auth rate limits from repeated `auth.setup` logins (wait ~2 min, iterate on
+one spec file), auth latency (`get_logs(service:"auth")` — durations are double-escaped JSON;
+`grep 429` matches request ids), a degraded long-lived dev server (compare suite runtime to a
+known-good figure; the suite is serial, `workers: 1`), and machine load from sibling slots
+(`uptime`, `pgrep -f playwright`; load > ~4 makes timings noise). Re-run isolated before
+explaining. `npx playwright test --no-deps` reuses `e2e/.auth/*.json` when only setup fails.
+"2 failed, 46 did not run" says nothing about the 46. A `selectOption` timeout can mean the
+OPTION doesn't exist (same message as a disabled control). A timeout is not an assertion failure.
+
+### Perf: verify the mechanism, not the clock (2026-08-15, 08-07)
+On a loaded box any single timing is unfalsifiable — prefer load-independent evidence (SSR HTML
+contains the rows, request count 2 → 1) and take the minimum of runs. Local SSR against remote
+Supabase is structurally pessimistic. For load tests: Node's 4-thread libuv pool queues
+`dns.lookup` inside measured `fetch` time — set `UV_THREADPOOL_SIZE=64` at process start
+(`ensureThreadpool()` re-execs in `scripts/loadtest/lib.cjs`). Fast at concurrency 1 and slow at
+N is a client symptom; two unrelated hosts degrading in lockstep is never the servers. Probes
+should skip rather than queue and count skips; filter stored tokens by `expires_at`.
+
+### A green check is not "the tests ran" (2026-08-05)
+The CI `e2e (sandbox tenant)` job skips every step when secrets are absent (none on this public
+repo) and still reports success in ~5s. Confirm a plausible duration or the step list. A
+conditional skip must not resolve to the same status as a pass. **Open decision:** configure the
+secrets (fork PRs don't get them) or make the gate fail loudly.
+
+### A test you haven't seen fail isn't a guard (2026-08-24, 08-05, 08-08, 08-15)
+When the fix is "the app moves something", the test must not move it (a spec that scrolled for
+the app passed while the bug shipped). Revert the fix, restart the dev server, watch the spec go
+red, restore. Assertions can be vacuous through shared fixtures (the sandbox member was already
+in every class chat — evict first). A guard whose input is a constant fails silently; assert it
+BLOCKS something. To A/B against base, commit first: `git checkout -- <path>` restores HEAD, not
+your uncommitted fix.
+
+### Specs must be lane-agnostic and time-relative (2026-08-01, 08-08, 08-05, 08-24)
+Extends the 2026-07-21 fixtures entry. Derive identities (`ministryName()`, `adminName()`,
+`memberName()` in `e2e/fixtures.ts`; a trailing " 2" diff is the tell) and the port
+(`process.env.E2E_PORT`); a suite that's always red on one lane hides real failures — run
+chronic failures on the known-good lane first (12 of 26 "seeding" failures were real test
+bugs). Express fixture dates relative to today, re-anchored in `beforeAll`, choosing the anchor
+from product rules ("up next" means starts in the future, and must beat other seeded events).
+Enumerate the whole ladder for time-derived copy ("Good night" at ≥21h). Clear the `central-mw`
+cookie when testing a routing decision `proxy.ts` caches for 5 minutes. Exact-set assertions
+over the shared sandbox are time bombs ("contains X, excludes the author" instead). Vary every
+field a future uniqueness rule could key on (name as well as email).
+
+### Fixtures follow the real user's path, and shared ones live in the seed (2026-08-17, 08-06)
+Fixtures inserted straight into `profiles` had no `user_ministries`, so every login took a
+two-query fallback no real user takes (7.2s → 4.1s once seeded); a slow fixture is a seeding bug,
+not a timeout. A fixture three specs select by label belongs in `scripts/seed-e2e.mjs`; when a
+spec stops depending on shared data, delete the old references in the same pass. In a DB that is
+mostly fixtures, group aggregates by cohort before believing them.
+
+### Specs that share sandbox rows interfere; arrange your own state (2026-08-22, 08-24)
+The three reaction specs pass alone and fail together (shared tenant, tenant-wide locators);
+re-run alone before believing a batch failure. Fix: per-spec prefixes that scope every locator,
+cleanup that runs on throw. Tests that mutate a shared seeded row must each arrange their start
+(`makeUnread()`); the desktop chat panel auto-opens the most recent chat and can consume a seed.
+
+### Every e2e spec is authenticated by default (2026-08-02)
+`playwright.config.ts` sets `storageState: ADMIN_STATE` on both projects (the `request` fixture
+inherits it). Signed-out tests need `test.use({ storageState: { cookies: [], origins: [] } })`.
+A "0 elements" failure on a page you know renders: check `page.url()` for a redirect first.
+
+### Sweeps: discover screens, report skips, and verify what the detector measured (2026-08-07, 08-09, 08-20, 08-20, 09-13)
+The mobile sweep walks `[data-pocket-row]` and backs out via `.back-chevron` (27 → 44 screens
+over a hand-written list). Collect every violation and assert once. An unreached screen or
+skipped branch must print SKIPPED — a silent skip equals a pass (the whole Plan branch vanished
+behind `if (teamId)`). Screens opened by anything other than a row (gear, card) need an explicit
+hop. Poll until two identical reads, wait for rows to paint, and check seeds match. Playwright's
+`visible` ignores occlusion: detect a new surface by counting `.back-chevron`s, on the way in and
+out; give swallowed clicks a 3s timeout. Pin every axis a contract cares about (position, type,
+colour) or name the free ones. A detector measuring the wrong element hides real bugs — require
+leaf text, skip `[data-monogram]`. When a surface's placement changes, grep `e2e/` for detectors
+keyed on the old z-index/position and anchor on a marker attribute (`data-msg-menu`). Any change to
+`message-row.tsx`/`ChatScreen` runs `chat-timestamps`, `chat-swipe-reply`, `chat-menu-bounds`,
+`jumbo-emoji`. A suite timeout is not a verdict — bisect against the previous commit.
+
+### A lint gate strips comments syntactically, and a detector change is proven both ways (2026-08-16)
+`check-chrome-title.sh` now strips `/* */` and `//` with perl before grepping (fixed). General
+rule for any checker: never skip comments by line prefix; after changing a detector, prove the
+false positive is gone AND a planted violation still fails. Rewording your code to dodge a gate
+is fixing the threshold.
+
+### Headless Chromium has no Notifications API (2026-08-24)
+`Notification.permission` is "denied" whatever Playwright permissions you pass. Prove the wiring
+instead (an `addInitScript` recorder for `navigator.serviceWorker`). `serviceWorker.ready` never
+settles with nothing registered — use `getRegistration()`. Two failed attempts on the same point
+means change approach.
+
+### Proving a call connects without a second human (2026-09-13)
+Other end = `tapprofile@sandbox.test` ("Tap Tester", the one sandbox cast member with a real auth
+row). DM group `038c6d5a-d21f-489a-b825-7e91cd4a8b5e` (insert via service role with `dm_key`;
+`get_or_create_dm` refuses across active ministries). Chromium with
+`--use-fake-device-for-media-stream --use-fake-ui-for-media-stream` at 390px; deep-link
+`/home?tab=chats&chat=<dm>`; the overlay timer appearing = connected. Brian's phone must be on
+Brian's Sandbox. Slot `.env.local` has placeholder LiveKit keys (`vercel env pull` returns them
+empty) — run the browser end against `https://joincentral.app`. Warn that the fake mic is a beep.
+
+## Workflow, git and tooling
+
+### Never commit to a branch whose PR already merged (2026-08-01)
+Pushing to a merged branch doesn't reopen the PR, and nothing warns you. Before declaring done,
+list local branches ahead of `origin/main` and cross-check `gh pr list --state open`. Rescue by
+cherry-picking onto a fresh branch off `origin/main`; after a merge, treat the branch as dead.
+
+### "We already did that" — check it's on main before building (2026-08-06)
+The countdown ladder existed as one unmerged, PR-less commit 30 behind main, while the DB was
+already migrated (a convincing half-state). `git log --all --grep=<concept> -i`, then
+`git merge-base --is-ancestor <sha> origin/main`. Open a PR the day work is written. Merge the
+stale branch INTO a fresh one; resolve each conflict by decision, never `--ours`/`--theirs`
+wholesale.
+
+### A doc is a claim, not evidence; an affordance's reach is a census (2026-08-17, 08-16)
+Abandoned checklists (`APPSTORE_SUBMISSION_STEPS.md`, 21 unchecked boxes on shipped Run Sheet
+work) drove a fictional strategy option. Verify any plan/status doc against code, schema, DB or
+git before it drives a decision; delete plans when work ships. Likewise, "X has one door" needs
+`grep -rn '<ComponentName'` across `app/` + `components/` reading each hit for opt-outs, not a
+handler grep in files already open — and surface a premise you supplied as soon as it proves false.
+
+### Before deleting a file, check every export (2026-08-04)
+`chats-section.tsx` and `up-next-card.tsx` had dead components but live types. `grep -n '^export'`
+then grep each symbol. The rescued type's destination must respect layering (`components/central`
+can't import `app/`).
+
+### A nullable DB column typed `string` makes selects uncontrolled (2026-08-04)
+`team_members.role_id` (nullable) typed `string` passed `value={null}`, so the select showed the
+first role as the member's. Verify interface nullability against `information_schema.columns`,
+normalize once at the load boundary to the component's sentinel (with a real `<option value="">`),
+and treat console-assertion spec failures as defects.
+
+### Read-only agents can't write their artifacts (2026-08-01)
+Merged into the 2026-07-19 "Explorer agents cannot write" entry above.
+
+### Supabase MCP: a reconnect, not a token; verify it's loaded before planning a migration (2026-09-16, 08-01)
+An auth failure on `mcp__supabase__*` is an expired OAuth session — ask Brian to run `/mcp` and
+reconnect (a local slash command), then retry; never ask for a personal access token. If no
+`mcp__supabase__*` tool exists at all, check with one ToolSearch at task start; author the `.sql`,
+run the rls-reviewer BEFORE pass statically (tell it MCP is down), hand off as "migration
+pending". Never route around it by reading the Management API token from `~/.claude.json`. If a
+reconnect doesn't clear it, check status.supabase.com.
+
+### `.env.local` is per worktree: check sibling slots before declaring a secret unobtainable (2026-08-15)
+Extends the 2026-07-12 and 2026-07-30 env entries. s3 kept disabled legacy Supabase keys after the
+2026-08-13 rotation (`session.sh` resets code, not env); the valid `sb_secret_` key was in the
+other three worktrees all along. A login failing in ONE slot is an env hypothesis first.
+`vercel env pull` writes `""` for sensitive vars with no warning — check the length.
+
+### Fix the runbook, not the memory (2026-08-08)
+`/ship` broke the slot dev server three ships running even after the lesson was written; the fix
+that held was editing `.claude/commands/ship.md` (frees the port before building, restarts and
+polls after). A recurring operational failure needs the fix in the command that executes.

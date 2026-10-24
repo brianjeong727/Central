@@ -51,4 +51,4 @@ Cast, push-safety trick, and teardown details live in memory `project-personal-s
 
 ## Definition of done
 
-Happy path ✓ empty state ✓ edge cases (0/1/max) ✓ ≥2 roles verified (UI + DB) ✓ persistence confirmed in Supabase ✓ errors visible ✓ realtime cleanup (if applicable) ✓ 390px layout ✓ seeded + exercised in Brian's Sandbox ✓ "How to test it yourself" section written ✓ `scripts/verify.sh` passes. Any unchecked → not complete.
+Happy path ✓ empty state ✓ edge cases (0/1/max) ✓ ≥2 roles verified (UI + DB) ✓ persistence confirmed in Supabase ✓ errors visible ✓ realtime cleanup (if applicable) ✓ 390px layout ✓ seeded + exercised in Brian's Sandbox ✓ "How to test it yourself" section written ✓ regression spec seen red on the unfixed code, after a dev-server restart ✓ `scripts/verify.sh` passes. Any unchecked → not complete.
