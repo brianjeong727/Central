@@ -103,6 +103,7 @@ COPIES_STATUS="n/a"
 CHROME_STATUS="n/a"
 TYPE_STATUS="n/a"
 ROLE_STATUS="n/a"
+SHAPE_STATUS="n/a"
 SERVER_STATUS="fail"
 E2E_STATUS="n/a"
 
@@ -282,6 +283,21 @@ else
   exit 1
 fi
 
+# ── (c5c) repo shape: no middleware.ts (#11), lesson inbox naming (#24) ──────
+echo "▶ scripts/check-repo-shape.sh"
+SHAPE_LOG="$(mktemp)"
+if bash scripts/check-repo-shape.sh >"$SHAPE_LOG" 2>&1; then
+  SHAPE_STATUS="pass"
+  tail -n 1 "$SHAPE_LOG"
+else
+  SHAPE_STATUS="fail"
+  echo "── repo-shape FAILED (BLOCKING) ─────────────────────"
+  cat "$SHAPE_LOG"
+  echo "─────────────────────────────────────────────────────"
+  echo "════════ VERIFY RESULT: FAIL (repo-shape) ════════"
+  exit 1
+fi
+
 # ── (c6) role domain: DB CHECK constraints == lib/roles.ts (BLOCKING) ────────
 # profiles_role_check allowed only 5 of the 7 roles lib/roles.ts had encoded for
 # months, so deacon/elder were unreachable platform-wide and nothing surfaced it
@@ -370,6 +386,7 @@ printf '  %-8s %s\n' "copies" "$COPIES_STATUS"
 printf '  %-8s %s\n' "chrome" "$CHROME_STATUS"
 printf '  %-8s %s\n' "type" "$TYPE_STATUS"
 printf '  %-8s %s\n' "avatar" "$AVATAR_STATUS"
+printf '  %-8s %s\n' "shape"  "$SHAPE_STATUS"
 printf '  %-8s %s\n' "roles"  "$ROLE_STATUS"
 printf '  %-8s %s (:%s)\n' "server" "$SERVER_STATUS" "$PORT"
 printf '  %-8s %s\n' "e2e"    "$E2E_STATUS"

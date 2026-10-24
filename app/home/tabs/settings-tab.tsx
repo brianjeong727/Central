@@ -1909,6 +1909,7 @@ export function SettingsTab({
                           {(close) => (
                             <>
                               <p style={{ fontFamily: "ui-monospace,'SF Mono',Menlo,monospace", fontSize: 10, color: "var(--muted-text)", padding: "4px 12px 6px", textTransform: "uppercase", letterSpacing: "1.2px", fontWeight: 400, margin: 0 }}>Set role</p>
+                              {/* eslint-disable-next-line central/no-inline-role-array -- UI role-picker enum (documented #2 nonconformer) */}
                               {(["visitor", "member", "leader", "admin", "deacon", "elder", "pastor"] as const).map(r => (
                                 <button key={r} onClick={() => { close(); if (m.role.toLowerCase() !== r) setRoleChangeConfirm({ memberId: m.id, name: m.name, currentRole: m.role, newRole: r }) }} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", fontSize: 13, background: "none", border: "none", cursor: "pointer", color: m.role.toLowerCase() === r ? "var(--plum)" : "var(--ink)", fontWeight: m.role.toLowerCase() === r ? 600 : 400, textAlign: "left", boxSizing: "border-box" }}>
                                   {r.charAt(0).toUpperCase() + r.slice(1)}
